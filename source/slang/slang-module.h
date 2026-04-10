@@ -118,6 +118,14 @@ public:
         return Super::link(outLinkedComponentType, outDiagnostics);
     }
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(
+        int targetIndex,
+        ISlangSharedLibrary** outSharedLibrary,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getTargetHostCallable(targetIndex, outSharedLibrary, outDiagnostics);
+    }
+
     SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
         int entryPointIndex,
         int targetIndex,
@@ -190,7 +198,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
         slang::IComponentType** outLinkedComponentType,
         uint32_t count,
-        slang::CompilerOptionEntry* entries,
+        slang::CompilerOptionEntry const* entries,
         ISlangBlob** outDiagnostics) override
     {
         return Super::linkWithOptions(outLinkedComponentType, count, entries, outDiagnostics);
@@ -406,7 +414,7 @@ public:
     /// TODO: We might eventually consider a non-stateful approach
     /// to constructing a `Module`.
     ///
-    void _collectShaderParams();
+    void _collectShaderParams(DiagnosticSink* sink);
 
     void _discoverEntryPoints(DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets);
     void _discoverEntryPointsImpl(

@@ -1,8 +1,9 @@
 // hit-object-reorder-thread.slang
 
 //TEST:SIMPLE: -target dxil -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -DNV_SHADER_EXTN_SLOT=u0
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -line-directive-mode none
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenerationMain -stage raygeneration -emit-spirv-directly
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -line-directive-mode none -capability spvShaderInvocationReorderNV
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -stage raygeneration -entry rayGenerationMain -line-directive-mode none
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-d3d12 -output-using-type -profile sm_6_5 -render-feature ray-query
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-vk -output-using-type -render-feature ray-query
@@ -23,11 +24,16 @@ uint calcValue(HitObject hit)
 {
     uint r = 0;
 
+    // GLSL: hitObjectIsHitEXT
     if (hit.IsHit())
     {
+        // GLSL-DAG: hitObjectGetInstanceIdEXT
         uint instanceIndex = hit.GetInstanceIndex();
+        // GLSL-DAG: hitObjectGetInstanceCustomIndexEXT
         uint instanceID = hit.GetInstanceID();
+        // GLSL-DAG: hitObjectGetGeometryIndexEXT
         uint geometryIndex = hit.GetGeometryIndex();
+        // GLSL-DAG: hitObjectGetPrimitiveIndexEXT
         uint primitiveIndex = hit.GetPrimitiveIndex();
 
         SomeValues objSomeValues = hit.GetAttributes<SomeValues>();
@@ -64,6 +70,7 @@ void rayGenerationMain()
     uint missShaderIndex = 0;
 
     // SPIRV: OpHitObjectTraceRayNV
+    // GLSL: hitObjectTraceRayEXT
     HitObject hit = HitObject::TraceRay(scene,
         rayFlags,
         instanceInclusionMask,
@@ -75,6 +82,7 @@ void rayGenerationMain()
 
     uint r = calcValue(hit);
     // SPIRV: OpReorderThreadWithHitObjectNV
+    // GLSL: reorderThreadEXT
     ReorderThread( hit );
 
     // Change the payload
@@ -82,6 +90,7 @@ void rayGenerationMain()
 
     // Now Invoke to cast another ray, with the new payload
     // SPIRV: OpHitObjectExecuteShaderNV
+    // GLSL: hitObjectExecuteShaderEXT
     HitObject::Invoke( scene, hit, otherValues );
 
     r += calcValue(hit);

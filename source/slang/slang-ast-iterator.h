@@ -70,6 +70,11 @@ struct ASTIterator
         }
 
         void visitBuiltinCastExpr(BuiltinCastExpr* expr) { dispatchIfNotNull(expr->base); }
+        void visitFloatBitCastExpr(FloatBitCastExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->value);
+        }
         void visitParenExpr(ParenExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
@@ -141,6 +146,20 @@ struct ASTIterator
         {
             for (auto arg : expr->args)
                 dispatchIfNotNull(arg);
+        }
+
+        void visitPackQueryExpr(PackQueryExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->value);
+        }
+
+        void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->packOperand.exp);
+            dispatchIfNotNull(expr->emptyType.exp);
+            dispatchIfNotNull(expr->nonEmptyType.exp);
         }
 
         void visitExpandExpr(ExpandExpr* expr)
@@ -478,6 +497,11 @@ struct ASTIterator
         {
             iterator->maybeDispatchCallback(stmt);
             iterator->visitExpr(stmt->expression);
+        }
+
+        void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt)
+        {
+            iterator->maybeDispatchCallback(stmt);
         }
     };
 };

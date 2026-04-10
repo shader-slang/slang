@@ -86,6 +86,9 @@ prelude/*.h.cpp
 /external/slang-llvm/
 /external/slang-glslang/
 /external/mimalloc/
+/external/slangpy/
+/external/dxvk-remix/
+/external/SaschaWillems-Vulkan/
 
 build/**/*.tlog
 build/**/*.lastbuildstate
@@ -106,8 +109,9 @@ vkd3d-proton.cache.write
 .*.swp
 .*.swo
 
-# Claude local settings and memory
+# Claude local settings, memory, and worktrees
 /.claude/settings.local.json
+/.claude/worktrees/
 CLAUDE.local.md
 
 # Other temporary files
@@ -131,3 +135,13 @@ perf.data.*
 
 # gh command
 .gh-pm.yml
+
+# act local testing (secrets, vars, event payloads)
+.secrets
+.vars
+.github/test-events/
+__pycache__/
+
+.slang-replays*
+log*.txt
+replay-capture

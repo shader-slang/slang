@@ -381,7 +381,7 @@ IRIntegerValue get16ByteAlignedVectorElementCount(
     IRIntegerValue minCount)
 {
     IRSizeAndAlignment sizeAlignment;
-    getNaturalSizeAndAlignment(target->getOptionSet(), elementType, &sizeAlignment);
+    getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment);
     if (sizeAlignment.size)
         return align(sizeAlignment.size * minCount, 16) / sizeAlignment.size;
     return 4;
@@ -467,6 +467,7 @@ struct LoweredElementTypeContext
     };
     // Specialized functions that takes storage-typed pointers instead of logical-typed pointers.
     Dictionary<SpecializationKey, IRFunc*> specializedFuncs;
+    Dictionary<IRFunc*, List<IRFunc*>> specializedFuncsByOriginal;
 
     LoweredElementTypeContext(TargetProgram* target, BufferElementTypeLoweringOptions inOptions)
         : target(target), options(inOptions)
@@ -692,7 +693,7 @@ struct LoweredElementTypeContext
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
                 getSizeAndAlignment(
-                    target->getOptionSet(),
+                    target->getTargetReq(),
                     config.getLayoutRule(),
                     loweredInnerTypeInfo.loweredType,
                     &elementSizeAlignment);
@@ -717,7 +718,7 @@ struct LoweredElementTypeContext
             {
                 IRSizeAndAlignment elementSizeAlignment;
                 getSizeAndAlignment(
-                    target->getOptionSet(),
+                    target->getTargetReq(),
                     config.getLayoutRule(),
                     loweredInnerTypeInfo.loweredType,
                     &elementSizeAlignment);
@@ -900,7 +901,7 @@ struct LoweredElementTypeContext
         info = getLoweredTypeInfoImpl(type, config);
         IRSizeAndAlignment sizeAlignment;
         getSizeAndAlignment(
-            target->getOptionSet(),
+            target->getTargetReq(),
             config.getLayoutRule(),
             info.loweredType,
             &sizeAlignment);
@@ -966,9 +967,14 @@ struct LoweredElementTypeContext
         case kIROp_RWStructuredBufferLoad:
         case kIROp_RWStructuredBufferLoadStatus:
         case kIROp_RWStructuredBufferStore:
-            return builder.emitRWStructuredBufferGetElementPtr(
-                baseAddr,
-                loadStoreInst->getOperand(1));
+            {
+                auto elementType =
+                    tryGetPointedToOrBufferElementType(&builder, baseAddr->getDataType());
+                return builder.emitRWStructuredBufferGetElementPtr(
+                    getPointerTypeWithBufferLayout(builder, baseAddr->getDataType(), elementType),
+                    baseAddr,
+                    loadStoreInst->getOperand(1));
+            }
         default:
             return nullptr;
         }
@@ -1000,13 +1006,13 @@ struct LoweredElementTypeContext
 
             IRSizeAndAlignment arrayElementSizeAlignment;
             getSizeAndAlignment(
-                target->getOptionSet(),
+                target->getTargetReq(),
                 config.getLayoutRule(),
                 loweredInnerType.loweredType,
                 &arrayElementSizeAlignment);
             IRSizeAndAlignment baseSizeAlignment;
             getSizeAndAlignment(
-                target->getOptionSet(),
+                target->getTargetReq(),
                 config.getLayoutRule(),
                 tryGetPointedToOrBufferElementType(&builder, fieldAddr->getBase()->getDataType()),
                 &baseSizeAlignment);
@@ -1105,7 +1111,14 @@ struct LoweredElementTypeContext
             // For structured buffer loads, the new address can be obtained by
             // getting the element pointer from the new base pointer and the original
             // index operand.
-            return builder.emitRWStructuredBufferGetElementPtr(newBasePtr, loadInst->getOperand(1));
+            {
+                auto elementType =
+                    tryGetPointedToOrBufferElementType(&builder, newBasePtr->getDataType());
+                return builder.emitRWStructuredBufferGetElementPtr(
+                    getPointerTypeWithBufferLayout(builder, newBasePtr->getDataType(), elementType),
+                    newBasePtr,
+                    loadInst->getOperand(1));
+            }
         default:
             return nullptr;
         }
@@ -1186,6 +1199,7 @@ struct LoweredElementTypeContext
                                 auto logicalBaseType = castInst->getDataType();
                                 auto logicalType = user->getDataType();
                                 IRInst* storageBaseAddr = ptrVal;
+                                IRPtrTypeBase* ptrType = as<IRPtrTypeBase>(logicalType);
                                 auto originalBaseValueType =
                                     tryGetPointedToOrBufferElementType(&builder, logicalBaseType);
                                 if (user->getOp() == kIROp_GetElementPtr)
@@ -1205,7 +1219,8 @@ struct LoweredElementTypeContext
                                                 args.add(user->getOperand(i));
                                             storageBaseAddr = builder.emitFieldAddress(
                                                 builder.getPtrType(
-                                                    arrayLowerInfo.loweredInnerArrayType),
+                                                    arrayLowerInfo.loweredInnerArrayType,
+                                                    ptrType),
                                                 ptrVal,
                                                 arrayLowerInfo.loweredInnerStructKey);
                                         }
@@ -1221,7 +1236,6 @@ struct LoweredElementTypeContext
                                         break;
                                     }
                                 }
-
 
                                 builder.setInsertBefore(user);
                                 IRInst* storageGEP = nullptr;
@@ -1256,7 +1270,9 @@ struct LoweredElementTypeContext
                                         auto storageTypeInfo =
                                             getLoweredTypeInfo(logicalValueType, config);
                                         storageGEP = builder.emitIntrinsicInst(
-                                            builder.getPtrType(storageTypeInfo.loweredType),
+                                            builder.getPtrType(
+                                                storageTypeInfo.loweredType,
+                                                ptrType),
                                             user->getOp(),
                                             newArgs.getCount(),
                                             newArgs.getArrayView().getBuffer());
@@ -1478,14 +1494,15 @@ struct LoweredElementTypeContext
             for (Index c = 0; c < callWorkList.getCount(); c++)
             {
                 auto call = callWorkList[c];
-                auto calleeFunc = as<IRGlobalValueWithParams>(call->getCallee());
+                auto calleeFunc = cast<IRFunc>(call->getCallee());
                 // We compute the func type for the specialized func based on the arguments
                 // provided, and check the specialization cache to reuse existing specialization
                 // when possible.
-                List<IRInst*> oldParams;
-                for (auto param : calleeFunc->getParams())
-                    oldParams.add(param);
-                SLANG_ASSERT(oldParams.getCount() == (Index)call->getArgCount());
+                List<IRType*> oldParamTypes;
+                for (auto paramType : calleeFunc->getDataType()->getParamTypes())
+                    oldParamTypes.add(paramType);
+
+                SLANG_ASSERT(oldParamTypes.getCount() == (Index)call->getArgCount());
 
                 ShortList<IRType*> paramTypes;
                 ShortList<IRInst*> newArgs;
@@ -1494,7 +1511,7 @@ struct LoweredElementTypeContext
                     auto arg = call->getArg(i);
                     if (auto castArg = as<IRCastStorageToLogical>(arg))
                     {
-                        auto oldParamPtrType = oldParams[i]->getDataType();
+                        auto oldParamPtrType = oldParamTypes[i];
                         auto storageValueType = tryGetPointedToOrBufferElementType(
                             &builder,
                             castArg->getOperand(0)->getDataType());
@@ -1519,11 +1536,12 @@ struct LoweredElementTypeContext
                         newArgs.add(arg);
                     }
                 }
+
                 auto specializedFuncType = builder.getFuncType(
                     (UInt)paramTypes.getCount(),
                     paramTypes.getArrayView().getBuffer(),
                     call->getDataType());
-                auto key = SpecializationKey{(IRFunc*)calleeFunc, specializedFuncType};
+                auto key = SpecializationKey{calleeFunc, specializedFuncType};
                 IRFunc* specializedFunc = nullptr;
                 if (!specializedFuncs.tryGetValue(key, specializedFunc))
                 {
@@ -1610,7 +1628,9 @@ struct LoweredElementTypeContext
                 builder.replaceOperand(use, castedParam);
         }
         clonedFunc->setFullType(specializedFuncType);
-        removeLinkageDecorations(clonedFunc);
+        // Keep track of the specialized functions. This is used to remove
+        // clashing linkage decorations if we need to retain the original too.
+        specializedFuncsByOriginal[(IRFunc*)call->getCallee()].add(clonedFunc);
 
         // Add all `CastStorageToLogical` insts in the cloned func to the worklist
         // for further processing.
@@ -1628,6 +1648,11 @@ struct LoweredElementTypeContext
     void processModule(IRModule* module)
     {
         IRBuilder builder(module);
+
+        // Fix the pointer types of `RWStructuredBufferGetElementPtr` and
+        // `FieldAddress` to be layout-aware.
+        fixBufferAccessPointerTypes(module->getModuleInst());
+
         struct BufferTypeInfo
         {
             IRType* bufferType;
@@ -1660,7 +1685,7 @@ struct LoweredElementTypeContext
                 // in`StructuredBufferGetDimensions`.
                 IRSizeAndAlignment sizeAlignment;
                 getSizeAndAlignment(
-                    target->getOptionSet(),
+                    target->getTargetReq(),
                     config.getLayoutRule(),
                     elementType,
                     &sizeAlignment);
@@ -1678,7 +1703,6 @@ struct LoweredElementTypeContext
                 continue;
             bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
         }
-
 
         List<IRCastStorageToLogicalBase*> castInstWorkList;
 
@@ -1773,6 +1797,23 @@ struct LoweredElementTypeContext
                 continue;
             bufferTypeInst.bufferType->replaceUsesWith(bufferTypeInst.loweredBufferType);
             bufferTypeInst.bufferType->removeAndDeallocate();
+        }
+
+        // Remove linkage decorations from specialized functions if they don't
+        // cleanly replace the original.
+        for (auto& [original, specializations] : specializedFuncsByOriginal)
+        {
+            if (original->hasUses() || specializations.getCount() > 1)
+            {
+                for (auto specialization : specializations)
+                    removeLinkageDecorations(specialization);
+            }
+            else
+            {
+                // Remove original, because the specialized function replaced
+                // it. If we don't remove it, the linkage decorations clash.
+                original->removeAndDeallocate();
+            }
         }
     }
 
@@ -2025,6 +2066,74 @@ struct LoweredElementTypeContext
             materializeStorageToLogicalCastsImpl(inst);
     }
 
+    IRPtrType* getPointerTypeWithBufferLayout(
+        IRBuilder& builder,
+        IRType* bufferType,
+        IRType* elementType)
+    {
+        TypeLoweringConfig loweringConfig = getTypeLoweringConfigForBuffer(target, bufferType);
+        IRType* layoutType = getTypeLayoutTypeForBuffer(target, builder, bufferType);
+        return builder.getPtrType(
+            elementType,
+            AccessQualifier::ReadWrite,
+            loweringConfig.addressSpace,
+            layoutType);
+    }
+
+    IRPtrType* copyBufferLayoutToPointer(
+        IRBuilder& builder,
+        IRType* bufferType,
+        IRPtrTypeBase* pointerType)
+    {
+        IRType* layoutType = getTypeLayoutTypeForBuffer(target, builder, bufferType);
+
+        AccessQualifier access = pointerType->getAccessQualifier();
+        AddressSpace addressSpace = pointerType->getAddressSpace();
+
+        return builder.getPtrType(pointerType->getValueType(), access, addressSpace, layoutType);
+    }
+
+    void fixBufferAccessPointerTypes(IRInst* root)
+    {
+        IRBuilder builder(root);
+        OrderedHashSet<IRInst*> workList;
+        workList.add(root);
+
+        while (workList.getCount() != 0)
+        {
+            IRInst* inst = workList.getLast();
+
+            workList.removeLast();
+
+            if (IRPtrTypeBase* ptrType = as<IRPtrTypeBase>(inst->getDataType()))
+            {
+                if (auto sgep = as<IRRWStructuredBufferGetElementPtr>(inst))
+                {
+                    auto bufferType = sgep->getBase()->getDataType();
+                    ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
+                    builder.setDataType(inst, ptrType);
+                }
+                else if (auto fa = as<IRFieldAddress>(inst))
+                {
+                    auto bufferType = fa->getBase()->getDataType();
+                    ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
+                    builder.setDataType(inst, ptrType);
+                }
+                else if (auto gep = as<IRGetElementPtr>(inst))
+                {
+                    auto bufferType = gep->getBase()->getDataType();
+                    ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
+                    builder.setDataType(inst, ptrType);
+                }
+            }
+
+            for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+            {
+                workList.add(child);
+            }
+        }
+    }
+
     // Lower all getElementPtr insts of a lowered matrix out of existance.
     void lowerMatrixAddresses(IRModule* module, MatrixAddrWorkItem workItem)
     {
@@ -2160,22 +2269,11 @@ void lowerBufferElementTypeToStorageType(
     context.processModule(module);
 }
 
-IRTypeLayoutRuleName getTypeLayoutRulesFromOp(IROp layoutTypeOp, IRTypeLayoutRuleName defaultLayout)
+static IRTypeLayoutRuleName getTypeLayoutRuleNameFromOpAlways(
+    IROp layoutTypeOp,
+    IRTypeLayoutRuleName defaultLayout)
 {
-    switch (layoutTypeOp)
-    {
-    case kIROp_DefaultBufferLayoutType:
-        return defaultLayout;
-    case kIROp_Std140BufferLayoutType:
-        return IRTypeLayoutRuleName::Std140;
-    case kIROp_Std430BufferLayoutType:
-        return IRTypeLayoutRuleName::Std430;
-    case kIROp_ScalarBufferLayoutType:
-        return IRTypeLayoutRuleName::Natural;
-    case kIROp_CBufferLayoutType:
-        return IRTypeLayoutRuleName::C;
-    }
-    return defaultLayout;
+    return getTypeLayoutRuleNameFromOp(layoutTypeOp, defaultLayout).value_or(defaultLayout);
 }
 
 IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRType* bufferType)
@@ -2193,6 +2291,34 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         // If we are just emitting GLSL, we can just use the general layout rule.
         if (!target->shouldEmitSPIRVDirectly() && !isCPUTargetViaLLVM(targetReq))
             return IRTypeLayoutRuleName::Natural;
+
+        // An explicit (non-default) layout annotation on the buffer takes precedence
+        // over global compiler options such as forceScalarLayout.
+        {
+            IROp layoutTypeOp = kIROp_DefaultBufferLayoutType;
+            if (auto paramGroupType = as<IRUniformParameterGroupType>(bufferType))
+            {
+                if (paramGroupType->getDataLayout())
+                    layoutTypeOp = paramGroupType->getDataLayout()->getOp();
+            }
+            else if (auto structBufferType = as<IRHLSLStructuredBufferTypeBase>(bufferType))
+            {
+                if (structBufferType->getDataLayout())
+                    layoutTypeOp = structBufferType->getDataLayout()->getOp();
+            }
+            else if (auto storageBufferType = as<IRGLSLShaderStorageBufferType>(bufferType))
+            {
+                if (storageBufferType->getDataLayout())
+                    layoutTypeOp = storageBufferType->getDataLayout()->getOp();
+            }
+            if (layoutTypeOp != kIROp_DefaultBufferLayoutType &&
+                layoutTypeOp != kIROp_DefaultPushConstantBufferLayoutType)
+            {
+                return getTypeLayoutRuleNameFromOpAlways(
+                    layoutTypeOp,
+                    IRTypeLayoutRuleName::Natural);
+            }
+        }
 
         // If the user specified a C-compatible buffer layout, then do that.
         if (target->getOptionSet().shouldUseCLayout())
@@ -2226,7 +2352,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto layoutTypeOp = structBufferType->getDataLayout()
                                     ? structBufferType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
-            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std430);
+            return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, IRTypeLayoutRuleName::Std430);
         }
     case kIROp_ParameterBlockType:
     case kIROp_ConstantBufferType:
@@ -2237,12 +2363,16 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
                                     ? parameterGroupType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
 
+            // DefaultPushConstantBufferLayoutType defaults to Std430.
+            if (layoutTypeOp == kIROp_DefaultPushConstantBufferLayoutType)
+                return IRTypeLayoutRuleName::Std430;
+
             // The CPU targets default to the C buffer layout for compatibility
             // with C/C++.
             auto defaultTypeOp =
                 isCPUTarget(targetReq) ? IRTypeLayoutRuleName::C : IRTypeLayoutRuleName::Std140;
 
-            return getTypeLayoutRulesFromOp(layoutTypeOp, defaultTypeOp);
+            return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, defaultTypeOp);
         }
     case kIROp_GLSLShaderStorageBufferType:
         {
@@ -2250,10 +2380,19 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto layoutTypeOp = storageBufferType->getDataLayout()
                                     ? storageBufferType->getDataLayout()->getOp()
                                     : kIROp_Std430BufferLayoutType;
-            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std430);
+            return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, IRTypeLayoutRuleName::Std430);
         }
-    case kIROp_PtrType:
-        return IRTypeLayoutRuleName::Natural;
+    }
+    if (auto ptrType = as<IRPtrTypeBase>(bufferType))
+    {
+        auto layoutTypeOp = ptrType->getDataLayout() ? ptrType->getDataLayout()->getOp()
+                                                     : kIROp_DefaultBufferLayoutType;
+
+        IRTypeLayoutRuleName defaultRule = IRTypeLayoutRuleName::Natural;
+        if (isCPUTargetViaLLVM(targetReq))
+            defaultRule = IRTypeLayoutRuleName::LLVM;
+
+        return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, defaultRule);
     }
     return IRTypeLayoutRuleName::Natural;
 }
@@ -2262,6 +2401,15 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
 {
     auto ruleName = getTypeLayoutRuleNameForBuffer(target, bufferType);
     return IRTypeLayoutRules::get(ruleName);
+}
+
+IRType* getTypeLayoutTypeForBuffer(TargetProgram* target, IRBuilder& builder, IRType* bufferType)
+{
+    TypeLoweringConfig loweringConfig = getTypeLoweringConfigForBuffer(target, bufferType);
+    IROp layoutOp = getOpFromTypeLayoutRuleName(loweringConfig.layoutRuleName);
+    IRType* layoutType =
+        as<IRType>(builder.createIntrinsicInst(nullptr, layoutOp, 0, nullptr, nullptr));
+    return layoutType;
 }
 
 TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType* bufferType)
@@ -2524,7 +2672,7 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
             auto vectorType = builder.getVectorType(matrixType->getElementType(), vectorSize);
             IRSizeAndAlignment elementSizeAlignment;
             getSizeAndAlignment(
-                target->getOptionSet(),
+                target->getTargetReq(),
                 config.getLayoutRule(),
                 vectorType,
                 &elementSizeAlignment);
@@ -2631,7 +2779,7 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
                         // Find an integer type of the correct size for the current layout rule.
                         IRSizeAndAlignment boolSizeAndAlignment;
                         if (getSizeAndAlignment(
-                                target->getOptionSet(),
+                                target->getTargetReq(),
                                 config.getLayoutRule(),
                                 scalarType,
                                 &boolSizeAndAlignment) == SLANG_OK)

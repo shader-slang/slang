@@ -5,7 +5,7 @@ permalink: /user-guide/convenience-features
 
 # Basic Convenience Features
 
-This topic covers a series of nice-to-have language features in Slang. These features are not supported by HLSL but are introduced to Slang to simplify code development. Many of these features are added to Slang per request of our users. 
+This topic covers a series of nice-to-have language features in Slang. These features are not supported by HLSL but are introduced to Slang to simplify code development. Many of these features are added to Slang per request of our users.
 
 ## Type Inference in Variable Definitions
 Slang supports automatic variable type inference:
@@ -77,7 +77,7 @@ void test()
 }
 ```
 
-Symbols defined in the same namespace can access each other without a qualified name, this is true even if the referenced symbol is defined in a different file or module:
+Symbols defined in the same namespace can access each other without a qualified name. This is true even if the referenced symbol is defined in a different file or module:
 ```csharp
 namespace ns
 {
@@ -122,7 +122,7 @@ Foo foo;
 int rs = foo.compute(1,2);
 ```
 
-Slang also supports static member functions, For example:
+Slang also supports static member functions. For example:
 ```
 struct Foo
 {
@@ -147,7 +147,7 @@ Foo foo;
 int rs = foo.staticMethod(a,b);
 ```
 
-### Mutability of member function
+### Mutability of member functions
 
 For GPU performance considerations, the `this` argument in a member function is immutable by default. Attempting to modify `this` will result in a compile error. If you intend to define a member function that mutates the object, use `[mutating]` attribute on the member function as shown in the following example.
 
@@ -172,7 +172,7 @@ void test()
 
 ## Properties
 
-Properties provide a convenient way to access values exposed by a type, where the logic behind accessing the value is defined in `getter` and `setter` function pairs. Slang's `property` feature is similar to C# and Swift. 
+Properties provide a convenient way to access values exposed by a type, where the logic behind accessing the value is defined in `getter` and `setter` function pairs. Slang's `property` feature is similar to C# and Swift.
 ```csharp
 struct MyType
 {
@@ -205,7 +205,7 @@ You may also use an explicit parameter for the setter method:
 ```csharp
 property uint highBits
 {
-    set(uint x) { flag = (flag & 0xFF) + (x << 16);  }
+    set(uint x) { flag = (flag & 0xFF) + (x << 16); }
 }
 ```
 
@@ -240,12 +240,12 @@ You can use a constructor to construct a new instance by using the type name in 
 MyType instance = MyType(1,2);  // instance.myVal is 3.
 ```
 
-You may also use C++ style initializer list to invoke a constructor:
+You may also use a C++-style initializer list to invoke a constructor:
 ```csharp
 MyType instance = {1, 2};
 ```
 
-If a constructor does not define any parameters, it will be recognized as *default* constructor that will be automatically called at the definition of a variable:
+If a constructor does not define any parameters, it will be recognized as a *default* constructor that will be automatically called at the definition of a variable:
 
 ```csharp
 struct MyType
@@ -329,7 +329,7 @@ int test()
     return rs.val; // returns 3.
 }
 ```
-Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~` and `!`. Please note that the `&&` and `||` operators are not supported.
+Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
 
 In addition, you can overload operator `()` as a member method:
 ```csharp
@@ -372,8 +372,8 @@ int test()
 
 ## Tuple Types
 
-Tuple types can hold collection of values of different types.
-Tuples types are defined in Slang with the `Tuple<...>` syntax, and
+Tuple types can hold a collection of values of different types.
+Tuple types are defined in Slang with the `Tuple<...>` syntax, and
 constructed with either a constructor or the `makeTuple` function:
 ```csharp
 Tuple<int, float, bool> t0 = Tuple<int, float, bool>(5, 2.0f, false);
@@ -399,7 +399,7 @@ You can concatenate two tuples:
 concat(t0, t1) // evaluates to (5, 2.0f, false, 3, 1.0f, true)
 ```
 
-If all element types of a tuple conforms to `IComparable`, then the tuple itself
+If all element types of a tuple conform to `IComparable`, then the tuple itself
 will conform to `IComparable`, and you can use comparison operators on the tuples
 to compare them:
 
@@ -503,7 +503,7 @@ Vertex<hasNormal, hasColor> vertMain<bool hasNormal, bool hasColor>(VertexIn inp
 
 
 ## `if_let` syntax
-Slang supports `if (let name = expr)` syntax to simplify the code when working with `Optional<T>` or `Conditional<T, hasValue>` value. The syntax is similar to Rust's
+Slang supports the `if (let name = expr)` syntax to simplify the code when working with `Optional<T>` or `Conditional<T, hasValue>` value. The syntax is similar to Rust's
 `if let` syntax, the value expression must be an `Optional<T>` or `Conditional<T, hasValue>` type, for example:
 
 ```csharp
@@ -545,7 +545,7 @@ float4 myPackedVector = reinterpret<float4>(myVal);
 
 ## Pointers (limited)
 
-Slang supports pointers when generating code for SPIRV, C++ and CUDA targets. The syntax for pointers is similar to C, with the exception that operator `.` can also be used to dereference a member from a pointer. For example:
+Slang supports pointers when generating code for SPIR-V, C++, and CUDA targets. The syntax for pointers is similar to C, with the exception that operator `.` can also be used to dereference a member from a pointer. For example:
 ```csharp
 struct MyType
 {
@@ -571,17 +571,21 @@ int validTest()
 
 int invalidTest()
 {
-    // cannot produce a pointer from a local variable 
+    // cannot produce a pointer from a local variable
     MyType obj;
     return test(&obj); // !! ERROR !!
 }
 ```
 
-Pointer types can also be specified using the generic syntax `Ptr<MyType>`. `Ptr<MyType>` is equivalent to `MyType*`.
+Pointer types can also be specified using the generic syntax
+`Ptr<MyType, AccessMode=Access.ReadWrite, AddressSpace=AddressSpace.Device>`. The generic syntax allows
+declaring pointers to read-only and immutable values, and pointers to address spaces other than
+`Device`. Pointers to immutable values can also be declared with type alias
+`ImmutablePtr<T, AddressSpace>`. `Ptr<MyType>` is equivalent to `MyType*`.
 
 ### Limitations
 
-- Slang supports pointers to global memory, but not shared or local memory. For example, it is invalid to define a pointer to a local variable.
+- Slang supports pointers to global and shared memory but not local memory. It is invalid to define a pointer to a local variable.
 
 - Slang supports pointers that are defined as shader parameters (e.g. as a constant buffer field).
 
@@ -589,18 +593,17 @@ Pointer types can also be specified using the generic syntax `Ptr<MyType>`. `Ptr
 
 - Slang doesn't support forming pointers to opaque handle types, e.g. `Texture2D`. For handle pointers, use `DescriptorHandle<T>` instead.
 
-- Slang doesn't support coherent load/stores.
+- Slang doesn't support custom alignment specification. Functions
+  `loadAligned()` and `storeAligned()` may be used for loads and stores using pointers with known alignment.
 
-- Slang doesn't support custom alignment specification.
-
-- Slang currently does not support pointers to immutable values, i.e. `const T*`.
+- Slang currently does not support `const` pointers.
 
 ## `DescriptorHandle` for Bindless Descriptor Access
 
 Slang supports the `DescriptorHandle<T>` type that represents a bindless handle to a resource. This feature provides a portable way of implementing
-the bindless resource idiom. When targeting HLSL, GLSL and SPIRV where descriptor types (e.g. textures, samplers and buffers) are opaque handles,
+the bindless resource idiom. When targeting HLSL, GLSL, and SPIR-V, where descriptor types (e.g., textures, samplers, and buffers) are opaque handles,
 `DescriptorHandle<T>` will translate into a `uint2` so it can be defined in any memory location. The underlying `uint2` value is treated as an index
-to access the global descriptor heap or resource array in order to obtain the actual resource handle. On targets with where resource handles
+to access the global descriptor heap or resource array in order to obtain the actual resource handle. On targets where resource handles
 are not opaque handles, `DescriptorHandle<T>` maps to `T` and will have the same size and alignment defined by the target.
 
 `DescriptorHandle<T>` is declared as:
@@ -610,9 +613,9 @@ struct DescriptorHandle<T> where T:IOpaqueDescriptor {}
 where `IOpaqueDescriptor` is an interface implemented by all resource types, including textures,
 `ConstantBuffer`, `RaytracingAccelerationStructure`, `SamplerState`, `SamplerComparisonState` and all types of `StructuredBuffer`.
 
-You may also write `Texture2D.Handle` as a short-hand of `DescriptorHandle<Texture2D>`.
+You may also write `Texture2D.Handle` as a shorthand for `DescriptorHandle<Texture2D>`.
 
-`DescriptorHandle<T>` supports `operator *`, `operator ->`, and can implicitly convert to `T`, for example:
+`DescriptorHandle<T>` can implicitly convert to `T`, for example:
 
 ```slang
 uniform StructuredBuffer<DescriptorHandle<Texture2D>> textures;
@@ -627,7 +630,7 @@ void main()
     output[0] = textures[textureIndex].Load(int3(0));
 
     // Alternatively, this syntax is also valid:
-    (*output)[0] = textures[textureIndex]->Load(int3(0));
+    (*output)[0] = textures[textureIndex].Load(int3(0));
 }
 ```
 
@@ -656,11 +659,14 @@ void test()
 }
 ```
 
-When targeting SPIRV, Slang will introduce a global array of descriptors and fetch from the global array.
+When targeting SPIR-V, Slang can generate two flavors of code for descriptor handles depending on whether
+the `spvDescriptorHeapEXT` capability is declared or requested on the compilation request.
+By default (without requesting `spvDescriptorHeapEXT`), Slang introduces a global array of descriptors and
+fetches from the global array.
 The descriptor set ID of the global descriptor array can be configured with the `-bindless-space-index`
 (or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
 
-Default behavior assigns binding-indicies based on descriptor types:
+Default behavior assigns binding indices based on descriptor types:
 
 | Enum Value             | Vulkan Descriptor Type                    | Binding Index |
 |------------------------|-------------------------------------------|---------------|
@@ -676,12 +682,13 @@ Default behavior assigns binding-indicies based on descriptor types:
 
 > `ACCELERATION_STRUCTURE` is excluded from the list of types since Slang by default uses the handle to a `RaytracingAccelerationStructure` as a GPU address, casting the handle to a `RaytracingAccelerationStructure`. This removes the need for a binding-slot of `RaytracingAccelerationStructure`.
 
-> #### Note
-> The default implementation for SPIRV may change in the future if SPIRV is extended to provide what is
-> equivalent to D3D's `ResourceDescriptorHeap` construct.
+When the `spvDescriptorHeapEXT` capability is requested (either via the `-capability` command-line option or via the compilation API), Slang will map descriptor handles to the `SPV_EXT_descriptor_heap` extension
+without declaring any explicit descriptor sets. Descriptor handles are still lowered to `uint2`.
+For resources other than `CombinedTextureSampler`, Slang uses `uint2.x` as the index to access the global sampler or resource heap.
+For `CombinedTextureSampler` handles, Slang uses `uint2.x` to index into the resource heap to obtain the texture, and `uint2.y` to index into the sampler
+heap to obtain the sampler state, and combines the objects with an `OpSampledImage` instruction. By default, when using the `spvDescriptorHeapEXT` capability, Slang will reinterpret the resource or sampler heap as an array of requested resource type, whose stride is defined by the resource type, obtained from `OpConstantSizeOfEXT` instruction. The user can override this behavior and specify a different stride with the `-spirv-resource-heap-stride` or `-spirv-sampler-heap-stride` compiler options.
 
-Users can override the default behavior of convering from bindless handle to resource handle, by providing a
-`getDescriptorFromHandle` in user code. For example:
+Additionally, if none of the above behaviors are desired, users can customize the conversion logic from descriptor handle to resource objects by providing a `getDescriptorFromHandle` in user code. For example:
 
 ```slang
 // All texture and buffer handles are defined in descriptor set 100.
@@ -709,7 +716,7 @@ export T getDescriptorFromHandle<T>(DescriptorHandle<T> handle) where T : IOpaqu
 
 Note that the `getDescriptorFromHandle` is not supposed to be called from the user code directly,
 it will be automatically called by the compiler to dereference a `DescriptorHandle<T>` to get `T`.
-Think about providing `getDescriptorFromHandle` as a way to override `operator->` for `DescriptorHandle<T>`. 
+Think about providing `getDescriptorFromHandle` as a way to override `operator->` for `DescriptorHandle<T>`.
 
 The `IOpaqueDescriptor` interface is defined as:
 
@@ -725,14 +732,14 @@ interface IOpaqueDescriptor
 The user can call `defaultGetDescriptorFromHandle` function from their implementation of
 `getDescriptorFromHandle` to dispatch to the default behavior.
 
-Additionally, `defaultGetDescriptorFromHandle()` takes an optional argument whose type is `constexpr BindlessDescriptorOptions`. This parameter allows to specify alternative standard presets for how bindless-indexes are assigned. Note that this is currently only relevant to SPIRV:
- ```slang
+Additionally, `defaultGetDescriptorFromHandle()` takes an optional argument whose type is `constexpr BindlessDescriptorOptions`. This parameter allows specifying alternative standard presets for how bindless-indexes are assigned. Note that this is currently only relevant to SPIR-V:
+```slang
 public enum BindlessDescriptorOptions
 {
     None = 0,      /// Bind assuming regular binding model rules.
     VkMutable = 1, /// **Current Default** Bind assuming `VK_EXT_mutable_descriptor_type`
 }
- ```
+```
 
 `None` provides the following bindings for descriptor types:
 
@@ -762,7 +769,7 @@ public enum BindlessDescriptorOptions
 | Buffer_ReadWrite       | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 2             |
 | Unknown                | Other                                     | 3             |
 
-The `kind` and `descriptorAccess` constants allows user code to fetch resources from different locations depending on the type and access of the resource being requested. The `DescriptorKind` and
+The `kind` and `descriptorAccess` constants allow user code to fetch resources from different locations depending on the type and access of the resource being requested. The `DescriptorKind` and
 `DescriptorAccess` enums are defined as:
 
 ```slang
@@ -823,7 +830,7 @@ extension MyType
 }
 ```
 
-All locations that sees the definition of the `extension` can access the new members:
+All locations that see the definition of the `extension` can access the new members:
 
 ```csharp
 void test()
@@ -858,7 +865,7 @@ for (int i = 0; i < 5; i++)
 
 Force inlining
 -----------------
-Most of the downstream shader compilers will inline all the function calls. However you can instruct Slang compiler to do the inlining
+Most downstream shader compilers will inline all function calls. However, you can instruct the Slang compiler to do the inlining
 by using the `[ForceInline]` decoration:
 ```
 [ForceInline]
@@ -872,7 +879,7 @@ Slang supports an error handling mechanism that is superficially similar to
 exceptions in many other languages, but has some unique characteristics.
 
 In contrast to C++ exceptions, this mechanism makes the control flow of errors
-more explicit, and the performance charasteristics are similar to adding an
+more explicit, and the performance characteristics are similar to adding an
 if-statement after every potentially throwing function call to check and handle
 the error.
 
@@ -933,7 +940,7 @@ You can chain multiple catch statements for different types of errors.
 
 Special Scoping Syntax
 -------------------
-Slang supports three special scoping syntax to allow users to mix in custom decorators and content in the shader code. These constructs allow a rendering engine to define custom meta-data in the shader, or map engine-specific block syntax to a meaningful block that is understood by the compiler via proper `#define`s.
+Slang supports three special scoping constructs to allow users to mix in custom decorators and content in the shader code. These constructs allow a rendering engine to define custom metadata in the shader, or map engine-specific block syntax to a meaningful block that is understood by the compiler via proper `#define`s.
 
 ### `__ignored_block`
 An ignored block will be parsed and ignored by the compiler:
@@ -968,7 +975,7 @@ struct MyType
 
 ### `__file_decl`
 Symbols defined in a `__file_decl` will be treated as if they are defined in
-the global scope. However, symbols defined in different `__file_decl`s is not visible
+the global scope. However, symbols defined in different `__file_decl`s are not visible
 to each other. For example:
 ```csharp
 __file_decl
@@ -986,10 +993,10 @@ __file_decl
 }
 ```
 
-User Defined Attributes (Experimental)
+User-Defined Attributes (Experimental)
 -------------------
 
-In addition to many system defined attributes, users can define their own custom attribute types to be used in the `[UserDefinedAttribute(args...)]` syntax. The following example shows how to define a custom attribute type.
+In addition to many system-defined attributes, users can define their own custom attribute types to be used in the `[UserDefinedAttribute(args...)]` syntax. The following example shows how to define a custom attribute type.
 
 ```csharp
 [__AttributeUsage(_AttributeTargets.Var)]
@@ -1003,10 +1010,10 @@ struct MaxValueAttribute
 uniform int scaleFactor;
 ```
 
-In the above code, the `MaxValueAttribute` struct type is decorated with the `[__AttributeUsage]` attribute, which informs that `MaxValueAttribute` type should be interpreted as a definition for a user-defined attribute, `[MaxValue]`, that can be used to decorate all variables or fields. The members of the struct defines the argument list for the attribute.
+In the above code, the `MaxValueAttribute` struct type is decorated with the `[__AttributeUsage]` attribute, which informs that `MaxValueAttribute` type should be interpreted as a definition for a user-defined attribute, `[MaxValue]`, that can be used to decorate all variables or fields. The members of the struct define the argument list for the attribute.
 
-The `scaleFactor` uniform parameter is declared with the user defined `[MaxValue]` attribute, providing two arguments for `value` and `description`.
+The `scaleFactor` uniform parameter is declared with the user-defined `[MaxValue]` attribute, providing two arguments for `value` and `description`.
 
-The `_AttributeTargets` enum is used to restrict the type of decls the attribute can apply. Possible values of `_AttributeTargets` can be `Function`, `Param`, `Struct` or `Var`.
+The `_AttributeTargets` enum is used to restrict the types of declarations the attribute can apply to. Possible values of `_AttributeTargets` can be `Function`, `Param`, `Struct` or `Var`.
 
-The usage of user-defined attributes can be queried via Slang's reflection API through `TypeReflection` or `VariableReflection`'s `getUserAttributeCount`, `getUserAttributeByIndex` and `findUserAttributeByName` methods. 
+The usage of user-defined attributes can be queried via Slang's reflection API through `TypeReflection` or `VariableReflection`'s `getUserAttributeCount`, `getUserAttributeByIndex`, and `findUserAttributeByName` methods.

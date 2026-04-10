@@ -158,6 +158,26 @@ static SlangResult _httpReflect(int argc, const char* const* argv)
     return SLANG_OK;
 }
 
+static SlangResult _httpCrash()
+{
+    RefPtr<Stream> stdinStream, stdoutStream;
+
+    Process::getStdStream(StdStreamType::In, stdinStream);
+    Process::getStdStream(StdStreamType::Out, stdoutStream);
+
+    RefPtr<BufferedReadStream> readStream(new BufferedReadStream(stdinStream));
+    RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, stdoutStream);
+
+    // Read a single packet, then exit without replying to simulate a crash.
+    SLANG_RETURN_ON_FAIL(connection->waitForResult());
+    if (connection->hasContent())
+    {
+        connection->consumeContent();
+    }
+
+    return SLANG_FAIL;
+}
+
 static SlangResult execute(int argc, const char* const* argv)
 {
     if (argc < 2)
@@ -178,6 +198,10 @@ static SlangResult execute(int argc, const char* const* argv)
     else if (toolName == "http-reflect")
     {
         return _httpReflect(argc, argv);
+    }
+    else if (toolName == "http-crash")
+    {
+        return _httpCrash();
     }
     return SLANG_E_NOT_AVAILABLE;
 }

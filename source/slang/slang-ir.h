@@ -32,6 +32,7 @@ class Layout;
 class Type;
 class Session;
 class Name;
+class TargetRequest;
 struct IRBuilder;
 struct IRFunc;
 struct IRGlobalValueWithCode;
@@ -526,6 +527,7 @@ enum class IRTypeLayoutRuleName
     D3DConstantBuffer,
     MetalParameterBlock,
     C,
+    CUDA,
     LLVM,
     _Count,
 };
@@ -995,6 +997,9 @@ bool isIntegralType(IRType* t);
 
 bool isFloatingType(IRType* t);
 
+// True if t is fp8 or bf16 types.
+bool isPackedFloatType(IRType* t);
+
 struct IntInfo
 {
     Int width;
@@ -1002,7 +1007,11 @@ struct IntInfo
     bool operator==(const IntInfo& i) const { return width == i.width && isSigned == i.isSigned; }
 };
 
-IntInfo getIntTypeInfo(const IRType* intType);
+// The size of some integer types (IntPtr & UIntPtr) depend on the target.
+Int getIntTypeWidth(TargetRequest* targetReq, IRType* intType);
+std::optional<Int> maybeGetIntTypeWidth(IRType* intType);
+bool getIntTypeSigned(IRType* intType);
+IntInfo getIntTypeInfo(TargetRequest* targetReq, IRType* intType);
 
 // left-inverse of getIntTypeInfo
 IROp getIntTypeOpFromInfo(const IntInfo info);
@@ -1055,6 +1064,7 @@ struct IRConstant : IRInst
     union ValueUnion
     {
         IRIntegerValue intVal; ///< Used for integrals and boolean
+        IRUnsignedIntegerValue uintVal;
         IRFloatingPointValue floatVal;
         void* ptrVal;
 
@@ -1147,7 +1157,7 @@ struct IRTerminatorInst : IRInst
 
 // A function parameter is owned by a basic block, and represents
 // either an incoming function parameter (in the entry block), or
-// a value that flows from one SSA block to another (in a non-entry
+// a value that flows from one SSA block to (in a non-entry
 // block).
 //
 // In each case, the basic idea is that a block is a "label with
@@ -1332,7 +1342,12 @@ struct IRBlock : IRInst
         Iterator begin() { return Iterator(begin_, stride); }
         Iterator end() { return Iterator(end_, stride); }
 
-        SuccessorList reverse() { return SuccessorList(end_ - stride, begin_ - stride, -stride); }
+        SuccessorList reverse()
+        {
+            if (!begin_ || !end_)
+                return SuccessorList(nullptr, nullptr, -stride);
+            return SuccessorList(end_ - stride, begin_ - stride, -stride);
+        }
     };
 
     PredecessorList getPredecessors();
@@ -1585,6 +1600,8 @@ struct IRPtrTypeBase : IRType
                    ? (AddressSpace) static_cast<IRIntLit*>(getOperand(2))->getValue()
                    : AddressSpace::Generic;
     }
+
+    IRType* getDataLayout() { return getOperandCount() > 3 ? (IRType*)getOperand(3) : nullptr; }
 };
 
 
@@ -1948,6 +1965,24 @@ struct IRConstantKey
     HashCode getHashCode() const { return inst->getHashCode(); }
 };
 
+struct AnnotationCacheKey
+{
+    IRInst* inst;
+    AnnotationKind associationKind;
+    bool operator==(const AnnotationCacheKey& other) const
+    {
+        return inst == other.inst && associationKind == other.associationKind;
+    }
+
+    HashCode getHashCode() const
+    {
+        Hasher hasher;
+        hasher.hashValue(inst);
+        hasher.hashValue(static_cast<int>(associationKind));
+        return hasher.getResult();
+    }
+};
+
 // State owned by IRModule for global value deduplication.
 // Not supposed to be used/instantiated outside IRModule.
 struct IRDeduplicationContext
@@ -1962,6 +1997,8 @@ public:
     Session* getSession() { return m_session; }
 
     void removeHoistableInstFromGlobalNumberingMap(IRInst* inst);
+
+    void removeInstFromConstantMap(IRInst* inst);
 
     void tryHoistInst(IRInst* inst);
 
@@ -2053,6 +2090,11 @@ public:
 
     Dictionary<IRInst*, UInt>* getUniqueIdMap() { return &m_mapInstToUniqueId; }
 
+    Dictionary<AnnotationCacheKey, IRAnnotation*>* getAnnotationLookupCache()
+    {
+        return &m_annotationLookupCache;
+    }
+
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
     {
         IRAnalysis* analysis = m_mapInstToAnalysis.tryGetValue(func);
@@ -2103,6 +2145,10 @@ public:
 
     ContainerPool& getContainerPool() { return m_containerPool; }
 
+    // TODO: Could be better...
+    IRCompilerDictionary* getTranslationDict() { return m_translationDict; }
+    void setTranslationDict(IRCompilerDictionary* dict) { m_translationDict = dict; }
+
     //
     // The range of module versions this compiler supports
     //
@@ -2119,7 +2165,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 5;
+    const static UInt k_maxSupportedModuleVersion = 14;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:
@@ -2175,6 +2221,12 @@ private:
     /// insts when unnecessary.
     ///
     Dictionary<IRInst*, UInt> m_mapInstToUniqueId;
+
+    // Translation cache.
+    IRCompilerDictionary* m_translationDict = nullptr;
+
+    // (inst, association-kind) -> associated-inst
+    Dictionary<AnnotationCacheKey, IRAnnotation*> m_annotationLookupCache;
 };
 
 
@@ -2356,6 +2408,11 @@ extern bool _slangIRPrintStackAtBreak;
 void _debugSetInstBeingCloned(uint32_t uid);
 void _debugResetInstBeingCloned();
 #endif
+
+// Print a call stack leading to 'inst' as a series of
+// Diagnostics::seeCallOfFunc diagnostic messages.
+void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink);
+
 
 // TODO: Ellie, comment and move somewhere more appropriate?
 

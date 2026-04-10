@@ -107,7 +107,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                 auto elementCount = getIntVal(vectorType->getElementCount());
                 IRSizeAndAlignment elementSize;
                 getNaturalSizeAndAlignment(
-                    targetProgram->getOptionSet(),
+                    targetProgram->getTargetReq(),
                     elementType,
                     &elementSize);
                 if (elementCount <= 2)

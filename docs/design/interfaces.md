@@ -287,7 +287,7 @@ Using this declaration one can now define a generic function that works on any m
     	float3 P_world,
     	float2 uv)
     {
-    	P.BRDFParams brdfParams = material.evaluatePattern(uv);
+    	M.BRDFParams brdfParams = material.evaluatePattern(uv);
     	for(...)
     	{
     		L light = lights[i];

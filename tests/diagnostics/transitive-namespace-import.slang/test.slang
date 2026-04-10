@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 module test;
 
@@ -6,20 +6,22 @@ import b;
 
 void testFunc()
 {
-    // CHECK-NOT: {{.*}}([[# @LINE + 1]]): error
-    ns.f_b(); // OK.
-    // CHECK: {{.*}}([[# @LINE + 1]]): error 30027:
+    ns.f_b(); // OK - no error expected here
     ns.f_a(); // Error.
+/*CHECK:
+       ^^^ member not found
+       ^^^ 'f_a' is not a member of 'overload group'.
+*/
 }
 
 namespace ns
 {
     void testFunc2()
     {
-        // CHECK-NOT: {{.*}}([[# @LINE + 1]]): error
-        f_b(); // OK.
-        // CHECK: {{.*}}([[# @LINE + 1]]): error 30015:
+        f_b(); // OK - no error expected here
         f_a(); // Error.
+//CHECK:^^^ undefined identifier
+//CHECK:^^^ undefined identifier 'f_a'.
     }
 }
 
@@ -29,9 +31,9 @@ namespace ns2
 
     void testFunc3()
     {
-        // CHECK-NOT: {{.*}}([[# @LINE + 1]]): error
-        f_b(); // OK.
-        // CHECK: {{.*}}([[# @LINE + 1]]): error 30015:
+        f_b(); // OK - no error expected here
         f_a(); // Error.
+//CHECK:^^^ undefined identifier
+//CHECK:^^^ undefined identifier 'f_a'.
     }
 }

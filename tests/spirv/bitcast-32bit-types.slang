@@ -1,7 +1,7 @@
 // Test that 32-bit types use OpBitcast directly in SPIR-V
 // Tests float <-> int <-> uint in scalar, vec2, vec3, vec4 forms
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
 // Per SPIR-V spec: these types MUST use direct OpBitcast (no lowering/splitting)
 // Scalar: float, int, uint

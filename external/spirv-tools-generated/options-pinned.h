@@ -73,31 +73,33 @@
 // Type Compatibility Options
 // -----------------------------------------------------------------------------
 
-// ABSL_OPTION_USE_STD_STRING_VIEW
+// ABSL_OPTION_USE_STD_SOURCE_LOCATION
 //
-// This option controls whether absl::string_view is implemented as an alias to
-// std::string_view, or as an independent implementation.
+// This option controls whether absl::SourceLocation is implemented as an alias
+// to the std::source_location type, or as an independent implementation.
 //
-// A value of 0 means to use Abseil's implementation.  This requires only C++11
-// support, and is expected to work on every toolchain we support.
+// A value of 0 means to use Abseil's implementation.  This requires only C++17
+// support, and is expected to run on every toolchain we support, and to
+// properly capture source location information on every toolchain that supports
+// the necessary built-ins (such as `__builtin_LINE`).
 //
-// A value of 1 means to use an alias to std::string_view.  This requires that
-// all code using Abseil is built in C++17 mode or later.
+// A value of 1 means to use aliases.  This requires that all code using Abseil
+// is built in C++20 mode or later.
 //
 // A value of 2 means to detect the C++ version being used to compile Abseil,
-// and use an alias only if a working std::string_view is available.  This
-// option is useful when you are building your program from source.  It should
-// not be used otherwise -- for example, if you are distributing Abseil in a
-// binary package manager -- since in mode 2, absl::string_view will name a
-// different type, with a different mangled name and binary layout, depending on
-// the compiler flags passed by the end user.  For more info, see
+// and use an alias only if working std::source_location types are available.
+// This option is useful when you are building your program from source.  It
+// should not be used otherwise -- for example, if you are distributing Abseil
+// in a binary package manager -- since in mode 2, they will name different
+// types, with different mangled names and binary layout, depending on the
+// compiler flags passed by the end user.  For more info, see
 // https://abseil.io/about/design/dropin-types.
 //
 // User code should not inspect this macro.  To check in the preprocessor if
-// absl::string_view is a typedef of std::string_view, use the feature macro
-// ABSL_USES_STD_STRING_VIEW.
-
-#define ABSL_OPTION_USE_STD_STRING_VIEW 1
+// the source location type is an alias of std::source_location type, use the
+// feature macro ABSL_USES_STD_SOURCE_LOCATION.
+//
+#define ABSL_OPTION_USE_STD_SOURCE_LOCATION 0
 
 // ABSL_OPTION_USE_STD_ORDERING
 //

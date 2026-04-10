@@ -98,13 +98,13 @@ public:
 
     virtual bool propagate(IRBuilder& builder, IRFunc* f) override
     {
-        bool hasReadNoneCall = false;
+        bool hasNonReadNoneOp = false;
         for (auto block : f->getBlocks())
         {
             for (auto inst : block->getChildren())
             {
                 // Is this inst known to not have global side effect/analyzable?
-                if (!isKnownOpCodeWithSideEffect(inst->getOp()) && !isDebugInst(inst))
+                if (!isKnownOpCodeWithSideEffect(inst->getOp()))
                 {
                     if (inst->mightHaveSideEffects() || isResourceLoad(inst->getOp()))
                     {
@@ -112,35 +112,19 @@ public:
                         // method, e.g. bufferStore, discard, etc. or we are seeing a resource load.
                         // These operations are not movable or removable,
                         // and should not be treated as ReadNone.
-                        hasReadNoneCall = true;
+                        hasNonReadNoneOp = true;
                         break;
                     }
                 }
 
                 if (auto call = as<IRCall>(inst))
                 {
-                    auto callee = getResolvedInstForDecorations(call->getCallee());
-                    switch (callee->getOp())
+                    if (!isReadNoneCallee(call->getCallee()))
                     {
-                    default:
-                        // We are calling an unknown function, so we have to assume
-                        // there are side effects in the call.
-                        hasReadNoneCall = true;
+                        hasNonReadNoneOp = true;
                         break;
-                    case kIROp_Func:
-                        if (!callee->findDecoration<IRReadNoneDecoration>())
-                        {
-                            hasReadNoneCall = true;
-                            break;
-                        }
                     }
                 }
-
-                // If the inst is a debug instruction, skip it.
-                // these are only annotations
-                //
-                if (isDebugInst(inst)) // TODO: May not need this
-                    continue;
 
                 // Do any operands defined have pointer type of global or
                 // unknown source? Passing them into a readNone callee may cause
@@ -154,16 +138,15 @@ public:
                         continue;
                     if (isGlobalOrUnknownMutableAddress(f, operand))
                     {
-                        hasReadNoneCall = true;
+                        hasNonReadNoneOp = true;
                         break;
                     }
-                    break;
                 }
             }
-            if (hasReadNoneCall)
+            if (hasNonReadNoneOp)
                 break;
         }
-        if (!hasReadNoneCall)
+        if (!hasNonReadNoneOp)
         {
             builder.addDecoration(f, kIROp_ReadNoneDecoration);
             return true;
@@ -330,21 +313,10 @@ public:
 
                 if (auto call = as<IRCall>(inst))
                 {
-                    auto callee = getResolvedInstForDecorations(call->getCallee());
-                    switch (callee->getOp())
+                    if (!isNoSideEffectCallee(call->getCallee()))
                     {
-                    default:
-                        // We are calling an unknown function, so we have to assume
-                        // there are side effects in the call.
                         hasSideEffectCall = true;
                         break;
-                    case kIROp_Func:
-                        if (!callee->findDecoration<IRReadNoneDecoration>() &&
-                            !callee->findDecoration<IRNoSideEffectDecoration>())
-                        {
-                            hasSideEffectCall = true;
-                            break;
-                        }
                     }
                 }
 
@@ -384,6 +356,21 @@ bool propagateFuncProperties(IRModule* module)
 
     NoSideEffectFuncPropertyPropagationContext noSideEffectContext;
     changed |= propagateFuncPropertiesImpl(module, &noSideEffectContext);
+
+    return changed;
+}
+
+bool propagatePropertiesForSingleFunc(IRModule* module, IRFunc* f)
+{
+    ReadNoneFuncPropertyPropagationContext readNoneContext;
+    bool changed = false;
+    IRBuilder builder(module);
+    if (readNoneContext.canProcess(f))
+        changed |= readNoneContext.propagate(builder, f);
+
+    NoSideEffectFuncPropertyPropagationContext noSideEffectContext;
+    if (noSideEffectContext.canProcess(f))
+        changed |= noSideEffectContext.propagate(builder, f);
 
     return changed;
 }

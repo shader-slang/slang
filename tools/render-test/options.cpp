@@ -37,7 +37,6 @@ static bool isValidFeatureName(
         }
         return true;
     }
-
 #define SLANG_RHI_FEATURES_X(id, name) name,
     static const char* kValidFeatureNames[] = {SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)};
 #undef SLANG_RHI_FEATURES_X
@@ -322,15 +321,13 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.showAdapterInfo = true;
         }
-        else if (argValue == "-ignore-abort-msg")
-        {
-#ifdef _MSC_VER
-            _set_abort_behavior(0, _WRITE_ABORT_MSG);
-#endif
-        }
         else if (argValue == "-cache-rhi-device")
         {
             outOptions.cacheRhiDevice = true;
+        }
+        else if (argValue == "-compile-only")
+        {
+            outOptions.compileOnly = true;
         }
         else
         {

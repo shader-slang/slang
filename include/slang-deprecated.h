@@ -713,6 +713,8 @@ extern "C"
     SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inVar);
     SLANG_API SlangResult
     spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t* rs);
+    SLANG_API SlangResult
+    spReflectionVariable_GetDefaultValueFloat(SlangReflectionVariable* inVar, float* rs);
     SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(
         SlangReflectionVariable* var);
     SLANG_API SlangReflectionVariable* spReflectionVariable_applySpecializations(
@@ -1044,6 +1046,11 @@ extern "C"
     SLANG_API char const* spGetTranslationUnitSource(
         SlangCompileRequest* request,
         int translationUnitIndex);
+
+    /** Get the descriptor set/space index allocated for the bindless resource heap.
+     *  Returns -1 if the program does not use bindless resource heap.
+     */
+    SLANG_API SlangInt spReflection_getBindlessSpaceIndex(SlangReflection* reflection);
 #ifdef __cplusplus
 }
 #endif

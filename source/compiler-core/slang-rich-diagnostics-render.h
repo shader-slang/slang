@@ -20,6 +20,7 @@ struct DiagnosticNote
 {
     String message;
     DiagnosticSpan span;
+    List<DiagnosticSpan> secondarySpans;
 };
 
 //
@@ -47,9 +48,9 @@ String renderDiagnostic(
     DiagnosticRenderOptions opts,
     const GenericDiagnostic& diag);
 
-#define SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS 0
-#ifdef SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS
-int slangRichDiagnosticsUnitTest(int argc, char* argv[]);
-#endif
+String renderDiagnosticMachineReadable(
+    DiagnosticSink::SourceLocationLexer sll,
+    SourceManager* sm,
+    const GenericDiagnostic& diag);
 
 } // namespace Slang

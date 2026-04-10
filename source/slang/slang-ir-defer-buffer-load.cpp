@@ -66,10 +66,8 @@ bool isTypePreferrableToDeferLoad(CodeGenContext* codeGenContext, IRType* type)
     // we expect them to be expensive to pass by value.
     //
     IRSizeAndAlignment sizeAlignment = {};
-    if (SLANG_FAILED(getNaturalSizeAndAlignment(
-            codeGenContext->getTargetProgram()->getOptionSet(),
-            type,
-            &sizeAlignment)))
+    if (SLANG_FAILED(
+            getNaturalSizeAndAlignment(codeGenContext->getTargetReq(), type, &sizeAlignment)))
     {
         // If type contains fields that we don't know how to compute natural size
         // for, default to specialize if it contains arrays.
@@ -95,10 +93,10 @@ bool isTypePreferrableToDeferLoad(CodeGenContext* codeGenContext, IRType* type)
 
 // Returns true if memory loaded by `loadInst` is not modified before `userInst` after it is
 // loaded.
-// This method is currently implementing a very conservative analysis that only allows
-// `loadInst` to be in the same block as `userInst`, with basic aliasing analysis for any
-// stores in between. All other cases are conservatively treated as the memory location may be
-// modified.
+// This method currently implements a conservative approach that observes all
+// instructions between 'loadInst' and 'userInst', searching from all blocks
+// between them. It checks for instructions that could potentially write to
+// addresses that could potentially alias with the address used in 'loadInst'.
 bool isMemoryLocationUnmodifiedBetweenLoadAndUser(
     TargetRequest* target,
     IRInst* loadInst,
@@ -108,40 +106,106 @@ bool isMemoryLocationUnmodifiedBetweenLoadAndUser(
     if (!func)
         return false;
 
-    // For now we only check if loadInst and userInst are in the same block.
-    if (loadInst->getParent() != userInst->getParent())
-        return false;
+    auto dom = loadInst->getModule()->findOrCreateDominatorTree(func);
 
-    for (IRInst* inst = loadInst->getNextInst(); inst; inst = inst->getNextInst())
+    IRBlock* rootBlock = as<IRBlock>(loadInst->getParent());
+    IRBlock* userBlock = as<IRBlock>(userInst->getParent());
+
+    // Collect all blocks that are dominated by rootBlock and are
+    // ancestors/transitive predecessors of userBlock.
+    HashSet<IRBlock*> searchBlocks;
+    List<IRBlock*> blockWorkList;
+    blockWorkList.add(userBlock);
+    bool userIsOwnPredecessor = false;
+
+    while (blockWorkList.getCount() > 0)
     {
-        // We found callInst before hitting any instruction that may modify the memory.
-        if (inst == userInst)
-            return true;
+        IRBlock* block = blockWorkList.getLast();
+        blockWorkList.removeLast();
 
-        if (!inst->mightHaveSideEffects())
+        // If the userBlock is re-encountered, that means that it's its own
+        // predecessor and there's a loop. In that case, we'll need to consider
+        // the whole userBlock instead of just the instructions up to userInst.
+        if (block == userBlock && searchBlocks.getCount() > 0)
+            userIsOwnPredecessor = true;
+
+        // There's a bit of nuance here. Because 'userInst' must be a direct user
+        // of 'loadInst', 'loadInst' must dominate 'userInst'. It therefore
+        // follows that all blocks that can run between 'loadInst' and
+        // 'userInst' must also be dominated by 'loadInst'.
+        if (!dom->dominates(rootBlock, block) || searchBlocks.contains(block))
             continue;
 
-        // If we see any inst that has side effect, check if it is simple case that we can rule
-        // out the possibility of modifying the memory location.
-        switch (inst->getOp())
+        searchBlocks.add(block);
+
+        // We do not care about the predecessors of the root block; they cannot
+        // possibly modify the value of the load, because they occur before the
+        // load. These can still be dominated by the rootBlock if we're in a
+        // loop (potentially referencing previous iteration's load), which is
+        // why we need to explicitly skip them here.
+        if (block == rootBlock)
+            continue;
+
+        for (IRBlock* predecessor : block->getPredecessors())
+            blockWorkList.add(predecessor);
+    }
+
+    for (IRBlock* block : searchBlocks)
+    {
+        // If we're in the rootBlock, we don't care about instructions prior
+        // to the load instruction.
+        IRInst* startInst = block == rootBlock ? loadInst->getNextInst() : block->getFirstInst();
+        for (IRInst* inst = startInst; inst; inst = inst->getNextInst())
         {
-        case kIROp_Store:
-            {
-                auto storedDest = inst->getOperand(0);
-                if (canAddressesPotentiallyAlias(target, func, loadInst->getOperand(0), storedDest))
-                    return false;
+            // We found userInst, later instructions don't matter unless there's
+            // a loop.
+            if (inst == userInst && !userIsOwnPredecessor)
+                break;
+
+            // No side effects, so can't write to memory.
+            if (!inst->mightHaveSideEffects())
                 continue;
+
+            // If we see any inst that has a side effect, check if it is a simple
+            // case that we can rule out the possibility of modifying the memory
+            // location.
+            switch (inst->getOp())
+            {
+            case kIROp_Store:
+                {
+                    auto storedDest = inst->getOperand(0);
+                    if (canAddressesPotentiallyAlias(
+                            target,
+                            func,
+                            loadInst->getOperand(0),
+                            storedDest))
+                        return false;
+                    continue;
+                }
+            case kIROp_UnconditionalBranch:
+            case kIROp_ConditionalBranch:
+            case kIROp_Switch:
+            case kIROp_TargetSwitch:
+            case kIROp_Return:
+            case kIROp_Yield:
+            case kIROp_Throw:
+            case kIROp_Defer:
+            case kIROp_Unreachable:
+            case kIROp_MissingReturn:
+            case kIROp_IfElse:
+            case kIROp_Loop:
+                // These instructions don't have memory side effects, but do
+                // still count as having other side effects (control flow).
+                break;
+            default:
+                // For any other case, conservatively assume the memory location may be modified.
+                return false;
             }
-        default:
-            // For any other case, conservatively assume the memory location may be modified.
-            return false;
         }
     }
-    // We didn't found callInst after loadInst within the same basic block.
-    // We conservatively assume the memory location may be modified.
-    // This check can be extended to use the dominator tree to allow
-    // loadInst and userInst to be in different blocks.
-    return false;
+
+    // Found no instructions that could possibly modify the memory location.
+    return true;
 }
 
 struct DeferBufferLoadContext

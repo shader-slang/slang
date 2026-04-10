@@ -3,7 +3,7 @@
 // - Total bits match
 // - Larger component count is an integer multiple of smaller component count
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
 // uint2 (2×32) <-> double (1×64)
 // CHECK-DAG: OpBitcast %double %

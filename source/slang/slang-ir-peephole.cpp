@@ -5,6 +5,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-util.h"
+#include "slang-target-program.h"
 
 namespace Slang
 {
@@ -125,6 +126,43 @@ struct PeepholeContext : InstPassBase
         return false;
     }
 
+    bool hasNestedFlattenablePackOperand(IRInst* packLikeInst)
+    {
+        for (UInt i = 0; i < packLikeInst->getOperandCount(); i++)
+        {
+            auto op = packLikeInst->getOperand(i);
+            switch (op->getOp())
+            {
+            case kIROp_MakeValuePack:
+            case kIROp_Expand:
+            case kIROp_TypePack:
+            case kIROp_ExpandTypeOrVal:
+            case kIROp_TrimFirstOfPack:
+            case kIROp_TrimLastOfPack:
+            case kIROp_ShapeConcat:
+            case kIROp_ShapePermute:
+            case kIROp_ShapeSwap:
+            case kIROp_ShapeReduce:
+                return true;
+            default:
+                break;
+            }
+        }
+        return false;
+    }
+
+    bool isConcreteShapePack(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_MakeValuePack:
+        case kIROp_MakeTuple:
+            return !hasNestedFlattenablePackOperand(inst);
+        default:
+            return false;
+        }
+    }
+
     bool tryOptimizeArithmeticInst(IRInst* inst)
     {
         bool allowUnsafeOptimizations =
@@ -162,6 +200,7 @@ struct PeepholeContext : InstPassBase
         switch (inst->getOp())
         {
         case kIROp_Add:
+        case kIROp_ConstexprAdd:
             if (isZero(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(1));
@@ -172,6 +211,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_Sub:
+        case kIROp_ConstexprSub:
             if (isZero(inst->getOperand(1)))
             {
                 return tryReplace(inst->getOperand(0));
@@ -185,6 +225,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_Mul:
+        case kIROp_ConstexprMul:
             if (isOne(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(1));
@@ -203,6 +244,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_Div:
+        case kIROp_ConstexprDiv:
             if (allowUnsafeOptimizations && isZero(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(0));
@@ -213,6 +255,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_And:
+        case kIROp_ConstexprAnd:
             if (isZero(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(0));
@@ -231,6 +274,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_Or:
+        case kIROp_ConstexprOr:
             if (isZero(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(1));
@@ -276,8 +320,66 @@ struct PeepholeContext : InstPassBase
                 else
                     baseType = inst->getOperand(0)->getDataType();
 
-                if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                IRTypeLayoutRules* layoutRules = IRTypeLayoutRules::getNatural();
+
+                if (inst->getOperandCount() >= 2)
+                {
+                    auto layoutOp = inst->getOperand(1)->getOp();
+
+                    auto ruleName =
+                        getTypeLayoutRuleNameFromOp(layoutOp, IRTypeLayoutRuleName::Natural);
+
+                    if (!ruleName.has_value())
+                        break;
+
+                    layoutRules = IRTypeLayoutRules::get(ruleName.value());
+                }
+
+                // Special handling for DescriptorHandleType - its size/alignment is
+                // target-dependent
+                if (as<IRDescriptorHandleType>(baseType))
+                {
+                    bool useUint64 = targetProgram->getTargetReq()->getTargetCaps().implies(
+                        CapabilityAtom::spvBindlessTextureNV);
+
+                    IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                    builder.setInsertBefore(inst);
+
+                    // Get the underlying type based on capability:
+                    // - With spvBindlessTextureNV: uint64_t
+                    // - Without: uint2
+                    IRType* underlyingType;
+                    if (useUint64)
+                    {
+                        underlyingType = builder.getUInt64Type();
+                    }
+                    else
+                    {
+                        auto uintType = builder.getUIntType();
+                        underlyingType = builder.getVectorType(uintType, 2);
+                    }
+
+                    IRSizeAndAlignment sizeAlign;
+                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                            targetProgram->getTargetReq(),
+                            underlyingType,
+                            &sizeAlign)))
+                        break;
+
+                    IRIntegerValue value =
+                        (inst->getOp() == kIROp_AlignOf) ? sizeAlign.alignment : sizeAlign.size;
+
+                    auto resultVal = builder.getIntValue(inst->getDataType(), value);
+                    inst->replaceUsesWith(resultVal);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                    break;
+                }
+
+                if (SLANG_FAILED(getSizeAndAlignment(
+                        targetProgram->getTargetReq(),
+                        layoutRules,
                         baseType,
                         &sizeAlignment)))
                     break;
@@ -350,18 +452,368 @@ struct PeepholeContext : InstPassBase
             case kIROp_MakeWitnessPack:
             case kIROp_TypePack:
                 {
+                    auto base = inst->getOperand(0);
                     auto element = inst->getOperand(1);
+
+                    // Bail if any operand is a nested pack or expand —
+                    // the flattening peephole must run first.
+                    if (hasNestedFlattenablePackOperand(base))
+                        break;
+
                     if (auto intLit = as<IRIntLit>(element))
                     {
-                        inst->replaceUsesWith(
-                            inst->getOperand(0)->getOperand((UInt)intLit->value.intVal));
-                        maybeRemoveOldInst(inst);
-                        changed = true;
+                        UInt index = (UInt)intLit->value.intVal;
+                        if (index < base->getOperandCount())
+                        {
+                            inst->replaceUsesWith(base->getOperand(index));
+                            maybeRemoveOldInst(inst);
+                            changed = true;
+                        }
                     }
                     break;
                 }
             default:
                 break;
+            }
+            break;
+        case kIROp_ExtractFirstFromPack:
+        case kIROp_ExtractLastFromPack:
+            {
+                auto base = inst->getOperand(0);
+                bool useLast = inst->getOp() == kIROp_ExtractLastFromPack;
+                IRInst* replacement = nullptr;
+
+                bool isValueLikePack =
+                    base->getOp() == kIROp_MakeValuePack || base->getOp() == kIROp_MakeTuple;
+                bool isTypeLikePack =
+                    base->getOp() == kIROp_TypePack || base->getOp() == kIROp_TupleType;
+                bool isWitnessLikePack = base->getOp() == kIROp_MakeWitnessPack;
+
+                if ((isValueLikePack || isTypeLikePack || isWitnessLikePack) &&
+                    !hasNestedFlattenablePackOperand(base) && base->getOperandCount() > 0)
+                {
+                    auto index = useLast ? base->getOperandCount() - 1 : 0;
+                    replacement = base->getOperand(index);
+                }
+
+                if (replacement)
+                {
+                    inst->replaceUsesWith(replacement);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_TrimFirstOfPack:
+        case kIROp_TrimLastOfPack:
+            {
+                auto base = inst->getOperand(0);
+                bool trimLast = inst->getOp() == kIROp_TrimLastOfPack;
+
+                auto buildSlicedPack = [&](IRInst* packInst, IROp typeOp, IROp packOp) -> IRInst*
+                {
+                    if (hasNestedFlattenablePackOperand(packInst))
+                        return nullptr;
+
+                    UInt operandCount = packInst->getOperandCount();
+                    UInt start = trimLast ? 0u : (operandCount > 0 ? 1u : 0u);
+                    UInt end = trimLast && operandCount > 0 ? operandCount - 1 : operandCount;
+                    IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                    builder.setInsertBefore(inst);
+
+                    ShortList<IRInst*> slicedOperands;
+                    ShortList<IRType*> slicedTypes;
+                    for (UInt i = start; i < end; ++i)
+                    {
+                        auto operand = packInst->getOperand(i);
+                        slicedOperands.add(operand);
+                        slicedTypes.add(
+                            (IRType*)(packOp == kIROp_Invalid ? operand : operand->getFullType()));
+                    }
+
+                    IRType* resultType = typeOp == kIROp_TupleType
+                                             ? static_cast<IRType*>(builder.getTupleType(
+                                                   slicedTypes.getCount(),
+                                                   slicedTypes.getArrayView().getBuffer()))
+                                             : static_cast<IRType*>(builder.getTypePack(
+                                                   slicedTypes.getCount(),
+                                                   slicedTypes.getArrayView().getBuffer()));
+
+                    if (packOp == kIROp_Invalid)
+                        return resultType;
+
+                    return builder.emitIntrinsicInst(
+                        resultType,
+                        packOp,
+                        slicedOperands.getCount(),
+                        slicedOperands.getArrayView().getBuffer());
+                };
+
+                IRInst* replacement = nullptr;
+                switch (base->getOp())
+                {
+                case kIROp_MakeValuePack:
+                    replacement = buildSlicedPack(base, kIROp_TypePack, kIROp_MakeValuePack);
+                    break;
+                case kIROp_MakeTuple:
+                    replacement = buildSlicedPack(base, kIROp_TupleType, kIROp_MakeTuple);
+                    break;
+                case kIROp_TypePack:
+                    replacement = buildSlicedPack(base, kIROp_TypePack, kIROp_Invalid);
+                    break;
+                case kIROp_TupleType:
+                    replacement = buildSlicedPack(base, kIROp_TupleType, kIROp_Invalid);
+                    break;
+                case kIROp_MakeWitnessPack:
+                    replacement = buildSlicedPack(base, kIROp_TypePack, kIROp_MakeWitnessPack);
+                    break;
+                default:
+                    break;
+                }
+
+                if (replacement)
+                {
+                    inst->replaceUsesWith(replacement);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_ShapeConcat:
+            {
+                auto leftPack = inst->getOperand(0);
+                auto rightPack = inst->getOperand(1);
+                auto axis = inst->getOperand(2);
+
+                if (isConcreteShapePack(leftPack) && isConcreteShapePack(rightPack) &&
+                    leftPack->getOperandCount() == rightPack->getOperandCount())
+                {
+                    Int64 axisValue = 0;
+                    if (tryGetConstantIntLit(axis, axisValue) && axisValue >= 0 &&
+                        (UInt)axisValue < leftPack->getOperandCount())
+                    {
+                        IRBuilder builder(module);
+                        IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                        builder.setInsertBefore(inst);
+
+                        ShortList<IRInst*> resultElements;
+                        bool canFold = true;
+                        for (UInt i = 0; i < leftPack->getOperandCount(); ++i)
+                        {
+                            auto leftElement = leftPack->getOperand(i);
+                            auto rightElement = rightPack->getOperand(i);
+                            if (i == (UInt)axisValue)
+                            {
+                                resultElements.add(builder.emitAdd(
+                                    as<IRType>(leftElement->getDataType()),
+                                    leftElement,
+                                    rightElement));
+                            }
+                            else if (areKnownEqualShapeElements(leftElement, rightElement))
+                            {
+                                resultElements.add(leftElement);
+                            }
+                            else
+                            {
+                                canFold = false;
+                                break;
+                            }
+                        }
+
+                        if (canFold)
+                        {
+                            if (auto replacement = emitPackLike(
+                                    module,
+                                    inst,
+                                    resultElements.getArrayView().arrayView))
+                            {
+                                inst->replaceUsesWith(replacement);
+                                maybeRemoveOldInst(inst);
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+            break;
+        case kIROp_ShapePermute:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto orderPack = inst->getOperand(1);
+                if (isConcreteShapePack(valuePack) && isConcreteShapePack(orderPack) &&
+                    valuePack->getOperandCount() == orderPack->getOperandCount())
+                {
+                    List<bool> seen;
+                    seen.setCount(valuePack->getOperandCount());
+                    for (Index i = 0; i < seen.getCount(); ++i)
+                        seen[i] = false;
+
+                    ShortList<IRInst*> resultElements;
+                    bool canFold = true;
+                    for (UInt i = 0; i < orderPack->getOperandCount(); ++i)
+                    {
+                        Int64 orderIndex = 0;
+                        if (!tryGetConstantIntLit(orderPack->getOperand(i), orderIndex) ||
+                            orderIndex < 0 || (UInt)orderIndex >= valuePack->getOperandCount() ||
+                            seen[(Index)orderIndex])
+                        {
+                            canFold = false;
+                            break;
+                        }
+
+                        seen[(Index)orderIndex] = true;
+                        resultElements.add(valuePack->getOperand((UInt)orderIndex));
+                    }
+
+                    if (canFold)
+                    {
+                        if (auto replacement =
+                                emitPackLike(module, inst, resultElements.getArrayView().arrayView))
+                        {
+                            inst->replaceUsesWith(replacement);
+                            maybeRemoveOldInst(inst);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            break;
+        case kIROp_ShapeSwap:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto dim0 = inst->getOperand(1);
+                auto dim1 = inst->getOperand(2);
+
+                if (isConcreteShapePack(valuePack))
+                {
+                    Int64 dim0Value = 0;
+                    Int64 dim1Value = 0;
+                    if (tryGetConstantIntLit(dim0, dim0Value) &&
+                        tryGetConstantIntLit(dim1, dim1Value))
+                    {
+                        if (dim0Value == dim1Value)
+                        {
+                            inst->replaceUsesWith(valuePack);
+                            maybeRemoveOldInst(inst);
+                            changed = true;
+                            break;
+                        }
+
+                        if (dim0Value >= 0 && dim1Value >= 0 &&
+                            (UInt)dim0Value < valuePack->getOperandCount() &&
+                            (UInt)dim1Value < valuePack->getOperandCount())
+                        {
+                            ShortList<IRInst*> resultElements;
+                            for (UInt i = 0; i < valuePack->getOperandCount(); ++i)
+                            {
+                                if (i == (UInt)dim0Value)
+                                    resultElements.add(valuePack->getOperand((UInt)dim1Value));
+                                else if (i == (UInt)dim1Value)
+                                    resultElements.add(valuePack->getOperand((UInt)dim0Value));
+                                else
+                                    resultElements.add(valuePack->getOperand(i));
+                            }
+
+                            if (auto replacement = emitPackLike(
+                                    module,
+                                    inst,
+                                    resultElements.getArrayView().arrayView))
+                            {
+                                inst->replaceUsesWith(replacement);
+                                maybeRemoveOldInst(inst);
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+            break;
+        case kIROp_ShapeReduce:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto axis = inst->getOperand(1);
+
+                if (isConcreteShapePack(valuePack))
+                {
+                    Int64 axisValue = 0;
+                    if (tryGetConstantIntLit(axis, axisValue) && axisValue >= 0 &&
+                        (UInt)axisValue < valuePack->getOperandCount())
+                    {
+                        IRBuilder builder(module);
+                        IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                        builder.setInsertBefore(inst);
+
+                        ShortList<IRInst*> resultElements;
+                        for (UInt i = 0; i < valuePack->getOperandCount(); ++i)
+                        {
+                            if (i == (UInt)axisValue)
+                            {
+                                resultElements.add(builder.getIntValue(
+                                    as<IRType>(valuePack->getOperand(i)->getDataType()),
+                                    1));
+                            }
+                            else
+                            {
+                                resultElements.add(valuePack->getOperand(i));
+                            }
+                        }
+
+                        if (auto replacement =
+                                emitPackLike(module, inst, resultElements.getArrayView().arrayView))
+                        {
+                            inst->replaceUsesWith(replacement);
+                            maybeRemoveOldInst(inst);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            break;
+        case kIROp_MakeTuple:
+        case kIROp_MakeValuePack:
+            {
+                // Flatten nested MakeValuePack operands.
+                bool hasNestedPack = false;
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                {
+                    if (as<IRMakeValuePack>(inst->getOperand(i)))
+                    {
+                        hasNestedPack = true;
+                        break;
+                    }
+                }
+                if (hasNestedPack)
+                {
+                    ShortList<IRInst*> flatOperands;
+                    for (UInt i = 0; i < inst->getOperandCount(); i++)
+                    {
+                        auto operand = inst->getOperand(i);
+                        if (auto nestedPack = as<IRMakeValuePack>(operand))
+                        {
+                            for (UInt j = 0; j < nestedPack->getOperandCount(); j++)
+                                flatOperands.add(nestedPack->getOperand(j));
+                        }
+                        else
+                        {
+                            flatOperands.add(operand);
+                        }
+                    }
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+                    IRInst* newInst = nullptr;
+                    if (inst->getOp() == kIROp_MakeValuePack)
+                        newInst = builder.emitMakeValuePack(
+                            (UInt)flatOperands.getCount(),
+                            flatOperands.getArrayView().getBuffer());
+                    else
+                        newInst = builder.emitMakeTuple(
+                            (UInt)flatOperands.getCount(),
+                            flatOperands.getArrayView().getBuffer());
+                    inst->replaceUsesWith(newInst);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
             }
             break;
         case kIROp_MakeCoopVectorFromValuePack:
@@ -798,6 +1250,16 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_GetConditionalValue:
+            {
+                if (auto makeConditional = as<IRMakeConditionalValue>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(makeConditional->getValue());
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
         case kIROp_OptionalHasValue:
             {
                 if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalValue)
@@ -921,6 +1383,73 @@ struct PeepholeContext : InstPassBase
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }
+                else
+                {
+                    // Handle common BuiltinCast cases that need to be lowered before emit.
+                    // In particular, legalization for tessellation-factor builtins may require
+                    // reshaping between vector and array representations (e.g. float4 <->
+                    // float[4]).
+                    auto val = inst->getOperand(0);
+                    auto fromType = val->getDataType();
+                    auto toType = inst->getFullType();
+
+                    // vector -> array
+                    if (auto fromVec = as<IRVectorType>(fromType))
+                    {
+                        if (auto toArr = as<IRArrayTypeBase>(toType))
+                        {
+                            if (isTypeEqual(fromVec->getElementType(), toArr->getElementType()))
+                            {
+                                auto fromCountLit = as<IRIntLit>(fromVec->getElementCount());
+                                auto toCountLit = as<IRIntLit>(toArr->getElementCount());
+                                if (fromCountLit && toCountLit &&
+                                    fromCountLit->getValue() == toCountLit->getValue())
+                                {
+                                    List<IRInst*> elems;
+                                    auto count = (UInt)fromCountLit->getValue();
+                                    elems.setCount((Index)count);
+                                    for (UInt i = 0; i < count; ++i)
+                                    {
+                                        elems[(Index)i] = builder.emitElementExtract(val, i);
+                                    }
+                                    auto newInst =
+                                        builder.emitMakeArray(toType, count, elems.getBuffer());
+                                    inst->replaceUsesWith(newInst);
+                                    maybeRemoveOldInst(inst);
+                                    changed = true;
+                                }
+                            }
+                        }
+                    }
+                    // array -> vector
+                    else if (auto fromArr = as<IRArrayTypeBase>(fromType))
+                    {
+                        if (auto toVec = as<IRVectorType>(toType))
+                        {
+                            if (isTypeEqual(fromArr->getElementType(), toVec->getElementType()))
+                            {
+                                auto fromCountLit = as<IRIntLit>(fromArr->getElementCount());
+                                auto toCountLit = as<IRIntLit>(toVec->getElementCount());
+                                if (fromCountLit && toCountLit &&
+                                    fromCountLit->getValue() == toCountLit->getValue())
+                                {
+                                    List<IRInst*> elems;
+                                    auto count = (UInt)fromCountLit->getValue();
+                                    elems.setCount((Index)count);
+                                    for (UInt i = 0; i < count; ++i)
+                                    {
+                                        elems[(Index)i] = builder.emitElementExtract(val, i);
+                                    }
+                                    auto newInst =
+                                        builder.emitMakeVector(toType, count, elems.getBuffer());
+                                    inst->replaceUsesWith(newInst);
+                                    maybeRemoveOldInst(inst);
+                                    changed = true;
+                                }
+                            }
+                        }
+                    }
+                }
             }
             break;
         case kIROp_VectorReshape:
@@ -1017,6 +1546,12 @@ struct PeepholeContext : InstPassBase
         case kIROp_Mul:
         case kIROp_Sub:
         case kIROp_Div:
+        case kIROp_ConstexprAdd:
+        case kIROp_ConstexprMul:
+        case kIROp_ConstexprSub:
+        case kIROp_ConstexprDiv:
+        case kIROp_ConstexprAnd:
+        case kIROp_ConstexprOr:
         case kIROp_And:
         case kIROp_Or:
             changed |= tryOptimizeArithmeticInst(inst);
@@ -1199,7 +1734,7 @@ struct PeepholeContext : InstPassBase
                     auto type = inst->getOperand(0)->getDataType();
                     IRSizeAndAlignment sizeAlignment;
                     const auto res = getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         type,
                         &sizeAlignment);
                     if (!SLANG_SUCCEEDED(res))
@@ -1251,15 +1786,50 @@ struct PeepholeContext : InstPassBase
                         result = type->getOp() == kIROp_HalfType;
                         break;
                     case kIROp_IsUnsignedInt:
-                        result = isIntegralType(type) && !getIntTypeInfo(type).isSigned;
+                        result = isIntegralType(type) && !getIntTypeSigned(type);
                         break;
                     case kIROp_IsSignedInt:
-                        result = isIntegralType(type) && getIntTypeInfo(type).isSigned;
+                        result = isIntegralType(type) && getIntTypeSigned(type);
                         break;
                     case kIROp_IsVector:
                         result = as<IRVectorType>(type);
                         break;
                     }
+                    inst->replaceUsesWith(builder.getBoolValue(result));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
+        case kIROp_IsCoopFloat:
+            {
+                auto type = inst->getOperand(0)->getDataType();
+                if (auto vectorType = as<IRVectorType>(type))
+                    type = vectorType->getElementType();
+                if (auto matType = as<IRMatrixType>(type))
+                    type = matType->getElementType();
+                if (isConcreteType(type))
+                {
+                    bool result = false;
+                    if (isFloatingType(type))
+                    {
+                        result = true;
+                    }
+                    else
+                    {
+                        switch (type->getOp())
+                        {
+                        case kIROp_FloatE5M2Type:
+                        case kIROp_FloatE4M3Type:
+                        case kIROp_BFloat16Type:
+                            result = true;
+                            break;
+                        }
+                    }
+                    IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                    builder.setInsertBefore(inst);
+
                     inst->replaceUsesWith(builder.getBoolValue(result));
                     maybeRemoveOldInst(inst);
                     changed = true;
@@ -1371,8 +1941,7 @@ bool peepholeOptimize(TargetProgram* target, IRModule* module, PeepholeOptimizat
     context.targetProgram = target;
     context.isPrelinking = options.isPrelinking;
     context.useFastAnalysis =
-        target ? target->getOptionSet().getBoolOption(CompilerOptionName::MinimumSlangOptimization)
-               : true;
+        target ? target->getOptionSet().shouldPerformMinimumOptimizations() : true;
     return context.processModule();
 }
 
@@ -1381,8 +1950,7 @@ bool peepholeOptimize(TargetProgram* target, IRInst* func)
     PeepholeContext context = PeepholeContext(func->getModule());
     context.targetProgram = target;
     context.useFastAnalysis =
-        target ? target->getOptionSet().getBoolOption(CompilerOptionName::MinimumSlangOptimization)
-               : true;
+        target ? target->getOptionSet().shouldPerformMinimumOptimizations() : true;
     return context.processFunc(func);
 }
 
@@ -1415,7 +1983,7 @@ bool peepholeOptimizeGlobalScope(TargetProgram* target, IRModule* module)
 
 bool tryReplaceInstUsesWithSimplifiedValue(TargetProgram* target, IRModule* module, IRInst* inst)
 {
-    if (inst != tryConstantFoldInst(module, inst))
+    if (inst != tryConstantFoldInst(module, target, inst))
         return true;
 
     PeepholeContext context = PeepholeContext(inst->getModule());

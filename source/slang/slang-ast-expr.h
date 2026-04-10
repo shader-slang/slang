@@ -480,8 +480,14 @@ class SizeOfLikeExpr : public Expr
     // Set during the parse, could be an expression, a variable or a type
     FIDDLE() Expr* value = nullptr;
 
+    // The (optional) data layout expression used for the value.
+    FIDDLE() Expr* dataLayout = nullptr;
+
     // The type the size/alignment needs to operate on. Set during traversal of SemanticsExprVisitor
     FIDDLE() Type* sizedType = nullptr;
+
+    // The type of `dataLayout`.
+    FIDDLE() Type* dataLayoutType = nullptr;
 };
 
 FIDDLE()
@@ -500,6 +506,89 @@ FIDDLE()
 class CountOfExpr : public SizeOfLikeExpr
 {
     FIDDLE(...)
+};
+
+FIDDLE(abstract)
+class PackQueryExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* value = nullptr;
+};
+
+FIDDLE()
+class FirstExpr : public PackQueryExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class LastExpr : public PackQueryExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class TrimFirstExpr : public PackQueryExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class TrimLastExpr : public PackQueryExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE(abstract)
+class ShapePackTransformExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() List<Expr*> args;
+
+    Expr* getArg(Index index) const { return args[index]; }
+    Index getArgCount() const { return args.getCount(); }
+};
+
+FIDDLE()
+class ShapeConcatExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ShapePermuteExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ShapeSwapExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ShapeReduceExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
+/// Expression for compile-time bit casting from floating-point to integer.
+/// __floatAsInt(expr) reinterprets the bits of a floating-point value as an integer.
+/// The input can be:
+///   - A floating-point literal with suffix: 1.0h (half), 1.0f or 1.0 (float), 1.0lf (double)
+///   - An explicit cast: half(x), float(x), double(x)
+/// Returns:
+///   - half -> int16_t
+///   - float -> int32_t (int)
+///   - double -> int64_t
+/// This is evaluated at compile-time when the argument is a constant.
+FIDDLE()
+class FloatBitCastExpr : public Expr
+{
+    FIDDLE(...)
+    /// The floating-point expression being bit-cast
+    FIDDLE() Expr* value = nullptr;
 };
 
 FIDDLE()
@@ -690,6 +779,20 @@ class BackwardDifferentiateExpr : public DifferentiateExpr
     FIDDLE(...)
 };
 
+FIDDLE()
+class FuncAsTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
+};
+
+FIDDLE()
+class FuncTypeOfExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
+};
+
 /// An expression of the form `__dispatch_kernel(fn, threadGroupSize, dispatchSize)` to
 /// dispatch a compute kernel from host.
 ///
@@ -798,6 +901,15 @@ class TupleTypeExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() List<TypeExp> members;
+};
+
+FIDDLE()
+class PackBranchTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp packOperand;
+    FIDDLE() TypeExp emptyType;
+    FIDDLE() TypeExp nonEmptyType;
 };
 
 /// An expression that applies a generic to arguments for some,

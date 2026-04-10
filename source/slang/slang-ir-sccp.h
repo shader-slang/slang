@@ -1,11 +1,14 @@
 // slang-ir-sccp.h
 #pragma once
+#include "slang-ir-insts-enum.h"
 
 namespace Slang
 {
 struct IRModule;
 struct IRInst;
+struct TranslationContext;
 class DiagnosticSink;
+class TargetProgram;
 
 /// Apply Sparse Conditional Constant Propagation (SCCP) to a module.
 ///
@@ -15,12 +18,23 @@ class DiagnosticSink;
 /// always evaluate to a constant (which can lead to entire blocks
 /// becoming dead code)
 /// Returns true if IR is changed.
-bool applySparseConditionalConstantPropagation(IRModule* module, DiagnosticSink* sink);
+bool applySparseConditionalConstantPropagation(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink);
 bool applySparseConditionalConstantPropagationForGlobalScope(
     IRModule* module,
+    TargetProgram* targetProgram,
     DiagnosticSink* sink);
 
-bool applySparseConditionalConstantPropagation(IRInst* func, DiagnosticSink* sink);
+bool applySparseConditionalConstantPropagation(
+    IRInst* func,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink,
+    TranslationContext* translationContext = nullptr);
 
-IRInst* tryConstantFoldInst(IRModule* module, IRInst* inst);
+IRInst* tryConstantFoldInst(IRModule* module, TargetProgram* targetProgram, IRInst* inst);
+
+bool isEvaluableOpCode(IROp op);
+
 } // namespace Slang

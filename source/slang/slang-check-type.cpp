@@ -1,5 +1,6 @@
 // slang-check-type.cpp
 #include "slang-check-impl.h"
+#include "slang-rich-diagnostics.h"
 
 // This file implements semantic checking logic related to types
 // and type expressions (aka `TypeRepr`).
@@ -124,7 +125,9 @@ Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
         return expr;
     }
 
-    getSink()->diagnose(expr, Diagnostics::expectedAType, expr->type);
+    getSink()->diagnose(Diagnostics::ExpectedAType{
+        .whatWeGot = expr->type.type ? String(expr->type.type->toString()) : String("null"),
+        .expr = expr});
     return CreateErrorExpr(expr);
 }
 
@@ -147,7 +150,8 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
     Expr* exp,
     Type* genericParamType,
     ConstantFoldingKind kind,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    ConstantFoldingCircularityInfo* circularityInfo)
 {
     IntVal* val = CheckIntegerConstantExpression(
         exp,
@@ -155,7 +159,8 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
                          : IntegerConstantExpressionCoercionType::AnyInteger,
         genericParamType,
         kind,
-        sink);
+        sink,
+        circularityInfo);
     if (val)
         return val;
 
@@ -173,10 +178,13 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, Type* genericParam
         exp,
         genericParamType,
         ConstantFoldingKind::LinkTime,
-        getSink());
+        getSink(),
+        nullptr);
 }
 
-Val* SemanticsVisitor::ExtractGenericArgVal(Expr* exp)
+Val* SemanticsVisitor::ExtractGenericArgVal(
+    Expr* exp,
+    ConstantFoldingCircularityInfo* circularityInfo)
 {
     if (auto overloadedExpr = as<OverloadedExpr>(exp))
     {
@@ -197,7 +205,12 @@ Val* SemanticsVisitor::ExtractGenericArgVal(Expr* exp)
         {
             CheckExpr(exp);
         }
-        return ExtractGenericArgInteger(exp, nullptr);
+        return ExtractGenericArgInteger(
+            exp,
+            nullptr,
+            ConstantFoldingKind::LinkTime,
+            getSink(),
+            circularityInfo);
     }
 }
 
@@ -271,10 +284,9 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 // diagnostic.
 
                 // Get the AST node type info, so we can output a 'got' name
-                diagSink->diagnose(
-                    originalExpr,
-                    Diagnostics::expectedAType,
-                    originalExpr->getClass().getName());
+                diagSink->diagnose(Diagnostics::ExpectedAType{
+                    .whatWeGot = originalExpr->getClass().getName(),
+                    .expr = originalExpr});
             }
         }
 
@@ -312,11 +324,24 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 {
                     if (diagSink)
                     {
-                        diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
+                        diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
+                            .type = typeExp.type,
+                            .typeExp = typeExp.exp});
                         *outProperType = m_astBuilder->getErrorType();
                     }
                     return false;
                 }
+            }
+            else if (as<GenericTypePackParamDecl>(member) || as<GenericValuePackParamDecl>(member))
+            {
+                if (diagSink)
+                {
+                    diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
+                        .type = typeExp.type,
+                        .typeExp = typeExp.exp});
+                    *outProperType = m_astBuilder->getErrorType();
+                }
+                return false;
             }
             else if (auto valParam = as<GenericValueParamDecl>(member))
             {
@@ -324,17 +349,21 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 {
                     if (diagSink)
                     {
-                        diagSink->diagnose(
-                            typeExp.exp,
-                            Diagnostics::unimplemented,
-                            "can't fill in default for generic type parameter");
+                        diagSink->diagnose(Diagnostics::Unimplemented{
+                            .feature = "can't fill in default for generic type parameter",
+                            .location = typeExp.exp->loc});
                         *outProperType = m_astBuilder->getErrorType();
                     }
                     return false;
                 }
                 // TODO: this is one place where syntax should get cloned!
                 if (outProperType)
-                    args.add(ExtractGenericArgVal(valParam->initExpr));
+                {
+                    ConstantFoldingCircularityInfo newCircularityInfo(
+                        makeDeclRef(valParam),
+                        nullptr);
+                    args.add(ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo));
+                }
             }
         }
 
@@ -347,24 +376,28 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             auto genericTypeParamDecl = as<GenericTypeParamDecl>(genericParam.getDecl());
             if (!genericTypeParamDecl)
             {
-                diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
+                diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
+                    .type = typeExp.type,
+                    .typeExp = typeExp.exp});
                 return false;
             }
             auto defaultType = CheckProperType(genericTypeParamDecl->initType);
             if (!defaultType)
             {
-                diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
+                diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
+                    .type = typeExp.type,
+                    .typeExp = typeExp.exp});
                 return false;
             }
-            auto witness = tryGetSubtypeWitness(defaultType, CheckProperType(constraintParam->sup));
+            auto constraintType = CheckProperType(constraintParam->sup);
+            auto witness = tryGetSubtypeWitness(defaultType, constraintType);
             if (!witness)
             {
                 // diagnose
-                getSink()->diagnose(
-                    genericTypeParamDecl->initType.exp,
-                    Diagnostics::typeArgumentDoesNotConformToInterface,
-                    defaultType,
-                    constraintParam->sup);
+                getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                    .typeArg = defaultType,
+                    .interface = constraintType,
+                    .location = genericTypeParamDecl->initType.exp->loc});
                 return false;
             }
             witnessArgs.add(witness);
@@ -389,7 +422,8 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
     {
         if (isManagedType(ptrType->getValueType()))
         {
-            getSink()->diagnose(typeExp.exp, Diagnostics::cannotDefinePtrTypeToManagedResource);
+            getSink()->diagnose(
+                Diagnostics::CannotDefinePtrTypeToManagedResource{.typeExp = typeExp.exp});
         }
     }
 
@@ -427,7 +461,7 @@ TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
         if (basicType->getBaseType() == BaseType::Void)
         {
             // TODO(tfoley): pick the right diagnostic message
-            getSink()->diagnose(result.exp, Diagnostics::invalidTypeVoid);
+            getSink()->diagnose(Diagnostics::InvalidTypeVoid{.location = result.exp->loc});
             result.type = m_astBuilder->getErrorType();
             return result;
         }
@@ -436,7 +470,8 @@ TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
     // A type pack is not a usable type other than for defining parameters.
     if (!as<ParamDecl>(decl) && isTypePack(type))
     {
-        getSink()->diagnose(typeExp.exp, Diagnostics::improperUseOfType, typeExp.type);
+        getSink()->diagnose(
+            Diagnostics::ImproperUseOfType{.type = typeExp.type, .expr = typeExp.exp});
         result.type = m_astBuilder->getErrorType();
         return result;
     }

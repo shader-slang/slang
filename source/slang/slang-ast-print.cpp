@@ -582,6 +582,17 @@ void ASTPrinter::addExpr(Expr* expr)
         {
             addExpr(sizeOfExpr->value);
         }
+
+        if (sizeOfExpr->dataLayoutType)
+        {
+            sb << ", ";
+            addType(sizeOfExpr->dataLayoutType);
+        }
+        else if (sizeOfExpr->dataLayout)
+        {
+            sb << ", ";
+            addExpr(sizeOfExpr->dataLayout);
+        }
         sb << ")";
     }
     else if (const auto alignOfExpr = as<AlignOfExpr>(expr))
@@ -595,6 +606,17 @@ void ASTPrinter::addExpr(Expr* expr)
         {
             addExpr(alignOfExpr->value);
         }
+
+        if (alignOfExpr->dataLayoutType)
+        {
+            sb << ", ";
+            addType(alignOfExpr->dataLayoutType);
+        }
+        else if (alignOfExpr->dataLayout)
+        {
+            sb << ", ";
+            addExpr(alignOfExpr->dataLayout);
+        }
         sb << ")";
     }
     else if (const auto countOfExpr = as<CountOfExpr>(expr))
@@ -607,6 +629,50 @@ void ASTPrinter::addExpr(Expr* expr)
         else if (countOfExpr->value)
         {
             addExpr(countOfExpr->value);
+        }
+        sb << ")";
+    }
+    else if (const auto packQueryExpr = as<PackQueryExpr>(expr))
+    {
+        sb << getPackQueryName(packQueryExpr) << "(";
+
+        if (packQueryExpr->value)
+            addExpr(packQueryExpr->value);
+        sb << ")";
+    }
+    else if (const auto shapePackExpr = as<ShapePackTransformExpr>(expr))
+    {
+        sb << getShapePackTransformName(shapePackExpr) << "(";
+
+        bool isFirst = true;
+        for (auto arg : shapePackExpr->args)
+        {
+            if (!isFirst)
+                sb << ", ";
+            addExpr(arg);
+            isFirst = false;
+        }
+        sb << ")";
+    }
+    else if (const auto packBranchExpr = as<PackBranchTypeExpr>(expr))
+    {
+        sb << "__packBranch(";
+        if (packBranchExpr->packOperand.exp)
+            addExpr(packBranchExpr->packOperand.exp);
+        sb << ", ";
+        if (packBranchExpr->emptyType.exp)
+            addExpr(packBranchExpr->emptyType.exp);
+        sb << ", ";
+        if (packBranchExpr->nonEmptyType.exp)
+            addExpr(packBranchExpr->nonEmptyType.exp);
+        sb << ")";
+    }
+    else if (const auto floatBitCastExpr = as<FloatBitCastExpr>(expr))
+    {
+        sb << "__floatAsInt(";
+        if (floatBitCastExpr->value)
+        {
+            addExpr(floatBitCastExpr->value);
         }
         sb << ")";
     }
@@ -682,6 +748,14 @@ void ASTPrinter::addExpr(Expr* expr)
     else if (as<ReturnValExpr>(expr))
     {
         sb << "__return_val";
+    }
+    else if (as<SharedTypeExpr>(expr))
+    {
+        auto typeType = as<TypeType>(expr->type);
+        if (typeType)
+            sb << typeType->getType();
+        else
+            sb << expr->type;
     }
     else if (const auto letExpr = as<LetExpr>(expr))
     {
@@ -1279,8 +1353,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 
     // If the parent declaration is a generic, then we need to print out its
     // signature
-    if (parentGenericDeclRef && !declRef.as<GenericValueParamDecl>() &&
-        !declRef.as<GenericTypeParamDeclBase>())
+    if (parentGenericDeclRef && !isGenericParam(declRef))
     {
         auto substArgs =
             tryGetGenericArguments(SubstitutionSet(declRef), parentGenericDeclRef.getDecl());
@@ -1394,6 +1467,25 @@ void ASTPrinter::addGenericParams(
                 ScopePart scopePart(this, Part::Type::GenericParamType);
                 sb << "each ";
                 sb << getText(genericTypePackParam.getName());
+            }
+        }
+        else if (auto genericValuePackParam = paramDeclRef.as<GenericValuePackParamDecl>())
+        {
+            if (!first)
+                sb << ", ";
+            first = false;
+            ParamScope paramScope(&sb, outParamRanges);
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamValue);
+                sb << "let each ";
+                sb << getText(genericValuePackParam.getName());
+                sb << " : ";
+                auto type = getType(m_astBuilder, genericValuePackParam);
+                if (auto valuePackType = as<ValuePackType>(type))
+                {
+                    type = valuePackType->getElementType();
+                }
+                addType(type);
             }
         }
         else

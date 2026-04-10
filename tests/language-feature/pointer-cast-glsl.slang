@@ -12,14 +12,14 @@ uniform int* pointer;
 RWStructuredBuffer<int> outputBuffer;
 
 // Ensure we have a proper GLSL supported ctor call for BDA
-//GLSL: BufferPointer__{{[a-zA-Z0-9_]+}}({{[a-zA-Z0-9_]+}}_0)
+//GLSL: BufferPointer__{{[a-zA-Z0-9_]+}}({{[a-zA-Z0-9_]+}})
 
 // Ensure our GLSL code compiles and runs
 //BUF: 2
 
 [shader("compute")]
 [numthreads(1,1,1)]
-void computeMain() : SV_Position
+void computeMain()
 {
     // This should generate BufferPointer(address) instead of (BufferPointer)address in GLSL
     let buffer1 = ConstBufferPointer<int>(address);

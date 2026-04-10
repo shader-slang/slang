@@ -1,10 +1,10 @@
-//TEST:SIMPLE(filecheck=CHECK): -target metal
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal
 
 struct T
 {
     RWStructuredBuffer<int> buf;
 }
-    
+
 struct U
 {
     ConstantBuffer<T> t;
@@ -15,14 +15,17 @@ struct S
     ConstantBuffer<RWStructuredBuffer<int>> cb;
 }
 
-// CHECK-DAG: ([[# @LINE+1]]): error 56101:
 ParameterBlock<S> s1;
+//CHECK:          ^^ ConstantBuffer with resource types in ParameterBlock not supported on Metal
+//CHECK:          ^^ nesting a 'ConstantBuffer' containing resource types inside a 'ParameterBlock' is not supported on Metal, please use 'ParameterBlock' instead.
 
-// CHECK-DAG: ([[# @LINE+1]]): error 56101:
 ParameterBlock<U> s2;
+//CHECK:          ^^ ConstantBuffer with resource types in ParameterBlock not supported on Metal
+//CHECK:          ^^ nesting a 'ConstantBuffer' containing resource types inside a 'ParameterBlock' is not supported on Metal, please use 'ParameterBlock' instead.
 
-// CHECK-DAG: ([[# @LINE+1]]): error 56101:
 ParameterBlock<ConstantBuffer<RWStructuredBuffer<int>>> s3;
+//CHECK:                                                ^^ ConstantBuffer with resource types in ParameterBlock not supported on Metal
+//CHECK:                                                ^^ nesting a 'ConstantBuffer' containing resource types inside a 'ParameterBlock' is not supported on Metal, please use 'ParameterBlock' instead.
 
 RWStructuredBuffer<int> outputBuffer;
 

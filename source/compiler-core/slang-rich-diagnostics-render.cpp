@@ -61,14 +61,23 @@ private:
     DiagnosticSink::SourceLocationLexer m_lexer;
     DiagnosticRenderOptions m_options;
 
+    // Colors safe on both dark and light terminal color schemes
+    // See https://blog.xoria.org/terminal-colors/
     enum class TerminalColor
     {
+        Regular,
+        BoldRegular,
         Red,
+        Green,
         Yellow,
+        Magenta,
         Cyan,
-        Blue,
-        Bold,
-        Reset
+        BrightRed,
+        BrightMagenta,
+        BoldRed,
+        BoldBrightRed,
+        BoldMagenta,
+        BoldBrightMagenta,
     };
 
     struct Glyphs
@@ -89,9 +98,24 @@ private:
         // to mark filenames at the beginning of a diagnostic
         const char* arrow;
         const char* noteDash;
+        // A south-east corner to close the gutter at the end (curves from down to left)
+        const char* gutterCorner;
     };
-    constexpr static Glyphs s_unicodeGlyphs = {"━", "┯", "─", "┬", "│", "╰ ", "-->", "---"};
-    constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---"};
+    // Unicode box-drawing glyphs as raw UTF-8 bytes to avoid source encoding assumptions:
+    //   ━ U+2501  ┯ U+252F  ─ U+2500  ┬ U+252C  │ U+2502
+    //   ╰ U+2570  ╭ U+256D  ╼ U+257C  ╯ U+256F
+    constexpr static Glyphs s_unicodeGlyphs = {
+        "\xe2\x94\x81",
+        "\xe2\x94\xaf",
+        "\xe2\x94\x80",
+        "\xe2\x94\xac",
+        "\xe2\x94\x82",
+        "\xe2\x95\xb0 ",
+        " \xe2\x95\xad\xe2\x95\xbc",
+        " \xe2\x95\xad\xe2\x95\xbc",
+        "\xe2\x95\xaf",
+    };
+    constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---", "'"};
     const Glyphs& m_glyphs;
 
     // A single highlight on a line, with an optional label to be connected
@@ -110,6 +134,7 @@ private:
         Int64 number = 0;
         UnownedStringSlice content;
         List<LineHighlight> spans;
+        bool sourceAvailable = false;
     };
 
     // A collection of nearby HighlightedLines
@@ -144,6 +169,7 @@ private:
             Int64 line = 0;
             Int64 col = 0;
             Int64 gutterIndent = 0;
+            PathInfo::Type pathType = PathInfo::Type::Unknown;
         } primaryLoc;
 
         SectionLayout primarySection;
@@ -165,26 +191,45 @@ private:
         const char* code = "";
         switch (c)
         {
-        case TerminalColor::Red:
-            code = "\x1B[31;1m";
-            break;
-        case TerminalColor::Yellow:
-            code = "\x1B[33;1m";
-            break;
-        case TerminalColor::Cyan:
-            code = "\x1B[36;1m";
-            break;
-        case TerminalColor::Blue:
-            code = "\x1B[34;1m";
-            break;
-        case TerminalColor::Bold:
-            code = "\x1B[1m";
-            break;
-        case TerminalColor::Reset:
+        case TerminalColor::Regular:
             code = "\x1B[0m";
             break;
-        default:
-            return text;
+        case TerminalColor::BoldRegular:
+            code = "\x1B[1m";
+            break;
+        case TerminalColor::Red:
+            code = "\x1B[31m";
+            break;
+        case TerminalColor::Green:
+            code = "\x1B[32m";
+            break;
+        case TerminalColor::Yellow:
+            code = "\x1B[33m";
+            break;
+        case TerminalColor::Magenta:
+            code = "\x1B[35m";
+            break;
+        case TerminalColor::Cyan:
+            code = "\x1B[36m";
+            break;
+        case TerminalColor::BrightRed:
+            code = "\x1B[91m";
+            break;
+        case TerminalColor::BrightMagenta:
+            code = "\x1B[95m";
+            break;
+        case TerminalColor::BoldRed:
+            code = "\x1B[1;31m";
+            break;
+        case TerminalColor::BoldBrightRed:
+            code = "\x1B[1;91m";
+            break;
+        case TerminalColor::BoldMagenta:
+            code = "\x1B[1;35m";
+            break;
+        case TerminalColor::BoldBrightMagenta:
+            code = "\x1B[1;95m";
+            break;
         }
         return String(code) + text + "\x1B[0m";
     }
@@ -192,7 +237,8 @@ private:
     String repeat(char c, Int64 n) const
     {
         String ret;
-        ret.appendRepeatedChar(c, n);
+        if (n > 0)
+            ret.appendRepeatedChar(c, n);
         return ret;
     }
 
@@ -258,14 +304,22 @@ private:
         {
             HighlightedLine& line = grouped[span.line];
             line.number = span.line;
-            if (line.content.getLength() == 0)
+            if (line.content.getLength() == 0 && !line.sourceAvailable)
             {
-                SourceView* view = m_sourceManager->findSourceView(span.startLoc);
+                SourceView* view =
+                    m_sourceManager ? m_sourceManager->findSourceView(span.startLoc) : nullptr;
                 if (view)
-                    line.content = StringUtil::trimEndOfLine(
+                {
+                    line.sourceAvailable = true;
+                    // Get the line content and trim end-of-line characters and trailing whitespace
+                    UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
                         view->getSourceFile()->getLineAtIndex(span.line - 1));
+                    // Trim trailing whitespace but preserve leading whitespace (indentation)
+                    line.content = UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
+                }
             }
-            if (m_lexer && span.length <= 0)
+            if (m_lexer && span.length <= 0 && line.content.getLength() > 0 && span.col > 0 &&
+                span.col - 1 < line.content.getLength())
                 span.length = m_lexer(line.content.tail(span.col - 1)).getLength();
             line.spans.add({span.col, span.length, span.label, span.isPrimary});
         }
@@ -293,6 +347,18 @@ private:
         section.blocks.add(currentBlock);
         section.commonIndent = findCommonIndent(section.blocks);
         return section;
+    }
+
+    // Returns true if any line in the section has source text available.
+    // When source is unavailable (e.g. built-in modules), we skip rendering
+    // the section body to avoid showing empty source lines with underlines.
+    bool sectionHasSourceAvailable(const SectionLayout& section) const
+    {
+        for (const auto& block : section.blocks)
+            for (const auto& line : block.lines)
+                if (line.sourceAvailable)
+                    return true;
+        return false;
     }
 
     Int64 findCommonIndent(const List<LayoutBlock>& blocks)
@@ -329,14 +395,18 @@ private:
         for (const auto& span : line.spans)
         {
             Int64 start = span.column - indent;
-            if (start > cursor)
+            if (start > cursor && cursor - 1 < content.getLength())
                 ss << content.subString(cursor - 1, start - cursor);
 
             TerminalColor c = span.isPrimary ? TerminalColor::Red : TerminalColor::Cyan;
-            ss << color(c, String(content.subString(std::max(Int64{0}, start - 1), span.length)));
+            Int64 startIdx = std::max(Int64{0}, start - 1);
+            Int64 safeLen =
+                std::max(Int64{0}, std::min(span.length, content.getLength() - startIdx));
+            if (safeLen > 0)
+                ss << color(c, String(content.subString(startIdx, safeLen)));
             cursor = start + span.length;
         }
-        if (cursor - 1 < content.getLength())
+        if (cursor - 1 >= 0 && cursor - 1 < content.getLength())
             ss << content.tail(cursor - 1);
     }
 
@@ -448,6 +518,24 @@ private:
         return rows;
     }
 
+    // When source text is unavailable (e.g. built-in modules), render span
+    // labels with a compact gutter structure (pipe + closing corner), using a
+    // minimal gutter width since there are no line numbers to display.
+    void renderOrphanedLabels(StringBuilder& ss, const SectionLayout& section, Int64 gutterWidth)
+    {
+        String gutter =
+            repeat(' ', gutterWidth + 1) + color(TerminalColor::Cyan, m_glyphs.vertical);
+        for (const auto& block : section.blocks)
+            for (const auto& line : block.lines)
+                for (const auto& span : line.spans)
+                    if (span.label.getLength() > 0)
+                        ss << gutter << " " << color(TerminalColor::BoldRed, span.label) << "\n";
+        ss << color(
+                  TerminalColor::Cyan,
+                  repeat(m_glyphs.secondaryUnderline, gutterWidth + 1) + m_glyphs.gutterCorner)
+           << "\n";
+    }
+
     void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
     {
         for (const auto& block : section.blocks)
@@ -458,15 +546,15 @@ private:
             {
                 String label = String(line.number);
                 ss << repeat(' ', section.maxGutterWidth - label.getLength())
-                   << color(TerminalColor::Bold, label) << " "
-                   << color(TerminalColor::Blue, m_glyphs.vertical) << " ";
+                   << color(TerminalColor::BoldRegular, label) << " "
+                   << color(TerminalColor::Cyan, m_glyphs.vertical) << " ";
                 renderSourceLine(ss, line, section.commonIndent);
                 ss << "\n";
 
                 auto rows = buildAnnotationRows(line, section.commonIndent);
                 for (const auto& row : rows)
                     ss << repeat(' ', section.maxGutterWidth + 1)
-                       << color(TerminalColor::Blue, m_glyphs.vertical) << " " << row << "\n";
+                       << color(TerminalColor::Cyan, m_glyphs.vertical) << " " << row << "\n";
             }
         }
     }
@@ -479,10 +567,15 @@ private:
         layout.header.code = diag.code;
         layout.header.message = diag.message;
 
-        HumaneSourceLoc humaneLoc = m_sourceManager->getHumaneLoc(diag.primarySpan.range.begin);
+        HumaneSourceLoc humaneLoc;
+        if (m_sourceManager)
+        {
+            humaneLoc = m_sourceManager->getHumaneLoc(diag.primarySpan.range.begin);
+        }
         layout.primaryLoc.fileName = humaneLoc.pathInfo.foundPath;
         layout.primaryLoc.line = humaneLoc.line;
         layout.primaryLoc.col = humaneLoc.column;
+        layout.primaryLoc.pathType = humaneLoc.pathInfo.type;
 
         List<LayoutSpan> allSpans;
         allSpans.add(makeLayoutSpan(diag.primarySpan, true));
@@ -496,13 +589,21 @@ private:
         {
             DiagnosticLayout::NoteEntry noteEntry;
             noteEntry.message = note.message;
-            HumaneSourceLoc noteHumane = m_sourceManager->getHumaneLoc(note.span.range.begin);
+            HumaneSourceLoc noteHumane;
+            if (m_sourceManager)
+            {
+                noteHumane = m_sourceManager->getHumaneLoc(note.span.range.begin);
+            }
             noteEntry.loc.fileName = noteHumane.pathInfo.foundPath;
             noteEntry.loc.line = noteHumane.line;
             noteEntry.loc.col = noteHumane.column;
+            noteEntry.loc.pathType = noteHumane.pathInfo.type;
 
             List<LayoutSpan> noteSpans;
             noteSpans.add(makeLayoutSpan(note.span, false));
+            // Add additional spans attached to the note
+            for (const auto& additionalSpan : note.secondarySpans)
+                noteSpans.add(makeLayoutSpan(additionalSpan, false));
             noteEntry.section = buildSectionLayout(noteSpans);
             noteEntry.loc.gutterIndent = noteEntry.section.maxGutterWidth;
             layout.notes.add(std::move(noteEntry));
@@ -512,7 +613,11 @@ private:
 
     LayoutSpan makeLayoutSpan(const DiagnosticSpan& span, bool isPrimary)
     {
-        HumaneSourceLoc humane = m_sourceManager->getHumaneLoc(span.range.begin);
+        HumaneSourceLoc humane;
+        if (m_sourceManager)
+        {
+            humane = m_sourceManager->getHumaneLoc(span.range.begin);
+        }
         return {
             humane.line,
             humane.column,
@@ -522,6 +627,34 @@ private:
             span.range.begin};
     }
 
+    void renderLocation(StringBuilder& ss, const DiagnosticLayout::Location& loc) const
+    {
+        ss << repeat(' ', loc.gutterIndent) << color(TerminalColor::Cyan, m_glyphs.arrow) << " ";
+        if (loc.pathType == PathInfo::Type::CommandLine)
+        {
+            // For command line sources, don't show line:col
+            ss << loc.fileName << "\n";
+        }
+        else
+        {
+            ss << loc.fileName << ":" << loc.line << ":" << loc.col << "\n";
+        }
+    }
+
+    void renderNoteLocation(StringBuilder& ss, const DiagnosticLayout::Location& loc) const
+    {
+        ss << repeat(' ', loc.gutterIndent) << color(TerminalColor::Cyan, m_glyphs.noteDash) << " ";
+        if (loc.pathType == PathInfo::Type::CommandLine)
+        {
+            // For command line sources, don't show line:col
+            ss << loc.fileName << "\n";
+        }
+        else
+        {
+            ss << loc.fileName << ":" << loc.line << ":" << loc.col << "\n";
+        }
+    }
+
     String renderFromLayout(const DiagnosticLayout& layout)
     {
         StringBuilder ss;
@@ -529,32 +662,74 @@ private:
                                      ? TerminalColor::Red
                                      : TerminalColor::Yellow;
         ss << color(sevColor, layout.header.severity);
-        String codeStr = String(layout.header.code);
-        while (codeStr.getLength() < 4)
-            codeStr = "0" + codeStr;
-        ss << "[E" << codeStr << "]"
-           << ": " << color(TerminalColor::Bold, layout.header.message) << "\n";
-        ss << repeat(' ', layout.primaryLoc.gutterIndent)
-           << color(TerminalColor::Blue, m_glyphs.arrow) << " " << layout.primaryLoc.fileName << ":"
-           << layout.primaryLoc.line << ":" << layout.primaryLoc.col << "\n";
-
-        if (layout.primarySection.blocks.getCount() > 0)
+        if (layout.header.code >= 0)
         {
-            ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
-               << color(TerminalColor::Blue, m_glyphs.vertical) << "\n";
-            renderSectionBody(ss, layout.primarySection);
+            String codeStr = String(layout.header.code);
+            ss << "[E" << repeat('0', 5 - codeStr.getLength()) << codeStr << "]";
+        }
+        ss << ": " << color(TerminalColor::BoldRegular, layout.header.message) << "\n";
+
+        // Skip location and source snippet for diagnostics without meaningful locations
+        // (line 0 indicates SourceLoc() was used, meaning no source location)
+        bool hasValidLocation =
+            layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
+        if (hasValidLocation)
+        {
+            bool primaryHasSource = sectionHasSourceAvailable(layout.primarySection);
+            if (primaryHasSource)
+            {
+                renderLocation(ss, layout.primaryLoc);
+                if (layout.primarySection.blocks.getCount() > 0)
+                {
+                    ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
+                       << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
+                    renderSectionBody(ss, layout.primarySection);
+                    ss << color(
+                              TerminalColor::Cyan,
+                              repeat(
+                                  m_glyphs.secondaryUnderline,
+                                  layout.primarySection.maxGutterWidth + 1) +
+                                  m_glyphs.gutterCorner)
+                       << "\n";
+                }
+            }
+            else
+            {
+                constexpr Int64 kOrphanGutterWidth = 0;
+                DiagnosticLayout::Location loc = layout.primaryLoc;
+                loc.gutterIndent = kOrphanGutterWidth;
+                renderLocation(ss, loc);
+                if (layout.primarySection.blocks.getCount() > 0)
+                    renderOrphanedLabels(ss, layout.primarySection, kOrphanGutterWidth);
+            }
         }
         for (const auto& note : layout.notes)
         {
             ss << "\n" << color(TerminalColor::Cyan, "note") << ": " << note.message << "\n";
-            ss << repeat(' ', note.loc.gutterIndent)
-               << color(TerminalColor::Blue, m_glyphs.noteDash) << " " << note.loc.fileName << ":"
-               << note.loc.line << ":" << note.loc.col << "\n";
-            if (note.section.blocks.getCount() > 0)
+            bool noteHasSource = sectionHasSourceAvailable(note.section);
+            if (noteHasSource)
             {
-                ss << repeat(' ', note.section.maxGutterWidth + 1)
-                   << color(TerminalColor::Blue, m_glyphs.vertical) << "\n";
-                renderSectionBody(ss, note.section);
+                renderNoteLocation(ss, note.loc);
+                if (note.section.blocks.getCount() > 0)
+                {
+                    ss << repeat(' ', note.section.maxGutterWidth + 1)
+                       << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
+                    renderSectionBody(ss, note.section);
+                    ss << color(
+                              TerminalColor::Cyan,
+                              repeat(m_glyphs.secondaryUnderline, note.section.maxGutterWidth + 1) +
+                                  m_glyphs.gutterCorner)
+                       << "\n";
+                }
+            }
+            else
+            {
+                constexpr Int64 kOrphanGutterWidth = 0;
+                DiagnosticLayout::Location noteLoc = note.loc;
+                noteLoc.gutterIndent = kOrphanGutterWidth;
+                renderNoteLocation(ss, noteLoc);
+                if (note.section.blocks.getCount() > 0)
+                    renderOrphanedLabels(ss, note.section, kOrphanGutterWidth);
             }
         }
         return ss.produceString();
@@ -573,563 +748,107 @@ String renderDiagnostic(
     return renderer.render(diag);
 }
 
-} // namespace Slang
-
-namespace Slang
+String renderDiagnosticMachineReadable(
+    DiagnosticSink::SourceLocationLexer sll,
+    SourceManager* sm,
+    const GenericDiagnostic& diag)
 {
+    StringBuilder sb;
 
-//
-// Tests to use while developing
-//
+    // Format:
+    // E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
 
-#ifdef SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS
-
-namespace
-{
-
-//
-// Some structures for describing a test case
-//
-
-struct SourceLoc
-{
-    String fileName;
-    Int64 line;
-    Int64 column;
-
-    SourceLoc()
-        : line(0), column(0)
+    // Format the error code as E##### (e.g., E00001, E12345)
+    // Use empty string for negative codes (-1 is used as placeholder for no code)
+    String codeStr;
+    if (diag.code >= 0)
     {
+        String numStr = String(diag.code);
+        String padding;
+        padding.appendRepeatedChar('0', std::max<Int64>(0, 5 - numStr.getLength()));
+        codeStr = padding + numStr;
     }
-    SourceLoc(const String& file, Int64 ln, Int64 col)
-        : fileName(file), line(ln), column(col)
+
+    // Helper lambda to output a span in the machine-readable format
+    // Returns false if the span was skipped (0,0 location with no message)
+    auto outputSpan = [&](const DiagnosticSpan& span, const char* severity, const String& message)
     {
-    }
-};
+        HumaneSourceLoc beginLoc = sm->getHumaneLoc(span.range.begin);
+        HumaneSourceLoc endLoc = sm->getHumaneLoc(span.range.end);
 
-struct TestDiagnosticSpan
-{
-    SourceLoc location;
-    String message;
-    Int64 length;
-
-    TestDiagnosticSpan()
-        : length(0)
-    {
-    }
-    TestDiagnosticSpan(const SourceLoc& loc, const String& msg, Int64 len = 0)
-        : location(loc), message(msg), length(len)
-    {
-    }
-};
-
-struct TestDiagnosticNote
-{
-    String message;
-    TestDiagnosticSpan span;
-};
-
-struct TestGenericDiagnostic
-{
-    Int64 code;
-    Severity severity;
-    String message;
-    TestDiagnosticSpan primarySpan;
-    List<TestDiagnosticSpan> secondarySpans;
-    List<TestDiagnosticNote> notes;
-};
-
-struct TestData
-{
-    const char* name;
-    const char* sourceFileName;
-    const char* sourceContent;
-    const char* expectedOutput;
-    TestGenericDiagnostic diagnostic;
-    SourceFile* sourceFile = nullptr;
-};
-
-//
-//
-//
-
-TestData testCases[] = {
-    {.name = "undeclared_identifier",
-     .sourceFileName = "example.slang",
-     .sourceContent = R"(struct VertexInput {
-    float4 position : POSITION;
-    float2 texCoord : TEXCOORD0;
-};
-
-struct PixelShader {
-    float4 main(VertexInput input) : SV_Target {
-        float4 color = tex2D(someSampler, input.texCoord); // Undefined sampler
-        return color;
-    }
-}
-)",
-     .expectedOutput = R"(
-error[E1001]: use of undeclared identifier 'someSampler'
- --> example.slang:8:30
-  |
-8 | float4 color = tex2D(someSampler, input.texCoord); // Undefined sampler
-  |                      ^^^^^^^^^^^ not found in this scope
-)",
-     .diagnostic =
-         {.code = 1001,
-          .severity = Severity::Error,
-          .message = "use of undeclared identifier 'someSampler'",
-          .primarySpan = {SourceLoc("example.slang", 8, 30), "not found in this scope", 11},
-          .secondarySpans = List<TestDiagnosticSpan>(),
-          .notes = List<TestDiagnosticNote>()}},
-
-    {.name = "type_mismatch_with_secondary",
-     .sourceFileName = "example.slang",
-     .sourceContent = R"(struct VertexInput {
-    float4 position : POSITION;
-    float2 texCoord : TEXCOORD0;
-    float4 color : COLOR;
-    Int64 invalid_field; // This field has issues
-};
-
-struct PixelShader {
-    float4 main(VertexInput input) : SV_Target {
-        return color * 2.0 + input.invalid_field; // Type mismatch
-    }
-}
-)",
-     .expectedOutput = R"(error[E1002]: cannot add `float4` and `Int64`
-  --> example.slang:10:28
-   |
- 5 | Int64 invalid_field; // This field has issues
-   | ----------------- field declared here
-...
-10 |     return color * 2.0 + input.invalid_field; // Type mismatch
-   |            ----------- ^ ------------------- Int64
-   |            |           |
-   |            |           no implementation for `float4 + Int64`
-   |            |
-   |            float4
-)",
-     .diagnostic =
-         {.code = 1002,
-          .severity = Severity::Error,
-          .message = "cannot add `float4` and `Int64`",
-          .primarySpan =
-              {SourceLoc("example.slang", 10, 28), "no implementation for `float4 + Int64`", 1},
-          .secondarySpans =
-              []()
-          {
-              List<TestDiagnosticSpan> spans;
-              spans.add({SourceLoc("example.slang", 5, 5), "field declared here", 17});
-              spans.add({SourceLoc("example.slang", 10, 16), "float4", 11});
-              spans.add({SourceLoc("example.slang", 10, 30), "Int64", 19});
-              return spans;
-          }(),
-          .notes = List<TestDiagnosticNote>()}},
-
-    {.name = "undeclared_variable",
-     .sourceFileName = "example.slang",
-     .sourceContent = R"(struct VertexInput {
-    float4 position : POSITION;
-};
-
-struct PixelShader {
-    float4 main(VertexInput input) : SV_Target {
-        Int64 x = undefinedVariable; // Undefined variable
-        return float4(x, 0, 0, 1);
-    }
-}
-)",
-     .expectedOutput = R"(
-error[E1003]: use of undeclared identifier 'undefinedVariable'
- --> example.slang:7:17
-  |
-7 | Int64 x = undefinedVariable; // Undefined variable
-  |         ^^^^^^^^^^^^^^^^^ not found in this scope
-)",
-     .diagnostic =
-         {.code = 1003,
-          .severity = Severity::Error,
-          .message = "use of undeclared identifier 'undefinedVariable'",
-          .primarySpan = {SourceLoc("example.slang", 7, 17), "not found in this scope", 17},
-          .secondarySpans = List<TestDiagnosticSpan>(),
-          .notes = List<TestDiagnosticNote>()}},
-
-    {.name = "wrong_type_assignment",
-     .sourceFileName = "example.slang",
-     .sourceContent = R"(struct VertexInput {
-    float4 position : POSITION;
-};
-
-struct PixelShader {
-    float4 main(VertexInput input) : SV_Target {
-        float y = "string"; // Wrong type assignment
-        return float4(y, 0, 0, 1);
-    }
-}
-)",
-     .expectedOutput = R"(
-error[E1004]: mismatched types
- --> example.slang:7:19
-  |
-7 | float y = "string"; // Wrong type assignment
-  | -----     ^^^^^^^^ expected `float`, found `&str`
-  | |
-  | expected due to this type
-)",
-     .diagnostic =
-         {.code = 1004,
-          .severity = Severity::Error,
-          .message = "mismatched types",
-          .primarySpan = {SourceLoc("example.slang", 7, 19), "expected `float`, found `&str`", 8},
-          .secondarySpans =
-              []()
-          {
-              List<TestDiagnosticSpan> spans;
-              spans.add({SourceLoc("example.slang", 7, 9), "expected due to this type", 5});
-              return spans;
-          }(),
-          .notes = List<TestDiagnosticNote>()}},
-
-    {.name = "division_by_zero_warning",
-     .sourceFileName = "math.slang",
-     .sourceContent = R"(float3 normalize(float3 v) {
-    float len = sqrt(dot(v, v));
-    return v / len; // Potential division by zero
-}
-
-struct VertexShader {
-    float4 main() : SV_Position {
-        return float4(0, 0, 0, 1);
-    }
-}
-)",
-     .expectedOutput = R"(
-warning[E2001]: potential division by zero
- --> math.slang:3:14
-  |
-2 | float len = sqrt(dot(v, v));
-  |             --------------- length computed here
-3 | return v / len; // Potential division by zero
-  |          ^ division by zero if `len` is 0.0
-
-note: consider using 'normalize' builtin function instead
- --- math.slang:1:8
-  |
-1 | float3 normalize(float3 v) {
-  |        ---------
-)",
-     .diagnostic = {
-         .code = 2001,
-         .severity = Severity::Warning,
-         .message = "potential division by zero",
-         .primarySpan = {SourceLoc("math.slang", 3, 14), "division by zero if `len` is 0.0", 1},
-         .secondarySpans =
-             []()
-         {
-             List<TestDiagnosticSpan> spans;
-             spans.add({SourceLoc("math.slang", 2, 17), "length computed here", 15});
-             return spans;
-         }(),
-         .notes =
-             []()
-         {
-             List<TestDiagnosticNote> notes;
-             notes.add(
-                 {.message = "consider using 'normalize' builtin function instead",
-                  .span = {SourceLoc("math.slang", 1, 8), "", 9}});
-             return notes;
-         }()}},
-
-    {.name = "mismatched_types_complex",
-     .sourceFileName = "example.slang",
-     .sourceContent = R"(struct Data {
-    string name = "User";
-};
-
-struct PixelShader {
-    float4 main() : SV_Target {
-        Data data;
-        float result = 5.0 + data.name;
-        return float4(result, 0, 0, 1);
-    }
-}
-)",
-     .expectedOutput = R"(
-error[E0308]: mismatched types
- --> example.slang:8:28
-  |
-2 | string name = "User";
-  | ------ defined as `string` here
-...
-8 |     float result = 5.0 + data.name;
-  |                    --- ^ --------- expected `float`
-  |                    |   |
-  |                    |   `+` cannot be applied to these types
-  |                    |
-  |                    float
-)",
-     .diagnostic = {
-         .code = 308,
-         .severity = Severity::Error,
-         .message = "mismatched types",
-         .primarySpan =
-             {SourceLoc("example.slang", 8, 28), "`+` cannot be applied to these types", 1},
-         .secondarySpans =
-             []()
-         {
-             List<TestDiagnosticSpan> spans;
-             spans.add({SourceLoc("example.slang", 2, 5), "defined as `string` here", 6});
-             spans.add({SourceLoc("example.slang", 8, 24), "float", 3});
-             spans.add({SourceLoc("example.slang", 8, 30), "expected `float`", 9});
-             return spans;
-         }(),
-         .notes = List<TestDiagnosticNote>()}}};
-
-const size_t NUM_TESTS = sizeof(testCases) / sizeof(testCases[0]);
-
-//
-//
-//
-
-String trimNewlines(const String& str)
-{
-    Index start = 0;
-    while (start < str.getLength() && (str[start] == '\n' || str[start] == '\r'))
-        ++start;
-    Index end = str.getLength();
-    while (end > start && (str[end - 1] == '\n' || str[end - 1] == '\r'))
-        --end;
-    return str.subString(start, end - start);
-}
-
-Int64 calculateFallbackLength(const UnownedStringSlice& line, Int64 col)
-{
-    if (col < 1 || col > Int64{line.getLength()})
-        return 1;
-    Int64 start = col - 1;
-    Int64 len = 0;
-    for (Index i = start; i < line.getLength(); ++i)
-    {
-        char ch = line[i];
-        if (std::isalnum(static_cast<unsigned char>(ch)) || ch == '_')
-            ++len;
-        else
-            break;
-    }
-    return len > 0 ? len : 1;
-}
-
-//
-// TestData -> RenderDiagnostic
-//
-
-Slang::SourceLoc calcSourceLoc(SourceView* view, Int64 lineIndex, Int64 columnOneBased)
-{
-    SLANG_ASSERT(view);
-    SourceFile* file = view->getSourceFile();
-    SourceFile::OffsetRange lineRange = file->getOffsetRangeAtLineIndex(Index(lineIndex));
-    uint32_t lineStart = lineRange.isValid() ? lineRange.start : 0;
-    uint32_t columnOffset = columnOneBased > 0 ? uint32_t(columnOneBased - 1) : 0;
-    if (lineRange.isValid())
-    {
-        uint32_t lineLength = lineRange.getCount();
-        if (columnOffset > lineLength)
-            columnOffset = lineLength;
-    }
-    Slang::SourceLoc base = view->getRange().begin;
-    return base + Int64(lineStart + columnOffset);
-}
-
-DiagnosticSpan createRenderSpan(SourceView* view, const TestDiagnosticSpan& inputSpan)
-{
-    DiagnosticSpan outSpan;
-    outSpan.message = inputSpan.message;
-
-    if (!view)
-        return outSpan;
-
-    SourceFile* file = view->getSourceFile();
-
-    // Convert 1-based line to 0-based index
-    Int64 lineIndex = std::max(Int64{0}, inputSpan.location.line - 1);
-
-    // Resolve length if not provided (legacy fallback behavior)
-    Int64 length = inputSpan.length;
-    if (length <= 0)
-    {
-        // Fetch line content to calculate fallback length
-        UnownedStringSlice lineContent = file->getLineAtIndex(lineIndex);
-        length = calculateFallbackLength(lineContent, inputSpan.location.column);
-    }
-
-    Slang::SourceLoc begin = calcSourceLoc(view, lineIndex, inputSpan.location.column);
-    Slang::SourceLoc end =
-        calcSourceLoc(view, lineIndex, inputSpan.location.column + inputSpan.length);
-
-    outSpan.range = Slang::SourceRange(begin, end);
-    return outSpan;
-}
-
-GenericDiagnostic createRenderDiagnostic(SourceManager& sm, TestData& test)
-{
-    GenericDiagnostic outDiag;
-    outDiag.code = test.diagnostic.code;
-    outDiag.severity = test.diagnostic.severity;
-    outDiag.message = test.diagnostic.message;
-
-    // Create the source infrastructure if not already present
-    if (!test.sourceFile)
-    {
-        PathInfo pathInfo = PathInfo::makePath(String(test.sourceFileName));
-        test.sourceFile = sm.createSourceFileWithString(pathInfo, test.sourceContent);
-    }
-
-    // Create view for the file
-    SourceView* view = sm.createSourceView(test.sourceFile, nullptr, Slang::SourceLoc());
-
-    // Map spans
-    outDiag.primarySpan = createRenderSpan(view, test.diagnostic.primarySpan);
-
-    for (const auto& sec : test.diagnostic.secondarySpans)
-    {
-        outDiag.secondarySpans.add(createRenderSpan(view, sec));
-    }
-
-    for (const auto& note : test.diagnostic.notes)
-    {
-        DiagnosticNote outNote;
-        outNote.message = note.message;
-        outNote.span = createRenderSpan(view, note.span);
-        outDiag.notes.add(outNote);
-    }
-
-    return outDiag;
-}
-
-//
-//
-//
-
-void writeTempFile(const std::string& path, const std::string& content)
-{
-    std::ofstream file(path);
-    file << content << '\n';
-}
-
-Int64 runDiff(const std::string& expected, const std::string& actual)
-{
-    writeTempFile("expected.tmp", expected);
-    writeTempFile("actual.tmp", actual);
-    Int64 result = std::system("diff -u expected.tmp actual.tmp");
-    std::remove("expected.tmp");
-    std::remove("actual.tmp");
-    return result;
-}
-
-} // namespace
-
-int slangRichDiagnosticsUnitTest(int argc, char* argv[])
-{
-    Int64 maxTests = -1;
-    bool useColor = false;
-    bool useUnicode = false;
-    bool forceOutput = false;
-
-    for (Int64 i = 1; i < argc; ++i)
-    {
-        if (std::strcmp(argv[i], "--until") == 0 && i + 1 < argc)
+        // When span has zero length (begin == end), use the lexer to find token boundaries,
+        // mirroring the logic in buildSectionLayout for rich diagnostics
+        if (sll && span.range.begin == span.range.end && beginLoc.line > 0)
         {
-            maxTests = std::atoi(argv[i + 1]);
-            ++i;
+            SourceView* view = sm->findSourceView(span.range.begin);
+            if (view)
+            {
+                UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
+                    view->getSourceFile()->getLineAtIndex(beginLoc.line - 1));
+                UnownedStringSlice lineContent =
+                    UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
+                if (lineContent.getLength() > 0 && beginLoc.column > 0 &&
+                    beginLoc.column - 1 < lineContent.getLength())
+                {
+                    Int64 tokenLen = sll(lineContent.tail(beginLoc.column - 1)).getLength();
+                    if (tokenLen > 0)
+                    {
+                        endLoc.line = beginLoc.line;
+                        endLoc.column = beginLoc.column + tokenLen;
+                    }
+                }
+            }
         }
-        else if (std::strcmp(argv[i], "--color") == 0)
+
+        // Check for locationless span (0,0)
+        bool isLocationless = (beginLoc.line == 0 && beginLoc.column == 0);
+        if (isLocationless)
         {
-            useColor = true;
+            // Skip outputting 0,0 spans with no message - they provide no value
+            if ((strcmp(severity, "span") == 0 || strcmp(severity, "note-span") == 0) &&
+                message.getLength() == 0)
+            {
+                return false;
+            }
         }
-        else if (std::strcmp(argv[i], "--unicode") == 0)
+
+        sb << "E" << codeStr << "\t";
+        sb << severity << "\t";
+        sb << beginLoc.pathInfo.foundPath << "\t";
+        sb << beginLoc.line << "\t";
+        sb << beginLoc.column << "\t";
+        sb << endLoc.line << "\t";
+        sb << endLoc.column << "\t";
+        sb << message << "\n";
+        return true;
+    };
+
+    // Output primary diagnostic
+    outputSpan(diag.primarySpan, getSeverityName(diag.severity), diag.message);
+
+    // Output primary span message (if it has a valid location or message)
+    outputSpan(diag.primarySpan, "span", diag.primarySpan.message);
+
+    // Output secondary spans
+    for (const auto& secondarySpan : diag.secondarySpans)
+    {
+        outputSpan(secondarySpan, "span", secondarySpan.message);
+    }
+
+    // Output notes
+    for (const auto& note : diag.notes)
+    {
+        // Output the note's primary span
+        outputSpan(note.span, "note", note.message);
+
+        // Output any secondary spans attached to the note
+        for (const auto& secondarySpan : note.secondarySpans)
         {
-            useUnicode = true;
-        }
-        else if (std::strcmp(argv[i], "--output") == 0)
-        {
-            forceOutput = true;
+            outputSpan(secondarySpan, "note-span", secondarySpan.message);
         }
     }
 
-    if (maxTests == 0)
-    {
-        std::cout << "Test harness initialized with " << NUM_TESTS << " test cases.\n";
-        return 0;
-    }
-
-    Int64 testLimit = (maxTests == -1) ? Int64{NUM_TESTS} : std::min(maxTests, Int64{NUM_TESTS});
-
-    std::cout << "Running " << testLimit << " test(s)...\n";
-
-    Int64 passed = 0;
-    Int64 failed = 0;
-
-    SourceManager sm;
-    sm.initialize(nullptr, nullptr);
-    DiagnosticSink sink;
-
-    DiagnosticRenderOptions options;
-    options.enableTerminalColors = useColor;
-    options.enableUnicode = useUnicode;
-
-    for (Int64 i = 0; i < testLimit; ++i)
-    {
-        TestData& test = testCases[i];
-
-        std::cout << "\nTest " << (i + 1) << ": " << test.name << '\n';
-
-        // 1. Convert Input Data -> System Types
-        GenericDiagnostic renderDiag = createRenderDiagnostic(sm, test);
-
-        // 2. Render using the provided options
-        String actualOutput =
-            renderDiagnostic(sink.getSourceLocationLexer(), &sm, options, renderDiag);
-
-        if (forceOutput)
-        {
-            std::cout << "--- Render Output ---\n";
-            std::cout << actualOutput.getBuffer();
-            std::cout << "---------------------\n";
-        }
-
-        // If color or unicode is enabled, we don't compare against expected text because
-        // the expected text doesn't contain ANSI escape sequences.
-        if (useColor || useUnicode)
-        {
-            std::cout << "Visual Check (Color/Unicode Enabled)\n";
-            ++passed;
-            continue;
-        }
-
-        String actualTrimmed = trimNewlines(actualOutput);
-        String expectedTrimmed = trimNewlines(test.expectedOutput);
-
-        if (actualTrimmed == expectedTrimmed)
-        {
-            std::cout << "PASS\n";
-            ++passed;
-        }
-        else
-        {
-            std::cout << "FAIL - Output mismatch\nRunning diff...\n";
-            runDiff(
-                std::string(expectedTrimmed.getBuffer()),
-                std::string(actualTrimmed.getBuffer()));
-            ++failed;
-        }
-    }
-
-    std::cout << "\nResults: " << passed << " passed, " << failed << " failed\n";
-    return failed > 0 ? 1 : 0;
+    return sb.produceString();
 }
-
-#endif // SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS
 
 } // namespace Slang

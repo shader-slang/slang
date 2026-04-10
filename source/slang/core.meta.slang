@@ -130,6 +130,12 @@ attribute_syntax [ExperimentalModule] : ExperimentalModuleAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
 
+__attributeTarget(DeclBase)
+attribute_syntax [HasTrivialForwardDerivative] : HasTrivialForwardDerivativeAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax [MaybeDifferentiable] : MaybeDifferentiableAttribute;
+
 /// Represents types that provide arithmetic operations.
 interface IArithmetic : IComparable
 {
@@ -298,42 +304,42 @@ interface IInteger : IArithmetic, ILogical
 interface IFloat : IArithmetic, IDifferentiable
 {
     /// Initializes a value of the conforming type form a `float`.
-    [TreatAsDifferentiable]
+    [Differentiable]
     __init(float value);
 
     /// Converts a value of the conforming type into a `float`.
-    [TreatAsDifferentiable]
+    [Differentiable]
     float toFloat();
 
     /// Computes the arithmetic sum of two values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This add(This other);
 
     /// Computes the arithmetic subtraction from values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This sub(This other);
 
     /// Computes the arithmetic multiplication from values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This mul(This other);
 
     /// Computes the arithmetic division from values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This div(This other);
 
     /// Computes the arithmetic remainder from values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This mod(This other);
 
     /// Computes the arithmetic negation of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This neg();
 
-    [TreatAsDifferentiable]
+    [Differentiable]
     __init(This value);
 
     /// Multiplies a value of the conforming type by a floating point scale factor..
-    [TreatAsDifferentiable]
+    [Differentiable]
     This scale<T:__BuiltinFloatingPointType>(T scale);
 }
 
@@ -349,7 +355,7 @@ interface __BuiltinType
 /// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinType, IArithmetic
+interface __BuiltinArithmeticType : __BuiltinType, IArithmetic, ICoopElement
 {
 }
 
@@ -392,6 +398,9 @@ interface __BuiltinRealType : __BuiltinSignedArithmeticType {}
 
 __attributeTarget(AggTypeDecl)
 attribute_syntax [__NonCopyableType] : NonCopyableTypeAttribute;
+
+__attributeTarget(InterfaceDecl)
+attribute_syntax [__FunctionInterface] : FunctionInterfaceAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__NoSideEffect] : NoSideEffectAttribute;
@@ -617,16 +626,11 @@ interface IDifferentiable
 
     /// Returns a zero-initialized value of the differential type.
     __builtin_requirement($((int)BuiltinRequirementKind::DZeroFunc))
-    static Differential dzero();
+    [Differentiable] static Differential dzero();
 
     /// Adds two differential values and returns the result.
     __builtin_requirement($((int)BuiltinRequirementKind::DAddFunc))
-    static Differential dadd(Differential, Differential);
-
-    /// Multiplies a scalar value of a built-in real type with a differential value and returns the result.
-    __builtin_requirement($((int)BuiltinRequirementKind::DMulFunc))
-    __generic<T : __BuiltinRealType>
-    static Differential dmul(T, Differential);
+    [Differentiable] static Differential dadd(Differential, Differential);
 };
 
 /// @experimental
@@ -656,6 +660,75 @@ interface IDifferentiablePtrType
     associatedtype Differential : IDifferentiablePtrType;
 };
 
+__magic_type(FwdDiffFuncType)
+__intrinsic_type($(kIROp_ForwardDiffFuncType))
+struct FwdDiffFuncType<FType> where __hasDiffTypeInfo(FType)
+{ };
+
+__magic_type(BwdCallableFuncType)
+__intrinsic_type($(kIROp_BwdCallableFuncType))
+struct BwdCallableFuncType<FType, CtxType> where __hasDiffTypeInfo(FType)
+{ };
+
+__magic_type(RematFuncType)
+__intrinsic_type($(kIROp_RematFuncType))
+struct RematFuncType<FType, MinimalCtxType, FullCtxType> where __hasDiffTypeInfo(FType)
+{ };
+
+__magic_type(ApplyForBwdFuncType)
+__intrinsic_type($(kIROp_ApplyForBwdFuncType))
+struct ApplyForBwdFuncType<FType, CtxType> where __hasDiffTypeInfo(FType)
+{ };
+
+__magic_type(BwdDiffFuncType)
+__intrinsic_type($(kIROp_BackwardDiffFuncType))
+struct BwdDiffFuncType<FType> where __hasDiffTypeInfo(FType)
+{ };
+
+__magic_type(ForwardDiffFuncInterfaceType)
+[KnownBuiltin($((int)KnownBuiltinDeclName::IForwardDifferentiable))]
+[__FunctionInterface]
+interface IForwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
+    [MaybeDifferentiable]
+    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff 
+};
+
+// Core library interfaces:
+__magic_type(BwdCallableBaseType)
+[KnownBuiltin($((int)KnownBuiltinDeclName::IBwdCallable))]
+interface IBwdCallable<FType> where __hasDiffTypeInfo(FType)
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallablePropFunc))
+    __associatedfunc BwdCallableFuncType<FType, This> operator(); // -> bwd_prop
+};
+
+__magic_type(BwdDiffFuncInterfaceType)
+[KnownBuiltin($((int)KnownBuiltinDeclName::IBackwardDifferentiable))]
+[__FunctionInterface]
+interface IBackwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
+    associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::MinimalContextType)) 
+    associatedtype MinimalContext; // -> minimal_context_type
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
+    __associatedfunc ApplyForBwdFuncType<FType, This.MinimalContext> apply_bwd; // -> apply_bwd
+
+    // WARNING: Currently, the func-type produced by 'remat' is actually inconsistent
+    // with the implementation because the position of the 'this-type' is different.
+    // This isn't an issue at the moment since the IR generates
+    // both the implementation and the call, butthis needs to be fixed.
+    // 
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableRematFunc))
+    __associatedfunc RematFuncType<FType, This.MinimalContext, This.BwdCallable> remat; // -> remat
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
+    __associatedfunc BwdDiffFuncType<FType> bwd_diff; // -> bwd_diff
+};
 
 /// `DifferentialPair<T>` is a built-in type that carries both the original and derivative value of a term.
 /// It is defined as follows:
@@ -680,30 +753,30 @@ interface IDifferentiablePtrType
 ///
 __generic<T : IDifferentiable>
 __magic_type(DifferentialPairType)
-__intrinsic_type($(kIROp_DifferentialPairUserCodeType))
+__intrinsic_type($(kIROp_DifferentialPairType))
 struct DifferentialPair : IDifferentiable
 {
     typedef DifferentialPair<T.Differential> Differential;
     typedef T.Differential DifferentialElementType;
 
-    __intrinsic_op($(kIROp_MakeDifferentialPairUserCode))
-    __init(T _primal, T.Differential _differential);
+    __intrinsic_op($(kIROp_MakeDifferentialPair))
+    [Differentiable] __init(T _primal, T.Differential _differential);
 
     property p : T
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
         get;
     }
 
     property v : T
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
         get;
     }
 
     property d : T.Differential
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetDifferentialUserCode))
+        __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
         get;
     }
 
@@ -720,12 +793,14 @@ struct DifferentialPair : IDifferentiable
     }
 
     [__unsafeForceInlineEarly]
+    [Differentiable]
     static Differential dzero()
     {
         return Differential(T.dzero(), T.Differential.dzero());
     }
 
     [__unsafeForceInlineEarly]
+    [Differentiable]
     static Differential dadd(Differential a, Differential b)
     {
         return Differential(
@@ -734,15 +809,6 @@ struct DifferentialPair : IDifferentiable
                 b.p
             ),
             T.Differential.dadd(a.d, b.d));
-    }
-
-    __generic<U : __BuiltinRealType>
-    [__unsafeForceInlineEarly]
-    static Differential dmul(U a, Differential b)
-    {
-        return Differential(
-            T.dmul<U>(a, b.p),
-            T.Differential.dmul<U>(a, b.d));
     }
 };
 
@@ -807,6 +873,21 @@ struct DifferentialPtrPair : IDifferentiablePtrType
 };
 
 
+[sealed]
+[builtin]
+interface ICoopElement
+{
+    [OverloadRank(-1)]
+    __init(int val);
+}
+
+[sealed]
+[builtin]
+interface IFloatingPointCoopElement : ICoopElement
+{
+}
+
+
 /// Represents builtin floating point scalar types.
 /// To define generic functions that work with both scalar and vector types, use `IFloat` instead.
 ///
@@ -814,7 +895,7 @@ struct DifferentialPtrPair : IDifferentiablePtrType
 [sealed]
 [builtin]
 [TreatAsDifferentiable]
-interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat
+interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat, IFloatingPointCoopElement
 {
         /// Get the value of the mathematical constant pi in this type.
     [Differentiable]
@@ -998,6 +1079,11 @@ __generic<T> Optional<T> select(bool condition, T ifTrue, __none_t ifFalse)
     return select(condition, Optional<T>(ifTrue), Optional<T>(none));
 }
 
+// Cast between any two floating point types, including substandard floating point types
+// like FloatE4M3, FloatE5M2, BFloat16, etc.
+__intrinsic_op($(kIROp_FloatCast))
+T floatCast<T:IFloatingPointCoopElement, U:IFloatingPointCoopElement>(U val);
+
 // Allow real-number types to be cast into each other
 //@hidden:
 __intrinsic_op($(kIROp_FloatCast))
@@ -1106,7 +1192,7 @@ ${
 
         const char* attrib = "";
         if ((kBaseTypes[tt].flags & kBaseTypes[ss].flags & FLOAT_MASK) != 0)
-            attrib = "[TreatAsDifferentiable]";
+            attrib = "[Differentiable]";
 $}
     $(attrib)
     __intrinsic_op($(intrinsicOpCode))
@@ -1207,37 +1293,30 @@ $}
          __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
          __intrinsic_op($(kIROp_Leq))  bool lessThanOrEquals(This other);
          __intrinsic_op($(kIROp_Eql))  bool equals(This other);
-         __intrinsic_op($(kIROp_Add))  This add(This other);
-         __intrinsic_op($(kIROp_Sub))  This sub(This other);
-         __intrinsic_op($(kIROp_Mul))  This mul(This other);
-         __intrinsic_op($(kIROp_Div))  This div(This other);
-         __intrinsic_op($(kIROp_FRem)) This mod(This other);
-         __intrinsic_op($(kIROp_Neg))  This neg();
-         __intrinsic_op($(kIROp_FloatCast)) float toFloat();
-         [__unsafeForceInlineEarly] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
+         __intrinsic_op($(kIROp_Add))  [Differentiable] This add(This other);
+         __intrinsic_op($(kIROp_Sub))  [Differentiable] This sub(This other);
+         __intrinsic_op($(kIROp_Mul))  [Differentiable] This mul(This other);
+         __intrinsic_op($(kIROp_Div))  [Differentiable] This div(This other);
+         __intrinsic_op($(kIROp_FRem)) [Differentiable] This mod(This other);
+         __intrinsic_op($(kIROp_Neg))  [Differentiable] This neg();
+         __intrinsic_op($(kIROp_FloatCast)) [Differentiable] float toFloat();
+         [__unsafeForceInlineEarly] [Differentiable] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
         typedef $(kBaseTypes[tt].name) Differential;
 
         [__unsafeForceInlineEarly]
-        [BackwardDifferentiable]
+        [Differentiable]
         static Differential dzero()
         {
             return Differential(0);
         }
 
         [__unsafeForceInlineEarly]
-        [BackwardDifferentiable]
+        [Differentiable]
         static Differential dadd(Differential a, Differential b)
         {
             return a + b;
         }
-
-        __generic<U : __BuiltinRealType>
-        [__unsafeForceInlineEarly]
-        [BackwardDifferentiable]
-        static Differential dmul(U a, Differential b)
-        {
-            return __realCast<Differential, U>(a) * b;
-        }
+        
 ${
         break;
     }
@@ -1270,6 +1349,7 @@ $}
 
 //@hidden:
 __magic_type(NullPtrType)
+__intrinsic_type($(kIROp_RawPointerType))
 struct NullPtr
 {
 };
@@ -1336,12 +1416,13 @@ __magic_type(PtrType)
 struct Ptr<
     T,
     Access access = Access.ReadWrite,
-    AddressSpace addrSpace = AddressSpace.Device>
+    AddressSpace addrSpace = AddressSpace.Device,
+    L:IBufferDataLayout = DefaultDataLayout>
 {
     // A user is allowed to explicitly cast between any pointer type of
     // the same address space
     __intrinsic_op($(kIROp_BitCast))
-    __init<U, Access accessOther>(Ptr<U, accessOther, addrSpace> ptr);
+    __init<U, Access accessOther>(Ptr<U, accessOther, addrSpace, L> ptr);
 
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(uint64_t val);
@@ -1398,7 +1479,11 @@ struct Ptr<
 /// execution of the program. This knowledge allows the compiler to perform more aggressive optimizations around the memory
 /// accesses through such pointers. If the data is changed during the program execution, the behavior is undefined and loaded
 /// data through such pointers may be invalid.
-typealias ImmutablePtr<T, AddressSpace addrSpace = AddressSpace.Device> = Ptr<T, Access.Immutable, addrSpace>;
+typealias ImmutablePtr<T, AddressSpace addrSpace = AddressSpace.Device, L:IBufferDataLayout = DefaultDataLayout> = Ptr<T, Access.Immutable, addrSpace, L>;
+
+/// Represents a pointer with custom data layout as a shorthand for Ptr<T>.
+/// Such pointers are almost always in the Device address space.
+typealias LayoutPtr<T, L:IBufferDataLayout> = Ptr<T, Access.ReadWrite, AddressSpace.Device, L>;
 
 //@hidden:
 __intrinsic_op($(kIROp_AlignedAttr))
@@ -1446,10 +1531,10 @@ __intrinsic_op($(kIROp_MemoryScopeAttr))
 internal int __memoryscope_attr(MemoryScope scope);
 
 __intrinsic_op($(kIROp_Load))
-internal T __load_coherent<T, Access access, AddressSpace addrSpace>(Ptr<T, access, addrSpace> ptr, int alignmentAttr, int memoryScopeAttr);
+internal T __load_coherent<T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>(Ptr<T, access, addrSpace, L> ptr, int alignmentAttr, int memoryScopeAttr);
 
 __intrinsic_op($(kIROp_Store))
-internal void __store_coherent<T, AddressSpace addrSpace>(Ptr<T, Access::ReadWrite, addrSpace> ptr, T value, int alignmentAttr, int memoryScopeAttr);
+internal void __store_coherent<T, AddressSpace addrSpace, L:IBufferDataLayout>(Ptr<T, Access::ReadWrite, addrSpace, L> ptr, T value, int alignmentAttr, int memoryScopeAttr);
 
 /// Store a value coherently to a memoryscope.
 /// Tighter memory scopes may be faster to operate on.
@@ -1458,10 +1543,10 @@ internal void __store_coherent<T, AddressSpace addrSpace>(Ptr<T, Access::ReadWri
 ///
 [require(SPV_KHR_vulkan_memory_model)]
 [ForceInline]
-__generic<int alignment, MemoryScope scope, T, AddressSpace addrSpace>
-void storeCoherent(Ptr<T, Access::ReadWrite, addrSpace> ptr, T value)
+__generic<int alignment, MemoryScope scope, T, AddressSpace addrSpace, L:IBufferDataLayout>
+void storeCoherent(Ptr<T, Access::ReadWrite, addrSpace, L> ptr, T value)
 {
-    __store_coherent<T, addrSpace>(ptr, value, __align_attr(alignment), __memoryscope_attr(scope));
+    __store_coherent<T, addrSpace, L>(ptr, value, __align_attr(alignment), __memoryscope_attr(scope));
 }
 
 /// Load a value coherently to a memoryscope.
@@ -1471,19 +1556,19 @@ void storeCoherent(Ptr<T, Access::ReadWrite, addrSpace> ptr, T value)
 [require(SPV_KHR_vulkan_memory_model)]
 [ForceInline]
 [__NoSideEffect]
-__generic<int alignment, MemoryScope scope, T, Access access, AddressSpace addrSpace>
-T loadCoherent(Ptr<T, access, addrSpace> ptr)
+__generic<int alignment, MemoryScope scope, T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>
+T loadCoherent(Ptr<T, access, addrSpace, L> ptr)
 {
-    return __load_coherent<T, access, addrSpace>(ptr, __align_attr(alignment), __memoryscope_attr(scope));
+    return __load_coherent<T, access, addrSpace, L>(ptr, __align_attr(alignment), __memoryscope_attr(scope));
 }
 
 ${
     StringBuilder ptrTypeParameterListBuilder;
-    ptrTypeParameterListBuilder << "T, Access access, AddressSpace addrSpace";
+    ptrTypeParameterListBuilder << "T, Access access, AddressSpace addrSpace, L:IBufferDataLayout";
     String ptrTypeParameterList = ptrTypeParameterListBuilder.toString();
 
     StringBuilder ptrArgListBuilder;
-    ptrArgListBuilder << "T, access, addrSpace";
+    ptrArgListBuilder << "T, access, addrSpace, L";
     String ptrArgList = ptrArgListBuilder.toString();
 
     StringBuilder fullPtrTypeBuilder;
@@ -1587,6 +1672,74 @@ extension uintptr_t : IRangedValue
     static const uintptr_t minValue = 0z;
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
 }
+
+
+// Packed float types.
+
+/// Represent a 8-bit floating point value with 4 bits of exponent and 3 bits of mantissa.
+[require(spvFloat8EXT)]
+[require(cuda_sm_8_0)]
+__intrinsic_type($(kIROp_FloatE4M3Type))
+__magic_type(FloatE4M3Type)
+struct FloatE4M3 : IFloatingPointCoopElement
+{
+    __intrinsic_op($(kIROp_CastIntToFloat))
+    __init(int val);
+
+    [OverloadRank(-10)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:IFloatingPointCoopElement>
+    __init(U val);
+}
+
+/// Represent a 8-bit floating point value with 5 bits of exponent and 2 bits of mantissa.
+[require(spvFloat8EXT)]
+[require(cuda_sm_8_0)]
+__intrinsic_type($(kIROp_FloatE5M2Type))
+__magic_type(FloatE5M2Type)
+struct FloatE5M2 : IFloatingPointCoopElement
+{
+    __intrinsic_op($(kIROp_CastIntToFloat))
+    __init(int val);
+
+    [OverloadRank(-10)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:IFloatingPointCoopElement>
+    __init(U val);
+}
+
+/// Represent a 16-bit floating point value with 8 bits of exponent and 7 bits of mantissa.
+[require(spvBFloat16KHR)]
+[require(cuda_sm_8_0)]
+__intrinsic_type($(kIROp_BFloat16Type))
+__magic_type(BFloat16Type)
+struct BFloat16 : IFloatingPointCoopElement
+{
+    __intrinsic_op($(kIROp_CastIntToFloat))
+    __init(int val);
+
+    [OverloadRank(-10)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:IFloatingPointCoopElement>
+    __init(U val);
+}
+
+
+extension<T:__BuiltinFloatingPointType> T
+{
+    [OverloadRank(-5)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __init(FloatE4M3 val);
+
+    [OverloadRank(-5)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __init(FloatE5M2 val);
+
+    [OverloadRank(-5)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __init(BFloat16 val);
+}
+
 
 //@hidden:
 
@@ -1693,20 +1846,26 @@ bool operator!=(__none_t noneVal, Optional<T> val)
     return val.hasValue;
 }
 
+__magic_type(ConditionalType)
+__intrinsic_type($(kIROp_ConditionalType))
 struct Conditional<T, bool hasValue>
 {
-    internal T storage[hasValue];
+    internal property T value
+    {
+        __intrinsic_op($(kIROp_GetConditionalValue))
+        get;
+    }
 
     __implicit_conversion($(kConversionCost_ValToOptional))
-    [__unsafeForceInlineEarly]
-    __init(T val) { if (hasValue) storage[0] = val;}
+    __intrinsic_op($(kIROp_MakeConditionalValue))
+    __init(T val);
 
     [__unsafeForceInlineEarly]
     public Optional<T> get()
     {
         if (hasValue)
         {
-            return Optional<T>(storage[0]);
+            return Optional<T>(value);
         }
         else
         {
@@ -1716,10 +1875,10 @@ struct Conditional<T, bool hasValue>
 
     [__unsafeForceInlineEarly]
     [mutating]
-    public void set(T value)
+    public void set(T newValue)
     {
         if (hasValue)
-            storage[0] = value;
+            this = Conditional<T, hasValue>(newValue);
     }
 }
 
@@ -1731,7 +1890,7 @@ extension<T> Optional<T>
     __init(Conditional<T, condHasValue> condVal)
     {
         if (condHasValue)
-            this = Optional<T>(condVal.storage[0]);
+            this = Optional<T>(condVal.value);
         else
             this = none;
     }
@@ -2088,7 +2247,6 @@ struct vector : IRWArray<T>
 
 
         /// Initialize a vector where all elements have the same scalar `value`.
-    [TreatAsDifferentiable]
     __implicit_conversion($(kConversionCost_ScalarToVector))
     __intrinsic_op($(kIROp_MakeVectorFromScalar))
     __init(T value);
@@ -2096,7 +2254,6 @@ struct vector : IRWArray<T>
     /// Initialize a vector from a value of the same type
     // TODO: we should revise semantic checking so this kind of "identity" conversion is not required
     __intrinsic_op(0)
-    [TreatAsDifferentiable]
     __init(vector<T,N> value);
 
     [ForceInline]
@@ -2116,13 +2273,11 @@ struct matrix : IRWArray<vector<T,C>>
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
-    [TreatAsDifferentiable]
     __init(T val);
 
     /// Initialize a vector from a value of the same type
     // TODO: we should revise semantic checking so this kind of "identity" conversion is not required
     __intrinsic_op(0)
-    [TreatAsDifferentiable]
     __init(This value);
 
     [ForceInline]
@@ -2195,22 +2350,32 @@ extension vector<T,N> : IInteger
     __init(vector<U, N> other);
 }
 
+extension<T:IFloatingPointCoopElement, let N : int> vector<T,N>
+{
+    [OverloadRank(-1)]
+    __implicit_conversion($(kConversionCost_Default))
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:IFloatingPointCoopElement>
+    __init(vector<U, N> other);
+}
+
 __generic<T:__BuiltinFloatingPointType, let N : int>
 extension vector<T,N> : IFloat
 {
     [__unsafeForceInlineEarly] bool lessThan(This other) { return this[0] < other[0]; }
     [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this[0] <= other[0]; }
     [__unsafeForceInlineEarly] bool equals(This other) { return all(__vectorEql(this, other)); }
-    __intrinsic_op($(kIROp_Add)) This add(This other);
-    __intrinsic_op($(kIROp_Sub)) This sub(This other);
-    __intrinsic_op($(kIROp_Mul)) This mul(This other);
-    __intrinsic_op($(kIROp_Div)) This div(This other);
-    __intrinsic_op($(kIROp_FRem)) This mod(This other);
-    __intrinsic_op($(kIROp_Neg)) This neg();
-    [__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
-    [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
+    __intrinsic_op($(kIROp_Add)) [Differentiable] This add(This other);
+    __intrinsic_op($(kIROp_Sub)) [Differentiable] This sub(This other);
+    __intrinsic_op($(kIROp_Mul)) [Differentiable] This mul(This other);
+    __intrinsic_op($(kIROp_Div)) [Differentiable] This div(This other);
+    __intrinsic_op($(kIROp_FRem)) [Differentiable] This mod(This other);
+    __intrinsic_op($(kIROp_Neg)) [Differentiable] This neg();
+    [Differentiable] [__unsafeForceInlineEarly]  This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
+    [Differentiable] [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
 
     [OverloadRank(-1)]
+    [Differentiable]
     __implicit_conversion($(kConversionCost_Default))
     __intrinsic_op($(kIROp_FloatCast))
     __generic<U:__BuiltinFloatingPointType>
@@ -2224,7 +2389,7 @@ extension vector<T,N> : IFloat
     [OverloadRank(-1)]
     [__unsafeForceInlineEarly] __init(int v) { this = vector<T,N>(T(v)); }
     [OverloadRank(-1)]
-    [__unsafeForceInlineEarly] __init(float v) { this = vector<T,N>(T(v)); }
+    [__unsafeForceInlineEarly] [Differentiable] __init(float v) { this = vector<T,N>(T(v)); }
 
 }
 
@@ -2241,54 +2406,57 @@ extension vector<T,N> : IDifferentiable
     typedef vector<T, N> Differential;
 
     [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
+    [Differentiable]
     static Differential dzero()
     {
         return Differential(__slang_noop_cast<T>(T.dzero()));
     }
 
     [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
+    [Differentiable]
     static Differential dadd(Differential a, Differential b)
     {
         return __internal_add(a, b);
-    }
-
-    __generic<U : __BuiltinRealType>
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dmul(U a, Differential b)
-    {
-        return __internal_mul(__realCast<float>(a), b);
     }
 }
 
 __generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 extension matrix<T,N,M,L> : IFloat
 {
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] bool equals(This other) { return all(this == other); }
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Add)) This add(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Sub)) This sub(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Mul))This mul(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Div)) This div(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_FRem)) This mod(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Neg)) This neg();
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
+    // TODO(sai): not sure what's going on here? With the previous commit this was (this <= other)
+    // which is just self-recursive.
+    //
+    [__unsafeForceInlineEarly] bool lessThan(This other) { return this[0][0] < other[0][0]; }
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this[0][0] <= other[0][0]; }
+    [__unsafeForceInlineEarly] bool equals(This other) { return all(this[0][0] == other[0][0]); }
+    [Differentiable] __intrinsic_op($(kIROp_Add)) This add(This other);
+    [Differentiable] __intrinsic_op($(kIROp_Sub)) This sub(This other);
+    [Differentiable] __intrinsic_op($(kIROp_Mul))This mul(This other);
+    [Differentiable] __intrinsic_op($(kIROp_Div)) This div(This other);
+    [Differentiable] __intrinsic_op($(kIROp_FRem)) This mod(This other);
+    [Differentiable] __intrinsic_op($(kIROp_Neg)) This neg();
+    [Differentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
+    [Differentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
 
     [OverloadRank(-1)]
-    [TreatAsDifferentiable]
+    [Differentiable]
     [__unsafeForceInlineEarly]
     __implicit_conversion($(kConversionCost_ScalarIntegerToFloatMatrix))
     __init(int v) { this = matrix<T,N,M>(T(v)); }
 
     [OverloadRank(-1)]
-    [TreatAsDifferentiable]
+    [Differentiable]
     [__unsafeForceInlineEarly]
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
     __init(float v) { this = matrix<T,N,M>(T(v)); }
+    
+    /// Initialize a matrix where all elements have the same scalar `value`.
+    [OverloadRank(-1)]
+    [Differentiable]
+    __implicit_conversion($(kConversionCost_ScalarToMatrix))
+    __intrinsic_op($(kIROp_MakeMatrixFromScalar))
+    __init(T value);
+
 }
 
 __generic<T:IDifferentiable, let N : int, let M : int, let L : int>
@@ -2298,25 +2466,17 @@ extension matrix<T,N,M,L> : IDifferentiable
     typedef matrix<T, N,M,L> Differential;
 
     [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
+    [Differentiable]
     static Differential dzero()
     {
         return matrix<T, N,M,L>(__slang_noop_cast<T>(T.dzero()));
     }
 
     [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
+    [Differentiable]
     static Differential dadd(Differential a, Differential b)
     {
         return __internal_add(a, b);
-    }
-
-    __generic<U : __BuiltinRealType>
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dmul(U a, Differential b)
-    {
-        return __internal_mul(__realCast<float>(a), b);
     }
 }
 
@@ -2769,9 +2929,9 @@ for (auto op : intrinsicUnaryOps)
 $}
 
 // Only ReadWrite is an L-value.
-__generic<T, Access access, AddressSpace addrSpace>
+__generic<T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>
 __intrinsic_op(0)
-__prefix Ref<T, access, addrSpace> operator*(Ptr<T, access, addrSpace> value);
+__prefix Ref<T, access, addrSpace> operator*(Ptr<T, access, addrSpace, L> value);
 
 // TODO: [require(cpu)]. This cannot be done yet since this change breaks slangpy
 __generic<T>
@@ -3366,7 +3526,7 @@ bool operator !=(T v0, T v1)
 
 ${
 const char* arithmeticInterfaces[] = {"IArithmetic", "IFloat"};
-const char* attribs[] = {"", "[TreatAsDifferentiable]"};
+const char* attribs[] = {"", "[Differentiable]"};
 for (Index i = 0; i < 2; i++) {
     const auto interfaceName = arithmeticInterfaces[i];
     const auto attrib = attribs[i];
@@ -3609,6 +3769,11 @@ __intrinsic_op($(kIROp_IsFloat))
 bool __isFloat_impl(T t);
 
 __generic<T>
+__intrinsic_op($(kIROp_IsCoopFloat))
+bool __isCoopFloat_impl(T t);
+
+
+__generic<T>
 __intrinsic_op($(kIROp_IsHalf))
 bool __isHalf_impl(T t);
 
@@ -3617,6 +3782,13 @@ __generic<T>
 bool __isFloat()
 {
     return __isFloat_impl(__declVal<T>());
+}
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isCoopFloat()
+{
+    return __isCoopFloat_impl(__declVal<T>());
 }
 
 __generic<T>
@@ -3670,15 +3842,6 @@ int __naturalStrideOf()
     return __naturalStrideOf_impl(__declVal<T>());
 }
 
-__intrinsic_op($(kIROp_AlignOf))
-int __alignOf_intrinsic_impl<T>(T t);
-
-[ForceInline]
-int __alignOf_intrinsic<T>()
-{
-    return __alignOf_intrinsic_impl<T>(__default<T>());
-}
-
 [__unsafeForceInlineEarly]
 int32_t __elemToByteOffset<T>(int32_t elemOffset)
 {
@@ -3690,6 +3853,12 @@ int32_t __byteToElemOffset<T>(int32_t byteOffset)
 {
     return byteOffset / __naturalStrideOf<T>();
 }
+
+__intrinsic_op($(kIROp_IRem))
+internal T __irem<T>(T left, T right);
+
+__intrinsic_op($(kIROp_FRem))
+internal T __frem<T>(T left, T right);
 
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
@@ -3812,6 +3981,63 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     /// value, storing the result and returning the original stored value.
     __intrinsic_op($(kIROp_AtomicMin))
     [__ref] T min(T value, MemoryOrder order = MemoryOrder.Relaxed);
+
+    /// Atomically adds the given value to the stored value without returning
+    /// the original value. On CUDA, maps to the PTX `red` instruction for
+    /// potentially better performance than `add()`.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceAdd(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, $1, (int)$2)";
+        default: add(value, order);
+        }
+    }
+
+    /// Atomically subtracts the given value from the stored value without
+    /// returning the original value. On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceSub(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, -($1), (int)$2)";
+        default: sub(value, order);
+        }
+    }
+
+    /// Atomically computes the maximum of the stored value and the given value
+    /// without returning the original value. On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceMax(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_max($0, $1, (int)$2)";
+        default: max(value, order);
+        }
+    }
+
+    /// Atomically computes the minimum of the stored value and the given value
+    /// without returning the original value. On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceMin(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_min($0, $1, (int)$2)";
+        default: min(value, order);
+        }
+    }
 }
 
 /// These additional members are only available when `T` conforms to `IBitAtomicable`.
@@ -3844,6 +4070,76 @@ extension<T : IBitAtomicable> Atomic<T>
     /// value.
     __intrinsic_op($(kIROp_AtomicDec))
     [__ref] T decrement(MemoryOrder order = MemoryOrder.Relaxed);
+
+    /// Atomically performs a bitwise AND without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceAnd(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_and($0, $1, (int)$2)";
+        default: and(value, order);
+        }
+    }
+
+    /// Atomically performs a bitwise OR without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceOr(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_or($0, $1, (int)$2)";
+        default: or(value, order);
+        }
+    }
+
+    /// Atomically performs a bitwise XOR without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceXor(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_xor($0, $1, (int)$2)";
+        default: xor(value, order);
+        }
+    }
+
+    /// Atomically increments the stored value without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceInc(MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_inc($0, (int)$1)";
+        default: increment(order);
+        }
+    }
+
+    /// Atomically decrements the stored value without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceDec(MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_dec($0, (int)$1)";
+        default: decrement(order);
+        }
+    }
 }
 
 //@ hidden:
@@ -4467,3 +4763,475 @@ typealias NodePayloadPtr = Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)A
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;
 
+//@hidden:
+
+semantic sv_position
+{
+    [require(fragment)]
+    [require(geometry)]
+    get : float4;
+
+    [require(fragment)]
+    [require(geometry)]
+    get : float3;
+
+    [require(fragment)]
+    [require(geometry)]
+    get : float2;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float4;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float3;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float2;
+}
+
+semantic sv_depth
+{
+    [require(fragment)]
+    set : float;
+}
+
+semantic sv_depthgreaterequal
+{
+    [require(fragment)]
+    set : float;
+}
+
+semantic sv_depthlessequal
+{
+    [require(fragment)]
+    set : float;
+}
+
+semantic sv_clipdistance
+{
+    [require(fragment)]
+    get : float;
+
+    [require(fragment)]
+    get : float[];
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float[];
+}
+
+semantic sv_culldistance
+{
+    [require(fragment)]
+    get : float;
+
+    [require(fragment)]
+    get : float[];
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float[];
+}
+
+semantic sv_target
+{
+    // SV_Target accepts any type - structs are flattened to multiple render targets
+}
+
+semantic sv_stencilref
+{
+    [require(fragment)]
+    set : uint;
+}
+
+semantic sv_coverage
+{
+    [require(fragment)]
+    get : uint;
+
+    [require(fragment)]
+    set : uint;
+}
+
+semantic sv_innercoverage
+{
+    [require(fragment)]
+    get : uint;
+}
+
+semantic sv_dispatchthreadid
+{
+    // uint and uint2 overloads allow convenient access for 1D/2D dispatches.
+    // HLSL requires uint3, but other backends (CUDA, SPIRV) extract appropriate
+    // components. See dispatch-thread-id-extraction.slang.
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint2;
+
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint3;
+}
+
+semantic sv_groupid
+{
+    // uint and uint2 overloads allow convenient access for 1D/2D dispatches.
+    // HLSL requires uint3, but other backends (CUDA, SPIRV) extract appropriate
+    // components. See dispatch-thread-id-extraction.slang.
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint2;
+
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint3;
+}
+
+semantic sv_groupindex
+{
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+}
+
+semantic sv_groupthreadid
+{
+    // uint and uint2 overloads allow convenient access for 1D/2D dispatches.
+    // HLSL requires uint3, but other backends (CUDA, SPIRV) extract appropriate
+    // components.
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint2;
+
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint3;
+}
+
+semantic sv_vertexid
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_instanceid
+{
+    [require(vertex)]
+    get : uint;
+
+    // Vertex output + fragment input enables passing instance ID as a varying
+    // Only works on SPIRV/GLSL, where we legalize it to a flat-interpolated user varying
+    // See tests/bugs/gh-3087.slang for an example
+    [require(vertex)]
+    set : uint;
+
+    [require(fragment)]
+    get : uint;
+}
+
+semantic sv_isfrontface
+{
+    [require(fragment)]
+    get : bool;
+
+    [require(geometry)]
+    set : bool;
+}
+
+semantic sv_sampleindex
+{
+    [require(fragment)]
+    get : uint;
+}
+
+semantic sv_pointcoord
+{
+    [require(fragment)]
+    get : float2;
+}
+
+semantic sv_primitiveid
+{
+    [require(fragment)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    get : uint;
+
+    [require(geometry)]
+    [require(mesh)]
+    set : uint;
+}
+
+semantic sv_viewportarrayindex
+{
+    [require(fragment)]
+    get : uint;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : uint;
+}
+
+semantic sv_rendertargetarrayindex
+{
+    [require(fragment)]
+    get : uint;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : uint;
+}
+
+semantic sv_domainlocation
+{
+    [require(domain)]
+    get : float2;
+
+    [require(domain)]
+    get : float3;
+}
+
+semantic sv_outputcontrolpointid
+{
+    [require(hull)]
+    get : uint;
+}
+
+semantic sv_tessfactor
+{
+    [require(hull)]
+    set : float;
+
+    [require(hull)]
+    set : float[];
+
+    [require(domain)]
+    get : float;
+
+    [require(domain)]
+    get : float[];
+}
+
+semantic sv_insidetessfactor
+{
+    [require(hull)]
+    set : float;
+
+    [require(hull)]
+    set : float[];
+
+    [require(domain)]
+    get : float;
+
+    [require(domain)]
+    get : float[];
+}
+
+semantic sv_gsinstanceid
+{
+    [require(geometry)]
+    get : uint;
+}
+
+semantic sv_pointsize
+{
+    [require(vertex)]
+    [require(geometry)]
+    [require(mesh)]
+    set : float;
+}
+
+
+semantic sv_drawindex
+{
+    [require(vertex)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+}
+
+semantic sv_deviceindex
+{
+    [require(vertex)]
+    [require(hull)]
+    [require(domain)]
+    [require(geometry)]
+    [require(fragment)]
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+}
+
+semantic sv_viewid
+{
+    [require(vertex)]
+    [require(hull)]
+    [require(domain)]
+    [require(geometry)]
+    [require(mesh)]
+    [require(fragment)]
+    get : uint;
+}
+
+semantic sv_wavelanecount
+{
+    [require(vertex)]
+    [require(hull)]
+    [require(domain)]
+    [require(geometry)]
+    [require(fragment)]
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+}
+
+semantic sv_wavelaneindex
+{
+    [require(vertex)]
+    [require(hull)]
+    [require(domain)]
+    [require(geometry)]
+    [require(fragment)]
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+}
+
+semantic sv_barycentrics
+{
+    [require(fragment)]
+    get : float3;
+}
+
+semantic sv_startvertexlocation
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_startinstancelocation
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_raypayload
+{
+    // Ray payload can be any user-defined type
+}
+
+semantic sv_intersectionattributes
+{
+    // Intersection attributes can be any user-defined type
+}
+
+semantic sv_cullprimitive
+{
+    [require(mesh)]
+    set : bool;
+}
+
+semantic sv_fragsize
+{
+    [require(fragment)]
+    get : int2;
+}
+
+semantic sv_fraginvocationcount
+{
+    [require(fragment)]
+    get : int;
+}
+
+semantic sv_shadingrate
+{
+    [require(fragment)]
+    get : uint;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(mesh)]
+    set : uint;
+}
+
+semantic sv_vulkanvertexid
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_vulkaninstanceid
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_vulkansampleposition
+{
+    [require(fragment)]
+    get : float2;
+}

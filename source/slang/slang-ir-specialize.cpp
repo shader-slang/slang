@@ -4,7 +4,9 @@
 #include "../core/slang-performance-profiler.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
@@ -54,8 +56,8 @@ struct SpecializationContext
     DiagnosticSink* sink;
     TargetProgram* targetProgram;
     SpecializationOptions options;
-    Dictionary<IROp, IRInst*> irDictionaryMap;
     bool changed = false;
+    Dictionary<IRSimpleSpecializationKey, IRSpecialize*> activeGenericSpecializations;
 
 
     SpecializationContext(IRModule* inModule, TargetProgram* target, SpecializationOptions options)
@@ -89,6 +91,8 @@ struct SpecializationContext
         case kIROp_Leq:
         case kIROp_Geq:
         case kIROp_Less:
+        case kIROp_And:
+        case kIROp_Or:
         case kIROp_IRem:
         case kIROp_FRem:
         case kIROp_Greater:
@@ -104,6 +108,35 @@ struct SpecializationContext
         case kIROp_IntCast:
         case kIROp_FloatCast:
         case kIROp_Select:
+        case kIROp_ConstexprAdd:
+        case kIROp_ConstexprSub:
+        case kIROp_ConstexprMul:
+        case kIROp_ConstexprDiv:
+        case kIROp_ConstexprNeg:
+        case kIROp_ConstexprIRem:
+        case kIROp_ConstexprShl:
+        case kIROp_ConstexprShr:
+        case kIROp_ConstexprBitAnd:
+        case kIROp_ConstexprBitOr:
+        case kIROp_ConstexprBitXor:
+        case kIROp_ConstexprBitNot:
+        case kIROp_ConstexprNot:
+        case kIROp_ConstexprEql:
+        case kIROp_ConstexprNeq:
+        case kIROp_ConstexprGreater:
+        case kIROp_ConstexprLess:
+        case kIROp_ConstexprGeq:
+        case kIROp_ConstexprLeq:
+        case kIROp_ConstexprAnd:
+        case kIROp_ConstexprOr:
+        case kIROp_ConstexprSelect:
+        case kIROp_ConstexprIntCast:
+        case kIROp_ConstexprCastIntToFloat:
+        case kIROp_ConstexprCastFloatToInt:
+        case kIROp_ConstexprFloatCast:
+        case kIROp_ConstexprCastIntToEnum:
+        case kIROp_ConstexprCastEnumToInt:
+        case kIROp_ConstexprEnumCast:
             {
                 if (isSpecConstRateType(inst->getFullType()))
                 {
@@ -115,6 +148,13 @@ struct SpecializationContext
             return false;
         }
     }
+
+    enum class PackBranchCardinality
+    {
+        Unknown,
+        Empty,
+        NonEmpty,
+    };
 
     // An instruction is then fully specialized if and only
     // if it is in our set.
@@ -135,7 +175,20 @@ struct SpecializationContext
         case kIROp_GlobalGenericParam:
         case kIROp_LookupWitnessMethod:
         case kIROp_GetTupleElement:
+        case kIROp_ExtractFirstFromPack:
+        case kIROp_ExtractLastFromPack:
+        case kIROp_TrimFirstOfPack:
+        case kIROp_TrimLastOfPack:
+        case kIROp_ShapeConcat:
+        case kIROp_ShapePermute:
+        case kIROp_ShapeSwap:
+        case kIROp_ShapeReduce:
+        case kIROp_PackBranch:
             return false;
+        case kIROp_NonEmptyPackWitness:
+            return getPackBranchCardinality(inst->getOperand(0)) ==
+                       PackBranchCardinality::NonEmpty &&
+                   areAllOperandsFullySpecialized(inst);
         case kIROp_Specialize:
             // The `specialize` instruction is a bit sepcial,
             // because it is possible to have a `specialize`
@@ -174,7 +227,8 @@ struct SpecializationContext
 
         if (isWrapperType(inst))
         {
-            // For all the wrapper type, we need to make sure the operands are fully specialized.
+            // For all the wrapper type, we need to make sure the operands are fully
+            // specialized.
             return areAllOperandsFullySpecialized(inst);
         }
 
@@ -231,7 +285,6 @@ struct SpecializationContext
     List<IRInst*>& workList;
     HashSet<IRInst*>& workListSet;
     HashSet<IRInst*>& cleanInsts;
-
     void addToWorkList(IRInst* inst)
     {
         if (workListSet.add(inst))
@@ -241,6 +294,83 @@ struct SpecializationContext
 
             addUsersToWorkList(inst);
         }
+    }
+
+    static constexpr UInt kMaxIRSpecializationDepthBudget = 512;
+
+    UInt getSpecializationDepth(IRSpecialize* specializeInst)
+    {
+        if (auto depthDecoration =
+                specializeInst->findDecoration<IRSpecializationDepthDecoration>())
+            return UInt(getIntVal(depthDecoration->getOperand(0)));
+
+        for (auto parent = specializeInst->getParent(); parent; parent = parent->getParent())
+        {
+            if (auto depthDecoration = parent->findDecoration<IRSpecializationDepthDecoration>())
+            {
+                return UInt(getIntVal(depthDecoration->getOperand(0)));
+            }
+        }
+        return 0;
+    }
+
+    void removeSpecializationDepthDecorations(IRInst* inst)
+    {
+        for (auto decor = inst->getFirstDecoration(); decor;)
+        {
+            auto nextDecor = decor->getNextDecoration();
+            if (decor->getOp() == kIROp_SpecializationDepthDecoration)
+                decor->removeAndDeallocate();
+            decor = nextDecor;
+        }
+    }
+
+    void addSpecializationDepthDecoration(IRSpecialize* specializeInst, UInt specializationDepth)
+    {
+        removeSpecializationDepthDecorations(specializeInst);
+        IRBuilder builder(module);
+        builder.addDecoration(
+            specializeInst,
+            kIROp_SpecializationDepthDecoration,
+            builder.getIntValue(builder.getUIntType(), specializationDepth));
+    }
+
+    void addSpecializationDepthDecorationsToClonedSpecializeInsts(
+        IRInst* inst,
+        UInt specializationDepth)
+    {
+        if (auto specializeInst = as<IRSpecialize>(inst))
+            addSpecializationDepthDecoration(specializeInst, specializationDepth);
+
+        for (auto child : inst->getDecorationsAndChildren())
+            addSpecializationDepthDecorationsToClonedSpecializeInsts(child, specializationDepth);
+    }
+
+    bool diagnoseGenericSpecializationCycle(IRSpecialize* specInst, IRInst* generic)
+    {
+        if (sink)
+        {
+            Diagnostics::GenericSpecializationRecursionCycle diag = {};
+            diag.location = specInst->sourceLoc;
+            diag.generic = generic;
+            sink->diagnose(diag);
+        }
+        cleanInsts.add(specInst);
+        return false;
+    }
+
+    bool diagnoseGenericSpecializationBudgetExceeded(IRSpecialize* specInst, IRInst* generic)
+    {
+        if (sink)
+        {
+            Diagnostics::GenericSpecializationBudgetExceeded diag = {};
+            diag.location = specInst->sourceLoc;
+            diag.generic = generic;
+            diag.budget = int(kMaxIRSpecializationDepthBudget);
+            sink->diagnose(diag);
+        }
+        cleanInsts.add(specInst);
+        return false;
     }
 
     // When a transformation makes a change to an instruction,
@@ -268,11 +398,7 @@ struct SpecializationContext
     // only want to generate the specialized code for `g<a,b,c>`
     // *once*, and re-use it for both versions.
     //
-    // We will cache existing specializations of generic function/types
-    // using the simple key type defined as part of the IR cloning infrastructure.
-    //
     typedef IRSimpleSpecializationKey Key;
-    Dictionary<Key, IRSpecializationDictionaryItem*> genericSpecializations;
 
 
     // Now let's look at the task of finding or generation a
@@ -299,7 +425,7 @@ struct SpecializationContext
             {
                 IRUse* argUse = specializeInst->getArgOperand(ii);
                 auto originalArg = argUse->get();
-                IRInst* foldedArg = tryConstantFoldInst(module, originalArg);
+                IRInst* foldedArg = tryConstantFoldInst(module, targetProgram, originalArg);
                 if (foldedArg == originalArg)
                     continue;
 
@@ -307,9 +433,16 @@ struct SpecializationContext
             }
         }
 
+        IRBuilder builder(module);
+        auto entry =
+            builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), specializeInst);
+
+        if (auto existingVal = entry->getValue())
+            return existingVal;
+
         // We want to see if an existing specialization
-        // has already been made. To do that we will construct a key
-        // for lookup in the generic specialization context.
+        // has already been made. To detect recursive specialization,
+        // we construct a key over the generic and its arguments.
         //
         // Our key will consist of the identity of the generic
         // being specialized, and each of the argument values
@@ -324,13 +457,10 @@ struct SpecializationContext
             key.vals.add(specializeInst->getArg(ii));
         }
 
+        if (activeGenericSpecializations.containsKey(key))
         {
-            // We use our generated key to look for an
-            // existing specialization that has been registered.
-            // If one is found, our work is done.
-            //
-            if (auto specializedVal = tryGetDictionaryEntry(genericSpecializations, key))
-                return specializedVal;
+            diagnoseGenericSpecializationCycle(specializeInst, genericVal);
+            return nullptr;
         }
 
         // If no existing specialization is found, we need
@@ -343,7 +473,12 @@ struct SpecializationContext
         // can be re-used in other cases that need to
         // do one-off specialization.
         //
+        activeGenericSpecializations[key] = specializeInst;
+        SLANG_DEFER(activeGenericSpecializations.remove(key));
+
         IRInst* specializedVal = specializeGenericImpl(genericVal, specializeInst, module, this);
+        if (!specializedVal)
+            return nullptr;
 
         // The body of the specialized generic may expose more specialization opportunities, so
         // we add the children to workList.
@@ -352,16 +487,11 @@ struct SpecializationContext
 
         // The value that was returned from evaluating
         // the generic is the specialized value, and we
-        // need to remember it in our dictionary of
-        // specializations so that we don't instantiate
-        // this generic again for the same arguments.
+        // need to remember it in the compiler dictionary
+        // so that we don't instantiate this generic again
+        // for the same arguments.
         //
-        genericSpecializations.add(
-            key,
-            addEntryToIRDictionary(
-                kIROp_GenericSpecializationDictionary,
-                key.vals,
-                specializedVal));
+        builder.setCompilerDictionaryEntryValue(entry, specializedVal);
 
         return specializedVal;
     }
@@ -449,6 +579,30 @@ struct SpecializationContext
         }
     }
 
+    bool hasNonTrivialUses(IRInst* inst)
+    {
+        // Check that our instruction either has non-annotation uses,
+        // or is marked as a dynamic dispatch witness table, in which case it should be specialized
+        // even if it has no uses, since it will be found by the dynamic dispatch pass.
+        //
+        bool hasNonTrivialUses = false;
+        traverseUsers<IRInst>(
+            inst,
+            [&](IRInst* user)
+            {
+                if (user->getOp() != kIROp_Annotation)
+                    hasNonTrivialUses = true;
+            });
+
+        if (auto specialize = as<IRSpecialize>(inst))
+        {
+            if (specialize->findDecoration<IRDynamicDispatchWitnessDecoration>())
+                hasNonTrivialUses = true;
+        }
+
+        return hasNonTrivialUses;
+    }
+
     // Now that we know when we can specialize a generic, and how
     // to do it, we can write a subroutine that takes a
     // `specialize(g, a, b, c, ...)` instruction and performs
@@ -456,11 +610,18 @@ struct SpecializationContext
     //
     bool maybeSpecializeGeneric(IRSpecialize* specInst)
     {
+        if (cleanInsts.contains(specInst))
+            return false;
+
         // We will only attempt to specialize when all of the
         // operands to the `speicalize(...)` instruction are
         // themselves fully specialized.
         //
         if (!areAllOperandsFullySpecialized(specInst))
+            return false;
+
+
+        if (!hasNonTrivialUses(specInst))
             return false;
 
         // The invariant that the arguments are fully specialized
@@ -481,81 +642,6 @@ struct SpecializationContext
         //
         if (!canSpecializeGeneric(genericVal))
         {
-            // We have to consider a special case here if baseVal is
-            // an intrinsic, and contains a custom differential.
-            // This is a case where the base cannot be specialized since it has
-            // no body, but the custom should be specialized.
-            // A better way to handle this would be to grab a reference to the
-            // appropriate custom differential, if one exists, at checking time
-            // during CheckInvoke() and construct it's specialization args appropriately.
-            //
-            // For now, we will overwrite the specialization args for the differential
-            // using the args for the base.
-            //
-            auto genericReturnVal = findInnerMostGenericReturnVal(genericVal);
-            if (genericReturnVal->findDecoration<IRTargetIntrinsicDecoration>())
-            {
-                for (auto decor : genericReturnVal->getDecorations())
-                {
-                    bool specialized = false;
-                    if (decor->getOp() == kIROp_ForwardDerivativeDecoration ||
-                        decor->getOp() == kIROp_UserDefinedBackwardDerivativeDecoration)
-                    {
-                        // If we already have a diff func on this specialize, skip.
-                        if (const auto specDiffRef = specInst->findDecorationImpl(decor->getOp()))
-                        {
-                            continue;
-                        }
-
-                        auto specDiffFunc = as<IRSpecialize>(decor->getOperand(0));
-
-                        // If the base is specialized, the JVP version must be also be a specialized
-                        // generic.
-                        //
-                        SLANG_RELEASE_ASSERT(specDiffFunc);
-
-                        // Build specialization arguments from specInst.
-                        // Note that if we've reached this point, we can safely assume
-                        // that our args are fully specialized/concrete.
-                        //
-                        UCount argCount = specInst->getArgCount();
-                        ShortList<IRInst*> args;
-                        for (UIndex ii = 0; ii < argCount; ii++)
-                            args.add(specInst->getArg(ii));
-
-                        IRBuilder builder(module);
-
-                        // Specialize the custom derivative function type with the original
-                        // arguments.
-                        builder.setInsertInto(module);
-                        auto newDiffFuncType = builder.emitSpecializeInst(
-                            builder.getTypeKind(),
-                            specDiffFunc->getBase()->getDataType(),
-                            argCount,
-                            args.getArrayView().getBuffer());
-
-                        // Specialize the custom derivative function with the original arguments.
-                        builder.setInsertBefore(specInst);
-                        auto newDiffFunc = builder.emitSpecializeInst(
-                            (IRType*)newDiffFuncType,
-                            specDiffFunc->getBase(),
-                            argCount,
-                            args.getArrayView().getBuffer());
-
-                        // Add the new spec insts to the list so they get specialized with
-                        // the usual logic.
-                        //
-                        addToWorkList(newDiffFuncType);
-                        addToWorkList(newDiffFunc);
-
-                        builder.addDecoration(specInst, decor->getOp(), newDiffFunc);
-
-                        specialized = true;
-                    }
-                    if (specialized)
-                        return true;
-                }
-            }
             return false;
         }
 
@@ -566,7 +652,37 @@ struct SpecializationContext
         // version of the result of the generic (a specialized
         // type, function, or whatever).
         //
+        auto errorsBefore = sink ? sink->getErrorCount() : 0;
         auto specializedVal = specializeGeneric(genericVal, specInst);
+        if (!specializedVal)
+        {
+            // When specialization fails due to an invalid existential specialization
+            // (e.g. genericFunc<IFoo>(...) with a missing witness table argument),
+            // emit a diagnostic and replace the specialize instruction with a poison
+            // value so that subsequent passes don't crash on the unresolved instruction.
+            // Only emit E33180 if no other diagnostic was already produced (e.g. by
+            // the specialization depth budget check).
+            if (sink && sink->getErrorCount() == errorsBefore)
+            {
+                String genericName;
+                if (auto inner = findGenericReturnVal(genericVal))
+                    if (auto nameHint = inner->findDecoration<IRNameHintDecoration>())
+                        genericName = nameHint->getName();
+                if (genericName.getLength() == 0)
+                    genericName = "<generic>";
+                sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+                    .generic = genericName,
+                    .location = specInst->sourceLoc});
+            }
+            // Replace the specialize instruction with a poison value to prevent
+            // later passes from encountering an unresolvable specialize instruction.
+            IRBuilder builder(module);
+            builder.setInsertBefore(specInst);
+            auto poison = builder.emitPoison(specInst->getFullType());
+            specInst->replaceUsesWith(poison);
+            specInst->removeAndDeallocate();
+            return true;
+        }
 
         // Any uses of this `specialize(...)` instruction will
         // become uses of `specializeVal`, so we want to re-consider
@@ -655,6 +771,18 @@ struct SpecializationContext
         case kIROp_GetTupleElement:
             return maybeSpecializeFoldableInst(inst);
 
+        case kIROp_ExtractFirstFromPack:
+        case kIROp_ExtractLastFromPack:
+        case kIROp_TrimFirstOfPack:
+        case kIROp_TrimLastOfPack:
+            return maybeSpecializeFoldableInst(inst);
+
+        case kIROp_ShapeConcat:
+        case kIROp_ShapePermute:
+        case kIROp_ShapeSwap:
+        case kIROp_ShapeReduce:
+            return maybeSpecializeShapePackTransformInst(inst);
+
         case kIROp_TypePack:
         case kIROp_TupleType:
             return maybeSpecializeTypePackOrTupleType(inst);
@@ -663,8 +791,14 @@ struct SpecializationContext
         case kIROp_MakeTuple:
             return maybeSpecializeMakeValuePackOrTuple(inst);
 
+        case kIROp_PackBranch:
+            return maybeSpecializePackBranch(cast<IRPackBranch>(inst));
+
         case kIROp_CountOf:
             return maybeSpecializeCountOf(inst);
+
+        case kIROp_FuncTypeOf:
+            return maybeSpecializeFuncTypeOf(inst);
 
         case kIROp_Func:
 
@@ -775,18 +909,82 @@ struct SpecializationContext
         IRInst* newInst = nullptr;
         if (inst->getOp() == kIROp_MakeValuePack)
             newInst = builder.emitMakeValuePack(
-                inst->getFullType(),
-                flattendOperands.getCount(),
+                (UInt)flattendOperands.getCount(),
                 flattendOperands.getArrayView().getBuffer());
         else
             newInst = builder.emitMakeTuple(
-                inst->getFullType(),
-                flattendOperands.getCount(),
+                (UInt)flattendOperands.getCount(),
                 flattendOperands.getArrayView().getBuffer());
 
         inst->replaceUsesWith(newInst);
         inst->removeAndDeallocate();
         addUsersToWorkList(newInst);
+        return true;
+    }
+
+    PackBranchCardinality getPackBranchCardinality(IRInst* pack)
+    {
+        if (!pack)
+            return PackBranchCardinality::Unknown;
+
+        switch (pack->getOp())
+        {
+        case kIROp_TypePack:
+        case kIROp_TupleType:
+        case kIROp_MakeValuePack:
+        case kIROp_MakeTuple:
+            for (UInt i = 0; i < pack->getOperandCount(); ++i)
+            {
+                switch (pack->getOperand(i)->getOp())
+                {
+                case kIROp_GlobalGenericParam:
+                case kIROp_Param:
+                case kIROp_TypePack:
+                case kIROp_ExpandTypeOrVal:
+                case kIROp_TrimFirstOfPack:
+                case kIROp_TrimLastOfPack:
+                case kIROp_ShapeConcat:
+                case kIROp_ShapePermute:
+                case kIROp_ShapeSwap:
+                case kIROp_ShapeReduce:
+                case kIROp_PackBranch:
+                    return PackBranchCardinality::Unknown;
+                case kIROp_MakeValuePack:
+                    // A nested MakeValuePack inside another value-level pack container
+                    // may represent a symbolic sub-pack whose cardinality is not yet known.
+                    if (pack->getOp() == kIROp_MakeValuePack || pack->getOp() == kIROp_MakeTuple)
+                        return PackBranchCardinality::Unknown;
+                    break;
+                default:
+                    break;
+                }
+            }
+            return pack->getOperandCount() == 0 ? PackBranchCardinality::Empty
+                                                : PackBranchCardinality::NonEmpty;
+        default:
+            return PackBranchCardinality::Unknown;
+        }
+    }
+
+    bool maybeSpecializePackBranch(IRPackBranch* packBranch)
+    {
+        auto cardinality = getPackBranchCardinality(packBranch->getOperand(0));
+        switch (cardinality)
+        {
+        case PackBranchCardinality::Unknown:
+            return false;
+
+        case PackBranchCardinality::Empty:
+        case PackBranchCardinality::NonEmpty:
+            break;
+        }
+
+        auto replacement = cardinality == PackBranchCardinality::Empty ? packBranch->getOperand(1)
+                                                                       : packBranch->getOperand(2);
+        packBranch->replaceUsesWith(replacement);
+        packBranch->removeAndDeallocate();
+        addToWorkList(replacement);
+        addUsersToWorkList(replacement);
         return true;
     }
 
@@ -822,6 +1020,8 @@ struct SpecializationContext
             case kIROp_Param:
             case kIROp_TypePack:
             case kIROp_ExpandTypeOrVal:
+            case kIROp_TrimFirstOfPack:
+            case kIROp_TrimLastOfPack:
                 return false;
             }
         }
@@ -832,6 +1032,56 @@ struct SpecializationContext
         inst->replaceUsesWith(newInst);
         inst->removeAndDeallocate();
         return true;
+    }
+
+    bool maybeSpecializeFuncTypeOf(IRInst* inst)
+    {
+        // The `func_type_of` instruction is a special case
+        // where we want to specialize the type of a function
+        // based on the concrete types of its parameters.
+        //
+        // We will only do this if all of the operands are
+        // fully specialized, and then we will replace the
+        // `func_type_of` with a `specialize` instruction
+        // that specializes the function type.
+        //
+        auto operand = inst->getOperand(0);
+        if (auto func = as<IRFunc>(operand))
+        {
+            addUsersToWorkList(inst);
+            inst->replaceUsesWith(func->getDataType());
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        if (auto specialize = as<IRSpecialize>(operand))
+        {
+            if (auto generic = as<IRGeneric>(specialize->getBase()))
+            {
+                if (auto typeGeneric = as<IRGeneric>(generic->getDataType()))
+                {
+                    // If the generic is a type, we can specialize it directly.
+                    //
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+
+                    List<IRInst*> args;
+                    for (UInt i = 0; i < specialize->getArgCount(); i++)
+                    {
+                        args.add(specialize->getArg(i));
+                    }
+                    auto funcTypeInst =
+                        builder.emitSpecializeInst(builder.getTypeKind(), typeGeneric, args);
+                    addUsersToWorkList(inst);
+                    addUsersToWorkList(funcTypeInst);
+                    inst->replaceUsesWith(funcTypeInst);
+                    inst->removeAndDeallocate();
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     // Specializing lookup on witness tables is a general
@@ -870,6 +1120,7 @@ struct SpecializationContext
                 HashSet<IRInst*> satisfyingValSet;
                 bool skipSpecialization = false;
                 forEachInSet(
+                    module,
                     witnessTableSet,
                     [&](IRInst* instElement)
                     {
@@ -922,6 +1173,8 @@ struct SpecializationContext
                         return false;
 
                     interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+                    if (!interfaceType)
+                        return false;
                 }
             }
             else
@@ -995,132 +1248,389 @@ struct SpecializationContext
         return instChanged;
     }
 
-    template<typename TDict>
-    void _readSpecializationDictionaryImpl(TDict& dict, IRInst* dictInst)
+    bool hasNestedShapePackOperand(IRInst* packLikeInst)
     {
-        int childrenCount = 0;
-        for (auto child = dictInst->getFirstChild(); child; child = child->next)
-            childrenCount++;
-        dict.reserve(Index{1} << Math::Log2Ceil(childrenCount * 2));
-
-        List<IRSpecializationDictionaryItem*> invalidItems;
-        for (auto child : dictInst->getChildren())
+        for (UInt i = 0; i < packLikeInst->getOperandCount(); i++)
         {
-            auto item = as<IRSpecializationDictionaryItem>(child);
-            if (!item)
-                continue;
-            IRSimpleSpecializationKey key;
-            bool isInvalid = false;
-            for (UInt i = 0; i < item->getOperandCount(); i++)
+            switch (packLikeInst->getOperand(i)->getOp())
             {
-                if (item->getOperand(i) == nullptr)
-                {
-                    isInvalid = true;
-                }
-                else if (item->getOperand(i)->getParent() == nullptr)
-                {
-                    isInvalid = true;
-                }
-                if (as<IRUndefined>(item->getOperand(i)))
-                {
-                    isInvalid = true;
-                }
-
-                if (i > 0)
-                {
-                    key.vals.add(item->getOperand(i));
-                }
-            }
-            if (isInvalid)
-            {
-                invalidItems.add(item);
-                if (dict.containsKey(key))
-                    dict.remove(key);
-                continue;
-            }
-            dict[key] = item;
-        }
-
-        // Clean up the IR dictionary
-        for (auto item : invalidItems)
-            item->removeAndDeallocate();
-    }
-    void readSpecializationDictionaries()
-    {
-        _readSpecializationDictionaryImpl(
-            genericSpecializations,
-            getOrCreateIRDictionary(kIROp_GenericSpecializationDictionary));
-
-        _readSpecializationDictionaryImpl(
-            existentialSpecializedFuncs,
-            getOrCreateIRDictionary(kIROp_ExistentialFuncSpecializationDictionary));
-
-        _readSpecializationDictionaryImpl(
-            existentialSpecializedStructs,
-            getOrCreateIRDictionary(kIROp_ExistentialTypeSpecializationDictionary));
-    }
-
-    IRInst* getOrCreateIRDictionary(IROp dictOp)
-    {
-        if (irDictionaryMap.containsKey(dictOp))
-            return irDictionaryMap[dictOp];
-
-        for (auto child : module->getModuleInst()->getChildren())
-        {
-            if (child->getOp() == dictOp)
-            {
-                irDictionaryMap[dictOp] = child;
-                return child;
+            case kIROp_MakeValuePack:
+            case kIROp_MakeTuple:
+            case kIROp_Expand:
+            case kIROp_TypePack:
+            case kIROp_ExpandTypeOrVal:
+            case kIROp_TrimFirstOfPack:
+            case kIROp_TrimLastOfPack:
+            case kIROp_ShapeConcat:
+            case kIROp_ShapePermute:
+            case kIROp_ShapeSwap:
+            case kIROp_ShapeReduce:
+                return true;
+            default:
+                break;
             }
         }
-
-        IRBuilder builder(module);
-        builder.setInsertInto(module);
-        auto dictInst = builder.emitIntrinsicInst(nullptr, dictOp, 0, nullptr);
-        irDictionaryMap[dictOp] = dictInst;
-        return dictInst;
+        return false;
     }
 
-    IRSpecializationDictionaryItem* addEntryToIRDictionary(
-        IROp dictOp,
-        const List<IRInst*>& key,
-        IRInst* val)
+    bool isConcreteShapePack(IRInst* inst)
     {
-        auto dictInst = getOrCreateIRDictionary(dictOp);
-        List<IRInst*> args;
-        args.add(val);
-        args.addRange(key);
-        IRBuilder builder(module);
-        builder.setInsertInto(dictInst);
-        return cast<IRSpecializationDictionaryItem>(builder.emitIntrinsicInst(
-            nullptr,
-            kIROp_SpecializationDictionaryItem,
-            (UInt)args.getCount(),
-            args.getBuffer()));
-    }
-
-    // Look up an entry in the given specialization dictionary.
-    //
-    // Takes care of cases where the entry is not longer valid
-    // by removing the entry in the dictionary and returning null.
-    //
-    IRInst* tryGetDictionaryEntry(
-        Dictionary<IRSimpleSpecializationKey, IRSpecializationDictionaryItem*>& dict,
-        const IRSimpleSpecializationKey& key)
-    {
-        IRSpecializationDictionaryItem* item = nullptr;
-        if (dict.tryGetValue(key, item))
+        switch (inst->getOp())
         {
-            if (!as<IRUndefined>(item->getOperand(0)))
-                return item->getOperand(0);
-            else
-            {
-                dict.remove(key);
-                return nullptr;
-            }
+        case kIROp_MakeValuePack:
+        case kIROp_MakeTuple:
+            return !hasNestedShapePackOperand(inst);
+        default:
+            return false;
         }
+    }
 
-        return nullptr;
+    bool areProvablyDifferentShapeElements(IRInst* left, IRInst* right)
+    {
+        Int64 leftValue = 0;
+        Int64 rightValue = 0;
+        return tryGetConstantIntLit(left, leftValue) && tryGetConstantIntLit(right, rightValue) &&
+               leftValue != rightValue;
+    }
+
+    bool hasAnyPotentialConcatAxis(IRInst* leftPack, IRInst* rightPack)
+    {
+        auto rank = leftPack->getOperandCount();
+        SLANG_ASSERT(rank == rightPack->getOperandCount());
+        for (UInt axis = 0; axis < rank; ++axis)
+        {
+            bool isPossibleAxis = true;
+            for (UInt i = 0; i < rank; ++i)
+            {
+                if (i != axis && areProvablyDifferentShapeElements(
+                                     leftPack->getOperand(i),
+                                     rightPack->getOperand(i)))
+                {
+                    isPossibleAxis = false;
+                    break;
+                }
+            }
+            if (isPossibleAxis)
+                return true;
+        }
+        return false;
+    }
+
+    bool maybeSpecializeShapePackTransformInst(IRInst* inst)
+    {
+        auto diagnose = [&](auto diag) -> bool
+        {
+            if (sink)
+                sink->diagnose(diag);
+            return false;
+        };
+
+        auto replaceWith = [&](IRInst* replacement) -> bool
+        {
+            if (!replacement)
+                return false;
+            addUsersToWorkList(inst);
+            inst->replaceUsesWith(replacement);
+            inst->removeAndDeallocate();
+            addToWorkList(replacement);
+            return true;
+        };
+
+        switch (inst->getOp())
+        {
+        case kIROp_ShapeConcat:
+            {
+                auto leftPack = inst->getOperand(0);
+                auto rightPack = inst->getOperand(1);
+                auto axis = inst->getOperand(2);
+                if (!isConcreteShapePack(leftPack) || !isConcreteShapePack(rightPack))
+                    return maybeSpecializeFoldableInst(inst);
+
+                auto leftRank = leftPack->getOperandCount();
+                auto rightRank = rightPack->getOperandCount();
+                if (leftRank != rightRank)
+                {
+                    Diagnostics::ShapePackRankMismatch diag = {};
+                    diag.opName = "__shapeConcat";
+                    diag.leftRank = (int)leftRank;
+                    diag.rightRank = (int)rightRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                Int64 axisValue = 0;
+                if (!tryGetConstantIntLit(axis, axisValue))
+                {
+                    if (leftRank == 0)
+                    {
+                        Diagnostics::ShapePackNoValidAxis diag = {};
+                        diag.opName = "__shapeConcat";
+                        diag.rank = 0;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+                    if (!hasAnyPotentialConcatAxis(leftPack, rightPack))
+                    {
+                        Diagnostics::ShapeConcatNoValidAxis diag = {};
+                        diag.rank = (int)leftRank;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+                    return maybeSpecializeFoldableInst(inst);
+                }
+
+                if (axisValue < 0 || (UInt)axisValue >= leftRank)
+                {
+                    Diagnostics::ShapePackAxisOutOfRange diag = {};
+                    diag.opName = "__shapeConcat";
+                    diag.axis = (int)axisValue;
+                    diag.rank = (int)leftRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+
+                ShortList<IRInst*> resultElements;
+                for (UInt i = 0; i < leftRank; ++i)
+                {
+                    auto leftElement = leftPack->getOperand(i);
+                    auto rightElement = rightPack->getOperand(i);
+                    if (i == (UInt)axisValue)
+                    {
+                        resultElements.add(builder.emitAdd(
+                            as<IRType>(leftElement->getDataType()),
+                            leftElement,
+                            rightElement));
+                    }
+                    else if (areKnownEqualShapeElements(leftElement, rightElement))
+                    {
+                        resultElements.add(leftElement);
+                    }
+                    else
+                    {
+                        Int64 leftValue = 0;
+                        Int64 rightValue = 0;
+                        if (tryGetConstantIntLit(leftElement, leftValue) &&
+                            tryGetConstantIntLit(rightElement, rightValue) &&
+                            leftValue != rightValue)
+                        {
+                            Diagnostics::ShapeConcatNonAxisMismatch diag = {};
+                            diag.axis = (int)axisValue;
+                            diag.dimIndex = (int)i;
+                            diag.location = inst->sourceLoc;
+                            return diagnose(diag);
+                        }
+                        return maybeSpecializeFoldableInst(inst);
+                    }
+                }
+
+                return replaceWith(
+                    emitPackLike(module, inst, resultElements.getArrayView().arrayView));
+            }
+
+        case kIROp_ShapePermute:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto orderPack = inst->getOperand(1);
+                if (!isConcreteShapePack(valuePack) || !isConcreteShapePack(orderPack))
+                    return maybeSpecializeFoldableInst(inst);
+
+                auto valueRank = valuePack->getOperandCount();
+                auto orderRank = orderPack->getOperandCount();
+                if (valueRank != orderRank)
+                {
+                    Diagnostics::ShapePermuteOrderLengthMismatch diag = {};
+                    diag.orderRank = (int)orderRank;
+                    diag.valueRank = (int)valueRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                Dictionary<Int64, Index> firstSeenPosition;
+                ShortList<IRInst*> resultElements;
+                for (UInt i = 0; i < orderRank; ++i)
+                {
+                    for (UInt j = 0; j < i; ++j)
+                    {
+                        if (orderPack->getOperand(i) == orderPack->getOperand(j))
+                        {
+                            Int64 orderIndex = 0;
+                            if (tryGetConstantIntLit(orderPack->getOperand(i), orderIndex))
+                            {
+                                Diagnostics::ShapePermuteDuplicateIndex diag = {};
+                                diag.indexValue = (int)orderIndex;
+                                diag.firstPosition = (int)j;
+                                diag.secondPosition = (int)i;
+                                diag.location = inst->sourceLoc;
+                                return diagnose(diag);
+                            }
+                            Diagnostics::ShapePermuteDuplicateEquivalentIndex diag = {};
+                            diag.firstPosition = (int)j;
+                            diag.secondPosition = (int)i;
+                            diag.location = inst->sourceLoc;
+                            return diagnose(diag);
+                        }
+                    }
+
+                    Int64 orderIndex = 0;
+                    if (!tryGetConstantIntLit(orderPack->getOperand(i), orderIndex))
+                        return maybeSpecializeFoldableInst(inst);
+
+                    Index firstPosition = 0;
+                    if (firstSeenPosition.tryGetValue(orderIndex, firstPosition))
+                    {
+                        Diagnostics::ShapePermuteDuplicateIndex diag = {};
+                        diag.indexValue = (int)orderIndex;
+                        diag.firstPosition = (int)firstPosition;
+                        diag.secondPosition = (int)i;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+                    firstSeenPosition[orderIndex] = i;
+
+                    if (orderIndex < 0 || (UInt)orderIndex >= valueRank)
+                    {
+                        Diagnostics::ShapePermuteIndexOutOfRange diag = {};
+                        diag.indexValue = (int)orderIndex;
+                        diag.indexPosition = (int)i;
+                        diag.rank = (int)valueRank;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+
+                    resultElements.add(valuePack->getOperand((UInt)orderIndex));
+                }
+
+                return replaceWith(
+                    emitPackLike(module, inst, resultElements.getArrayView().arrayView));
+            }
+
+        case kIROp_ShapeSwap:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto dim0 = inst->getOperand(1);
+                auto dim1 = inst->getOperand(2);
+
+                if (!isConcreteShapePack(valuePack))
+                    return maybeSpecializeFoldableInst(inst);
+
+                Int64 dim0Value = 0;
+                Int64 dim1Value = 0;
+                if (!tryGetConstantIntLit(dim0, dim0Value) ||
+                    !tryGetConstantIntLit(dim1, dim1Value))
+                {
+                    if (valuePack->getOperandCount() == 0)
+                    {
+                        Diagnostics::ShapePackNoValidAxis diag = {};
+                        diag.opName = "__shapeSwap";
+                        diag.rank = 0;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+                    return maybeSpecializeFoldableInst(inst);
+                }
+
+                auto valueRank = valuePack->getOperandCount();
+                if (dim0Value < 0 || (UInt)dim0Value >= valueRank)
+                {
+                    Diagnostics::ShapePackAxisOutOfRange diag = {};
+                    diag.opName = "__shapeSwap";
+                    diag.axis = (int)dim0Value;
+                    diag.rank = (int)valueRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                if (dim1Value < 0 || (UInt)dim1Value >= valueRank)
+                {
+                    Diagnostics::ShapePackAxisOutOfRange diag = {};
+                    diag.opName = "__shapeSwap";
+                    diag.axis = (int)dim1Value;
+                    diag.rank = (int)valueRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                if (dim0Value == dim1Value)
+                    return replaceWith(valuePack);
+
+                ShortList<IRInst*> resultElements;
+                for (UInt i = 0; i < valueRank; ++i)
+                {
+                    if (i == (UInt)dim0Value)
+                        resultElements.add(valuePack->getOperand((UInt)dim1Value));
+                    else if (i == (UInt)dim1Value)
+                        resultElements.add(valuePack->getOperand((UInt)dim0Value));
+                    else
+                        resultElements.add(valuePack->getOperand(i));
+                }
+
+                return replaceWith(
+                    emitPackLike(module, inst, resultElements.getArrayView().arrayView));
+            }
+
+        case kIROp_ShapeReduce:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto axis = inst->getOperand(1);
+
+                if (!isConcreteShapePack(valuePack))
+                    return maybeSpecializeFoldableInst(inst);
+
+                Int64 axisValue = 0;
+                if (!tryGetConstantIntLit(axis, axisValue))
+                {
+                    if (valuePack->getOperandCount() == 0)
+                    {
+                        Diagnostics::ShapePackNoValidAxis diag = {};
+                        diag.opName = "__shapeReduce";
+                        diag.rank = 0;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+                    return maybeSpecializeFoldableInst(inst);
+                }
+
+                auto valueRank = valuePack->getOperandCount();
+                if (axisValue < 0 || (UInt)axisValue >= valueRank)
+                {
+                    Diagnostics::ShapePackAxisOutOfRange diag = {};
+                    diag.opName = "__shapeReduce";
+                    diag.axis = (int)axisValue;
+                    diag.rank = (int)valueRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+
+                ShortList<IRInst*> resultElements;
+                for (UInt i = 0; i < valueRank; ++i)
+                {
+                    if (i == (UInt)axisValue)
+                    {
+                        resultElements.add(builder.getIntValue(
+                            as<IRType>(valuePack->getOperand(i)->getDataType()),
+                            1));
+                    }
+                    else
+                    {
+                        resultElements.add(valuePack->getOperand(i));
+                    }
+                }
+
+                return replaceWith(
+                    emitPackLike(module, inst, resultElements.getArrayView().arrayView));
+            }
+
+        default:
+            return maybeSpecializeFoldableInst(inst);
+        }
     }
 
     // All of the machinery for generic specialization
@@ -1129,11 +1639,6 @@ struct SpecializationContext
     //
     void processModule()
     {
-        // Sync local dictionaries with the IR specialization
-        // dictionaries for faster lookup.
-        //
-        readSpecializationDictionaries();
-
         // The unspecialized IR we receive as input will have
         // `IRBindGlobalGenericParam` instructions that associate
         // each global-scope generic parameter (a type, witness
@@ -1184,6 +1689,15 @@ struct SpecializationContext
                 //
                 while (workList.getCount() != 0)
                 {
+                    // If we've emitted errors (e.g. from diagnosing an invalid
+                    // existential specialization), bail out early to avoid
+                    // processing IR that may be in an inconsistent state.
+                    if (sink && sink->getErrorCount() != 0)
+                    {
+                        workList.clear();
+                        break;
+                    }
+
                     IRInst* inst = workList.getLast();
 
                     workList.removeLast();
@@ -1224,7 +1738,8 @@ struct SpecializationContext
                         // of an IR generic, because we don't actually want
                         // to perform specialization inside of generics.
                         //
-                        addToWorkList(child);
+                        if (!isAnnotation(child))
+                            addToWorkList(child);
                     }
                 }
                 if (hasSpecialization)
@@ -1233,31 +1748,45 @@ struct SpecializationContext
                     break;
             }
 
+            if (sink && sink->getErrorCount() != 0)
+                break;
+
             if (iterChanged)
             {
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst());
-                applySparseConditionalConstantPropagationForGlobalScope(this->module, this->sink);
+                peepholeOptimizeGlobalScope(targetProgram, this->module);
+                performMandatoryEarlyInlining(module);
+                applySparseConditionalConstantPropagation(this->module, targetProgram, this->sink);
+                unrollLoopsInModule(module, targetProgram, sink);
             }
+
+            if (sink && sink->getErrorCount() != 0)
+                break;
 
             // Once the work list has gone dry, we should have the invariant
             // that there are no `specialize` instructions inside of non-generic
-            // functions that in turn reference a generic type/function unless the generic is for a
-            // builtin type/function, or some of the type arguments are unknown at compile time, in
-            // which case we will rely on a follow up pass the translate it into a dynamic dispatch
-            // function.
+            // functions that in turn reference a generic type/function unless the generic is
+            // for a builtin type/function, or some of the type arguments are unknown at compile
+            // time, in which case we will rely on a follow up pass the translate it into a
+            // dynamic dispatch function.
             //
             // Now we consider lower lookupWitnessMethod insts into dynamic dispatch calls,
             // which may open up more specialization opportunities.
             //
             if (options.lowerWitnessLookups)
             {
-                iterChanged = specializeDynamicInsts(module, sink);
-                if (iterChanged)
-                {
+                bool dynPassChanged = specializeDynamicInsts(
+                    module,
+                    targetProgram,
+                    sink,
+                    this,
+                    options.reportDynamicDispatchSites);
+
+                if (dynPassChanged)
                     eliminateDeadCode(module->getModuleInst());
-                    lowerDispatchers(module, sink, options.reportDynamicDispatchSites);
-                }
+
+                iterChanged |= dynPassChanged;
             }
 
             if (!iterChanged || sink->getErrorCount())
@@ -1299,8 +1828,9 @@ struct SpecializationContext
         return false;
     }
 
-    /// Used by `maybeSpecailizeBufferLoadCall`, this function returns a new specialized callee that
-    /// replaces a `specialize(.operator[], oldType)` to `specialize(.operator[], newElementType)`.
+    /// Used by `maybeSpecailizeBufferLoadCall`, this function returns a new specialized callee
+    /// that replaces a `specialize(.operator[], oldType)` to `specialize(.operator[],
+    /// newElementType)`.
     IRInst* getNewSpecializedBufferLoadCallee(
         IRInst* oldSpecializedCallee,
         IRType* newContainerType,
@@ -1444,251 +1974,7 @@ struct SpecializationContext
             inst = tryExpandArgPack((IRCall*)inst);
         }
 
-        // We can only specialize a call when the callee function is known.
-        //
-        auto calleeFunc = as<IRFunc>(inst->getCallee());
-        if (!calleeFunc)
-            return false;
-
-        // Update result type since the callee may have been changed.
-        if (inst->getDataType() != calleeFunc->getResultType())
-        {
-            inst->setFullType(calleeFunc->getResultType());
-        }
-
-        // We can only specialize if we have access to a body for the callee.
-        //
-        if (!calleeFunc->isDefinition())
-            return false;
-
-        // We shouldn't bother specializing unless the callee has at least
-        // one parameter/return type that has an existential/interface type.
-        //
-        bool returnTypeNeedSpecialization = isExistentialReturnTypeSpecializable(calleeFunc);
-        bool argumentNeedSpecialization = false;
-        UInt argCounter = 0;
-        for (auto param : calleeFunc->getParams())
-        {
-            auto arg = inst->getArg(argCounter++);
-            if (!isExistentialType(param->getDataType()))
-                continue;
-
-            // Is arg in the most simplified form for specialization? If not we are
-            // not ready to consider specialization yet.
-            if (!isSimplifiedExistentialArg(arg))
-                return false;
-
-            // We *cannot* specialize unless the argument value corresponding
-            // to such a parameter is one we can specialize.
-            //
-            if (!canSpecializeExistentialArg(arg))
-                continue;
-
-            argumentNeedSpecialization = true;
-        }
-
-        // If we never found a parameter or return type worth specializing, we should bail out.
-        //
-        if (!returnTypeNeedSpecialization && !argumentNeedSpecialization)
-            return false;
-
-        // At this point, we believe we *should* and *can* specialize.
-        //
-        // We need a specialized variant of the callee (with the concrete
-        // types substituted in for existential-type parameters), and then
-        // we can replace the call site to call the new function instead.
-        //
-        // Any two call sites where the argument types are the same can
-        // re-use the same callee, so we will  cache and re-use the
-        // specialized functions that we generate (similar to how generic
-        // specialization works). Therefore we will construct a key
-        // for use when caching the specialized functions.
-        //
-        IRSimpleSpecializationKey key;
-
-        // The specialized callee will always depend on the unspecialized
-        // function from which it is generated, so we add that to our key.
-        //
-        key.vals.add(calleeFunc);
-
-        // Also, for any parameter that has an existential type, the
-        // specialized function will depend on the concrete type of the
-        // argument.
-        //
-        argCounter = 0;
-        for (auto param : calleeFunc->getParams())
-        {
-            auto arg = inst->getArg(argCounter++);
-            if (!isExistentialType(param->getDataType()))
-                continue;
-            if (auto makeExistential = as<IRMakeExistential>(arg))
-            {
-                // Note that we use the *type* stored in the
-                // existential-type argument, but not anything to
-                // do with the particular value (otherwise we'd only
-                // be able to re-use the specialized callee for
-                // call sites that pass in the exact same argument).
-                //
-                auto val = makeExistential->getWrappedValue();
-                auto valType = val->getDataType();
-                if (isCompileTimeConstantType(valType))
-                {
-                    key.vals.add(valType);
-
-                    // We are also including the witness table in the key.
-                    // This isn't required with our current language model,
-                    // since a given type can only conform to a given interface
-                    // in one way (so there can be only one witness table).
-                    // That means that the `valType` and the existential
-                    // type of `param` above should uniquely determine
-                    // the witness table we see.
-                    //
-                    // There are forward-looking cases where supporting
-                    // "overlapping conformances" could be required, and
-                    // there is low incremental cost to future-proofing
-                    // this code, so we go ahead and add the witness
-                    // table even if it is redundant.
-                    //
-                    auto witnessTable = makeExistential->getWitnessTable();
-                    key.vals.add(witnessTable);
-                }
-                else
-                {
-                    key.vals.add(param->getDataType());
-                }
-            }
-            else if (auto wrapExistential = as<IRWrapExistential>(arg))
-            {
-                auto val = wrapExistential->getWrappedValue();
-                auto valType = val->getFullType();
-                key.vals.add(valType);
-
-                UInt slotOperandCount = wrapExistential->getSlotOperandCount();
-                for (UInt ii = 0; ii < slotOperandCount; ++ii)
-                {
-                    auto slotOperand = wrapExistential->getSlotOperand(ii);
-                    key.vals.add(slotOperand);
-                }
-            }
-            else
-            {
-                SLANG_UNEXPECTED("unhandled existential argument");
-            }
-        }
-
-        // Once we've constructed our key, we can try to look for an
-        // existing specialization of the callee that we can use.
-        //
-        IRFunc* specializedCallee =
-            cast<IRFunc>(tryGetDictionaryEntry(existentialSpecializedFuncs, key));
-
-        if (!specializedCallee)
-        {
-            // If we didn't find a specialized callee already made, then we
-            // will go ahead and create one, and then register it in our cache.
-            //
-            specializedCallee = createExistentialSpecializedFunc(inst, calleeFunc);
-            existentialSpecializedFuncs.add(
-                key,
-                addEntryToIRDictionary(
-                    kIROp_ExistentialFuncSpecializationDictionary,
-                    key.vals,
-                    specializedCallee));
-        }
-
-        // At this point we have found or generated a specialized version
-        // of the callee, and we need to emit a call to it.
-        //
-        // We will start by constructing the argument list for the new call.
-        //
-        argCounter = 0;
-        ShortList<IRInst*> newArgs;
-        for (auto param : calleeFunc->getParams())
-        {
-            auto arg = inst->getArg(argCounter++);
-
-            // How we handle each argument depends on whether the corresponding
-            // parameter has an existential type or not.
-            //
-            if (!isExistentialType(param->getDataType()))
-            {
-                // If the parameter doesn't have an existential type, then we
-                // don't want to change up the argument we pass at all.
-                //
-                newArgs.add(arg);
-            }
-            else
-            {
-                // Any place where the original function had a parameter of
-                // existential type, we will now be passing in the concrete
-                // argument value instead of an existential wrapper.
-                //
-                if (auto makeExistential = as<IRMakeExistential>(arg))
-                {
-                    auto val = makeExistential->getWrappedValue();
-                    auto valType = val->getDataType();
-                    if (isCompileTimeConstantType(valType))
-                        newArgs.add(val);
-                    else
-                        newArgs.add(arg);
-                }
-                else if (auto wrapExistential = as<IRWrapExistential>(arg))
-                {
-                    auto val = wrapExistential->getWrappedValue();
-                    newArgs.add(val);
-                }
-                else
-                {
-                    SLANG_UNEXPECTED("missing case for existential argument");
-                }
-            }
-        }
-
-        // Now that we've built up our argument list, it is simple enough
-        // to construct a new `call` instruction.
-        //
-        IRBuilder builderStorage(module);
-        auto builder = &builderStorage;
-
-        builder->setInsertBefore(inst);
-        auto callResultType = specializedCallee->getResultType();
-        IRInst* newCall = builder->emitCallInst(
-            callResultType,
-            specializedCallee,
-            (UInt)newArgs.getCount(),
-            newArgs.getArrayView().getBuffer());
-
-        if (as<IRInterfaceType>(inst->getDataType()))
-        {
-            // If the result of the original call is specialized to a concrete type,
-            // we need to wrap it back into an existential type.
-            //
-            if (auto resultWitnessDecor =
-                    specializedCallee->findDecoration<IRResultWitnessDecoration>())
-            {
-                newCall = builder->emitMakeExistential(
-                    inst->getDataType(),
-                    newCall,
-                    resultWitnessDecor->getWitness());
-            }
-        }
-
-        // We will completely replace the old `call` instruction with the
-        // new one, and will go so far as to transfer any decorations
-        // that were attached to the old call over to the new one.
-        //
-        inst->transferDecorationsTo(newCall);
-        inst->replaceUsesWith(newCall);
-        inst->removeAndDeallocate();
-
-        // Just in case, we will add any instructions that used the
-        // result of this call to our work list for re-consideration.
-        // At this moment this shouldn't open up new opportunities
-        // for specialization, but we can always play it safe.
-        //
-        addUsersToWorkList(newCall);
-
-        return true;
+        return false;
     }
 
     // The above `maybeSpecializeExistentialsForCall` routine needed
@@ -1813,12 +2099,6 @@ struct SpecializationContext
 
         return false;
     }
-
-    // In order to cache and re-use functions that have had existential-type
-    // parameters specialized, we need storage for the cache.
-    //
-    Dictionary<IRSimpleSpecializationKey, IRSpecializationDictionaryItem*>
-        existentialSpecializedFuncs;
 
     // The logic for creating a specialized callee function by plugging
     // in concrete types for existentials is similar to other cases of
@@ -2066,8 +2346,8 @@ struct SpecializationContext
             // concrete type, we can simplify the function to return the concrete type.
             // We also need to mark the simplfiied function with a result witness decoration
             // so we can rewrite all the callsites into IRMakeExistential using the witness.
-            // This is effectively pushing the MakeExistential to the call sites, so optimizations
-            // can happen across the function call boundaries.
+            // This is effectively pushing the MakeExistential to the call sites, so
+            // optimizations can happen across the function call boundaries.
             IRInst* witnessTable = nullptr;
             IRInst* concreteType = nullptr;
             for (auto block : newFunc->getBlocks())
@@ -2587,7 +2867,7 @@ struct SpecializationContext
         return false;
     }
 
-    UInt calcExistentialTypeParamSlotCount(IRType* type)
+    UInt calcExistentialTypeParamSlotCount(IRType* type, HashSet<IRType*>& activeTypes)
     {
     top:
         if (as<IRInterfaceType>(type))
@@ -2611,10 +2891,14 @@ struct SpecializationContext
         }
         else if (auto structType = as<IRStructType>(type))
         {
+            if (!activeTypes.add(type))
+                return 0;
+            SLANG_DEFER(activeTypes.remove(type));
+
             UInt count = 0;
             for (auto field : structType->getFields())
             {
-                count += calcExistentialTypeParamSlotCount(field->getFieldType());
+                count += calcExistentialTypeParamSlotCount(field->getFieldType(), activeTypes);
             }
             return count;
         }
@@ -2624,8 +2908,11 @@ struct SpecializationContext
         }
     }
 
-    Dictionary<IRSimpleSpecializationKey, IRSpecializationDictionaryItem*>
-        existentialSpecializedStructs;
+    UInt calcExistentialTypeParamSlotCount(IRType* type)
+    {
+        HashSet<IRType*> activeTypes;
+        return calcExistentialTypeParamSlotCount(type, activeTypes);
+    }
 
     bool maybeSpecializeBindExistentialsType(IRBindExistentialsType* type)
     {
@@ -2719,10 +3006,19 @@ struct SpecializationContext
                 key.vals.add(type->getExistentialArg(ii));
             }
 
+            IRBuilder keyBuilder(module);
+            keyBuilder.setInsertBefore(type);
+            auto keyInst = keyBuilder.emitIntrinsicInst(
+                nullptr,
+                kIROp_SpecializeExistentialsInType,
+                (UInt)key.vals.getCount(),
+                key.vals.getBuffer());
+            auto entry =
+                builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), keyInst);
+
             addUsersToWorkList(type);
 
-            IRStructType* newStructType =
-                cast<IRStructType>(tryGetDictionaryEntry(existentialSpecializedStructs, key));
+            IRStructType* newStructType = as<IRStructType>(entry->getValue());
 
             if (!newStructType)
             {
@@ -2751,13 +3047,7 @@ struct SpecializationContext
 
                     builder.createStructField(newStructType, oldField->getKey(), newFieldType);
                 }
-
-                existentialSpecializedStructs.add(
-                    key,
-                    addEntryToIRDictionary(
-                        kIROp_ExistentialTypeSpecializationDictionary,
-                        key.vals,
-                        newStructType));
+                builder.setCompilerDictionaryEntryValue(entry, newStructType);
             }
 
             type->replaceUsesWith(newStructType);
@@ -2830,7 +3120,8 @@ struct SpecializationContext
 
         for (UInt i = 0; i < expandInst->getCaptureCount(); i++)
         {
-            if (!as<IRTypePack>(expandInst->getCapture(i)))
+            auto capture = expandInst->getCapture(i);
+            if (!as<IRTypePack>(capture) && !as<IRMakeValuePack>(capture))
                 return false;
         }
 
@@ -2841,6 +3132,10 @@ struct SpecializationContext
         if (auto firstTypePack = as<IRTypePack>(expandInst->getCapture(0)))
         {
             elementCount = firstTypePack->getOperandCount();
+        }
+        else if (auto firstValuePack = as<IRMakeValuePack>(expandInst->getCapture(0)))
+        {
+            elementCount = firstValuePack->getOperandCount();
         }
         if (elementCount == 0)
         {
@@ -3118,10 +3413,6 @@ bool specializeModule(
 
 void finalizeSpecialization(IRModule* module)
 {
-    // Go through all the top-level children of module's module inst,
-    // and remove any specialization dictionary insts.
-    //
-
     auto moduleInst = module->getModuleInst();
     IRInst* next = nullptr;
     for (auto inst = moduleInst->getFirstChild(); inst; inst = next)
@@ -3150,12 +3441,6 @@ void finalizeSpecialization(IRModule* module)
                 decor = nextDecor;
             }
             break;
-
-        case kIROp_ExistentialFuncSpecializationDictionary:
-        case kIROp_ExistentialTypeSpecializationDictionary:
-        case kIROp_GenericSpecializationDictionary:
-            inst->removeAndDeallocate();
-            break;
         }
     }
 }
@@ -3170,7 +3455,10 @@ void finalizeSpecialization(IRModule* module)
 // The resulting function will therefore have additional parameters at the beginning
 // to accept this information.
 //
-IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
+IRInst* specializeGenericWithSetArgs(
+    IRSpecialize* specializeInst,
+    SpecializationContext* context,
+    UInt specializationDepth)
 {
     // The high-level logic for specializing a generic to operate over collections
     // is similar to specializing a simple generic:
@@ -3295,7 +3583,13 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
             builder.setInsertBefore(loweredFunc->getFirstBlock());
             for (auto decoration : returnedFunc->getDecorations())
             {
-                cloneInst(&staticCloningEnv, &builder, decoration);
+                auto clonedDecoration = cloneInst(&staticCloningEnv, &builder, decoration);
+                if (context)
+                {
+                    context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                        clonedDecoration,
+                        specializationDepth);
+                }
             }
 
             builder.setInsertInto(loweredFunc);
@@ -3332,7 +3626,13 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
                  _inst = _inst->getNextInst())
             {
                 // Clone the instructions in the first block.
-                cloneInst(&cloneEnv, &builder, _inst);
+                auto clonedInst = cloneInst(&cloneEnv, &builder, _inst);
+                if (context)
+                {
+                    context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                        clonedInst,
+                        specializationDepth);
+                }
             }
 
             for (auto block : returnedFunc->getBlocks())
@@ -3345,6 +3645,12 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
                     builder.getModule(),
                     block,
                     cloneEnv.mapOldValToNew[block]);
+                if (context)
+                {
+                    context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                        cloneEnv.mapOldValToNew[block],
+                        specializationDepth);
+                }
             }
 
             // Add extra indices to the func-type parameters
@@ -3364,7 +3670,13 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
             // Emit out into the global scope.
             IRBuilder globalBuilder(builder.getModule());
             globalBuilder.setInsertInto(builder.getModule());
-            cloneInst(&staticCloningEnv, &globalBuilder, inst);
+            auto clonedInst = cloneInst(&staticCloningEnv, &globalBuilder, inst);
+            if (context)
+            {
+                context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                    clonedInst,
+                    specializationDepth);
+            }
         }
         else if (!as<IRReturn>(inst))
         {
@@ -3379,8 +3691,17 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
             // parameter types) being cloned under the dynamic environment, but
             // a subsequent pass of dynamic-inst-lowering will convert those to the static form.
             //
-            cloneInst(&staticCloningEnv, &builder, inst);
-            cloneInst(&cloneEnv, &builder, inst);
+            auto clonedStaticInst = cloneInst(&staticCloningEnv, &builder, inst);
+            auto clonedDynamicInst = cloneInst(&cloneEnv, &builder, inst);
+            if (context)
+            {
+                context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                    clonedStaticInst,
+                    specializationDepth);
+                context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                    clonedDynamicInst,
+                    specializationDepth);
+            }
         }
     }
 
@@ -3393,8 +3714,19 @@ IRInst* specializeGenericImpl(
     IRModule* module,
     SpecializationContext* context)
 {
+    UInt specializationDepth = 0;
+    if (context)
+    {
+        specializationDepth = context->getSpecializationDepth(specializeInst);
+        if (specializationDepth >= context->kMaxIRSpecializationDepthBudget)
+        {
+            context->diagnoseGenericSpecializationBudgetExceeded(specializeInst, genericVal);
+            return nullptr;
+        }
+    }
+
     if (isSetSpecializedGeneric(specializeInst))
-        return specializeGenericWithSetArgs(specializeInst);
+        return specializeGenericWithSetArgs(specializeInst, context, specializationDepth + 1);
 
     // Effectively, specializing a generic amounts to "calling" the generic
     // on its concrete argument values and computing the
@@ -3420,6 +3752,18 @@ IRInst* specializeGenericImpl(
     // be initializing our environment to map `T -> a`, `U -> b`,
     // and `V -> c`.
     //
+    // When a generic is explicitly specialized with an interface type (e.g.
+    // genericFunc<IFoo>(...)), the specialize instruction may have fewer arguments
+    // than the generic has parameters (the witness-table argument is missing).
+    // Return nullptr; the caller handles diagnostics and cleanup.
+    {
+        UInt paramCount = 0;
+        for ([[maybe_unused]] auto param : genericVal->getParams())
+            paramCount++;
+        if (specializeInst->getArgCount() < paramCount)
+            return nullptr;
+    }
+
     UInt argCounter = 0;
     for (auto param : genericVal->getParams())
     {
@@ -3437,7 +3781,12 @@ IRInst* specializeGenericImpl(
     //
     IRBuilder builderStorage(module);
     IRBuilder* builder = &builderStorage;
-    builder->setInsertBefore(genericVal);
+    // builder->setInsertBefore(genericVal);
+    //
+    // We can just insert before the specialize inst, which is hoistable
+    // and de-duplicated, and so will be in the appropriate scope.
+    //
+    builder->setInsertBefore(specializeInst);
 
     List<IRInst*> pendingWorkList;
     SLANG_DEFER(for (Index ii = pendingWorkList.getCount() - 1; ii >= 0; ii--) if (context)
@@ -3470,14 +3819,16 @@ IRInst* specializeGenericImpl(
             {
                 auto specializedVal = findCloneForOperand(&env, returnValInst->getVal());
 
-                // Clone decorations on the orignal `specialize` inst over to the newly specialized
-                // value.
+                // Clone decorations on the orignal `specialize` inst over to the newly
+                // specialized value.
                 cloneInstDecorationsAndChildren(&env, module, specializeInst, specializedVal);
+                if (context)
+                    context->removeSpecializationDepthDecorations(specializedVal);
 
-                // Perform IR simplifications to fold constants in this specialized value if it is a
-                // function, so further specializations from the specialized function will have as
-                // simple specialization arguments as possible to avoid creating specializations
-                // that eventually simplified into the same thing.
+                // Perform IR simplifications to fold constants in this specialized value if it
+                // is a function, so further specializations from the specialized function will
+                // have as simple specialization arguments as possible to avoid creating
+                // specializations that eventually simplified into the same thing.
                 if (context)
                 {
                     if (auto func = as<IRFunc>(specializedVal))
@@ -3509,6 +3860,9 @@ IRInst* specializeGenericImpl(
             //
             if (context)
             {
+                context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                    clonedInst,
+                    specializationDepth + 1);
                 pendingWorkList.add(clonedInst);
             }
         }
@@ -3521,23 +3875,41 @@ IRInst* specializeGenericImpl(
     UNREACHABLE_RETURN(nullptr);
 }
 
-IRInst* specializeGeneric(IRSpecialize* specializeInst)
+IRInst* specializeGeneric(SpecializationContext* context, IRSpecialize* specializeInst)
 {
+    SLANG_ASSERT(context);
+    if (!context)
+        return specializeInst;
+
     auto baseGeneric = as<IRGeneric>(specializeInst->getBase());
     SLANG_ASSERT(baseGeneric);
     if (!baseGeneric)
         return specializeInst;
 
-    auto module = specializeInst->getModule();
-    SLANG_ASSERT(module);
+    if (isSetSpecializedGeneric(specializeInst))
+    {
+        auto specializationDepth = context->getSpecializationDepth(specializeInst);
+        if (specializationDepth >= context->kMaxIRSpecializationDepthBudget)
+        {
+            context->diagnoseGenericSpecializationBudgetExceeded(specializeInst, baseGeneric);
+            return nullptr;
+        }
+        return specializeGenericWithSetArgs(specializeInst, context, specializationDepth + 1);
+    }
+
+    return context->specializeGeneric(baseGeneric, specializeInst);
+}
+
+IRInst* specializeGeneric(IRSpecialize* specializeInst)
+{
+    auto module = specializeInst ? specializeInst->getModule() : nullptr;
     if (!module)
         return specializeInst;
 
-    if (isSetSpecializedGeneric(specializeInst))
-        return specializeGenericWithSetArgs(specializeInst);
-
-    // Standard static specialization of generic.
-    return specializeGenericImpl(baseGeneric, specializeInst, module, nullptr);
+    SpecializationContext context(module, nullptr, SpecializationOptions());
+    context.sink = nullptr;
+    auto result = specializeGeneric(&context, specializeInst);
+    return result;
 }
 
 } // namespace Slang

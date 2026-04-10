@@ -3,6 +3,7 @@
 
 #include "shader-input-layout.h"
 
+#include "core/slang-math.h"
 #include "core/slang-token-reader.h"
 #include "core/slang-type-text-util.h"
 
@@ -215,7 +216,6 @@ struct ShaderInputLayoutParser
             parser.Read("=");
 
             parser.Read("[");
-            uint32_t offset = 0;
             while (!parser.IsEnd() && !parser.LookAhead("]"))
             {
                 bool negate = false;
@@ -225,7 +225,18 @@ struct ShaderInputLayoutParser
                     negate = true;
                 }
 
-                if (parser.NextToken().Type == Misc::TokenType::IntLiteral)
+                if (parser.NextToken().Type == Misc::TokenType::HalfLiteral)
+                {
+                    // Half float literal (e.g. 1.0h): store one half per uint32_t slot.
+                    // Packing into the final buffer layout is handled by assignBuffer()
+                    // based on the buffer's stride.
+                    auto token = parser.ReadToken();
+                    float floatNum = (float)stringToDouble(token.Content);
+                    if (negate)
+                        floatNum = -floatNum;
+                    val->bufferData.add(uint32_t(FloatToHalf(floatNum)));
+                }
+                else if (parser.NextToken().Type == Misc::TokenType::IntLiteral)
                 {
                     uint32_t value = parser.ReadUInt();
                     if (negate)
@@ -239,7 +250,6 @@ struct ShaderInputLayoutParser
                         floatNum = -floatNum;
                     val->bufferData.add(*(unsigned int*)&floatNum);
                 }
-                offset += 4;
             }
             parser.Read("]");
         }
@@ -1138,72 +1148,64 @@ void ShaderInputLayout::parse(RandomGenerator* rand, const char* source)
             }
             break;
         }
-    case ScalarType::UInt32:
+    case ScalarType::BFloat16:
         {
-            auto ptr = (const uint32_t*)data;
+            auto ptr = (const uint16_t*)data;
             const size_t size = sizeInBytes / sizeof(ptr[0]);
             for (size_t i = 0; i < size; ++i)
             {
-                uint32_t v = ptr[i];
-                writer.print("%u\n", v);
-            }
-            break;
-        }
-    case ScalarType::Int32:
-        {
-            auto ptr = (const int32_t*)data;
-            const size_t size = sizeInBytes / sizeof(ptr[0]);
-            for (size_t i = 0; i < size; ++i)
-            {
-                int32_t v = ptr[i];
-                writer.print("%i\n", v);
-            }
-            break;
-        }
-    case ScalarType::Int64:
-        {
-            auto ptr = (const int64_t*)data;
-            const size_t size = sizeInBytes / sizeof(ptr[0]);
-            for (size_t i = 0; i < size; ++i)
-            {
-                int64_t v = ptr[i];
-                writer.print("%" PRId64 "\n", v);
-            }
-            break;
-        }
-    case ScalarType::UInt64:
-        {
-            auto ptr = (const uint64_t*)data;
-            const size_t size = sizeInBytes / sizeof(ptr[0]);
-            for (size_t i = 0; i < size; ++i)
-            {
-                uint64_t v = ptr[i];
-                writer.print("%" PRIu64 "\n", v);
-            }
-            break;
-        }
-    case ScalarType::Float32:
-        {
-            auto ptr = (const float*)data;
-            const size_t size = sizeInBytes / sizeof(ptr[0]);
-            for (size_t i = 0; i < size; ++i)
-            {
-                const float v = ptr[i];
+                const float v = BFloat16ToFloat(ptr[i]);
                 writer.print("%f\n", v);
             }
             break;
         }
-    case ScalarType::Float64:
+    case ScalarType::FloatE4M3:
         {
-            auto ptr = (const double*)data;
+            auto ptr = (const uint8_t*)data;
             const size_t size = sizeInBytes / sizeof(ptr[0]);
             for (size_t i = 0; i < size; ++i)
             {
-                const double v = ptr[i];
+                const float v = FloatE4M3ToFloat(ptr[i]);
                 writer.print("%f\n", v);
             }
             break;
         }
+    case ScalarType::FloatE5M2:
+        {
+            auto ptr = (const uint8_t*)data;
+            const size_t size = sizeInBytes / sizeof(ptr[0]);
+            for (size_t i = 0; i < size; ++i)
+            {
+                const float v = FloatE5M2ToFloat(ptr[i]);
+                writer.print("%f\n", v);
+            }
+            break;
+        }
+#define CASE(SLANG_TYPE, C_TYPE, FORMAT)                      \
+    case ScalarType::SLANG_TYPE:                              \
+        {                                                     \
+            auto ptr = (const C_TYPE*)data;                   \
+            const size_t size = sizeInBytes / sizeof(ptr[0]); \
+            for (size_t i = 0; i < size; ++i)                 \
+            {                                                 \
+                C_TYPE v = ptr[i];                            \
+                writer.print("%" FORMAT "\n", v);             \
+            }                                                 \
+            break;                                            \
+        }
+        CASE(UInt8, uint8_t, PRIu8);
+        CASE(Int8, int8_t, PRId8);
+        CASE(UInt16, uint16_t, PRIu16);
+        CASE(Int16, int16_t, PRId16);
+        CASE(UInt32, uint32_t, PRIu32);
+        CASE(Int32, int32_t, PRId32);
+        CASE(UInt64, uint64_t, PRIu64);
+        CASE(Int64, int64_t, PRId64);
+        CASE(UIntPtr, uintptr_t, PRIuPTR);
+        CASE(IntPtr, intptr_t, PRIdPTR);
+        CASE(Float32, float, "f");
+        CASE(Float64, double, "f");
+#undef CASE
     }
 
     return SLANG_OK;
@@ -1486,6 +1488,9 @@ void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputD
     case SLANG_SCALAR_TYPE_FLOAT64:
     case SLANG_SCALAR_TYPE_FLOAT32:
     case SLANG_SCALAR_TYPE_FLOAT16:
+    case SLANG_SCALAR_TYPE_BFLOAT16:
+    case SLANG_SCALAR_TYPE_FLOAT_E4M3:
+    case SLANG_SCALAR_TYPE_FLOAT_E5M2:
         type = SimpleScalarType::kFloat;
         break;
     default:

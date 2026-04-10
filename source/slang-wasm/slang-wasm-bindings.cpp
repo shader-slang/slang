@@ -11,6 +11,8 @@ EMSCRIPTEN_BINDINGS(slang)
 
     function("getLastError", &slang::wgsl::getLastError);
 
+    function("getVersionString", &slang::wgsl::getVersionString);
+
     function("getCompileTargets", &slang::wgsl::getCompileTargets);
 
     class_<slang::wgsl::GlobalSession>("GlobalSession")
@@ -155,7 +157,12 @@ EMSCRIPTEN_BINDINGS(slang)
         .value("Int8", slang::TypeReflection::ScalarType::Int8)
         .value("UInt8", slang::TypeReflection::ScalarType::UInt8)
         .value("Int16", slang::TypeReflection::ScalarType::Int16)
-        .value("UInt16", slang::TypeReflection::ScalarType::UInt16);
+        .value("UInt16", slang::TypeReflection::ScalarType::UInt16)
+        .value("IntPtr", slang::TypeReflection::ScalarType::IntPtr)
+        .value("UIntPtr", slang::TypeReflection::ScalarType::UIntPtr)
+        .value("BFloat16", slang::TypeReflection::ScalarType::BFloat16)
+        .value("FloatE4M3", slang::TypeReflection::ScalarType::FloatE4M3)
+        .value("FloatE5M2", slang::TypeReflection::ScalarType::FloatE5M2);
 
     class_<slang::wgsl::TypeReflection>("TypeReflection")
         .function("getScalarType", &slang::wgsl::TypeReflection::getScalarType)

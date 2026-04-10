@@ -18,16 +18,14 @@ using namespace Slang;
 #define MAIN main
 #endif
 
-static void _diagnosticCallback(char const* message, void* /*userData*/)
-{
-    auto stdError = StdWriters::getError();
-    stdError.put(message);
-    stdError.flush();
-}
-
 static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const char* const* argv)
 {
-    spSetDiagnosticCallback(compileRequest, &_diagnosticCallback, nullptr);
+    // Use the stderr writer directly instead of a callback.
+    // This allows the API to correctly detect TTY status for -diagnostic-color auto.
+    spSetWriter(
+        compileRequest,
+        SLANG_WRITER_CHANNEL_DIAGNOSTIC,
+        StdWriters::getSingleton()->getWriter(SLANG_WRITER_CHANNEL_STD_ERROR));
     spSetCommandLineCompilerMode(compileRequest);
 
     SlangResult res = spProcessCommandLineArguments(compileRequest, &argv[1], argc - 1);
@@ -62,7 +60,7 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
     return res;
 }
 
-bool shouldEmbedPrelude(const char* const* argv, int argc)
+static bool shouldEmbedPrelude(const char* const* argv, int argc)
 {
     for (int i = 0; i < argc; i++)
     {
@@ -130,6 +128,11 @@ int wmain(int argc, wchar_t** argv)
 {
     int result = 0;
 
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+
     {
         // Convert the wide-character Unicode arguments to UTF-8,
         // since that is what Slang expects on the API side.
@@ -137,15 +140,17 @@ int wmain(int argc, wchar_t** argv)
         List<String> args;
         for (int ii = 0; ii < argc; ++ii)
         {
-            args.add(String::fromWString(argv[ii]));
-        }
-        List<char const*> argBuffers;
-        for (int ii = 0; ii < argc; ++ii)
-        {
-            argBuffers.add(args[ii].getBuffer());
+            String arg = String::fromWString(argv[ii]);
+            args.add(arg);
         }
 
-        result = MAIN(argc, (char**)&argBuffers[0]);
+        // argBuffers holds raw pointers into the String buffers owned by args.
+        // args must outlive argBuffers.
+        List<char const*> argBuffers;
+        for (const auto& arg : args)
+            argBuffers.add(arg.getBuffer());
+
+        result = MAIN((int)argBuffers.getCount(), (char**)&argBuffers[0]);
     }
 
 #ifdef _MSC_VER

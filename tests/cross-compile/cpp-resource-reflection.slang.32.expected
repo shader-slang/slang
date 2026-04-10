@@ -194,6 +194,7 @@ standard output = {
             ],
             "threadGroupSize": [4, 1, 1]
         }
-    ]
+    ],
+    "bindlessSpaceIndex": 1
 }
 }

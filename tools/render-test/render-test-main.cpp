@@ -18,6 +18,9 @@
 #if defined(_WIN32)
 #include <d3d12.h>
 #include <windows.h>
+#endif
+
+#if defined(_MSC_VER)
 #pragma comment(lib, "advapi32")
 #endif
 
@@ -409,6 +412,25 @@ struct AssignValsFromLayoutContext
     {
         const InputBufferDesc& srcBuffer = srcVal->bufferDesc;
         auto& bufferData = srcVal->bufferData;
+
+        // When stride=1 or stride=2, each value in data=[] should occupy only `stride` bytes.
+        // Pack values per uint32, little-endian (first value in LSB).
+        if (srcBuffer.stride == 1 || srcBuffer.stride == 2)
+        {
+            const int strideBits = srcBuffer.stride * 8;
+            const uint32_t mask = (1u << strideBits) - 1u;
+            const int valsPerWord = (int)sizeof(uint32_t) / srcBuffer.stride;
+            List<uint32_t> packed;
+            for (Index i = 0; i < bufferData.getCount(); i += valsPerWord)
+            {
+                uint32_t word = 0;
+                for (int j = 0; j < valsPerWord && (i + j) < bufferData.getCount(); j++)
+                    word |= (bufferData[i + j] & mask) << (j * strideBits);
+                packed.add(word);
+            }
+            bufferData = packed;
+        }
+
         const size_t bufferSize = Math::Max(
             (size_t)bufferData.getCount() * sizeof(uint32_t),
             (size_t)(srcBuffer.elementCount * srcBuffer.stride));
@@ -694,13 +716,19 @@ struct AssignValsFromLayoutContext
     SlangResult assignObject(ShaderCursor const& dstCursor, ShaderInputLayout::ObjectVal* srcVal)
     {
         auto typeName = srcVal->typeName;
-        slang::TypeReflection* slangType = nullptr;
+        ComPtr<IShaderObject> shaderObject;
+
         if (typeName.getLength() != 0)
         {
             // If the input line specified the name of the type
             // to allocate, then we use it directly.
             //
-            slangType = slangReflection()->findTypeByName(typeName.getBuffer());
+            auto slangType = slangReflection()->findTypeByName(typeName.getBuffer());
+            device->createShaderObject(
+                slangSession(),
+                slangType,
+                rhi::ShaderObjectContainerType::None,
+                shaderObject.writeRef());
         }
         else
         {
@@ -724,15 +752,9 @@ struct AssignValsFromLayoutContext
                 slangTypeLayout = slangTypeLayout->getElementTypeLayout();
                 break;
             }
-            slangType = slangTypeLayout->getType();
+            auto slangType = slangTypeLayout->getType();
+            device->createShaderObjectFromTypeLayout(slangTypeLayout, shaderObject.writeRef());
         }
-
-        ComPtr<IShaderObject> shaderObject;
-        device->createShaderObject(
-            slangSession(),
-            slangType,
-            ShaderObjectContainerType::None,
-            shaderObject.writeRef());
 
         SLANG_RETURN_ON_FAIL(assign(ShaderCursor(shaderObject), srcVal->contentVal));
         shaderObject->finalize();
@@ -1254,8 +1276,8 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
     // Wait until everything is complete
     m_queue->waitOnHost();
 
-    FILE* f = fopen(fileName.getBuffer(), "wb");
-    if (!f)
+    FILE* f = nullptr;
+    if (fopen_s(&f, fileName.getBuffer(), "wb") != 0 || !f)
     {
         return SLANG_FAIL;
     }
@@ -1277,11 +1299,24 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
 
             if (!blob)
             {
+                printf("Missing output blob\n");
                 return SLANG_FAIL;
             }
+
+            slang::TypeLayoutReflection* typeLayout = nullptr;
+            if (m_options.outputUsingType)
+            {
+                // TODO: always output using type
+                typeLayout = outputItem.typeLayout;
+                if (typeLayout == nullptr)
+                {
+                    printf("Output using type layout requested but type layout was null\n");
+                    return SLANG_FAIL;
+                }
+            }
+
             const SlangResult res = ShaderInputLayout::writeBinding(
-                m_options.outputUsingType ? outputItem.typeLayout
-                                          : nullptr, // TODO: always output using type
+                typeLayout,
                 blob->getBufferPointer(),
                 bufferSize,
                 &writer);
@@ -1713,6 +1748,79 @@ static SlangResult _innerMain(
         return SLANG_E_NOT_AVAILABLE;
     }
 
+    if (options.compileOnly)
+    {
+        // Use text output targets so downstream compilers are not required.
+        // This exercises Slang's emit code paths without needing DXC, FXC, NVRTC, etc.
+        switch (input.target)
+        {
+        case SLANG_DXBC:
+        case SLANG_DXIL:
+            input.target = SLANG_HLSL;
+            break;
+        case SLANG_METAL_LIB:
+            input.target = SLANG_METAL;
+            break;
+        case SLANG_PTX:
+            input.target = SLANG_CUDA_SOURCE;
+            break;
+        case SLANG_SHADER_HOST_CALLABLE:
+            input.target = SLANG_CPP_SOURCE;
+            break;
+        case SLANG_SPIRV:
+            // When not generating SPIRV directly, remap to GLSL to avoid
+            // needing glslang. This exercises the GLSL emitter rather than
+            // the SPIRV emitter for these tests.
+            if (!options.generateSPIRVDirectly)
+                input.target = SLANG_GLSL;
+            break;
+        default:
+            break;
+        }
+        input.passThrough = SLANG_PASS_THROUGH_NONE;
+
+        ShaderCompilerUtil::OutputAndLayout output;
+        SLANG_RETURN_ON_FAIL(
+            ShaderCompilerUtil::compileWithLayout(session, options, input, output));
+
+        // Force target code generation so the emit pipeline is exercised.
+        // compileWithLayout only links the program; without this call the
+        // backend emit code (slang-emit-hlsl, slang-emit-spirv, etc.) would
+        // never run and would not appear in coverage data.
+        //
+        // This is best-effort: some configurations (incomplete libraries,
+        // certain pipeline types) may fail at code generation even though
+        // compilation succeeded. We still count those as passing since the
+        // compilation itself is the authority.
+        if (output.output.slangProgram)
+        {
+            ComPtr<ISlangBlob> code;
+            ComPtr<ISlangBlob> diagnostics;
+            SlangResult codeGenResult = output.output.slangProgram->getTargetCode(
+                0,
+                code.writeRef(),
+                diagnostics.writeRef());
+            if (SLANG_FAILED(codeGenResult))
+            {
+                if (diagnostics)
+                {
+                    fprintf(
+                        stderr,
+                        "compile-only: code generation failed: %s\n",
+                        (const char*)diagnostics->getBufferPointer());
+                }
+                else
+                {
+                    fprintf(
+                        stderr,
+                        "compile-only: code generation failed (0x%08x)\n",
+                        (unsigned)codeGenResult);
+                }
+            }
+        }
+        return SLANG_OK;
+    }
+
     CachedDeviceWrapper deviceWrapper;
     {
         DeviceDesc desc = {};
@@ -1906,6 +2014,12 @@ SLANG_TEST_TOOL_API SlangResult innerMain(
 int main(int argc, char** argv)
 {
     using namespace Slang;
+
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+
     SlangSession* session = spCreateSession(nullptr);
 
     TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);

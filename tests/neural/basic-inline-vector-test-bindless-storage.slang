@@ -8,18 +8,22 @@
 // Currently, only CUDA supports atomicAdd on half. So we can only test fp16 on CUDA.
 
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_POINTER=1
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_POINTER=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_POINTER=1 -xslang -DTEST_TENSORVIEW=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_POINTER=0 -xslang -DTEST_TENSORVIEW=0
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0  -xslang -DTEST_POINTER=1
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0  -xslang -DTEST_POINTER=1 -xslang -DTEST_TENSORVIEW=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=0 -xslang -DTEST_TENSORVIEW=0
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type -emit-spirv-directly -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type -emit-spirv-directly -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1 -xslang -DTEST_TENSORVIEW=0
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1 -xslang -DTEST_TENSORVIEW=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=0 -xslang -DTEST_TENSORVIEW=0
+//
+// Compile-only test for TorchTensorViewAddress (CUDA target):
+//TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_HALF=0 -DTEST_TENSORVIEW=1 -DTEST_POINTER=0 -experimental-feature
+// CHECK: computeMain
 
-import neural;
+import slang.neural;
 
 #if TEST_HALF
 typealias ElementType = half;
@@ -45,7 +49,12 @@ uniform RWStructuredBuffer<float> parametersFloat;
 // set up a 2x4 matrix for derivative of parameters, the last 2 elements are for derivative of bias
 //TEST_INPUT: set dParameters = ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4)
 
-#if TEST_POINTER
+#if TEST_TENSORVIEW
+    uniform TensorView<ElementType> parameters;
+    uniform TensorView<ElementType> dInput;
+    uniform TensorView<ElementType> dParameters;
+    typealias Address = TorchTensorViewAddress<ElementType>;
+#elif TEST_POINTER
     uniform ElementType* parameters;
     uniform ElementType* dInput;
     uniform ElementType* dParameters;
@@ -62,10 +71,10 @@ uniform RWStructuredBuffer<float> parametersFloat;
 OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
     InputVector input,
     Address address)
-    where InputVector : IVector<ElementType, 4>
-    where OutputVector : IVector<ElementType, 2>
+    where InputVector : IVector<ElementType>
+    where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<2, Address, OutputVector>(address);
+    var outputVec = input.linearTransform<Address, LinearLayout, OutputVector>(address);
     return outputVec;
 }
 
@@ -74,10 +83,10 @@ OutputVector TestInlineVectorMatMulAdd<InputVector, OutputVector>(
     InputVector input,
     Address weightAddress,
     Address biasAddress)
-    where InputVector : IVector<ElementType, 4>
-    where OutputVector : IVector<ElementType, 2>
+    where InputVector : IVector<ElementType>
+    where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<2, Address, OutputVector>(weightAddress, biasAddress);
+    var outputVec = input.linearTransform<Address, LinearLayout, OutputVector>(weightAddress, biasAddress);
     return outputVec;
 }
 
@@ -102,12 +111,12 @@ bool BasicTestWithoutBias()
 
     // Run the backward pass
     // dInput = W^T * dOutput
-    // dInput = {3, 7, 11, 15}
+    // dInput = {6, 8, 10, 12}
     bwd_diff(TestInlineVectorMatMul<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>>)
                 (dPair, weightDiffPair, dRes);
 
     isPassed = isPassed &&
-        dPair.d[0] == 3.0 && dPair.d[1] == 7.0 && dPair.d[2] == 11.0 && dPair.d[3] == 15.0;
+        dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;
 
     // dW = dOutput * dInput^T
     // dW = [1, 1]^T * [1, 2, 3, 4]
@@ -143,12 +152,12 @@ bool BasicTestWithBias()
 
     // Run the backward pass
     // dInput = W^T * dOutput
-    // dInput = {3, 7, 11, 15}
+    // dInput = {6, 8, 10, 12}
     bwd_diff(TestInlineVectorMatMulAdd<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>>)
                 (dPair, weightDiffPair, biasDiffPair, dOutput);
 
     isPassed = isPassed &&
-        dPair.d[0] == 3.0 && dPair.d[1] == 7.0 && dPair.d[2] == 11.0 && dPair.d[3] == 15.0;
+        dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;
 
     // dW = dOutput * dInput^T
     // dW = [1, 1]^T * [1, 2, 3, 4]

@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK):-target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHK_NEG):-target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=SPV):-target spirv -stage compute -entry computeMain
@@ -54,36 +55,37 @@ extension MyType<T>
 [numthreads(1,1,1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-    // CHK-DAG: error {{.*}} TEST_specialize T_is_int
-    // CHK-DAG:{{.*}} TEST_specialize<float>
+    // CHK-DAG: TEST_specialize T_is_int
+    // CHK-DAG: TEST_specialize<float>
     TEST_specialize<float>();
 
-    // CHK-DAG: error {{.*}} TEST_specialize T_is_float
-    // CHK-DAG:{{.*}} TEST_specialize<int>
+    // CHK-DAG: TEST_specialize T_is_float
+    // CHK-DAG: TEST_specialize<int>
     TEST_specialize<int>();
 
-    //HLSL: error {{.*}} TEST_target_switch all
-    //HLSL: error {{.*}} TEST_target_switch hlsl
-    //HLSL-NOT: error {{.*}} TEST_target_switch glsl
-    //HLSL-NOT: error {{.*}} TEST_target_switch default
+    //HLSL: TEST_target_switch all
+    //HLSL: TEST_target_switch hlsl
+    //HLSL-NOT: TEST_target_switch glsl
+    //HLSL-NOT: TEST_target_switch default
     //
-    //GLSL: error {{.*}} TEST_target_switch all
-    //GLSL-NOT: error {{.*}} TEST_target_switch hlsl
-    //GLSL: error {{.*}} TEST_target_switch glsl
-    //GLSL-NOT: error {{.*}} TEST_target_switch default
+    //GLSL: TEST_target_switch all
+    //GLSL-NOT: TEST_target_switch hlsl
+    //GLSL: TEST_target_switch glsl
+    //GLSL-NOT: TEST_target_switch default
     //
-    //SPV: error {{.*}} TEST_target_switch all
-    //SPV-NOT: error {{.*}} TEST_target_switch hlsl
-    //SPV-NOT: error {{.*}} TEST_target_switch glsl
-    //SPV: error {{.*}} TEST_target_switch default
+    //SPV: TEST_target_switch all
+    //SPV-NOT: TEST_target_switch hlsl
+    //SPV-NOT: TEST_target_switch glsl
+    //SPV: TEST_target_switch default
     //
     TEST_target_switch();
 
-    //CHK-NOT: error {{.*}} MyType init true
-    //CHK: error {{.*}} MyType init false
+    //CHK_NEG-NOT: MyType init true
+    //CHK-DAG: MyType init false
     MyType<float> obj;
 
-    //CHK: ([[#@LINE+1]]): error
+    //CHK-DAG: error[E41402]
+    //CHK-DAG: static_assert.slang:[[#@LINE+1]]
     static_assert(dispatchThreadID.x == 0, "not constant");
 }
 

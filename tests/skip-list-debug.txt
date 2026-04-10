@@ -1,0 +1,37 @@
+# Skip list for debug builds
+# These tests are skipped to reduce CI time in debug builds.
+# Each line is a path prefix - tests starting with these paths will be skipped.
+
+# Skip most neural tests in debug builds, except for a few basic ones:
+#   - basic-inline-vector-test.slang (basic inline vector functionality)
+#   - basic-coopmat-vector-test.slang (basic cooperative matrix vector)
+#   - mma-helper-test-single-warp.slang (basic MMA single warp)
+#   - neural-module-discovery-diagnose.slang (module discovery diagnostics)
+
+# TODO: Those test expose the issue that our compiler is very slow in debug mode
+        when specializing complicated generics. We might need to optimize this
+        in the future. File an issue to track the this #9755.
+
+tests/neural/bias-sum-reduce.slang
+tests/neural/common.slang
+tests/neural/mma-helper-test-multi-warps-arbitrary-size.slang
+tests/neural/mma-helper-test-multi-warps.slang
+tests/neural/mma-helper-test-single-warp-arbitrary-size.slang
+tests/neural/mma-helper-test-single-warp.slang
+tests/neural/mma-helper-test-transpose-multi-warps-arbitrary-size.slang
+tests/neural/mma-helper-test-transpose-multi-warps.slang
+tests/neural/mma-helper-test-transpose-single-warp-arbitrary-size.slang
+tests/neural/mma-helper-test-transpose-single-warp.slang
+tests/neural/neural-module-discovery-diagnose.slang
+tests/neural/outerproduct-accumulate-test-arbitrary-size.slang
+tests/neural/outerproduct-accumulate-test.slang
+tests/neural/shared-memory-size.slang
+tests/neural/test1.slang
+tests/neural/tiled-mma-load-test-aligned.slang
+tests/neural/tiled-mma-load-test-transpose-aligned.slang
+tests/neural/tiled-mma-load-test-transpose-unAligned-width-A.slang
+tests/neural/tiled-mma-load-test-transpose-unAligned-width-height-A.slang
+tests/neural/tiled-mma-load-test-unAligned-height-A.slang
+tests/neural/tiled-mma-load-test-unAligned-height-B.slang
+tests/neural/tiled-mma-load-test-unAligned-width-B-multi-warps.slang
+tests/neural/tiled-mma-load-test-unAligned-width-height-A.slang

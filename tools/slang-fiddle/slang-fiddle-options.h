@@ -3,6 +3,10 @@
 
 #include "slang-fiddle-diagnostics.h"
 
+#ifdef _MSC_VER
+#include <stdlib.h>
+#endif
+
 namespace fiddle
 {
 using namespace Slang;

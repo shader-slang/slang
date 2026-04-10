@@ -110,7 +110,16 @@ static void emitReflectionVarBindingInfoJSON(
             CASE(REGISTER_SPACE, registerSpace);
             CASE(SUB_ELEMENT_REGISTER_SPACE, subElementRegisterSpace);
             CASE(GENERIC, generic);
+            CASE(RAY_PAYLOAD, rayPayload);
+            CASE(HIT_ATTRIBUTES, hitAttributes);
+            CASE(CALLABLE_PAYLOAD, callablePayload);
+            CASE(SHADER_RECORD, shaderRecord);
+            CASE(EXISTENTIAL_TYPE_PARAM, existentialTypeParam);
+            CASE(EXISTENTIAL_OBJECT_PARAM, existentialObjectParam);
+            CASE(SUBPASS, inputAttachmentIndex);
             CASE(METAL_ARGUMENT_BUFFER_ELEMENT, metalArgumentBufferElement);
+            CASE(METAL_ATTRIBUTE, metalAttribute);
+            CASE(METAL_PAYLOAD, metalPayload);
 #undef CASE
 
         default:
@@ -459,6 +468,11 @@ static void emitReflectionScalarTypeInfoJSON(PrettyWriter& writer, SlangScalarTy
         CASE(Float16, float16);
         CASE(Float32, float32);
         CASE(Float64, float64);
+        CASE(IntPtr, intptr);
+        CASE(UIntPtr, uintptr);
+        CASE(BFloat16, bfloat16);
+        CASE(FloatE4M3, float_e4m3);
+        CASE(FloatE5M2, float_e5m2);
 #undef CASE
     }
     writer << "\"";
@@ -493,6 +507,7 @@ static void emitReflectionResourceTypeBaseInfoJSON(
         CASE(STRUCTURED_BUFFER, structuredBuffer);
         CASE(BYTE_ADDRESS_BUFFER, byteAddressBuffer);
         CASE(ACCELERATION_STRUCTURE, accelerationStructure);
+        CASE(TEXTURE_SUBPASS, subpassInput);
 #undef CASE
     }
     writer << "\"";
@@ -582,6 +597,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
             case SLANG_TEXTURE_2D:
             case SLANG_TEXTURE_3D:
             case SLANG_TEXTURE_CUBE:
+            case SLANG_TEXTURE_SUBPASS:
                 if (auto resultType = type->getResourceResultType())
                 {
                     writer.maybeComma();
@@ -723,10 +739,6 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
     case slang::TypeReflection::Kind::DynamicResource:
         writer.maybeComma();
         writer << "\"kind\": \"DynamicResource\"";
-        break;
-    case slang::TypeReflection::Kind::OutputStream:
-        writer.maybeComma();
-        writer << "\"kind\": \"OutputStream\"";
         break;
     case slang::TypeReflection::Kind::MeshOutput:
         writer.maybeComma();
@@ -917,6 +929,10 @@ static void emitReflectionTypeLayoutInfoJSON(
 
     case slang::TypeReflection::Kind::ConstantBuffer:
         emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "constantBuffer");
+        break;
+
+    case slang::TypeReflection::Kind::OutputStream:
+        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "outputStream");
         break;
 
     case slang::TypeReflection::Kind::ParameterBlock:
@@ -1307,6 +1323,13 @@ static void emitReflectionJSON(
             writer.dedent();
             writer << "\n}\n";
         }
+    }
+
+    // Emit the bindless space index
+    auto bindlessSpaceIndex = programReflection->getBindlessSpaceIndex();
+    if (bindlessSpaceIndex >= 0)
+    {
+        writer << ",\n\"bindlessSpaceIndex\": " << bindlessSpaceIndex;
     }
 
     writer.dedent();

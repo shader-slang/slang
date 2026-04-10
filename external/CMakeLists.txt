@@ -81,6 +81,26 @@ if(NOT ${SLANG_USE_SYSTEM_LZ4})
     endif()
 endif()
 
+# cmark-gfm (CommonMark / GFM Markdown parser, swiftlang fork)
+set(CMARK_LIB_FUZZER OFF)
+set(CMARK_FUZZ_QUADRATIC OFF)
+set(_prev_BUILD_TESTING ${BUILD_TESTING})
+set(_prev_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+set(BUILD_TESTING OFF)
+set(BUILD_SHARED_LIBS OFF)
+if(NOT SLANG_OVERRIDE_CMARK_PATH)
+    add_subdirectory(cmark EXCLUDE_FROM_ALL ${system})
+else()
+    add_subdirectory(
+        ${SLANG_OVERRIDE_CMARK_PATH}/cmark
+        cmark
+        EXCLUDE_FROM_ALL
+        ${system}
+    )
+endif()
+set(BUILD_TESTING ${_prev_BUILD_TESTING})
+set(BUILD_SHARED_LIBS ${_prev_BUILD_SHARED_LIBS})
+
 # Vulkan headers
 if(NOT TARGET Vulkan::Headers)
     if(NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
@@ -280,14 +300,10 @@ if(SLANG_ENABLE_SLANG_RHI)
     set(SLANG_RHI_SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})
     set(SLANG_RHI_ENABLE_NVAPI ${SLANG_ENABLE_NVAPI})
 
-    # CoopVec requires 1.717.0-preview, but we cannot use the version until slang-rhi
-    # allow slang to override D3D12Version value
+    # CoopVec requires the preview Agility SDK that supports SM 6.10
     #set(SLANG_RHI_AGILITY_SDK_VERSION D3D12_PREVIEW_SDK_VERSION)
-    #set(SLANG_RHI_FETCH_AGILITY_SDK_VERSION
-    #    "1.717.0-preview"
-    #    CACHE STRING
-    #    "Agility SDK version to fetch"
-    #    FORCE
+    #set(SLANG_RHI_AGILITY_SDK_URL
+    #"https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.719.1-preview"
     #)
 
     if(SLANG_ENABLE_DX_ON_VK)

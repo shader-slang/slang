@@ -12,7 +12,7 @@ and linear algebra operations for neural network computations.
 @see `InlineVector`
 @category neural
 */
-public interface IVector<T, int N> : IDifferentiable
+public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -21,7 +21,7 @@ public interface IVector<T, int N> : IDifferentiable
 
     /// The differential type for automatic differentiation.
     /// @remarks Ensures the differential is also a vector with the same structure.
-    public associatedtype Differential : IVector<T.Differential, N>;
+    public associatedtype Differential : IVector<T>;
 
     /// Default constructor - initializes vector to zero.
     public __init();
@@ -36,7 +36,9 @@ public interface IVector<T, int N> : IDifferentiable
     Array constructor - initializes from an array.
     @param[in] data Array of N elements to initialize the vector.
     */
-    public __init(T[N] data);
+    public __init(T[This.Size] data);
+
+    public __init<InputArray : IArray<T>>(InputArray data);
 
     /**
     Copy constructor.
@@ -45,127 +47,51 @@ public interface IVector<T, int N> : IDifferentiable
     public __init(This other);
 
     /**
-    Element access operator.
-    @param[in] index The element index (0-based).
-    @return Reference to the element at the given index.
-    */
-    public __subscript(int index)->T
-    {
-        get;
-        set;
-    }
-
-    /**
-    Evaluates a linear transformation: output = W * input.
-    Performs matrix-vector multiplication.
-    Supports automatic differentiation for backpropagation.
-    @param OutputSize The size of the output vector.
-    @param Bias Whether to include bias in the computation.
-    @param Storage The storage type for parameters (must implement IStorage).
-    @param OutputVector The output vector type.
-    @param[in] weightStorage The storage object containing weight matrix.
-        The weight matrix is stored in a contiguous block of memory, the size
-        of the weight matrix is in `OutputSize` rows, and `N` columns.
-    @param[in] weightAddress The starting address in weightStorage for the weight matrix.
-    @return The result of the linear transformation, `result = W * this`, whose size is `OutputSize`.
-    @remarks Type constraints:
-    - `Storage` must conform to `IStorage<T>`
-    - `Storage.Differential` must conform to `IStorage<T.Differential>`
-    - `Storage.Address` must equal `Storage.Differential.Address` (same address type)
-    - `OutputVector` must conform to `IVector<T, OutputSize>`
-    */
-    [Differentiable]
-    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
-        Storage weightStorage,
-        no_diff Storage.Address weightAddress)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
-        where OutputVector : IVector<T, OutputSize>;
-
-    /**
-    Evaluates a linear transformation: output = W * this + bias.
-    Performs matrix-vector multiplication with bias addition.
-    Supports automatic differentiation for backpropagation.
-    @param OutputSize The size of the output vector.
-    @param Storage The storage type for parameters (must implement IStorage).
-    @param OutputVector The output vector type.
-    @param[in] weightStorage The storage object containing weight matrix.
-            The weight matrix is stored in a contiguous block of memory, the size
-            of the weight matrix is in `OutputSize` rows, and `N` columns.
-    @param[in] weightAddress The starting address in weightStorage for the weight matrix.
-    @param[in] biasStorage The storage object containing bias vector.
-            The bias vector is stored in a contiguous block of memory, the size
-            of the bias vector is `OutputSize`.
-    @param[in] weightAddress The starting address in `weightStorage` for the weight matrix.
-    @param[in] biasAddress The starting address in `biasStorage` for the bias vector.
-    @return The result of the linear transformation, `result = W * this + bias`, whose size is `OutputSize`.
-    @remarks Type constraints:
-    - `Storage` must conform to `IStorage<T>`
-    - `Storage.Differential` must conform to `IStorage<T.Differential>`
-    - `Storage.Address` must equal `Storage.Differential.Address` (same address type)
-    - `OutputVector` must conform to `IVector<T, OutputSize>`
-    */
-    [Differentiable]
-    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
-        Storage weightStorage,
-        Storage biasStorage,
-        no_diff Storage.Address weightAddress,
-        no_diff Storage.Address biasAddress)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
-            where OutputVector : IVector<T, OutputSize>;
-
-    /**
     Evaluates a linear transformation: output = W * this.
-    This is a overload method but using bindless storage (pointer-like addressing).
-    @param OutputSize The size of the output vector.
-    @param BindlessStorage The bindless storage type with pointer-like addresses.
+    Uses pointer-like addressing for direct access to weight parameters.
+    @param Address The address type with pointer-like access.
+    @param Layout The storage layout type.
     @param OutputVector The output vector type.
-    @param[in] weightAddress The address of weight matrix in bindless storage.
+    @param[in] weightAddress The address of the weight matrix.
             The weight matrix is stored in a contiguous block of memory, the size
-            of the weight matrix is in `OutputSize` rows, and `N` columns. As this method take the
-            bindless storage buffer, we don't need to provide the storage object.
-    @return The result of the linear transformation, `result = W * this`, whose size is `OutputSize`.
+            of the weight matrix is in `OutputVector.Size` rows, and `N` columns.
+    @return The result of the linear transformation, `result = W * this`, whose size is `OutputVector.Size`.
     @remarks Type constraints:
-    - `BindlessStorage` must conform to `IStorage<T>`
-    - `BindlessStorage.Address` must conform to `IPointerLikeAddress<T>`
-    - `BindlessStorage.Address.Differential` must conform to `IPointerLikeAddress<T.Differential>`
-    - `OutputVector` must conform to `IVector<T, OutputSize>`
+    - `Address` must conform to `IPointerLikeAddress<T>`
+    - `Address.Differential` must conform to `IPointerLikeAddress<T.Differential>`
+    - `OutputVector` must conform to `IVector<T>`
     */
     [Differentiable]
-    public OutputVector linearTransform<int OutputSize, Address, OutputVector>(Address weightAddress)
+    public OutputVector linearTransform<Address, Layout, OutputVector>(Address weightAddress)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
-            where OutputVector : IVector<T, OutputSize>;
+            where Address.Differential : IPointerLikeAddress<T>
+            where Layout : IStorageLayout
+            where OutputVector : IVector<T>;
 
     /**
     Evaluates a linear transformation: output = W * this + bias.
     Performs matrix-vector multiplication with bias addition.
-    Supports automatic differentiation for backpropagation.
-    @param OutputSize The size of the output vector.
-    @param BindlessStorage The bindless storage type with pointer-like addresses.
+    Uses pointer-like addressing for direct access to weight and bias parameters.
+    @param Address The address type with pointer-like access.
+    @param Layout The storage layout type.
     @param OutputVector The output vector type.
-    @param[in] weightAddress The address of weight matrix in bindless storage.
+    @param[in] weightAddress The address of the weight matrix.
             The weight matrix is stored in a contiguous block of memory, the size
-            of the weight matrix is in `OutputSize` rows, and `N` columns. As this method take the
-            bindless storage buffer, we don't need to provide the storage object.
-    @param[in] biasAddress The address of bias vector in bindless storage.
+            of the weight matrix is in `OutputVector.Size` rows, and `N` columns.
+    @param[in] biasAddress The address of the bias vector.
             The bias vector is stored in a contiguous block of memory, the size
-            of the bias vector is `OutputSize`. As this method take the
-            bindless storage buffer, we don't need to provide the storage object.
-    @return The result of the linear transformation, `result = W * this + bias`, whose size is `OutputSize`.
+            of the bias vector is `OutputVector.Size`.
+    @return The result of the linear transformation, `result = W * this + bias`, whose size is `OutputVector.Size`.
     @remarks Type constraints:
-    - `BindlessStorage` must conform to `IStorage<T>`
-    - `BindlessStorage.Address` must conform to `IPointerLikeAddress<T>`
-    - `BindlessStorage.Address.Differential` must conform to `IPointerLikeAddress<T.Differential>`
-    - `OutputVector` must conform to `IVector<T, OutputSize>`
+    - `Address` must conform to `IPointerLikeAddress<T>`
+    - `Address.Differential` must conform to `IPointerLikeAddress<T.Differential>`
+    - `OutputVector` must conform to `IVector<T>`
     */
     [Differentiable]
-    public OutputVector linearTransform<int OutputSize, Address, OutputVector>(
+    public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress, Address biasAddress)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
-            where OutputVector : IVector<T, OutputSize>;
+            where Address.Differential : IPointerLikeAddress<T>
+            where Layout : IStorageLayout
+            where OutputVector : IVector<T>;
 }

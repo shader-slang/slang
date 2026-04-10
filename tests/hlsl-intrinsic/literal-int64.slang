@@ -84,7 +84,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         {
             v = 0;
         }
-        //CHK: warning 39999: integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+        //CHK: warning[E40004]: integer literal is too large to be represented in a signed integer type, interpreting as unsigned
     }
     else
     {

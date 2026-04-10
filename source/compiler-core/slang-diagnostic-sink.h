@@ -170,6 +170,8 @@ public:
                 0x10, ///< If set will format message in a way that is suitable for language server
             AlwaysGenerateRichDiagnostics =
                 0x20, ///< Convert old style diagnostics to the new style
+            MachineReadableDiagnostics =
+                0x40, ///< If set will format diagnostics in machine-readable TSV format
         };
     };
 
@@ -217,7 +219,7 @@ public:
     template<typename D>
     bool diagnose(D const& d)
     {
-        return diagnoseRichImpl(d.toGenericDiagnostic());
+        return diagnoseRichImpl(d.toGenericDiagnostic(), D::getInfo());
     }
 
     // Useful for notes on existing diagnostics, where it would be redundant to display the same
@@ -279,6 +281,45 @@ public:
     void setSourceLineMaxLength(Index length) { m_sourceLineMaxLength = length; }
     Index getSourceLineMaxLength() const { return m_sourceLineMaxLength; }
 
+    /// Set the diagnostic color mode for rich diagnostics
+    /// AUTO will check writer->isConsole() to determine if colors should be used
+    void setDiagnosticColorMode(SlangDiagnosticColor mode) { m_diagnosticColorMode = mode; }
+    SlangDiagnosticColor getDiagnosticColorMode() const { return m_diagnosticColorMode; }
+
+    /// Returns true if terminal colors should be enabled based on color mode and writer
+    bool shouldEnableTerminalColors() const
+    {
+        switch (m_diagnosticColorMode)
+        {
+        case SLANG_DIAGNOSTIC_COLOR_ALWAYS:
+            return true;
+        case SLANG_DIAGNOSTIC_COLOR_NEVER:
+            return false;
+        case SLANG_DIAGNOSTIC_COLOR_AUTO:
+        default:
+            if (writer)
+                return writer->isConsole();
+            return false;
+        }
+    }
+
+    /// Set whether to enable unicode in rich diagnostics.
+    /// When not explicitly set, unicode is auto-detected based on whether
+    /// output goes to a console (matching the behavior of color auto-detection).
+    void setEnableUnicode(bool enable)
+    {
+        m_enableUnicode = enable;
+        m_unicodeExplicitlySet = true;
+    }
+    bool getEnableUnicode() const { return m_enableUnicode; }
+
+    bool shouldEnableUnicode() const
+    {
+        if (m_unicodeExplicitlySet)
+            return m_enableUnicode;
+        return shouldEnableTerminalColors();
+    }
+
     /// The parent sink is another sink that will receive diagnostics from this sink.
     void setParentSink(DiagnosticSink* parentSink) { m_parentSink = parentSink; }
     DiagnosticSink* getParentSink() const { return m_parentSink; }
@@ -304,6 +345,20 @@ public:
     {
         init(sourceManager, sourceLocationLexer);
     }
+    /// Ctor that also copies display/settings state from an optional parent sink.
+    DiagnosticSink(
+        SourceManager* sourceManager,
+        SourceLocationLexer sourceLocationLexer,
+        DiagnosticSink* parentSink)
+    {
+        init(sourceManager, sourceLocationLexer);
+        if (parentSink)
+        {
+            setFlags(parentSink->getFlags());
+            setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
+            setEnableUnicode(parentSink->getEnableUnicode());
+        }
+    }
     /// Default Ctor
     DiagnosticSink()
         : m_sourceManager(nullptr), m_sourceLocationLexer(nullptr)
@@ -326,8 +381,15 @@ protected:
         DiagnosticArg const* args);
     bool diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
 
-    // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal
-    bool diagnoseRichImpl(const GenericDiagnostic& diagnostic);
+    // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal.
+    // The info parameter is used for severity override lookup (e.g., -Wno-xxx flags).
+    bool diagnoseRichImpl(const GenericDiagnostic& diagnostic, const DiagnosticInfo* info);
+
+    // Overload that allows specifying a source manager (used when routing to parent sinks)
+    bool diagnoseRichImpl(
+        const GenericDiagnostic& diagnostic,
+        const DiagnosticInfo* info,
+        SourceManager* sourceManager);
 
     // An overload which takes an old-style diagnostic and manipulates it into a GenericDiagnostic
     bool diagnoseRichImpl(
@@ -355,10 +417,18 @@ protected:
 
     SourceLocationLexer m_sourceLocationLexer;
 
-    // Configuration that allows the user to control the severity of certain diagnostic messages
+    // Configuration that allows the user to control the severity of certain diagnostic messages.
+    // Currently keyed by diagnostic code (int). This means diagnostics with duplicate codes
+    // will share the same override. TODO: Consider keying by DiagnosticInfo* instead for
+    // more precise per-diagnostic control.
     Dictionary<int, Severity> m_severityOverrides;
 
     RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
+
+    // Rich diagnostics rendering options
+    SlangDiagnosticColor m_diagnosticColorMode = SLANG_DIAGNOSTIC_COLOR_AUTO;
+    bool m_enableUnicode = false;
+    bool m_unicodeExplicitlySet = false;
 };
 
 /// An `ISlangWriter` that writes directly to a diagnostic sink.

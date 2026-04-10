@@ -21,6 +21,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if SLANG_UNIX_FAMILY
+#include <signal.h>
+#endif
+
 #if defined(_WIN32)
 #include <slang-rhi/agility-sdk.h>
 SLANG_RHI_EXPORT_AGILITY_SDK
@@ -191,17 +195,10 @@ SlangResult TestServer::init(int argc, const char* const* argv)
 {
     m_exePath = argv[0];
 
-    // Command-line argument parsing
-    for (int i = 1; i < argc; i++)
-    {
-        if (strcmp(argv[i], "-ignore-abort-msg") == 0)
-        {
-#ifdef _MSC_VER
-            _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
 #endif
-        }
-        // Ignore unknown arguments for now
-    }
 
     String canonicalPath;
     if (SLANG_SUCCEEDED(Path::getCanonical(m_exePath, canonicalPath)))
@@ -530,9 +527,10 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     StringBuilder stdError;
     renderer_test::CoreDebugCallback debugCallback;
 
-    // Make writer/s act as if they are the console.
+    RefPtr<StringWriter> stdErrorWriter(new StringWriter(&stdError));
+    // Use IsConsole on stdout because we have tests which output spirv
+    // which we want to have disassembled
     RefPtr<StringWriter> stdOutWriter(new StringWriter(&stdOut, WriterFlag::IsConsole));
-    RefPtr<StringWriter> stdErrorWriter(new StringWriter(&stdError, WriterFlag::IsConsole));
 
     stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, stdErrorWriter);
     stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, stdOutWriter);
@@ -629,6 +627,21 @@ SlangResult _execute(int argc, const char* const* argv)
     TestServer server;
     SLANG_RETURN_ON_FAIL(server.init(argc, argv));
     SLANG_RETURN_ON_FAIL(server.execute());
+
+    // Clean up cached GPU devices before shutdown. The DeviceCache is a static
+    // singleton in render-test-tool that holds Vulkan/CUDA devices. If not cleaned
+    // up explicitly, its destructor runs during process exit (__run_exit_handlers)
+    // after the GPU driver's own static destructors, causing segfaults from
+    // corrupted vtables.
+    typedef void (*CleanDeviceCacheFunc)();
+    ISlangSharedLibrary* renderTestLib = server.loadSharedLibrary("render-test-tool");
+    if (renderTestLib)
+    {
+        auto cleanFunc = (CleanDeviceCacheFunc)renderTestLib->findFuncByName("cleanDeviceCache");
+        if (cleanFunc)
+            cleanFunc();
+    }
+
     slang::shutdown();
     return SLANG_OK;
 }
@@ -637,5 +650,11 @@ SlangResult _execute(int argc, const char* const* argv)
 
 int main(int argc, const char* const* argv)
 {
+#if SLANG_UNIX_FAMILY
+    // Ignore SIGPIPE so that writing to a broken pipe returns EPIPE
+    // instead of killing this process.
+    signal(SIGPIPE, SIG_IGN);
+#endif
+
     return (int)Slang::TestToolUtil::getReturnCode(TestServer::_execute(argc, argv));
 }

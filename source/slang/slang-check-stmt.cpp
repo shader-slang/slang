@@ -1,6 +1,7 @@
 // slang-check-stmt.cpp
 #include "slang-check-impl.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 // This file implements semantic checking logic related to statements.
 
@@ -68,7 +69,14 @@ void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
     //
     ensureDeclBase(stmt->decl, DeclCheckState::DefinitionChecked, this);
     if (auto decl = as<Decl>(stmt->decl))
+    {
         decl->hiddenFromLookup = false;
+        if (auto varDecl = as<VarDeclBase>(decl))
+        {
+            if (varDecl->initExpr)
+                varDecl->initExpr = maybeRegisterLambdaCapture(varDecl->initExpr);
+        }
+    }
 }
 
 void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
@@ -167,7 +175,9 @@ void SemanticsStmtVisitor::visitBreakStmt(BreakStmt* stmt)
         auto foundOuterStmt = findOuterStmtWithLabel(stmt->targetLabel.getName());
         if (!foundOuterStmt)
         {
-            getSink()->diagnose(stmt, Diagnostics::breakLabelNotFound, stmt->targetLabel.getName());
+            getSink()->diagnose(Diagnostics::BreakLabelNotFound{
+                .label = stmt->targetLabel.getName(),
+                .stmt = stmt});
         }
         else
         {
@@ -178,10 +188,9 @@ void SemanticsStmtVisitor::visitBreakStmt(BreakStmt* stmt)
             targetOuterStmt = as<BreakableStmt>(foundOuterStmt);
             if (!targetOuterStmt)
             {
-                getSink()->diagnose(
-                    stmt,
-                    Diagnostics::targetLabelDoesNotMarkBreakableStmt,
-                    stmt->targetLabel.getName());
+                getSink()->diagnose(Diagnostics::TargetLabelDoesNotMarkBreakableStmt{
+                    .label = stmt->targetLabel.getName(),
+                    .stmt = stmt});
             }
         }
     }
@@ -194,7 +203,7 @@ void SemanticsStmtVisitor::visitBreakStmt(BreakStmt* stmt)
         targetOuterStmt = FindOuterStmt<BreakableStmt>();
         if (!targetOuterStmt)
         {
-            getSink()->diagnose(stmt, Diagnostics::breakOutsideLoop);
+            getSink()->diagnose(Diagnostics::BreakOutsideLoop{.stmt = stmt});
         }
     }
 
@@ -212,7 +221,7 @@ void SemanticsStmtVisitor::visitBreakStmt(BreakStmt* stmt)
     {
         if (FindOuterStmt<DeferStmt>(targetOuterStmt))
         {
-            getSink()->diagnose(stmt, Diagnostics::breakInsideDefer);
+            getSink()->diagnose(Diagnostics::BreakInsideDefer{.stmt = stmt});
         }
 
         // We stash the ID of the target statement in the `break`
@@ -228,13 +237,13 @@ void SemanticsStmtVisitor::visitContinueStmt(ContinueStmt* stmt)
     auto targetOuterStmt = FindOuterStmt<LoopStmt>();
     if (!targetOuterStmt)
     {
-        getSink()->diagnose(stmt, Diagnostics::continueOutsideLoop);
+        getSink()->diagnose(Diagnostics::ContinueOutsideLoop{.stmt = stmt});
     }
     else
     {
         if (FindOuterStmt<DeferStmt>(targetOuterStmt))
         {
-            getSink()->diagnose(stmt, Diagnostics::continueInsideDefer);
+            getSink()->diagnose(Diagnostics::ContinueInsideDefer{.stmt = stmt});
         }
 
         // We stash the ID of the target statement in the `continue`
@@ -249,10 +258,11 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
 {
     if (as<AssignExpr>(expr))
     {
-        getSink()->diagnose(expr, Diagnostics::assignmentInPredicateExpr);
+        getSink()->diagnose(Diagnostics::AssignmentInPredicateExpr{.expr = expr});
     }
     Expr* e = expr;
     e = CheckTerm(e);
+    e = maybeRegisterLambdaCapture(e);
     e = coerce(CoercionSite::General, m_astBuilder->getBoolType(), e, getSink());
     return e;
 }
@@ -367,7 +377,7 @@ void SemanticsStmtVisitor::validateCaseStmts(SwitchStmt* stmt, DiagnosticSink* s
                 // uniqueness within the scope of the switch statement.
                 if (!caseStmtVals.add(caseStmt->exprVal))
                 {
-                    sink->diagnose(sStmt, Diagnostics::switchDuplicateCases);
+                    sink->diagnose(Diagnostics::SwitchDuplicateCases{.stmt = sStmt});
                     return;
                 }
             }
@@ -377,7 +387,7 @@ void SemanticsStmtVisitor::validateCaseStmts(SwitchStmt* stmt, DiagnosticSink* s
             // check that there is at most one `default` clause
             if (hasDefaultStmt)
             {
-                sink->diagnose(sStmt, Diagnostics::switchMultipleDefault);
+                sink->diagnose(Diagnostics::SwitchMultipleDefault{.stmt = sStmt});
                 return;
             }
             hasDefaultStmt = true;
@@ -403,7 +413,7 @@ void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
     auto switchStmt = FindOuterStmt<SwitchStmt>();
     if (!switchStmt)
     {
-        getSink()->diagnose(stmt, Diagnostics::caseOutsideSwitch);
+        getSink()->diagnose(Diagnostics::CaseOutsideSwitch{.stmt = stmt});
         return;
     }
 
@@ -444,10 +454,9 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
         {
             if (!isStage && caseStmt->capability != (int32_t)CapabilityName::Invalid)
             {
-                getSink()->diagnose(
-                    caseStmt->capabilityToken.loc,
-                    Diagnostics::unknownStageName,
-                    caseStmt->capabilityToken);
+                getSink()->diagnose(Diagnostics::UnknownStageName{
+                    .stageName = String(caseStmt->capabilityToken.getContent()),
+                    .location = caseStmt->capabilityToken.loc});
             }
             caseStmt->capability = (int32_t)canonicalStage;
         }
@@ -455,18 +464,16 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
         {
             if (isStage)
             {
-                getSink()->diagnose(
-                    caseStmt->capabilityToken.loc,
-                    Diagnostics::targetSwitchCaseCannotBeAStage);
+                getSink()->diagnose(Diagnostics::TargetSwitchCaseCannotBeAStage{
+                    .location = caseStmt->capabilityToken.loc});
             }
             else if (
                 caseStmt->capabilityToken.getContentLength() != 0 &&
                 (set.getCapabilityTargetSets().getCount() != 1 || set.isInvalid() || set.isEmpty()))
             {
-                getSink()->diagnose(
-                    caseStmt->capabilityToken.loc,
-                    Diagnostics::invalidTargetSwitchCase,
-                    capabilityNameToString((CapabilityName)caseStmt->capability));
+                getSink()->diagnose(Diagnostics::InvalidTargetSwitchCase{
+                    .capability = capabilityNameToString((CapabilityName)caseStmt->capability),
+                    .location = caseStmt->capabilityToken.loc});
             }
         }
 
@@ -489,7 +496,7 @@ void SemanticsStmtVisitor::visitTargetCaseStmt(TargetCaseStmt* stmt)
     }
     if (!switchStmt)
     {
-        getSink()->diagnose(stmt, Diagnostics::caseOutsideSwitch);
+        getSink()->diagnose(Diagnostics::CaseOutsideSwitch{.stmt = stmt});
     }
     else
     {
@@ -511,7 +518,7 @@ void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
     auto switchStmt = FindOuterStmt<SwitchStmt>();
     if (!switchStmt)
     {
-        getSink()->diagnose(stmt, Diagnostics::defaultOutsideSwitch);
+        getSink()->diagnose(Diagnostics::DefaultOutsideSwitch{.stmt = stmt});
     }
     else
     {
@@ -564,12 +571,12 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
         if (expectedReturnType && !expectedReturnType->equals(m_astBuilder->getVoidType()) &&
             !as<ConstructorDecl>(function))
         {
-            getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
+            getSink()->diagnose(Diagnostics::ReturnNeedsExpression{.stmt = stmt});
         }
     }
     else
     {
-        stmt->expression = CheckTerm(stmt->expression);
+        stmt->expression = CheckExpr(stmt->expression);
         returnType = stmt->expression->type.type;
         if (!stmt->expression->type->equals(m_astBuilder->getErrorType()))
         {
@@ -588,17 +595,16 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
             m_parentLambdaDecl->funcDecl->returnType.type = returnType;
         if (!m_parentLambdaDecl->funcDecl->returnType.type->equals(returnType))
         {
-            getSink()->diagnose(
-                stmt,
-                Diagnostics::returnTypeMismatchInsideLambda,
-                returnType,
-                m_parentLambdaDecl->funcDecl->returnType.type);
+            getSink()->diagnose(Diagnostics::ReturnTypeMismatchInsideLambda{
+                .returnedType = returnType,
+                .previousType = m_parentLambdaDecl->funcDecl->returnType.type,
+                .stmt = stmt});
         }
     }
 
     if (FindOuterStmt<DeferStmt>())
     {
-        getSink()->diagnose(stmt, Diagnostics::returnInsideDefer);
+        getSink()->diagnose(Diagnostics::ReturnInsideDefer{.stmt = stmt});
     }
 }
 
@@ -620,13 +626,13 @@ void SemanticsStmtVisitor::visitDeferStmt(DeferStmt* stmt)
 
 void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
 {
-    stmt->expression = CheckTerm(stmt->expression);
+    stmt->expression = CheckExpr(stmt->expression);
     Stmt* catchStmt = findMatchingCatchStmt(stmt->expression->type);
 
     auto parentFunc = getParentFunc();
     if (!catchStmt && (!parentFunc || parentFunc->errorType->equals(m_astBuilder->getBottomType())))
     {
-        getSink()->diagnose(stmt, Diagnostics::uncaughtThrowInNonThrowFunc);
+        getSink()->diagnose(Diagnostics::UncaughtThrowInNonThrowFunc{.stmt = stmt});
         return;
     }
 
@@ -634,11 +640,10 @@ void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
     {
         if (!parentFunc->errorType->equals(stmt->expression->type))
         {
-            getSink()->diagnose(
-                stmt->expression,
-                Diagnostics::throwTypeIncompatibleWithErrorType,
-                stmt->expression->type,
-                parentFunc->errorType);
+            getSink()->diagnose(Diagnostics::ThrowTypeIncompatibleWithErrorType{
+                .throwType = stmt->expression->type.type,
+                .errorType = parentFunc->errorType,
+                .expr = stmt->expression});
         }
     }
 
@@ -650,7 +655,7 @@ void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
         // called and when. Both can't fully run. That kind of goes against the
         // point of 'defer', which is to _always_ run some code when exiting
         // scopes.
-        getSink()->diagnose(stmt, Diagnostics::uncaughtThrowInsideDefer);
+        getSink()->diagnose(Diagnostics::UncaughtThrowInsideDefer{.stmt = stmt});
     }
 }
 
@@ -676,10 +681,15 @@ void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
         {
             if (func->name && func->name->text == "==")
             {
-                getSink()->diagnose(operatorExpr, Diagnostics::danglingEqualityExpr);
+                getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = operatorExpr});
             }
         }
     }
+}
+
+void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)
+{
+    // Nothing to do
 }
 
 void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
@@ -838,11 +848,10 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
             // If the user writes something like `for (int i = 0; i < 5; j++)`,
             // it is most likely a bug, so we issue a warning.
             if (predicateVar == initialVar)
-                getSink()->diagnose(
-                    varExpr,
-                    Diagnostics::forLoopSideEffectChangingDifferentVar,
-                    initialVar,
-                    varExpr->declRef);
+                getSink()->diagnose(Diagnostics::ForLoopSideEffectChangingDifferentVar{
+                    .initVar = initialVar.getDecl(),
+                    .modifiedVar = varExpr->declRef.getDecl(),
+                    .sideEffect = varExpr});
             return;
         }
     }
@@ -869,11 +878,10 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     if (predicateVar.getDecl() != initialVar.getDecl())
     {
         if (predicateVar)
-            getSink()->diagnose(
-                stmt->predicateExpression,
-                Diagnostics::forLoopPredicateCheckingDifferentVar,
-                initialVar,
-                predicateVar);
+            getSink()->diagnose(Diagnostics::ForLoopPredicateCheckingDifferentVar{
+                .initVar = initialVar.getDecl(),
+                .predicateVar = predicateVar.getDecl(),
+                .predicate = stmt->predicateExpression});
         return;
     }
     if (!stepSize)
@@ -883,10 +891,9 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         if (sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Greater ||
             sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Less)
         {
-            getSink()->diagnose(
-                stmt->sideEffectExpression,
-                Diagnostics::forLoopChangingIterationVariableInOppsoiteDirection,
-                initialVar);
+            getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppsoiteDirection{
+                .var = initialVar.getDecl(),
+                .sideEffect = stmt->sideEffectExpression});
             return;
         }
     }
@@ -895,19 +902,17 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         if (sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Less ||
             sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Greater)
         {
-            getSink()->diagnose(
-                stmt->sideEffectExpression,
-                Diagnostics::forLoopChangingIterationVariableInOppsoiteDirection,
-                initialVar);
+            getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppsoiteDirection{
+                .var = initialVar.getDecl(),
+                .sideEffect = stmt->sideEffectExpression});
             return;
         }
     }
     else
     {
-        getSink()->diagnose(
-            stmt->sideEffectExpression,
-            Diagnostics::forLoopNotModifyingIterationVariable,
-            initialVar);
+        getSink()->diagnose(Diagnostics::ForLoopNotModifyingIterationVariable{
+            .var = initialVar.getDecl(),
+            .sideEffect = stmt->sideEffectExpression});
         return;
     }
 
@@ -939,7 +944,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     }
     if (iterations == 0)
     {
-        getSink()->diagnose(stmt, Diagnostics::loopRunsForZeroIterations);
+        getSink()->diagnose(Diagnostics::LoopRunsForZeroIterations{.stmt = stmt});
     }
 
     // Note: the inferred max iterations may not be valid if the loop body

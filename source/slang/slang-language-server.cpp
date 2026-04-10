@@ -291,6 +291,10 @@ String getDeclKindString(DeclRef<Decl> declRef)
     {
         return "(generic type pack parameter) ";
     }
+    else if (declRef.as<GenericValuePackParamDecl>())
+    {
+        return "(generic value pack parameter) ";
+    }
     else if (declRef.as<GenericValueParamDecl>())
     {
         return "(generic value parameter) ";
@@ -337,7 +341,19 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
                 ASTPrinter::OptionFlag::SimplifiedBuiltinType |
                 ASTPrinter::OptionFlag::DefaultParamValues);
         printer.getStringBuilder() << getDeclKindString(declRef);
-        printer.addDeclSignature(declRef);
+        if (auto valPackParam = declRef.as<GenericValuePackParamDecl>())
+        {
+            auto& sb = printer.getStringBuilder();
+            sb << "let each " << getText(valPackParam.getName()) << " : ";
+            if (auto packType = as<ValuePackType>(valPackParam.getDecl()->getType()))
+                printer.addType(packType->getElementType());
+            else
+                printer.addType(valPackParam.getDecl()->getType());
+        }
+        else
+        {
+            printer.addDeclSignature(declRef);
+        }
         auto printInitExpr = [&](Module* module, Type* declType, Expr* initExpr)
         {
             auto& sb = printer.getStringBuilder();
@@ -849,6 +865,62 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
                 }
             }
         }
+        else if (auto packQueryExpr = as<PackQueryExpr>(expr))
+        {
+            String queryName = "__trimLast";
+            if (as<FirstExpr>(packQueryExpr))
+                queryName = "__first";
+            else if (as<LastExpr>(packQueryExpr))
+                queryName = "__last";
+            else if (as<TrimFirstExpr>(packQueryExpr))
+                queryName = "__trimFirst";
+
+            sb << "```\n" << queryName << "(";
+            if (packQueryExpr->value && packQueryExpr->value->type)
+            {
+                ASTPrinter printer(version->linkage->getASTBuilder());
+                printer.addExpr(packQueryExpr->value);
+                sb << printer.getString();
+            }
+            sb << ")";
+            if (expr->type)
+            {
+                sb << " : ";
+                if (auto typeType = as<TypeType>(expr->type))
+                    typeType->getType()->toText(sb);
+                else
+                    expr->type.type->toText(sb);
+            }
+            sb << "\n```\n";
+            fillLoc(expr->loc);
+        }
+        else if (auto shapePackExpr = as<ShapePackTransformExpr>(expr))
+        {
+            auto opName = getShapePackTransformName(shapePackExpr);
+            sb << "```\n" << opName << "(";
+            bool isFirst = true;
+            ASTPrinter printer(version->linkage->getASTBuilder());
+            for (auto arg : shapePackExpr->args)
+            {
+                if (!isFirst)
+                    sb << ", ";
+                printer.reset();
+                printer.addExpr(arg);
+                sb << printer.getString();
+                isFirst = false;
+            }
+            sb << ")";
+            if (expr->type)
+            {
+                sb << " : ";
+                if (auto typeType = as<TypeType>(expr->type))
+                    typeType->getType()->toText(sb);
+                else
+                    expr->type.type->toText(sb);
+            }
+            sb << "\n```\n";
+            fillLoc(expr->loc);
+        }
         if (const auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr))
         {
             String documentation;
@@ -890,6 +962,14 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     else if (auto countOfExpr = as<CountOfExpr>(leafNode))
     {
         fillExprHoverInfo(countOfExpr);
+    }
+    else if (auto packQueryExpr = as<PackQueryExpr>(leafNode))
+    {
+        fillExprHoverInfo(packQueryExpr);
+    }
+    else if (auto shapePackExpr = as<ShapePackTransformExpr>(leafNode))
+    {
+        fillExprHoverInfo(shapePackExpr);
     }
     else if (auto swizzleExpr = as<SwizzleExpr>(leafNode))
     {
