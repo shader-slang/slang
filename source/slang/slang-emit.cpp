@@ -79,6 +79,7 @@
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-lower-combined-texture-sampler.h"
+#include "slang-ir-lower-conditional-type.h"
 #include "slang-ir-lower-coopvec.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
@@ -425,6 +426,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_OptionalType:
         result.optionalType = true;
+        break;
+    case kIROp_ConditionalType:
+        result.conditionalType = true;
         break;
     case kIROp_EnumType:
         result.enumType = true;
@@ -866,6 +870,20 @@ void lowerSumVectorMatrixInsts(IRModule* module)
     pass.processModule();
 }
 
+void removeWeakUseInsts(IRModule* module)
+{
+    List<IRInst*> weakUseInsts;
+    for (auto inst : module->getModuleInst()->getGlobalInsts())
+    {
+        if (inst->getOp() == kIROp_WeakUse)
+            weakUseInsts.add(inst);
+    }
+
+    for (auto weakUse : weakUseInsts)
+    {
+        weakUse->removeAndDeallocate();
+    }
+}
 
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
@@ -1089,12 +1107,6 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.enumType)
         SLANG_PASS(lowerEnumType, sink);
 
-    // Lower enum types early since enums and enum casts may appear in
-    // specialization & not resolving them here would block specialization.
-    //
-    if (requiredLoweringPassSet.enumType)
-        lowerEnumType(irModule, sink);
-
     IRSimplificationOptions defaultIRSimplificationOptions =
         IRSimplificationOptions::getDefault(targetProgram);
     IRSimplificationOptions fastIRSimplificationOptions =
@@ -1157,6 +1169,15 @@ Result linkAndOptimizeIR(
     // single pass that looks for all simplification opportunities.
     //
 
+    // Diagnose circular interface conformances before specialization.
+    // Circular conformance IR (e.g. a struct implementing IFoo that contains
+    // an IFoo field) produces IR that the translation/specialization passes
+    // cannot handle. Detecting and reporting this early avoids crashes in
+    // downstream passes.
+    SLANG_PASS(diagnoseCircularConformances, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     if (!codeGenContext->isSpecializationDisabled())
     {
         SpecializationOptions specOptions;
@@ -1189,6 +1210,9 @@ Result linkAndOptimizeIR(
     // result structure are generated.
     if (requiredLoweringPassSet.resultType)
         SLANG_PASS(lowerResultType, targetProgram, sink);
+
+    if (requiredLoweringPassSet.conditionalType)
+        SLANG_PASS(lowerConditionalType, sink);
 
     if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerReinterpretOptional, targetProgram, sink);
@@ -1280,6 +1304,9 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(inferAnyValueSizeWhereNecessary, targetProgram, sink);
 
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     // If we have any witness tables that are marked as `KeepAlive`,
     // but are not used for dynamic dispatch, unpin them so we don't
     // do unnecessary work to lower them.
@@ -1314,21 +1341,8 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(lowerExistentials, targetProgram, sink);
 
-    // get rid of weak-use insts and any dictionaries in the
-    // module inst.
-    //
-    // -- put into a pass --
-    List<IRInst*> weakUseInsts;
-    for (auto insts : irModule->getModuleInst()->getGlobalInsts())
-    {
-        if (insts->getOp() == kIROp_WeakUse)
-            weakUseInsts.add(insts);
-    }
-
-    for (auto weakUse : weakUseInsts)
-    {
-        weakUse->removeAndDeallocate();
-    }
+    // Get rid of weak-use insts and any dictionaries in the module inst.
+    SLANG_PASS(removeWeakUseInsts);
 
     clearTranslationDictionary(irModule);
 

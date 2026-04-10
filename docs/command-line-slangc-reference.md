@@ -1346,8 +1346,11 @@ A capability describes an optional feature that a target may or may not support.
 * `spvFragmentShaderPixelInterlockEXT` 
 * `spvFragmentBarycentricKHR` 
 * `spvFragmentFullyCoveredEXT` 
+* `spvGroupNonUniform` 
 * `spvGroupNonUniformBallot` 
 * `spvGroupNonUniformShuffle` 
+* `spvGroupNonUniformShuffleRelative` 
+* `spvGroupNonUniformClustered` 
 * `spvGroupNonUniformArithmetic` 
 * `spvGroupNonUniformQuad` 
 * `spvGroupNonUniformVote` 
@@ -1541,6 +1544,7 @@ A capability describes an optional feature that a target may or may not support.
 * `tensor_addressing` 
 * `cooperative_matrix_2` 
 * `vk_mem_model` 
+* `mem_model` 
 * `descriptor_handle` 
 * `pixel` 
 * `tesscontrol` 

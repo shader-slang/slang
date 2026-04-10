@@ -786,11 +786,17 @@ Extensions
 `spvFragmentShaderPixelInterlockEXT`
 > Represents the SPIR-V capability for using SPV_EXT_fragment_shader_interlock.
 
+`spvGroupNonUniform`
+> Represents the SPIR-V GroupNonUniform capability (basic subgroup operations).
+
 `spvGroupNonUniformArithmetic`
 > Represents the SPIR-V capability for group non-uniform arithmetic operations.
 
 `spvGroupNonUniformBallot`
 > Represents the SPIR-V capability for group non-uniform ballot operations.
+
+`spvGroupNonUniformClustered`
+> Represents the SPIR-V capability for group non-uniform clustered operations.
 
 `spvGroupNonUniformPartitionedNV`
 > Represents the SPIR-V capability for group non-uniform partitioned operations.
@@ -803,6 +809,9 @@ Extensions
 
 `spvGroupNonUniformShuffle`
 > Represents the SPIR-V capability for group non-uniform shuffle operations.
+
+`spvGroupNonUniformShuffleRelative`
+> Represents the SPIR-V capability for group non-uniform shuffle relative operations.
 
 `spvGroupNonUniformVote`
 > Represents the SPIR-V capability for group non-uniform vote operations.
@@ -1241,6 +1250,9 @@ Compound Capabilities
 > @remark Implicit derivatives for the compute stage can be enabled by declaring capability `GL_NV_compute_shader_derivatives` (GLSL),
 > `SPV_KHR_compute_shader_derivatives` (SPIR-V), or profile `cs_6_6` (HLSL).
 > 
+
+`mem_model`
+> Capabilities needed to use memory model
 
 `memorybarrier`
 > Capabilities required to use sm_5_0 style memory barriers

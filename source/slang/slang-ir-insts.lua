@@ -131,6 +131,8 @@ local insts = {
 			},
 			-- Represents an `Optional<T>`.
 			{ Optional = { struct_name = "OptionalType", operands = { { "valueType", "IRType" } }, hoistable = true } },
+			-- Represents a `Conditional<T, hasValue>`.
+			{ Conditional = { struct_name = "ConditionalType", operands = { { "valueType", "IRType" }, { "hasValue", "IRInst" } }, hoistable = true } },
 			-- Represents an enum type
 			{ Enum = { struct_name = "EnumType", operands = { { "tagType", "IRType" } }, parent = true } },
 			{
@@ -1024,6 +1026,8 @@ local insts = {
 	{ optionalHasValue = { operands = { { "optionalOperand" } } } },
 	{ makeOptionalValue = { operands = { { "value" } } } },
 	{ makeOptionalNone = {} },
+	{ getConditionalValue = { operands = { { "conditionalOperand" } } } },
+	{ makeConditionalValue = { operands = { { "value" } } } },
 	{ CombinedTextureSamplerGetTexture = { operands = { { "sampler" } } } },
 	{ CombinedTextureSamplerGetSampler = { operands = { { "sampler" } } } },
 	{ call = { operands = { { "callee" } } } },
@@ -2683,11 +2687,6 @@ local insts = {
 	{
 		LiveRangeMarker = { { liveRangeStart = { min_operands = 2 } }, { liveRangeEnd = {} } },
 	},
-	-- IRSpecialization
-	{ SpecializationDictionaryItem = {} },
-	{ GenericSpecializationDictionary = { parent = true } },
-	{ ExistentialFuncSpecializationDictionary = { parent = true } },
-	{ ExistentialTypeSpecializationDictionary = { parent = true } },
 	-- Differentiable Type Dictionary
 	{ DifferentiableTypeDictionaryItem = { operands = { { "concreteType" }, { "witness" } } } },
 	-- Differentiable Type Annotation (for run-time types)
@@ -3084,7 +3083,7 @@ local insts = {
 	} },
 	{ WeakUse = { hoistable = true } },
 	{ FuncTypeOf = { hoistable = true }},
-	{ SpecializeExistentials = {
+	{ SpecializeExistentialsInFunc = {
 		-- Represents a reference to a function with specific existential parameter bindings.
 		--
 		-- Used by the type-flow specialization pass to represent different
@@ -3099,6 +3098,15 @@ local insts = {
 		--
 		hoistable = true,
 		operands = { {"func"} }
+	} },
+	{ SpecializeExistentialsInType = {
+		-- Represents an existential specialization key for type specialization caching.
+		--
+		-- Used as a compiler-dictionary key for specialized BindExistentialsType results.
+		-- Operands: (baseType, binding0, binding1, ...)
+		--
+		hoistable = true,
+		operands = { {"baseType"} }
 	} },
 	{ CompilerDictionaryEntry = { hoistable = true, parent = true }},
 	{ CompilerDictionaryValue = { operands = { {"value"} } } },

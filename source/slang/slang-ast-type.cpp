@@ -1114,6 +1114,11 @@ Type* ConditionalType::getValueType()
     return as<Type>(_getGenericTypeArg(this, 0));
 }
 
+IntVal* ConditionalType::getHasValue()
+{
+    return as<IntVal>(_getGenericTypeArg(this, 1));
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AtomicType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Type* AtomicType::getElementType()
 {

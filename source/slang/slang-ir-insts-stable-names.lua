@@ -609,10 +609,6 @@ return {
 	["Attr.FuncThrowType"] = 627,
 	["LiveRangeMarker.liveRangeStart"] = 628,
 	["LiveRangeMarker.liveRangeEnd"] = 629,
-	["SpecializationDictionaryItem"] = 630,
-	["GenericSpecializationDictionary"] = 631,
-	["ExistentialFuncSpecializationDictionary"] = 632,
-	["ExistentialTypeSpecializationDictionary"] = 633,
 	["DifferentiableTypeDictionaryItem"] = 634,
 	["DifferentiableTypeAnnotation"] = 635,
 	["BeginFragmentShaderInterlock"] = 636,
@@ -814,7 +810,7 @@ return {
 	["constexprCastEnumToInt"] = 834,
 	["constexprEnumCast"] = 835,
 	["constexprDiv"] = 836,
-	["SpecializeExistentials"] = 837,
+	["SpecializeExistentialsInFunc"] = 837,
 	["ReportCheckpointStore"] = 838,
 	["Type.TupleName"] = 839,
 	["TranslateBase.BackwardRematFromLegacyBwdDiffFunc"] = 840,
@@ -826,5 +822,9 @@ return {
 	["Type.TranslatedTypeBase.BackwardMinimalContextFromLegacyBwdDiffFunc"] = 846,
 	["Decoration.ParamsContextDecoration"] = 847,
 	["matrixSwizzleStore"] = 848,
-	["assumeAddress"] = 849
+	["Type.Conditional"] = 849,
+	["getConditionalValue"] = 850,
+	["makeConditionalValue"] = 851,
+  ["SpecializeExistentialsInType"] = 852,
+  ["assumeAddress"] = 853
 }

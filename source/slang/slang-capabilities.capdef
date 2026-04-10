@@ -760,6 +760,10 @@ def spvFragmentBarycentricKHR : SPV_KHR_fragment_shader_barycentric;
 /// [EXT]
 def spvFragmentFullyCoveredEXT : SPV_EXT_fragment_fully_covered;
 
+/// Represents the SPIR-V GroupNonUniform capability (basic subgroup operations).
+/// [EXT]
+def spvGroupNonUniform : _spirv_1_3;
+
 /// Represents the SPIR-V capability for group non-uniform ballot operations.
 /// [EXT]
 def spvGroupNonUniformBallot : _spirv_1_3;
@@ -767,6 +771,14 @@ def spvGroupNonUniformBallot : _spirv_1_3;
 /// Represents the SPIR-V capability for group non-uniform shuffle operations.
 /// [EXT]
 def spvGroupNonUniformShuffle : _spirv_1_3;
+
+/// Represents the SPIR-V capability for group non-uniform shuffle relative operations.
+/// [EXT]
+def spvGroupNonUniformShuffleRelative : _spirv_1_3;
+
+/// Represents the SPIR-V capability for group non-uniform clustered operations.
+/// [EXT]
+def spvGroupNonUniformClustered : _spirv_1_3;
 
 /// Represents the SPIR-V capability for group non-uniform arithmetic operations.
 /// [EXT]
@@ -1187,11 +1199,11 @@ alias GL_KHR_shader_subgroup_ballot = _GL_KHR_shader_subgroup_ballot | spvGroupN
 
 /// Represents the GL_KHR_shader_subgroup_basic extension.
 /// [EXT]
-alias GL_KHR_shader_subgroup_basic = _GL_KHR_shader_subgroup_basic | spvGroupNonUniformBallot;
+alias GL_KHR_shader_subgroup_basic = _GL_KHR_shader_subgroup_basic | spvGroupNonUniform;
 
 /// Represents the GL_KHR_shader_subgroup_clustered extension.
 /// [EXT]
-alias GL_KHR_shader_subgroup_clustered = _GL_KHR_shader_subgroup_clustered | spvGroupNonUniformShuffle;
+alias GL_KHR_shader_subgroup_clustered = _GL_KHR_shader_subgroup_clustered | spvGroupNonUniformClustered;
 
 /// Represents the GL_KHR_shader_subgroup_quad extension.
 /// [EXT]
@@ -1203,7 +1215,7 @@ alias GL_KHR_shader_subgroup_shuffle = _GL_KHR_shader_subgroup_shuffle | spvGrou
 
 /// Represents the GL_KHR_shader_subgroup_shuffle_relative extension.
 /// [EXT]
-alias GL_KHR_shader_subgroup_shuffle_relative = _GL_KHR_shader_subgroup_shuffle_relative | spvGroupNonUniformShuffle;
+alias GL_KHR_shader_subgroup_shuffle_relative = _GL_KHR_shader_subgroup_shuffle_relative | spvGroupNonUniformShuffleRelative;
 
 /// Represents the GL_KHR_shader_subgroup_vote extension.
 /// [EXT]
@@ -1364,7 +1376,7 @@ alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV
 alias cooperative_vector_training = spvCooperativeVectorTrainingNV | _GL_NV_cooperative_vector;
 /// Capabilities needed to use cooperative matrices
 /// [Compound]
-alias cooperative_matrix = spvCooperativeMatrixKHR | cuda;
+alias cooperative_matrix = spvCooperativeMatrixKHR | cuda | _sm_6_10;
 /// Capabilities needed to use reduction operations with cooperative matrix
 /// [Compound]
 alias cooperative_matrix_spirv = spvCooperativeMatrixKHR;
@@ -1373,7 +1385,7 @@ alias cooperative_matrix_spirv = spvCooperativeMatrixKHR;
 alias cooperative_matrix_reduction = spvCooperativeMatrixReductionsNV;
 /// Capabilities needed to convert cooperative matrices, all the conversions can be supported by cuda
 /// [Compound]
-alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV | cuda;
+alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV | cuda | _sm_6_10;
 /// Capabilities needed to use MapElement operation with cooperative matrix
 /// [Compound]
 alias cooperative_matrix_map_element = spvCooperativeMatrixPerElementOperationsNV;
@@ -1393,6 +1405,10 @@ alias cooperative_matrix_2 = spvCooperativeMatrixKHR + spvCooperativeMatrixReduc
 /// Capabilities needed to use vulkan memory model
 /// [Compound]
 alias vk_mem_model = spvVulkanMemoryModelKHR + spvVulkanMemoryModelDeviceScopeKHR;
+
+/// Capabilities needed to use memory model
+/// [Compound]
+alias mem_model = vk_mem_model | _sm_6_10;
 
 /// Targets that support DescriptorHandle types for bindless descriptor access.
 /// [Compound]
