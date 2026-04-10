@@ -1,29 +1,41 @@
-// Circular dependencies in interface conformance are invalid for dynamic dispatch.
+// Direct circular dependency: struct contains the interface it implements.
 //
 // Dynamic dispatch uses a tagged union (AnyValue) to store conforming types at
 // runtime. If a conforming type contains a field of the interface type it
-// implements, this creates infinite recursion: packing the struct requires
-// knowing its size, but the interface field's size depends on all conforming
-// types, including this one.
-//
-// The compiler should detect this circularity and report an error. Currently
-// the error manifests as "cannot be packed" (41014) or "does not fit in size"
-// (41011), but ideally would be a specific circular dependency diagnostic.
+// implements, the struct must be larger than the AnyValue it contains, but the
+// AnyValue must be large enough to hold the struct. This is inherently
+// unsatisfiable.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK): -target glsl
+//TEST:SIMPLE(filecheck=CHECK): -target cpp
+//TEST:SIMPLE(filecheck=CHECK): -target metal
+//TEST:SIMPLE(filecheck=CHECK): -target wgsl
+//TEST:SIMPLE(filecheck=CHECK_NEG): -target spirv
+//TEST:SIMPLE(filecheck=CHECK_NEG): -target hlsl
 
-// Direct circular dependency: struct contains the interface it implements
 [anyValueSize(32)]
 interface IValue
 {
     float get();
 }
 
-// CHECK: error {{[0-9]+}}
+// CHECK: error[E41003]
+// CHECK: BadImpl
+// CHECK: circular reference through interface
+// CHECK: IValue
+// CHECK_NEG-NOT: error[E41011]
 struct BadImpl : IValue
 {
-    IValue child;  // Circular: BadImpl contains IValue, BadImpl conforms to IValue
+    IValue child;
     float get() { return 0; }
+}
+
+IValue createValue()
+{
+    BadImpl b;
+    return b;
 }
 
 RWStructuredBuffer<float> outputBuffer;
@@ -31,6 +43,6 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    IValue v = createDynamicObject<IValue>(0, 5);
+    IValue v = createValue();
     outputBuffer[0] = v.get();
 }

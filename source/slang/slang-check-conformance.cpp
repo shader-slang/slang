@@ -65,6 +65,149 @@ SubtypeWitness* SemanticsVisitor::isSubtype(
     return result;
 }
 
+
+Witness* SemanticsVisitor::getDiffTypeInfoWitness(Type* type)
+{
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto callableDeclRef = declRefType->getDeclRef().as<FunctionDeclBase>())
+            return getDiffTypeInfoWitness(callableDeclRef);
+
+        if (auto funcAliasDeclRef = declRefType->getDeclRef().as<FuncAliasDecl>())
+        {
+            auto targetDeclRef = substituteDeclRef(
+                                     SubstitutionSet(funcAliasDeclRef),
+                                     getCurrentASTBuilder(),
+                                     funcAliasDeclRef.getDecl()->targetDeclRef)
+                                     .as<FunctionDeclBase>();
+            if (targetDeclRef)
+                return getDiffTypeInfoWitness(targetDeclRef);
+        }
+
+        auto declRef = declRefType->getDeclRef();
+        if (as<GenericTypeParamDeclBase>(declRef.getDecl()))
+        {
+            if (auto genericDecl = as<GenericDecl>(declRef.getDecl()->parentDecl))
+            {
+                for (auto constraintDecl :
+                     genericDecl->getDirectMemberDeclsOfType<HasDiffTypeInfoConstraintDecl>())
+                {
+                    auto constraintDeclRef = substituteDeclRef(
+                                                 SubstitutionSet(declRef),
+                                                 getCurrentASTBuilder(),
+                                                 constraintDecl->getDefaultDeclRef())
+                                                 .as<HasDiffTypeInfoConstraintDecl>();
+                    if (!constraintDeclRef)
+                        continue;
+
+                    auto constraintType = getBaseType(getCurrentASTBuilder(), constraintDeclRef);
+                    if (constraintType && constraintType->equals(type))
+                        return getCurrentASTBuilder()->getHasDiffTypeInfoWitness(constraintDeclRef);
+                }
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef)
+{
+    List<SubtypeWitness*> paramWitnesses;
+
+    auto astBuilder = getCurrentASTBuilder();
+    FuncType* funcType = nullptr;
+    auto rawDirectFuncType = callableDeclRef.getDecl()->funcType.type;
+    Type* substitutedDirectFuncType = rawDirectFuncType
+                                          ? dynamicCast<Type>(substituteType(
+                                                                  SubstitutionSet(callableDeclRef),
+                                                                  getCurrentASTBuilder(),
+                                                                  rawDirectFuncType)
+                                                                  ->resolve())
+                                          : nullptr;
+
+    if (auto rawFwdDiffFuncType = as<FwdDiffFuncType>(rawDirectFuncType))
+    {
+        SLANG_UNUSED(rawFwdDiffFuncType);
+        if (auto substFwdDiffFuncType = as<FwdDiffFuncType>(substitutedDirectFuncType))
+        {
+            auto diffTypeWitness =
+                as<GenericAppDeclRef>(substFwdDiffFuncType->getDeclRefBase())->getArg(1);
+            return astBuilder->getOrCreate<HigherOrderDiffTypeTranslationWitness>(
+                as<Witness>(diffTypeWitness));
+        }
+        else if (auto directFuncType = dynamicCast<FuncType>(substitutedDirectFuncType))
+        {
+            funcType = directFuncType;
+        }
+        else
+        {
+            SLANG_UNEXPECTED("expected FuncType or FwdDiffFuncType after substitution");
+            return nullptr;
+        }
+    }
+    else if (auto directFuncType = dynamicCast<FuncType>(substitutedDirectFuncType))
+    {
+        funcType = directFuncType;
+    }
+    else
+    {
+        funcType = as<FuncType>(getFuncType(astBuilder, callableDeclRef));
+    }
+
+    if (!funcType)
+    {
+        SLANG_UNEXPECTED("expected FuncType or FwdDiffFuncType");
+        return nullptr;
+    }
+
+    auto getDiffWitness = [&](Type* type) -> SubtypeWitness*
+    {
+        auto witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableInterfaceType());
+
+        if (!witness)
+            witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableRefInterfaceType());
+
+        return witness;
+    };
+
+    for (auto paramType : funcType->getParamTypes())
+    {
+        auto [paramValueType, _] = splitParameterTypeAndDirection(astBuilder, paramType);
+        auto witness = getDiffWitness(paramValueType);
+        paramWitnesses.add(witness);
+    }
+
+    SubtypeWitness* returnWitness = getDiffWitness(funcType->getResultType());
+
+    auto thisValueType = getTypeForThisExpr(this, callableDeclRef);
+    Type* thisParamType = nullptr;
+
+    if (callableDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() ||
+        as<ConstructorDecl>(callableDeclRef.getDecl()))
+    {
+        thisParamType = nullptr;
+    }
+    else if (thisValueType.type)
+    {
+        if (thisValueType.isLeftValue)
+            thisParamType = astBuilder->getBorrowInOutParamType(thisValueType.type);
+        else
+            thisParamType = thisValueType.type;
+    }
+
+    SubtypeWitness* thisWitness = thisParamType ? getDiffWitness(thisValueType) : nullptr;
+
+    if (callableDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>())
+        thisWitness = nullptr;
+
+    return astBuilder->getOrCreate<DiffTypeInfoWitness>(
+        thisParamType,
+        thisWitness,
+        returnWitness,
+        paramWitnesses);
+}
+
 SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     Type* subType,
     Type* superType,
@@ -138,7 +281,7 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // the facets that represent supertypes, and those
         // will be the ones that store a type on the facet.
         //
-        auto facetType = facet->getType();
+        auto facetType = facet->getType()->resolve();
         if (!facetType)
             continue;
 
@@ -163,7 +306,7 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
 
         // Conveniently, the `facet` stores a pre-computed witness for the
         // subtype relationship, which we can use here.
-        return facet->subtypeWitness;
+        return as<SubtypeWitness>(facet->subtypeWitness->resolve());
     }
     //
     // TODO: We could expand upon the test using the facet list above
@@ -202,85 +345,47 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         auto witness = m_astBuilder->getOrCreate<DynamicSubtypeWitness>(subType, superType);
         return witness;
     }
-    else if (auto conjunctionSuperType = as<AndType>(superType))
+    else if (as<AndType>(superType))
     {
-        // We know that `T <: L & R` if `T <: L` and `T <: R`.
-        //
-        // We therefore simply recursively test both `T <: L`
-        // and `T <: R`.
-        //
-        auto leftWitness =
-            isSubtype(subType, conjunctionSuperType->getLeft(), IsSubTypeOptions::None);
-        if (!leftWitness)
-            return nullptr;
-        //
-        auto rightWitness =
-            isSubtype(subType, conjunctionSuperType->getRight(), IsSubTypeOptions::None);
-        if (!rightWitness)
-            return nullptr;
-
-        // If both of the sub-relationships hold, we can construct
-        // a conjunction of those witnesses to witness `T <: L&R`
-        //
-        return m_astBuilder->getConjunctionSubtypeWitness(
-            subType,
-            conjunctionSuperType,
-            leftWitness,
-            rightWitness);
+        // AndType constraints should have been flattened into individual constraints
+        // during visitGenericTypeConstraintDecl. If we get here, something is wrong.
+        SLANG_UNEXPECTED("AndType should have been flattened before reaching isSubtype");
     }
-    else if (auto extractExistentialType = as<ExtractExistentialType>(subType))
+    else if (auto eachSubType = as<EachType>(subType))
     {
-        // An ExtractExistentialType from an existential value of type I
-        // is a subtype of I.
-        // We need to check and make sure the interface type of the `ExtractExistentialType`
-        // is equal to `superType`.
-        //
-        // TODO(tfoley): We could add support for `ExtractExistentialType` to
-        // the inheritance linearization logic, and eliminate this case.
-        //
-        auto interfaceDeclRef = extractExistentialType->getOriginalInterfaceDeclRef();
-        if (interfaceDeclRef.equals(superTypeDeclRef))
+        // `each T : U` is satisfied when every element of `T` satisfies `U`.
+        if (auto patternWitness =
+                isSubtype(eachSubType->getElementType(), superType, isSubTypeOptions))
         {
-            auto witness = extractExistentialType->getSubtypeWitness();
-            return witness;
+            return m_astBuilder->getEachSubtypeWitness(subType, superType, patternWitness);
         }
-        return nullptr;
     }
     else if (auto subTypePack = as<ConcreteTypePack>(subType))
     {
-        // A type pack (T0, T1, ...) is a subtype of supType, if each of its elements
-        // is a subtype of the supType.
-        ShortList<SubtypeWitness*> elementWitnesses;
-        for (Index i = 0; i < subTypePack->getTypeCount(); i++)
+        // An empty type pack vacuously satisfies any element-wise subtype constraint.
+        if (subTypePack->getTypeCount() == 0)
+        {
+            return m_astBuilder->getSubtypeWitnessPack(
+                subType,
+                superType,
+                ArrayView<SubtypeWitness*>());
+        }
+
+        List<SubtypeWitness*> elementWitnesses;
+        for (Index i = 0; i < subTypePack->getTypeCount(); ++i)
         {
             auto elementWitness =
-                isSubtype(subTypePack->getElementType(i), superType, IsSubTypeOptions::None);
+                isSubtype(subTypePack->getElementType(i), superType, isSubTypeOptions);
             if (!elementWitness)
-                return nullptr;
+                return failureWitness;
+
             elementWitnesses.add(elementWitness);
         }
+
         return m_astBuilder->getSubtypeWitnessPack(
             subType,
             superType,
-            elementWitnesses.getArrayView().arrayView);
-    }
-    else if (auto expandType = as<ExpandType>(subType))
-    {
-        // A expand type `expand patternType, captureList` is a subtype of supType, if patternType
-        // is a subtype of supType.
-        auto elementWitness =
-            isSubtype(expandType->getPatternType(), superType, IsSubTypeOptions::None);
-        if (!elementWitness)
-            return nullptr;
-        return m_astBuilder->getExpandSubtypeWitness(subType, superType, elementWitness);
-    }
-    else if (auto eachType = as<EachType>(subType))
-    {
-        auto elementWitness =
-            isSubtype(eachType->getElementType(), superType, IsSubTypeOptions::None);
-        if (!elementWitness)
-            return nullptr;
-        return m_astBuilder->getEachSubtypeWitness(subType, superType, elementWitness);
+            elementWitnesses.getArrayView());
     }
     // default is failure
     return failureWitness;

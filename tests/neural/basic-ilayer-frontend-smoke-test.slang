@@ -5,7 +5,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
 
-import neural;
+import slang.neural;
 
 // Parameters: FFLayer<float, 4, 2, ..., HasBias=true>
 // weights = 2x4 matrix, bias = 2
@@ -27,12 +27,11 @@ typealias Layer = FFLayer<float, XVec, YVec, LinearLayout, Act, true>;
 // Test: evaluate layer through ILayer constraint
 InlineVector<float, 2> evalAsLayer<L>(
     L layer,
-    Address weightAddr,
-    Address biasAddr,
+    Address paramAddr,
     InlineVector<float, 4> input)
     where L : ILayer<float, InlineVector<float, 4>, InlineVector<float, 2>, LinearLayout, Act>
 {
-    return layer.eval<Address>(input, weightAddr, biasAddr);
+    return layer.eval<Address>(input, paramAddr);
 }
 
 bool forwardTest()
@@ -43,16 +42,12 @@ bool forwardTest()
     let baseAddr = Address(params);
     let layer = Layer();
 
-    // Compute weight/bias addresses
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(8);
-
     // Input x = [1,2,3,4]
     float[4] xArr = {1.0, 2.0, 3.0, 4.0};
     let x = InlineVector<float, 4>(xArr);
 
     // Layer: y = ReLU(W*x + b)
-    let y = evalAsLayer<Layer>(layer, weightAddr, biasAddr, x);
+    let y = evalAsLayer<Layer>(layer, baseAddr, x);
 
     // Expected: W*x + b = [1*1+2*2+3*3+4*4 + 9, 5*1+6*2+7*3+8*4 + 10] = [39, 80]
     // ReLU([39, 80]) = [39, 80]

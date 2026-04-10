@@ -27,6 +27,7 @@
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -760,10 +761,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         if (addressSpace == AddressSpace::Generic)
                             addressSpace = argPtrType->getAddressSpace();
                         else if (addressSpace != argPtrType->getAddressSpace())
+                        {
                             m_sharedContext->m_sink->diagnose(
-                                inst,
-                                Diagnostics::inconsistentPointerAddressSpace,
-                                inst);
+                                Diagnostics::InconsistentPointerAddressSpace{
+                                    .inst = inst,
+                                    .location = inst->sourceLoc});
+                        }
                     }
                 }
             }
@@ -1203,9 +1206,24 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             // image operand here.
             auto image = subscript->getImage();
             if (auto load = as<IRLoad>(image))
+            {
                 subscript->setOperand(0, load->getPtr());
-
-            addUsersToWorkList(subscript);
+                addUsersToWorkList(subscript);
+            }
+            else if (auto loadDescriptor = as<IRSPIRVLoadDescriptorFromHeap>(image))
+            {
+                auto texelPtr = builder.emitSPIRVLoadTexelPointerFromHeap(
+                    newPtrType,
+                    loadDescriptor->getHeap(),
+                    loadDescriptor->getIndex(),
+                    loadDescriptor->getDataType(),
+                    subscript->getCoord(),
+                    subscript->hasSampleCoord() ? subscript->getSampleCoord()
+                                                : builder.getIntValue(builder.getIntType(), 0));
+                subscript->replaceUsesWith(texelPtr);
+                subscript->removeAndDeallocate();
+                addUsersToWorkList(texelPtr);
+            }
         }
     }
 
@@ -1550,6 +1568,31 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    void processMakeCombinedTextureSamplerFromHandle(IRInst* inst)
+    {
+        // Rewrite `MakeCombinedTextureSamplerFromHandle(uint2_handle)` to
+        // `MakeCombinedTextureSampler(
+        //      LoadDescriptorFromHeap(ResourceHeap, uint2_handle.x),
+        //      LoadDescriptorFromHeap(SamplerHeap, uint2_handle.y))`
+        auto textureType = getTextureTypeFromCombinedTextureSampler(inst->getDataType());
+        auto samplerType = getSamplerTypeFromCombinedTextureSampler(inst->getDataType());
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto texture = builder.emitLoadDescriptorFromHeap(
+            textureType,
+            builder.emitSPIRVResourceDescriptorHeap(),
+            builder.emitElementExtract(inst->getOperand(0), IRIntegerValue(0)));
+        auto sampler = builder.emitLoadDescriptorFromHeap(
+            samplerType,
+            builder.emitSPIRVSamplerDescriptorHeap(),
+            builder.emitElementExtract(inst->getOperand(0), IRIntegerValue(1)));
+        auto newInst =
+            builder.emitMakeCombinedTextureSampler(inst->getDataType(), texture, sampler);
+        inst->replaceUsesWith(newInst);
+        inst->removeAndDeallocate();
+    }
+
     static bool isAsmInst(IRInst* inst)
     {
         return (as<IRSPIRVAsmInst>(inst) || as<IRSPIRVAsmOperand>(inst));
@@ -1737,7 +1780,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         bool isLegalGlobalInstForTarget(IRInst* inst) override
         {
-            return as<IRSPIRVAsmOperand>(inst);
+            switch (inst->getOp())
+            {
+            case kIROp_MakeStruct:
+            case kIROp_MakeArray:
+            case kIROp_MakeArrayFromElement:
+            case kIROp_MakeVector:
+            case kIROp_MakeMatrix:
+            case kIROp_MakeMatrixFromScalar:
+            case kIROp_MakeVectorFromScalar:
+                return true;
+            default:
+                return as<IRSPIRVAsmOperand>(inst);
+            };
         }
 
         bool isInlinableGlobalInstForTarget(IRInst* inst) override
@@ -1820,6 +1875,44 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             inst = builder.replaceOperand(inst->getOperands(), newOperand0);
             inst = builder.replaceOperand(inst->getOperands() + 1, newOperand1);
         }
+    }
+
+    void emitPerMemberDebugValue(IRBuilder& builder, IRInst* debugVar, IRInst* value)
+    {
+        auto valueType = as<IRType>(unwrapAttributedType(value->getDataType()));
+        if (auto structType = as<IRStructType>(valueType))
+        {
+            for (auto field : structType->getFields())
+            {
+                auto fieldDebugVar = builder.emitFieldAddress(debugVar, field->getKey());
+                auto fieldValue =
+                    builder.emitFieldExtract(field->getFieldType(), value, field->getKey());
+                emitPerMemberDebugValue(builder, fieldDebugVar, fieldValue);
+            }
+            return;
+        }
+
+        auto debugValue = builder.emitDebugValue(debugVar, value);
+        addToWorkList(debugValue);
+    }
+
+    void processDebugValue(IRDebugValue* inst)
+    {
+        auto valueType = as<IRType>(unwrapAttributedType(inst->getValue()->getDataType()));
+        if (as<IRStructType>(valueType))
+        {
+            // Decompose the struct into per-member DebugValue updates to help
+            // shader debuggers resolve the struct value.
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            emitPerMemberDebugValue(builder, inst->getDebugVar(), inst->getValue());
+            inst->removeAndDeallocate();
+            return;
+        }
+
+        // Unsupported type, remove the DebugValue.
+        if (!isSimpleDataType(valueType))
+            inst->removeAndDeallocate();
     }
 
     List<IRInst*> m_instsToRemove;
@@ -1928,6 +2021,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_MakeOptionalNone:
                 processConstructor(inst);
                 break;
+            case kIROp_MakeCombinedTextureSamplerFromHandle:
+                processMakeCombinedTextureSamplerFromHandle(inst);
+                break;
             case kIROp_PtrLit:
                 processPtrLit(inst);
                 break;
@@ -1951,8 +2047,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
 
             case kIROp_DebugValue:
-                if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
-                    inst->removeAndDeallocate();
+                processDebugValue(as<IRDebugValue>(inst));
                 break;
             case kIROp_DebugVar:
                 if (!isSimpleDataType(as<IRDebugVar>(inst)->getDataType()))
@@ -2126,7 +2221,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             // Direct SPIRV backend does not support generating SPIRV before 1.3,
             // we will issue an error message here.
-            m_sharedContext->m_sink->diagnose(SourceLoc(), Diagnostics::spirvVersionNotSupported);
+            m_sharedContext->m_sink->diagnose(Diagnostics::SpirvVersionNotSupported{});
         }
     }
 
@@ -2583,7 +2678,9 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
     snippet = SpvSnippet::parse(*m_grammarInfo, intrinsic->getDefinition());
     if (!snippet)
     {
-        m_sink->diagnose(intrinsic, Diagnostics::snippetParsingFailed, intrinsic->getDefinition());
+        m_sink->diagnose(Diagnostics::SnippetParsingFailed{
+            .snippet = intrinsic->getDefinition(),
+            .location = intrinsic->sourceLoc});
         return nullptr;
     }
     m_parsedSpvSnippets[intrinsic] = snippet;

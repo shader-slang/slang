@@ -290,6 +290,32 @@ static SlangResult parseMachineReadableDiagnostics(
             }
             diag.message = messageBuilder.produceString();
 
+            // Machine-readable output includes both the primary diagnostic row
+            // (for example "error" or "fatal error") and a separate "span"
+            // row for the primary span. If the span row has the same location
+            // and text as the primary diagnostic, treat it as redundant for
+            // annotation matching so exhaustive tests don't have to duplicate
+            // the same expectation twice.
+            if (diag.severity == "span")
+            {
+                bool isDuplicatePrimarySpan = false;
+                for (const auto& existing : outDiagnostics)
+                {
+                    if (existing.severity != "span" && existing.severity != "note-span" &&
+                        existing.errorCode == diag.errorCode &&
+                        existing.filename == diag.filename &&
+                        existing.beginLine == diag.beginLine &&
+                        existing.beginCol == diag.beginCol && existing.endLine == diag.endLine &&
+                        existing.endCol == diag.endCol && existing.message == diag.message)
+                    {
+                        isDuplicatePrimarySpan = true;
+                        break;
+                    }
+                }
+                if (isDuplicatePrimarySpan)
+                    continue;
+            }
+
             outDiagnostics.add(diag);
         }
     }
@@ -725,7 +751,7 @@ static bool checkAnnotations(
 
             // Suggest using non-exhaustive mode as an alternative
             sb << "\n  Or add 'non-exhaustive' to skip checking unannotated diagnostics:\n";
-            sb << "  //DIAGNOSTIC_TEST:SIMPLE(diag=" << prefix << ",non-exhaustive):\n";
+            sb << "  //DIAGNOSTIC_TEST:SIMPLE(diag=" << prefix << "):\n";
 
             outMissingAnnotations.add(sb.produceString());
         }

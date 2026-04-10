@@ -144,7 +144,14 @@ public:
             context->results.add(result);
             return true;
         }
-        return dispatchIfNotNull(expr->value);
+
+        if (dispatchIfNotNull(expr->value))
+            return true;
+
+        if (dispatchIfNotNull(expr->dataLayout))
+            return true;
+
+        return false;
     }
 
     bool visitFloatBitCastExpr(FloatBitCastExpr* expr)
@@ -516,6 +523,14 @@ public:
         }
         return false;
     }
+    bool visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
+    {
+        if (dispatchIfNotNull(expr->packOperand.exp))
+            return true;
+        if (dispatchIfNotNull(expr->emptyType.exp))
+            return true;
+        return dispatchIfNotNull(expr->nonEmptyType.exp);
+    }
     bool visitTryExpr(TryExpr* expr) { return dispatchIfNotNull(expr->base); }
     bool visitPackExpr(PackExpr* expr)
     {
@@ -551,6 +566,23 @@ public:
         if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
             return true;
         return dispatchIfNotNull(expr->baseExpr);
+    }
+    bool visitPackQueryExpr(PackQueryExpr* expr)
+    {
+        if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
+            return true;
+        return dispatchIfNotNull(expr->value);
+    }
+    bool visitShapePackTransformExpr(ShapePackTransformExpr* expr)
+    {
+        if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
+            return true;
+        for (auto arg : expr->args)
+        {
+            if (dispatchIfNotNull(arg))
+                return true;
+        }
+        return false;
     }
     bool visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
     {
@@ -699,6 +731,8 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
     bool visitGpuForeachStmt(GpuForeachStmt*) { return false; }
 
     bool visitExpressionStmt(ExpressionStmt* stmt) { return checkExpr(stmt->expression); }
+
+    bool visitRequireCapabilityStmt(RequireCapabilityStmt*) { return false; }
 };
 
 bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)

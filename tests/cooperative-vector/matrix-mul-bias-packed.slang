@@ -1,6 +1,9 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-feature cooperative-vector -dx12-experimental -output-using-type -profile cs_6_9 -Xslang... -Xdxc -Vd -X.
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-feature cooperative-vector -dx12-experimental -output-using-type -profile cs_6_10 -Xslang... -Xdxc -Ibuild/dxc/include -X.
+
+//DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include
+//DXIL: result code = 0
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 35
@@ -11,12 +14,12 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int32_t> outputBuffer;
 
-//TEST_INPUT:ubuffer(data=[67305985], stride=4),name=input
-//[1 2 3 4]
+// int8_t values [1 2 3 4] packed as uint8_t4_packed
+//TEST_INPUT:ubuffer(data=[1 2 3 4], stride=1),name=input
 ByteAddressBuffer input;
 
-//TEST_INPUT:ubuffer(data=[67305985 134678021 202050057 269422093], stride=4),name=matrix
-//[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16]
+// int8_t 4x4 row-major matrix [1..16] packed as uint8_t4_packed (4 values per element)
+//TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16], stride=1),name=matrix
 ByteAddressBuffer matrix;
 
 //TEST_INPUT:ubuffer(data=[5 6 7 8], stride=4),name=bias
@@ -25,11 +28,7 @@ ByteAddressBuffer bias;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // Expected to fail with Vulkan 1.4.313.0 or below due to a bug in the VVL
-    // The VVL incorrectly reports that the result type in the following command is `VK_COMPONENT_TYPE_UINT32_KHR`.
-    // Tracking the issue in github #7715.
-
-    let vec = coopVecLoad<1, uint32_t>(input);
+    let vec = coopVecLoad<1, uint8_t4_packed>(input);
     let result = coopVecMatMulAddPacked<int32_t, 4>(
         vec,
         CoopVecComponentType::SignedInt8Packed,

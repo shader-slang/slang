@@ -94,7 +94,7 @@ ConstantBuffer, (RW/RasterizerOrdered)StructuredBuffer, (RW/RasterizerOrdered)By
 
 ConstantBuffer translates to the `uniform` address space with `read` access mode in WGSL.
 ByteAddressBuffer and RWByteAddressBuffer translate to `array<u32>` in the `storage` address space, with the `read` and `read_write` access modes in WGSL, respectively.
-StructuredBuffer and RWStructuredBuffer with struct type T translate to `array<T>` in the `storage` address space, with with the `read` and `read_write` access modes in WGSL, respectively.
+StructuredBuffer and RWStructuredBuffer with struct type T translate to `array<T>` in the `storage` address space, with the `read` and `read_write` access modes in WGSL, respectively.
 
 Interlocked operations
 ----------------------
@@ -109,8 +109,15 @@ Entry Point Parameter Handling
 Slang performs several transformations on entry point parameters when targeting WGSL:
 
 - Struct parameters and returned structs are flattened to eliminate nested structures.
+- Varying input parameters are packed into a single struct type.
 - System value semantics are translated to WGSL built-ins. (See the `@builtin` attribute, and the table above.)
 - Parameters without semantics are given automatic location indices. (See the `@location` attribute.)
+
+### Limitation: `isParameterLocationUsed` for varying inputs
+
+Because WGSL entry point varying inputs are packed into a single struct parameter during legalization, `IMetadata::isParameterLocationUsed` cannot distinguish between used and unused individual varying inputs. The metadata is recorded at the struct level, so if any varying input is used, all varying input locations covered by the struct will be reported as used. This differs from SPIR-V, where each varying input becomes a separate global parameter that can be individually tracked.
+
+This limitation does not affect non-varying resource types (e.g. descriptor table slots), which are tracked individually.
 
 
 Parameter blocks
@@ -122,8 +129,8 @@ Each `ParameterBlock` is assigned its own bind group in WGSL.
 Write-only Textures
 ---------------
 
-Many image formats supported by WebGPU can only be accessed in compute shader as a write-only image.
-Use `WTexture2D` type (similar to `RWTexture2D`) to write to an image when possible.
+Many image formats supported by WebGPU can only be accessed in a compute shader as a write-only image.
+Use the `WTexture2D` type (similar to `RWTexture2D`) to write to an image when possible.
 The write-only texture types are also supported when targeting HLSL/GLSL/SPIR-V/Metal and CUDA.
 
 
@@ -133,7 +140,7 @@ Pointers
 `out` and `inout` parameters in Slang are translated to pointer-typed parameters in WGSL.
 At callsites, a pointer value is formed and passed as argument using the `&` operator in WGSL.
 
-Since WGSL cannot form pointers to fields of structs (or fields of fields of structs, etc...), the described transformation cannot be done in a direct way when a function argument expression is an "access chain" like `myStruct.myField` or `myStruct.myStructField.someField`.
+Since WGSL cannot form pointers to fields of structs (or fields of fields of structs, etc.), the described transformation cannot be done in a direct way when a function argument expression is an "access chain" like `myStruct.myField` or `myStruct.myStructField.someField`.
 In those cases, the argument is copied to a local variable, the address of the local variable is passed to the function, and then the local
 variable is written back to the struct field after the function call.
 
@@ -155,7 +162,7 @@ WGSL requires explicit address space qualifiers. Slang automatically assigns app
 Matrix type translation
 -----------------------
 
-A m-row-by-n-column matrix in Slang, represented as float`m`x`n` or matrix<T, m, n>, is translated to `mat[n]x[m]` in WGSL, i.e. a matrix with `n` columns and `m` rows.
+An m-row-by-n-column matrix in Slang, represented as float`m`x`n` or matrix<T, m, n>, is translated to `mat[n]x[m]` in WGSL, i.e. a matrix with `n` columns and `m` rows.
 The rationale for this inversion of terminology is the same as [the rationale for SPIR-V](a2-01-spirv-target-specific.md#matrix-type-translation).
 Since the WGSL matrix multiplication convention is the normal one, where inner products of rows of the matrix on the left are taken with columns of the matrix on the right, the order of matrix products is also reversed in WGSL. This is relying on the fact that the transpose of a matrix product equals the product of the transposed matrix operands in reverse order.
 

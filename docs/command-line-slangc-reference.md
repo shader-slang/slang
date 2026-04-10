@@ -186,7 +186,7 @@ Specify the shader profile for code generation.
 
 Accepted profiles are: 
 
-* sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6} 
+* sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6,6_7,6_8,6_9,6_10} 
 
 * glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460} 
 
@@ -570,6 +570,22 @@ Allow generating code from incomplete libraries with unresolved external functio
 **-bindless-space-index &lt;index&gt;**
 
 Specify the space index for the system defined global bindless resource array. 
+
+
+<a id="spirv-resource-heap-stride"></a>
+### -spirv-resource-heap-stride
+
+**-spirv-resource-heap-stride &lt;stride&gt;**
+
+Specify the byte stride for the resource descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType). 
+
+
+<a id="spirv-sampler-heap-stride"></a>
+### -spirv-sampler-heap-stride
+
+**-spirv-sampler-heap-stride &lt;stride&gt;**
+
+Specify the byte stride for the sampler descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(OpTypeSampler). 
 
 
 <a id="separate-debug-info"></a>
@@ -1122,7 +1138,7 @@ Help Style
 Optimization Level 
 
 * `0`, `none` : Disable all optimizations 
-* `1`, `default` : Enable a default level of optimization.This is the default if no [-o](#o) options are used. 
+* `1`, `default` : Enable a default level of optimization.This is the default if no [-O](#o-1) options are used. 
 * `2`, `high` : Enable aggressive optimizations for speed. 
 * `3`, `maximal` : Enable further optimizations, which might have a significant impact on compile time, or involve unwanted tradeoffs in terms of code size. 
 
@@ -1259,6 +1275,7 @@ A capability describes an optional feature that a target may or may not support.
 * `metallib_2_4` 
 * `metallib_3_0` 
 * `metallib_3_1` 
+* `metallib_4_0` 
 * `hlsl_nvapi` 
 * `hlsl_2018` 
 * `optix_coopvec` 
@@ -1292,8 +1309,8 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_NV_shader_subgroup_partitioned` : enables the SPV_NV_shader_subgroup_partitioned extension 
 * `SPV_KHR_subgroup_rotate` : enables the SPV_KHR_subgroup_rotate extension 
 * `SPV_NV_ray_tracing_motion_blur` : enables the SPV_NV_ray_tracing_motion_blur extension 
-* `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
 * `SPV_EXT_shader_invocation_reorder` : enables the SPV_EXT_shader_invocation_reorder extension 
+* `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
 * `SPV_NV_cluster_acceleration_structure` : enables the SPV_NV_cluster_acceleration_structure extension 
 * `SPV_NV_linear_swept_spheres` : enables the SPV_NV_linear_swept_spheres extension 
 * `SPV_NV_shader_image_footprint` : enables the SPV_NV_shader_image_footprint extension 
@@ -1307,6 +1324,8 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
 * `SPV_NV_bindless_texture` : enables the SPV_NV_bindless_texture extension 
 * `SPV_EXT_float8` : enables the SPV_EXT_float8 extension 
+* `SPV_EXT_descriptor_heap` : enables the SPV_EXT_descriptor_heap extension 
+* `SPV_KHR_untyped_pointers` : enables the SPV_KHR_untyped_pointers extension 
 * `SPV_KHR_bfloat16` : enables the SPV_KHR_bfloat16 extension 
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
@@ -1327,8 +1346,11 @@ A capability describes an optional feature that a target may or may not support.
 * `spvFragmentShaderPixelInterlockEXT` 
 * `spvFragmentBarycentricKHR` 
 * `spvFragmentFullyCoveredEXT` 
+* `spvGroupNonUniform` 
 * `spvGroupNonUniformBallot` 
 * `spvGroupNonUniformShuffle` 
+* `spvGroupNonUniformShuffleRelative` 
+* `spvGroupNonUniformClustered` 
 * `spvGroupNonUniformArithmetic` 
 * `spvGroupNonUniformQuad` 
 * `spvGroupNonUniformVote` 
@@ -1340,8 +1362,8 @@ A capability describes an optional feature that a target may or may not support.
 * `spvRayTracingPositionFetchKHR` 
 * `spvRayQueryKHR` 
 * `spvRayQueryPositionFetchKHR` 
-* `spvShaderInvocationReorderNV` 
 * `spvShaderInvocationReorderEXT` 
+* `spvShaderInvocationReorderNV` 
 * `spvRayTracingClusterAccelerationStructureNV` 
 * `spvRayTracingLinearSweptSpheresGeometryNV` 
 * `spvShaderClockKHR` 
@@ -1364,6 +1386,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvVulkanMemoryModelKHR` 
 * `spvVulkanMemoryModelDeviceScopeKHR` 
 * `spvBindlessTextureNV` 
+* `spvDescriptorHeapEXT` 
 * `ser_hlsl_native` 
 * `metallib_latest` 
 * `dxil_lib` 
@@ -1520,6 +1543,7 @@ A capability describes an optional feature that a target may or may not support.
 * `tensor_addressing` 
 * `cooperative_matrix_2` 
 * `vk_mem_model` 
+* `mem_model` 
 * `descriptor_handle` 
 * `pixel` 
 * `tesscontrol` 
@@ -1591,6 +1615,8 @@ A capability describes an optional feature that a target may or may not support.
 * `sm_6_8` 
 * `sm_6_9_version` 
 * `sm_6_9` 
+* `sm_6_10_version` 
+* `sm_6_10` 
 * `DX_4_0` 
 * `DX_4_1` 
 * `DX_5_0` 
@@ -1605,6 +1631,7 @@ A capability describes an optional feature that a target may or may not support.
 * `DX_6_7` 
 * `DX_6_8` 
 * `DX_6_9` 
+* `DX_6_10` 
 * `GLSL_130` : enables the GLSL_130 extension 
 * `GLSL_140` : enables the GLSL_140 extension 
 * `GLSL_150` : enables the GLSL_150 extension 
@@ -1635,6 +1662,7 @@ A capability describes an optional feature that a target may or may not support.
 * `METAL_2_4` 
 * `METAL_3_0` 
 * `METAL_3_1` 
+* `METAL_4_0` 
 * `appendstructuredbuffer` 
 * `atomic_hlsl` 
 * `atomic_hlsl_nvapi` 

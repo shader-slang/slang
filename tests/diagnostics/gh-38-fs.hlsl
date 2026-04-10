@@ -1,8 +1,9 @@
 //TEST_IGNORE_FILE:
 
-// Companion file to `gh-38-fs.hlsl`
+// Companion file to `gh-38-vs.hlsl`
 
 Texture2D overlappingB : register(t0);
+//CHECK:      ^^^^^^^^^^^^ explicit binding for parameter 'overlappingB' overlaps with parameter 'overlappingA'
 
 Texture2D conflicting : register(t2);
 

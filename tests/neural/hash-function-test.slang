@@ -3,7 +3,7 @@
 
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -xslang -experimental-feature -output-using-type
-import neural;
+import slang.neural;
 
 // Output buffer for test results (22 results total)
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=gOutputBuffer

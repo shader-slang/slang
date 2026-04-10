@@ -49,6 +49,28 @@ target_include_directories(
     INTERFACE ${SLANG_FIDDLE_OUTPUT_DIR}
 )
 
+# Optimize slang-rich-diagnostics.cpp for size regardless of build type.
+# This file includes generated fiddle code that can be large.
+# Use /O1;/Os for MSVC, -Oz for Clang, -Os for GCC.
+# For MSVC, we must disable PCH for this file since changing optimization
+# level is incompatible with precompiled headers (warning C4653).
+# Skip optimization in MSVC Debug builds to avoid /RTC1 conflicts.
+# GCC/Clang don't have this issue, so they get size optimization in all configs.
+string(CONCAT RICH_DIAG_SIZE_OPT_FLAGS
+    "$<$<NOT:"
+        "$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:MSVC>>"
+    ">:"
+        "$<IF:$<CXX_COMPILER_ID:MSVC>,/O1;/Os,"
+            "$<IF:$<CXX_COMPILER_ID:GNU>,-Os,-Oz>>"
+    ">"
+)
+set_source_files_properties(
+    slang-rich-diagnostics.cpp
+    PROPERTIES
+        SKIP_PRECOMPILE_HEADERS ON
+        COMPILE_OPTIONS "${RICH_DIAG_SIZE_OPT_FLAGS}"
+)
+
 #
 # generate capability files
 #
@@ -122,8 +144,8 @@ set(SLANG_LOOKUP_GENERATED_SOURCE
     "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-lookup-GLSLstd450.cpp"
 )
 set(SLANG_RECORD_REPLAY_SYSTEM
-    "${slang_SOURCE_DIR}/source/slang-record-replay/record"
-    "${slang_SOURCE_DIR}/source/slang-record-replay/util"
+    "${slang_SOURCE_DIR}/source/slang-record-replay"
+    "${slang_SOURCE_DIR}/source/slang-record-replay/proxy"
 )
 
 add_custom_command(
@@ -232,6 +254,7 @@ set(slang_link_args
     slang-fiddle-output
     slang-lookup-tables
     SPIRV-Headers::SPIRV-Headers
+    libcmark-gfm
 )
 set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
 set(slang_public_lib_args
@@ -369,10 +392,12 @@ include(\"${slang_SOURCE_DIR}/cmake/RegenerateDllExports.cmake\")
     # Set output name to slang (produces slang.dll) and match directories
     set_target_properties(slang-proxy PROPERTIES
         OUTPUT_NAME slang
+        PDB_NAME slang-proxy
         RUNTIME_OUTPUT_DIRECTORY "${slang_runtime_dir}"
         ARCHIVE_OUTPUT_DIRECTORY "${slang_archive_dir}"
     )
-    
+    target_link_options(slang-proxy PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/INCREMENTAL:NO>")
+
     # Install the proxy DLL alongside slang-compiler.dll
     install(
         TARGETS slang-proxy

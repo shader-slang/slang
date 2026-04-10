@@ -3,30 +3,209 @@
 language: "en-US"
 
 reviews:
+  profile: assertive
   high_level_summary: false
   auto_title_placeholder: ""
-  poem: true
+  poem: false
   in_progress_fortune: false
   collapse_walkthrough: true
-  sequence_diagrams: true
-  review_effort: false
-  issue_assessment: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  assess_linked_issues: true
   related_issues: false
-  related_pull_requests: false
-  labels: false
+  related_prs: false
+  suggested_labels: false
   auto_label: false
-  reviewers: false
-  auto_assign_reviewers: false
+  suggested_reviewers: true
+  auto_assign_reviewers: true
 
   path_filters:
     - "!build/**"
     - "!external/**"
 
+  path_instructions:
+    - path: "source/slang/**"
+      instructions: >-
+        This is the core compiler AND all target emitters (slang-emit-*.cpp).
+        Review for:
+        (1) IR pass correctness — ensure SSA form and type invariants are maintained.
+        (2) Proper use of FIDDLE macros for AST/IR node definitions.
+        (3) Emit logic should stay simple; heavy transforms belong in IR passes.
+        (4) Check that new IR instructions are registered in slang-ir-insts.lua.
+        (5) Null pointer safety and proper error handling via diagnostics.
+        (6) Cross-backend consistency — changes to one emitter may need parallel changes in others.
+
+    - path: "source/core/**"
+      instructions: >-
+        Core utilities shared across the compiler. Check for:
+        (1) Thread safety if the utility may be used concurrently.
+        (2) Memory management — Slang uses reference counting (RefPtr/ComPtr).
+        (3) Platform portability (Windows, Linux, macOS).
+
+    - path: "source/compiler-core/**"
+      instructions: >-
+        Compiler infrastructure (diagnostics, source locations, codegen utilities).
+        Ensure diagnostic messages are clear and include source locations.
+
+    - path: "include/**"
+      instructions: >-
+        PUBLIC API HEADERS. Changes here are potentially breaking for all downstream
+        users. Flag any modification to existing function signatures, struct layouts,
+        or enum values. New additions should follow existing naming conventions.
+        Check COM interface compatibility (ISlang* interfaces).
+
+    - path: "tests/**"
+      instructions: >-
+        Verify test correctness. Tests use //TEST directives:
+        COMPARE_COMPUTE for GPU compute tests, INTERPRET for CPU interpreter tests.
+        Ensure new features have corresponding tests. Check that expected outputs
+        match the intended behavior, not just current behavior.
+
+    - path: "prelude/**"
+      instructions: >-
+        Built-in language definitions and intrinsics. Changes here affect all
+        Slang programs. Verify backward compatibility and check that all target
+        backends handle new intrinsics.
+
+    - path: "cmake/**"
+      instructions: >-
+        Build system changes. Verify cross-platform compatibility (Windows/Linux/macOS).
+        Check for proper target dependency declarations and generator expressions.
+
+    - path: "CMakeLists.txt"
+      instructions: >-
+        Root build configuration. Verify minimum CMake version compatibility (3.22+).
+        Check that new targets are properly linked and installed.
+
+    - path: ".github/workflows/**"
+      instructions: >-
+        CI/CD workflow changes. Verify correct trigger conditions, proper secret
+        handling, and that matrix configurations cover all required platforms.
+
+    - path: "tools/**"
+      instructions: >-
+        Development tools (slang-test, slangd LSP, render-test, etc.).
+        Ensure command-line interface changes are backward compatible.
+
   auto_review:
     enabled: true
     drafts: false
+    base_branches:
+      - "master"
+    ignore_title_keywords:
+      - "WIP"
+      - "wip"
+      - "DO NOT MERGE"
 
-  prompts_for_ai_agents: false
+  enable_prompt_for_ai_agents: false
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
+  tools:
+    # C++ — relevant
+    cppcheck:
+      enabled: true
+    clang:
+      enabled: true
+    # Scripts/config — relevant
+    shellcheck:
+      enabled: true
+    yamllint:
+      enabled: true
+    luacheck:
+      enabled: true
+    actionlint:
+      enabled: true
+    # Security — relevant
+    gitleaks:
+      enabled: true
+    # Everything else — not applicable to a C++ compiler project
+    ruff:
+      enabled: false
+    markdownlint:
+      enabled: false
+    languagetool:
+      enabled: false
+    biome:
+      enabled: false
+    hadolint:
+      enabled: false
+    swiftlint:
+      enabled: false
+    phpstan:
+      enabled: false
+    phpmd:
+      enabled: false
+    phpcs:
+      enabled: false
+    golangci-lint:
+      enabled: false
+    trufflehog:
+      enabled: false
+    checkov:
+      enabled: false
+    tflint:
+      enabled: false
+    detekt:
+      enabled: false
+    eslint:
+      enabled: false
+    flake8:
+      enabled: false
+    fortitudeLint:
+      enabled: false
+    rubocop:
+      enabled: false
+    buf:
+      enabled: false
+    regal:
+      enabled: false
+    pmd:
+      enabled: false
+    opengrep:
+      enabled: false
+    semgrep:
+      enabled: false
+    circleci:
+      enabled: false
+    clippy:
+      enabled: false
+    sqlfluff:
+      enabled: false
+    trivy:
+      enabled: false
+    prismaLint:
+      enabled: false
+    pylint:
+      enabled: false
+    oxc:
+      enabled: false
+    shopifyThemeCheck:
+      enabled: false
+    brakeman:
+      enabled: false
+    dotenvLint:
+      enabled: false
+    htmlhint:
+      enabled: false
+    stylelint:
+      enabled: false
+    checkmake:
+      enabled: false
+    osvScanner:
+      enabled: false
+    blinter:
+      enabled: false
+    smartyLint:
+      enabled: false
+    emberTemplateLint:
+      enabled: false
+    psscriptanalyzer:
+      enabled: false
 
 chat:
   auto_reply: false

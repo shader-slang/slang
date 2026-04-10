@@ -2,6 +2,8 @@
 
 #include "slang-ir-autodiff.h"
 #include "slang-ir-inst-pass-base.h"
+#include "slang-ir-sccp.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -12,65 +14,76 @@ public:
     DiagnosticSink* sink;
     AutoDiffSharedContext sharedContext;
 
-    enum DifferentiableLevel
+    enum DiffCheckingLevel
     {
-        Forward,
-        Backward
+        None = 0,
+        Forward = 1,
+        Backward = 2
     };
-    Dictionary<IRInst*, DifferentiableLevel> differentiableFunctions;
+
+    Dictionary<IRInst*, DiffCheckingLevel> differentiableFunctions;
 
     CheckDifferentiabilityPassContext(IRModule* inModule, DiagnosticSink* inSink)
         : InstPassBase(inModule), sink(inSink), sharedContext(nullptr, inModule->getModuleInst())
     {
     }
 
-    bool _isFuncMarkedForAutoDiff(IRInst* func)
+    DiffCheckingLevel getCheckingLevelRequirementForFunc(IRGlobalValueWithCode* code)
     {
-        func = getResolvedInstForDecorations(func);
-        if (!func)
-            return false;
-        for (auto decorations : func->getDecorations())
-        {
-            switch (decorations->getOp())
-            {
-            case kIROp_ForwardDifferentiableDecoration:
-            case kIROp_BackwardDifferentiableDecoration:
-                return true;
-            }
-        }
-        return false;
-    }
+        DiffCheckingLevel level = DiffCheckingLevel::None;
 
-    bool _isDifferentiableFuncImpl(IRInst* func, DifferentiableLevel level)
-    {
-        func = getResolvedInstForDecorations(func);
-        if (!func)
-            return false;
-        if (auto substDecor = func->findDecoration<IRPrimalSubstituteDecoration>())
+        auto addToLevel = [&](IRTranslateBase* inst)
         {
-            func = getResolvedInstForDecorations(substDecor->getPrimalSubstituteFunc());
-            if (!func)
-                return false;
-        }
-
-        for (auto decorations : func->getDecorations())
-        {
-            switch (decorations->getOp())
+            switch (inst->getOp())
             {
-            case kIROp_ForwardDerivativeDecoration:
-            case kIROp_ForwardDifferentiableDecoration:
-                if (level == DifferentiableLevel::Forward)
-                    return true;
+            case kIROp_ForwardDifferentiate:
+                level = std::max(level, DiffCheckingLevel::Forward);
                 break;
-            case kIROp_UserDefinedBackwardDerivativeDecoration:
-            case kIROp_BackwardDerivativeDecoration:
-            case kIROp_BackwardDifferentiableDecoration:
-                return true;
+            case kIROp_BackwardDifferentiate:
+                level = std::max(level, DiffCheckingLevel::Backward);
+                break;
+            case kIROp_BackwardDifferentiatePrimal:
+                level = std::max(level, DiffCheckingLevel::Backward);
+                break;
+            case kIROp_BackwardDifferentiatePropagate:
+                level = std::max(level, DiffCheckingLevel::Backward);
+                break;
             default:
                 break;
             }
+        };
+
+        if (as<IRModuleInst>(code->getParent()))
+        {
+            traverseUsers(
+                code,
+                [&](IRInst* user)
+                {
+                    if (auto translateInst = as<IRTranslateBase>(user))
+                        addToLevel(translateInst);
+                });
         }
-        return false;
+        else if (auto block = as<IRBlock>(code->getParent()))
+        {
+            auto generic = as<IRGeneric>(block->getParent());
+            if (generic)
+            {
+                traverseUsers<IRSpecialize>(
+                    generic,
+                    [&](IRSpecialize* specialize)
+                    {
+                        traverseUsers(
+                            specialize,
+                            [&](IRInst* user)
+                            {
+                                if (auto translateInst = as<IRTranslateBase>(user))
+                                    addToLevel(translateInst);
+                            });
+                    });
+            }
+        }
+
+        return level;
     }
 
     bool shouldTreatCallAsDifferentiable(IRInst* callInst)
@@ -82,11 +95,43 @@ public:
             callInst->findDecoration<IRDifferentiableCallDecoration>());
     }
 
-    // If a function call takes all literals as arguments, it will implies that this function will
-    // not be expected to any gradients, in this case, this call should be treated as no_diff even
-    // there is no 'no_diff' decorated on it explicitly. In the actual check, we only need to check
-    // the argument corresponding to the differentiable parameters, because non-differentiable
-    // parameter are not expected to produce any gradients anyway.
+    bool isConstantVal(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_IntLit:
+        case kIROp_FloatLit:
+            return true;
+        case kIROp_MakeValuePack:
+            {
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                {
+                    if (!isConstantVal(inst->getOperand(i)))
+                        return false;
+                }
+                return true;
+            }
+        }
+
+        if (isEvaluableOpCode(inst->getOp()))
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                auto operand = inst->getOperand(i);
+                if (!isConstantVal(operand))
+                    return false;
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    // If a function call takes all literals as arguments, it will implies that this function
+    // will not be expected to any gradients, in this case, this call should be treated as
+    // no_diff even there is no 'no_diff' decorated on it explicitly. In the actual check, we
+    // only need to check the argument corresponding to the differentiable parameters, because
+    // non-differentiable parameter are not expected to produce any gradients anyway.
     bool shouldCallImpliesNoDiff(
         DifferentiableTypeConformanceContext& diffTypeContext,
         IRCall* callInst)
@@ -106,10 +151,11 @@ public:
         UInt paramIndex = 0;
         for (auto paramType : calleeFuncType->getParamTypes())
         {
-            if (isDifferentiableType(diffTypeContext, paramType))
+            auto [paramDirectionInfo, paramBaseType] = splitParameterDirectionAndType(paramType);
+            if (diffTypeContext.isDifferentiableType(paramBaseType))
             {
                 auto arg = callInst->getArg(paramIndex);
-                if (!as<IRConstant>(arg))
+                if (!isConstantVal(arg))
                 {
                     doesImplyNoDiff = false;
                 }
@@ -125,76 +171,20 @@ public:
         return doesImplyNoDiff;
     }
 
-    bool isDifferentiableFunc(IRInst* func, DifferentiableLevel level)
+    bool isDifferentiableFunc(
+        DifferentiableTypeConformanceContext& ctx,
+        IRInst* func,
+        DiffCheckingLevel level)
     {
-        switch (func->getOp())
+        if (ctx.tryGetAssociationOfKind(func, AnnotationKind::ForwardDerivative))
         {
-        case kIROp_ForwardDifferentiate:
-            if (auto fwdDerivative =
-                    func->getOperand(0)->findDecoration<IRForwardDerivativeDecoration>())
-                return isDifferentiableFunc(fwdDerivative->getForwardDerivativeFunc(), level);
-            return isDifferentiableFunc(func->getOperand(0), level);
-        case kIROp_BackwardDifferentiate:
-            if (auto bwdDerivative =
-                    func->getOperand(0)
-                        ->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
-                return isDifferentiableFunc(bwdDerivative->getBackwardDerivativeFunc(), level);
-            return isDifferentiableFunc(func->getOperand(0), level);
-        default:
-            break;
+            if (level == DiffCheckingLevel::Forward)
+                return true;
         }
 
-        func = getResolvedInstForDecorations(func);
-        if (!func)
-            return false;
-
-        if (auto substDecor = func->findDecoration<IRPrimalSubstituteDecoration>())
+        if (ctx.tryGetAssociationOfKind(func, AnnotationKind::BackwardDerivativeApply))
         {
-            func = getResolvedInstForDecorations(substDecor->getPrimalSubstituteFunc());
-            if (!func)
-                return false;
-        }
-
-        if (auto existingLevel = differentiableFunctions.tryGetValue(func))
-            return *existingLevel >= level;
-
-        if (func->findDecoration<IRTreatAsDifferentiableDecoration>())
             return true;
-
-        if (auto lookupInterfaceMethod = as<IRLookupWitnessMethod>(func))
-        {
-            auto wit = lookupInterfaceMethod->getWitnessTable();
-            if (!wit)
-                return false;
-            auto witType = as<IRWitnessTableTypeBase>(wit->getDataType());
-            if (!witType)
-                return false;
-            auto interfaceType = witType->getConformanceType();
-            if (!interfaceType)
-                return false;
-            if (interfaceType->findDecoration<IRTreatAsDifferentiableDecoration>())
-                return true;
-            if (sharedContext.differentiableInterfaceType &&
-                interfaceType == sharedContext.differentiableInterfaceType)
-                return true;
-            if (lookupInterfaceMethod->getRequirementKey()
-                    ->findDecoration<IRBackwardDerivativeDecoration>())
-                return true;
-            if (lookupInterfaceMethod->getRequirementKey()
-                    ->findDecoration<IRForwardDerivativeDecoration>())
-                return level == DifferentiableLevel::Forward;
-        }
-
-        for (; func; func = func->parent)
-        {
-            if (as<IRGeneric>(func))
-            {
-                if (auto existingLevel = differentiableFunctions.tryGetValue(func))
-                {
-                    if (*existingLevel >= level)
-                        return true;
-                }
-            }
         }
         return false;
     }
@@ -222,8 +212,16 @@ public:
             switch (addr->getOp())
             {
             case kIROp_Var:
+                {
+                    auto valueType = as<IRPtrTypeBase>(addr->getDataType())->getValueType();
+                    return diffTypeContext.isDifferentiableType(valueType);
+                }
             case kIROp_Param:
-                return isDifferentiableType(diffTypeContext, addr->getDataType());
+                {
+                    auto [passingMode, valueType] =
+                        splitParameterDirectionAndType(addr->getDataType());
+                    return diffTypeContext.isDifferentiableType(valueType);
+                }
             case kIROp_FieldAddress:
                 if (!as<IRFieldAddress>(addr)->getField() ||
                     as<IRFieldAddress>(addr)
@@ -233,9 +231,9 @@ public:
                 addr = as<IRFieldAddress>(addr)->getBase();
                 break;
             case kIROp_GetElementPtr:
-                if (!isDifferentiableType(
-                        diffTypeContext,
-                        as<IRGetElementPtr>(addr)->getBase()->getDataType()))
+                if (!diffTypeContext.isDifferentiableType(
+                        as<IRPtrTypeBase>(as<IRGetElementPtr>(addr)->getBase()->getDataType())
+                            ->getValueType()))
                     return false;
                 addr = as<IRGetElementPtr>(addr)->getBase();
                 break;
@@ -258,12 +256,66 @@ public:
             {
                 auto call = as<IRCall>(inst);
                 return isDifferentiableFunc(
+                    diffTypeContext,
                     call->getCallee(),
-                    CheckDifferentiabilityPassContext::DifferentiableLevel::Forward);
+                    CheckDifferentiabilityPassContext::DiffCheckingLevel::Forward);
             }
         default:
-            return isDifferentiableType(diffTypeContext, inst->getDataType());
+            return diffTypeContext.isDifferentiableType(inst->getDataType());
         }
+    }
+
+    bool checkIsPtrPairMethod(
+        DifferentiableTypeConformanceContext& diffTypeContext,
+        IRFuncType* funcType)
+    {
+        // Determine if this call should use "pointer pair method" mode.
+        // If any output (out/inout/ref parameter, or return value) is a differentiable pointer type
+        // (conforms to IDifferentiablePtrType), we should not mark the call as mixed-differential
+        // so that the transposition logic won't try to reverse it (doesn't make sense for
+        // differential pointers).
+        //
+        // If we detect a differentiable pointer output but there are also any differentiable
+        // value types (either inputs or outputs, i.e. conforming to IDifferentiable), we
+        // emit a diagnostic since we cannot transpose such mixed functions.
+        //
+        bool hasDiffPtrOutput = false;
+        bool hasDiffValueType = false;
+
+        // Check all parameters for differentiable value types (inputs and outputs)
+        // and output parameters for differentiable pointer types.
+        for (UIndex ii = 0; ii < funcType->getParamCount(); ii++)
+        {
+            auto paramType = funcType->getParamType(ii);
+            bool isOutput = as<IROutParamTypeBase>(paramType) || as<IRRefParamType>(paramType);
+
+            // For outputs (out/inout/ref), get the value type from the pointer.
+            // For inputs, use the param type directly.
+            IRType* valueType;
+            if (isOutput)
+                valueType = (IRType*)as<IRPtrTypeBase>(paramType)->getValueType();
+            else
+                valueType = paramType;
+
+            // Only outputs can contribute differentiable pointer types.
+            if (isOutput && diffTypeContext.isDifferentiablePtrType(valueType))
+                hasDiffPtrOutput = true;
+
+            // Any parameter (input or output) can contribute differentiable value types.
+            if (diffTypeContext.isDifferentiableValueType(valueType))
+                hasDiffValueType = true;
+        }
+
+        // Check return type.
+        if (auto retType = funcType->getResultType())
+        {
+            if (diffTypeContext.isDifferentiablePtrType((IRType*)retType))
+                hasDiffPtrOutput = true;
+            if (diffTypeContext.isDifferentiableValueType((IRType*)retType))
+                hasDiffValueType = true;
+        }
+
+        return hasDiffPtrOutput;
     }
 
     bool checkType(IRInst* type)
@@ -314,7 +366,9 @@ public:
                     auto loc = inst->sourceLoc;
                     if (!loc.isValid())
                         loc = funcInst->sourceLoc;
-                    sink->diagnose(loc, Diagnostics::invalidUseOfTorchTensorTypeInDeviceFunc);
+                    sink->diagnose(Diagnostics::InvalidUseOfTorchTensorTypeInDeviceFunc{
+                        .location = loc,
+                    });
                     return;
                 }
             }
@@ -325,13 +379,14 @@ public:
     {
         checkForInvalidHostTypeUsage(funcInst);
 
-        if (!_isFuncMarkedForAutoDiff(funcInst))
+        auto requiredDiffLevel = getCheckingLevelRequirementForFunc(funcInst);
+        if (requiredDiffLevel == DiffCheckingLevel::None)
             return;
+
         if (!funcInst->getFirstBlock())
             return;
 
         DifferentiableTypeConformanceContext diffTypeContext(&sharedContext);
-        diffTypeContext.setFunc(funcInst);
 
         // We compute and track three different set of insts to complete our
         // data flow analysis.
@@ -349,7 +404,8 @@ public:
         bool isDifferentiableReturnType = false;
         for (auto param : funcInst->getFirstBlock()->getParams())
         {
-            if (isDifferentiableType(diffTypeContext, param->getFullType()))
+            auto [_, paramBaseType] = splitParameterDirectionAndType(param->getDataType());
+            if (diffTypeContext.isDifferentiableType(paramBaseType))
             {
                 produceDiffSet.add(param);
                 carryNonTrivialDiffSet.add(param);
@@ -357,15 +413,11 @@ public:
         }
         if (auto funcType = as<IRFuncType>(funcInst->getDataType()))
         {
-            if (isDifferentiableType(diffTypeContext, funcType->getResultType()))
+            if (diffTypeContext.isDifferentiableType(funcType->getResultType()))
             {
                 isDifferentiableReturnType = true;
             }
         }
-
-        DifferentiableLevel requiredDiffLevel = DifferentiableLevel::Forward;
-        if (isBackwardDifferentiableFunc(funcInst))
-            requiredDiffLevel = DifferentiableLevel::Backward;
 
         auto isInstProducingDiff = [&](IRInst* inst) -> bool
         {
@@ -375,8 +427,11 @@ public:
                 return true;
             case kIROp_Call:
                 return shouldTreatCallAsDifferentiable(inst) ||
-                       isDifferentiableFunc(as<IRCall>(inst)->getCallee(), requiredDiffLevel) &&
-                           isDifferentiableType(diffTypeContext, inst->getFullType());
+                       isDifferentiableFunc(
+                           diffTypeContext,
+                           as<IRCall>(inst)->getCallee(),
+                           requiredDiffLevel) &&
+                           diffTypeContext.isDifferentiableType(inst->getFullType());
             case kIROp_Load:
                 // We don't have more knowledge on whether diff is available at the destination
                 // address. Just assume it is producing diff if the dest address can hold a
@@ -387,7 +442,7 @@ public:
             default:
                 // default case is to assume the inst produces a diff value if any
                 // of its operands produces a diff value.
-                if (!isDifferentiableType(diffTypeContext, inst->getFullType()))
+                if (!diffTypeContext.isDifferentiableType(inst->getFullType()))
                     return false;
                 for (UInt i = 0; i < inst->getOperandCount(); i++)
                 {
@@ -409,8 +464,11 @@ public:
             case kIROp_Call:
                 if (shouldTreatCallAsDifferentiable(inst))
                     return false;
-                return isDifferentiableFunc(as<IRCall>(inst)->getCallee(), requiredDiffLevel) &&
-                       isDifferentiableType(diffTypeContext, inst->getFullType());
+                return isDifferentiableFunc(
+                           diffTypeContext,
+                           as<IRCall>(inst)->getCallee(),
+                           requiredDiffLevel) &&
+                       diffTypeContext.isDifferentiableType(inst->getFullType());
             case kIROp_Load:
                 // We don't have more knowledge on whether diff is available at the destination
                 // address. Just assume it is producing diff if the dest address can hold a
@@ -421,7 +479,7 @@ public:
             default:
                 // default case is to assume the inst produces a diff value if any
                 // of its operands produces a diff value.
-                if (!isDifferentiableType(diffTypeContext, inst->getFullType()))
+                if (!diffTypeContext.isDifferentiableType(inst->getFullType()))
                     return false;
                 for (UInt i = 0; i < inst->getOperandCount(); i++)
                 {
@@ -487,7 +545,10 @@ public:
                     switch (inst->getOp())
                     {
                     case kIROp_Call:
-                        if (isDifferentiableFunc(as<IRCall>(inst)->getCallee(), requiredDiffLevel))
+                        if (isDifferentiableFunc(
+                                diffTypeContext,
+                                as<IRCall>(inst)->getCallee(),
+                                requiredDiffLevel))
                         {
                             addToExpectDiffWorkList(inst);
                         }
@@ -496,8 +557,7 @@ public:
                         {
                             auto storeInst = as<IRStore>(inst);
                             if (canAddressHoldDerivative(diffTypeContext, storeInst->getPtr()) &&
-                                isDifferentiableType(
-                                    diffTypeContext,
+                                diffTypeContext.isDifferentiableType(
                                     as<IRStore>(inst)->getPtr()->getDataType()))
                             {
                                 addToExpectDiffWorkList(storeInst->getVal());
@@ -508,7 +568,7 @@ public:
                         if (auto returnVal = as<IRReturn>(inst)->getVal())
                         {
                             if (isDifferentiableReturnType &&
-                                isDifferentiableType(diffTypeContext, returnVal->getDataType()))
+                                diffTypeContext.isDifferentiableType(returnVal->getDataType()))
                             {
                                 addToExpectDiffWorkList(inst);
                             }
@@ -531,11 +591,19 @@ public:
                 if (auto call = as<IRCall>(inst))
                 {
                     const auto callee = call->getCallee();
+
+                    DiffCheckingLevel diffLevelForCall = requiredDiffLevel;
+
+                    if (checkIsPtrPairMethod(
+                            diffTypeContext,
+                            cast<IRFuncType>(callee->getDataType())))
+                        diffLevelForCall = DiffCheckingLevel::Forward;
+
                     // If inst's type is differentiable, and it is in expectDiffInstWorkList,
-                    // then some user is expecting the result of the call to produce a derivative.
-                    // In this case we need to issue a diagnostic.
-                    if (isDifferentiableType(diffTypeContext, inst->getFullType()) &&
-                        !isDifferentiableFunc(callee, requiredDiffLevel))
+                    // then some user is expecting the result of the call to produce a
+                    // derivative. In this case we need to issue a diagnostic.
+                    if (diffTypeContext.isDifferentiableType(inst->getFullType()) &&
+                        !isDifferentiableFunc(diffTypeContext, callee, diffLevelForCall))
                     {
                         // No need to fail here if the function is no_diff in
                         // both inputs and all outputs, this is equivalent of
@@ -544,11 +612,13 @@ public:
                             !shouldCallImpliesNoDiff(diffTypeContext, call))
                         {
                             sink->diagnose(
-                                inst,
-                                Diagnostics::lossOfDerivativeDueToCallOfNonDifferentiableFunction,
-                                getResolvedInstForDecorations(call->getCallee()),
-                                requiredDiffLevel == DifferentiableLevel::Forward ? "forward"
-                                                                                  : "backward");
+                                Diagnostics::LossOfDerivativeDueToCallOfNonDifferentiableFunction{
+                                    .diffLevel = diffLevelForCall == DiffCheckingLevel::Forward
+                                                     ? "forward"
+                                                     : "backward",
+                                    .funcName = getResolvedInstForDecorations(call->getCallee()),
+                                    .location = inst->sourceLoc,
+                                });
                         }
                     }
                 }
@@ -595,7 +665,8 @@ public:
                     {
                         auto arg = callInst->getArg(a);
                         auto paramType = calleeFuncType->getParamType(a);
-                        if (!isDifferentiableType(diffTypeContext, paramType))
+                        auto [_, paramBaseType] = splitParameterDirectionAndType(paramType);
+                        if (!diffTypeContext.isDifferentiableType(paramBaseType))
                             continue;
                         addToExpectDiffWorkList(arg);
                     }
@@ -607,7 +678,7 @@ public:
                 for (UInt opIndex = 0; opIndex < inst->getOperandCount(); opIndex++)
                 {
                     auto operand = inst->getOperand(opIndex);
-                    if (isDifferentiableType(diffTypeContext, operand->getFullType()))
+                    if (diffTypeContext.isDifferentiableType(operand->getFullType()))
                     {
                         addToExpectDiffWorkList(operand);
                     }
@@ -639,7 +710,8 @@ public:
             }
             else
             {
-                sink->diagnose(loop->sourceLoc, Diagnostics::loopInDiffFuncRequireUnrollOrMaxIters);
+                sink->diagnose(Diagnostics::LoopInDiffFuncRequireUnrollOrMaxIters{
+                    .location = loop->sourceLoc});
             }
         }
 
@@ -656,13 +728,17 @@ public:
                         !canAddressHoldDerivative(diffTypeContext, storeInst->getPtr()))
                     {
                         sink->diagnose(
-                            storeInst->sourceLoc,
-                            Diagnostics::lossOfDerivativeAssigningToNonDifferentiableLocation);
+                            Diagnostics::LossOfDerivativeAssigningToNonDifferentiableLocation{
+                                .location = storeInst->sourceLoc,
+                            });
                     }
                 }
                 else if (auto callInst = as<IRCall>(inst))
                 {
-                    if (!isDifferentiableFunc(callInst->getCallee(), DifferentiableLevel::Forward))
+                    if (!isDifferentiableFunc(
+                            diffTypeContext,
+                            callInst->getCallee(),
+                            DiffCheckingLevel::Forward))
                         continue;
                     auto calleeFuncType = as<IRFuncType>(callInst->getCallee()->getFullType());
                     if (!calleeFuncType)
@@ -673,16 +749,23 @@ public:
                     {
                         auto arg = callInst->getArg(a);
                         auto paramType = calleeFuncType->getParamType(a);
-                        if (!isDifferentiableType(diffTypeContext, paramType))
+
+                        auto [paramDirectionInfo, paramBaseType] =
+                            splitParameterDirectionAndType(paramType);
+                        if (!diffTypeContext.isDifferentiableType(paramBaseType))
                             continue;
-                        if (as<IROutParamTypeBase>(paramType))
+
+                        if (paramDirectionInfo.kind == ParameterDirectionInfo::Kind::Out ||
+                            paramDirectionInfo.kind == ParameterDirectionInfo::Kind::BorrowInOut ||
+                            paramDirectionInfo.kind == ParameterDirectionInfo::Kind::Ref)
                         {
                             if (!canAddressHoldDerivative(diffTypeContext, arg))
                             {
                                 sink->diagnose(
-                                    arg->sourceLoc,
                                     Diagnostics::
-                                        lossOfDerivativeUsingNonDifferentiableLocationAsOutArg);
+                                        LossOfDerivativeUsingNonDifferentiableLocationAsOutArg{
+                                            .location = arg->sourceLoc,
+                                        });
                             }
                         }
                     }
@@ -695,19 +778,21 @@ public:
     {
         // Collect set of differentiable functions.
         HashSet<UnownedStringSlice> fwdDifferentiableSymbolNames, bwdDifferentiableSymbolNames;
+        DifferentiableTypeConformanceContext ctx(&sharedContext);
+
         for (auto inst : module->getGlobalInsts())
         {
-            if (_isDifferentiableFuncImpl(inst, DifferentiableLevel::Backward))
+            if (isDifferentiableFunc(ctx, inst, DiffCheckingLevel::Backward))
             {
                 if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
                     bwdDifferentiableSymbolNames.add(linkageDecor->getMangledName());
-                differentiableFunctions.add(inst, DifferentiableLevel::Backward);
+                differentiableFunctions.add(inst, DiffCheckingLevel::Backward);
             }
-            else if (_isDifferentiableFuncImpl(inst, DifferentiableLevel::Forward))
+            else if (isDifferentiableFunc(ctx, inst, DiffCheckingLevel::Forward))
             {
                 if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
                     fwdDifferentiableSymbolNames.add(linkageDecor->getMangledName());
-                differentiableFunctions.add(inst, DifferentiableLevel::Forward);
+                differentiableFunctions.add(inst, DiffCheckingLevel::Forward);
             }
         }
         for (auto inst : module->getGlobalInsts())
@@ -715,9 +800,9 @@ public:
             if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
             {
                 if (bwdDifferentiableSymbolNames.contains(linkageDecor->getMangledName()))
-                    differentiableFunctions[inst] = DifferentiableLevel::Backward;
+                    differentiableFunctions[inst] = DiffCheckingLevel::Backward;
                 else if (fwdDifferentiableSymbolNames.contains(linkageDecor->getMangledName()))
-                    differentiableFunctions.addIfNotExists(inst, DifferentiableLevel::Forward);
+                    differentiableFunctions.addIfNotExists(inst, DiffCheckingLevel::Forward);
             }
         }
 

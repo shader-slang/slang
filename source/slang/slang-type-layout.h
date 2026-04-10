@@ -1525,6 +1525,9 @@ struct TypeLayoutContext
     // The target request that is triggering layout
     TargetRequest* targetReq;
 
+    // Optional sink for reporting layout-time diagnostics.
+    DiagnosticSink* sink = nullptr;
+
     // A parent program layout that will establish the ordering
     // of all global generic type parameters.
     //
@@ -1542,6 +1545,12 @@ struct TypeLayoutContext
 
     // Map types to their type layout
     Dictionary<Type*, TypeLayoutResult> layoutMap;
+
+    // Recursion depth for type layout creation.
+    UInt recursionDepth = 0;
+
+    // Optional declaration used as the source location anchor for layout diagnostics.
+    Decl* layoutDeclForDiagnostics = nullptr;
 
     // Options passed to object layout
     ObjectLayoutRulesImpl::Options objectLayoutOptions;

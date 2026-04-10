@@ -24,6 +24,17 @@ bool diagnoseCapabilityErrors(
     return sink->diagnose(pos, info, args...);
 }
 
+template<typename D>
+bool diagnoseCapabilityErrors(
+    DiagnosticSink* sink,
+    CompilerOptionSet& optionSet,
+    D const& diagnostic)
+{
+    if (optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+        return false;
+    return sink->diagnose(diagnostic);
+}
+
 enum class IsSubTypeOptions
 {
     None = 0,
@@ -714,6 +725,8 @@ struct SharedSemanticsContext : public RefObject
 
     Dictionary<TypePair, ConversionCost> m_typeConversionCostCache;
 
+    Dictionary<Val*, VariadicPackCardinality> m_packCardinalityCache;
+
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
@@ -748,17 +761,18 @@ public:
         return false;
     }
     /// Get the list of extension declarations that appear to apply to `decl` in this context
-    List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(AggTypeDecl* decl);
+    List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(Decl* decl);
 
     /// Register a candidate extension `extDecl` for `typeDecl` encountered during checking.
-    void registerCandidateExtension(AggTypeDecl* typeDecl, ExtensionDecl* extDecl);
+    void registerCandidateExtension(Decl* typeDecl, ExtensionDecl* extDecl);
+
+    /// Invalidate inheritance info for `type`
+    void invalidateInheritanceInfo(Type* type);
 
     void registerAssociatedDecl(Decl* original, DeclAssociationKind assoc, Decl* declaration);
 
     List<RefPtr<DeclAssociation>> const& getAssociatedDeclsForDecl(Decl* decl);
 
-    bool isDifferentiableFunc(FunctionDeclBase* func);
-    bool isBackwardDifferentiableFunc(FunctionDeclBase* func);
     FunctionDifferentiableLevel _getFuncDifferentiableLevelImpl(
         FunctionDeclBase* func,
         int recurseLimit);
@@ -832,8 +846,8 @@ public:
     DeclRef<GenericDecl> getDependentGenericParent(DeclRef<Decl> declRef);
 
 private:
-    /// Mapping from type declarations to the known extensiosn that apply to them
-    Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> m_mapTypeDeclToCandidateExtensions;
+    /// Mapping from type declarations to the known extensions that apply to them
+    Dictionary<Decl*, RefPtr<CandidateExtensionList>> m_mapDeclToCandidateExtensions;
 
     /// Is the `m_mapTypeDeclToCandidateExtensions` dictionary valid and up to date?
     bool m_candidateExtensionListsBuilt = false;
@@ -861,7 +875,9 @@ private:
         DeclRef<Decl> declRef,
         Type* selfType,
         InheritanceCircularityInfo* circularityInfo);
+
     InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
+
     InheritanceInfo _calcInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
@@ -942,6 +958,33 @@ private:
         FacetList baseFacets,
         FacetList::Builder& ioMergedFacets);
 
+    /// Rewrite an interface inheritance witness that is still expressed in terms of the
+    /// base interface's abstract `This` lookup so it applies to a concrete/new subtype path.
+    ///
+    /// Inputs:
+    /// - `baseInterfaceDecl`: the interface that contributed the original `This` type.
+    /// - `selfIsSubtypeOfBase`: witness for `Self : Base`.
+    /// - `baseIsSubtypeOfFacet`: witness for `Base : Facet`, expressed using `Base.This`.
+    ///
+    /// Returns:
+    /// - A witness for `Self : Facet` produced by replacing the abstract `Base.This`
+    ///   lookup inside `baseIsSubtypeOfFacet` with
+    ///   `Lookup(selfIsSubtypeOfBase, baseInterfaceDecl.This)`.
+    ///
+    /// Examples:
+    /// - If `baseIsSubtypeOfFacet` proves `IBase.This : IFacet`, and
+    ///   `selfIsSubtypeOfBase` proves `Child : IBase`, the result proves `Child : IFacet`.
+    /// - If `baseIsSubtypeOfFacet` proves `IBase.This : IFacet`, and
+    ///   `selfIsSubtypeOfBase` proves `IDerived : IBase`, the result proves
+    ///   `IDerived : IFacet`.
+    ///
+    /// This is a centralized workaround until we have a first-class utility for substituting
+    /// an interface `This` type and its constraint with a concrete subtype witness.
+    SubtypeWitness* _specializeInterfaceInheritanceWitness(
+        InterfaceDecl* baseInterfaceDecl,
+        SubtypeWitness* selfIsSubtypeOfBase,
+        SubtypeWitness* baseIsSubtypeOfFacet);
+
     Dictionary<Type*, InheritanceInfo> m_mapTypeToInheritanceInfo;
     Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
     Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
@@ -1009,11 +1052,11 @@ public:
         return result;
     }
 
-    SemanticsContext withParentExpandExpr(ExpandExpr* expr, OrderedHashSet<Type*>* capturedTypes)
+    SemanticsContext withParentExpandExpr(ExpandExpr* expr, OrderedHashSet<Val*>* capturedPacks)
     {
         SemanticsContext result(*this);
         result.m_parentExpandExpr = expr;
-        result.m_capturedTypePacks = capturedTypes;
+        result.m_capturedPacks = capturedPacks;
         return result;
     }
 
@@ -1026,6 +1069,31 @@ public:
         result.m_parentLambdaExpr = expr;
         result.m_mapSrcDeclToCapturedLambdaDecl = mapSrcDeclToCapturedLambdaDecl;
         result.m_parentLambdaDecl = decl;
+        return result;
+    }
+
+    UInt getDefaultCtorRecursionDepth() const { return m_defaultCtorRecursionDepth; }
+    void pushDefaultCtorRecursionDepth() { ++m_defaultCtorRecursionDepth; }
+    void popDefaultCtorRecursionDepth() { --m_defaultCtorRecursionDepth; }
+
+    /// Tracks a temporary local assumption that a specific pack is non-empty.
+    ///
+    /// This is needed when checking the non-empty branch operand of a
+    /// `__packBranch(...)` type expression: inside that branch we want pack
+    /// queries like `__first(...)` / `__trimFirst(...)` on the tested pack to
+    /// type-check as if the pack had already been proven non-empty, without
+    /// turning that fact into a global constraint or caching it in shared
+    /// pack-cardinality state.
+    struct AssumedNonEmptyPackInfo
+    {
+        Val* pack = nullptr;
+        AssumedNonEmptyPackInfo* next = nullptr;
+    };
+
+    SemanticsContext withAssumedNonEmptyPack(AssumedNonEmptyPackInfo* assumedNonEmptyPack)
+    {
+        SemanticsContext result(*this);
+        result.m_assumedNonEmptyPack = assumedNonEmptyPack;
         return result;
     }
 
@@ -1148,6 +1216,13 @@ public:
         return result;
     }
 
+    SemanticsContext allowDroppingDerivatives()
+    {
+        SemanticsContext result(*this);
+        result.m_allowDroppingDerivatives = true;
+        return result;
+    }
+
     SemanticsContext allowStaticReferenceToNonStaticMember()
     {
         SemanticsContext result(*this);
@@ -1162,6 +1237,11 @@ public:
         return result;
     }
 
+    TreatAsDifferentiableExpr* getTreatAsDifferentiableParentExpr()
+    {
+        return m_treatAsDifferentiableExpr;
+    }
+
     Decl* getDeclToExcludeFromLookup() { return m_declToExcludeFromLookup; }
 
     SemanticsContext excludeTransparentMembersFromLookup()
@@ -1173,7 +1253,9 @@ public:
 
     bool getExcludeTransparentMembersFromLookup() { return m_excludeTransparentMembersFromLookup; }
 
-    OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
+    bool getAllowDroppingDerivatives() { return m_allowDroppingDerivatives; }
+
+    OrderedHashSet<Val*>* getCapturedPacks() { return m_capturedPacks; }
 
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker()
     {
@@ -1213,6 +1295,8 @@ protected:
     /// a non-differentiable function as differentiable and not issue a diagnostic).
     TreatAsDifferentiableExpr* m_treatAsDifferentiableExpr = nullptr;
 
+    bool m_allowDroppingDerivatives = false;
+
     ASTBuilder* m_astBuilder = nullptr;
 
     Scope* m_outerScope = nullptr;
@@ -1228,10 +1312,13 @@ protected:
     // allowed
     bool m_inForLoopSideEffect = false;
 
+    // Recursion depth for synthesizing nested default-constructor/default-init expressions.
+    UInt m_defaultCtorRecursionDepth = 0;
+
 
     ExpandExpr* m_parentExpandExpr = nullptr;
 
-    OrderedHashSet<Type*>* m_capturedTypePacks = nullptr;
+    OrderedHashSet<Val*>* m_capturedPacks = nullptr;
 
     // If we are checking inside a lambda expression, we need
     // to track the referenced variables that should be captured
@@ -1239,6 +1326,7 @@ protected:
     LambdaExpr* m_parentLambdaExpr = nullptr;
     LambdaDecl* m_parentLambdaDecl = nullptr;
     Dictionary<Decl*, VarDeclBase*>* m_mapSrcDeclToCapturedLambdaDecl = nullptr;
+    AssumedNonEmptyPackInfo* m_assumedNonEmptyPack = nullptr;
 };
 
 struct OuterScopeContextRAII
@@ -1300,6 +1388,21 @@ struct SemanticsVisitor : public SemanticsContext
         if (!getShared()->m_reportedDiagnosticKeys.add(key))
             return; // Already reported
         getSink()->diagnose(loc, diagnostic, std::forward<Args>(args)...);
+    }
+
+    /// Diagnose a rich diagnostic only once per unique key (diagnostic ID + serialized content).
+    template<typename D>
+    void diagnoseOnce(D const& diagnostic)
+    {
+        auto genericDiag = diagnostic.toGenericDiagnostic();
+        StringBuilder keyBuilder;
+        keyBuilder << D::getInfo()->id;
+        keyBuilder << "|" << genericDiag.primarySpan.range.begin.getRaw();
+        keyBuilder << "|" << genericDiag.primarySpan.message;
+        String key = keyBuilder.produceString();
+        if (!getShared()->m_reportedDiagnosticKeys.add(key))
+            return; // Already reported
+        getSink()->diagnose(diagnostic);
     }
 
 public:
@@ -1446,7 +1549,9 @@ public:
             return nullptr;
         return val->resolve();
     }
-    Type* resolveType(Type* type) { return (Type*)resolveVal(type); }
+
+    Type* resolveType(Type* type);
+
     DeclRef<Decl> resolveDeclRef(DeclRef<Decl> declRef);
 
     /// Attempt to "resolve" an overloaded `LookupResult` to only include the "best" results
@@ -1488,6 +1593,10 @@ public:
         return resolveOverloadedExpr(overloadedExpr, nullptr, mask);
     }
 
+    bool hasNonEmptyPackConstraint(Decl* decl);
+    VariadicPackCardinality getPackCardinality(Val* packVal);
+    bool isKnownNonEmptyPack(Val* packVal);
+
     /// Worker reoutine for `maybeResolveOverloadedExpr` and `resolveOverloadedExpr`.
     Expr* _resolveOverloadedExprImpl(
         OverloadedExpr* overloadedExpr,
@@ -1514,14 +1623,17 @@ public:
         SpecializationConstant
     };
 
+    struct ConstantFoldingCircularityInfo;
+
     IntVal* ExtractGenericArgInteger(
         Expr* exp,
         Type* genericParamType,
         ConstantFoldingKind kind,
-        DiagnosticSink* sink);
+        DiagnosticSink* sink,
+        ConstantFoldingCircularityInfo* circularityInfo = nullptr);
     IntVal* ExtractGenericArgInteger(Expr* exp, Type* genericParamType);
 
-    Val* ExtractGenericArgVal(Expr* exp);
+    Val* ExtractGenericArgVal(Expr* exp, ConstantFoldingCircularityInfo* circularityInfo = nullptr);
 
     // Construct a type representing the instantiation of
     // the given generic declaration for the given arguments.
@@ -1652,21 +1764,23 @@ public:
     // Auto-diff convenience functions for translating primal types to differential types.
     Type* _toDifferentialParamType(Type* primalType);
 
-    Type* getDifferentialPairType(Type* primalType);
+    Type* tryGetDifferentialPairType(Type* primalType);
 
     // Convert a function's original type to it's forward/backward diff'd type.
-    Type* getForwardDiffFuncType(FuncType* originalType);
+    Type* getForwardDiffFuncType(FuncType* originalType, QualType thisType);
     Type* getBackwardDiffFuncType(FuncType* originalType);
 
     /// Registers a type as conforming to IDifferentiable, along with a witness
     /// describing the relationship.
     ///
-    void addDifferentiableTypeToDiffTypeRegistry(Type* type, SubtypeWitness* witness);
     void maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* builder, Type* type);
 
     // Construct the differential for 'type', if it exists.
     Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
     Type* tryGetDifferentialType(ASTBuilder* builder, Type* type);
+    Type* tryGetDifferentialValueType(ASTBuilder* builder, Type* type);
+    Type* tryGetDifferentialPtrType(ASTBuilder* builder, Type* type);
+
 
     // Helper function to check if a struct can be used as its own differential type.
     bool canStructBeUsedAsSelfDifferentialType(AggTypeDecl* aggTypeDecl);
@@ -1798,6 +1912,17 @@ public:
     /// when a conversion is being done "for real" so that diagnostics
     /// should be emitted on failure.
     ///
+    /// If `outWitnessOfConversion` is non-null and zero valid conversions are found
+    /// `outWitnessOfConversion` will be set to a `nullptr`.
+    ///
+    /// If `outWitnessOfConversion` is non-null and a conversion is found,
+    /// `outWitnessOfConversion` will either be set to:
+    /// (1) `BuiltinTypeCoercionWitness*` to signify that Slang casts without
+    /// a user-definition.
+    /// (2) `DeclRefTypeCoercionWitness*` to signify that Slang will cast
+    /// via a user-definition.
+    /// (3) `nullptr` to signify that the case is unhandled and should be handled
+    ///
     bool _coerce(
         CoercionSite site,
         Type* toType,
@@ -1805,7 +1930,8 @@ public:
         QualType fromType,
         Expr* fromExpr,
         DiagnosticSink* sink,
-        ConversionCost* outCost);
+        ConversionCost* outCost,
+        TypeCoercionWitness** outWitnessOfConversion);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
     ///
@@ -1850,7 +1976,7 @@ public:
 
     void visitModifier(Modifier*);
 
-    DeclRef<VarDeclBase> tryGetIntSpecializationConstant(Expr* expr);
+    DeclRef<VarDeclBase> tryGetIntOrEnumSpecializationConstant(Expr* expr);
 
     AttributeDecl* lookUpAttributeDecl(Name* attributeName, Scope* scope);
 
@@ -1910,9 +2036,9 @@ public:
         DeclRef<GenericDecl> requirementGenDecl,
         RefPtr<WitnessTable> witnessTable);
 
-    bool doesTypeSatisfyAssociatedTypeConstraintRequirement(
+    bool doesTypeSatisfyConstraintRequirements(
         Type* satisfyingType,
-        DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef,
+        DeclRef<ContainerDecl> requiredAssociatedTypeDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyAssociatedTypeRequirement(
@@ -2077,6 +2203,9 @@ public:
         RefPtr<WitnessTable> witnessTable,
         MethodWitnessSynthesisFailureDetails* outFailureDetails = nullptr);
 
+    /// Clone generic containers.
+    DeclRef<Decl> liftDeclFromGenericContainers(Decl* decl, SubstitutionSet& outSubst);
+
     enum SynthesisPattern
     {
         // Synthesized method inducts over all arguments.
@@ -2099,7 +2228,7 @@ public:
         FixedFirstArg
     };
 
-    /// Attempt to synthesize `zero`, `dadd` & `dmul` methods for a type that conforms to
+    /// Attempt to synthesize `dzero` and `dadd` methods for a type that conforms to
     /// `IDifferentiable`.
     /// On success, installs the syntethesized functions and returns `true`.
     /// Otherwise, returns `false`.
@@ -2108,6 +2237,14 @@ public:
         DeclRef<Decl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable,
         SynthesisPattern pattern);
+
+    /// Attempt to synthesize `fwd_diff`, `bwd_diff`, `apply`, `get_val` and
+    /// other auto-diff related requirements.
+    bool trySynthesizeDiffFuncRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<Decl> requirementDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        BuiltinRequirementKind requirementKind);
 
     /// Attempt to synthesize an associated `Differential` type for a type that conforms to
     /// `IDifferentiable`.
@@ -2120,6 +2257,12 @@ public:
         ConformanceCheckingContext* context,
         DeclRef<AssocTypeDecl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable);
+
+    bool trySynthesizeDiffContextTypeRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<AssocTypeDecl> requirementDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        BuiltinRequirementKind requirementKind);
 
     /// Attempt to synthesize function requirements for enum types to make them conform to
     /// `ILogical`.
@@ -2143,7 +2286,10 @@ public:
     List<DifferentiableMemberInfo> collectDifferentiableMemberInfo(ContainerDecl* decl);
 
     // Check and register a type if it is differentiable.
-    void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
+    void maybeRegisterDifferentiableType(
+        ASTBuilder* builder,
+        Type* type,
+        SourceLoc diagnosticLoc = SourceLoc());
 
     void maybeCheckMissingNoDiffThis(Expr* expr);
 
@@ -2198,6 +2344,13 @@ public:
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         SubtypeWitness* subTypeConformsToSuperInterfaceWitness);
 
+    void _checkDifferentialConformance(
+        ConformanceCheckingContext* context,
+        Type* subType,
+        InheritanceDecl* inheritanceDecl,
+        DeclRef<InterfaceDecl> superInterfaceDeclRef,
+        WitnessTable* witnessTable);
+
     bool checkConformanceToType(
         ConformanceCheckingContext* context,
         Type* subType,
@@ -2220,6 +2373,13 @@ public:
 
     void checkAggTypeConformance(AggTypeDecl* decl);
 
+    void checkGenericConstraintConformances(GenericDecl* genericDecl);
+
+    void _fillInGenericConstraintPathResolutionTableForInheritance(
+        Type* subType,
+        Type* interfaceType,
+        WitnessTable* pathResolutionTable);
+
     bool isIntegerBaseType(BaseType baseType);
 
     /// Is `type` a scalar integer type.
@@ -2234,6 +2394,9 @@ public:
     /// Is `type` a scalar half type.
     bool isHalfType(Type* type);
 
+    /// Is `type` something we allow for specialization constants, i.e. scalar and enum types.
+    bool isValidSpecializationConstantType(Type* type);
+
     /// Is `type` something we allow as compile time constants, i.e. scalar integer and enum types.
     bool isValidCompileTimeConstantType(Type* type);
 
@@ -2247,10 +2410,7 @@ public:
 
     Stmt* maybeParseStmt(Stmt* stmt, const SemanticsContext& context);
 
-    void getGenericParams(
-        GenericDecl* decl,
-        List<Decl*>& outParams,
-        List<GenericTypeConstraintDecl*>& outConstraints);
+    void getGenericParams(GenericDecl* decl, List<Decl*>& outParams, List<Decl*>& outConstraints);
 
     /// Determine if `left` and `right` have matching generic signatures.
     /// If they do, then outputs a specialized declRef to `ioSubstRightToLeft` that
@@ -2295,16 +2455,19 @@ public:
     /// to prevent the compiler from going into infinite loops or overflowing the stack.
     struct ConstantFoldingCircularityInfo
     {
-        ConstantFoldingCircularityInfo(Decl* decl, ConstantFoldingCircularityInfo* next)
-            : decl(decl), next(next)
+        ConstantFoldingCircularityInfo(DeclRefBase* declRef, ConstantFoldingCircularityInfo* next)
+            : declRef(declRef), next(next), depth(next ? next->depth + 1 : 1)
         {
         }
 
-        /// A declaration whose value is contributing to the constant being folded
-        Decl* decl = nullptr;
+        /// A declaration reference whose value is contributing to the constant being folded.
+        DeclRefBase* declRef = nullptr;
 
         /// The rest of the links in the chain of declarations being folded
         ConstantFoldingCircularityInfo* next = nullptr;
+
+        /// Current recursion depth of constant folding/evaluation.
+        UInt depth = 0;
     };
     /// Try to apply front-end constant folding to determine the value of `invokeExpr`.
     IntVal* tryConstantFoldExpr(
@@ -2319,7 +2482,7 @@ public:
         ConstantFoldingCircularityInfo* circularityInfo);
 
     bool _checkForCircularityInConstantFolding(
-        Decl* decl,
+        DeclRefBase* declRef,
         ConstantFoldingCircularityInfo* circularityInfo);
 
     /// Try to resolve a compile-time constant `IntVal` from the given `declRef`.
@@ -2359,6 +2522,13 @@ public:
         Type* expectedType,
         ConstantFoldingKind kind,
         DiagnosticSink* sink);
+    IntVal* CheckIntegerConstantExpression(
+        Expr* inExpr,
+        IntegerConstantExpressionCoercionType coercionType,
+        Type* expectedType,
+        ConstantFoldingKind kind,
+        DiagnosticSink* sink,
+        ConstantFoldingCircularityInfo* circularityInfo);
 
     IntVal* CheckEnumConstantExpression(Expr* expr, ConstantFoldingKind kind);
 
@@ -2394,23 +2564,56 @@ public:
     /// Determine what type `This` should refer to in an extension of `type`.
     Type* calcThisType(Type* type);
 
+    DeclRef<Decl> getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl);
+
+    FuncType* getCalculatedDiffFuncType(const char* magicCalcName, Type* baseFuncAsType)
+    {
+        Val* args[] = {baseFuncAsType, getDiffTypeInfoWitness(baseFuncAsType)};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    FuncType* getCalculatedDiffFuncType(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* operand1)
+    {
+        Val* args[] = {baseFuncAsType, operand1, getDiffTypeInfoWitness(baseFuncAsType)};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    FuncType* getCalculatedDiffFuncType(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* operand1,
+        Type* operand2)
+    {
+        Val* args[] = {baseFuncAsType, operand1, operand2, getDiffTypeInfoWitness(baseFuncAsType)};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    Type* getForwardDiffFuncInterfaceType(Type* baseType);
+    Type* getBackwardDiffFuncInterfaceType(Type* baseType);
+    Type* getBwdCallableBaseType(Type* baseType);
 
     //
 
     struct Constraint
     {
         Decl* decl = nullptr;  // the declaration of the thing being constraints
-        Index indexInPack = 0; // If the constraint is for a type parameter pack, which index in the
-                               // pack is this constraint for?
+        Index indexInPack = 0; // If the constraint is for a type parameter pack, which index in
+                               // the pack is this constraint for?
 
         Val* val = nullptr;          // the value to which we are constraining it
-        bool isUsedAsLValue = false; // If this constraint is for a type parameter, is the type used
-                                     // in an l-value parameter?
+        bool isUsedAsLValue = false; // If this constraint is for a type parameter, is the type
+                                     // used in an l-value parameter?
         bool satisfied = false;      // Has this constraint been met?
 
-        // Is this constraint optional? An optional constraint provides a hint value to a parameter
-        // if it is otherwise unconstrained, but doesn't take precedence over a constraint that is
-        // not optional.
+        // Is this constraint optional? An optional constraint provides a hint value to a
+        // parameter if it is otherwise unconstrained, but doesn't take precedence over a
+        // constraint that is not optional.
         bool isOptional = false;
 
         // Is this constraint an equality? This tells us that "joining" types is meaningless, we
@@ -2443,6 +2646,8 @@ public:
         // constraint (e.g., int -> float to satisfy __BuiltinFloatingPointType).
         ConversionCost typePromotionCost = kConversionCost_None;
     };
+
+    bool isRelevantGeneric(ConstraintSystem& system, Decl* generic);
 
     Type* TryJoinVectorAndScalarType(
         ConstraintSystem* constraints,
@@ -2483,6 +2688,9 @@ public:
         Type* superType,
         IsSubTypeOptions isSubTypeOptions);
 
+    Witness* getDiffTypeInfoWitness(Type* type);
+    Witness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
+
     bool isValidGenericConstraintType(Type* type);
 
     SubtypeWitness* isTypeDifferentiable(Type* type);
@@ -2512,7 +2720,9 @@ public:
 
     Expr* createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, Val* witness);
 
-    Expr* createModifierCastExpr(Type* toType, Expr* fromExpr);
+    // Handles special modifier cases. In general case, calls createModifierCastExpr.
+    Expr* createModifierCast(Type* toType, Type* fromType, Expr* fromExpr);
+    Expr* createModifierCastExpr(Type* toType, Expr* fromExpr); // General modifier cast expr.
 
     /// Does there exist an implicit conversion from `fromType` to `toType`?
     bool canConvertImplicitly(Type* toType, QualType fromType);
@@ -3029,6 +3239,11 @@ public:
         InitializerListExpr* fromInitializerListExpr,
         Expr** outExpr);
 
+    bool createCtorInvokeExprForAbstractType(
+        Type* toType,
+        InitializerListExpr* fromInitializerListExpr,
+        Expr** outExpr);
+
     bool createInvokeExprForSynthesizedCtor(
         Type* toType,
         InitializerListExpr* fromInitializerListExpr,
@@ -3046,6 +3261,13 @@ public:
     void checkRayPayloadStructFields(StructDecl* structDecl);
 
     CatchStmt* findMatchingCatchStmt(Type* errorType);
+
+    DeclaredSubtypeWitness* getThisTypeWitness(
+        ASTBuilder* astBuilder,
+        DeclRef<InterfaceDecl> interfaceDeclRef);
+
+    bool doesCalleeHaveFwdDiff(DeclRef<CallableDecl> declRef);
+    bool doesCalleeHaveBwdDiff(DeclRef<CallableDecl> declRef);
 };
 
 
@@ -3158,6 +3380,10 @@ public:
     Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
     Expr* visitFuncTypeExpr(FuncTypeExpr* expr);
     Expr* visitTupleTypeExpr(TupleTypeExpr* expr);
+    Expr* visitPackBranchTypeExpr(PackBranchTypeExpr* expr);
+
+    Expr* visitFuncAsTypeExpr(FuncAsTypeExpr* expr);
+    Expr* visitFuncTypeOfExpr(FuncTypeOfExpr* expr);
 
     Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
     Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
@@ -3167,6 +3393,9 @@ public:
     Expr* visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr);
 
     Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
+
+    Expr* visitPackQueryExpr(PackQueryExpr* expr);
+    Expr* visitShapePackTransformExpr(ShapePackTransformExpr* expr);
 
     Expr* visitDefaultConstructExpr(DefaultConstructExpr* expr);
 
@@ -3247,6 +3476,8 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitExpressionStmt(ExpressionStmt* stmt);
 
+    void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt);
+
     // Try to infer the max number of iterations the loop will run.
     void tryInferLoopMaxIterations(ForStmt* stmt);
 
@@ -3274,6 +3505,10 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 
     ConstructorDecl* createCtor(AggTypeDecl* decl, DeclVisibility ctorVisibility);
 };
+
+QualType getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl);
+
+QualType getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> funcDeclRef);
 
 bool isUnsizedArrayType(Type* type);
 
@@ -3348,5 +3583,37 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
 RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
     EndToEndCompileRequest* endToEndReq,
     List<RefPtr<ComponentType>>& outSpecializedEntryPoints);
+
+// Returns `false` if coerce fails.
+// * `constraintDecl` is the constraint we need to satisfy
+// * `genericDeclRef` is the generic decl we are operating on
+// * `maybeContext` is the contect for our current operation. This variable must be filled if
+// `shouldEmitError == true`.
+// * `maybeConstrainedGenericParams` contains set of constrained params relative to `genericDeclRef`
+// and current context.
+//   This param is optional. Coercion `toType` and `fromType` will be added to the set if function
+//   succeeds.
+// * `args` are the current arguments relative to `genericDeclRef`.
+bool addTypeCoercionWitnessToArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    TypeCoercionConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    HashSet<Decl*>* maybeConstrainedGenericParams,
+    ShortList<Val*>& args,
+    bool shouldEmitError);
+
+bool addHasDiffTypeInfoWitnessToArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    HasDiffTypeInfoConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    HashSet<Decl*>* maybeConstrainedGenericParams,
+    ShortList<Val*>& args,
+    bool shouldEmitError);
+
+SourceLoc _getTypeNestingDiagnosticPosForDecl(Decl* decl);
 
 } // namespace Slang

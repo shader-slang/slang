@@ -16,20 +16,20 @@ T getWaveLaneIndex<T: IInteger>(T value)
     return T(WaveGetLaneIndex()) + value;
 }
 
-// CHECK_SPIRV: GlobalInvocationId
-// CHECK_SPIRV: SubgroupLocalInvocationId
+// CHECK_SPIRV-DAG: GlobalInvocationId
+// CHECK_SPIRV-DAG: SubgroupLocalInvocationId
 
-// CHECK_GLSL: gl_GlobalInvocationID
-// CHECK_GLSL: gl_SubgroupInvocationID
+// CHECK_GLSL-DAG: gl_GlobalInvocationID
+// CHECK_GLSL-DAG: gl_SubgroupInvocationID
 
-// CHECK_HLSL: WaveGetLaneIndex()
-// CHECK_HLSL: SV_DispatchThreadID
+// CHECK_HLSL-DAG: WaveGetLaneIndex()
+// CHECK_HLSL-DAG: SV_DispatchThreadID
 
-// CHECK_METAL: thread_position_in_grid
-// CHECK_METAL: thread_index_in_simdgroup
+// CHECK_METAL-DAG: thread_position_in_grid
+// CHECK_METAL-DAG: thread_index_in_simdgroup
 
-// CHECK_WGSL: global_invocation_id
-// CHECK_WGSL: subgroup_invocation_id
+// CHECK_WGSL-DAG: global_invocation_id
+// CHECK_WGSL-DAG: subgroup_invocation_id
 
 [shader("compute")]
 void main()

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Test that __floatAsInt requires a compile-time constant expression
 
@@ -15,18 +15,21 @@ cbuffer U
 float4 main() : SV_Target
 {
     float localFloat = 1.0f;
-    
+
     // Error: function call result is not a compile-time constant
-    // CHECK: ([[# @LINE+1]]): error 30085:
     int a = __floatAsInt(getFloat());
+//CHECK:    ^^^^^^^^^^^^ bit cast requires constant
+//CHECK:    ^^^^^^^^^^^^ '__floatAsInt' requires a compile-time constant floating-point expression
 
     // Error: uniform variable is not a compile-time constant
-    // CHECK: ([[# @LINE+1]]): error 30085:
     int b = __floatAsInt(uniformFloat);
+//CHECK:    ^^^^^^^^^^^^ bit cast requires constant
+//CHECK:    ^^^^^^^^^^^^ '__floatAsInt' requires a compile-time constant floating-point expression
 
     // Error: local variable is not a compile-time constant
-    // CHECK: ([[# @LINE+1]]): error 30085:
     int c = __floatAsInt(localFloat);
+//CHECK:    ^^^^^^^^^^^^ bit cast requires constant
+//CHECK:    ^^^^^^^^^^^^ '__floatAsInt' requires a compile-time constant floating-point expression
 
     return float4(a, b, c, 0);
 }

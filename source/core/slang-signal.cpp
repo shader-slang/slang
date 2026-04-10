@@ -48,10 +48,8 @@ String _getMessage(SignalType type, char const* message)
     return buf.produceString();
 }
 
-// Special handler for assertions that can optionally return based on environment variable
-void handleAssert(char const* message)
+void handleAssert(char const* message, bool isReleaseAssert)
 {
-#if _WIN32 && defined(_MSC_VER)
     StringBuilder envValue;
     if (SLANG_SUCCEEDED(
             PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_ASSERT"), envValue)))
@@ -63,8 +61,12 @@ void handleAssert(char const* message)
         {
             // Ignore the assert and continue execution.
             // This is to mimic the behavior of Release build with Debug build.
-            return;
+            if (!isReleaseAssert)
+            {
+                return;
+            }
         }
+#if _WIN32 && defined(_MSC_VER)
         else if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("system")))
         {
             assert(!"SLANG_ASSERT triggered");
@@ -81,8 +83,8 @@ void handleAssert(char const* message)
                 assert(!"SLANG_ASSERT triggered (no debugger attached)");
             }
         }
-    }
 #endif
+    }
 
     // Default behavior: delegate to handleSignal
     handleSignal(SignalType::AssertFailure, message);

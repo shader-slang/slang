@@ -78,7 +78,7 @@ Restrictions for unknown-length arrays:
 > avoid memory copies when possible, the compiler attempts to optimize these as pass by constant references or
 > pointers when the target supports it.
 
-> 📝 **Remark 5:** 0-length arrays can be used to disable data members in `struct` types. See [Generics (TODO)](TODO)
+> 📝 **Remark 5:** 0-length arrays can be used to disable data members in `struct` types. See [Generics](generics.md)
 > for further information.
 
 

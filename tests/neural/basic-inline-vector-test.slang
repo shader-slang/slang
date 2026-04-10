@@ -5,7 +5,7 @@
 // Currently, only CUDA supports atomicAdd on half. So we can only test fp16 on CUDA.
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_HALF=1
-import neural;
+import slang.neural;
 
 #if TEST_HALF
 typealias ElementType = half;
@@ -24,7 +24,7 @@ RWStructuredBuffer<uint> testResult;
 // bias = {9.0, 10.0}
 uniform RWStructuredBuffer<float> parametersFloat;
 
-//TEST_INPUT: set parameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=2)
+//TEST_INPUT: set parameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
 uniform RWStructuredBuffer<ElementType>.Handle parameters;
 
 // set up a 2x4 matrix for derivative of parameters, the last 2 elements are for derivative of bias

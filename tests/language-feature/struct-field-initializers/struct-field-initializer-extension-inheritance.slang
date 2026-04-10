@@ -3,7 +3,7 @@ RWStructuredBuffer<int> outputBuffer;
 
 #pragma warning(disable:30816)
 
-//CHECK: error 30851
+//CHECK: error[E30851]
 
 struct DefaultStructNoInit_base
 {

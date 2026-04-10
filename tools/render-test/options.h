@@ -101,6 +101,8 @@ struct Options
 
     bool useLLVMDirectly = false;
 
+    bool compileOnly = false;
+
     Slang::List<Slang::String> capabilities;
 
     Options() { downstreamArgs.addName("slang"); }

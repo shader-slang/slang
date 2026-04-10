@@ -141,10 +141,16 @@ struct Options
 
     Slang::HashSet<Slang::String> capabilities;
     Slang::HashSet<Slang::String> expectedFailureList;
-    Slang::List<Slang::String> skipList;
 
-    // Ignore abort message dialog popup on Windows
-    bool ignoreAbortMsg = false;
+    // Per-file info for expected failure lists: (fileName, count) pairs, in order added.
+    struct ExpectedFailureFileInfo
+    {
+        Slang::String fileName;
+        int count;
+    };
+    Slang::List<ExpectedFailureFileInfo> expectedFailureFiles;
+
+    Slang::List<Slang::String> skipList;
 
     /// Parse the args, report any errors into stdError, and write the results into optionsOut
     static SlangResult parse(
@@ -172,6 +178,18 @@ struct Options
 
     /// Whether to disable automatic retries of failed tests
     bool disableRetries = false;
+
+    /// Only run API detection and print results, then exit
+    bool apiDetectionOnly = false;
+
+    /// Synthesize compile-only tests for all available backends from GPU-requiring tests.
+    /// This exercises backend code generation paths (emit HLSL, GLSL, SPIRV, etc.)
+    /// without needing a GPU, improving code coverage of emit/codegen code.
+    bool synthesizeCompileTargets = false;
+
+    /// When true, only run synthesized compile-target tests (skip original tests).
+    /// Implies -synthesize-compile-targets.
+    bool onlySynthesized = false;
 };
 
 #endif // OPTIONS_H_INCLUDED

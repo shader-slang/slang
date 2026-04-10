@@ -22,6 +22,7 @@
 #include "slang-module.h"
 #include "slang-preprocessor.h"
 #include "slang-profile.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-session.h"
 #include "slang-translation-unit.h"
 
@@ -349,14 +350,42 @@ protected:
     {
         if (existingValue != newValue)
         {
-            m_sink->diagnose(
-                loc,
-                Diagnostics::nvapiMacroMismatch,
-                macroName,
-                existingValue,
-                newValue);
+            m_sink->diagnose(Diagnostics::NvapiMacroMismatch{
+                .macroName = macroName,
+                .existingValue = existingValue,
+                .newValue = newValue,
+                .location = loc});
         }
     }
 };
+
+class Scope;
+class ContainerDecl;
+
+struct PreprocessedSegment
+{
+    TokenList tokens;
+    SourceLanguage sourceLanguage;
+};
+
+List<SourceFile*> extractSourceSegments(SourceFile* sourceFile, SourceManager* sourceManager);
+
+List<PreprocessedSegment> preprocessSourceSegments(
+    List<SourceFile*> const& segments,
+    SourceLanguage defaultSourceLanguage,
+    SlangLanguageVersion& ioLanguageVersion,
+    DiagnosticSink* sink,
+    IncludeSystem* includeSystem,
+    Dictionary<String, String> const& preprocessorDefinitions,
+    Linkage* linkage,
+    PreprocessorHandler* preprocessorHandler);
+
+void parsePreprocessedSegments(
+    List<PreprocessedSegment> const& segments,
+    ASTBuilder* astBuilder,
+    TranslationUnitRequest* translationUnit,
+    DiagnosticSink* sink,
+    Scope* outerScope,
+    ContainerDecl* parentDecl);
 
 } // namespace Slang
