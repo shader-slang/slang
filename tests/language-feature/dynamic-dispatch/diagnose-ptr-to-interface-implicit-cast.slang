@@ -1,7 +1,6 @@
 // Implicit conversion from a concrete pointer (Foo*) to an interface pointer
-// (IFoo*) is not allowed. The type checker requires an explicit cast because
-// the memory layouts differ: Foo contains only its fields, while IFoo contains
-// a tag, witness table, and AnyValue payload.
+// (IFoo*) is not allowed because the pointed-to data layouts are not bit
+// equivalent. The compiler emits a specific diagnostic explaining this.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
@@ -25,8 +24,9 @@ void computeMain()
     f.val = 5;
     Foo* pf = &f;
 
-    // Implicit conversion: error
+    // Concrete-to-interface pointer: rejected with layout explanation
     // CHECK: error[E30019]
+    // CHECK: not bit equivalent
     IFoo* ip = pf;
 
     outputBuffer[0] = 0;
