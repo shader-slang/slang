@@ -11,6 +11,10 @@
 namespace Slang
 {
 // Base class for all reference-counted objects
+#if SLANG_VC
+#pragma warning(push)
+#pragma warning(disable : 4251)
+#endif
 class SLANG_RT_API RefObject
 {
 private:
@@ -56,6 +60,9 @@ public:
 
     UInt debugGetReferenceCount() { return referenceCount.load(std::memory_order_relaxed); }
 };
+#if SLANG_VC
+#pragma warning(pop)
+#endif
 
 SLANG_FORCE_INLINE void addReference(RefObject* obj)
 {
