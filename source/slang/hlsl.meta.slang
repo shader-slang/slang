@@ -32097,7 +32097,7 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     constexpr CoopVecComponentType matrixInterpretation,
 )
 {
-    let matrixPtr0 = (void*)(&matrix);
+    let matrixPtr0 = (void*)(__getAddress(matrix));
     __coopVecOuterProductAccumulateFromPointer<T, M, N>(
         matrixPtr0,
         matrixOffset,
@@ -32115,7 +32115,7 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, U, let
     int32_t offset
 )
 {
-    let bufferPtr0 = (void*)(&buffer);
+    let bufferPtr0 = (void*)(__getAddress(buffer));
     __coopVecReduceSumAccumulateFromPointer<T, N>(bufferPtr0, offset, v);
 }
 
