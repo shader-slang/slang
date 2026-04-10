@@ -120,6 +120,9 @@ else
   if [[ "$WITH_SYNTHESIS" == "true" ]]; then
     echo
     echo "Running synthesized compile-target tests..."
+    # Use a separate profraw prefix so synthesis data doesn't interfere
+    # with main pass data during merge
+    export LLVM_PROFILE_FILE="$COVERAGE_DIR/synth-%p.profraw"
     SYNTH_EXIT=0
     "$SLANG_TEST" "${TEST_ARGS[@]}" -only-synthesized || SYNTH_EXIT=$?
     if [ "$SYNTH_EXIT" -gt 128 ]; then
@@ -139,15 +142,21 @@ else
 
   # Merge coverage data
   echo
-  echo "Coverage data files found:"
+  echo "Main pass profraw files:"
   ls -lh "$COVERAGE_DIR"/slang-test-*.profraw 2>/dev/null | head -20
-  PROFRAW_COUNT=$(ls "$COVERAGE_DIR"/slang-test-*.profraw 2>/dev/null | wc -l)
-  PROFRAW_TOTAL_SIZE=$(du -sh "$COVERAGE_DIR"/slang-test-*.profraw 2>/dev/null | tail -1 | cut -f1)
-  echo "Total profraw files: $PROFRAW_COUNT"
-  echo "Total profraw size: $PROFRAW_TOTAL_SIZE"
+  echo "Main pass profraw count: $(ls "$COVERAGE_DIR"/slang-test-*.profraw 2>/dev/null | wc -l)"
+
+  if ls "$COVERAGE_DIR"/synth-*.profraw >/dev/null 2>&1; then
+    echo
+    echo "Synthesis pass profraw files:"
+    ls -lh "$COVERAGE_DIR"/synth-*.profraw 2>/dev/null | head -20
+    echo "Synthesis profraw count: $(ls "$COVERAGE_DIR"/synth-*.profraw 2>/dev/null | wc -l)"
+  fi
+
   echo
   echo "Merging coverage data..."
-  $LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata
+  $LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw "$COVERAGE_DIR"/synth-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata 2>/dev/null \
+    || $LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata
   echo "Merged profdata size: $(ls -lh "$COVERAGE_DIR/slang-test.profdata" | awk '{print $5}')"
 fi
 
