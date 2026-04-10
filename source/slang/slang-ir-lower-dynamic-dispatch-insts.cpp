@@ -786,10 +786,42 @@ void lowerUntaggedUnionTypes(IRModule* module, TargetProgram* targetProgram, Dia
 //
 struct SequentialIDTagLoweringContext : public InstPassBase
 {
-    SequentialIDTagLoweringContext(Linkage* linkage, IRModule* module)
-        : InstPassBase(module), m_linkage(linkage)
+    SequentialIDTagLoweringContext(Linkage* linkage, IRModule* module, DiagnosticSink* sink)
+        : InstPassBase(module), m_linkage(linkage), m_sink(sink)
     {
     }
+
+    void diagnoseDuplicateSequentialID(
+        IRInst* interfaceType,
+        IRInst* witnessTable,
+        IRInst* previousWitnessTable,
+        uint32_t sequentialID)
+    {
+        SLANG_ASSERT(interfaceType);
+        SLANG_ASSERT(witnessTable);
+        SLANG_ASSERT(previousWitnessTable);
+
+        StringBuilder keyBuilder;
+        if (auto interfaceLinkage = interfaceType->findDecoration<IRLinkageDecoration>())
+            keyBuilder << interfaceLinkage->getMangledName();
+        else
+            keyBuilder << "interface";
+        keyBuilder << "#" << sequentialID;
+
+        if (!m_diagnosedDuplicateSequentialIDKeys.add(keyBuilder.produceString()))
+            return;
+
+        if (!m_sink)
+            return;
+
+        m_sink->diagnose(Diagnostics::DuplicateTypeConformanceSequentialId{
+            .id = int(sequentialID),
+            .interfaceType = interfaceType,
+            .location = getDiagnosticPos(witnessTable),
+            .previousLocation = getDiagnosticPos(previousWitnessTable),
+        });
+    }
+
     void lowerGetTagFromSequentialID(IRGetTagFromSequentialID* inst)
     {
         // We use the result type to figure out the destination collection
@@ -945,9 +977,29 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                     witnessTableMangledName = generatedMangledName.getUnownedSlice();
                 }
 
+                auto interfaceType = cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
+                auto interfaceName = String();
+                if (as<IRInterfaceType>(interfaceType))
+                {
+                    auto interfaceLinkage = interfaceType->findDecoration<IRLinkageDecoration>();
+                    SLANG_ASSERT(
+                        interfaceLinkage && "An interface type does not have a linkage,"
+                                            "but a witness table associated with it has one.");
+                    interfaceName = interfaceLinkage->getMangledName();
+                }
+
                 // If the inst already has a SequentialIDDecoration, stop now.
-                if (inst->findDecoration<IRSequentialIDDecoration>())
+                if (auto seqDecoration = inst->findDecoration<IRSequentialIDDecoration>())
+                {
+                    if (interfaceName.getLength())
+                    {
+                        linkage->registerTypeConformanceWitnessSequentialID(
+                            String(witnessTableMangledName),
+                            interfaceName,
+                            uint32_t(seqDecoration->getSequentialID()));
+                    }
                     continue;
+                }
 
                 // Get a sequential ID for the witness table using the map from the Linkage.
                 uint32_t seqID = 0;
@@ -955,36 +1007,27 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                         witnessTableMangledName,
                         seqID))
                 {
-                    auto interfaceType =
-                        cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
                     if (as<IRInterfaceType>(interfaceType))
                     {
-                        auto interfaceLinkage =
-                            interfaceType->findDecoration<IRLinkageDecoration>();
-                        SLANG_ASSERT(
-                            interfaceLinkage && "An interface type does not have a linkage,"
-                                                "but a witness table associated with it has one.");
-                        auto interfaceName = interfaceLinkage->getMangledName();
-                        auto idAllocator =
-                            linkage->mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(
-                                interfaceName);
-                        if (!idAllocator)
-                        {
-                            linkage->mapInterfaceMangledNameToSequentialIDCounters[interfaceName] =
-                                0;
-                            idAllocator =
-                                linkage->mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(
-                                    interfaceName);
-                        }
-                        seqID = *idAllocator;
-                        ++(*idAllocator);
+                        seqID =
+                            linkage->getFirstFreeTypeConformanceWitnessSequentialID(interfaceName);
                     }
                     else
                     {
                         // NoneWitness, has special ID of -1.
                         seqID = uint32_t(-1);
                     }
-                    linkage->mapMangledNameToRTTIObjectIndex[witnessTableMangledName] = seqID;
+                    if (interfaceName.getLength())
+                    {
+                        linkage->registerTypeConformanceWitnessSequentialID(
+                            String(witnessTableMangledName),
+                            interfaceName,
+                            seqID);
+                    }
+                    else
+                    {
+                        linkage->mapMangledNameToRTTIObjectIndex[witnessTableMangledName] = seqID;
+                    }
                 }
 
                 // Add a decoration to the inst.
@@ -995,9 +1038,67 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         }
     }
 
+    void validateUniqueWitnessTableSequentialIDs()
+    {
+        Dictionary<String, IRInst*> witnessTableForSequentialID;
+        auto linkage = getLinkage();
+
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (inst->getOp() != kIROp_WitnessTable)
+                continue;
+
+            auto witnessTableType = as<IRWitnessTableType>(inst->getDataType());
+            if (!witnessTableType)
+                continue;
+
+            auto interfaceType = witnessTableType->getConformanceType();
+            if (!as<IRInterfaceType>(interfaceType))
+                continue;
+
+            auto seqDecoration = inst->findDecoration<IRSequentialIDDecoration>();
+            if (!seqDecoration)
+                continue;
+
+            auto witnessTableLinkage = inst->findDecoration<IRLinkageDecoration>();
+            if (!witnessTableLinkage)
+                continue;
+            if (!linkage->hasExplicitTypeConformanceWitnessSequentialID(
+                    witnessTableLinkage->getMangledName()))
+            {
+                continue;
+            }
+
+            auto interfaceLinkage = interfaceType->findDecoration<IRLinkageDecoration>();
+            if (!interfaceLinkage)
+                continue;
+
+            StringBuilder keyBuilder;
+            keyBuilder << interfaceLinkage->getMangledName() << "#"
+                       << uint32_t(seqDecoration->getSequentialID());
+            auto key = keyBuilder.produceString();
+
+            if (auto previousWitnessTable = witnessTableForSequentialID.tryGetValue(key))
+            {
+                if (*previousWitnessTable != inst)
+                {
+                    diagnoseDuplicateSequentialID(
+                        interfaceType,
+                        inst,
+                        *previousWitnessTable,
+                        uint32_t(seqDecoration->getSequentialID()));
+                }
+                continue;
+            }
+
+            witnessTableForSequentialID.add(key, inst);
+        }
+    }
+
     void processModule()
     {
         ensureWitnessTableSequentialIDs();
+        validateUniqueWitnessTableSequentialIDs();
 
         processInstsOfType<IRGetTagFromSequentialID>(
             kIROp_GetTagFromSequentialID,
@@ -1012,12 +1113,13 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
 private:
     Linkage* m_linkage;
+    DiagnosticSink* m_sink;
+    HashSet<String> m_diagnosedDuplicateSequentialIDKeys;
 };
 
 void lowerSequentialIDTagCasts(IRModule* module, Linkage* linkage, DiagnosticSink* sink)
 {
-    SLANG_UNUSED(sink);
-    SequentialIDTagLoweringContext context(linkage, module);
+    SequentialIDTagLoweringContext context(linkage, module, sink);
     context.processModule();
 }
 

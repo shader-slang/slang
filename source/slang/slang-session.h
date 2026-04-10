@@ -231,6 +231,14 @@ public:
 
     RefPtr<ASTBuilder> m_astBuilder;
 
+    uint32_t getFirstFreeTypeConformanceWitnessSequentialID(String const& interfaceMangledName);
+    void registerTypeConformanceWitnessSequentialID(
+        String const& witnessTableMangledName,
+        String const& interfaceMangledName,
+        uint32_t sequentialID,
+        bool isExplicitOverride = false);
+    bool hasExplicitTypeConformanceWitnessSequentialID(String const& witnessTableMangledName);
+
     // Cache for container types.
     Dictionary<ContainerTypeKey, Type*> m_containerTypes;
 
@@ -254,6 +262,12 @@ public:
     // Map from the mangled name of RTTI objects to sequential IDs
     // used by `switch`-based dynamic dispatch.
     Dictionary<String, uint32_t> mapMangledNameToRTTIObjectIndex;
+
+    // Tracks which interface/sequential-ID pairs are already occupied.
+    HashSet<String> usedTypeConformanceWitnessSequentialIDKeys;
+
+    // Tracks witness tables whose sequential ID came from an explicit user override.
+    HashSet<String> witnessTablesWithExplicitSequentialIDOverrides;
 
     // Counters for allocating sequential IDs to witness tables conforming to each interface type.
     Dictionary<String, uint32_t> mapInterfaceMangledNameToSequentialIDCounters;

@@ -735,6 +735,56 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessMangled
     return SLANG_OK;
 }
 
+static String _getTypeConformanceSequentialIDKey(
+    String const& interfaceMangledName,
+    uint32_t sequentialID)
+{
+    StringBuilder builder;
+    builder << interfaceMangledName << "#" << sequentialID;
+    return builder.produceString();
+}
+
+uint32_t Linkage::getFirstFreeTypeConformanceWitnessSequentialID(String const& interfaceMangledName)
+{
+    auto idAllocator =
+        mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceMangledName);
+    if (!idAllocator)
+    {
+        mapInterfaceMangledNameToSequentialIDCounters[interfaceMangledName] = 0;
+        idAllocator =
+            mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceMangledName);
+    }
+
+    while (usedTypeConformanceWitnessSequentialIDKeys.contains(
+        _getTypeConformanceSequentialIDKey(interfaceMangledName, *idAllocator)))
+    {
+        ++(*idAllocator);
+    }
+
+    return *idAllocator;
+}
+
+void Linkage::registerTypeConformanceWitnessSequentialID(
+    String const& witnessTableMangledName,
+    String const& interfaceMangledName,
+    uint32_t sequentialID,
+    bool isExplicitOverride)
+{
+    mapMangledNameToRTTIObjectIndex[witnessTableMangledName] = sequentialID;
+    usedTypeConformanceWitnessSequentialIDKeys.add(
+        _getTypeConformanceSequentialIDKey(interfaceMangledName, sequentialID));
+
+    if (isExplicitOverride)
+        witnessTablesWithExplicitSequentialIDOverrides.add(witnessTableMangledName);
+
+    getFirstFreeTypeConformanceWitnessSequentialID(interfaceMangledName);
+}
+
+bool Linkage::hasExplicitTypeConformanceWitnessSequentialID(String const& witnessTableMangledName)
+{
+    return witnessTablesWithExplicitSequentialIDOverrides.contains(witnessTableMangledName);
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequentialID(
     slang::TypeReflection* type,
     slang::TypeReflection* interfaceType,
@@ -757,15 +807,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
             *outId = resultIndex;
         return SLANG_OK;
     }
-    auto idAllocator = mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceName);
-    if (!idAllocator)
-    {
-        mapInterfaceMangledNameToSequentialIDCounters[interfaceName] = 0;
-        idAllocator = mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceName);
-    }
-    resultIndex = (*idAllocator);
-    ++(*idAllocator);
-    mapMangledNameToRTTIObjectIndex[name] = resultIndex;
+    resultIndex = getFirstFreeTypeConformanceWitnessSequentialID(interfaceName);
+    registerTypeConformanceWitnessSequentialID(name, interfaceName, resultIndex);
     if (outId)
         *outId = resultIndex;
     return SLANG_OK;
@@ -824,6 +867,19 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
         if (auto subtypeWitness = as<SubtypeWitness>(witness))
         {
             result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
+            if (conformanceIdOverride != -1)
+            {
+                auto subType = asInternal(type);
+                auto supType = asInternal(interfaceType);
+                if (subType && supType)
+                {
+                    registerTypeConformanceWitnessSequentialID(
+                        getMangledNameForConformanceWitness(m_astBuilder, subType, supType),
+                        getMangledTypeName(m_astBuilder, supType),
+                        uint32_t(conformanceIdOverride),
+                        true);
+                }
+            }
         }
     }
     catch (...)

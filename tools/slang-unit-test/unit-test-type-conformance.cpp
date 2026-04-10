@@ -13,6 +13,49 @@ using namespace Slang;
 
 // Test the compilation API for adding type conformances.
 
+static const char* kHitInfoExampleSource = R"(
+    interface IHitInfo
+    {
+        uint getGeoNameHash();
+    }
+
+    struct InvalidHitInfo : IHitInfo
+    {
+        int dummy;
+        uint getGeoNameHash() { return 111u; }
+    }
+
+    struct TriangleHitInfo : IHitInfo
+    {
+        int dummy;
+        uint getGeoNameHash() { return 222u; }
+    }
+
+    struct CurvesHitInfo : IHitInfo
+    {
+        int dummy;
+        uint getGeoNameHash() { return 333u; }
+    }
+
+    IHitInfo makeHitInfo(uint geoID)
+    {
+        if (geoID == 0)
+            return InvalidHitInfo(0);
+
+        int data = 0;
+        return createDynamicObject<IHitInfo, int>(geoID, data);
+    }
+
+    RWStructuredBuffer<uint> outputBuffer;
+
+    [shader("compute")]
+    [numthreads(1, 1, 1)]
+    void computeMain(uint3 tid : SV_DispatchThreadID)
+    {
+        outputBuffer[0] = makeHitInfo(tid.x).getGeoNameHash();
+    }
+)";
+
 SLANG_UNIT_TEST(typeConformance)
 {
     const char* userSourceBody = R"(
@@ -144,13 +187,13 @@ SLANG_UNIT_TEST(typeConformance)
         mesh,
         ishape,
         meshIShape.writeRef(),
-        0,
+        1,
         diagnosticBlob.writeRef());
     session->createTypeConformanceComponentType(
         sphere,
         ishape,
         sphereIShape.writeRef(),
-        0,
+        2,
         diagnosticBlob.writeRef());
 
     slang::IComponentType* componentTypes[5] =
@@ -169,4 +212,149 @@ SLANG_UNIT_TEST(typeConformance)
     linkedProgram->getTargetCode(0, code.writeRef(), diagnosticBlob.writeRef());
 
     SLANG_CHECK(code != nullptr);
+}
+
+SLANG_UNIT_TEST(typeConformanceSequentialIDAllocatesFirstFreeSlot)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromSourceString(
+        "hitInfoConformance",
+        "hitInfoConformance.slang",
+        kHitInfoExampleSource,
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto layout = module->getLayout();
+    SLANG_CHECK_ABORT(layout != nullptr);
+
+    auto hitInfo = layout->findTypeByName("IHitInfo");
+    auto invalidHitInfo = layout->findTypeByName("InvalidHitInfo");
+    auto triangleHitInfo = layout->findTypeByName("TriangleHitInfo");
+    auto curvesHitInfo = layout->findTypeByName("CurvesHitInfo");
+    SLANG_CHECK_ABORT(hitInfo != nullptr);
+    SLANG_CHECK_ABORT(invalidHitInfo != nullptr);
+    SLANG_CHECK_ABORT(triangleHitInfo != nullptr);
+    SLANG_CHECK_ABORT(curvesHitInfo != nullptr);
+
+    ComPtr<slang::ITypeConformance> triangleConformance;
+    SLANG_CHECK_ABORT(
+        session->createTypeConformanceComponentType(
+            triangleHitInfo,
+            hitInfo,
+            triangleConformance.writeRef(),
+            5,
+            diagnostics.writeRef()) == SLANG_OK);
+
+    uint32_t invalidID = 0;
+    uint32_t triangleID = 0;
+    uint32_t curvesID = 0;
+    SLANG_CHECK_ABORT(
+        session->getTypeConformanceWitnessSequentialID(invalidHitInfo, hitInfo, &invalidID) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        session->getTypeConformanceWitnessSequentialID(triangleHitInfo, hitInfo, &triangleID) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        session->getTypeConformanceWitnessSequentialID(curvesHitInfo, hitInfo, &curvesID) == SLANG_OK);
+
+    SLANG_CHECK(invalidID == 0);
+    SLANG_CHECK(triangleID == 5);
+    SLANG_CHECK(curvesID == 1);
+}
+
+SLANG_UNIT_TEST(typeConformanceDuplicateExplicitSequentialIDDiagnostic)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromSourceString(
+        "hitInfoConformanceDuplicateID",
+        "hitInfoConformanceDuplicateID.slang",
+        kHitInfoExampleSource,
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_CHECK_ABORT(
+        module->findAndCheckEntryPoint(
+            "computeMain",
+            SLANG_STAGE_COMPUTE,
+            entryPoint.writeRef(),
+            diagnostics.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(entryPoint != nullptr);
+
+    auto layout = module->getLayout();
+    SLANG_CHECK_ABORT(layout != nullptr);
+
+    auto hitInfo = layout->findTypeByName("IHitInfo");
+    auto triangleHitInfo = layout->findTypeByName("TriangleHitInfo");
+    auto curvesHitInfo = layout->findTypeByName("CurvesHitInfo");
+    SLANG_CHECK_ABORT(hitInfo != nullptr);
+    SLANG_CHECK_ABORT(triangleHitInfo != nullptr);
+    SLANG_CHECK_ABORT(curvesHitInfo != nullptr);
+
+    ComPtr<slang::ITypeConformance> triangleConformance;
+    ComPtr<slang::ITypeConformance> curvesConformance;
+    SLANG_CHECK_ABORT(
+        session->createTypeConformanceComponentType(
+            triangleHitInfo,
+            hitInfo,
+            triangleConformance.writeRef(),
+            0,
+            diagnostics.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        session->createTypeConformanceComponentType(
+            curvesHitInfo,
+            hitInfo,
+            curvesConformance.writeRef(),
+            0,
+            diagnostics.writeRef()) == SLANG_OK);
+
+    slang::IComponentType* componentTypes[] =
+        {module, entryPoint.get(), triangleConformance.get(), curvesConformance.get()};
+    ComPtr<slang::IComponentType> composedProgram;
+    SLANG_CHECK_ABORT(
+        session->createCompositeComponentType(
+            componentTypes,
+            SLANG_COUNT_OF(componentTypes),
+            composedProgram.writeRef(),
+            diagnostics.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    SLANG_CHECK_ABORT(composedProgram->link(linkedProgram.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> code;
+    diagnostics = nullptr;
+    SlangResult result = linkedProgram->getTargetCode(0, code.writeRef(), diagnostics.writeRef());
+    SLANG_CHECK(result != SLANG_OK);
+    SLANG_CHECK(code == nullptr);
+    SLANG_CHECK(diagnostics != nullptr);
+
+    auto diagnosticText = UnownedStringSlice(
+        (const char*)diagnostics->getBufferPointer(),
+        diagnostics->getBufferSize());
+    SLANG_CHECK(diagnosticText.indexOf(toSlice("duplicate type conformance sequential ID")) != -1);
+    SLANG_CHECK(diagnosticText.indexOf(toSlice("Sequential ID '0'")) != -1);
 }
