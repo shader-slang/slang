@@ -33,6 +33,9 @@ jobs:
           submodules: "recursive"
           fetch-depth: "1"
 
+      - name: Check disk space
+        uses: ./.github/actions/check-disk-space
+
       - name: Download Slang Artifacts
         uses: actions/download-artifact@v4
         with:
