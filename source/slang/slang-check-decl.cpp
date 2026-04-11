@@ -15380,14 +15380,7 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
     _getCandidateExtensionList(typeDecl, m_mapDeclToCandidateExtensions).add(extDecl);
 
     // Remove the cached inheritanceInfo about typeDecl, if `extDecl` inherits new types.
-    bool invalidateSubtypes = false;
-    if (as<InterfaceDecl>(typeDecl))
-    {
-        // If we are extending an interface, we are effectively extending all types
-        // that inherits the interface. So we need to remove all inheritance info
-        // that is related to the interface.
-        invalidateSubtypes = true;
-    }
+    bool invalidateSubtypes = as<InterfaceDecl>(typeDecl) != nullptr;
     bool hasInheritanceMember = false;
     bool hasImplicitCastMember = false;
     for (auto member : extDecl->getDirectMemberDecls())
@@ -15402,6 +15395,53 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
                 hasImplicitCastMember = true;
         }
     }
+
+    if (as<FunctionDeclBase>(typeDecl))
+    {
+        // Auto-diff synthesizes many function extensions. Fully invalidating the
+        // shared caches on every synthesized function extension causes a large
+        // amount of repeated semantic work, but we still need to drop any
+        // entries cached directly for the extended function type.
+        ShortList<DeclRef<Decl>, 16> keysToRemove;
+        for (auto& kv : m_mapDeclRefToInheritanceInfo)
+        {
+            if (kv.first.getDecl() == typeDecl)
+            {
+                keysToRemove.add(kv.first);
+            }
+        }
+        for (auto& key : keysToRemove)
+        {
+            m_mapDeclRefToInheritanceInfo.remove(key);
+        }
+
+        if (hasInheritanceMember)
+        {
+            auto isTypeForFunctionDecl = [typeDecl](Type* type)
+            {
+                if (auto declRefType = as<DeclRefType>(type))
+                    return declRefType->getDeclRef().getDecl() == typeDecl;
+                return false;
+            };
+
+            ShortList<TypePair, 16> typePairsToRemove;
+            for (auto& kv : m_mapTypePairToSubtypeWitness)
+            {
+                if (isTypeForFunctionDecl(kv.first.type0) ||
+                    isTypeForFunctionDecl(kv.first.type1))
+                {
+                    typePairsToRemove.add(kv.first);
+                }
+            }
+            for (auto& key : typePairsToRemove)
+            {
+                m_mapTypePairToSubtypeWitness.remove(key);
+            }
+        }
+
+        return;
+    }
+
     auto isTypeUpToDate = [this](Type* type)
     {
         if (auto declRefType = as<DeclRefType>(type))
