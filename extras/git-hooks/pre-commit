@@ -16,80 +16,71 @@ if [ ! -x "$FORMAT_SCRIPT" ]; then
   exit 0
 fi
 
-# Get list of staged files
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+have_local_formatters() {
+  command -v gersemi >/dev/null 2>&1 &&
+    command -v clang-format >/dev/null 2>&1 &&
+    command -v prettier >/dev/null 2>&1 &&
+    command -v shfmt >/dev/null 2>&1
+}
 
-if [ -z "$STAGED_FILES" ]; then
+run_formatter() {
+  if have_local_formatters || ! command -v wsl.exe >/dev/null 2>&1; then
+    "$FORMAT_SCRIPT" "$@"
+    return
+  fi
+
+  local wsl_repo_root
+  if ! wsl_repo_root=$(
+    MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' \
+      wsl.exe -e bash -lc 'wslpath -a "$1"' bash "$REPO_ROOT" 2>/dev/null
+  ); then
+    echo "Error: failed to translate repository path for WSL: $REPO_ROOT" >&2
+    return 1
+  fi
+
+  echo "Formatter tools not found locally; running formatting via WSL..."
+  MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' wsl.exe -e bash -lc '
+    set -e
+    repo_root="$1"
+    shift
+    cd "$repo_root"
+    ./extras/formatting.sh "$@"
+  ' bash "$wsl_repo_root" "$@"
+}
+
+# Get the list of staged files and keep only formats handled by formatting.sh
+mapfile -d '' -t STAGED_FILES < <(git diff --cached --name-only --diff-filter=ACMR -z)
+
+if [ ${#STAGED_FILES[@]} -eq 0 ]; then
   exit 0
 fi
 
-# Determine which file types are staged
-has_cpp=0
-has_yaml=0
-has_md=0
-has_sh=0
-has_cmake=0
+FORMATTABLE_FILES=()
 
-while IFS= read -r file; do
+for file in "${STAGED_FILES[@]}"; do
   case "$file" in
-    *.cpp|*.hpp|*.c|*.h)
-      has_cpp=1
-      ;;
-    *.yaml|*.yml|*.json)
-      has_yaml=1
-      ;;
-    *.md)
-      has_md=1
-      ;;
-    *.sh)
-      has_sh=1
-      ;;
-    *.cmake|CMakeLists.txt)
-      has_cmake=1
+    *.cpp|*.hpp|*.c|*.h|*.yaml|*.yml|*.json|*.md|*.sh|*.cmake|CMakeLists.txt)
+      FORMATTABLE_FILES+=("$file")
       ;;
   esac
-done <<< "$STAGED_FILES"
-
-# Build the formatter command with appropriate flags
-format_args=()
-
-if [ $has_cpp -eq 1 ]; then
-  format_args+=(--cpp)
-fi
-
-if [ $has_yaml -eq 1 ]; then
-  format_args+=(--yaml)
-fi
-
-if [ $has_md -eq 1 ]; then
-  format_args+=(--md)
-fi
-
-if [ $has_sh -eq 1 ]; then
-  format_args+=(--sh)
-fi
-
-if [ $has_cmake -eq 1 ]; then
-  format_args+=(--cmake)
-fi
+done
 
 # If we have files to format, run the formatter
-if [ ${#format_args[@]} -gt 0 ]; then
+if [ ${#FORMATTABLE_FILES[@]} -gt 0 ]; then
   echo "Formatting staged files..."
 
-  # Run formatter on modified files
-  if ! "$FORMAT_SCRIPT" "${format_args[@]}" --modified --no-version-check; then
+  if ! run_formatter --no-version-check -- "${FORMATTABLE_FILES[@]}"; then
     echo "Error: Formatting failed"
     exit 1
   fi
 
   # Re-stage any files that were formatted
   # Only re-add files that were originally staged
-  while IFS= read -r file; do
+  for file in "${STAGED_FILES[@]}"; do
     if [ -f "$file" ]; then
-      git add "$file"
+      git add -- "$file"
     fi
-  done <<< "$STAGED_FILES"
+  done
 
   echo "Formatting complete. Modified files have been re-staged."
 fi
