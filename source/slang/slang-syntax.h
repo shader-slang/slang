@@ -16,14 +16,14 @@ inline Type* getSup(ASTBuilder* astBuilder, DeclRef<TypeConstraintDecl> const& d
     return declRef.substitute(astBuilder, declRef.getDecl()->getSup().type);
 }
 
+inline Type* getToType(ASTBuilder* astBuilder, DeclRef<TypeCoercionConstraintDecl> const& declRef)
+{
+    return declRef.substitute(astBuilder, declRef.getDecl()->toType.Ptr());
+}
+
 inline Type* getFromType(ASTBuilder* astBuilder, DeclRef<TypeCoercionConstraintDecl> const& declRef)
 {
     return declRef.substitute(astBuilder, declRef.getDecl()->fromType.Ptr());
-}
-
-inline Type* getToType(ASTBuilder* astBuilder, DeclRef<TypeCoercionConstraintDecl> const& declRef)
-{
-    return declRef.substitute(astBuilder, declRef.getDecl()->toType);
 }
 
 inline Type* getBaseType(

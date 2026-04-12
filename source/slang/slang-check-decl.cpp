@@ -4117,6 +4117,9 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
                     return;
             }
         }
+        else if (isAssociatedTypeDecl(decl->parentDecl) &&
+            toTypeDeclRefType->getDeclRef().getDecl() == decl->parentDecl)
+            return;
     }
     getSink()->diagnose(
         Diagnostics::TypeCoerceConstraintToTypeMustBeDefinedInTheCurrentScopesGeneric{
@@ -5965,49 +5968,72 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
 {
     SLANG_UNUSED(satisfyingType);
 
-    // We will enumerate the type constraints placed on the
+    // We will enumerate the constraints placed on the
     // associated type and see if they can be satisfied.
     //
     bool conformance = true;
     Val* witness = nullptr;
     for (auto requiredConstraintDeclRef :
-         getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, requirementDeclRef))
+         getMembers(m_astBuilder, requirementDeclRef))
     {
-        // Grab the type we expect to conform to from the constraint.
-        auto requiredSuperType = getSup(m_astBuilder, requiredConstraintDeclRef);
+        if (auto genericTypeConstraintDecl =
+                requiredConstraintDeclRef.as<GenericTypeConstraintDecl>())
+        {
+            // Grab the type we expect to conform to from the constraint.
+            auto requiredSuperType = getSup(m_astBuilder, genericTypeConstraintDecl);
 
-        auto subType = getSub(m_astBuilder, requiredConstraintDeclRef);
-        witness = tryGetSubtypeWitness(subType, requiredSuperType);
+            auto subType = getSub(m_astBuilder, genericTypeConstraintDecl);
+            witness = tryGetSubtypeWitness(subType, requiredSuperType);
 
-        if (witness)
-        {
-            auto genConstraint = as<GenericTypeConstraintDecl>(requiredConstraintDeclRef.getDecl());
-            if (genConstraint && genConstraint->isEqualityConstraint &&
-                !isTypeEqualityWitness(witness))
-                witness = nullptr;
-        }
-        if (witness)
-        {
-            // If a subtype witness was found, then the conformance
-            // appears to hold, and we can satisfy that requirement.
-            witnessTable->add(requiredConstraintDeclRef.getDecl(), RequirementWitness(witness));
-        }
-        else
-        {
-            // Is our constraint optional? If so, then our conformance is still fine.
-            // We'll just use a NoneWitness.
-            //
-            if (requiredConstraintDeclRef.getDecl()->findModifier<OptionalConstraintModifier>())
+            if (witness)
             {
-                witnessTable->add(
-                    requiredConstraintDeclRef.getDecl(),
-                    m_astBuilder->getOrCreate<NoneWitness>());
-                continue;
+                auto genConstraint =
+                    as<GenericTypeConstraintDecl>(genericTypeConstraintDecl.getDecl());
+                if (genConstraint && genConstraint->isEqualityConstraint &&
+                    !isTypeEqualityWitness(witness))
+                    witness = nullptr;
             }
+            if (witness)
+            {
+                // If a subtype witness was found, then the conformance
+                // appears to hold, and we can satisfy that requirement.
+                witnessTable->add(genericTypeConstraintDecl.getDecl(), RequirementWitness(witness));
+            }
+            else
+            {
+                // Is our constraint optional? If so, then our conformance is still fine.
+                // We'll just use a NoneWitness.
+                //
+                if (genericTypeConstraintDecl.getDecl()->findModifier<OptionalConstraintModifier>())
+                {
+                    witnessTable->add(
+                        genericTypeConstraintDecl.getDecl(),
+                        m_astBuilder->getOrCreate<NoneWitness>());
+                    continue;
+                }
 
-            // If a witness couldn't be found, then the conformance
-            // seems like it will fail.
-            conformance = false;
+                // If a witness couldn't be found, then the conformance
+                // seems like it will fail.
+                conformance = false;
+            }
+        }
+        else if (auto typeCoercionConstraintDeclRef = requiredConstraintDeclRef
+                     .as<TypeCoercionConstraintDecl>())
+        {
+            auto astBuilder = getASTBuilder();
+            auto fromType = getFromType(astBuilder, typeCoercionConstraintDeclRef);
+            auto toType = getToType(astBuilder, typeCoercionConstraintDeclRef);
+            if (!checkTypeCoercionWitnessValidity(
+                    astBuilder,
+                    this,
+                    typeCoercionConstraintDeclRef.getDecl(),
+                    fromType,
+                    toType,
+                    nullptr,
+                    nullptr,
+                    false,
+                    nullptr))
+                conformance = false;
         }
     }
     return conformance;

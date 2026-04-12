@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=NEGATIVE_CHECK_1): -target spirv -stage compute -entry computeMain -DNEGATIVE_CHECK_1
+//TEST:SIMPLE(filecheck=NEGATIVE_CHECK): -target spirv -stage compute -entry computeMain
 
-// NEGATIVE_CHECK_1 tests that the compile fails since `FromType` cannot be converted to `ToType` given the
+// NEGATIVE_CHECK tests that the compile fails since `FromType` cannot be converted to `ToType` given the
 // type information the user provided to the function. More `where` constraints would be needed to get
 // this code to compile: super-type constraints or type-coerce-constraint.
 
@@ -27,8 +27,8 @@ struct CustomStruct2
 
 RWStructuredBuffer<int> outputBuffer;
 
-// NEGATIVE_CHECK_1-DAG: note:
-// NEGATIVE_CHECK_1-DAG: {{.*}}:[[# @LINE+1]]:
+// NEGATIVE_CHECK-DAG: note:
+// NEGATIVE_CHECK-DAG: {{.*}}:[[# @LINE+1]]:
 ToType castableConstraint<ToType, FromType>() where ToType(FromType)
 {
     return ToType();
@@ -36,8 +36,8 @@ ToType castableConstraint<ToType, FromType>() where ToType(FromType)
 
 ToType logic<ToType, FromType>()
 {
-    // NEGATIVE_CHECK_1-DAG: error[E38043]:
-    // NEGATIVE_CHECK_1-DAG: {{.*}}:[[# @LINE+1]]:
+    // NEGATIVE_CHECK-DAG: error[E38043]:
+    // NEGATIVE_CHECK-DAG: {{.*}}:[[# @LINE+1]]:
     return castableConstraint<ToType, FromType>();
 }
 

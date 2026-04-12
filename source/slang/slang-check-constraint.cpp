@@ -352,25 +352,19 @@ Type* SemanticsVisitor::TryJoinTypes(ConstraintSystem* constraints, QualType lef
     return nullptr;
 }
 
-bool addTypeCoercionWitnessToArgs(
+bool checkTypeCoercionWitnessValidity(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
     TypeCoercionConstraintDecl* constraintDecl,
-    DeclRef<GenericDecl> genericDeclRef,
+    Type* fromType,
+    Type* toType,
+    DeclRef<GenericDecl>* maybeGenericDeclRef,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
-    HashSet<Decl*>* maybeConstrainedGenericParams,
-    ShortList<Val*>& args,
-    bool shouldEmitError)
+    bool shouldEmitError,
+    TypeCoercionWitness** outTypeCoercionWitness)
 {
-    // To emit an error, `maybeContext` must be provided.
-    SLANG_ASSERT(!shouldEmitError || shouldEmitError && maybeContext);
+    SLANG_ASSERT(!shouldEmitError || shouldEmitError && maybeContext && maybeGenericDeclRef);
 
-    DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
-        astBuilder
-            ->getGenericAppDeclRef(genericDeclRef, args.getArrayView().arrayView, constraintDecl)
-            .as<TypeCoercionConstraintDecl>();
-    auto fromType = getFromType(astBuilder, constraintDeclRef);
-    auto toType = getToType(astBuilder, constraintDeclRef);
     TypeCoercionWitness* typeCoercionWitness = nullptr;
     DeclRef<Decl> declRefUsedToConvert{};
     ConversionCost conversionCost = kConversionCost_Impossible;
@@ -419,10 +413,46 @@ bool addTypeCoercionWitnessToArgs(
                 .toType = toType,
                 .location = maybeContext->loc});
             visitor->getSink()->diagnose(
-                Diagnostics::SeeDefinitionOf{.decl = genericDeclRef.getDecl()->inner});
+                Diagnostics::SeeDefinitionOf{.decl = maybeGenericDeclRef->getDecl()->inner});
         }
         return false;
     }
+
+    if (outTypeCoercionWitness)
+        *outTypeCoercionWitness = typeCoercionWitness;
+    return true;
+}
+
+bool addTypeCoercionWitnessToArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    TypeCoercionConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    HashSet<Decl*>* maybeConstrainedGenericParams,
+    ShortList<Val*>& args,
+    bool shouldEmitError)
+{
+    SLANG_ASSERT(!shouldEmitError || shouldEmitError && maybeContext && genericDeclRef);
+
+    DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
+        astBuilder
+            ->getGenericAppDeclRef(genericDeclRef, args.getArrayView().arrayView, constraintDecl)
+            .as<TypeCoercionConstraintDecl>();
+    auto fromType = getFromType(astBuilder, constraintDeclRef);
+    auto toType = getToType(astBuilder, constraintDeclRef);
+    TypeCoercionWitness* typeCoercionWitness = nullptr;
+    if (!checkTypeCoercionWitnessValidity(
+            astBuilder,
+            visitor,
+            constraintDecl,
+            fromType,
+            toType,
+            &genericDeclRef,
+            maybeContext,
+            shouldEmitError,
+            &typeCoercionWitness))
+        return false;
 
     if (maybeConstrainedGenericParams)
     {

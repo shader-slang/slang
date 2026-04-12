@@ -9859,7 +9859,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl)
     {
-        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
+        if (auto assocTypeDecl = as<AssocTypeDecl>(decl->parentDecl))
+        {
+            if (const auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->parentDecl))
+            {
+                return LoweredValInfo::simple(getInterfaceRequirementKey(decl));
+            }
+        }
+        else if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
         {
             SLANG_UNUSED(globalGenericParamDecl);
             auto builder = getBuilder();

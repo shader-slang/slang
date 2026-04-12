@@ -1,6 +1,7 @@
-//TEST:SIMPLE(filecheck=NEGATIVE_CHECK_1): -target spirv -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=NEGATIVE_CHECK): -target spirv -stage compute -entry computeMain
 
-// tests that we emit an error when a user uses a concrete type as a ToType for a type coercion constraint
+// NEGATIVE_CHECK tests that we emit an error when a user uses a concrete type as a ToType for a type coercion constraint
+// and this ToType does not have its declaration in the immediate parent generic argument list
 
 RWStructuredBuffer<int> inputBuffer;
 RWStructuredBuffer<int> outputBuffer;
@@ -33,22 +34,22 @@ struct CustomStruct2
 CustomStruct2 logic<FromType>(FromType dataIn)
     where CustomStruct2(FromType)
 {
-    // NEGATIVE_CHECK_1-DAG: error[E38044]:
-    // NEGATIVE_CHECK_1-DAG: {{.*}}:[[# @LINE+1]]:
+    // NEGATIVE_CHECK-DAG: error[E38044]:
+    // NEGATIVE_CHECK-DAG: {{.*}}:[[# @LINE+1]]:
     return CustomStruct2(dataIn);
 }
 
 struct CustomStruct3<T>
 {
-    // NEGATIVE_CHECK_1-DAG: error[E38044]:
-    // NEGATIVE_CHECK_1-DAG: {{.*}}:[[# @LINE+1]]:
+    // NEGATIVE_CHECK-DAG: error[E38044]:
+    // NEGATIVE_CHECK-DAG: {{.*}}:[[# @LINE+1]]:
     void convert<>() where CustomStruct1(int)
     {
 
     }
 
-    // NEGATIVE_CHECK_1-DAG: error[E38044]:
-    // NEGATIVE_CHECK_1-DAG: {{.*}}:[[# @LINE+1]]:
+    // NEGATIVE_CHECK-DAG: error[E38044]:
+    // NEGATIVE_CHECK-DAG: {{.*}}:[[# @LINE+1]]:
     void convert<>() where T(int)
     {
 
