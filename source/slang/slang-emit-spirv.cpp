@@ -3549,15 +3549,55 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
 
         // Handle integer casts in spec constant context.
-        // Inside OpSpecConstantOp, UConvert/SConvert require different bit widths
-        // and matching signedness on the result type, and OpBitcast is not in the
-        // set of allowed opcodes. See emitSpecConstantSignReinterpret for the
-        // workaround used for signedness changes.
         auto irOp = inst->getOp();
         if (irOp == kIROp_IntCast || irOp == kIROp_ConstexprIntCast)
         {
             auto srcType = inst->getOperand(0)->getDataType();
             auto dstType = inst->getDataType();
+
+            // bool to integer: UConvert/SConvert cannot accept a bool operand,
+            // so we use OpSelect to pick between literal 1 and 0 instead.
+            if (srcType->getOp() == kIROp_BoolType && isIntegralType(dstType))
+            {
+                auto operand = emitSpecializationConstantOp(inst->getOperand(0));
+                IRBuilder builder(m_irModule);
+                auto one = emitLit(builder.getIntValue(dstType, 1));
+                auto zero = emitLit(builder.getIntValue(dstType, 0));
+                return emitInst(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    inst,
+                    SpvOpSpecConstantOp,
+                    inst->getFullType(),
+                    kResultID,
+                    SpvOpSelect,
+                    operand,
+                    one,
+                    zero);
+            }
+
+            // integer to bool: UConvert/SConvert cannot produce a bool result,
+            // so we compare the operand against zero with OpINotEqual instead.
+            if (isIntegralType(srcType) && dstType->getOp() == kIROp_BoolType)
+            {
+                auto operand = emitSpecializationConstantOp(inst->getOperand(0));
+                IRBuilder builder(m_irModule);
+                auto zero = emitLit(builder.getIntValue(srcType, 0));
+                return emitInst(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    inst,
+                    SpvOpSpecConstantOp,
+                    inst->getFullType(),
+                    kResultID,
+                    SpvOpINotEqual,
+                    operand,
+                    zero);
+            }
+
+            // Inside OpSpecConstantOp, UConvert/SConvert require different bit
+            // widths and matching signedness on the result type, and OpBitcast
+            // is not in the set of allowed opcodes. See
+            // emitSpecConstantSignReinterpret for the workaround used for
+            // signedness changes.
             if (isIntegralType(srcType) && isIntegralType(dstType))
             {
                 auto srcInfo = getIntTypeInfo(m_targetRequest, srcType);

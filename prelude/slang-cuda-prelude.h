@@ -3014,9 +3014,8 @@ struct RWByteAddressBuffer
 #ifndef SLANG_USE_ASM_LANE_ID
 __forceinline__ __device__ uint32_t _getLaneId()
 {
-    // If the launch is (or I guess some multiple of the warp size)
-    // we try this mechanism, which is apparently faster.
-    return threadIdx.x & SLANG_CUDA_WARP_MASK;
+    return ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) &
+           SLANG_CUDA_WARP_MASK;
 }
 #else
 __forceinline__ __device__ uint32_t _getLaneId()
