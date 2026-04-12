@@ -2654,10 +2654,10 @@ bool SemanticsVisitor::_coerce(
             }
         }
         if (outWitnessOfConversion)
-           *outWitnessOfConversion = getASTBuilder()->getDeclRefTypeCoercionWitness(
-               fromType,
-               toType,
-               overloadContext.bestCandidate->item.declRef);
+            *outWitnessOfConversion = getASTBuilder()->getDeclRefTypeCoercionWitness(
+                fromType,
+                toType,
+                overloadContext.bestCandidate->item.declRef);
         return true;
     }
     if (!cachedMethod)

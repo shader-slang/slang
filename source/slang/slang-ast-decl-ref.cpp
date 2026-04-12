@@ -427,10 +427,7 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
     return innerDeclRefType;
 }
 
-DeclRefBase* MemberConstraintDeclRef::_substituteImplOverride(
-    ASTBuilder*,
-    SubstitutionSet,
-    int*)
+DeclRefBase* MemberConstraintDeclRef::_substituteImplOverride(ASTBuilder*, SubstitutionSet, int*)
 {
     return this;
 }

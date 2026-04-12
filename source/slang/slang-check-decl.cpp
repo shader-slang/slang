@@ -4069,7 +4069,7 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
     paramDecl->type = decl->fromType;
     paramDecl->nameAndLoc.name = getName("value");
     paramDecl->nameAndLoc.loc = decl->loc;
-    
+
     auto syntheticFunctionDecl = astBuilder->create<ConstructorDecl>();
     syntheticFunctionDecl->returnType = decl->toType;
     syntheticFunctionDecl->nameAndLoc.name = getName("$init");
@@ -4081,8 +4081,7 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
         addModifier(syntheticFunctionDecl, implicitConversionModifier);
 
     auto parentDecl = getModuleDecl(decl->parentDecl);
-    DeclRef<KnownMethodDecl> syntheticFacetDeclRef =
-        astBuilder->create<KnownMethodDecl>();
+    DeclRef<KnownMethodDecl> syntheticFacetDeclRef = astBuilder->create<KnownMethodDecl>();
     KnownMethodDecl* syntheticFacetDecl = syntheticFacetDeclRef.getDecl();
     syntheticFacetDecl->constraintDecl = decl;
     syntheticFacetDecl->ownedScope = astBuilder->create<Scope>();
@@ -4092,9 +4091,9 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
     syntheticFacetDecl->nameAndLoc.loc = decl->loc;
     syntheticFacetDecl->addMember(syntheticFunctionDecl);
     syntheticFacetDecl->thisType = getToType(astBuilder, decl);
-    
+
     decl->syntheticFacetDeclRef = syntheticFacetDeclRef;
-    
+
     // To resolve calling a method constrained via a `TypeCoercionWitness` we must
     // add a synthetic facet to our `ToType` and resolve the methods existence via
     // specialization. As a result, if a user specifies a `ToType` not defined in the
@@ -4117,7 +4116,8 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
                     return;
             }
         }
-        else if (isAssociatedTypeDecl(decl->parentDecl) &&
+        else if (
+            isAssociatedTypeDecl(decl->parentDecl) &&
             toTypeDeclRefType->getDeclRef().getDecl() == decl->parentDecl)
             return;
     }
@@ -5973,8 +5973,7 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
     //
     bool conformance = true;
     Val* witness = nullptr;
-    for (auto requiredConstraintDeclRef :
-         getMembers(m_astBuilder, requirementDeclRef))
+    for (auto requiredConstraintDeclRef : getMembers(m_astBuilder, requirementDeclRef))
     {
         if (auto genericTypeConstraintDecl =
                 requiredConstraintDeclRef.as<GenericTypeConstraintDecl>())
@@ -6017,8 +6016,9 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
                 conformance = false;
             }
         }
-        else if (auto typeCoercionConstraintDeclRef = requiredConstraintDeclRef
-                     .as<TypeCoercionConstraintDecl>())
+        else if (
+            auto typeCoercionConstraintDeclRef =
+                requiredConstraintDeclRef.as<TypeCoercionConstraintDecl>())
         {
             auto astBuilder = getASTBuilder();
             auto fromType = getFromType(astBuilder, typeCoercionConstraintDeclRef);
@@ -14254,7 +14254,8 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
         // Also collect declarations referenced by generic & type-coercion constraints
         for (auto constraintDeclRef : getMembers(getASTBuilder(), genericDecl))
         {
-            if (auto genericTypeConstraintDeclRef = constraintDeclRef.as<GenericTypeConstraintDecl>())
+            if (auto genericTypeConstraintDeclRef =
+                    constraintDeclRef.as<GenericTypeConstraintDecl>())
                 collectReferencedDecls(
                     genericTypeConstraintDeclRef.getDecl()->sup.type,
                     genericParamsReferencedByConstraints);

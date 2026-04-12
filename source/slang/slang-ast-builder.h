@@ -456,7 +456,9 @@ public:
         return result;
     }
 
-    DeclRef<Decl> getMemberConstraintDeclRef(TypeCoercionConstraintDecl* constraintDecl, Decl* declToLookup)
+    DeclRef<Decl> getMemberConstraintDeclRef(
+        TypeCoercionConstraintDecl* constraintDecl,
+        Decl* declToLookup)
     {
         return getOrCreate<MemberConstraintDeclRef>(declToLookup, constraintDecl);
     }

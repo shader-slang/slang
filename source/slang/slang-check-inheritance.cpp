@@ -405,7 +405,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         return result;
     };
 
-    
+
     auto tryToAddTypeCoercionConstraintFacet =
         [&](DeclRef<TypeCoercionConstraintDecl> typeCoercionConstraintDeclRef)
     {
@@ -449,10 +449,9 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             // In the case where we have an aggregate type or `extension`
             // declaration, we can use the explicit list of direct bases.
             //
-            for (auto constraintDeclRef :
-                 getMembers(_getASTBuilder(), containerDeclRef))
+            for (auto constraintDeclRef : getMembers(_getASTBuilder(), containerDeclRef))
             {
-                if(auto typeConstraintDeclRef = constraintDeclRef.as<TypeConstraintDecl>())
+                if (auto typeConstraintDeclRef = constraintDeclRef.as<TypeConstraintDecl>())
                 {
                     // Note: In certain cases something takes the *syntactic* form of an inheritance
                     // clause, but it is not actually something that should be treated as implying
@@ -486,16 +485,18 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                             visitor.calcThisType(interfaceDeclRef));
                     }
 
-                    // The only case we will ever see a GenericTypeConstraintDecl inside a AggTypeDecl
-                    // is when AggTypeDecl is a associatedtype decl. In this case, we will only lookup
-                    // the type constraint if the constraint is on the associated type itself.
+                    // The only case we will ever see a GenericTypeConstraintDecl inside a
+                    // AggTypeDecl is when AggTypeDecl is a associatedtype decl. In this case, we
+                    // will only lookup the type constraint if the constraint is on the associated
+                    // type itself.
                     //
                     auto genericTypeConstraintDeclRef =
                         typeConstraintDeclRef.as<GenericTypeConstraintDecl>();
                     if (genericTypeConstraintDeclRef)
                     {
-                        // If the base expr on the constraint isn't even a `VarExpr`, then it can't be
-                        // referencing the associated type itself and we can skip this constraint.
+                        // If the base expr on the constraint isn't even a `VarExpr`, then it can't
+                        // be referencing the associated type itself and we can skip this
+                        // constraint.
                         if (!genericTypeConstraintDeclRef.getDecl()->sub.type &&
                             !as<VarExpr>(genericTypeConstraintDeclRef.getDecl()->sub.exp))
                             continue;
@@ -505,8 +506,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         typeConstraintDeclRef,
                         DeclCheckState::CanUseBaseOfInheritanceDecl);
 
-                    // For generic type constraint decls, always make sure it is about the type being
-                    // checked.
+                    // For generic type constraint decls, always make sure it is about the type
+                    // being checked.
                     //
                     if (genericTypeConstraintDeclRef)
                     {
@@ -529,7 +530,9 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
 
                     addDirectBaseType(baseType, satisfyingWitness);
                 }
-                else if (auto typeCoercionConstraintDeclRef = constraintDeclRef.as<TypeCoercionConstraintDecl>())
+                else if (
+                    auto typeCoercionConstraintDeclRef =
+                        constraintDeclRef.as<TypeCoercionConstraintDecl>())
                 {
                     tryToAddTypeCoercionConstraintFacet(typeCoercionConstraintDeclRef);
                 }
@@ -635,7 +638,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     continue;
 
                 // Further check the constraint, since we now need the sup-type.
-                ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::CanSpecializeGeneric);
+                ensureDecl(
+                    &visitor,
+                    constraintDeclRef.getDecl(),
+                    DeclCheckState::CanSpecializeGeneric);
 
                 auto superType = getSup(astBuilder, constraintDeclRef);
 
@@ -643,12 +649,15 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 // adding the base to our list of direct bases is as straightforward
                 // as in all the preceding cases.
                 //
-                auto satisfyingWitness =
-                    _getASTBuilder()->getDeclaredSubtypeWitness(selfType, superType, constraintDeclRef);
+                auto satisfyingWitness = _getASTBuilder()->getDeclaredSubtypeWitness(
+                    selfType,
+                    superType,
+                    constraintDeclRef);
                 addDirectBaseType(superType, satisfyingWitness);
             }
             else if (
-                auto typeCoercionConstraintDeclRef = genericDeclRefMember.as<TypeCoercionConstraintDecl>())
+                auto typeCoercionConstraintDeclRef =
+                    genericDeclRefMember.as<TypeCoercionConstraintDecl>())
             {
                 tryToAddTypeCoercionConstraintFacet(typeCoercionConstraintDeclRef);
             }

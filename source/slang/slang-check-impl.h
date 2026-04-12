@@ -3604,7 +3604,8 @@ bool addTypeCoercionWitnessToArgs(
     ShortList<Val*>& args,
     bool shouldEmitError);
 
-// Returns `false` if coerce fails, `true` if success, `outTypeCoercionWitness` maybe filled on success.
+// Returns `false` if coerce fails, `true` if success, `outTypeCoercionWitness` maybe filled on
+// success.
 bool checkTypeCoercionWitnessValidity(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,

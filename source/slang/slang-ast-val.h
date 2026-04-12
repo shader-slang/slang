@@ -94,17 +94,16 @@ private:
 };
 
 // A DeclRef that encodes that there is some `placeholderDecl` that was looked-up from
-// a synthetic facet, defined on some variation of a explicit member constraint (ex: type-coercion constraint).
-// This `placeholderDecl` can be resolved into a "real" declaration via the original constraint it comes from
-// subsituting.
+// a synthetic facet, defined on some variation of a explicit member constraint (ex: type-coercion
+// constraint). This `placeholderDecl` can be resolved into a "real" declaration via the original
+// constraint it comes from subsituting.
 FIDDLE()
 class MemberConstraintDeclRef : public DeclRefBase
 {
     FIDDLE(...)
 public:
-
     MemberConstraintDeclRef(Decl* placeholderDecl, TypeCoercionConstraintDecl* constraintDecl)
-    { 
+    {
         setOperands(placeholderDecl, constraintDecl);
     }
 

@@ -13820,7 +13820,7 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
         SLANG_ASSERT(loweredDeclInfo);
         return *loweredDeclInfo;
     }
-    
+
     if (as<ThisTypeDecl>(decl))
     {
         // A declref to ThisType decl should be lowered differently
