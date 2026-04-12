@@ -56,6 +56,14 @@ struct CustomStruct3<T>
     }
 }
 
+interface IAssociatedTypeStruct<T>
+{
+    associatedtype U;
+    // NEGATIVE_CHECK-DAG: error[E38044]:
+    // NEGATIVE_CHECK-DAG: {{.*}}:[[# @LINE+1]]:
+    associatedtype T where U(float);
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
