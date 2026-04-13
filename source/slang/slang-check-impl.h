@@ -2568,9 +2568,7 @@ public:
 
     FuncType* getCalculatedDiffFuncType(const char* magicCalcName, Type* baseFuncAsType)
     {
-        Val* args[] = {
-            baseFuncAsType,
-            tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+        Val* args[] = {baseFuncAsType, getDiffTypeInfoWitness(baseFuncAsType)};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2580,10 +2578,7 @@ public:
         Type* baseFuncAsType,
         Type* operand1)
     {
-        Val* args[] = {
-            baseFuncAsType,
-            operand1,
-            tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+        Val* args[] = {baseFuncAsType, operand1, getDiffTypeInfoWitness(baseFuncAsType)};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2594,11 +2589,7 @@ public:
         Type* operand1,
         Type* operand2)
     {
-        Val* args[] = {
-            baseFuncAsType,
-            operand1,
-            operand2,
-            tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+        Val* args[] = {baseFuncAsType, operand1, operand2, getDiffTypeInfoWitness(baseFuncAsType)};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2697,7 +2688,8 @@ public:
         Type* superType,
         IsSubTypeOptions isSubTypeOptions);
 
-    SubtypeWitness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
+    Witness* getDiffTypeInfoWitness(Type* type);
+    Witness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
 
     bool isValidGenericConstraintType(Type* type);
 
@@ -3606,6 +3598,16 @@ bool addTypeCoercionWitnessToArgs(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
     TypeCoercionConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    HashSet<Decl*>* maybeConstrainedGenericParams,
+    ShortList<Val*>& args,
+    bool shouldEmitError);
+
+bool addHasDiffTypeInfoWitnessToArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    HasDiffTypeInfoConstraintDecl* constraintDecl,
     DeclRef<GenericDecl> genericDeclRef,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     HashSet<Decl*>* maybeConstrainedGenericParams,

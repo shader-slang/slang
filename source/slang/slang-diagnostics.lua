@@ -1113,6 +1113,13 @@ err(
     }
 )
 
+standalone_note(
+    "this-type-mismatch-after-erasure",
+    30021,
+    "the concrete 'This' type identity is lost after type erasure into interface type '~interfaceType:Type'; consider using a generic function with a type constraint instead",
+    span { loc = "location" }
+)
+
 err(
     "cannot-convert-array-of-smaller-to-larger-size",
     30024,
@@ -1437,6 +1444,13 @@ err(
     30302,
     "cannot use 'as' with interface on right-hand side",
     span { loc = "expr:Expr", message = "cannot use 'as' operator with an interface type as the right-hand side. Use a concrete type instead. If you want to use an optional constraint, use an 'if (T is IInterface)' block instead." }
+)
+
+err(
+    "is-as-on-unrelated-concrete-types",
+    30304,
+    "'is'/'as' on unrelated concrete types",
+    span { loc = "expr:Expr", message = "'is'/'as' on unrelated concrete types will never succeed. Use an interface-typed expression for runtime type checks." }
 )
 
 err(
@@ -2796,6 +2810,20 @@ err(
     span { loc = "attr:Modifier", message = "'[MaybeDifferentiable]' cannot be applied to non-interface requirement; it can only be applied to interface requirements." }
 )
 
+err(
+    "optional-has-diff-type-info-constraint-is-invalid",
+    30315,
+    "optional __hasDiffTypeInfo constraint invalid",
+    span { loc = "location", message = "'optional' is not supported on '__hasDiffTypeInfo(...)' constraints" }
+)
+
+err(
+    "type-does-not-have-diff-type-info",
+    30316,
+    "type does not have diff type info",
+    span { loc = "location", message = "type '~type:Type' does not satisfy '__hasDiffTypeInfo(...)'" }
+)
+
 -- Interop (304xx)
 
 err(
@@ -3139,6 +3167,13 @@ err(
     30703,
     "per-primitive system value semantic '~semantic' must be placed in an 'OutputPrimitives' (or 'out primitives') parameter, not in a vertex or index output",
     span { loc = "location" }
+)
+
+err(
+    "parameter-without-default-after-parameter-with-default",
+    30704,
+    "parameter '~param:Decl' does not have a default value, but follows a parameter that does",
+    span { loc = "param:Decl" }
 )
 
 --
@@ -4191,6 +4226,13 @@ err(
 )
 
 err(
+    "circular-conformance",
+    41003,
+    "type contains circular reference through conforming interface",
+    span { loc = "location", message = "type '~type:IRInst' contains circular reference through interface '~interfaceType:IRInst'. The type's conformance creates a cycle in dynamic-dispatch storage that prevents computing a finite AnyValue size." }
+)
+
+err(
     "missing-return-error",
     41009,
     "non-void function must return",
@@ -4521,6 +4563,13 @@ err(
     50101,
     "cannot dispatch on uninitialized interface",
     span { loc = "location", message = "Cannot dynamically dispatch on potentially uninitialized interface object '~object'." }
+)
+
+err(
+    "interface-typed-entry-point-param-not-supported",
+    50104,
+    "interface-typed entry point parameter not supported",
+    span { loc = "location", message = "Interface-typed entry point parameter of type '~interfaceType' is not supported on the current target. Use a concrete type or a different target." }
 )
 
 standalone_note(
