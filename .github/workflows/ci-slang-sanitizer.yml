@@ -9,7 +9,7 @@ on:
       server-count:
         required: false
         type: number
-        default: 8
+        default: 2
       test-category:
         required: false
         type: string
