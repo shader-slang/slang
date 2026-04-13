@@ -11,6 +11,10 @@ inputs:
   llvm-hash:
     description: "Hash of build-llvm.sh for cache key"
     required: true
+  llvm-targets:
+    description: "Semicolon-separated LLVM target architectures to build"
+    required: false
+    default: "X86;ARM;AArch64"
   build-if-missing:
     description: "Build LLVM if not found in GCS"
     required: false
@@ -31,7 +35,9 @@ runs:
       id: download
       shell: bash
       run: |
-        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}"
+        # Include targets in cache key so different target sets get separate cache entries
+        TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" | tr ';' '-')"
+        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${TARGETS_SLUG}-${{ inputs.llvm-hash }}"
         PUBLIC_URL="https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
 
         echo "🔍 Checking for LLVM prebuilt: ${PUBLIC_URL}"
@@ -78,7 +84,8 @@ runs:
 
         ./external/build-llvm.sh \
           --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
-          --repo "${REPO_URL}"
+          --repo "${REPO_URL}" \
+          --targets "${{ inputs.llvm-targets }}"
 
         echo "✅ LLVM build complete"
 
@@ -90,7 +97,8 @@ runs:
       if: steps.download.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
       shell: bash
       run: |
-        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}"
+        TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" | tr ';' '-')"
+        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${TARGETS_SLUG}-${{ inputs.llvm-hash }}"
         GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
         LLVM_DIR="${{ github.workspace }}/build/llvm-project-install"
 

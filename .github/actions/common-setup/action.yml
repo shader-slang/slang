@@ -16,6 +16,10 @@ inputs:
   use-cached-llvm:
     default: true
     required: false
+  llvm-targets:
+    description: "Semicolon-separated LLVM target architectures to build"
+    default: "X86;ARM;AArch64"
+    required: false
   min-disk-gb:
     description: "Minimum required free disk space in GB"
     default: "3"
@@ -111,6 +115,7 @@ runs:
         compiler: ${{ inputs.compiler }}
         platform: ${{ inputs.platform }}
         llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+        llvm-targets: ${{ inputs.llvm-targets }}
         build-if-missing: "true"
         github-token: ${{ github.token }}
 
