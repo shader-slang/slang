@@ -3722,6 +3722,13 @@ err(
 )
 
 err(
+    "member-return-type-non-copyable-mismatch",
+    38109,
+    "return type copyability mismatch",
+    span { loc = "member:Decl", message = "member '~member' return type '~actualType:Type' and interface requirement return type '~expectedType:Type' differ in copyability: one is copyable and the other is not." }
+)
+
+err(
     "generic-signature-does-not-match-requirement",
     38107,
     "generic signature mismatch",

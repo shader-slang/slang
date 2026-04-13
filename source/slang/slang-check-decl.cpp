@@ -4909,6 +4909,11 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
     DeclRef<CallableDecl> requiredMemberDeclRef,
     RefPtr<WitnessTable> witnessTable)
 {
+    auto isEffectivelyNonCopyableType = [](Type* type)
+    { return type && isNonCopyableType(type->getCanonicalType()); };
+    auto getDeclaredResultType = [this](DeclRef<CallableDecl> declRef)
+    { return getResultType(m_astBuilder, makeDeclRef(declRef.getDecl()).as<CallableDecl>()); };
+
     if (satisfyingMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>() !=
         requiredMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>())
     {
@@ -5002,6 +5007,9 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
         auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
         if (!requiredResultType->equals(satisfyingResultType))
+            return false;
+        if (isEffectivelyNonCopyableType(getDeclaredResultType(requiredMemberDeclRef)) !=
+            isEffectivelyNonCopyableType(getDeclaredResultType(satisfyingMemberDeclRef)))
             return false;
 
         auto requiredErrorType = getErrorCodeType(m_astBuilder, requiredMemberDeclRef);
@@ -5227,6 +5235,11 @@ bool SemanticsVisitor::doesSubscriptMatchRequirement(
     DeclRef<SubscriptDecl> requiredMemberDeclRef,
     RefPtr<WitnessTable> witnessTable)
 {
+    auto isEffectivelyNonCopyableType = [](Type* type)
+    { return type && isNonCopyableType(type->getCanonicalType()); };
+    auto getDeclaredResultType = [this](DeclRef<SubscriptDecl> declRef)
+    { return getResultType(m_astBuilder, makeDeclRef(declRef.getDecl()).as<CallableDecl>()); };
+
     // The result type and parameters of the satisfying member must match the type of the required
     // member.
     //
@@ -5251,6 +5264,9 @@ bool SemanticsVisitor::doesSubscriptMatchRequirement(
     auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
     auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
     if (!requiredResultType->equals(satisfyingResultType))
+        return false;
+    if (isEffectivelyNonCopyableType(getDeclaredResultType(requiredMemberDeclRef)) !=
+        isEffectivelyNonCopyableType(getDeclaredResultType(satisfyingMemberDeclRef)))
         return false;
 
     // Each accessor in the requirement must be accounted for by an accessor
@@ -7363,6 +7379,10 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         // Check if the failure was due to return type coercion
         if (!IsErrorExpr(checkedExpr) && outFailureDetails)
         {
+            auto declaredRequirementResultType = getResultType(
+                m_astBuilder,
+                makeDeclRef(requiredMemberDeclRef.getDecl()).as<CallableDecl>());
+
             // The call resolved - check if it's a return type mismatch
             auto actualReturnType = checkedExpr->type;
             if (!actualReturnType->equals(resultType))
@@ -7378,6 +7398,22 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                         outFailureDetails->candidateMethod = declRefExpr->declRef;
                         outFailureDetails->actualType = actualReturnType;
                         outFailureDetails->expectedType = resultType;
+                    }
+                }
+            }
+            else if (
+                isNonCopyableType(actualReturnType->getCanonicalType()) !=
+                isNonCopyableType(declaredRequirementResultType->getCanonicalType()))
+            {
+                if (auto invokeExpr = as<InvokeExpr>(checkedCall))
+                {
+                    if (auto declRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr))
+                    {
+                        outFailureDetails->reason =
+                            WitnessSynthesisFailureReason::MethodResultNonCopyableMismatch;
+                        outFailureDetails->candidateMethod = declRefExpr->declRef;
+                        outFailureDetails->actualType = actualReturnType;
+                        outFailureDetails->expectedType = declaredRequirementResultType;
                     }
                 }
             }
@@ -7527,7 +7563,12 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             synDeclRef.getParent().as<GenericDecl>(),
             requiredMemberDeclRef.getParent().as<GenericDecl>(),
             witnessTable);
-        SLANG_ASSERT(doesSignatureMatch);
+        if (!doesSignatureMatch)
+        {
+            if (outFailureDetails)
+                outFailureDetails->reason = WitnessSynthesisFailureReason::GenericSignatureMismatch;
+            return false;
+        }
     }
     else
     {
@@ -7536,7 +7577,33 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             synDeclRef.as<FuncDecl>(),
             requiredMemberDeclRef,
             witnessTable);
-        SLANG_ASSERT(doesSignatureMatch);
+        if (!doesSignatureMatch)
+        {
+            if (outFailureDetails)
+            {
+                auto declaredRequirementResultType = getResultType(
+                    m_astBuilder,
+                    makeDeclRef(requiredMemberDeclRef.getDecl()).as<CallableDecl>());
+                auto declaredWitnessResultType = getResultType(
+                    m_astBuilder,
+                    makeDeclRef(synDeclRef.getDecl()).as<CallableDecl>());
+
+                outFailureDetails->reason = WitnessSynthesisFailureReason::General;
+                if (declaredWitnessResultType && declaredRequirementResultType &&
+                    getResultType(m_astBuilder, requiredMemberDeclRef)
+                        ->equals(getResultType(m_astBuilder, synDeclRef.as<FuncDecl>())) &&
+                    isNonCopyableType(declaredWitnessResultType->getCanonicalType()) !=
+                        isNonCopyableType(declaredRequirementResultType->getCanonicalType()))
+                {
+                    outFailureDetails->reason =
+                        WitnessSynthesisFailureReason::MethodResultNonCopyableMismatch;
+                    outFailureDetails->candidateMethod = lookupResult.item.declRef;
+                    outFailureDetails->actualType = declaredWitnessResultType;
+                    outFailureDetails->expectedType = declaredRequirementResultType;
+                }
+            }
+            return false;
+        }
     }
 
     return true;
@@ -9115,10 +9182,23 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     //
     this->ensureDecl(witnessDecl, DeclCheckState::ReadyForLookup);
 
+    auto isEffectivelyNonCopyableType = [](Type* type)
+    { return type && isNonCopyableType(type->getCanonicalType()); };
+    auto getDeclaredResultType = [this](DeclRef<CallableDecl> declRef)
+    { return getResultType(m_astBuilder, makeDeclRef(declRef.getDecl()).as<CallableDecl>()); };
+
+    auto synthesizedCallableDeclRef = synthesizedWitnessDeclRef.as<CallableDecl>();
+    auto requiredCallableDeclRef = requirementDeclRef.as<CallableDecl>();
+    if (isEffectivelyNonCopyableType(getDeclaredResultType(synthesizedCallableDeclRef)) !=
+        isEffectivelyNonCopyableType(getDeclaredResultType(requiredCallableDeclRef)))
+    {
+        return false;
+    }
+
     // Test signature and register in witness table.
     bool doesSignatureMatch = doesSignatureMatchRequirement(
-        synthesizedWitnessDeclRef.as<CallableDecl>(),
-        requirementDeclRef.as<CallableDecl>(),
+        synthesizedCallableDeclRef,
+        requiredCallableDeclRef,
         witnessTable);
 
     // If we decide that it is possible to synthesize this requirement, then we should
@@ -9571,6 +9651,14 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     {
         // Emit specific return type mismatch diagnostic
         getSink()->diagnose(Diagnostics::MemberReturnTypeMismatch{
+            .actualType = failureDetails.actualType,
+            .expectedType = failureDetails.expectedType,
+            .member = failureDetails.candidateMethod.getDecl()});
+    }
+    else if (
+        failureDetails.reason == WitnessSynthesisFailureReason::MethodResultNonCopyableMismatch)
+    {
+        getSink()->diagnose(Diagnostics::MemberReturnTypeNonCopyableMismatch{
             .actualType = failureDetails.actualType,
             .expectedType = failureDetails.expectedType,
             .member = failureDetails.candidateMethod.getDecl()});
