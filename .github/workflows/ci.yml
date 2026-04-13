@@ -335,7 +335,7 @@ jobs:
       - name: Check for GPU health check failures and dispatch retry
         env:
           GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.SLANGBOT_PAT }}
         run: |
           gpu_failures=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
             --jq '[.jobs[]
