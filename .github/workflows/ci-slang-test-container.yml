@@ -97,6 +97,7 @@ jobs:
 
       - name: Test Slang
         run: |
+          set -o pipefail
           ulimit -c unlimited
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -120,11 +121,11 @@ jobs:
             slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")
           fi
 
-          "$bin_dir/slang-test" "${slang_test_args[@]}"
+          "$bin_dir/slang-test" "${slang_test_args[@]}" 2>&1 | tee test-output.log
 
       - name: Run slangc tests
         run: |
-          PATH=$bin_dir:$PATH tools/slangc-test/test.sh
+          PATH=$bin_dir:$PATH tools/slangc-test/test.sh 2>&1 | tee -a test-output.log
 
       - name: Test Slang via glsl
         if: inputs.config == 'release' && github.event_name == 'pull_request'
@@ -140,7 +141,8 @@ jobs:
             -expected-failure-list tests/expected-failure-via-glsl.txt \
             -expected-failure-list tests/expected-failure-github.txt \
             -expected-failure-list tests/expected-failure-linux.txt \
-            -expected-failure-list tests/expected-failure-linux-gpu.txt
+            -expected-failure-list tests/expected-failure-linux-gpu.txt \
+            2>&1 | tee -a test-output.log
 
       - name: GPU post-test diagnostics
         if: failure()
@@ -279,6 +281,20 @@ jobs:
           path: intermittency-report.json
           retention-days: 30
           if-no-files-found: ignore
+
+      - name: Compress and upload test log on failure
+        if: failure()
+        run: gzip -9 test-output.log 2>/dev/null || true
+
+      - name: Upload test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-log-${{ inputs.config }}-slang-test
+          path: test-output.log.gz
+          retention-days: 7
+          if-no-files-found: ignore
+          compression-level: 0
 
   test-slang-rhi:
     runs-on: ["Linux", "self-hosted", "GPU"]
