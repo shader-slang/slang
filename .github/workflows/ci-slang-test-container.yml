@@ -171,6 +171,46 @@ jobs:
             exit 1
           fi
 
+      - name: Analyze core dumps
+        if: failure()
+        run: |
+          CORE_FILES=$(find /tmp -name "core.*" -type f 2>/dev/null)
+          if [[ -z "$CORE_FILES" ]]; then
+            echo "No core dumps found"
+            exit 0
+          fi
+
+          # Install gdb if not present
+          which gdb >/dev/null 2>&1 || (apt-get update -qq && apt-get install -y -qq gdb >/dev/null 2>&1) || true
+
+          for core_file in $CORE_FILES; do
+            core_basename=$(basename "$core_file")
+            # Extract executable name from core pattern: core.PID.EXECUTABLE
+            exe_name=$(echo "$core_basename" | cut -d. -f3)
+            if [[ -z "$exe_name" ]]; then
+              exe_name="test-server"
+            fi
+
+            binary=$(find "$bin_dir" -name "$exe_name" -type f 2>/dev/null | head -1)
+            if [[ -z "$binary" ]]; then
+              echo "::warning::Core dump $core_basename: could not find binary '$exe_name'"
+              continue
+            fi
+
+            echo ""
+            echo "::group::Core dump analysis: $core_basename ($exe_name)"
+            gdb -batch \
+              -ex "set pagination off" \
+              -ex "echo === Signal ===\n" \
+              -ex "info signal" \
+              -ex "echo \n=== Backtrace ===\n" \
+              -ex "bt full 30" \
+              -ex "echo \n=== All Threads ===\n" \
+              -ex "thread apply all bt 15" \
+              "$binary" "$core_file" 2>&1 || echo "(gdb analysis failed)"
+            echo "::endgroup::"
+          done
+
       - name: Upload crash artifacts
         if: failure()
         uses: actions/upload-artifact@v4
