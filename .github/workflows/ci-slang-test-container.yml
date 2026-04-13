@@ -88,8 +88,16 @@ jobs:
           # Display environment configuration
           print-env-info
 
+      - name: Enable core dumps
+        run: |
+          ulimit -c unlimited
+          # Core dumps go to /tmp so they're easy to find
+          echo "/tmp/core.%p.%e" > /proc/sys/kernel/core_pattern 2>/dev/null || true
+          mkdir -p /tmp/crash-logs
+
       - name: Test Slang
         run: |
+          ulimit -c unlimited
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
 
@@ -162,6 +170,17 @@ jobs:
           if [[ "$gpu_crashed" -eq 1 ]]; then
             exit 1
           fi
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crash-logs-${{ inputs.config }}-slang-test
+          path: |
+            /tmp/core.*
+            /tmp/crash-logs/
+          retention-days: 3
+          if-no-files-found: ignore
 
   test-slang-rhi:
     runs-on: ["Linux", "self-hosted", "GPU"]

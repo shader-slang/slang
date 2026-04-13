@@ -6080,9 +6080,20 @@ SlangResult innerMain(int argc, char** argv)
             if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
             {
                 if (context.failedFileTests.getCount() > 0)
+                {
                     printf(
                         "Retrying %d failed tests...\n",
                         (int)context.failedFileTests.getCount());
+                    printf("Tests to retry:\n");
+                    for (auto& test : context.failedFileTests)
+                    {
+                        FileTestInfoImpl* fileTestInfo =
+                            static_cast<FileTestInfoImpl*>(test.Ptr());
+                        printf("  - %s\n", fileTestInfo->testName.getBuffer());
+                    }
+                }
+                int retriedCount = 0;
+                int retryPassedCount = 0;
                 for (auto& test : context.failedFileTests)
                 {
                     context.isRetry = true;
@@ -6096,6 +6107,23 @@ SlangResult innerMain(int argc, char** argv)
                         fileTestInfo->testName,
                         fileTestInfo->options);
                     reporter.addResult(newResult);
+                    retriedCount++;
+                    if (newResult == TestResult::Pass)
+                        retryPassedCount++;
+                }
+                if (retriedCount > 0)
+                {
+                    printf(
+                        "\nRetry summary: %d/%d tests passed on retry "
+                        "(intermittent failures)\n",
+                        retryPassedCount,
+                        retriedCount);
+                    if (retryPassedCount < retriedCount)
+                    {
+                        printf("Tests that still failed after retry:\n");
+                        // The reporter already has the results, so we just note
+                        // this for visibility
+                    }
                 }
             }
             else
