@@ -60,9 +60,9 @@ float dispatch(uint id, float x)
 {
     IFoo obj;
     if (id == 0)
-        obj = no_diff(A(1.0));
+        obj = no_diff(A(2.0));
     else
-        obj = no_diff(B(1.0));
+        obj = no_diff(B(3.0));
     return run(obj, x);
 }
 
@@ -79,21 +79,21 @@ float firstDeriv(uint id, float x)
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // A: f(x) = x^3, f'(x) = 3x^2
-    // At x=2: f'(2) = 12
+    // A: f(x) = 2*x^3, f'(x) = 6*x^2
+    // At x=2: f'(2) = 24
     outputBuffer[0] = fwd_diff(dispatch)(0, DifferentialPair<float>(2.0, 1.0)).d;
-    // CHECK: 12.0
+    // CHECK: 24.0
 
-    // Second derivative of A at x=2: f''(2) = 6*2 = 12
+    // Second derivative of A at x=2: f''(x) = 12*x, f''(2) = 24
     outputBuffer[1] = fwd_diff(firstDeriv)(0, DifferentialPair<float>(2.0, 1.0)).d;
-    // CHECK: 12.0
+    // CHECK: 24.0
 
-    // B: f(x) = x^4, f'(x) = 4x^3
-    // At x=2: f'(2) = 32
+    // B: f(x) = 3*x^4, f'(x) = 12*x^3
+    // At x=2: f'(2) = 96
     outputBuffer[2] = fwd_diff(dispatch)(1, DifferentialPair<float>(2.0, 1.0)).d;
-    // CHECK: 32.0
+    // CHECK: 96.0
 
-    // Second derivative of B at x=2: f''(2) = 12*x^2 = 48
+    // Second derivative of B at x=2: f''(x) = 36*x^2, f''(2) = 144
     outputBuffer[3] = fwd_diff(firstDeriv)(1, DifferentialPair<float>(2.0, 1.0)).d;
-    // CHECK: 48.0
+    // CHECK: 144.0
 }

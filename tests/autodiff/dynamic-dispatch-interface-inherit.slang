@@ -3,7 +3,7 @@
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;
 
 [anyValueSize(16)]
@@ -68,7 +68,7 @@ float dispatchBase(uint id, float x, no_diff float param)
 }
 
 // Note: Direct dispatch through IDerived existential triggers ICE (#10775).
-// See autodiff-dynamic-dispatch-interface-inherit-derived.slang for the
+// See dynamic-dispatch-interface-inherit-derived.slang for the
 // disabled regression test covering that path.
 
 //TEST_INPUT: type_conformance A:IBase = 0
@@ -91,5 +91,13 @@ void computeMain()
         bwd_diff(dispatchBase)(1, p, 3.0, 1.0);
         outputBuffer[1] = p.d;
     }
+    // CHECK: 3.0
+
+    // Forward diff: A.baseCalc at x=3, param=2: f'(3) = 4*3 = 12.0
+    outputBuffer[2] = fwd_diff(dispatchBase)(0, DifferentialPair<float>(3.0, 1.0), 2.0).d;
+    // CHECK: 12.0
+
+    // Forward diff: B.baseCalc at x=2, param=3: f'(2) = 3.0
+    outputBuffer[3] = fwd_diff(dispatchBase)(1, DifferentialPair<float>(2.0, 1.0), 3.0).d;
     // CHECK: 3.0
 }
