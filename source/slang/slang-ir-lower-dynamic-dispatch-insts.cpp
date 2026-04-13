@@ -1042,7 +1042,6 @@ struct SequentialIDTagLoweringContext : public InstPassBase
     void validateUniqueWitnessTableSequentialIDs()
     {
         Dictionary<String, IRInst*> witnessTableForSequentialID;
-        auto linkage = getLinkage();
 
         for (auto inst : module->getGlobalInsts())
         {
@@ -1060,15 +1059,6 @@ struct SequentialIDTagLoweringContext : public InstPassBase
             auto seqDecoration = inst->findDecoration<IRSequentialIDDecoration>();
             if (!seqDecoration)
                 continue;
-
-            auto witnessTableLinkage = inst->findDecoration<IRLinkageDecoration>();
-            if (!witnessTableLinkage)
-                continue;
-            if (!linkage->hasExplicitTypeConformanceWitnessSequentialID(
-                    witnessTableLinkage->getMangledName()))
-            {
-                continue;
-            }
 
             auto interfaceLinkage = interfaceType->findDecoration<IRLinkageDecoration>();
             if (!interfaceLinkage)

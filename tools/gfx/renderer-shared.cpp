@@ -993,7 +993,8 @@ Result ShaderObjectBase::setExistentialHeader(
     // fact and error out.
     //
     uint32_t conformanceID = 0xFFFFFFFF;
-    SLANG_RETURN_ON_FAIL(getLayoutBase()->m_slangSession->getTypeConformanceWitnessSequentialID(
+    SLANG_RETURN_ON_FAIL(
+        getLayoutBase()->m_slangSession->getOrAllocTypeConformanceWitnessSequentialID(
         concreteType,
         existentialType,
         &conformanceID));

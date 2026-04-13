@@ -160,6 +160,10 @@ public:
         slang::TypeReflection* type,
         slang::TypeReflection* interfaceType,
         ISlangBlob** outNameBlob) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL getOrAllocTypeConformanceWitnessSequentialID(
+        slang::TypeReflection* type,
+        slang::TypeReflection* interfaceType,
+        uint32_t* outId) override;
     SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessSequentialID(
         slang::TypeReflection* type,
         slang::TypeReflection* interfaceType,
@@ -235,9 +239,7 @@ public:
     void registerTypeConformanceWitnessSequentialID(
         String const& witnessTableMangledName,
         String const& interfaceMangledName,
-        uint32_t sequentialID,
-        bool isExplicitOverride = false);
-    bool hasExplicitTypeConformanceWitnessSequentialID(String const& witnessTableMangledName);
+        uint32_t sequentialID);
 
     // Cache for container types.
     Dictionary<ContainerTypeKey, Type*> m_containerTypes;
@@ -265,9 +267,6 @@ public:
 
     // Tracks which interface/sequential-ID pairs are already occupied.
     HashSet<String> usedTypeConformanceWitnessSequentialIDKeys;
-
-    // Tracks witness tables whose sequential ID came from an explicit user override.
-    HashSet<String> witnessTablesWithExplicitSequentialIDOverrides;
 
     // Counters for allocating sequential IDs to witness tables conforming to each interface type.
     Dictionary<String, uint32_t> mapInterfaceMangledNameToSequentialIDCounters;

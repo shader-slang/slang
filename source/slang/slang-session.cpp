@@ -767,25 +767,18 @@ uint32_t Linkage::getFirstFreeTypeConformanceWitnessSequentialID(String const& i
 void Linkage::registerTypeConformanceWitnessSequentialID(
     String const& witnessTableMangledName,
     String const& interfaceMangledName,
-    uint32_t sequentialID,
-    bool isExplicitOverride)
+    uint32_t sequentialID)
 {
     mapMangledNameToRTTIObjectIndex[witnessTableMangledName] = sequentialID;
     usedTypeConformanceWitnessSequentialIDKeys.add(
         _getTypeConformanceSequentialIDKey(interfaceMangledName, sequentialID));
 
-    if (isExplicitOverride)
-        witnessTablesWithExplicitSequentialIDOverrides.add(witnessTableMangledName);
-
+    // Advance the per-interface counter past any IDs that are now occupied,
+    // so the next allocation starts from a free slot.
     getFirstFreeTypeConformanceWitnessSequentialID(interfaceMangledName);
 }
 
-bool Linkage::hasExplicitTypeConformanceWitnessSequentialID(String const& witnessTableMangledName)
-{
-    return witnessTablesWithExplicitSequentialIDOverrides.contains(witnessTableMangledName);
-}
-
-SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequentialID(
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getOrAllocTypeConformanceWitnessSequentialID(
     slang::TypeReflection* type,
     slang::TypeReflection* interfaceType,
     uint32_t* outId)
@@ -814,6 +807,14 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
     return SLANG_OK;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequentialID(
+    slang::TypeReflection* type,
+    slang::TypeReflection* interfaceType,
+    uint32_t* outId)
+{
+    return getOrAllocTypeConformanceWitnessSequentialID(type, interfaceType, outId);
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getDynamicObjectRTTIBytes(
     slang::TypeReflection* type,
     slang::TypeReflection* interfaceType,
@@ -831,7 +832,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getDynamicObjectRTTIBytes(
 
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
-    SLANG_RETURN_ON_FAIL(getTypeConformanceWitnessSequentialID(type, interfaceType, outBuffer + 2));
+    SLANG_RETURN_ON_FAIL(
+        getOrAllocTypeConformanceWitnessSequentialID(type, interfaceType, outBuffer + 2));
 
     // Make the RTTI part non zero.
     outBuffer[0] = 1;
@@ -876,8 +878,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
                     registerTypeConformanceWitnessSequentialID(
                         getMangledNameForConformanceWitness(m_astBuilder, subType, supType),
                         getMangledTypeName(m_astBuilder, supType),
-                        uint32_t(conformanceIdOverride),
-                        true);
+                        uint32_t(conformanceIdOverride));
                 }
             }
         }

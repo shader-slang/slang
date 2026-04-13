@@ -144,6 +144,7 @@ static void registerAllHandlers()
     REPLAY_REGISTER(SessionProxy, getTypeRTTIMangledName);
     REPLAY_REGISTER(SessionProxy, getTypeConformanceWitnessMangledName);
     REPLAY_REGISTER(SessionProxy, getTypeConformanceWitnessSequentialID);
+    REPLAY_REGISTER(SessionProxy, getOrAllocTypeConformanceWitnessSequentialID);
     REPLAY_REGISTER(SessionProxy, createCompileRequest);
     REPLAY_REGISTER(SessionProxy, createTypeConformanceComponentType);
     REPLAY_REGISTER(SessionProxy, isBinaryModuleUpToDate);
