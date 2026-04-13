@@ -347,10 +347,10 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
             if (exprModule->languageVersion >= removedSinceAttr->sinceVersion)
             {
                 getSink()->diagnose(Diagnostics::RemovedUsage{
-                        .declName = declRef.getName(),
-                        .sinceVersion = removedSinceAttr->sinceVersion,
-                        .message = removedSinceAttr->message,
-                        .location = loc});
+                    .declName = declRef.getName(),
+                    .sinceVersion = removedSinceAttr->sinceVersion,
+                    .message = removedSinceAttr->message,
+                    .location = loc});
 
                 return;
             }

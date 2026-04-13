@@ -1125,8 +1125,7 @@ Modifier* SemanticsVisitor::validateAttribute(
 
         const int32_t kMinVersion = -1;
         const int32_t kMaxVersion = 9999;
-        if ((sinceVersion->getValue() < kMinVersion) ||
-            (sinceVersion->getValue() > kMaxVersion))
+        if ((sinceVersion->getValue() < kMinVersion) || (sinceVersion->getValue() > kMaxVersion))
         {
             getSink()->diagnose(Diagnostics::RemovedSinceBadVersion{
                 .minVersion = kMinVersion,

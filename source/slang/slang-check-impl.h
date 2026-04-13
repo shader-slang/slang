@@ -1477,7 +1477,10 @@ public:
 
     Scope* getScope(SyntaxNode* node);
 
-    void diagnoseDeprecatedAndRemovedDeclRefUsage(DeclRef<Decl> declRef, SourceLoc loc, Expr* originalExpr);
+    void diagnoseDeprecatedAndRemovedDeclRefUsage(
+        DeclRef<Decl> declRef,
+        SourceLoc loc,
+        Expr* originalExpr);
 
     DeclRef<Decl> getDefaultDeclRef(Decl* decl)
     {
