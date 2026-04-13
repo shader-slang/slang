@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
 
 [__NonCopyableType]
 struct MoveOnly
@@ -11,15 +11,16 @@ interface IFactory
 {
     associatedtype Output;
     Output make();
+//CHECK:        ^^^^ see interface requirement declaration of 'make'
 }
 
 struct ConcreteFactory : IFactory
 {
     typedef MoveOnly Output;
 
-    // CHECK: error[E38109]:
-    // CHECK-SAME: member 'make' return type 'MoveOnly' and interface requirement return type 'Output' differ in copyability: one is copyable and the other is not
     MoveOnly make()
+//CHECK:          ^^^^ return type copyability mismatch
+//CHECK:          ^^^^ member 'make' return type 'MoveOnly' and interface requirement return type 'Output' differ in copyability: one is copyable and the other is not.
     {
         return MoveOnly();
     }
