@@ -3236,6 +3236,44 @@ struct TypeFlowSpecializationContext
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeLookupWitnessMethod");
     }
 
+    // Check if an existential operand is an entry-point parameter of interface type
+    // that lacks typeflow info. This catches targets (like CUDA compute) that skip
+    // collectEntryPointUniformParams and moveEntryPointUniformParamsToGlobalScope,
+    // leaving interface-typed params as plain IRParam without typeflow info.
+    // Emits E50100 when no conformances are registered, or E50104 when conformances
+    // exist but the target cannot handle interface-typed entry-point params.
+    void diagnoseEntryPointInterfaceParamIfNeeded(IRParam* param, IRInst* inst)
+    {
+        auto interfaceType = as<IRInterfaceType>(param->getDataType());
+        if (!interfaceType || isComInterfaceType(interfaceType) || !isFuncParam(param))
+            return;
+        if (diagnosedEntryPointInterfaceParams.contains(param))
+            return;
+        auto paramFunc = as<IRFunc>(as<IRBlock>(param->getParent())->getParent());
+        if (!paramFunc || !paramFunc->findDecoration<IREntryPointDecoration>())
+            return;
+
+        diagnosedEntryPointInterfaceParams.add(param);
+        StringBuilder typeStr;
+        printDiagnosticArg(typeStr, interfaceType);
+
+        HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+        collectExistentialTables(interfaceType, tables);
+        if (tables.getCount() == 0)
+        {
+            sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                .interfaceType = typeStr.produceString(),
+                .location = inst->sourceLoc});
+        }
+        else
+        {
+            sink->diagnose(Diagnostics::InterfaceTypedEntryPointParamNotSupported{
+                .interfaceType = typeStr.produceString(),
+                .location = inst->sourceLoc});
+        }
+        module->getContainerPool().free(&tables);
+    }
+
     IRInst* analyzeExtractExistentialWitnessTable(
         IRInst* context,
         IRExtractExistentialWitnessTable* inst)
@@ -3261,7 +3299,11 @@ struct TypeFlowSpecializationContext
 
         auto operandInfo = tryGetInfo(context, operand);
         if (!operandInfo)
+        {
+            if (auto param = as<IRParam>(operand))
+                diagnoseEntryPointInterfaceParamIfNeeded(param, inst);
             return none();
+        }
 
         if (auto taggedUnion = as<IRTaggedUnionType>(operandInfo))
         {
@@ -3308,7 +3350,11 @@ struct TypeFlowSpecializationContext
 
         auto operandInfo = tryGetInfo(context, operand);
         if (!operandInfo)
+        {
+            if (auto param = as<IRParam>(operand))
+                diagnoseEntryPointInterfaceParamIfNeeded(param, inst);
             return none();
+        }
 
         if (auto taggedUnion = as<IRTaggedUnionType>(operandInfo))
             return makeElementOfSetType(taggedUnion->getTypeSet());
@@ -3340,7 +3386,11 @@ struct TypeFlowSpecializationContext
 
         auto operandInfo = tryGetInfo(context, operand);
         if (!operandInfo)
+        {
+            if (auto param = as<IRParam>(operand))
+                diagnoseEntryPointInterfaceParamIfNeeded(param, inst);
             return none();
+        }
 
         if (auto taggedUnion = as<IRTaggedUnionType>(operandInfo))
             return makeUntaggedUnionType(taggedUnion->getTypeSet());
@@ -7693,6 +7743,10 @@ struct TypeFlowSpecializationContext
     // Set of parameters already diagnosed for ref/constref interface issues,
     // to avoid emitting duplicate diagnostics per call edge.
     HashSet<IRInst*> diagnosedRefParams;
+
+    // Set of entry-point params already diagnosed for missing conformances,
+    // to avoid emitting duplicate E50100 from multiple ExtractExistential* ops.
+    HashSet<IRInst*> diagnosedEntryPointInterfaceParams;
 
     // Set of call sites/contexts already diagnosed for invalid existential specialization,
     // to avoid duplicate diagnostics when instructions are revisited during propagation.
