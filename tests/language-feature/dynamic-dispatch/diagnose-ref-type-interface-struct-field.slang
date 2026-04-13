@@ -73,6 +73,30 @@ struct BorrowInParamField
 //CHECK:                 ^ cannot be used as a struct field; reference types can only be used for function parameters and return values.
 }
 
+// OutParam<T> as a struct field: also rejected.
+struct OutParamField
+{
+    OutParam<float> p;
+//CHECK:            ^ reference type cannot be used as struct field
+//CHECK:            ^ cannot be used as a struct field; reference types can only be used for function parameters and return values.
+}
+
+// BorrowInOutParam<T> as a struct field: also rejected.
+struct BorrowInOutParamField
+{
+    BorrowInOutParam<float> p;
+//CHECK:                    ^ reference type cannot be used as struct field
+//CHECK:                    ^ cannot be used as a struct field; reference types can only be used for function parameters and return values.
+}
+
+// Ref<T> in a class field: same restriction applies to all aggregate types.
+class ClassWithRefField
+{
+    Ref<float> field;
+//CHECK:       ^^^^^ reference type cannot be used as struct field
+//CHECK:       ^^^^^ cannot be used as a struct field; reference types can only be used for function parameters and return values.
+}
+
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
