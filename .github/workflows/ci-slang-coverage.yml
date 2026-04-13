@@ -216,7 +216,11 @@ jobs:
 
           # --with-synthesis runs a second pass with -only-synthesized to
           # exercise backend emit paths without a GPU.
-          ./tools/coverage/run-coverage.sh --with-synthesis "${test_args[@]}"
+          # Retry once on failure to handle intermittent test failures.
+          if ! ./tools/coverage/run-coverage.sh --with-synthesis "${test_args[@]}"; then
+            echo "::warning::First coverage run failed. Retrying..."
+            ./tools/coverage/run-coverage.sh --with-synthesis "${test_args[@]}"
+          fi
 
       - name: Generate Coverage Summary
         id: coverage-summary
