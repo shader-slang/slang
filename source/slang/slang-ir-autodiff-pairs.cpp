@@ -302,7 +302,7 @@ struct DifferentialPairTypeBuilder
             for (UInt i = 0; i < typePack->getOperandCount(); i++)
             {
                 auto type = (IRType*)typePack->getOperand(i);
-                auto diffType = (IRType*)typePack->getOperand(i);
+                auto diffType = (IRType*)diffTypePack->getOperand(i);
 
                 if (pairTypeCache.tryGetValue(type, result))
                 {

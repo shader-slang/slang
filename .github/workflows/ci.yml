@@ -73,6 +73,14 @@ jobs:
       config: release
       runs-on: '["ubuntu-22.04"]'
 
+  # Sanitizer build+test (blocking via check-ci, runs on every PR)
+  sanitizer-linux-clang-x86_64:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-sanitizer.yml
+    with:
+      runs-on: '["ubuntu-22.04"]'
+
   # macOS builds
   build-macos-debug-clang-aarch64:
     needs: [filter]
@@ -268,6 +276,7 @@ jobs:
         test-linux-release-gcc-aarch64,
         test-linux-debug-gcc-aarch64,
         test-materialx-windows-release,
+        sanitizer-linux-clang-x86_64,
       ]
     runs-on: ubuntu-latest
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
@@ -284,6 +293,7 @@ jobs:
           echo "Linux Release ARM64: ${{ needs.test-linux-release-gcc-aarch64.result }}"
           echo "Linux Debug ARM64: ${{ needs.test-linux-debug-gcc-aarch64.result }}"
           echo "MaterialX Windows: ${{ needs.test-materialx-windows-release.result }}"
+          echo "Sanitizer Linux: ${{ needs.sanitizer-linux-clang-x86_64.result }}"
 
           # Check if any required jobs failed (allow success or skipped)
           if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "failure" ]] || \
@@ -295,6 +305,7 @@ jobs:
              [[ "${{ needs.test-linux-release-gcc-aarch64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-linux-debug-gcc-aarch64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-materialx-windows-release.result }}" == "failure" ]] || \
+             [[ "${{ needs.sanitizer-linux-clang-x86_64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "cancelled" ]] || \
@@ -303,6 +314,7 @@ jobs:
              [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-linux-release-gcc-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-linux-debug-gcc-aarch64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.sanitizer-linux-clang-x86_64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-materialx-windows-release.result }}" == "cancelled" ]]; then
             echo "One or more CI jobs failed or were cancelled"
             exit 1
@@ -323,7 +335,7 @@ jobs:
       - name: Check for GPU health check failures and dispatch retry
         env:
           GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.SLANGBOT_PAT }}
         run: |
           gpu_failures=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
             --jq '[.jobs[]
