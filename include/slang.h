@@ -4352,16 +4352,23 @@ struct ISession : public ISlangUnknown
         ISlangBlob** outNameBlob) = 0;
 
     /** Get or allocate the sequential ID used to identify a type witness in a dynamic object.
-        The sequential ID is part of the RTTI bytes returned by `getDynamicObjectRTTIBytes`.
+ The
+     * sequential ID is part of the RTTI bytes returned by `getDynamicObjectRTTIBytes`.
 
-        If no sequential ID has been assigned for `type : interfaceType`, this call will allocate
-        an implicit ID and return it.
+        If
+     * no sequential ID has been assigned for `type : interfaceType`, this call will allocate
+ an
+     * implicit ID and return it.
 
         Any explicit sequential-ID reservations made via
-        `ISession::createTypeConformanceComponentType(..., conformanceIdOverride, ...)` should be
-        performed before calling this API. Querying implicit IDs first and then reserving
-        conflicting explicit IDs later will cause code generation to diagnose a duplicate
-        sequential-ID error.
+
+     * `ISession::createTypeConformanceComponentType(..., conformanceIdOverride, ...)` should be
+
+     * performed before calling this API. Querying implicit IDs first and then reserving
+
+     * conflicting explicit IDs later will cause code generation to diagnose a duplicate
+
+     * sequential-ID error.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrAllocTypeConformanceWitnessSequentialID(
         slang::TypeReflection* type,
@@ -4369,7 +4376,8 @@ struct ISession : public ISlangUnknown
         uint32_t* outId) = 0;
 
     /** @deprecated Use `getOrAllocTypeConformanceWitnessSequentialID`.
-        This API allocates an implicit sequential ID when one does not already exist.
+        This API allocates
+     * an implicit sequential ID when one does not already exist.
      */
     SLANG_DEPRECATED virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getTypeConformanceWitnessSequentialID(
@@ -4397,12 +4405,16 @@ struct ISession : public ISlangUnknown
         also given the opportunity to specify the dispatch ID of the implementation type. If
         `conformanceIdOverride` is -1, there will be no override behavior and Slang will
         automatically assign IDs to implementation types. The automatically assigned IDs can be
-        queried via `ISession::getOrAllocTypeConformanceWitnessSequentialID`.
 
-        If an application mixes explicit ID reservations with implicitly allocated IDs, explicit
-        reservations should be established first before any implicit IDs are queried.
+       queried via `ISession::getOrAllocTypeConformanceWitnessSequentialID`.
 
-        Returns SLANG_OK if succeeds, or SLANG_FAIL if `type` does not conform to `interfaceType`.
+        If an
+       application mixes explicit ID reservations with implicitly allocated IDs, explicit
+
+       reservations should be established first before any implicit IDs are queried.
+
+ Returns
+       SLANG_OK if succeeds, or SLANG_FAIL if `type` does not conform to `interfaceType`.
     */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createTypeConformanceComponentType(
         slang::TypeReflection* type,

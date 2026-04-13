@@ -995,9 +995,9 @@ Result ShaderObjectBase::setExistentialHeader(
     uint32_t conformanceID = 0xFFFFFFFF;
     SLANG_RETURN_ON_FAIL(
         getLayoutBase()->m_slangSession->getOrAllocTypeConformanceWitnessSequentialID(
-        concreteType,
-        existentialType,
-        &conformanceID));
+            concreteType,
+            existentialType,
+            &conformanceID));
     //
     // Once we have the conformance ID, then we can write it into the object
     // at the required offset.
