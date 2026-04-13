@@ -1159,6 +1159,13 @@ err(
 )
 
 err(
+    "reference-type-as-struct-field",
+    30030,
+    "reference type cannot be used as struct field",
+    span { loc = "location", message = "'~type:Type' cannot be used as a struct field; reference types can only be used for function parameters and return values." }
+)
+
+err(
     "no-member-of-name-in-type",
     30027,
     "member not found",

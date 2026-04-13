@@ -2,22 +2,13 @@
 // (Ref, RefParam, BorrowInParam) are designed for function parameters
 // and return values; they cannot be stored in struct fields because
 // there is no stable storage address to reference across struct copies.
-//
-// When T is an interface type, this is doubly problematic: the existential
-// value is stored as an AnyValue-packed tuple, and a reference into that
-// buffer would bypass the pack/unpack marshalling needed for dynamic
-// dispatch.
-//
-// Currently this triggers an internal compiler error (assert failure in
-// LoweredValInfo) instead of a user-friendly diagnostic. These tests are
-// disabled until the compiler produces a proper error message.
 
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target cuda -stage compute -entry computeMain
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry computeMain
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target cpp -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target wgsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cpp -stage compute -entry computeMain
 
 [anyValueSize(16)]
 interface IFoo
@@ -37,25 +28,28 @@ struct ImplB : IFoo
     float getValue() { return v * 2; }
 }
 
-// Ref<IFoo> as a struct field: should be diagnosed rather than ICE.
+// Ref<IFoo> as a struct field: should be diagnosed.
 struct RefInterfaceField
 {
-    // CHECK: ([[# @LINE+1]]): error
     Ref<IFoo> field;
+//CHECK:      ^^^^^ reference type cannot be used as struct field
+//CHECK:      ^^^^^ cannot be used as a struct field; reference types can only be used for function parameters and return values.
 }
 
 // Ref<ConcreteType> as a struct field: same underlying issue.
 struct RefConcreteField
 {
-    // CHECK: ([[# @LINE+1]]): error
     Ref<float> field;
+//CHECK:       ^^^^^ reference type cannot be used as struct field
+//CHECK:       ^^^^^ cannot be used as a struct field; reference types can only be used for function parameters and return values.
 }
 
 // Nested: struct containing another struct with Ref<IFoo> field.
 struct InnerRef
 {
-    // CHECK: ([[# @LINE+1]]): error
     Ref<IFoo> iface;
+//CHECK:      ^^^^^ reference type cannot be used as struct field
+//CHECK:      ^^^^^ cannot be used as a struct field; reference types can only be used for function parameters and return values.
 }
 
 struct OuterRef
