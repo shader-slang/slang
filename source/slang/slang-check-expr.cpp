@@ -299,7 +299,7 @@ ContainerDecl* isStaticScopeDecl(Decl* decl)
     return nullptr;
 }
 
-void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
+void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     DeclRef<Decl> declRef,
     SourceLoc loc,
     Expr* originalExpr)
@@ -334,6 +334,30 @@ void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
         return;
     }
 
+    // Check if we're using a removed declaration
+    if (auto removedSinceAttr = declRef.getDecl()->findModifier<RemovedSinceAttribute>())
+    {
+        if (auto declRefExpr = as<DeclRefExpr>(originalExpr))
+        {
+            SLANG_ASSERT(declRefExpr->scope != nullptr);
+
+            auto exprModule = getModuleDecl(declRefExpr->scope);
+            SLANG_ASSERT(exprModule != nullptr);
+
+            if (exprModule->languageVersion >= removedSinceAttr->sinceVersion)
+            {
+                getSink()->diagnose(Diagnostics::RemovedUsage{
+                        .declName = declRef.getName(),
+                        .sinceVersion = removedSinceAttr->sinceVersion,
+                        .message = removedSinceAttr->message,
+                        .location = loc});
+
+                return;
+            }
+        }
+    }
+
+    // Check if we're using a deprecated declaration
     if (auto deprecatedAttr = declRef.getDecl()->findModifier<DeprecatedAttribute>())
     {
         getSink()->diagnose(Diagnostics::DeprecatedUsage{
@@ -387,7 +411,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     // This is the bottleneck for using declarations which might be
     // deprecated, diagnose here.
     if (getSink())
-        diagnoseDeprecatedDeclRefUsage(declRef, loc, originalExpr);
+        diagnoseDeprecatedAndRemovedDeclRefUsage(declRef, loc, originalExpr);
 
     // Construct an appropriate expression based on the structured of
     // the declaration reference.
