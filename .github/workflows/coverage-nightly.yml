@@ -24,11 +24,11 @@ jobs:
       compiler: clang-18
       platform: x86_64
       config: relwithdebinfo
-      runs-on: '["Linux", "self-hosted", "GPU"]'
-      container: ghcr.io/shader-slang/slang-linux-gpu-coverage-ci:v1.0.0
+      runs-on: '["ubuntu-22.04"]'
+      container: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
       build-llvm: true
       deploy-pages: false
-      server-count: 4
+      server-count: 1
     secrets: inherit
 
   coverage-macos:

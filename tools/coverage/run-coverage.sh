@@ -83,16 +83,12 @@ else
   # Set up coverage output in temp directory
   export LLVM_PROFILE_FILE="$COVERAGE_DIR/slang-test-%p.profraw"
 
-  # Run tests (capture exit code but continue to generate reports even if tests fail)
+  # Run tests
   echo
   echo "Running tests with coverage instrumentation..."
   echo "Coverage data directory: $COVERAGE_DIR"
   cd "$REPO_ROOT"
-  TEST_EXIT=0
-  "$SLANG_TEST" "${TEST_ARGS[@]}" || TEST_EXIT=$?
-  if [ "$TEST_EXIT" -ne 0 ]; then
-    echo "Warning: slang-test exited with code $TEST_EXIT. Coverage data still collected."
-  fi
+  "$SLANG_TEST" "${TEST_ARGS[@]}"
 
   # Run record-replay API tests with recording enabled to capture record-replay coverage
   # This runs only the focused RecordReplayApi* tests with SLANG_RECORD_LAYER=1 to
@@ -120,9 +116,6 @@ else
   if [[ "$WITH_SYNTHESIS" == "true" ]]; then
     echo
     echo "Running synthesized compile-target tests..."
-    # Use a separate profraw prefix so synthesis data doesn't interfere
-    # with main pass data during merge
-    export LLVM_PROFILE_FILE="$COVERAGE_DIR/synth-%p.profraw"
     SYNTH_EXIT=0
     "$SLANG_TEST" "${TEST_ARGS[@]}" -only-synthesized || SYNTH_EXIT=$?
     if [ "$SYNTH_EXIT" -gt 128 ]; then
@@ -142,22 +135,8 @@ else
 
   # Merge coverage data
   echo
-  echo "Main pass profraw files:"
-  ls -lh "$COVERAGE_DIR"/slang-test-*.profraw 2>/dev/null | head -20
-  echo "Main pass profraw count: $(ls "$COVERAGE_DIR"/slang-test-*.profraw 2>/dev/null | wc -l)"
-
-  if ls "$COVERAGE_DIR"/synth-*.profraw >/dev/null 2>&1; then
-    echo
-    echo "Synthesis pass profraw files:"
-    ls -lh "$COVERAGE_DIR"/synth-*.profraw 2>/dev/null | head -20
-    echo "Synthesis profraw count: $(ls "$COVERAGE_DIR"/synth-*.profraw 2>/dev/null | wc -l)"
-  fi
-
-  echo
   echo "Merging coverage data..."
-  $LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw "$COVERAGE_DIR"/synth-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata 2>/dev/null \
-    || $LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata
-  echo "Merged profdata size: $(ls -lh "$COVERAGE_DIR/slang-test.profdata" | awk '{print $5}')"
+  $LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata
 fi
 
 # Load slangc compiler-only ignore patterns (shared with CI workflow)
@@ -233,11 +212,4 @@ if [[ "$REPORT_ONLY" != "true" ]]; then
   echo "Cleaning up raw profile data..."
   rm -f "$COVERAGE_DIR"/*.profraw
   echo "Kept merged profile data at: $COVERAGE_DIR/slang-test.profdata"
-fi
-
-# Propagate test failure after reports are generated
-if [[ "${TEST_EXIT:-0}" -ne 0 ]]; then
-  echo
-  echo "Exiting with test failure code $TEST_EXIT (reports were still generated)"
-  exit "$TEST_EXIT"
 fi
