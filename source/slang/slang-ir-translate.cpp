@@ -302,20 +302,8 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
             for (UIndex i = 0; i < funcType->getParamCount(); ++i)
                 params.add(funcBuilder.emitParam(funcType->getParamType(i)));
 
-            // Return the parameter whose type matches the return type
-            // (the MinimalContext). For free functions this is params[0],
-            // but for member methods it may be at a different index.
-            auto returnType = funcType->getResultType();
-            IRParam* contextParam = params[0];
-            for (auto p : params)
-            {
-                if (p->getDataType() == returnType)
-                {
-                    contextParam = p;
-                    break;
-                }
-            }
-            funcBuilder.emitReturn(contextParam);
+            // Return the first parameter (the MinimalContext).
+            funcBuilder.emitReturn(params[0]);
 
             translationResult = func;
         }

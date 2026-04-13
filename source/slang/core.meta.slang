@@ -718,13 +718,8 @@ interface IBackwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
     __associatedfunc ApplyForBwdFuncType<FType, This.MinimalContext> apply_bwd; // -> apply_bwd
 
-    // WARNING: Currently, the func-type produced by 'remat' is actually inconsistent
-    // with the implementation because the position of the 'this-type' is different.
-    // This isn't an issue at the moment since the IR generates
-    // both the implementation and the call, butthis needs to be fixed.
-    // 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableRematFunc))
-    __associatedfunc RematFuncType<FType, This.MinimalContext, This.BwdCallable> remat; // -> remat
+    static __associatedfunc RematFuncType<FType, This.MinimalContext, This.BwdCallable> remat; // -> remat
 
     __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
     static __associatedfunc BwdDiffFuncType<FType> bwd_diff; // -> bwd_diff

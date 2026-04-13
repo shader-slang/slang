@@ -698,8 +698,17 @@ Val* RematFuncType::_resolveImplOverride()
         auto funcType =
             getFuncType(astBuilder, as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
 
-        // First parameter is the MinimalCtxType.
+        // First parameter is always the MinimalCtxType.
         newParamTypes.add(resolvedMinimalCtxType);
+
+        // For member methods, include the this-type as an explicit parameter.
+        // Since remat is static, there is no implicit `this` from the extension,
+        // so the this-type must be explicitly present in the parameter list.
+        auto thisParamType = diffTypeWitness->getThisParamType();
+        if (thisParamType)
+        {
+            newParamTypes.add(thisParamType);
+        }
 
         // Get references to the differentiable interfaces to determine witness type.
         auto differentiableRefInterface = astBuilder->getDifferentiableRefInterfaceType();

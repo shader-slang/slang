@@ -13592,7 +13592,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                             funcAsTypeFromExtension,
                             minimalCtxType,
                             fullCtxType),
-                        false,
+                        true,
                         visibility);
 
                     this->ensureDecl(bwdDiffExtension.getDecl(), DeclCheckState::ReadyForLookup);
@@ -13673,7 +13673,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                             funcAsTypeFromExtension,
                             minimalCtxType,
                             fullCtxType),
-                        false,
+                        true,
                         visibility);
 
                     this->ensureDecl(bwdDiffExtension.getDecl(), DeclCheckState::ReadyForLookup);
@@ -14446,7 +14446,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
             kIROp_BackwardRematFromLegacyBwdDiffFunc,
             {funcAsTypeForSynth->getDeclRefBase(), synBwdDiffFunc},
             getCalculatedDiffFuncType("RematFuncType", baseFuncAsType, minimalCtxType, fullCtxType),
-            false,
+            true,
             visibility);
     }
     else if (as<ApplyForBwdExpr>(diffExpr))
@@ -14520,7 +14520,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
             kIROp_IdentityRemat,
             {synApplyBwdFunc},
             getCalculatedDiffFuncType("RematFuncType", baseFuncAsType, ctxType, ctxType),
-            false,
+            true,
             visibility);
 
         // bwd_diff is synthesized by the existing LegacyBackwardDerivativeFunc
@@ -17472,7 +17472,7 @@ static void translateBwdDerivativeAttributeToAD2(
             funcAsTypeFromExtension,
             minimalCtxType,
             fullCtxType),
-        false,
+        true,
         visibility);
 }
 
@@ -17729,7 +17729,7 @@ static void checkDerivativeAttribute(
                         funcAsTypeFromExtension,
                         minimalCtxType,
                         fullCtxType),
-                    false,
+                    true,
                     visibility);
             }
         }
