@@ -93,10 +93,13 @@ bool validateStructuredBufferResourceTypes(
     DiagnosticSink* sink,
     TargetRequest* targetRequest);
 
-// Process kIROp_AssumeAddress instructions. When validate is true,
-// checks that getRootAddr(addr) is in UserPointer address space and emits
-// an error if not. Always replaces each AssumeAddress(x) with x so backend
-// passes never see the opcode.
+// Process kIROp_AssumeAddress instructions. When validate is true, checks that
+// getRootAddr(addr) is not a function-local variable (kIROp_Var) holding a
+// plain value, and emits an error if it is. Vars whose stored type is a pointer,
+// pointer-like resource (e.g. ConstantBuffer), structured buffer, or
+// byte-address buffer are exempt because those always refer to device memory.
+// Always replaces each AssumeAddress(x) with x so backend passes never see the
+// opcode.
 void validateAndRemoveAssumeAddress(IRModule* module, bool validate, DiagnosticSink* sink);
 
 // Validate cooperative matrix/vector operations after type specialization.

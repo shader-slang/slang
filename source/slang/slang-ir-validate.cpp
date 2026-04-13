@@ -810,7 +810,42 @@ void validateAndRemoveAssumeAddress(IRModule* module, bool validate, DiagnosticS
         {
             auto addr = inst->getOperand(0);
             auto root = getRootAddr(addr);
-            if (root->getOp() != kIROp_Var)
+            bool shouldDiagnose = false;
+            if (root->getOp() == kIROp_Var)
+            {
+                // Don't diagnose vars that hold resource/buffer handles. Those
+                // always refer to device memory regardless of where the handle
+                // itself is stored (e.g. a ConstantBuffer parameter copied to a
+                // local var still points into device memory).
+                IRType* valueType = nullptr;
+                if (auto ptrType = as<IRPtrTypeBase>(root->getDataType()))
+                    valueType = ptrType->getValueType();
+                shouldDiagnose = !valueType || (!as<IRPointerLikeType>(valueType) &&
+                                                !as<IRHLSLStructuredBufferTypeBase>(valueType) &&
+                                                !as<IRByteAddressBufferTypeBase>(valueType));
+            }
+            else if (auto param = as<IRParam>(root))
+            {
+                // Also diagnose function parameters that are not of
+                // pointer/pointer-like type. Those represent function-local
+                // storage that cannot be addressed on GPU targets.
+                // (By-value params go through a kIROp_Var copy above; this
+                // catches inout/ref params where the IRParam itself is the root.)
+                auto parentBlock = as<IRBlock>(param->getParent());
+                IRGlobalValueWithCode* parentFunc = nullptr;
+                if (parentBlock)
+                    parentFunc = as<IRGlobalValueWithCode>(parentBlock->getParent());
+
+                if (parentFunc && parentBlock == parentFunc->getFirstBlock())
+                {
+                    auto type = root->getDataType();
+                    shouldDiagnose = !as<IRPtrTypeBase>(type) &&
+                                     !as<IRPointerLikeType>(type) &&
+                                     !as<IRHLSLStructuredBufferTypeBase>(type) &&
+                                     !as<IRByteAddressBufferTypeBase>(type);
+                }
+            }
+            if (!shouldDiagnose)
                 continue;
             sink->diagnose(Diagnostics::InvalidAddressOf{
                 .location = inst->sourceLoc,
