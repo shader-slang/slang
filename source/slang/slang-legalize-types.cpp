@@ -1233,7 +1233,7 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
 
             // When special types leak out of a parameter group, they need to
             // be bound differently. Warn the user when this happens.
-            if (legalElementType.flavor == LegalType::Flavor::pair)
+            if (legalElementType.flavor == LegalType::Flavor::pair && as<IRConstantBufferType>(type))
             {
                 context->m_sink->diagnose(Diagnostics::SpecialTypeLeaksFromParameterGroup{
                     .location = findFirstUseLoc(type)});
