@@ -325,6 +325,15 @@ void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
     {
         return;
     }
+
+    // If the expression location is the same as the declaration location, don't
+    // diagnose. This avoids diagnosing struct member fields which get
+    // referenced by synthesized constructors etc.
+    if (declRef.getDecl() && originalExpr && (declRef.getDecl()->getNameLoc() == originalExpr->loc))
+    {
+        return;
+    }
+
     if (auto deprecatedAttr = declRef.getDecl()->findModifier<DeprecatedAttribute>())
     {
         getSink()->diagnose(Diagnostics::DeprecatedUsage{
