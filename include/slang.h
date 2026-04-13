@@ -4354,7 +4354,7 @@ struct ISession : public ISlangUnknown
     /** Get the sequential ID used to identify a type witness in a dynamic object.
         The sequential ID is part of the RTTI bytes returned by `getDynamicObjectRTTIBytes`.
 
-        If no sequential ID has been assigned for `type : interfaceType`, this call will allocate an 
+        If no sequential ID has been assigned for `type : interfaceType`, this call will allocate an
         implicit ID and return it.
 
         Any explicit sequential-ID reservations made via
