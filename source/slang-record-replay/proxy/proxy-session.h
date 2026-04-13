@@ -190,24 +190,7 @@ public:
         RECORD_INPUT(type);
         RECORD_INPUT(interfaceType);
         PREPARE_POINTER_OUTPUT(outId);
-        auto result = getActual<slang::ISession>()->getOrAllocTypeConformanceWitnessSequentialID(
-            type,
-            interfaceType,
-            outId);
-        RECORD_OUTPUT(outId);
-        RECORD_RETURN(result);
-    }
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getOrAllocTypeConformanceWitnessSequentialID(
-        slang::TypeReflection* type,
-        slang::TypeReflection* interfaceType,
-        uint32_t* outId) override
-    {
-        RECORD_CALL();
-        RECORD_INPUT(type);
-        RECORD_INPUT(interfaceType);
-        PREPARE_POINTER_OUTPUT(outId);
-        auto result = getActual<slang::ISession>()->getOrAllocTypeConformanceWitnessSequentialID(
+        auto result = getActual<slang::ISession>()->getTypeConformanceWitnessSequentialID(
             type,
             interfaceType,
             outId);

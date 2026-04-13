@@ -263,17 +263,13 @@ SLANG_UNIT_TEST(typeConformanceSequentialIDAllocatesFirstFreeSlot)
     uint32_t triangleID = 0;
     uint32_t curvesID = 0;
     SLANG_CHECK_ABORT(
-        session->getOrAllocTypeConformanceWitnessSequentialID(
-            invalidHitInfo,
-            hitInfo,
-            &invalidID) == SLANG_OK);
+        session->getTypeConformanceWitnessSequentialID(invalidHitInfo, hitInfo, &invalidID) ==
+        SLANG_OK);
     SLANG_CHECK_ABORT(
-        session->getOrAllocTypeConformanceWitnessSequentialID(
-            triangleHitInfo,
-            hitInfo,
-            &triangleID) == SLANG_OK);
+        session->getTypeConformanceWitnessSequentialID(triangleHitInfo, hitInfo, &triangleID) ==
+        SLANG_OK);
     SLANG_CHECK_ABORT(
-        session->getOrAllocTypeConformanceWitnessSequentialID(curvesHitInfo, hitInfo, &curvesID) ==
+        session->getTypeConformanceWitnessSequentialID(curvesHitInfo, hitInfo, &curvesID) ==
         SLANG_OK);
 
     SLANG_CHECK(invalidID == 0);
@@ -414,10 +410,8 @@ SLANG_UNIT_TEST(typeConformanceImplicitThenExplicitSequentialIDDiagnostic)
 
     uint32_t invalidID = uint32_t(-1);
     SLANG_CHECK_ABORT(
-        session->getOrAllocTypeConformanceWitnessSequentialID(
-            invalidHitInfo,
-            hitInfo,
-            &invalidID) == SLANG_OK);
+        session->getTypeConformanceWitnessSequentialID(invalidHitInfo, hitInfo, &invalidID) ==
+        SLANG_OK);
     SLANG_CHECK(invalidID == 0);
 
     ComPtr<slang::ITypeConformance> triangleConformance;
