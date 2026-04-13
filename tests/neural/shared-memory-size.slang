@@ -32,33 +32,47 @@ void computeOneLayer<ExecutionMode Mode, T, U, Arr:IRWArray<uint>>(T inputSize, 
     where T == uint
     where U == uint
 {
-    // In this test, the CoopMat shape is always 16x16x16.
     const int coopMatShape = 16;
     const int alignedK = ((inputSize + coopMatShape - 1) / coopMatShape) * coopMatShape;
     const int alignedM = ((outputSize + coopMatShape - 1) / coopMatShape) * coopMatShape;
-    const int aliggnedN = SubgroupSize;
+    const int alignedN = SubgroupSize;
     const int subgroupCount = BatchSize / SubgroupSize;
+    const bool isTraining = Mode == ExecutionMode.Training;
 
-    const int tileASize = Mode == ExecutionMode.Inference ?
-                alignedM * coopMatShape * sizeof(half) :               // Forward,  A is M x K, tile A is M x 16
-                max(alignedM, alignedK) * coopMatShape * sizeof(half); // Backward, A is K x M, tile A is K x 16
+    // Term 1: BytesForMMA — A staging + per-warp C staging
+    const int tileASize = !isTraining ?
+                alignedM * coopMatShape * sizeof(half) :
+                max(alignedM, alignedK) * coopMatShape * sizeof(half);
 
-    // in backward, B is M x N, and N x K, tile B is 16 x max(N, K)
-    const int tileBSize = Mode == ExecutionMode.Inference ?
-                coopMatShape * aliggnedN * sizeof(half) :                   // forward,  B is K x N, tile B is 16 x N
-                coopMatShape * (max(aliggnedN, alignedK)) * sizeof(half);   // backward, B is M x N, tile B is 16 x max(N, K)
+    const int tileBSize = !isTraining ?
+                coopMatShape * alignedN * sizeof(half) :
+                coopMatShape * (max(alignedN, alignedK)) * sizeof(half);
 
     const int tileCSize = tileBSize * sizeof(DType) / sizeof(half);
-
     const int bytesForMMA = tileASize + tileCSize * subgroupCount;
 
-    // The backward outer product loads ALL N lanes' vectors simultaneously (2x).
-    const int bytesForOuterProduct = Mode == ExecutionMode.Training ?
-        2 * (tileASize + tileBSize) * subgroupCount : 0;
+    // Term 2: BytesForCrossWarpReduction — butterfly outer product reduction
+    const int nTileRows = (int(outputSize) + coopMatShape - 1) / coopMatShape;
+    const int nTileCols = (int(inputSize) + coopMatShape - 1) / coopMatShape;
+    const int elementsPerLane = (coopMatShape * coopMatShape) / SubgroupSize;
+    const int regsPerLane = (elementsPerLane * sizeof(DType) + 3) / 4;
+    const int tileStride = (regsPerLane * SubgroupSize * 4 + sizeof(uint4) - 1) / sizeof(uint4);
+    const int bytesForCrossWarpReduction = !isTraining ? 0 :
+        max(subgroupCount / 2, 1) * nTileRows * nTileCols * tileStride * sizeof(uint4);
 
-    const int expectedSize = bytesForMMA > bytesForOuterProduct ? bytesForMMA : bytesForOuterProduct;
+    // Term 3: BytesForOuterProductStore — per-row MatC tile store
+    const int bytesForOuterProductStore = !isTraining ? 0 :
+        nTileCols * coopMatShape * coopMatShape * sizeof(DType);
 
-    result[index++] = expectedSize;
+    // Term 4: BytesForSumReduceRows — bias reduce
+    const int heightInVecB = coopMatShape / (sizeof(uint4) / sizeof(half));
+    const int tileStrideVec = coopMatShape / (sizeof(uint4) / sizeof(DType));
+    const int mPadded = (int(outputSize) + 1) & ~1;
+    const int bytesForSumReduceRows = !isTraining ? 0 :
+        (subgroupCount * SubgroupSize * heightInVecB + subgroupCount * tileStrideVec * coopMatShape) * sizeof(uint4)
+        + ((subgroupCount * mPadded * sizeof(DType) + sizeof(uint4) - 1) / sizeof(uint4)) * sizeof(uint4);
+
+    result[index++] = max(max(max(bytesForMMA, bytesForOuterProductStore), bytesForCrossWarpReduction), bytesForSumReduceRows);
 }
 
 

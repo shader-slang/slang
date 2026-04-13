@@ -378,18 +378,17 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
     static const uint BytesForMMA =
         (ShMemInfo.SharedMemSizeInVectorMatA + (ShMemInfo.SharedMemSizeInVectorMatC) * SubgroupCount) * sizeof(uint4);
 
-    // Cross-warp all-at-once reduction for sumReduceTilesAllAtOnce().
-    // Stores ALL tiles at once instead of row-by-row to minimize barriers.
-    // Memory = NTileRows * NTileCols * TileStride * sizeof(uint4)
-    // Used by both the legacy outer product (shmem-staged) and the new
-    // MMAHelperNew outer product (FromLocal-based, shmem only for reduction).
+    // Cross-warp butterfly reduction for outer product.
+    // The first butterfly pass has G/2 warps storing simultaneously, each
+    // needing one full MatrixC<T,M,K> in native layout. The final store-to-
+    // global phase (warp 0 only) also needs one matrix. Max(G/2, 1) covers both.
     static const int NTileRows = (OutputSize + CMShape.ROW_A - 1) / CMShape.ROW_A;
     static const int NTileCols = (InputSize + CMShape.COLUMN_A - 1) / CMShape.COLUMN_A;
     static const int ElementsPerLane = CMShape.SizeCInElements / SubgroupSize;
     static const int RegsPerLane = (ElementsPerLane * sizeof(T) + 3) / 4;
     static const int TileStride = (RegsPerLane * SubgroupSize * 4 + sizeof(uint4) - 1) / sizeof(uint4);
     static const uint BytesForCrossWarpReduction = !ShMemInfo.IsTraining ? 0 :
-        NTileRows * NTileCols * TileStride * sizeof(uint4);
+        Max(SubgroupCount / 2, 1) * NTileRows * NTileCols * TileStride * sizeof(uint4);
 
     // Outer product store phase: one row of MatC tiles stored to shmem at a time.
     // NTileCols MatC tiles × (ROW_C * COLUMN_C * sizeof(T)) bytes each.
