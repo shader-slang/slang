@@ -37,7 +37,7 @@ jobs:
             bash -euo pipefail -c '
               yum install -y gcc-toolset-11-gcc gcc-toolset-11-gcc-c++
               source /opt/rh/gcc-toolset-11/enable
-              pip3 install cmake ninja
+              pip3 install cmake==3.25.0 ninja==1.11.1.4
               cd /home/app
               git config --global --add safe.directory /home/app
               cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
@@ -65,7 +65,7 @@ jobs:
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> "$GITHUB_OUTPUT"
       - name: File check
         run: |
-          find "build/dist-release" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
+          find "build/dist-release" -type f ! -iname '*.md' ! -iname '*.h' -print0 | xargs -0 file
       - name: UploadBinary
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/v')
