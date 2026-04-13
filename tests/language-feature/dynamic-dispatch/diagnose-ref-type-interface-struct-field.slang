@@ -57,6 +57,22 @@ struct OuterRef
     InnerRef inner;
 }
 
+// RefParam<T> as a struct field: also rejected.
+struct RefParamField
+{
+    RefParam<float> p;
+//CHECK:            ^ reference type cannot be used as struct field
+//CHECK:            ^ cannot be used as a struct field; reference types can only be used for function parameters and return values.
+}
+
+// BorrowInParam<T> as a struct field: also rejected.
+struct BorrowInParamField
+{
+    BorrowInParam<float> p;
+//CHECK:                 ^ reference type cannot be used as struct field
+//CHECK:                 ^ cannot be used as a struct field; reference types can only be used for function parameters and return values.
+}
+
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]

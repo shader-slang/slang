@@ -2628,10 +2628,9 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             auto type = varDecl->type.type;
             if (as<ExplicitRefType>(type) || as<ParamPassingModeType>(type))
             {
-                getSink()->diagnose(
-                    Diagnostics::ReferenceTypeAsStructField{
-                        .type = type,
-                        .location = varDecl->loc});
+                getSink()->diagnose(Diagnostics::ReferenceTypeAsStructField{
+                    .type = type,
+                    .location = varDecl->loc});
             }
         }
 
