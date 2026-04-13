@@ -43,7 +43,7 @@ jobs:
   coverage:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 120
-    container: ${{ inputs.container != '' && fromJSON(format('{{"image":"{0}","options":"--user root"}}', inputs.container)) || null }}
+    container: ${{ inputs.container != '' && fromJSON(format('{{"image":"{0}","options":"--user root","credentials":{{"username":"{1}","password":"{2}"}}}}', inputs.container, github.actor, github.token)) || null }}
     permissions:
       id-token: write # Required for Workload Identity (GCS auth)
       contents: read
