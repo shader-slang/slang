@@ -29,7 +29,7 @@ on:
       container:
         required: false
         type: string
-        default: ''
+        default: ""
       deploy-pages:
         required: false
         type: boolean
