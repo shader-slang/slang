@@ -3,7 +3,7 @@
 //
 // BUG: Debug assertion failure "doesSignatureMatch" when type provides custom
 // dzero/dadd without compiler-synthesized defaults. Works in Release builds.
-// TODO: File bug and re-enable once assertion is fixed.
+// TODO(#10806): Re-enable once doesSignatureMatch assertion is fixed in Debug builds.
 
 //DISABLE_TEST:INTERPRET(filecheck=CHECK):
 
