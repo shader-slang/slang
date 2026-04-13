@@ -2831,7 +2831,7 @@ internal T __builtin_cast<T, U>(U u);
 __generic<ToType, let N : int> extension vector<ToType,N>
 {
     //`ToType_T` is used as a workaround since Slang does not support contextual resolution for available members
-    // of a type. (see error 38044)
+    // of a type through constraints (see error 38044).
     __implicit_conversion(constraint)
     __intrinsic_op(BuiltinCast)
     __init<FromType, ToType_T>(vector<FromType,N> value) 
@@ -2839,7 +2839,7 @@ __generic<ToType, let N : int> extension vector<ToType,N>
         where ToType_T(FromType) implicit;
 
     //`ToType_T` is used as a workaround since Slang does not support contextual resolution for available members
-    // of a type. (see error 38044)
+    // of a type through constraints (see error 38044).
     __implicit_conversion(constraint +)
     [__unsafeForceInlineEarly]
     [__readNone]
@@ -2856,7 +2856,7 @@ __generic<ToType, let N : int> extension vector<ToType,N>
 __generic<ToType, let R : int, let C : int, let L : int> extension matrix<ToType,R,C,L>
 {
     //`ToType_T` is used as a workaround since Slang does not support contextual resolution for available members
-    // of a type. (see error 38044)
+    // of a type through constraints (see error 38044).
     __implicit_conversion(constraint)
     __intrinsic_op(BuiltinCast)
     __init<FromType, ToType_T>(matrix<FromType,R,C,L> value)
