@@ -31,17 +31,6 @@ static Val* _getNonEmptyConstraintPackVal(
     ASTBuilder* astBuilder,
     DeclRef<NonEmptyPackConstraintDecl> const& constraintDeclRef);
 
-static bool _isCanonicallyNonCopyableType(Type* type)
-{
-    return type && isNonCopyableType(type->getCanonicalType());
-}
-
-template<typename TDecl>
-static Type* _getDeclaredCallableLikeResultType(ASTBuilder* astBuilder, DeclRef<TDecl> declRef)
-{
-    return getResultType(astBuilder, makeDeclRef(declRef.getDecl()).as<CallableDecl>());
-}
-
 // ============================================================================
 // Declaration nesting validation (disallowed-by-default)
 //
@@ -5014,10 +5003,11 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
         if (!requiredResultType->equals(satisfyingResultType))
             return false;
-        if (_isCanonicallyNonCopyableType(
-                _getDeclaredCallableLikeResultType(m_astBuilder, requiredMemberDeclRef)) !=
-            _isCanonicallyNonCopyableType(
-                _getDeclaredCallableLikeResultType(m_astBuilder, satisfyingMemberDeclRef)))
+        auto declaredSatisfyingResultType = getResultType(
+            m_astBuilder,
+            makeDeclRef(satisfyingMemberDeclRef.getDecl()).as<CallableDecl>());
+        if (declaredSatisfyingResultType &&
+            isNonCopyableType(declaredSatisfyingResultType->getCanonicalType()))
             return false;
 
         auto requiredErrorType = getErrorCodeType(m_astBuilder, requiredMemberDeclRef);
@@ -5268,10 +5258,11 @@ bool SemanticsVisitor::doesSubscriptMatchRequirement(
     auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
     if (!requiredResultType->equals(satisfyingResultType))
         return false;
-    if (_isCanonicallyNonCopyableType(
-            _getDeclaredCallableLikeResultType(m_astBuilder, requiredMemberDeclRef)) !=
-        _isCanonicallyNonCopyableType(
-            _getDeclaredCallableLikeResultType(m_astBuilder, satisfyingMemberDeclRef)))
+    auto declaredSatisfyingResultType = getResultType(
+        m_astBuilder,
+        makeDeclRef(satisfyingMemberDeclRef.getDecl()).as<CallableDecl>());
+    if (declaredSatisfyingResultType &&
+        isNonCopyableType(declaredSatisfyingResultType->getCanonicalType()))
         return false;
 
     // Each accessor in the requirement must be accounted for by an accessor
@@ -7408,8 +7399,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             }
             else if (
                 declaredRequirementResultType &&
-                _isCanonicallyNonCopyableType(actualReturnType) !=
-                    _isCanonicallyNonCopyableType(declaredRequirementResultType))
+                isNonCopyableType(actualReturnType->getCanonicalType()))
             {
                 if (auto invokeExpr = as<InvokeExpr>(checkedCall))
                 {
@@ -7598,8 +7588,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 if (declaredWitnessResultType && declaredRequirementResultType &&
                     getResultType(m_astBuilder, requiredMemberDeclRef)
                         ->equals(getResultType(m_astBuilder, synDeclRef.as<FuncDecl>())) &&
-                    _isCanonicallyNonCopyableType(declaredWitnessResultType) !=
-                        _isCanonicallyNonCopyableType(declaredRequirementResultType))
+                    isNonCopyableType(declaredWitnessResultType->getCanonicalType()))
                 {
                     outFailureDetails->reason =
                         WitnessSynthesisFailureReason::MethodResultNonCopyableMismatch;
@@ -9189,11 +9178,11 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     this->ensureDecl(witnessDecl, DeclCheckState::ReadyForLookup);
 
     auto synthesizedCallableDeclRef = synthesizedWitnessDeclRef.as<CallableDecl>();
-    auto requiredCallableDeclRef = requirementDeclRef.as<CallableDecl>();
-    if (_isCanonicallyNonCopyableType(
-            _getDeclaredCallableLikeResultType(m_astBuilder, synthesizedCallableDeclRef)) !=
-        _isCanonicallyNonCopyableType(
-            _getDeclaredCallableLikeResultType(m_astBuilder, requiredCallableDeclRef)))
+    auto declaredSatisfyingResultType = getResultType(
+        m_astBuilder,
+        makeDeclRef(synthesizedCallableDeclRef.getDecl()).as<CallableDecl>());
+    if (declaredSatisfyingResultType &&
+        isNonCopyableType(declaredSatisfyingResultType->getCanonicalType()))
     {
         return false;
     }
@@ -9201,7 +9190,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     // Test signature and register in witness table.
     bool doesSignatureMatch = doesSignatureMatchRequirement(
         synthesizedCallableDeclRef,
-        requiredCallableDeclRef,
+        requirementDeclRef.as<CallableDecl>(),
         witnessTable);
 
     // If we decide that it is possible to synthesize this requirement, then we should
