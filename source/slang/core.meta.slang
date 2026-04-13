@@ -2830,12 +2830,16 @@ internal T __builtin_cast<T, U>(U u);
 // If T is implicitly convertible to U, then vector<T,N> is implicitly convertible to vector<U,N>.
 __generic<ToType, let N : int> extension vector<ToType,N>
 {
+    //`ToType_T` is used as a workaround since Slang does not support contextual resolution for available members
+    // of a type. (see error 38044)
     __implicit_conversion(constraint)
     __intrinsic_op(BuiltinCast)
     __init<FromType, ToType_T>(vector<FromType,N> value) 
         where ToType_T == ToType
         where ToType_T(FromType) implicit;
 
+    //`ToType_T` is used as a workaround since Slang does not support contextual resolution for available members
+    // of a type. (see error 38044)
     __implicit_conversion(constraint +)
     [__unsafeForceInlineEarly]
     [__readNone]
@@ -2851,6 +2855,8 @@ __generic<ToType, let N : int> extension vector<ToType,N>
 // If T is implicitly convertible to U, then matrix<T,R,C,L> is implicitly convertible to matrix<U,R,C,L>.
 __generic<ToType, let R : int, let C : int, let L : int> extension matrix<ToType,R,C,L>
 {
+    //`ToType_T` is used as a workaround since Slang does not support contextual resolution for available members
+    // of a type. (see error 38044)
     __implicit_conversion(constraint)
     __intrinsic_op(BuiltinCast)
     __init<FromType, ToType_T>(matrix<FromType,R,C,L> value)
