@@ -7367,9 +7367,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         // Check if the failure was due to return type coercion
         if (!IsErrorExpr(checkedExpr) && outFailureDetails)
         {
-            auto declaredRequirementResultType = getResultType(
-                m_astBuilder,
-                makeDeclRef(requiredMemberDeclRef.getDecl()).as<CallableDecl>());
+            auto declaredRequirementResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
 
             // The call resolved - check if it's a return type mismatch
             auto actualReturnType = checkedExpr->type;
@@ -7567,9 +7565,8 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         {
             if (outFailureDetails)
             {
-                auto declaredRequirementResultType = getResultType(
-                    m_astBuilder,
-                    makeDeclRef(requiredMemberDeclRef.getDecl()).as<CallableDecl>());
+                auto declaredRequirementResultType =
+                    getResultType(m_astBuilder, requiredMemberDeclRef);
                 auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
                 auto satisfyingResultType = getResultType(m_astBuilder, synDeclRef.as<FuncDecl>());
 
