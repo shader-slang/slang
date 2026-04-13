@@ -223,6 +223,24 @@ bool isInvalidExistentialSpecialization(IRInst* specializedValue)
         {
             for (auto inst : block->getOrdinaryInsts())
             {
+                // Detect ByteAddressBufferLoad/Store specialized with an interface type.
+                // When byteAddressBufferLoad<IFoo> is specialized, the result type of
+                // the load instruction (or an operand type of the store) will be an
+                // interface type, which is not supported.
+                if (inst->getOp() == kIROp_ByteAddressBufferLoad)
+                {
+                    if (as<IRInterfaceType>(inst->getDataType()))
+                        return true;
+                }
+                if (inst->getOp() == kIROp_ByteAddressBufferStore)
+                {
+                    // Operands: (buffer, offset, alignment, value).
+                    // The stored value is at index 3.
+                    if (inst->getOperandCount() > 3 &&
+                        as<IRInterfaceType>(inst->getOperand(3)->getDataType()))
+                        return true;
+                }
+
                 auto call = as<IRCall>(inst);
                 if (!call)
                     continue;
