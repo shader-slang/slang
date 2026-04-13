@@ -116,7 +116,9 @@
       "inherits": "default",
       "description": "Build with code coverage instrumentation",
       "cacheVariables": {
-        "SLANG_ENABLE_COVERAGE": true
+        "SLANG_ENABLE_COVERAGE": true,
+        "CMAKE_C_FLAGS": "-fprofile-instr-generate -fcoverage-mapping",
+        "CMAKE_CXX_FLAGS": "-fprofile-instr-generate -fcoverage-mapping"
       }
     },
     {
