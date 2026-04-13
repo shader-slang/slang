@@ -334,30 +334,34 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
         return;
     }
 
-    // Check if we're using a removed declaration
+    // Check whether we're using a removed declaration
     if (auto removedSinceAttr = declRef.getDecl()->findModifier<RemovedSinceAttribute>())
     {
+        // resolve the effective scope for the expression
+        Scope* exprScope = nullptr;
         if (auto declRefExpr = as<DeclRefExpr>(originalExpr))
+            exprScope = declRefExpr->scope;
+        if (!exprScope)
+            exprScope = getOuterScope();
+
+        // Then figure out the module where the scope belongs. That's what we'll
+        // use for the language version.
+        if (auto exprModule = exprScope ? getModuleDecl(exprScope) : nullptr)
         {
-            SLANG_ASSERT(declRefExpr->scope != nullptr);
-
-            auto exprModule = getModuleDecl(declRefExpr->scope);
-            SLANG_ASSERT(exprModule != nullptr);
-
             if (exprModule->languageVersion >= removedSinceAttr->sinceVersion)
             {
                 getSink()->diagnose(Diagnostics::RemovedUsage{
-                    .declName = declRef.getName(),
-                    .sinceVersion = removedSinceAttr->sinceVersion,
-                    .message = removedSinceAttr->message,
-                    .location = loc});
+                        .declName = declRef.getName(),
+                        .sinceVersion = removedSinceAttr->sinceVersion,
+                        .message = removedSinceAttr->message,
+                        .location = loc});
 
                 return;
             }
         }
     }
 
-    // Check if we're using a deprecated declaration
+    // Check whether we're using a deprecated declaration
     if (auto deprecatedAttr = declRef.getDecl()->findModifier<DeprecatedAttribute>())
     {
         getSink()->diagnose(Diagnostics::DeprecatedUsage{
