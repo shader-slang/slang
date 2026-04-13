@@ -33,7 +33,7 @@ struct RemovedStructSince2024
 
 [RemovedSince(-2, "Min-1")]
 /*CHECK:
- ^^^^^^^^^^^^ 'RemovedSince' argument 'version' exceeds allowed range
+ ^^^^^^^^^^^^ 'RemovedSince' argument 'version' is outside allowed range
  ^^^^^^^^^^^^ valid range: [-1, 9999]
 */
 struct RemovedStructSinceMinMinus1
@@ -52,7 +52,7 @@ struct RemovedStructSinceMax
 
 [RemovedSince(10000, "Max+1")]
 /*CHECK:
- ^^^^^^^^^^^^ 'RemovedSince' argument 'version' exceeds allowed range
+ ^^^^^^^^^^^^ 'RemovedSince' argument 'version' is outside allowed range
  ^^^^^^^^^^^^ valid range: [-1, 9999]
 */
 struct RemovedStructSinceMaxPlus1

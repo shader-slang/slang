@@ -1988,8 +1988,8 @@ class DeprecatedAttribute : public Attribute
     FIDDLE() String message;
 };
 
-/// A `[removedSince(languageVersion, "message")]` attribute indicates that the
-/// target has been removed since the specified language version.
+/// A `[RemovedSince(languageVersion, "message")]` attribute indicates that the
+/// target has been removed starting from the specified language version.
 ///
 FIDDLE()
 class RemovedSinceAttribute : public Attribute

@@ -2615,7 +2615,7 @@ err(
 err(
     "removed-since-bad-version",
     31209,
-    "'RemovedSince' argument 'version' exceeds allowed range",
+    "'RemovedSince' argument 'version' is outside allowed range",
     span { loc = "location", message = "valid range: [~minVersion:Int, ~maxVersion:Int]" }
 )
 

@@ -65,6 +65,12 @@ void deprecatedFunction()
 [deprecated("This typealias is deprecated")]
 typealias DeprecatedTypeDef = int;
 
+[deprecated("This enum is deprecated")]
+enum DeprecatedEnum
+{
+    DeprecatedValue, // note: enum values cannot be decorated with attributes
+};
+
 [numthreads(1,1,1)]
 void main(uint3 threadId : SV_DispatchThreadID)
 {
@@ -98,4 +104,11 @@ void main(uint3 threadId : SV_DispatchThreadID)
       ^^^^^^^^^^^^^^^^^^^^^^^^^^ deprecatedExtendedFunction has been deprecated: This extension-provided member function is deprecated
 */
 
+    var e : DeprecatedEnum;
+//CHECK:    ^^^^^^^^^^^^^^ use of deprecated declaration
+//CHECK:    ^^^^^^^^^^^^^^ DeprecatedEnum has been deprecated: This enum is deprecated
+
+    var ev = DeprecatedEnum.DeprecatedValue;
+//CHECK:     ^^^^^^^^^^^^^^ use of deprecated declaration
+//CHECK:     ^^^^^^^^^^^^^^ DeprecatedEnum has been deprecated: This enum is deprecated
 }

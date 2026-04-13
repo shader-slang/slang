@@ -65,6 +65,12 @@ void removedFunction()
 [RemovedSince(-1, "This typealias is removed")]
 typealias RemovedTypeDef = int;
 
+[RemovedSince(-1, "This enum is removed")]
+enum RemovedEnum
+{
+    RemovedValue, // note: enum values cannot be decorated with attributes
+};
+
 [numthreads(1,1,1)]
 void main(uint3 threadId : SV_DispatchThreadID)
 {
@@ -97,5 +103,13 @@ void main(uint3 threadId : SV_DispatchThreadID)
       ^^^^^^^^^^^^^^^^^^^^^^^ use of removed declaration
       ^^^^^^^^^^^^^^^^^^^^^^^ removedExtendedFunction has been removed since language version '-1': This extension-provided member function is removed
 */
+
+    var e : RemovedEnum;
+//CHECK:    ^^^^^^^^^^^ use of removed declaration
+//CHECK:    ^^^^^^^^^^^ RemovedEnum has been removed since language version '-1': This enum is removed
+
+    var ev = RemovedEnum.RemovedValue;
+//CHECK:     ^^^^^^^^^^^ use of removed declaration
+//CHECK:     ^^^^^^^^^^^ RemovedEnum has been removed since language version '-1': This enum is removed
 
 }
