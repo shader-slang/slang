@@ -801,14 +801,16 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         SLANG_ASSERT(witnessTable);
         SLANG_ASSERT(previousWitnessTable);
 
-        StringBuilder keyBuilder;
-        if (auto interfaceLinkage = interfaceType->findDecoration<IRLinkageDecoration>())
-            keyBuilder << interfaceLinkage->getMangledName();
-        else
-            keyBuilder << "interface";
-        keyBuilder << "#" << sequentialID;
+        auto diagnosedSequentialIDs =
+            m_diagnosedDuplicateSequentialIDKeys.tryGetValue(interfaceType);
+        if (!diagnosedSequentialIDs)
+        {
+            m_diagnosedDuplicateSequentialIDKeys.add(interfaceType, HashSet<uint32_t>());
+            diagnosedSequentialIDs =
+                m_diagnosedDuplicateSequentialIDKeys.tryGetValue(interfaceType);
+        }
 
-        if (!m_diagnosedDuplicateSequentialIDKeys.add(keyBuilder.produceString()))
+        if (!diagnosedSequentialIDs->add(sequentialID))
             return;
 
         if (!m_sink)
@@ -1041,7 +1043,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
     void validateUniqueWitnessTableSequentialIDs()
     {
-        Dictionary<String, IRInst*> witnessTableForSequentialID;
+        Dictionary<IRInst*, Dictionary<uint32_t, IRInst*>> witnessTableForSequentialID;
 
         for (auto inst : module->getGlobalInsts())
         {
@@ -1060,16 +1062,15 @@ struct SequentialIDTagLoweringContext : public InstPassBase
             if (!seqDecoration)
                 continue;
 
-            auto interfaceLinkage = interfaceType->findDecoration<IRLinkageDecoration>();
-            if (!interfaceLinkage)
-                continue;
+            auto sequentialID = uint32_t(seqDecoration->getSequentialID());
+            auto witnessTablesForInterface = witnessTableForSequentialID.tryGetValue(interfaceType);
+            if (!witnessTablesForInterface)
+            {
+                witnessTableForSequentialID.add(interfaceType, Dictionary<uint32_t, IRInst*>());
+                witnessTablesForInterface = witnessTableForSequentialID.tryGetValue(interfaceType);
+            }
 
-            StringBuilder keyBuilder;
-            keyBuilder << interfaceLinkage->getMangledName() << "#"
-                       << uint32_t(seqDecoration->getSequentialID());
-            auto key = keyBuilder.produceString();
-
-            if (auto previousWitnessTable = witnessTableForSequentialID.tryGetValue(key))
+            if (auto previousWitnessTable = witnessTablesForInterface->tryGetValue(sequentialID))
             {
                 if (*previousWitnessTable != inst)
                 {
@@ -1077,12 +1078,12 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                         interfaceType,
                         inst,
                         *previousWitnessTable,
-                        uint32_t(seqDecoration->getSequentialID()));
+                        sequentialID);
                 }
                 continue;
             }
 
-            witnessTableForSequentialID.add(key, inst);
+            witnessTablesForInterface->add(sequentialID, inst);
         }
     }
 
@@ -1105,7 +1106,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 private:
     Linkage* m_linkage;
     DiagnosticSink* m_sink;
-    HashSet<String> m_diagnosedDuplicateSequentialIDKeys;
+    Dictionary<IRInst*, HashSet<uint32_t>> m_diagnosedDuplicateSequentialIDKeys;
 };
 
 void lowerSequentialIDTagCasts(IRModule* module, Linkage* linkage, DiagnosticSink* sink)
