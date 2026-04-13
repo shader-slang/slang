@@ -214,6 +214,52 @@ jobs:
             echo "::endgroup::"
           done
 
+      - name: Enrich intermittency report with system data
+        if: always()
+        run: |
+          REPORT="intermittency-report.json"
+
+          # If slang-test didn't create the file (no retries), create a minimal one
+          if [[ ! -f "$REPORT" ]]; then
+            echo '{"retries": {"total": 0, "passed_on_retry": 0, "tests": []}, "scheduling_stopped": false}' > "$REPORT"
+          fi
+
+          # Collect GPU state
+          gpu_crashed=false
+          gpu_info=""
+          if nvidia-smi --query-gpu=name,driver_version,memory.used,temperature.gpu,pstate \
+              --format=csv,noheader 2>/dev/null; then
+            gpu_info=$(nvidia-smi --query-gpu=name,driver_version,memory.used,temperature.gpu,pstate \
+              --format=csv,noheader 2>/dev/null | head -1)
+          else
+            gpu_crashed=true
+          fi
+
+          # Count core dumps
+          core_count=$(find /tmp -name "core.*" -type f 2>/dev/null | wc -l | tr -d ' ')
+          core_files=""
+          if [[ "$core_count" -gt 0 ]]; then
+            core_files=$(find /tmp -name "core.*" -type f 2>/dev/null | xargs -I{} basename {} | tr '\n' ', ' | sed 's/,$//')
+          fi
+
+          # Use python to merge system data into existing JSON (jq may not be available)
+          python3 -c "
+          import json, sys
+          with open('$REPORT') as f:
+              data = json.load(f)
+          data['system'] = {
+              'gpu_crashed': $( [[ "$gpu_crashed" == "true" ]] && echo "True" || echo "False" ),
+              'gpu_info': '''$gpu_info'''.strip(),
+              'core_dumps': $core_count,
+              'core_files': '''$core_files'''.strip()
+          }
+          with open('$REPORT', 'w') as f:
+              json.dump(data, f, indent=2)
+          " 2>/dev/null || echo "::warning::Failed to enrich intermittency report with system data"
+
+          echo "Intermittency report:"
+          cat "$REPORT"
+
       - name: Upload crash artifacts
         if: failure()
         uses: actions/upload-artifact@v4
@@ -225,12 +271,12 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
 
-      - name: Upload retry report
+      - name: Upload intermittency report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: retry-report-${{ inputs.config }}-slang-test
-          path: retry-report.json
+          name: intermittency-report-${{ inputs.config }}-slang-test
+          path: intermittency-report.json
           retention-days: 30
           if-no-files-found: ignore
 

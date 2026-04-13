@@ -6130,30 +6130,42 @@ SlangResult innerMain(int argc, char** argv)
                         passedCount,
                         (int)retryResults.getCount());
 
-                    // Write retry report as JSON for CI artifact collection
-                    FILE* reportFile = fopen("retry-report.json", "w");
+                    // Write intermittency report as JSON for CI artifact collection
+                    FILE* reportFile = fopen("intermittency-report.json", "w");
                     if (reportFile)
                     {
                         fprintf(reportFile, "{\n");
+                        fprintf(reportFile, "  \"retries\": {\n");
                         fprintf(
                             reportFile,
-                            "  \"total_retried\": %d,\n",
+                            "    \"total\": %d,\n",
                             (int)retryResults.getCount());
-                        fprintf(reportFile, "  \"passed_on_retry\": %d,\n", passedCount);
-                        fprintf(reportFile, "  \"tests\": [\n");
+                        fprintf(
+                            reportFile,
+                            "    \"passed_on_retry\": %d,\n",
+                            passedCount);
+                        fprintf(reportFile, "    \"tests\": [\n");
                         for (Index i = 0; i < retryResults.getCount(); i++)
                         {
                             auto& rr = retryResults[i];
                             fprintf(
                                 reportFile,
-                                "    {\"name\": \"%s\", \"passed_on_retry\": %s}%s\n",
+                                "      {\"name\": \"%s\", \"passed_on_retry\": %s}%s\n",
                                 rr.testName.getBuffer(),
                                 rr.passedOnRetry ? "true" : "false",
                                 (i < retryResults.getCount() - 1) ? "," : "");
                         }
-                        fprintf(reportFile, "  ]\n}\n");
+                        fprintf(reportFile, "    ]\n");
+                        fprintf(reportFile, "  },\n");
+                        fprintf(
+                            reportFile,
+                            "  \"scheduling_stopped\": %s\n",
+                            context.stopSchedulingTests.load() ? "true" : "false");
+                        fprintf(reportFile, "}\n");
                         fclose(reportFile);
-                        printf("Retry report written to retry-report.json\n");
+                        printf(
+                            "Intermittency report written to "
+                            "intermittency-report.json\n");
                     }
                 }
             }

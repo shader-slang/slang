@@ -85,11 +85,11 @@ if ! gh run download "$RUN_ID" --repo "$REPO" --name "$CRASH_ARTIFACT" --dir "$W
 	gh run download "$RUN_ID" --repo "$REPO" --pattern "*crash*" --dir "$WORK_DIR/crash" 2>&1 || true
 	gh run download "$RUN_ID" --repo "$REPO" --pattern "*retry*" --dir "$WORK_DIR/retry" 2>&1 || true
 
-	# Show retry report if available
-	if [[ -f "$WORK_DIR/retry/retry-report.json" ]]; then
+	# Show intermittency report if available
+	if [[ -f "$WORK_DIR/retry/intermittency-report.json" ]]; then
 		echo ""
-		echo "=== Retry Report ==="
-		cat "$WORK_DIR/retry/retry-report.json"
+		echo "=== Intermittency Report ==="
+		cat "$WORK_DIR/retry/intermittency-report.json"
 	fi
 
 	echo ""
@@ -205,17 +205,17 @@ GDB_EOF
 	fi
 done
 
-# Step 5: Also show retry report if available
+# Step 5: Also show intermittency report if available
 echo ""
-echo "=== Step 5: Checking retry report ==="
+echo "=== Step 5: Checking intermittency report ==="
 gh run download "$RUN_ID" --repo "$REPO" --pattern "*retry*${CONFIG}*" --dir "$WORK_DIR/retry" 2>&1 || true
 
-RETRY_FILE=$(find "$WORK_DIR/retry" -name "retry-report.json" 2>/dev/null | head -1)
+RETRY_FILE=$(find "$WORK_DIR/retry" -name "intermittency-report.json" 2>/dev/null | head -1)
 if [[ -n "$RETRY_FILE" ]]; then
 	echo "Retry report:"
 	cat "$RETRY_FILE"
 else
-	echo "No retry report found (no tests were retried, or retries not yet enabled)"
+	echo "No intermittency report found (no tests were retried, or retries not yet enabled)"
 fi
 
 echo ""

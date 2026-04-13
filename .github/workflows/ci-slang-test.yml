@@ -104,12 +104,12 @@ jobs:
 
           # Execute slang-test with all arguments
           "$bin_dir/slang-test" "${slang_test_args[@]}"
-      - name: Upload retry report
+      - name: Upload intermittency report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: retry-report-${{ inputs.os }}-${{ inputs.config }}-slang-test
-          path: retry-report.json
+          name: intermittency-report-${{ inputs.os }}-${{ inputs.config }}-slang-test
+          path: intermittency-report.json
           retention-days: 30
           if-no-files-found: ignore
 
