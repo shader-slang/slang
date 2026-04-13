@@ -134,8 +134,9 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
         if (Layout.Layout == LayoutType.Optimal)
         {
             typealias MMA = TiledMMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, true, SubgroupCount>;
-            let dInputVec = MMA.backward<Address, OutputVector.Differential>(
-                dthis.p, doutput, dWeightAddress.p, dWeightAddress.d, biasAddress.value.d);
+            let dInputVec = MMA.backward<Address, OutputVector.Differential, Bias>(
+                dthis.p, doutput, dWeightAddress.p, dWeightAddress.d,
+                Bias ? biasAddress.value.d : dWeightAddress.d);
             dthis = DifferentialPair<This>(dthis.p, bit_cast<This>(dInputVec));
         }
         else

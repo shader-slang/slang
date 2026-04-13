@@ -67,6 +67,8 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
 
     neural_unittest.testOuterProductAccumulateTiled<DType, PaddedInputSize, PaddedOutputSize, TestShMemSize, workgroupCount>(inputData, dOutData, outputBuffer);
 
+    convertNativeToRowMajorTiled<DType, PaddedOutputSize, PaddedInputSize, WorkgroupSize>(tid, outputBuffer);
+
     int subgroupIndex = tid / SubgroupSize;
     if (subgroupIndex != 0)
         return;
@@ -87,7 +89,7 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
         if (rowIdx >= OutputSize)
             break;
 
-        int startVal = OutputSize - rowIdx;
+        int startVal = PaddedOutputSize - rowIdx;
 
         for (int j = 0; j < InputSize; j++)
         {

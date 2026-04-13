@@ -34,7 +34,7 @@ DType[InputSize]
     OutputVec dOut = OutputVec(dOutData);
 
     typealias GradAddress = Address.Differential;
-    let dInput = MMA.backward<Address, OutputVec.Differential>(
+    let dInput = MMA.backward<Address, OutputVec.Differential, true>(
         input, bit_cast<OutputVec.Differential>(dOut), Address(weightBuffer),
         bit_cast<GradAddress>(Address(weightGradBuffer)),
         bit_cast<GradAddress>(Address(biasGradBuffer)));

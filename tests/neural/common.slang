@@ -88,6 +88,52 @@ public void setBufferOneValue<int Size, int WorkgroupSize, T>(uint tid, RWStruct
     AllMemoryBarrierWithGroupSync();
 }
 
+// Map (row, col) inside a 16×16 tile to CUDA MatB native fragment index.
+// Layout: lane = gid*4+tidLocal, each lane holds 8 elements.
+//   gid = col % 8,  tidLocal = (row % 8) / 2
+//   Sub-tiles split at row 8 and col 8.
+int rowMajorToNativeMatB(int row, int col)
+{
+    int rowGroup   = row < 8 ? 0 : 1;
+    int rowInGroup = row - 8 * rowGroup;
+    int tidLocal   = rowInGroup / 2;
+    int pair       = rowInGroup % 2;
+    int sub        = col < 8 ? 0 : 1;
+    int gid        = col - 8 * sub;
+    int lane       = gid * 4 + tidLocal;
+    int localPos   = sub * 4 + rowGroup * 2 + pair;
+    return lane * 8 + localPos;
+}
+
+// Offset for element (row, col) in the weight buffer's tiled layout.
+// On CUDA: native MatB fragment layout (for loadWeightRaw).
+// On Vulkan: row-major within each 16×16 tile (for CoopMat.Load<RowMajor>).
+// Single-tile version (row, col both < 16).
+// row = output dimension (M), col = input dimension (K).
+// CUDA weight is MatB<K, M> — native layout indexed as (K_row, M_col).
+// Vulkan weight is MatA<M, K> — row-major indexed as (M_row, K_col).
+public int tiledWeightOffset(int row, int col)
+{
+    __target_switch
+    {
+    case cuda:  return rowMajorToNativeMatB(col, row);
+    case spirv: return row * 16 + col;
+    }
+}
+
+// Offset for element (row, col) in the dWeight buffer's tiled layout.
+// On CUDA: native MatC fragment layout (from storeRaw + atomicAdd).
+// On Vulkan: row-major within each 16×16 tile (from storeTileRowToGlobal).
+// Single-tile version (row, col both < 16).
+public int tiledDWeightOffset(int row, int col)
+{
+    __target_switch
+    {
+    case cuda:  return rowMajorToNativeMatC(row, col);
+    case spirv: return row * 16 + col;
+    }
+}
+
 // Convert a row-major 16x16 tile to MatB native register layout.
 // MatB packs vertically: same column (gid), adjacent rows (tid*2, tid*2+1).
 public void convertTileRowMajorToNativeB<T>(
@@ -149,6 +195,96 @@ public void convertTiledToNativeB<T, int PaddedRows, int PaddedCols, int Workgro
             if (index < TotalElements)
                 buffer[index] = buffer[TempOffset + index];
         }
+        AllMemoryBarrierWithGroupSync();
+    }
+    case spirv:
+        break;
+    }
+}
+
+// Map (row, col) inside a 16×16 tile to the CUDA MatC native fragment index.
+// Layout for CoopMat<half, 16, 16, Accumulator> stored via storeRaw:
+//   Lane L (g=L/4, c=L%4) holds 4 regs × 2 halves = 8 elements:
+//     reg 0: (g, 2c), (g, 2c+1)          sub-tile 0
+//     reg 1: (g+8, 2c), (g+8, 2c+1)      sub-tile 0
+//     reg 2: (g, 2c+8), (g, 2c+9)        sub-tile 1
+//     reg 3: (g+8, 2c+8), (g+8, 2c+9)    sub-tile 1
+int rowMajorToNativeMatC(int row, int col)
+{
+    int g      = row < 8 ? row : row - 8;
+    int regSub = row < 8 ? 0 : 1;
+    int sub    = col < 8 ? 0 : 1;
+    int c      = (col - 8 * sub) / 2;
+    int hp     = col % 2;
+    int lane   = g * 4 + c;
+    int loc    = sub * 4 + regSub * 2 + hp;
+    return lane * 8 + loc;
+}
+
+// Convert CUDA outer product output from native layout (col-major tiles,
+// native MatC fragment order within tiles) to row-major tiled layout.
+// On Vulkan the output is already row-major, so this is a no-op.
+//
+// Each thread reads its share of elements into registers, barrier, then
+// writes back to the remapped positions.  No scratch buffer needed.
+public void convertNativeToRowMajorTiled<T, int PaddedRows, int PaddedCols, int WorkgroupSize>(
+    uint tid, RWStructuredBuffer<T>.Handle buffer)
+    where T : __BuiltinFloatingPointType
+{
+    __target_switch
+    {
+    case cuda:
+    {
+        static const int TileSize = 16;
+        static const int NTileRows = PaddedRows / TileSize;
+        static const int NTileCols = PaddedCols / TileSize;
+        static const int TileElements = TileSize * TileSize;
+        static const int TotalElements = PaddedRows * PaddedCols;
+        static const int ElemsPerThread = (TotalElements + WorkgroupSize - 1) / WorkgroupSize;
+
+        T regs[ElemsPerThread];
+        int dstIdx[ElemsPerThread];
+
+        [ForceUnroll]
+        for (int i = 0; i < ElemsPerThread; i++)
+        {
+            int srcLinear = i * WorkgroupSize + int(tid);
+            if (srcLinear < TotalElements)
+            {
+                regs[i] = buffer[srcLinear];
+
+                int tileSeq  = srcLinear / TileElements;
+                int localNat = srcLinear % TileElements;
+                int tileRow  = tileSeq % NTileRows;
+                int tileCol  = tileSeq / NTileRows;
+
+                int lane    = localNat / 8;
+                int loc     = localNat % 8;
+                int g       = lane / 4;
+                int c       = lane % 4;
+                int sub     = loc / 4;
+                int regSub  = (loc % 4) / 2;
+                int hp      = loc % 2;
+                int row     = g + regSub * 8;
+                int col     = 2 * c + 8 * sub + hp;
+
+                dstIdx[i] = (tileRow * NTileCols + tileCol) * TileElements + row * TileSize + col;
+            }
+            else
+            {
+                dstIdx[i] = -1;
+            }
+        }
+
+        AllMemoryBarrierWithGroupSync();
+
+        [ForceUnroll]
+        for (int i = 0; i < ElemsPerThread; i++)
+        {
+            if (dstIdx[i] >= 0)
+                buffer[dstIdx[i]] = regs[i];
+        }
+
         AllMemoryBarrierWithGroupSync();
     }
     case spirv:

@@ -67,7 +67,7 @@ internal struct TiledMMAHelper<T, int InputSize, int OutputSize, int SubgroupSiz
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
     internal static WaveTangledVector<T.Differential, ShMemSize, InputSize, SubgroupSize, SubgroupCount>
-    backward<Address, OutputVector>(
+    backward<Address, OutputVector, bool Bias = true>(
         WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount> input,
         OutputVector dOut,
         Address weightAddress,
@@ -87,11 +87,11 @@ internal struct TiledMMAHelper<T, int InputSize, int OutputSize, int SubgroupSiz
         {
         case cuda:
             typealias Cuda = TiledMMACuda<T, InputSize, OutputSize, SubgroupSize, Target>;
-            return Cuda.backward<Address, ShMemSize, SubgroupCount>(
+            return Cuda.backward<Address, ShMemSize, SubgroupCount, Bias>(
                 input, dOutConcrete, weightAddress, weightGradConcrete, biasGradConcrete);
         case spirv:
             typealias Vulkan = TiledMMAVulkan<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, TransposeA, SubgroupCount>;
-            return Vulkan.backward<Address>(
+            return Vulkan.backward<Address, Bias>(
                 input, dOutConcrete, weightAddress, weightGradConcrete, biasGradConcrete);
         }
     }

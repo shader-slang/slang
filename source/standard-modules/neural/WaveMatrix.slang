@@ -427,8 +427,6 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
     //
     // Each tile is stored as 32 lanes × RegsPerLane registers contiguously.
     // Uses uint4 vectorized shared memory access for efficiency.
-    //
-    // Equivalent to Tin2's store_native / load_native on shared memory.
     // =========================================================================
 
     [ForceInline]
@@ -532,15 +530,49 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
             int vecStart = g * TILE;
             uint base = shMemOffset + laneId * uint(TileWidthUint4);
 
+            static const int ElemsPerUint4_U = sizeof(uint4) / sizeof(U);
+
             [ForceUnroll]
             for (int i = 0; i < TileWidthUint4; i++)
             {
-                uint4 value;
-                int s = vecStart + i * HalvesPerUint4;
-                value.x = bit_cast<uint>(half2(__realCast<half>(vec[s+0]), __realCast<half>(vec[s+1])));
-                value.y = bit_cast<uint>(half2(__realCast<half>(vec[s+2]), __realCast<half>(vec[s+3])));
-                value.z = bit_cast<uint>(half2(__realCast<half>(vec[s+4]), __realCast<half>(vec[s+5])));
-                value.w = bit_cast<uint>(half2(__realCast<half>(vec[s+6]), __realCast<half>(vec[s+7])));
+                uint4 value = uint4(0, 0, 0, 0);
+
+                if (sizeof(U) == sizeof(half))
+                {
+                    int s = vecStart + i * HalvesPerUint4;
+                    if (s < VecSize)
+                    {
+                        let h4a = half4(__realCast<half>(vec[s+0]), __realCast<half>(vec[s+1]),
+                                        __realCast<half>(vec[s+2]), __realCast<half>(vec[s+3]));
+                        let h4b = half4(__realCast<half>(vec[s+4]), __realCast<half>(vec[s+5]),
+                                        __realCast<half>(vec[s+6]), __realCast<half>(vec[s+7]));
+                        let u2a = bit_cast<uint2>(h4a);
+                        let u2b = bit_cast<uint2>(h4b);
+                        value = uint4(u2a.x, u2a.y, u2b.x, u2b.y);
+                    }
+                }
+                else
+                {
+                    int s0 = vecStart + i * ElemsPerUint4_U * 2;
+                    if (s0 < VecSize)
+                    {
+                        let h4 = half4(__realCast<half>(vec[s0+0]), __realCast<half>(vec[s0+1]),
+                                       __realCast<half>(vec[s0+2]), __realCast<half>(vec[s0+3]));
+                        let u2 = bit_cast<uint2>(h4);
+                        value.x = u2.x;
+                        value.y = u2.y;
+                    }
+                    int s1 = s0 + ElemsPerUint4_U;
+                    if (s1 < VecSize)
+                    {
+                        let h4 = half4(__realCast<half>(vec[s1+0]), __realCast<half>(vec[s1+1]),
+                                       __realCast<half>(vec[s1+2]), __realCast<half>(vec[s1+3]));
+                        let u2 = bit_cast<uint2>(h4);
+                        value.z = u2.x;
+                        value.w = u2.y;
+                    }
+                }
+
                 ShMemPool.data[base + uint(i)] = value;
             }
 
@@ -616,26 +648,29 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
             [ForceUnroll]
             for (int i = 0; i < TileWidthUint4; i++)
             {
-                uint4 value = ShMemPool.data[base + uint(i)];
                 int s = vecStart + i * ElemPerUint4;
+                if (s < VecSize)
+                {
+                    uint4 value = ShMemPool.data[base + uint(i)];
 
-                if (sizeof(T) == 2)
-                {
-                    vector<T, 2> p0 = bit_cast<vector<T, 2>>(value.x);
-                    vector<T, 2> p1 = bit_cast<vector<T, 2>>(value.y);
-                    vector<T, 2> p2 = bit_cast<vector<T, 2>>(value.z);
-                    vector<T, 2> p3 = bit_cast<vector<T, 2>>(value.w);
-                    vec[s+0] = p0.x; vec[s+1] = p0.y;
-                    vec[s+2] = p1.x; vec[s+3] = p1.y;
-                    vec[s+4] = p2.x; vec[s+5] = p2.y;
-                    vec[s+6] = p3.x; vec[s+7] = p3.y;
-                }
-                else if (sizeof(T) == 4)
-                {
-                    vec[s+0] = bit_cast<T>(value.x);
-                    vec[s+1] = bit_cast<T>(value.y);
-                    vec[s+2] = bit_cast<T>(value.z);
-                    vec[s+3] = bit_cast<T>(value.w);
+                    if (sizeof(T) == 2)
+                    {
+                        vector<T, 2> p0 = bit_cast<vector<T, 2>>(value.x);
+                        vector<T, 2> p1 = bit_cast<vector<T, 2>>(value.y);
+                        vector<T, 2> p2 = bit_cast<vector<T, 2>>(value.z);
+                        vector<T, 2> p3 = bit_cast<vector<T, 2>>(value.w);
+                        vec[s+0] = p0.x; vec[s+1] = p0.y;
+                        vec[s+2] = p1.x; vec[s+3] = p1.y;
+                        vec[s+4] = p2.x; vec[s+5] = p2.y;
+                        vec[s+6] = p3.x; vec[s+7] = p3.y;
+                    }
+                    else if (sizeof(T) == 4)
+                    {
+                        vec[s+0] = bit_cast<T>(value.x);
+                        vec[s+1] = bit_cast<T>(value.y);
+                        vec[s+2] = bit_cast<T>(value.z);
+                        vec[s+3] = bit_cast<T>(value.w);
+                    }
                 }
             }
 

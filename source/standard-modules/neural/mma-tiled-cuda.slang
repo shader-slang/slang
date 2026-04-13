@@ -80,11 +80,6 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
     // Weight loaded as MatB via loadWeightRaw, input packed as MatA via shuffles.
     // =========================================================================
 
-    // MatA/MatB are always half: 2 halves per uint for input packing.
-    // MatC element type is T: 1 float per uint or 2 halves per uint for result.
-    static const int PackedSizeFwdInputHalf = K / 2;
-    static const int PackedSizeFwdResult = M / (sizeof(uint) / sizeof(T));
-
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
     internal static WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>
@@ -95,31 +90,37 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
         where Address : IPointerLikeAddress<T>
     {
         typealias OutputVec = WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>;
+        typealias InputVecT = WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount>;
+
+        // Packed sizes derived from Uint4AlignedInputSize so fromArrayPacked/toArrayPacked
+        // always receive arrays aligned to RegColsPacked (4 uints).
+        static const int AlignedPackedInputHalf = InputVecT.Uint4AlignedInputSize / 2;
+        static const int AlignedPackedResult = OutputVec.Uint4AlignedInputSize * sizeof(T) / sizeof(uint);
 
         InputMatrix inputMat;
         if (sizeof(T) == 2)
         {
-            // T is half — direct pack
-            let inputPacked = bit_cast<uint[PackedSizeFwdInputHalf]>(input.data);
-            inputMat.fromArrayPacked<PackedSizeFwdInputHalf>(inputPacked);
+            let inputPacked = bit_cast<uint[AlignedPackedInputHalf]>(input.data);
+            inputMat.fromArrayPacked<AlignedPackedInputHalf>(inputPacked);
         }
         else
         {
-            // T is float — convert to half first
-            half inputHalf[K];
+            half inputHalf[InputVecT.Uint4AlignedInputSize];
             for (int i = 0; i < K; i++)
                 inputHalf[i] = __realCast<half>(input[i]);
-            let inputPacked = bit_cast<uint[PackedSizeFwdInputHalf]>(inputHalf);
-            inputMat.fromArrayPacked<PackedSizeFwdInputHalf>(inputPacked);
+            for (int i = K; i < InputVecT.Uint4AlignedInputSize; i++)
+                inputHalf[i] = half(0);
+            let inputPacked = bit_cast<uint[AlignedPackedInputHalf]>(inputHalf);
+            inputMat.fromArrayPacked<AlignedPackedInputHalf>(inputPacked);
         }
 
         // MMA: result(N, M) = input(N, K) × W(K, M)
         ResultMatrix resultMat;
         mma<Address>(inputMat, weightAddress, resultMat);
 
-        // Extract result (MatC element type is T, so packed size depends on sizeof(T))
-        uint resultPacked[PackedSizeFwdResult];
-        resultMat.toArrayPacked<PackedSizeFwdResult>(resultPacked);
+        // Extract result
+        uint resultPacked[AlignedPackedResult];
+        resultMat.toArrayPacked<AlignedPackedResult>(resultPacked);
 
         OutputVec output;
         output.data = bit_cast<T[OutputVec.Uint4AlignedInputSize]>(resultPacked);
@@ -143,7 +144,7 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
     internal static WaveTangledVector<T.Differential, ShMemSize, K, N, SubgroupCount>
-    backward<Address, ShMemSize : ISharedMemorySize, int SubgroupCount>(
+    backward<Address, ShMemSize : ISharedMemorySize, int SubgroupCount, bool Bias = true>(
         WaveTangledVector<T, ShMemSize, K, N, SubgroupCount> input,
         WaveTangledVector<T, ShMemSize, M, N, SubgroupCount> dOut,
         Address weightAddress,
@@ -151,16 +152,46 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
         Address biasGradAddress)
         where Address : IPointerLikeAddress<T>
     {
-        let dOutPacked = bit_cast<uint[PackedSizeOutput]>(dOut.data);
-        let inputPacked = bit_cast<uint[PackedSizeInput]>(input.data);
+        typealias OutputVec = WaveTangledVector<T, ShMemSize, M, N, SubgroupCount>;
+        typealias InputVecT = WaveTangledVector<T, ShMemSize, K, N, SubgroupCount>;
+        static const int AlignedPackedDOutHalf = OutputVec.Uint4AlignedInputSize / 2;
+        static const int AlignedPackedInputHalf = InputVecT.Uint4AlignedInputSize / 2;
 
-        // DOut is loaded as Row vector for MatA.
+        // DOut is loaded as Row vector for MatA (half-typed).
         DOutMatrix dOutMat;
-        dOutMat.fromArrayPacked<PackedSizeOutput>(dOutPacked);
+        if (sizeof(T) == 2)
+        {
+            let dOutPacked = bit_cast<uint[AlignedPackedDOutHalf]>(dOut.data);
+            dOutMat.fromArrayPacked<AlignedPackedDOutHalf>(dOutPacked);
+        }
+        else
+        {
+            half dOutHalf[OutputVec.Uint4AlignedInputSize];
+            for (int i = 0; i < M; i++)
+                dOutHalf[i] = __realCast<half>(dOut[i]);
+            for (int i = M; i < OutputVec.Uint4AlignedInputSize; i++)
+                dOutHalf[i] = half(0);
+            let dOutPacked = bit_cast<uint[AlignedPackedDOutHalf]>(dOutHalf);
+            dOutMat.fromArrayPacked<AlignedPackedDOutHalf>(dOutPacked);
+        }
 
-        // Input is loaded as Row vector for MatB.
+        // Input is loaded as Row vector for MatA (half-typed).
         InputMatrix inputMat;
-        inputMat.fromArrayPacked<PackedSizeInput>(inputPacked);
+        if (sizeof(T) == 2)
+        {
+            let inputPacked = bit_cast<uint[AlignedPackedInputHalf]>(input.data);
+            inputMat.fromArrayPacked<AlignedPackedInputHalf>(inputPacked);
+        }
+        else
+        {
+            half inputHalf[InputVecT.Uint4AlignedInputSize];
+            for (int i = 0; i < K; i++)
+                inputHalf[i] = __realCast<half>(input[i]);
+            for (int i = K; i < InputVecT.Uint4AlignedInputSize; i++)
+                inputHalf[i] = half(0);
+            let inputPacked = bit_cast<uint[AlignedPackedInputHalf]>(inputHalf);
+            inputMat.fromArrayPacked<AlignedPackedInputHalf>(inputPacked);
+        }
 
         // 1. Transpose MMA: dIn = dOut × W^T
         BwdResultMatrix resultMat;
@@ -168,18 +199,20 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
 
         // 2. Bias reduce
         int subgroupId = int(getWaveId());
-        biasReduce<T, Address, ShMemSize, SubgroupCount>(
-            0u, dOutMat, subgroupId, biasGradAddress);
+        if (Bias)
+            biasReduce<T, Address, ShMemSize, SubgroupCount>(
+                0u, dOutMat, subgroupId, biasGradAddress);
 
         // 3. Outer product: accumulate dWeight
         outerProduct<T, Address, ShMemSize, SubgroupCount>(
             0u, dOutMat, inputMat, weightGradAddress);
 
-        // 4. Extract dInput from result
-        uint resultPacked[PackedSizeInput];
-        resultMat.toArrayPacked<PackedSizeInput>(resultPacked);
-
+        // 4. Extract dInput from result (MatC is T-typed, so use T-sized packing)
         typealias InputVec = WaveTangledVector<T.Differential, ShMemSize, K, N, SubgroupCount>;
+        static const int AlignedPackedResultK = InputVecT.Uint4AlignedInputSize * sizeof(T) / sizeof(uint);
+        uint resultPacked[AlignedPackedResultK];
+        resultMat.toArrayPacked<AlignedPackedResultK>(resultPacked);
+
         InputVec dInput;
         dInput.data = bit_cast<T.Differential[InputVec.Uint4AlignedInputSize]>(resultPacked);
         return dInput;
@@ -347,6 +380,23 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
                     }
                 }
             }
+            else if (sizeof(U) == 4)
+            {
+                static const int FloatsPerTile = OPResultTileStride * (sizeof(uint4) / sizeof(U));
+                static const int TotalFloats = OP_TotalTiles * FloatsPerTile;
+                static const int ItersPerLane = (TotalFloats + N - 1) / N;
+
+                [ForceUnroll]
+                for (uint p = 0; p < ItersPerLane; p++)
+                {
+                    int fIdx = int(laneId) + int(p) * N;
+                    if (fIdx < TotalFloats)
+                    {
+                        U val = ShMemPool.smemLoad<U>(sharedMemoryOffset, fIdx);
+                        weightAddress.atomicAdd(uint(fIdx), val);
+                    }
+                }
+            }
         }
 
         GroupMemoryBarrierWithGroupSync();
@@ -436,53 +486,34 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
 
         int pairIdx = subgroupId * N + int(laneId);
 
-        if (sizeof(U) == 2)
+        for (int j = 0; j < NumIters; j++)
         {
-            for (int j = 0; j < NumIters; j++)
+            if (pairIdx < PairsPerWarp)
             {
-                if (pairIdx < PairsPerWarp)
+                vector<half, 2> sum_h2 = vector<half, 2>(half(0), half(0));
+                for (int i = 0; i < SubgroupCount; i++)
+                    sum_h2 = sum_h2 + ShMemPool.smemLoad<vector<half, 2>>(sharedMemoryOffset, pairIdx + i * PairsPerWarp);
+
+                int elemIdx0 = pairIdx * 2;
+                int elemIdx1 = elemIdx0 + 1;
+
+                if (sizeof(U) == 2)
                 {
-                    vector<U, 2> sum_v2 = vector<U, 2>(U(0), U(0));
-                    for (int i = 0; i < SubgroupCount; i++)
-                        sum_v2 = sum_v2 + ShMemPool.smemLoad<vector<U, 2>>(sharedMemoryOffset, pairIdx + i * PairsPerWarp);
-
-                    int elemIdx0 = pairIdx * 2;
-                    int elemIdx1 = elemIdx0 + 1;
-
                     if (elemIdx1 < M)
                     {
                         let addr = biasAddress.getOffset(elemIdx0);
-                        addr.atomicAdd(0u, sum_v2);
+                        addr.atomicAdd(0u, vector<U, 2>(__realCast<U>(sum_h2.x), __realCast<U>(sum_h2.y)));
                     }
                 }
-                pairIdx += NUM_VECTORS;
-            }
-        }
-        else
-        {
-            for (int j = 0; j < NumIters; j++)
-            {
-                if (pairIdx < PairsPerWarp)
+                else
                 {
-                    U sum0 = U(0);
-                    U sum1 = U(0);
-                    for (int i = 0; i < SubgroupCount; i++)
-                    {
-                        static const int MPadded2 = (M + 1) & ~1;
-                        sum0 = sum0 + ShMemPool.smemLoad<U>(sharedMemoryOffset, i * MPadded2 + pairIdx * 2);
-                        sum1 = sum1 + ShMemPool.smemLoad<U>(sharedMemoryOffset, i * MPadded2 + pairIdx * 2 + 1);
-                    }
-
-                    int elemIdx0 = pairIdx * 2;
-                    int elemIdx1 = elemIdx0 + 1;
-
                     if (elemIdx0 < M)
-                        biasAddress.atomicAdd(uint(elemIdx0), sum0);
+                        biasAddress.atomicAdd(uint(elemIdx0), __realCast<U>(sum_h2.x));
                     if (elemIdx1 < M)
-                        biasAddress.atomicAdd(uint(elemIdx1), sum1);
+                        biasAddress.atomicAdd(uint(elemIdx1), __realCast<U>(sum_h2.y));
                 }
-                pairIdx += NUM_VECTORS;
             }
+            pairIdx += NUM_VECTORS;
         }
 
         GroupMemoryBarrierWithGroupSync();

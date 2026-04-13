@@ -55,26 +55,25 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
         wA.loadWeightTiled<T, Address, false>(weightAddress);
 
         // Input: MatB(K, N) — each lane's K-element input as a row
-        T inputArr[K];
-        for (int i = 0; i < K; i++) inputArr[i] = input[i];
+        typealias InputVec = WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount>;
         MatrixB<K, N> inputB;
-        inputB.fromVectorViaShMem<ShMemSize, T, K, false>(inputArr, shBase);
+        inputB.fromVectorViaShMem<ShMemSize, T, InputVec.Uint4AlignedInputSize, false>(input.data, shBase);
 
         // MMA: result(M, N) = W(M, K) × input(K, N)
         MatrixC<T, M, N> resultMat = matMul<T, M, K, N>(wA, inputB);
 
         // Extract output vector
         typealias OutputVec = WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>;
-        T outputArr[M] = {};
-        resultMat.toVectorViaShMem<ShMemSize, M, false>(outputArr, shBase);
+        OutputVec output;
+        resultMat.toVectorViaShMem<ShMemSize, OutputVec.Uint4AlignedInputSize, false>(output.data, shBase);
 
         if (Bias)
         {
             for (int i = 0; i < M; i++)
-                outputArr[i] = outputArr[i] + biasAddress.value[uint(i)];
+                output.data[i] = output.data[i] + biasAddress.value[uint(i)];
         }
 
-        return OutputVec(outputArr);
+        return output;
     }
 
     // =========================================================================
@@ -87,10 +86,10 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    internal static void mmaTranspose<Address>(
+    internal static void mmaTranspose<Address, int ResultVecSize>(
         MatrixB<M, N> inputB,
         Address weightAddress,
-        inout T resultArr[K],
+        inout T resultArr[ResultVecSize],
         uint shBase)
         where Address : IPointerLikeAddress<T>
     {
@@ -100,26 +99,27 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
         // MMA: result(K, N) = W^T(K, M) × input(M, N)
         MatrixC<T, K, N> resultMat = matMul<T, K, M, N>(wA, inputB);
 
-        resultMat.toVectorViaShMem<ShMemSize, K, false>(resultArr, shBase);
+        resultMat.toVectorViaShMem<ShMemSize, ResultVecSize, false>(resultArr, shBase);
     }
 
     // =========================================================================
     // Bias reduce: dBias += sum(dOut) across lanes
     //
-    // Reuses the pre-loaded dOutB (MatB<M, N>) directly — no shmem reload.
-    // MMA: ones(16,16) × dOutB_tile → column sums. Then cross-warp reduce + atomicAdd.
+    // Takes dOutA (MatA<M, N>, lanes as columns) so it can be reused by outerProductAccumulate.
+    // MMA: C(M, 16) = dOutA(M, N) × onesB(N, 16) → each column of C = dBias.
+    // Then cross-warp reduce + atomicAdd.
     // =========================================================================
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     internal static void biasReduce<Address>(
-        MatrixB<M, N> dOutB,
+        MatrixA<M, N> dOutA,
         int subgroupId,
         Address biasGradAddress,
         uint shBase)
         where Address : IPointerLikeAddress<T>
     {
-        typealias Tile16A = linalg.CoopMat<half, MemoryScope.Subgroup, 16, 16, linalg.CoopMatMatrixUse.MatrixA>;
+        typealias Tile16B = linalg.CoopMat<half, MemoryScope.Subgroup, 16, 16, linalg.CoopMatMatrixUse.MatrixB>;
         typealias Tile16C = linalg.CoopMat<T, MemoryScope.Subgroup, 16, 16, linalg.CoopMatMatrixUse.MatrixAccumulator>;
 
         const uint laneId = WaveGetLaneIndex();
@@ -137,25 +137,26 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
         uint tempBase = shBase + uint(subgroupId) * uint(TempAreaPerWarp);
         uint crossWarpBase = shBase + uint(subgroupCount) * uint(TempAreaPerWarp);
 
-        Tile16A matOnes;
+        Tile16B matOnes;
         matOnes.fill(half(1));
 
         [ForceUnroll]
         for (int ot = 0; ot < NOutputTiles; ot++)
         {
-            // MMA: sum across lane tiles using pre-loaded dOutB
+            // MMA: C(16, 16) = dOutA_tile(16, 16) × onesB(16, 16)
+            // Summing across the N (lane) dimension. All columns of C are identical = dBias.
             Tile16C matC;
             matC.fill(T(0));
 
             [ForceUnroll]
             for (int g = 0; g < NLaneTiles; g++)
             {
-                int bIdx = dOutB.tileIdx(ot, g);
+                int aIdx = dOutA.tileIdx(ot, g);
                 matC = linalg.coopMatMulAdd<T, false, half, half, T,
-                    MemoryScope.Subgroup, 16, 16, 16>(matOnes, dOutB.tiles[bIdx], matC);
+                    MemoryScope.Subgroup, 16, 16, 16>(dOutA.tiles[aIdx], matOnes, matC);
             }
 
-            // All rows of matC are identical. Store to temp shmem, copy row 0 to cross-warp layout.
+            // All columns of matC are identical. Store to temp shmem, copy column 0 to cross-warp layout.
             static const linalg.CoopMatMatrixLayout RowMajor = linalg.CoopMatMatrixLayout.RowMajor;
             matC.Store<RowMajor, uint4>(ShMemPool.data, tempBase, uint(TileStrideVec));
 
@@ -199,26 +200,24 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    internal static void outerProductAccumulate<Address>(
-        T dOutArr[M],
-        T inputArr[K],
+    internal static void outerProductAccumulate<Address, int InputVecSize>(
+        MatrixA<M, N> dOutA,
+        T inputArr[InputVecSize],
         Address weightGradAddress,
         uint shBase)
         where Address : IPointerLikeAddress<T>
     {
         const uint subgroupIndex = getWaveId();
 
-        // dOut: MatA(M, N) — each lane's dOut as a column, converted to half internally
-        MatrixA<M, N> dOutA;
-        dOutA.fromVectorViaShMem<ShMemSize, T, M, false>(dOutArr, shBase);
+        // Per-warp shmem for fromVectorViaShMem (input only — dOutA is pre-loaded).
+        static const int HalvesPerUint4 = sizeof(uint4) / sizeof(half);
+        static const int TileWidthUint4 = 16 / HalvesPerUint4;
+        static const int ShmemPerWarp = N * TileWidthUint4;
+        uint perWarpBase = shBase + subgroupIndex * uint(ShmemPerWarp);
 
         // input: MatB(N, K) — each lane's input as a row
-        static const int ElemPerUint4_half = sizeof(uint4) / sizeof(half);
-        static const int ShmemPerWarpA = N * ((M + ElemPerUint4_half - 1) / ElemPerUint4_half);
-        uint shInputBase = shBase + uint(SubgroupCount) * uint(ShmemPerWarpA);
-
         MatrixB<N, K> inputB;
-        inputB.fromVectorViaShMem<ShMemSize, T, K, true>(inputArr, shInputBase);
+        inputB.fromVectorViaShMem<ShMemSize, T, InputVecSize, true>(inputArr, perWarpBase);
 
         GroupMemoryBarrierWithWaveSync();
 
@@ -289,7 +288,7 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     internal static WaveTangledVector<T.Differential, ShMemSize, InputSize, SubgroupSize, SubgroupCount>
-    backward<Address>(
+    backward<Address, bool Bias = true>(
         WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount> input,
         WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount> dOut,
         Address weightAddress,
@@ -299,38 +298,42 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
     {
         uint shBase = 0u;
 
-        // Prepare T-typed arrays from WaveTangledVectors
-        T dOutArr[M];
-        for (int i = 0; i < M; i++) dOutArr[i] = dOut[i];
-        T inputArr[K];
-        for (int i = 0; i < K; i++) inputArr[i] = input[i];
+        typealias OutputVec = WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>;
+        typealias InputVecT = WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount>;
+        static const int PaddedM = OutputVec.Uint4AlignedInputSize;
+        static const int PaddedK = InputVecT.Uint4AlignedInputSize;
 
-        // Load dOut as MatB(M, N) once — reused by both MMA and bias reduce.
-        // fromVectorViaShMem handles float→half conversion internally.
+        // Per-warp shmem for fromVectorViaShMem.
+        static const int HalvesPerUint4 = sizeof(uint4) / sizeof(half);
+        static const int TileWidthUint4 = 16 / HalvesPerUint4;
+        static const int ShmemPerWarp = N * TileWidthUint4;
+        uint perWarpBase = shBase + uint(getWaveId()) * uint(ShmemPerWarp);
+
+        // Load dOut as MatB(M, N) for transpose MMA.
         MatrixB<M, N> dOutB;
-        dOutB.fromVectorViaShMem<ShMemSize, T, M, false>(dOutArr, shBase);
+        dOutB.fromVectorViaShMem<ShMemSize, T, PaddedM, false>(dOut.data, perWarpBase);
+
+        // Load dOut as MatA(M, N) — reused by biasReduce and outerProduct.
+        MatrixA<M, N> dOutA;
+        dOutA.fromVectorViaShMem<ShMemSize, T, PaddedM, false>(dOut.data, perWarpBase);
 
         // 1. Transpose MMA: dInput = W^T × dOut
-        T dInputArr[K] = {};
-        mmaTranspose<Address>(dOutB, weightAddress, dInputArr, shBase);
-
-        GroupMemoryBarrierWithGroupSync();
-
-        // 2. Bias reduce: dBias += sum(dOut)
-        // Reuses dOutB loaded in step 1 — no re-loading from shmem.
-        biasReduce<Address>(dOutB, int(getWaveId()), biasGradAddress, shBase);
-
-        GroupMemoryBarrierWithGroupSync();
-
-        // 3. Outer product: dW += dOut ⊗ input
-        // fromVectorViaShMem handles float→half conversion internally.
-        outerProductAccumulate<Address>(dOutArr, inputArr, weightGradAddress, shBase);
-
-
-        typealias InputVecDiff = WaveTangledVector<T.Differential, ShMemSize, K, N, SubgroupCount>;
+        typealias InputVecDiff = WaveTangledVector<T, ShMemSize, K, N, SubgroupCount>;
         InputVecDiff dInput;
-        for (int i = 0; i < K; i++) dInput.data[i] = T.Differential(dInputArr[i]);
-        return dInput;
+        mmaTranspose<Address, InputVecDiff.Uint4AlignedInputSize>(dOutB, weightAddress, dInput.data, shBase);
+
+        GroupMemoryBarrierWithGroupSync();
+
+        // 2. Bias reduce: dBias += sum(dOut) — uses dOutA
+        if (Bias)
+            biasReduce<Address>(dOutA, int(getWaveId()), biasGradAddress, shBase);
+
+        GroupMemoryBarrierWithGroupSync();
+
+        // 3. Outer product: dW += dOut ⊗ input — reuses dOutA
+        outerProductAccumulate<Address, PaddedK>(dOutA, input.data, weightGradAddress, shBase);
+
+        return bit_cast<WaveTangledVector<T.Differential, ShMemSize, InputSize, SubgroupSize, SubgroupCount>>(dInput);
     }
 
     // Store one row of tiles from shmem to global using atomicAdd.

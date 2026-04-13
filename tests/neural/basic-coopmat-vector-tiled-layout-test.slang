@@ -69,15 +69,12 @@ void setupParameters(uint tid)
         for (int i = 0; i < 258; i++)
             parameters[i] = ElementType(0.0);
 
-        // Row 0 of weight: parameters[0..3] = {1, 2, 3, 4}
         for (int col = 0; col < InputSize; col++)
-            parameters[col] = ElementType(parametersFloat[col]);
+            parameters[tiledWeightOffset(0, col)] = ElementType(parametersFloat[col]);
 
-        // Row 1 of weight: parameters[16..19] = {5, 6, 7, 8}
         for (int col = 0; col < InputSize; col++)
-            parameters[16 + col] = ElementType(parametersFloat[InputSize + col]);
+            parameters[tiledWeightOffset(1, col)] = ElementType(parametersFloat[InputSize + col]);
 
-        // Bias at offset 256 (after the 16x16 tile): {9, 10}
         parameters[256] = ElementType(parametersFloat[8]);
         parameters[257] = ElementType(parametersFloat[9]);
     }
@@ -200,12 +197,11 @@ void BackwardTestWithoutBias(int tid, int resIndex)
 
     // dW = dOutput * input^T = [[1],[1]] * [1,2,3,4] = [[1,2,3,4],[1,2,3,4]]
     // Accumulated across 32 threads: 32x.
-    // In tiled layout: row 0 at offsets [0..3], row 1 at offsets [16..19].
     isPassed = isPassed &&
-        equals(dParameters[0], ElementType(32.0)) && equals(dParameters[1], ElementType(64.0)) &&
-        equals(dParameters[2], ElementType(96.0)) && equals(dParameters[3], ElementType(128.0)) &&
-        equals(dParameters[16], ElementType(32.0)) && equals(dParameters[17], ElementType(64.0)) &&
-        equals(dParameters[18], ElementType(96.0)) && equals(dParameters[19], ElementType(128.0));
+        equals(dParameters[tiledDWeightOffset(0, 0)], ElementType(32.0)) && equals(dParameters[tiledDWeightOffset(0, 1)], ElementType(64.0)) &&
+        equals(dParameters[tiledDWeightOffset(0, 2)], ElementType(96.0)) && equals(dParameters[tiledDWeightOffset(0, 3)], ElementType(128.0)) &&
+        equals(dParameters[tiledDWeightOffset(1, 0)], ElementType(32.0)) && equals(dParameters[tiledDWeightOffset(1, 1)], ElementType(64.0)) &&
+        equals(dParameters[tiledDWeightOffset(1, 2)], ElementType(96.0)) && equals(dParameters[tiledDWeightOffset(1, 3)], ElementType(128.0));
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
@@ -248,12 +244,12 @@ void BackwardTestWithBias(int tid, int resIndex)
         equals(dPair.d[0], ElementType(6.0)) && equals(dPair.d[1], ElementType(8.0)) &&
         equals(dPair.d[2], ElementType(10.0)) && equals(dPair.d[3], ElementType(12.0));
 
-    // dW in tiled layout: same as BackwardTestWithoutBias.
+    // dW: same as BackwardTestWithoutBias.
     isPassed = isPassed &&
-        equals(dParameters[0], ElementType(32.0)) && equals(dParameters[1], ElementType(64.0)) &&
-        equals(dParameters[2], ElementType(96.0)) && equals(dParameters[3], ElementType(128.0)) &&
-        equals(dParameters[16], ElementType(32.0)) && equals(dParameters[17], ElementType(64.0)) &&
-        equals(dParameters[18], ElementType(96.0)) && equals(dParameters[19], ElementType(128.0));
+        equals(dParameters[tiledDWeightOffset(0, 0)], ElementType(32.0)) && equals(dParameters[tiledDWeightOffset(0, 1)], ElementType(64.0)) &&
+        equals(dParameters[tiledDWeightOffset(0, 2)], ElementType(96.0)) && equals(dParameters[tiledDWeightOffset(0, 3)], ElementType(128.0)) &&
+        equals(dParameters[tiledDWeightOffset(1, 0)], ElementType(32.0)) && equals(dParameters[tiledDWeightOffset(1, 1)], ElementType(64.0)) &&
+        equals(dParameters[tiledDWeightOffset(1, 2)], ElementType(96.0)) && equals(dParameters[tiledDWeightOffset(1, 3)], ElementType(128.0));
 
     // dBias = dOutput accumulated across 32 threads = [32, 32]
     isPassed = isPassed &&

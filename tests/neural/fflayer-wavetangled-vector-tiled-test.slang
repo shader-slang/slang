@@ -118,15 +118,14 @@ void testFFLayerBackward(int tid, int resIndex)
     // dW accumulated across BatchSize threads.
     // dW = BatchSize * [[1,2,3,4],[1,2,3,4]]
     ElementType scale = ElementType(BatchSize);
-    // Tiled layout: row 0 at [0..3], row 1 at [16..19]
-    isPassed = isPassed && equals(dParameters[0], scale * ElementType(1.0));
-    isPassed = isPassed && equals(dParameters[1], scale * ElementType(2.0));
-    isPassed = isPassed && equals(dParameters[2], scale * ElementType(3.0));
-    isPassed = isPassed && equals(dParameters[3], scale * ElementType(4.0));
-    isPassed = isPassed && equals(dParameters[16], scale * ElementType(1.0));
-    isPassed = isPassed && equals(dParameters[17], scale * ElementType(2.0));
-    isPassed = isPassed && equals(dParameters[18], scale * ElementType(3.0));
-    isPassed = isPassed && equals(dParameters[19], scale * ElementType(4.0));
+    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(0, 0)], scale * ElementType(1.0));
+    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(0, 1)], scale * ElementType(2.0));
+    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(0, 2)], scale * ElementType(3.0));
+    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(0, 3)], scale * ElementType(4.0));
+    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(1, 0)], scale * ElementType(1.0));
+    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(1, 1)], scale * ElementType(2.0));
+    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(1, 2)], scale * ElementType(3.0));
+    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(1, 3)], scale * ElementType(4.0));
 
     // dBias = [BatchSize, BatchSize]
     isPassed = isPassed && equals(dParameters[BiasOffset], scale);
@@ -170,15 +169,12 @@ void setupParameters(uint tid)
         for (int i = 0; i < ParamBufferSize; i++)
             parameters[i] = ElementType(0.0);
 
-        // Row 0: parameters[0..3] = {1,2,3,4}
         for (int col = 0; col < InputSize; col++)
-            parameters[col] = ElementType(parametersFloat[col]);
+            parameters[tiledWeightOffset(0, col)] = ElementType(parametersFloat[col]);
 
-        // Row 1: parameters[16..19] = {5,6,7,8}
         for (int col = 0; col < InputSize; col++)
-            parameters[16 + col] = ElementType(parametersFloat[InputSize + col]);
+            parameters[tiledWeightOffset(1, col)] = ElementType(parametersFloat[InputSize + col]);
 
-        // Bias at offset 256: {9, 10}
         parameters[256] = ElementType(parametersFloat[8]);
         parameters[257] = ElementType(parametersFloat[9]);
     }
