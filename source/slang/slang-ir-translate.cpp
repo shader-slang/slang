@@ -282,6 +282,44 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
             }
         }
         break;
+    case kIROp_IdentityRemat:
+        {
+            // Identity remat: MinimalContext == BwdCallable, so remat is the identity.
+            // Build a function that takes (MinCtx, <original params>) and returns MinCtx.
+            DifferentiableTypeConformanceContext ctx(&autodiffContext);
+            auto funcType = cast<IRFuncType>(ctx.resolveType(&subBuilder, inst->getFullType()));
+
+            IRBuilder funcBuilder(subBuilder);
+            auto func = funcBuilder.createFunc();
+            func->setFullType(funcType);
+
+            funcBuilder.setInsertInto(func);
+            auto block = funcBuilder.emitBlock();
+            funcBuilder.setInsertInto(block);
+
+            // Emit parameters.
+            List<IRParam*> params;
+            for (UIndex i = 0; i < funcType->getParamCount(); ++i)
+                params.add(funcBuilder.emitParam(funcType->getParamType(i)));
+
+            // Return the parameter whose type matches the return type
+            // (the MinimalContext). For free functions this is params[0],
+            // but for member methods it may be at a different index.
+            auto returnType = funcType->getResultType();
+            IRParam* contextParam = params[0];
+            for (auto p : params)
+            {
+                if (p->getDataType() == returnType)
+                {
+                    contextParam = p;
+                    break;
+                }
+            }
+            funcBuilder.emitReturn(contextParam);
+
+            translationResult = func;
+        }
+        break;
     default:
         break;
     }

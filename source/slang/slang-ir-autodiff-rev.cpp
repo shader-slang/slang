@@ -870,13 +870,33 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
         applyBwdFuncArgs.getBuffer());
     builder.addDecoration(applyResult, kIROp_IgnoreSideEffectsDecoration);
 
+    // The remat function has one extra parameter beyond the original function args:
+    // the MinimalContext. Find where to insert it by matching the context type against
+    // rematFuncType params. For free functions it's typically param(0); for member
+    // methods it may be at a different position.
     bool isContextTypeInTuple = false;
+    Index contextInsertIdx = 0;
     if (auto tupleType = as<IRTupleType>(applyResult->getDataType()))
     {
-        if (tupleType->getOperandCount() >= 2 &&
-            tupleType->getOperand(1) == rematFuncType->getParamType(0))
+        if (tupleType->getOperandCount() >= 2)
         {
-            isContextTypeInTuple = true;
+            auto ctxTypeFromTuple = tupleType->getOperand(1);
+            for (UIndex i = 0; i < rematFuncType->getParamCount(); ++i)
+            {
+                if (ctxTypeFromTuple == rematFuncType->getParamType(i))
+                {
+                    // Find the correct insertion index within rematFuncArgs.
+                    // Params before index i have already been added by the loop above;
+                    // params after will be added later. So the insert position is
+                    // min(i, rematFuncArgs.getCount()).
+                    contextInsertIdx =
+                        static_cast<Index>(i) <= rematFuncArgs.getCount()
+                            ? static_cast<Index>(i)
+                            : rematFuncArgs.getCount();
+                    isContextTypeInTuple = true;
+                    break;
+                }
+            }
         }
     }
 
@@ -886,7 +906,7 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
         // it to the remat func.
         //
         auto contextVal = builder.emitElementExtract(applyResult, builder.getIntValue(1));
-        rematFuncArgs.insert(0, contextVal);
+        rematFuncArgs.insert(contextInsertIdx, contextVal);
     }
     else
     {

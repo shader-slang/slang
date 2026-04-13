@@ -788,6 +788,52 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         auto resultType = astBuilder->getVoidType();
         auto errorType = funcType->getErrorType();
 
+        // Handle this-type explicitly (bwd_diff is static, so this becomes a parameter).
+        auto thisParamType = diffTypeWitness->getThisParamType();
+        auto [thisParamValueType, thisParamDirection] =
+            splitParameterTypeAndDirection(astBuilder, thisParamType);
+        if (auto thisTypeDiffWitness = diffTypeWitness->getThisTypeDiffWitness())
+        {
+            auto thisPairType =
+                getEffectiveDiffPairType(thisParamValueType, thisTypeDiffWitness);
+            switch (thisParamDirection)
+            {
+            case ParamPassingMode::In:
+                // In parameters become inout differential pairs in backward diff.
+                if (as<DifferentialPairType>(thisPairType))
+                    newParamTypes.add(astBuilder->getBorrowInOutParamType(thisPairType));
+                else if (as<DifferentialPtrPairType>(thisPairType))
+                    newParamTypes.add(thisPairType);
+                break;
+            case ParamPassingMode::BorrowInOut:
+                newParamTypes.add(astBuilder->getBorrowInOutParamType(thisPairType));
+                break;
+            default:
+                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
+                break;
+            }
+        }
+        else if (thisParamType)
+        {
+            // Non-differentiable this type gets no_diff modifier.
+            auto noDiffThisType = astBuilder->getModifiedType(
+                thisParamValueType,
+                {astBuilder->getNoDiffModifierVal()});
+            switch (thisParamDirection)
+            {
+            case ParamPassingMode::In:
+                newParamTypes.add(noDiffThisType);
+                break;
+            case ParamPassingMode::BorrowInOut:
+                newParamTypes.add(
+                    astBuilder->getBorrowInOutParamType(noDiffThisType));
+                break;
+            default:
+                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
+                break;
+            }
+        }
+
         // Process each parameter according to backward diff rules.
         for (Index i = 0; i < funcType->getParamCount(); ++i)
         {

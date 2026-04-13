@@ -825,5 +825,6 @@ return {
 	["Type.Conditional"] = 849,
 	["getConditionalValue"] = 850,
 	["makeConditionalValue"] = 851,
-  ["SpecializeExistentialsInType"] = 852
+  ["SpecializeExistentialsInType"] = 852,
+  ["TranslateBase.IdentityRemat"] = 854
 }

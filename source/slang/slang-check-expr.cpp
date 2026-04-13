@@ -4512,7 +4512,7 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType 
     return diffType;
 }
 
-Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
+Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType thisQualType)
 {
     // Resolve backward diff type here.
     // Note that this type checking needs to be in sync with
@@ -4526,6 +4526,23 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
     // No support for differentiating function that throw errors, for now.
     SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
     auto errorType = originalType->getErrorType();
+
+    // Handle implicit `this` parameter for non-static member methods.
+    if (thisQualType.type)
+    {
+        Type* thisType = thisQualType.isLeftValue
+                             ? m_astBuilder->getBorrowInOutParamType(thisQualType.type)
+                             : thisQualType.type;
+        if (auto diffPairType = tryGetDifferentialPairType(thisType))
+        {
+            paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairType));
+        }
+        else
+        {
+            paramTypes.add(m_astBuilder->getModifiedType(
+                thisType, {m_astBuilder->getNoDiffModifierVal()}));
+        }
+    }
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
     {
@@ -4641,6 +4658,41 @@ struct HigherOrderInvokeExprCheckingActions
         }
         return nullptr;
     }
+
+    // Extract the implicit `this` type for a statically-referenced non-static
+    // member method (e.g. `Type::method`).  Returns a null QualType for free
+    // functions, static methods, constructors, and member methods referenced
+    // by name within their own type (e.g. `[BackwardDerivativeOf(f)]`).
+    QualType getThisTypeForBaseFunc(SemanticsVisitor* semantics, Expr* funcExpr)
+    {
+        auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
+        // Only produce a this-type when the method is accessed via Type::method
+        // (StaticMemberExpr). When referenced by name within the same struct
+        // (plain DeclRefExpr), the derivative is itself a member method and
+        // the this parameter is handled implicitly.
+        if (!as<StaticMemberExpr>(innerExpr))
+            return QualType();
+        if (auto declRefExpr = as<DeclRefExpr>(innerExpr))
+        {
+            auto declRef = declRefExpr->declRef;
+            // Unwrap GenericDecl to get to the inner callable.
+            if (auto genDecl = as<GenericDecl>(declRef.getDecl()))
+            {
+                declRef = semantics->getASTBuilder()->getMemberDeclRef(
+                    declRef.as<GenericDecl>(), genDecl->inner);
+            }
+            if (auto callableDeclRef = declRef.as<FunctionDeclBase>())
+            {
+                auto callableDecl = callableDeclRef.getDecl();
+                if (!callableDecl->hasModifier<HLSLStaticModifier>() &&
+                    !as<ConstructorDecl>(callableDecl))
+                {
+                    return getTypeForThisExpr(semantics, callableDeclRef);
+                }
+            }
+        }
+        return QualType();
+    }
 };
 
 struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingActions
@@ -4662,7 +4714,8 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, nullptr);
+        auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
+        resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, thisType);
         if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
         {
             auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
@@ -4672,6 +4725,8 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             }
             if (funcDecl)
             {
+                if (thisType.type)
+                    resultDiffExpr->newParameterNames.add(semantics->getName("this"));
                 for (auto param : funcDecl->getParameters())
                 {
                     resultDiffExpr->newParameterNames.add(param->getName());
@@ -4700,7 +4755,8 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType);
+        auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
+        resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType, thisType);
         if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
         {
             auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
@@ -4710,6 +4766,8 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             }
             if (funcDecl)
             {
+                if (thisType.type)
+                    resultDiffExpr->newParameterNames.add(semantics->getName("this"));
                 for (auto param : funcDecl->getParameters())
                 {
                     if (param->findModifier<NoDiffModifier>())
@@ -4831,6 +4889,37 @@ Expr* SemanticsExprVisitor::visitForwardDifferentiateExpr(ForwardDifferentiateEx
 Expr* SemanticsExprVisitor::visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
 {
     BackwardDifferentiateExprCheckingActions actions;
+    return _checkHigherOrderInvokeExpr(this, expr, &actions);
+}
+
+struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
+{
+    virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) override
+    {
+        return semantics->getASTBuilder()->create<ApplyForBwdExpr>();
+    }
+    void fillHigherOrderInvokeExpr(
+        HigherOrderInvokeExpr* resultExpr,
+        SemanticsVisitor* semantics,
+        Expr* funcExpr) override
+    {
+        resultExpr->baseFunction = funcExpr;
+        auto baseFuncType = getBaseFunctionType(semantics, funcExpr);
+        if (!baseFuncType)
+        {
+            resultExpr->type = semantics->getASTBuilder()->getErrorType();
+            semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
+            return;
+        }
+        // apply(fn) takes the same params as fn (not wrapped in DifferentialPair).
+        // Give it the base function type so overload resolution works with original args.
+        resultExpr->type = baseFuncType;
+    }
+};
+
+Expr* SemanticsExprVisitor::visitApplyForBwdExpr(ApplyForBwdExpr* expr)
+{
+    ApplyForBwdExprCheckingActions actions;
     return _checkHigherOrderInvokeExpr(this, expr, &actions);
 }
 
@@ -7630,6 +7719,49 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
             else if (funcDeclBase->hasModifier<RefAttribute>())
             {
                 expr->type.isLeftValue = true;
+            }
+
+            // When a function has been reparented into an AggTypeDeclBase
+            // (e.g., a __func_extension's inner function moved into a
+            // synthesized ExtensionDecl), its parentDecl is the extension
+            // even though the parsing scope chain doesn't include it.
+            // Resolve `this` from the parent extension in this case.
+            if (auto parentExtDecl = as<ExtensionDecl>(funcDeclBase->parentDecl))
+            {
+                if (!funcDeclBase->hasModifier<HLSLStaticModifier>())
+                {
+                    // For func_extension apply on a member method, the extension's
+                    // target is a function-as-type. We want `this` to be the parent
+                    // struct type of that member function, not the function type itself.
+                    // Use the target function's DeclRef to get the correctly
+                    // substituted parent type (e.g., MyVec<float> not MyVec<T>).
+                    if (auto targetDeclRefType =
+                            as<DeclRefType>(parentExtDecl->targetType.type))
+                    {
+                        auto targetDeclRef = targetDeclRefType->getDeclRef();
+                        if (auto targetFuncDecl =
+                                as<FunctionDeclBase>(targetDeclRef.getDecl()))
+                        {
+                            if (auto parentTypeDecl =
+                                    as<AggTypeDeclBase>(targetFuncDecl->parentDecl))
+                            {
+                                auto thisType = calcThisType(makeDeclRef(parentTypeDecl));
+                                // Apply the target function's substitutions to get
+                                // the specialized parent type.
+                                if (thisType)
+                                {
+                                    expr->type.type = as<Type>(thisType->substitute(
+                                        m_astBuilder,
+                                        SubstitutionSet(targetDeclRef)));
+                                }
+                                return expr;
+                            }
+                        }
+                    }
+                    // Fallback: use the extension's this type directly.
+                    expr->type.type = calcThisType(makeDeclRef(parentExtDecl));
+                    return expr;
+                }
             }
         }
         else if (auto typeOrExtensionDecl = as<AggTypeDeclBase>(containerDecl))
