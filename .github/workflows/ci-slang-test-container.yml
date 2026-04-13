@@ -182,6 +182,15 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
 
+      - name: Upload retry report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retry-report-${{ inputs.config }}-slang-test
+          path: retry-report.json
+          retention-days: 30
+          if-no-files-found: ignore
+
   test-slang-rhi:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30

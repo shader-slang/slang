@@ -6092,8 +6092,13 @@ SlangResult innerMain(int argc, char** argv)
                         printf("  - %s\n", fileTestInfo->testName.getBuffer());
                     }
                 }
-                int retriedCount = 0;
-                int retryPassedCount = 0;
+                struct RetryResult
+                {
+                    String testName;
+                    bool passedOnRetry;
+                };
+                List<RetryResult> retryResults;
+
                 for (auto& test : context.failedFileTests)
                 {
                     context.isRetry = true;
@@ -6107,22 +6112,48 @@ SlangResult innerMain(int argc, char** argv)
                         fileTestInfo->testName,
                         fileTestInfo->options);
                     reporter.addResult(newResult);
-                    retriedCount++;
-                    if (newResult == TestResult::Pass)
-                        retryPassedCount++;
+                    RetryResult rr;
+                    rr.testName = fileTestInfo->testName;
+                    rr.passedOnRetry = (newResult == TestResult::Pass);
+                    retryResults.add(rr);
                 }
-                if (retriedCount > 0)
+                if (retryResults.getCount() > 0)
                 {
+                    int passedCount = 0;
+                    for (auto& rr : retryResults)
+                        if (rr.passedOnRetry)
+                            passedCount++;
+
                     printf(
                         "\nRetry summary: %d/%d tests passed on retry "
                         "(intermittent failures)\n",
-                        retryPassedCount,
-                        retriedCount);
-                    if (retryPassedCount < retriedCount)
+                        passedCount,
+                        (int)retryResults.getCount());
+
+                    // Write retry report as JSON for CI artifact collection
+                    FILE* reportFile = fopen("retry-report.json", "w");
+                    if (reportFile)
                     {
-                        printf("Tests that still failed after retry:\n");
-                        // The reporter already has the results, so we just note
-                        // this for visibility
+                        fprintf(reportFile, "{\n");
+                        fprintf(
+                            reportFile,
+                            "  \"total_retried\": %d,\n",
+                            (int)retryResults.getCount());
+                        fprintf(reportFile, "  \"passed_on_retry\": %d,\n", passedCount);
+                        fprintf(reportFile, "  \"tests\": [\n");
+                        for (Index i = 0; i < retryResults.getCount(); i++)
+                        {
+                            auto& rr = retryResults[i];
+                            fprintf(
+                                reportFile,
+                                "    {\"name\": \"%s\", \"passed_on_retry\": %s}%s\n",
+                                rr.testName.getBuffer(),
+                                rr.passedOnRetry ? "true" : "false",
+                                (i < retryResults.getCount() - 1) ? "," : "");
+                        }
+                        fprintf(reportFile, "  ]\n}\n");
+                        fclose(reportFile);
+                        printf("Retry report written to retry-report.json\n");
                     }
                 }
             }
