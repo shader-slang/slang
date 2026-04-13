@@ -2382,6 +2382,11 @@ struct TypeFlowSpecializationContext
                     }
                     else
                     {
+                        StringBuilder typeStr;
+                        printDiagnosticArg(typeStr, interfaceType);
+                        sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                            .interfaceType = typeStr.produceString(),
+                            .location = inst->sourceLoc});
                         module->getContainerPool().free(&tables);
                         return none();
                     }
