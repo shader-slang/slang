@@ -5003,11 +5003,7 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
         if (!requiredResultType->equals(satisfyingResultType))
             return false;
-        auto declaredSatisfyingResultType = getResultType(
-            m_astBuilder,
-            makeDeclRef(satisfyingMemberDeclRef.getDecl()).as<CallableDecl>());
-        if (declaredSatisfyingResultType &&
-            isNonCopyableType(declaredSatisfyingResultType->getCanonicalType()))
+        if (satisfyingResultType && isNonCopyableType(satisfyingResultType->getCanonicalType()))
             return false;
 
         auto requiredErrorType = getErrorCodeType(m_astBuilder, requiredMemberDeclRef);
@@ -5258,11 +5254,7 @@ bool SemanticsVisitor::doesSubscriptMatchRequirement(
     auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
     if (!requiredResultType->equals(satisfyingResultType))
         return false;
-    auto declaredSatisfyingResultType = getResultType(
-        m_astBuilder,
-        makeDeclRef(satisfyingMemberDeclRef.getDecl()).as<CallableDecl>());
-    if (declaredSatisfyingResultType &&
-        isNonCopyableType(declaredSatisfyingResultType->getCanonicalType()))
+    if (satisfyingResultType && isNonCopyableType(satisfyingResultType->getCanonicalType()))
         return false;
 
     // Each accessor in the requirement must be accounted for by an accessor
@@ -7397,9 +7389,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                     }
                 }
             }
-            else if (
-                declaredRequirementResultType &&
-                isNonCopyableType(actualReturnType->getCanonicalType()))
+            else if (isNonCopyableType(actualReturnType->getCanonicalType()))
             {
                 if (auto invokeExpr = as<InvokeExpr>(checkedCall))
                 {
@@ -7580,20 +7570,18 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 auto declaredRequirementResultType = getResultType(
                     m_astBuilder,
                     makeDeclRef(requiredMemberDeclRef.getDecl()).as<CallableDecl>());
-                auto declaredWitnessResultType = getResultType(
-                    m_astBuilder,
-                    makeDeclRef(synDeclRef.getDecl()).as<CallableDecl>());
+                auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
+                auto satisfyingResultType = getResultType(m_astBuilder, synDeclRef.as<FuncDecl>());
 
                 outFailureDetails->reason = WitnessSynthesisFailureReason::General;
-                if (declaredWitnessResultType && declaredRequirementResultType &&
-                    getResultType(m_astBuilder, requiredMemberDeclRef)
-                        ->equals(getResultType(m_astBuilder, synDeclRef.as<FuncDecl>())) &&
-                    isNonCopyableType(declaredWitnessResultType->getCanonicalType()))
+                if (satisfyingResultType && requiredResultType &&
+                    requiredResultType->equals(satisfyingResultType) &&
+                    isNonCopyableType(satisfyingResultType->getCanonicalType()))
                 {
                     outFailureDetails->reason =
                         WitnessSynthesisFailureReason::MethodResultNonCopyableMismatch;
                     outFailureDetails->candidateMethod = lookupResult.item.declRef;
-                    outFailureDetails->actualType = declaredWitnessResultType;
+                    outFailureDetails->actualType = satisfyingResultType;
                     outFailureDetails->expectedType = declaredRequirementResultType;
                 }
             }
@@ -9178,11 +9166,8 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     this->ensureDecl(witnessDecl, DeclCheckState::ReadyForLookup);
 
     auto synthesizedCallableDeclRef = synthesizedWitnessDeclRef.as<CallableDecl>();
-    auto declaredSatisfyingResultType = getResultType(
-        m_astBuilder,
-        makeDeclRef(synthesizedCallableDeclRef.getDecl()).as<CallableDecl>());
-    if (declaredSatisfyingResultType &&
-        isNonCopyableType(declaredSatisfyingResultType->getCanonicalType()))
+    auto satisfyingResultType = getResultType(m_astBuilder, synthesizedCallableDeclRef);
+    if (satisfyingResultType && isNonCopyableType(satisfyingResultType->getCanonicalType()))
     {
         return false;
     }
