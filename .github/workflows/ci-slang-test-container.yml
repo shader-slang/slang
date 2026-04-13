@@ -180,8 +180,11 @@ jobs:
             exit 0
           fi
 
-          # Install gdb if not present
-          which gdb >/dev/null 2>&1 || (apt-get update -qq && apt-get install -y -qq gdb >/dev/null 2>&1) || true
+          # gdb is pre-installed in the container (linux-gpu-ci)
+          if ! which gdb >/dev/null 2>&1; then
+            echo "::warning::gdb not found in container — skipping core dump analysis"
+            exit 0
+          fi
 
           for core_file in $CORE_FILES; do
             core_basename=$(basename "$core_file")
