@@ -839,8 +839,7 @@ void validateAndRemoveAssumeAddress(IRModule* module, bool validate, DiagnosticS
                 if (parentFunc && parentBlock == parentFunc->getFirstBlock())
                 {
                     auto type = root->getDataType();
-                    shouldDiagnose = !as<IRPtrTypeBase>(type) &&
-                                     !as<IRPointerLikeType>(type) &&
+                    shouldDiagnose = !as<IRPtrTypeBase>(type) && !as<IRPointerLikeType>(type) &&
                                      !as<IRHLSLStructuredBufferTypeBase>(type) &&
                                      !as<IRByteAddressBufferTypeBase>(type);
                 }
