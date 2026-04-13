@@ -56,6 +56,7 @@ include(SlangTarget)
 include(AutoOption)
 include(GitHubRelease)
 include(FetchedSharedLibrary)
+include(CheckSecureCRT)
 
 #
 # Options

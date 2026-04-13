@@ -121,6 +121,16 @@ jobs:
           path: ir-version-check-artifact/
           retention-days: 1
 
+      - name: Install pinned TypeScript for WASM build
+        if: inputs.platform == 'wasm'
+        run: |
+          npm install -g typescript@5.9.3
+          TS_VERSION="$(tsc --version | awk '{print $2}')"  
+          if [[ "$TS_VERSION" != "5.9.3" ]]; then  
+            echo "Expected TypeScript 5.9.3, got ${TS_VERSION}"  
+            exit 1  
+          fi
+
       - name: Build Slang
         run: |
           echo "cmake version: $(cmake --version)"
@@ -172,6 +182,12 @@ jobs:
               cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${ccache_symlinks_path}")
             else
               echo "ℹ️  No cache compiler launcher available"
+            fi
+
+            # When save-sccache is requested, sccache must be available
+            if [[ "${{ inputs.save-sccache }}" == "true" && -z "${sccache_path:-}" ]]; then
+              echo "::error::save-sccache is true but sccache is not available"
+              exit 1
             fi
 
             if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then

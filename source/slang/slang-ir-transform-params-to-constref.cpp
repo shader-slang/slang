@@ -316,7 +316,7 @@ struct TransformParamsToConstRefContext
             // Specialization dictionary entries are transient bookkeeping for later
             // specialization/finalization and should not block borrow-in rewriting
             // of entry-point parameters.
-            if (as<IRSpecializationDictionaryItem>(user) || as<IRCompilerDictionaryValue>(user))
+            if (as<IRCompilerDictionaryValue>(user) || as<IRCompilerDictionaryEntry>(user))
                 continue;
             if (auto call = as<IRCall>(user))
             {

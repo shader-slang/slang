@@ -298,6 +298,7 @@ bool isValueType(IRInst* dataType)
     case kIROp_TupleType:
     case kIROp_ResultType:
     case kIROp_OptionalType:
+    case kIROp_ConditionalType:
     case kIROp_DifferentialPairType:
     case kIROp_DynamicType:
     case kIROp_AnyValueType:
@@ -397,6 +398,7 @@ bool isWrapperType(IRInst* inst)
     case kIROp_HLSLConsumeStructuredBufferType:
     case kIROp_TupleType:
     case kIROp_OptionalType:
+    case kIROp_ConditionalType:
     case kIROp_TypePack:
         return true;
     default:
@@ -2853,6 +2855,27 @@ IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* o
     return oldType;
 }
 
+// Ensures `type` carries a SpecConst rate.
+// If the type already has a different rate (e.g. ConstExpr from a `static const`
+// expression whose operands are specialization constants), the existing rate is
+// replaced, as a value that depends on a spec-const is only known at pipeline
+// creation time, so `ConstExpr` (compile-time) would be incorrect.
+//
+IRType* ensureSpecConstRate(IRBuilder* builder, IRType* type)
+{
+    if (isSpecConstRateType(type))
+        return type;
+
+    // Strip any existing rate (e.g. ConstExpr) to avoid double-wrapping,
+    // since getRateQualifiedType does not unwrap for us.
+    if (auto rateQualified = as<IRRateQualifiedType>(type))
+        return builder->getRateQualifiedType(
+            builder->getSpecConstRate(),
+            rateQualified->getValueType());
+
+    return builder->getRateQualifiedType(builder->getSpecConstRate(), type);
+}
+
 bool canOperationBeSpecConst(IROp op, IRType* resultType, IRInst* const* fixedArgs, IRUse* operands)
 {
     // Returns true for ops that can be declared as an operation under `OpSpecConstantOp`.
@@ -2913,18 +2936,44 @@ bool canOperationBeSpecConst(IROp op, IRType* resultType, IRInst* const* fixedAr
     }
 }
 
-bool isSpecConstOpHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
+bool shouldHaveSpecConstRate(
+    IROp op,
+    IRType* resultType,
+    UInt operandCount,
+    IRInst* const* operands)
 {
-    auto rateType = as<IRRateQualifiedType>(type);
-    return rateType && as<IRSpecConstRate>(rateType->getRate()) &&
-           canOperationBeSpecConst(op, rateType->getValueType(), fixedArgs, nullptr);
+    if (operandCount == 0)
+        return false;
+
+    // Unwrap any rate qualification so canOperationBeSpecConst sees the bare
+    // value type. isFloatingType checks as<IRBasicType> which doesn't match
+    // rate-qualified types like @ConstExpr float, so without unwrapping we
+    // would incorrectly allow float arithmetic as `OpSpecConstantOp`.
+    IRType* valueType = resultType;
+    if (auto rateQualifiedType = as<IRRateQualifiedType>(resultType))
+        valueType = rateQualifiedType->getValueType();
+
+    if (!canOperationBeSpecConst(op, valueType, operands, nullptr))
+        return false;
+
+    // An instruction whose result carries a spec-const rate is hoisted and
+    // emitted as OpSpecConstantOp for SPIR-V. That is only valid when
+    // every operand is itself a specialization constant or a plain
+    // constant. Mixing in a runtime value would produce invalid SPIR-V.
+    bool hasSpecConstOperand = false;
+    for (UInt ii = 0; ii < operandCount; ++ii)
+    {
+        if (isSpecConstRateType(operands[ii]->getFullType()))
+            hasSpecConstOperand = true;
+        else if (!as<IRConstant>(operands[ii]))
+            return false;
+    }
+    return hasSpecConstOperand;
 }
 
-
-bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
+bool isInstHoistable(IROp op)
 {
-    return (getIROpInfo(op).flags & kIROpFlag_Hoistable) ||
-           isSpecConstOpHoistable(op, type, fixedArgs);
+    return (getIROpInfo(op).flags & kIROpFlag_Hoistable);
 }
 
 IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type)

@@ -54,6 +54,7 @@ struct RequiredLoweringPassSet
     bool debugInfo;
     bool resultType;
     bool optionalType;
+    bool conditionalType;
     bool enumType;
     bool combinedTextureSamplers;
     bool reinterpret;
