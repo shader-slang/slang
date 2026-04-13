@@ -5384,6 +5384,18 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
         case LoweredValInfo::Flavor::Ptr:
             {
+                // When lowering a GetAddress expression like `__getAddress(x)`, the
+                // recursive lowering of the inner expression `x` returns a LoweredVal
+                // with Ptr flavor (i.e. `<IRVar inst>`), and the lowering of GetAddress
+                // can simply return the lowered value of the inner expr directly.
+                // However, we want to check for invalid uses of GetAddress, e.g.
+                // `__getAddress(localVar)` after lowering to IR.
+                //
+                // Here we simply insert an `AssumeAddress(innerVal)` instruction,
+                // so the later IR validation pass can pick it up and produce a
+                // diagnostic if the user is trying to get the address of something
+                // allowed by the type system but not allowed by the target (e.g.
+                // a local variable or a function parameter).
                 auto assumeAddr = context->irBuilder->emitIntrinsicInst(
                     loweredType,
                     kIROp_AssumeAddress,
