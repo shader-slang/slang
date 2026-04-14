@@ -3722,13 +3722,6 @@ err(
 )
 
 err(
-    "member-return-type-non-copyable-mismatch",
-    38109,
-    "return type copyability mismatch",
-    span { loc = "member:Decl", message = "member '~member' return type '~actualType:Type' and interface requirement return type '~expectedType:Type' differ in copyability: one is copyable and the other is not." }
-)
-
-err(
     "generic-signature-does-not-match-requirement",
     38107,
     "generic signature mismatch",
@@ -3740,6 +3733,13 @@ err(
     38108,
     "parameter direction mismatch",
     span { loc = "param:Decl", message = "parameter '~param' direction '~actualDirection:ParamPassingMode' does not match interface requirement '~expectedDirection:ParamPassingMode'." }
+)
+
+err(
+    "non-copyable-type-cannot-conform-to-interface",
+    38109,
+    "non-copyable type cannot conform to interface",
+    span { loc = "inheritance:Decl", message = "non-copyable type '~type:Type' cannot conform to interface '~interface:Decl' because interfaces are copyable by default." }
 )
 
 --

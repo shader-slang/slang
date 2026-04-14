@@ -2074,10 +2074,9 @@ public:
     /// Reasons why witness synthesis can fail
     enum class WitnessSynthesisFailureReason
     {
-        General,                         // Generic failure (default)
-        MethodResultTypeMismatch,        // Method return type doesn't match interface requirement
-        MethodResultNonCopyableMismatch, // Method return copyability doesn't match requirement
-        ParameterDirMismatch,            // Parameter direction mismatch (e.g., `in` vs `out`)
+        General,                  // Generic failure (default)
+        MethodResultTypeMismatch, // Method return type doesn't match interface requirement
+        ParameterDirMismatch,     // Parameter direction mismatch (e.g., `in` vs `out`)
         GenericSignatureMismatch, // Generic signature mismatch (e.g., number of generic parameters)
     };
 

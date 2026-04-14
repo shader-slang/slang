@@ -5003,8 +5003,6 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
         if (!requiredResultType->equals(satisfyingResultType))
             return false;
-        if (satisfyingResultType && isNonCopyableType(satisfyingResultType->getCanonicalType()))
-            return false;
 
         auto requiredErrorType = getErrorCodeType(m_astBuilder, requiredMemberDeclRef);
         auto satisfyingErrorType = getErrorCodeType(m_astBuilder, satisfyingMemberDeclRef);
@@ -5253,8 +5251,6 @@ bool SemanticsVisitor::doesSubscriptMatchRequirement(
     auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
     auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
     if (!requiredResultType->equals(satisfyingResultType))
-        return false;
-    if (satisfyingResultType && isNonCopyableType(satisfyingResultType->getCanonicalType()))
         return false;
 
     // Each accessor in the requirement must be accounted for by an accessor
@@ -7367,8 +7363,6 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         // Check if the failure was due to return type coercion
         if (!IsErrorExpr(checkedExpr) && outFailureDetails)
         {
-            auto declaredRequirementResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
-
             // The call resolved - check if it's a return type mismatch
             auto actualReturnType = checkedExpr->type;
             if (!actualReturnType->equals(resultType))
@@ -7384,20 +7378,6 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                         outFailureDetails->candidateMethod = declRefExpr->declRef;
                         outFailureDetails->actualType = actualReturnType;
                         outFailureDetails->expectedType = resultType;
-                    }
-                }
-            }
-            else if (isNonCopyableType(actualReturnType->getCanonicalType()))
-            {
-                if (auto invokeExpr = as<InvokeExpr>(checkedCall))
-                {
-                    if (auto declRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr))
-                    {
-                        outFailureDetails->reason =
-                            WitnessSynthesisFailureReason::MethodResultNonCopyableMismatch;
-                        outFailureDetails->candidateMethod = declRefExpr->declRef;
-                        outFailureDetails->actualType = actualReturnType;
-                        outFailureDetails->expectedType = declaredRequirementResultType;
                     }
                 }
             }
@@ -7563,25 +7543,6 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             witnessTable);
         if (!doesSignatureMatch)
         {
-            if (outFailureDetails)
-            {
-                auto declaredRequirementResultType =
-                    getResultType(m_astBuilder, requiredMemberDeclRef);
-                auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
-                auto satisfyingResultType = getResultType(m_astBuilder, synDeclRef.as<FuncDecl>());
-
-                outFailureDetails->reason = WitnessSynthesisFailureReason::General;
-                if (satisfyingResultType && requiredResultType &&
-                    requiredResultType->equals(satisfyingResultType) &&
-                    isNonCopyableType(satisfyingResultType->getCanonicalType()))
-                {
-                    outFailureDetails->reason =
-                        WitnessSynthesisFailureReason::MethodResultNonCopyableMismatch;
-                    outFailureDetails->candidateMethod = lookupResult.item.declRef;
-                    outFailureDetails->actualType = satisfyingResultType;
-                    outFailureDetails->expectedType = declaredRequirementResultType;
-                }
-            }
             return false;
         }
     }
@@ -9163,11 +9124,6 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     this->ensureDecl(witnessDecl, DeclCheckState::ReadyForLookup);
 
     auto synthesizedCallableDeclRef = synthesizedWitnessDeclRef.as<CallableDecl>();
-    auto satisfyingResultType = getResultType(m_astBuilder, synthesizedCallableDeclRef);
-    if (satisfyingResultType && isNonCopyableType(satisfyingResultType->getCanonicalType()))
-    {
-        return false;
-    }
 
     // Test signature and register in witness table.
     bool doesSignatureMatch = doesSignatureMatchRequirement(
@@ -9629,14 +9585,6 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
             .expectedType = failureDetails.expectedType,
             .member = failureDetails.candidateMethod.getDecl()});
     }
-    else if (
-        failureDetails.reason == WitnessSynthesisFailureReason::MethodResultNonCopyableMismatch)
-    {
-        getSink()->diagnose(Diagnostics::MemberReturnTypeNonCopyableMismatch{
-            .actualType = failureDetails.actualType,
-            .expectedType = failureDetails.expectedType,
-            .member = failureDetails.candidateMethod.getDecl()});
-    }
     else if (failureDetails.reason == WitnessSynthesisFailureReason::ParameterDirMismatch)
     {
         getSink()->diagnose(Diagnostics::ParameterDirectionDoesNotMatchRequirement{
@@ -10021,6 +9969,15 @@ bool SemanticsVisitor::checkConformanceToType(
         auto superTypeDeclRef = supereclRefType->getDeclRef();
         if (auto superInterfaceDeclRef = superTypeDeclRef.as<InterfaceDecl>())
         {
+            if (isNonCopyableType(subType))
+            {
+                getSink()->diagnose(Diagnostics::NonCopyableTypeCannotConformToInterface{
+                    .type = subType,
+                    .interface = superInterfaceDeclRef.getDecl(),
+                    .inheritance = inheritanceDecl});
+                return false;
+            }
+
             // The type is stating that it conforms to an interface.
             // We need to check that it provides all of the members
             // required by that interface.
