@@ -26,8 +26,6 @@ __include "inline-vector";
 __include "istorages";
 __include "bindless-storage";
 __include "accelerate-vector-coopmat";
-// __include "mma-new-helper";
-__include "mma-new-helper-v2";
 __include "WaveMatrix";
 __include "mma-linear-layout-help";
 __include "mma-tiled-cuda";
