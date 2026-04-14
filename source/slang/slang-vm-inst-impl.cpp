@@ -579,7 +579,10 @@ static void getElementHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void
     auto basePtr = (uint8_t*)inst->getOperand(1).getPtr();
     uint32_t elementIndex;
     memcpy(&elementIndex, inst->getOperand(2).getPtr(), sizeof(elementIndex));
-    memcpy(inst->getOperand(0).getPtr(), basePtr + elementIndex * inst->opcodeExtension, inst->opcodeExtension);
+    memcpy(
+        inst->getOperand(0).getPtr(),
+        basePtr + elementIndex * inst->opcodeExtension,
+        inst->opcodeExtension);
 }
 
 static void offsetPtrHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
