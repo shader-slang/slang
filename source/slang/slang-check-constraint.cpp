@@ -499,6 +499,136 @@ bool addHasDiffTypeInfoWitnessToArgs(
     return false;
 }
 
+struct SolvedArg
+{
+    Val* val = nullptr;
+    SemanticsVisitor::ConstraintPriority priority =
+        SemanticsVisitor::ConstraintPriority::Default;
+    ShortList<QualType, 8> types;
+};
+
+bool constraintSystemSolverUnpackArgs(
+    SemanticsVisitor* visitor,
+    List<GenericDecl*>& genericDecls,
+    ArrayView<Val*> knownGenericArgs,
+    Dictionary<Decl*, ShortList<SolvedArg>>& solvedArgs,
+    Dictionary<Decl*, ShortList<Val*>>& args)
+{
+    ASTBuilder* astBuilder = visitor->getASTBuilder();
+
+    args.clear();
+    for (auto arg : knownGenericArgs)
+        args[genericDecls[0]].add(arg);
+
+    Count knownGenericArgCount = knownGenericArgs.getCount();
+    for (auto _genericDecl : genericDecls)
+    {
+        for (auto member : _genericDecl->getDirectMemberDecls())
+        {
+            if (auto typeParam = as<GenericTypeParamDeclBase>(member))
+            {
+                SLANG_ASSERT(typeParam->parameterIndex != -1);
+
+                if (typeParam->parameterIndex < knownGenericArgCount)
+                    continue;
+                bool isPack = as<GenericTypePackParamDecl>(typeParam) != nullptr;
+                if (typeParam->parameterIndex >= solvedArgs[_genericDecl].getCount())
+                {
+                    // If the parameter is not a type pack and we don't have a
+                    // resolved type for it, we should fail.
+                    if (!isPack)
+                        return false;
+                    // If the parameter is a type pack, we should add an empty
+                    // type list to solvedTypes.
+                    solvedArgs[_genericDecl].setCount(typeParam->parameterIndex + 1);
+                }
+                auto& types = solvedArgs[_genericDecl][typeParam->parameterIndex].types;
+                // Fail if any of the resolved type element is empty.
+                for (auto t : types)
+                {
+                    if (!t)
+                        return false;
+                }
+                if (!isPack)
+                {
+                    // If the generic parameter is not a pack, we can simply add the first type.
+                    if (types.getCount() != 1)
+                        return false;
+
+                    args[_genericDecl].add(types[0]);
+                }
+                else
+                {
+                    // If the generic parameter is a pack, and we are supplying one single pack
+                    // argument, we can use it as is.
+                    if (types.getCount() == 1 && isTypePack(types[0]))
+                    {
+                        args[_genericDecl].add(types[0]);
+                    }
+                    else
+                    {
+                        // If we are supplying 0 or multiple arguments for the pack, we need to
+                        // create a type pack and add it to the argument list.
+                        ShortList<Type*> typeList;
+                        bool isLVal = true;
+                        for (auto t : types)
+                        {
+                            typeList.add(t);
+                            isLVal = isLVal && t.isLeftValue;
+                        }
+                        args[_genericDecl].add(QualType(
+                            astBuilder->getTypePack(typeList.getArrayView().arrayView),
+                            isLVal));
+                    }
+                }
+            }
+            else if (auto valPackParam = as<GenericValuePackParamDecl>(member))
+            {
+                SLANG_ASSERT(valPackParam->parameterIndex != -1);
+
+                if (valPackParam->parameterIndex < knownGenericArgCount)
+                    continue;
+
+                if (valPackParam->parameterIndex >= solvedArgs[_genericDecl].getCount())
+                {
+                    // Empty pack.
+                    args[_genericDecl].add(astBuilder->getIntValPack(ArrayView<IntVal*>()));
+                    continue;
+                }
+
+                auto val = solvedArgs[_genericDecl][valPackParam->parameterIndex].val;
+                if (!val)
+                {
+                    args[_genericDecl].add(astBuilder->getIntValPack(ArrayView<IntVal*>()));
+                }
+                else
+                {
+                    args[_genericDecl].add(val);
+                }
+            }
+            else if (auto valParam = as<GenericValueParamDecl>(member))
+            {
+                SLANG_ASSERT(valParam->parameterIndex != -1);
+
+                if (valParam->parameterIndex < knownGenericArgCount)
+                    continue;
+
+                if (valParam->parameterIndex >= solvedArgs[_genericDecl].getCount())
+                    return false;
+
+                auto val = solvedArgs[_genericDecl][valParam->parameterIndex].val;
+                if (!val)
+                {
+                    // failure!
+                    return false;
+                }
+                args[_genericDecl].add(val);
+            }
+        }
+    }
+    return true;
+}
+
 DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     ConstraintSystem* system,
     DeclRef<GenericDecl> genericDeclRef,
@@ -572,23 +702,51 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     // or known, we need to go ahead and use those arguments direclty (whether
     // or not they are compatible with the constraints).
     //
-    Count knownGenericArgCount = 0;
-    if (knownGenericArgs.getCount())
+    Count knownGenericArgCount = knownGenericArgs.getCount();
+
+    // Add default args to the constraints.
+    for (auto _genericDecl : genericDecls)
     {
-        knownGenericArgCount = knownGenericArgs.getCount();
-        for (auto arg : knownGenericArgs)
+        for (auto member : _genericDecl->getDirectMemberDecls())
         {
-            args[genericDecls[0]].add(arg);
+            if (auto typeParam = as<GenericTypeParamDecl>(member))
+            {
+                SLANG_ASSERT(typeParam->parameterIndex != -1);
+
+                if (typeParam->initType && typeParam->parameterIndex >= knownGenericArgCount)
+                {
+                    Constraint c;
+                    c.decl = member;
+                    c.val = typeParam->initType;
+                    c.priority = ConstraintPriority::Default;
+                    c.isEquality = true;
+                    c.potentiallyDependent = true;
+                    system->constraints.add(c);
+                }
+            }
+            else if (auto valParam = as<GenericValueParamDecl>(member))
+            {
+                SLANG_ASSERT(valParam->parameterIndex != -1);
+
+                if (valParam->initExpr && valParam->parameterIndex >= knownGenericArgCount)
+                {
+                    ConstantFoldingCircularityInfo newCircularityInfo(
+                        makeDeclRef(member),
+                        nullptr);
+
+                    Constraint c;
+                    c.decl = member;
+                    c.val = ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo);
+                    c.priority = ConstraintPriority::Default;
+                    c.isEquality = true;
+                    c.potentiallyDependent = true;
+                    system->constraints.add(c);
+                }
+            }
         }
     }
 
     // The state of currently solved arguments.
-    struct SolvedArg
-    {
-        Val* val = nullptr;
-        bool isOptional = true;
-        ShortList<QualType, 8> types;
-    };
     Dictionary<Decl*, ShortList<SolvedArg>> solvedArgs;
 
     // We will then iterate over the constraints trying to solve all generic parameters.
@@ -602,6 +760,29 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         // loop as we discover new constraints.
         //
         auto c = system->constraints[constraintIndex];
+
+        // If the constraint is potentially dependent on earlier constraints,
+        // try to substitute it with the currently known args.
+        if (c.potentiallyDependent)
+        {
+            // Return value intentionally ignored: partial args are sufficient
+            // for substituting references to already-solved parameters.
+            constraintSystemSolverUnpackArgs(
+                this,
+                genericDecls,
+                knownGenericArgs,
+                solvedArgs,
+                args);
+
+            auto genSubst = m_astBuilder->getGenericAppDeclRef(
+                genericDeclRef,
+                args[c.decl->parentDecl].getArrayView().arrayView);
+
+            auto newVal = c.val->substitute(m_astBuilder, SubstitutionSet(genSubst));
+            if (newVal)
+                c.val = newVal;
+        }
+
         if (auto typeParam = as<GenericTypeParamDeclBase>(c.decl))
         {
             SLANG_ASSERT(typeParam->parameterIndex != -1);
@@ -637,8 +818,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
             if (!isPack)
                 types.setCount(1);
 
-            bool& typeConstraintOptional =
-                solvedArgs[typeParam->parentDecl][typeParam->parameterIndex].isOptional;
+            ConstraintPriority& typeConstraintPriority =
+                solvedArgs[typeParam->parentDecl][typeParam->parameterIndex].priority;
 
             QualType* ptype = nullptr;
             if (isPack)
@@ -653,12 +834,12 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
             auto cType = QualType(as<Type>(c.val), c.isUsedAsLValue);
             SLANG_RELEASE_ASSERT(cType);
 
-            if (!type || (typeConstraintOptional && !c.isOptional))
+            if (!type)
             {
                 type = cType;
-                typeConstraintOptional = c.isOptional;
+                typeConstraintPriority = c.priority;
             }
-            else if (!typeConstraintOptional)
+            else
             {
                 // If the type parameter is already constrained to a known type,
                 // we need to make sure our resolved type can satisfy both constraints.
@@ -676,8 +857,14 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 auto joinType = TryJoinTypes(system, type, cType);
                 if (!joinType)
                 {
-                    if (c.isOptional)
+                    // New constraint has higher priority, so it overrides.
+                    if (c.priority < typeConstraintPriority)
+                        joinType = cType;
+                    // New constraint has lower priority, so it doesn't override.
+                    else if (c.priority > typeConstraintPriority)
                         joinType = type;
+                    // Equality constraint; latter overrides, failures are
+                    // checked during type substitutions later.
                     else if (c.isEquality)
                         joinType = type;
                     else
@@ -686,6 +873,9 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 }
                 type = QualType(joinType, type.isLeftValue || cType.isLeftValue);
             }
+
+            if (c.priority < typeConstraintPriority)
+                typeConstraintPriority = c.priority;
 
             c.satisfied = true;
         }
@@ -728,24 +918,27 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
             if (solvedArgs[valParam->parentDecl].getCount() <= valParam->parameterIndex)
                 solvedArgs[valParam->parentDecl].setCount(valParam->parameterIndex + 1);
             Val*& val = solvedArgs[valParam->parentDecl][valParam->parameterIndex].val;
-            bool& valOptional =
-                solvedArgs[valParam->parentDecl][valParam->parameterIndex].isOptional;
+            ConstraintPriority& valPriority =
+                solvedArgs[valParam->parentDecl][valParam->parameterIndex].priority;
 
             auto cVal = as<IntVal>(c.val);
             SLANG_RELEASE_ASSERT(cVal);
 
-            if (!val || (valOptional && !c.isOptional))
+            if (!val || (c.priority < valPriority))
             {
+                // Either we didn't have a value or this is a hard constraint
+                // overriding an optional constraint, so we can replace the
+                // value.
                 val = cVal;
-                valOptional = c.isOptional;
+                valPriority = c.priority;
             }
-            else
+            else if (valPriority == c.priority && !val->equals(cVal))
             {
-                if (!valOptional && !val->equals(cVal))
-                {
-                    // failure!
-                    return DeclRef<Decl>();
-                }
+                // Two clashing constraints with the same priority, and they
+                // have different values. We have no way to join these and no
+                // way to prefer one over the other (due to ambiguity), so this
+                // is a failure case.
+                return DeclRef<Decl>();
             }
 
             c.satisfied = true;
@@ -753,113 +946,12 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         system->constraints[constraintIndex].satisfied = c.satisfied;
     }
 
-    // After we processed all constraints, `solvedTypes` and `solvedVals`
-    // should have been filled with the resolved types and values for the
-    // generic parameters. We can now verify if they are complete and consolidate
-    // them into final argument list.
-    for (auto _genericDecl : genericDecls)
-        for (auto member : _genericDecl->getDirectMemberDecls())
-        {
-            if (auto typeParam = as<GenericTypeParamDeclBase>(member))
-            {
-                SLANG_ASSERT(typeParam->parameterIndex != -1);
-
-                if (typeParam->parameterIndex < knownGenericArgCount)
-                    continue;
-                bool isPack = as<GenericTypePackParamDecl>(typeParam) != nullptr;
-                if (typeParam->parameterIndex >= solvedArgs[_genericDecl].getCount())
-                {
-                    // If the parameter is not a type pack and we don't have a
-                    // resolved type for it, we should fail.
-                    if (!isPack)
-                        return DeclRef<Decl>();
-                    // If the parameter is a type pack, we should add an empty
-                    // type list to solvedTypes.
-                    solvedArgs[_genericDecl].setCount(typeParam->parameterIndex + 1);
-                }
-                auto& types = solvedArgs[_genericDecl][typeParam->parameterIndex].types;
-                // Fail if any of the resolved type element is empty.
-                for (auto t : types)
-                {
-                    if (!t)
-                        return DeclRef<Decl>();
-                }
-                if (!isPack)
-                {
-                    // If the generic parameter is not a pack, we can simply add the first type.
-                    if (types.getCount() != 1)
-                        return DeclRef<Decl>();
-
-                    args[_genericDecl].add(types[0]);
-                }
-                else
-                {
-                    // If the generic parameter is a pack, and we are supplying one single pack
-                    // argument, we can use it as is.
-                    if (types.getCount() == 1 && isTypePack(types[0]))
-                    {
-                        args[_genericDecl].add(types[0]);
-                    }
-                    else
-                    {
-                        // If we are supplying 0 or multiple arguments for the pack, we need to
-                        // create a type pack and add it to the argument list.
-                        ShortList<Type*> typeList;
-                        bool isLVal = true;
-                        for (auto t : types)
-                        {
-                            typeList.add(t);
-                            isLVal = isLVal && t.isLeftValue;
-                        }
-                        args[_genericDecl].add(QualType(
-                            m_astBuilder->getTypePack(typeList.getArrayView().arrayView),
-                            isLVal));
-                    }
-                }
-            }
-            else if (auto valPackParam = as<GenericValuePackParamDecl>(member))
-            {
-                SLANG_ASSERT(valPackParam->parameterIndex != -1);
-
-                if (valPackParam->parameterIndex < knownGenericArgCount)
-                    continue;
-
-                if (valPackParam->parameterIndex >= solvedArgs[_genericDecl].getCount())
-                {
-                    // Empty pack.
-                    args[_genericDecl].add(m_astBuilder->getIntValPack(ArrayView<IntVal*>()));
-                    continue;
-                }
-
-                auto val = solvedArgs[_genericDecl][valPackParam->parameterIndex].val;
-                if (!val)
-                {
-                    args[_genericDecl].add(m_astBuilder->getIntValPack(ArrayView<IntVal*>()));
-                }
-                else
-                {
-                    args[_genericDecl].add(val);
-                }
-            }
-            else if (auto valParam = as<GenericValueParamDecl>(member))
-            {
-                SLANG_ASSERT(valParam->parameterIndex != -1);
-
-                if (valParam->parameterIndex < knownGenericArgCount)
-                    continue;
-
-                if (valParam->parameterIndex >= solvedArgs[_genericDecl].getCount())
-                    return DeclRef<Decl>();
-
-                auto val = solvedArgs[_genericDecl][valParam->parameterIndex].val;
-                if (!val)
-                {
-                    // failure!
-                    return DeclRef<Decl>();
-                }
-                args[_genericDecl].add(val);
-            }
-        }
+    // After we processed all constraints, `solvedArgs` should have been filled
+    // with the resolved types and values for the generic parameters. We can
+    // now verify if they are complete and consolidate them into final argument
+    // list.
+    if (!constraintSystemSolverUnpackArgs(this, genericDecls, knownGenericArgs, solvedArgs, args))
+        return DeclRef<Decl>();
 
     // After we've solved for the explicit arguments, we need to
     // make a second pass and consider the implicit arguments,
@@ -1310,7 +1402,9 @@ bool SemanticsVisitor::TryUnifyTypeParam(
     constraint.indexInPack = unificationContext.indexInTypePack;
     constraint.val = type;
     constraint.isUsedAsLValue = type.isLeftValue;
-    constraint.isOptional = unificationContext.optionalConstraint;
+    constraint.priority = unificationContext.optionalConstraint ?
+        ConstraintPriority::Optional :
+        ConstraintPriority::Required;
     constraint.isEquality = unificationContext.equalityConstraint;
     constraints.constraints.add(constraint);
 
@@ -1367,7 +1461,9 @@ bool SemanticsVisitor::TryUnifyIntParam(
         Constraint constraint;
         constraint.decl = genericValuePackParamRef.getDecl();
         constraint.val = val;
-        constraint.isOptional = unifyCtx.optionalConstraint;
+        constraint.priority = unifyCtx.optionalConstraint ?
+            ConstraintPriority::Optional :
+            ConstraintPriority::Required;
         constraints.constraints.add(constraint);
         return true;
     }
@@ -1646,7 +1742,7 @@ void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
     c.decl = intParam->getDeclRef().getDecl();
     c.isUsedAsLValue = paramIsLVal;
     c.val = arg;
-    c.isOptional = true;
+    c.priority = ConstraintPriority::Optional;
     constraints.constraints.add(c);
 }
 

@@ -2639,7 +2639,12 @@ public:
     Type* getBackwardDiffFuncInterfaceType(Type* baseType);
     Type* getBwdCallableBaseType(Type* baseType);
 
-    //
+    enum class ConstraintPriority
+    {
+        Required = 0,
+        Optional,
+        Default
+    };
 
     struct Constraint
     {
@@ -2652,15 +2657,18 @@ public:
                                      // used in an l-value parameter?
         bool satisfied = false;      // Has this constraint been met?
 
-        // Is this constraint optional? An optional constraint provides a hint value to a
-        // parameter if it is otherwise unconstrained, but doesn't take precedence over a
-        // constraint that is not optional.
-        bool isOptional = false;
+        // There are multiple levels of optional constraints, the least binding
+        // of which are the default generic arguments; all deduced (even
+        // optional) constraints must override those.
+        ConstraintPriority priority = ConstraintPriority::Required;
 
         // Is this constraint an equality? This tells us that "joining" types is meaningless, we
         // know the result will be the sub type. If it is not, we will error once we start
         // substituting types.
         bool isEquality = false;
+
+        // Can `val` itself depend on other constraints? E.g. `<T, U = T>`
+        bool potentiallyDependent = false;
     };
 
     // A collection of constraints that will need to be satisfied (solved)
