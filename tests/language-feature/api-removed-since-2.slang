@@ -1,4 +1,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std 2026
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std 2026 -target cpp -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std 2026 -target cuda -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std 2026 -target glsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std 2026 -target hlsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std 2026 -target wgsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std 2026 -target spirv-asm -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std 2026 -target metal -stage compute -entry main
 
 // This test verifies the [RemovedSince] logic and that, when in
 // effect, it overrides [deprecated].
@@ -6,28 +13,8 @@
 // Note: When Slang language version 2026 is removed, please bump up
 // the RemovedSince language versions in this test.
 
-[deprecated("This struct is deprecated")]
-[RemovedSince(2027, "Use something else")]
-struct RemovedStructSince2027
-{
-}
+import "api-removed-since-2-helper";
 
-[deprecated("This struct is deprecated")]
-[RemovedSince(2026, "Use something else")]
-struct RemovedStructSince2026
-{
-}
-
-[RemovedSince(2026, "Use something else")]
-struct RemovedStructSince2026NoDeprecation
-{
-}
-
-[deprecated("This struct is deprecated")]
-[RemovedSince(2024, "Use something else")]
-struct RemovedStructSince2024
-{
-}
 
 // attribute boundaries
 
