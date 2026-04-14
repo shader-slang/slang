@@ -17,7 +17,14 @@ on:
 
 jobs:
   # Run GPU tests in container with Vulkan and CUDA support.
-  # Requires mounting host NVIDIA Vulkan ICD and EGL vendor config for Vulkan to work.
+  #
+  # Vulkan ICD: We use libEGL_nvidia.so.0 as the Vulkan ICD instead of the
+  # default libGLX_nvidia.so.0. This avoids a TOCTOU race in libEGL_nvidia.so's
+  # EGL initialization path (driver 580.x) that causes intermittent segfaults
+  # when libglvnd loads the EGL vendor. Using libEGL_nvidia as the ICD directly
+  # (it exports vk_icd* symbols) bypasses the buggy EGL init code path.
+  # We also skip mounting the EGL vendor JSON (10_nvidia.json) to prevent
+  # libglvnd from triggering EGL initialization.
   test-slang:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 60
@@ -38,9 +45,7 @@ jobs:
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
-        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
-        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
 
     defaults:
       run:
@@ -55,6 +60,28 @@ jobs:
             exit 1
           fi
           echo "GPU: $output"
+
+      - name: Setup Vulkan ICD
+        run: |
+          # Use libEGL_nvidia.so.0 as the Vulkan ICD instead of the default
+          # libGLX_nvidia.so.0. Both export vk_icd* symbols. The default ICD
+          # (libGLX) causes the NVIDIA driver to internally initialize EGL via
+          # libglvnd, which hits a TOCTOU race in libEGL_nvidia.so (driver
+          # 580.x) that intermittently segfaults test-server processes.
+          # Using libEGL_nvidia directly as the ICD avoids the libglvnd EGL
+          # vendor dispatch path entirely.
+          mkdir -p /etc/vulkan/icd.d
+          cat > /etc/vulkan/icd.d/nvidia_icd.json <<'EOF'
+          {
+              "file_format_version": "1.0.1",
+              "ICD": {
+                  "library_path": "libEGL_nvidia.so.0",
+                  "api_version": "1.4.312"
+              }
+          }
+          EOF
+          rm -f /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null || true
+          echo "Vulkan ICD configured: libEGL_nvidia.so.0"
 
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
@@ -183,9 +210,7 @@ jobs:
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
-        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
-        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
 
     defaults:
       run:
@@ -200,6 +225,23 @@ jobs:
             exit 1
           fi
           echo "GPU: $output"
+
+      - name: Setup Vulkan ICD
+        run: |
+          # Use libEGL_nvidia.so.0 as the Vulkan ICD instead of the default
+          # libGLX_nvidia.so.0. See test-slang job comment for details.
+          mkdir -p /etc/vulkan/icd.d
+          cat > /etc/vulkan/icd.d/nvidia_icd.json <<'EOF'
+          {
+              "file_format_version": "1.0.1",
+              "ICD": {
+                  "library_path": "libEGL_nvidia.so.0",
+                  "api_version": "1.4.312"
+              }
+          }
+          EOF
+          rm -f /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null || true
+          echo "Vulkan ICD configured: libEGL_nvidia.so.0"
 
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
