@@ -816,6 +816,27 @@ struct SemanticsDeclBasesVisitor : public SemanticsDeclVisitorBase,
     void visitExtensionDecl(ExtensionDecl* decl);
 
     void visitFuncExtensionDecl(FuncExtensionDecl* decl);
+
+    // Helpers for visitFuncExtensionDecl — one per higher-order expression type.
+    // Returns true on success, false on error.
+    bool _funcExtensionForwardDiff(
+        ExtensionDecl* extensionDecl,
+        FuncDecl* innerFunc,
+        Type* baseFuncAsType,
+        DeclVisibility visibility);
+    bool _funcExtensionBackwardDiff(
+        ExtensionDecl* extensionDecl,
+        FuncDecl* innerFunc,
+        Type* baseFuncAsType,
+        DeclVisibility visibility,
+        bool isStaticFunc);
+    bool _funcExtensionApply(
+        ExtensionDecl* extensionDecl,
+        FuncDecl* innerFunc,
+        Type* baseFuncAsType,
+        DeclVisibility visibility,
+        bool isStaticFunc,
+        SourceLoc loc);
 };
 
 struct SemanticsDeclTypeResolutionVisitor : public SemanticsDeclVisitorBase,
@@ -14234,6 +14255,261 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
     }
 }
 
+// Populate the extension for a forward derivative func_extension.
+//
+// Input:
+//   __func_extension fwd_diff(foo)(DifferentialPair<float> x) -> DifferentialPair<float> { ... }
+//
+// Output:
+//   extension foo : IForwardDifferentiable<foo>
+//   {
+//       static fwd_diff(DifferentialPair<float> x) -> DifferentialPair<float> { ... }  // user body
+//   }
+//
+bool SemanticsDeclBasesVisitor::_funcExtensionForwardDiff(
+    ExtensionDecl* extensionDecl,
+    FuncDecl* innerFunc,
+    Type* baseFuncAsType,
+    DeclVisibility visibility)
+{
+    auto astBuilder = getASTBuilder();
+
+    auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
+    inheritanceDecl->base.type = getForwardDiffFuncInterfaceType(baseFuncAsType);
+    extensionDecl->addMember(inheritanceDecl);
+
+    innerFunc->nameAndLoc.name = getName("fwd_diff");
+    addModifier(innerFunc, astBuilder->create<HLSLStaticModifier>());
+    extensionDecl->addMember(innerFunc);
+    return true;
+}
+
+// Populate the extension for a backward derivative func_extension.
+//
+// Input:
+//   __func_extension bwd_diff(foo)(inout DifferentialPair<float> x, float dOut) -> void { ... }
+//
+// Output:
+//   extension foo : IBackwardDifferentiable<foo>
+//   {
+//       static userBwdFunc(inout DifferentialPair<float> x, float dOut) -> void { ... }  // user body
+//       static bwd_diff  = FunctionCopy(userBwdFunc)              // typed as BwdDiffFuncType<foo>
+//       struct BwdCallable  : IBwdCallable<foo> { ... }           // synthesized from bwd_diff
+//       struct MinimalContext { ... }                              // synthesized from bwd_diff
+//       apply_bwd = BackwardPrimalFromLegacyBwdDiffFunc(...)      // synthesized
+//       static remat = BackwardRematFromLegacyBwdDiffFunc(...)    // synthesized
+//   }
+//
+bool SemanticsDeclBasesVisitor::_funcExtensionBackwardDiff(
+    ExtensionDecl* extensionDecl,
+    FuncDecl* innerFunc,
+    Type* baseFuncAsType,
+    DeclVisibility visibility,
+    bool isStaticFunc)
+{
+    SLANG_UNUSED(isStaticFunc);
+    auto astBuilder = getASTBuilder();
+
+    auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
+    inheritanceDecl->base.type = getBackwardDiffFuncInterfaceType(baseFuncAsType);
+    extensionDecl->addMember(inheritanceDecl);
+
+    // Mark static so it doesn't acquire an implicit `this` parameter
+    // (the user's explicit self parameter handles this-type).
+    addModifier(innerFunc, astBuilder->create<HLSLStaticModifier>());
+    extensionDecl->addMember(innerFunc);
+
+    auto userFuncDeclRef =
+        createDefaultSubstitutionsIfNeeded(astBuilder, this, innerFunc->getDefaultDeclRef());
+
+    auto funcAsTypeForSynth = as<DeclRefType>(baseFuncAsType);
+
+    auto synBwdDiffFunc = addSynthesizedFunc(
+        this,
+        extensionDecl,
+        getName("bwd_diff"),
+        kIROp_FunctionCopy,
+        {userFuncDeclRef},
+        getCalculatedDiffFuncType("BwdDiffFuncType", baseFuncAsType),
+        true,
+        visibility);
+    synBwdDiffFunc =
+        createDefaultSubstitutionsIfNeeded(astBuilder, this, synBwdDiffFunc)
+            .as<SynthesizedFuncDecl>();
+
+    auto synContextStruct = addOrExtendSynthesizedStruct(
+        this,
+        extensionDecl,
+        getName("BwdCallable"),
+        kIROp_BackwardContextFromLegacyBwdDiffFunc,
+        {funcAsTypeForSynth->getDeclRefBase(), synBwdDiffFunc},
+        {getBwdCallableBaseType(baseFuncAsType)},
+        visibility);
+
+    auto synMinimalContextStruct = addOrExtendSynthesizedStruct(
+        this,
+        extensionDecl,
+        getName("MinimalContext"),
+        kIROp_BackwardMinimalContextFromLegacyBwdDiffFunc,
+        {funcAsTypeForSynth->getDeclRefBase(), synBwdDiffFunc},
+        {},
+        visibility);
+
+    auto minimalCtxType = DeclRefType::create(astBuilder, synMinimalContextStruct);
+    auto fullCtxType = DeclRefType::create(astBuilder, synContextStruct);
+
+    addSynthesizedFunc(
+        this,
+        extensionDecl,
+        getName("apply_bwd"),
+        kIROp_BackwardPrimalFromLegacyBwdDiffFunc,
+        {funcAsTypeForSynth->getDeclRefBase(), synBwdDiffFunc},
+        getCalculatedDiffFuncType("ApplyForBwdFuncType", baseFuncAsType, minimalCtxType),
+        false,
+        visibility);
+
+    addSynthesizedFunc(
+        this,
+        extensionDecl,
+        getName("remat"),
+        kIROp_BackwardRematFromLegacyBwdDiffFunc,
+        {funcAsTypeForSynth->getDeclRefBase(), synBwdDiffFunc},
+        getCalculatedDiffFuncType("RematFuncType", baseFuncAsType, minimalCtxType, fullCtxType),
+        true,
+        visibility);
+    return true;
+}
+
+// Populate the extension for a custom apply (forward pass) func_extension.
+//
+// Input:
+//   struct MyCtx { void operator()(out float dx, float dOut) { ... } };
+//   __func_extension apply(foo)(float x) -> Tuple<float, MyCtx> { ... }
+//
+// Output:
+//   extension foo : IBackwardDifferentiable<foo>
+//   {
+//       userApplyFunc(float x) -> Tuple<float, MyCtx> { ... }    // user body
+//       apply_bwd  = FunctionCopy(userApplyFunc)                  // typed as ApplyForBwdFuncType
+//       typealias BwdCallable = MyCtx;
+//       typealias MinimalContext = MyCtx;
+//       static remat = IdentityRemat(apply_bwd)                   // identity (MinCtx == BwdCallable)
+//       // bwd_diff is synthesized later by LegacyBackwardDerivativeFunc requirement
+//   }
+//   extension MyCtx : IBwdCallable<foo> { }                       // conformance for the context type
+//
+bool SemanticsDeclBasesVisitor::_funcExtensionApply(
+    ExtensionDecl* extensionDecl,
+    FuncDecl* innerFunc,
+    Type* baseFuncAsType,
+    DeclVisibility visibility,
+    bool isStaticFunc,
+    SourceLoc loc)
+{
+    SLANG_UNUSED(isStaticFunc);
+    auto astBuilder = getASTBuilder();
+
+    auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
+    inheritanceDecl->base.type = getBackwardDiffFuncInterfaceType(baseFuncAsType);
+    extensionDecl->addMember(inheritanceDecl);
+
+    // Ensure innerFunc's return type is checked so we can extract CtxType.
+    ensureDecl(innerFunc, DeclCheckState::SignatureChecked);
+
+    // Extract the context type from the return type (Tuple<RetType, CtxType>).
+    auto returnType = innerFunc->returnType.type;
+    auto tupleType = as<TupleType>(returnType);
+    if (!tupleType || tupleType->getMemberCount() != 2)
+    {
+        getSink()->diagnose(Diagnostics::Unimplemented{
+            .feature = "__func_extension apply: return type must be Tuple<RetType, CtxType>",
+            .location = loc});
+        return false;
+    }
+    auto ctxType = tupleType->getMember(1);
+
+    extensionDecl->addMember(innerFunc);
+
+    auto userFuncDeclRef =
+        createDefaultSubstitutionsIfNeeded(astBuilder, this, innerFunc->getDefaultDeclRef());
+
+    auto synApplyBwdFunc = addSynthesizedFunc(
+        this,
+        extensionDecl,
+        getName("apply_bwd"),
+        kIROp_FunctionCopy,
+        {userFuncDeclRef},
+        getCalculatedDiffFuncType("ApplyForBwdFuncType", baseFuncAsType, ctxType),
+        false,
+        visibility);
+    synApplyBwdFunc =
+        createDefaultSubstitutionsIfNeeded(astBuilder, this, synApplyBwdFunc)
+            .as<SynthesizedFuncDecl>();
+
+    auto bwdCallableAlias = astBuilder->create<TypeAliasDecl>();
+    bwdCallableAlias->nameAndLoc.name = getName("BwdCallable");
+    addVisibilityModifier(bwdCallableAlias, visibility);
+    bwdCallableAlias->type.type = ctxType;
+    extensionDecl->addMember(bwdCallableAlias);
+
+    auto minCtxAlias = astBuilder->create<TypeAliasDecl>();
+    minCtxAlias->nameAndLoc.name = getName("MinimalContext");
+    addVisibilityModifier(minCtxAlias, visibility);
+    minCtxAlias->type.type = ctxType;
+    extensionDecl->addMember(minCtxAlias);
+
+    addSynthesizedFunc(
+        this,
+        extensionDecl,
+        getName("remat"),
+        kIROp_IdentityRemat,
+        {synApplyBwdFunc},
+        getCalculatedDiffFuncType("RematFuncType", baseFuncAsType, ctxType, ctxType),
+        true,
+        visibility);
+
+    // Create IBwdCallable<F> conformance for the user's context type.
+    // We create the conformance extension as a child of extensionDecl (which is
+    // inside the func-extension's generic scope), then lift it out. This ensures
+    // that baseFuncAsType (referencing the func-extension's generic T) is in the
+    // correct scope when substituted during lifting.
+    {
+        auto bwdCallableConformanceExt = astBuilder->create<ExtensionDecl>();
+        bwdCallableConformanceExt->loc = loc;
+        addVisibilityModifier(bwdCallableConformanceExt, visibility);
+
+        // Add as child of the main extensionDecl so it shares the same generic scope.
+        extensionDecl->addMember(bwdCallableConformanceExt);
+
+        // Lift from generic containers — this clones the func-extension's generic
+        // params and creates wrappers at module scope.
+        SubstitutionSet conformanceSubstSet;
+        liftDeclFromGenericContainers(bwdCallableConformanceExt, conformanceSubstSet);
+
+        // Apply substitutions to target type and interface type using the
+        // func-extension's generic params (now substituted by the lift).
+        auto substCtxType = as<Type>(ctxType->substitute(astBuilder, conformanceSubstSet));
+        bwdCallableConformanceExt->targetType.type = substCtxType;
+        bwdCallableConformanceExt->targetType.exp = astBuilder->create<SharedTypeExpr>();
+        bwdCallableConformanceExt->targetType.exp->type =
+            astBuilder->getOrCreate<TypeType>(substCtxType);
+
+        auto substBwdCallableBase = as<Type>(
+            getBwdCallableBaseType(baseFuncAsType)->substitute(astBuilder, conformanceSubstSet));
+        auto bwdCallableInheritance = astBuilder->create<InheritanceDecl>();
+        bwdCallableInheritance->base.type = substBwdCallableBase;
+        bwdCallableConformanceExt->addMember(bwdCallableInheritance);
+
+        // Walk up to outermost wrapper and add to module.
+        Decl* outermostDecl = bwdCallableConformanceExt;
+        while (outermostDecl->parentDecl && !as<ModuleDecl>(outermostDecl->parentDecl))
+            outermostDecl = outermostDecl->parentDecl;
+        getModuleDecl(extensionDecl)->addMember(outermostDecl);
+    }
+
+    return true;
+}
+
 void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
 {
     // Convert a __func_extension into a regular ExtensionDecl.
@@ -14346,237 +14622,24 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
                        !getTypeForThisExpr(this, baseFuncDecl).type;
     }
 
-    // For the apply path, we need to create the IBwdCallable conformance
-    // extension after step 5 (when the generic parent chain is fully wired).
-    // Track the context type here so we can use it later.
-    Type* applyCtxType = nullptr;
-
+    // Dispatch to the appropriate helper based on the higher-order expression type.
+    bool success = false;
     if (as<ForwardDifferentiateExpr>(diffExpr))
-    {
-        // Forward derivative: single requirement — the user's function becomes fwd_diff.
-        auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
-        inheritanceDecl->base.type = getForwardDiffFuncInterfaceType(baseFuncAsType);
-        extensionDecl->addMember(inheritanceDecl);
-
-        innerFunc->nameAndLoc.name = getName("fwd_diff");
-        // Function-as-type interface requirements are always static
-        // (the `this` type becomes an explicit parameter in the diff signature).
-        addModifier(innerFunc, astBuilder->create<HLSLStaticModifier>());
-        extensionDecl->addMember(innerFunc);
-    }
+        success = _funcExtensionForwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
     else if (as<BackwardDifferentiateExpr>(diffExpr))
-    {
-        // Backward derivative: the user provides the bwd_diff function body.
-        // We add it to the module as a standalone function, then create a
-        // SynthesizedFuncDecl (kIROp_FunctionCopy) in the extension as bwd_diff,
-        // and synthesize BwdCallable, MinimalContext, apply_bwd, remat.
-
-        auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
-        inheritanceDecl->base.type = getBackwardDiffFuncInterfaceType(baseFuncAsType);
-        extensionDecl->addMember(inheritanceDecl);
-
-        // Add the user's function as a member of the extension.
-        // It stays inside the same generic scope as the extension, so
-        // references to generic type params remain valid.
-        // Mark it static so it doesn't acquire an implicit `this` parameter
-        // (the user's explicit self parameter handles this-type).
-        addModifier(innerFunc, astBuilder->create<HLSLStaticModifier>());
-        extensionDecl->addMember(innerFunc);
-
-        auto userFuncDeclRef = createDefaultSubstitutionsIfNeeded(
-            astBuilder, this, innerFunc->getDefaultDeclRef());
-
-        auto funcAsTypeForSynth = as<DeclRefType>(baseFuncAsType);
-
-        // Create a SynthesizedFuncDecl for bwd_diff inside the extension,
-        // wrapping the user's function with the correct type (kIROp_FunctionCopy).
-        // bwd_diff is static in the interface (this-type becomes an explicit parameter).
-        auto synBwdDiffFunc = addSynthesizedFunc(
-            this,
-            extensionDecl,
-            getName("bwd_diff"),
-            kIROp_FunctionCopy,
-            {userFuncDeclRef},
-            getCalculatedDiffFuncType("BwdDiffFuncType", baseFuncAsType),
-            true,
-            visibility);
-        synBwdDiffFunc =
-            createDefaultSubstitutionsIfNeeded(astBuilder, this, synBwdDiffFunc)
-                .as<SynthesizedFuncDecl>();
-
-        // Synthesize BwdCallable struct.
-        auto synContextStruct = addOrExtendSynthesizedStruct(
-            this,
-            extensionDecl,
-            getName("BwdCallable"),
-            kIROp_BackwardContextFromLegacyBwdDiffFunc,
-            {funcAsTypeForSynth->getDeclRefBase(), synBwdDiffFunc},
-            {getBwdCallableBaseType(baseFuncAsType)},
-            visibility);
-
-        // Synthesize MinimalContext struct.
-        auto synMinimalContextStruct = addOrExtendSynthesizedStruct(
-            this,
-            extensionDecl,
-            getName("MinimalContext"),
-            kIROp_BackwardMinimalContextFromLegacyBwdDiffFunc,
-            {funcAsTypeForSynth->getDeclRefBase(), synBwdDiffFunc},
-            {},
-            visibility);
-
-        auto minimalCtxType = DeclRefType::create(astBuilder, synMinimalContextStruct);
-        auto fullCtxType = DeclRefType::create(astBuilder, synContextStruct);
-
-        // Synthesize apply_bwd.
-        addSynthesizedFunc(
-            this,
-            extensionDecl,
-            getName("apply_bwd"),
-            kIROp_BackwardPrimalFromLegacyBwdDiffFunc,
-            {funcAsTypeForSynth->getDeclRefBase(), synBwdDiffFunc},
-            getCalculatedDiffFuncType("ApplyForBwdFuncType", baseFuncAsType, minimalCtxType),
-            false,
-            visibility);
-
-        // Synthesize remat.
-        addSynthesizedFunc(
-            this,
-            extensionDecl,
-            getName("remat"),
-            kIROp_BackwardRematFromLegacyBwdDiffFunc,
-            {funcAsTypeForSynth->getDeclRefBase(), synBwdDiffFunc},
-            getCalculatedDiffFuncType("RematFuncType", baseFuncAsType, minimalCtxType, fullCtxType),
-            true,
-            visibility);
-    }
+        success = _funcExtensionBackwardDiff(
+            extensionDecl, innerFunc, baseFuncAsType, visibility, isStaticFunc);
     else if (as<ApplyForBwdExpr>(diffExpr))
-    {
-        // Apply-for-backward: the user provides a custom forward pass (apply_bwd)
-        // that returns Tuple<RetType, CtxType>. The CtxType is a user-defined struct
-        // with operator() for backward propagation.
-        // We set BwdCallable = MinimalContext = CtxType (the user's type),
-        // synthesize identity remat, and synthesize bwd_diff.
-
-        auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
-        inheritanceDecl->base.type = getBackwardDiffFuncInterfaceType(baseFuncAsType);
-        extensionDecl->addMember(inheritanceDecl);
-
-        // Ensure innerFunc's return type is checked so we can extract CtxType.
-        ensureDecl(innerFunc, DeclCheckState::SignatureChecked);
-
-        // Extract the context type from the return type (Tuple<RetType, CtxType>).
-        auto returnType = innerFunc->returnType.type;
-        auto tupleType = as<TupleType>(returnType);
-        if (!tupleType || tupleType->getMemberCount() != 2)
-        {
-            getSink()->diagnose(Diagnostics::Unimplemented{
-                .feature = "__func_extension apply: return type must be Tuple<RetType, CtxType>",
-                .location = decl->loc});
-            return;
-        }
-        auto ctxType = tupleType->getMember(1);
-        applyCtxType = ctxType;
-
-        // Add the user's function as a member of the extension.
-        extensionDecl->addMember(innerFunc);
-
-        auto userFuncDeclRef = createDefaultSubstitutionsIfNeeded(
-            astBuilder, this, innerFunc->getDefaultDeclRef());
-
-        auto funcAsTypeForSynth = as<DeclRefType>(baseFuncAsType);
-
-        // apply_bwd = FunctionCopy of the user's function.
-        auto synApplyBwdFunc = addSynthesizedFunc(
-            this,
-            extensionDecl,
-            getName("apply_bwd"),
-            kIROp_FunctionCopy,
-            {userFuncDeclRef},
-            getCalculatedDiffFuncType("ApplyForBwdFuncType", baseFuncAsType, ctxType),
-            false,
-            visibility);
-        synApplyBwdFunc =
-            createDefaultSubstitutionsIfNeeded(astBuilder, this, synApplyBwdFunc)
-                .as<SynthesizedFuncDecl>();
-
-        // BwdCallable = MinimalContext = CtxType (user's context struct).
-        auto bwdCallableAlias = astBuilder->create<TypeAliasDecl>();
-        bwdCallableAlias->nameAndLoc.name = getName("BwdCallable");
-        addVisibilityModifier(bwdCallableAlias, visibility);
-        bwdCallableAlias->type.type = ctxType;
-        extensionDecl->addMember(bwdCallableAlias);
-
-        auto minCtxAlias = astBuilder->create<TypeAliasDecl>();
-        minCtxAlias->nameAndLoc.name = getName("MinimalContext");
-        addVisibilityModifier(minCtxAlias, visibility);
-        minCtxAlias->type.type = ctxType;
-        extensionDecl->addMember(minCtxAlias);
-
-        // remat = identity (MinimalContext -> BwdCallable, same type).
-        addSynthesizedFunc(
-            this,
-            extensionDecl,
-            getName("remat"),
-            kIROp_IdentityRemat,
-            {synApplyBwdFunc},
-            getCalculatedDiffFuncType("RematFuncType", baseFuncAsType, ctxType, ctxType),
-            true,
-            visibility);
-
-        // bwd_diff is synthesized by the existing LegacyBackwardDerivativeFunc
-        // requirement synthesis from apply_bwd, remat, BwdCallable, and
-        // BwdCallable.operator().
-        // IBwdCallable conformance is created after step 5 (see below).
-    }
+        success = _funcExtensionApply(
+            extensionDecl, innerFunc, baseFuncAsType, visibility, isStaticFunc, decl->loc);
     else
-    {
         getSink()->diagnose(Diagnostics::Unimplemented{
             .feature = "unsupported operator in __func_extension",
             .location = decl->loc});
+    if (!success)
         return;
-    }
 
-    // 5. For apply: create IBwdCallable<F> conformance for the user's context type.
-    //    We create the conformance extension as a child of extensionDecl (which is
-    //    inside the func-extension's generic scope), then lift it out. This ensures
-    //    that baseFuncAsType (referencing the func-extension's generic T) is in the
-    //    correct scope when substituted during lifting.
-    if (applyCtxType)
-    {
-        auto bwdCallableConformanceExt = astBuilder->create<ExtensionDecl>();
-        bwdCallableConformanceExt->loc = decl->loc;
-        addVisibilityModifier(bwdCallableConformanceExt, visibility);
-
-        // Add as child of the main extensionDecl so it shares the same generic scope.
-        extensionDecl->addMember(bwdCallableConformanceExt);
-
-        // Lift from generic containers — this clones the func-extension's generic
-        // params and creates wrappers at module scope.
-        SubstitutionSet conformanceSubstSet;
-        liftDeclFromGenericContainers(bwdCallableConformanceExt, conformanceSubstSet);
-
-        // Apply substitutions to target type and interface type using the
-        // func-extension's generic params (now substituted by the lift).
-        auto substCtxType = as<Type>(applyCtxType->substitute(astBuilder, conformanceSubstSet));
-        bwdCallableConformanceExt->targetType.type = substCtxType;
-        bwdCallableConformanceExt->targetType.exp = astBuilder->create<SharedTypeExpr>();
-        bwdCallableConformanceExt->targetType.exp->type =
-            astBuilder->getOrCreate<TypeType>(substCtxType);
-
-        auto substBwdCallableBase = as<Type>(
-            getBwdCallableBaseType(baseFuncAsType)->substitute(astBuilder, conformanceSubstSet));
-        auto bwdCallableInheritance = astBuilder->create<InheritanceDecl>();
-        bwdCallableInheritance->base.type = substBwdCallableBase;
-        bwdCallableConformanceExt->addMember(bwdCallableInheritance);
-
-        // Walk up to outermost wrapper and add to module.
-        Decl* outermostDecl = bwdCallableConformanceExt;
-        while (outermostDecl->parentDecl && !as<ModuleDecl>(outermostDecl->parentDecl))
-            outermostDecl = outermostDecl->parentDecl;
-        getModuleDecl(decl)->addMember(outermostDecl);
-    }
-
-    // 6. Now run the normal extension checking on the newly created ExtensionDecl.
+    // Now run the normal extension checking on the newly created ExtensionDecl.
     visitExtensionDecl(extensionDecl);
 }
 
