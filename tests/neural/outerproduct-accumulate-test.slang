@@ -16,7 +16,7 @@
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_SIZE=64
 
 #pragma warning(disable: 41017)
-import neural;
+import slang.neural;
 import common;
 
 // TEST_INPUT: ubuffer(data=[0], stride=4, count=1):out, name=resultBuffer
@@ -29,10 +29,10 @@ typealias DType = half;
 typealias DType = float;
 #endif
 
-// TEST_INPUT: ubuffer(stride=4, count=4096):name=outputBuffer
-RWStructuredBuffer<DType> outputBuffer;
+//TEST_INPUT: set outputBuffer = ubuffer(stride=4, count=4096)
+uniform RWStructuredBuffer<DType>.Handle outputBuffer;
 
-typealias BufferStorage = StructuredBufferStorage<DType>;
+typealias Address = BindlessAddress<DType>;
 
 static const int SubgroupSize = 32;
 static const int WorkgroupSize = 128;
@@ -43,18 +43,22 @@ static const int MaxM = 64;
 
 static const int ShMemSizeA = MaxM * 2;
 static const int ShMemSizeB = MaxK * 2;
+static const int TotalShMemSizeA = ShMemSizeA * workgroupCount;
+static const int TotalShMemSizeB = ShMemSizeB * workgroupCount * sizeof(DType)/sizeof(half);
 
-groupshared uint4 s_sharedMemoryA[ShMemSizeA * workgroupCount];
-groupshared uint4 s_sharedMemoryB[ShMemSizeB * workgroupCount * sizeof(DType)/sizeof(half)];
-
-typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
+public struct TestShMemSize : ISharedMemorySize {
+    public static const uint Bytes = (TotalShMemSizeA + TotalShMemSizeB) * sizeof(uint4);
+}
+typealias TestPool = SharedMemoryPool<TestShMemSize>;
+static const uint OffsetA = 0;
+static const uint OffsetB = TotalShMemSizeA;
 
 // Basic test on MatMul without bias, this test covers both forward and backward pass
 void TestOuterProductAccumulate<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
-    BufferStorage storage = BufferStorage(outputBuffer);
+    Address address = Address(outputBuffer);
 
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, false>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, false>;
     const int OutSize = MMA.Uint4AlignedM;
     const int InSize = MMA.Uint4AlignedK;
 
@@ -73,18 +77,15 @@ void TestOuterProductAccumulate<int InputSize, int OutputSize, TargetEnum Target
         dOutVector[i] = DType((OutputSize - i) * scaleFactor);
     }
 
-    SPtr ptrA = __getAddress(s_sharedMemoryA[0]);
-    SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
-
     // perform dOut OPA Input
-    MMA.outerProductAccumulate<DType, BufferStorage, DType, DType[OutSize], DType, DType[InSize]>(ptrA, ptrB, dOutVector, inputVector, storage, 0);
+    MMA.outerProductAccumulate<DType, Address, DType, DType[OutSize], DType, DType[InSize]>(OffsetA, OffsetB, dOutVector, inputVector, address);
 
-    // serialRead<32, DType>(tid, ptrB);
+    // serialRead<32, DType>(tid, OffsetB);
     // serialRead<OutputSize, InputSize>(tid, outputBuffer);
 }
 
 // This function is just used for debugging, not for verification. So keep it here.
-void serialRead<int Stride, T: __BuiltinFloatingPointType>(uint tid, SPtr sharedMem)
+void serialRead<int Stride, T: __BuiltinFloatingPointType>(uint tid, uint sharedMemOffset)
 {
     GroupMemoryBarrierWithGroupSync();
 
@@ -97,7 +98,7 @@ void serialRead<int Stride, T: __BuiltinFloatingPointType>(uint tid, SPtr shared
         int strideInVector  = Stride / (sizeof(uint4) / sizeof(T));
         for (int i = 0; i < strideInVector; i++)
         {
-            uint4 values = sharedMem[id * strideInVector + i];
+            uint4 values = TestPool.data[sharedMemOffset + id * strideInVector + i];
             uint4 element = values;
             for (int j = 0; j < 4; j++)
             {

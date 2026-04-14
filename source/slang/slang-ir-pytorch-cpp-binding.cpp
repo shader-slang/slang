@@ -5,6 +5,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-lower-cuda-builtin-types.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -376,10 +377,9 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
     auto hostReturnType = translateToTupleType(builder, func->getResultType());
     if (!hostReturnType)
     {
-        sink->diagnose(
-            func->sourceLoc,
-            Diagnostics::invalidTorchKernelReturnType,
-            func->getResultType());
+        sink->diagnose(Diagnostics::InvalidTorchKernelReturnType{
+            .type = func->getResultType(),
+            .location = func->sourceLoc});
         return;
     }
     List<IRType*> hostParamTypes;
@@ -407,7 +407,9 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
         auto newParamType = translateToTupleType(builder, paramType);
         if (!newParamType)
         {
-            sink->diagnose(param->sourceLoc, Diagnostics::invalidTorchKernelParamType, paramType);
+            sink->diagnose(Diagnostics::InvalidTorchKernelParamType{
+                .type = paramType,
+                .location = param->sourceLoc});
             return;
         }
         auto newParam = builder.emitParam(newParamType);
@@ -533,7 +535,12 @@ IRType* translateToHostType(
     }
 
     if (sink)
-        sink->diagnose(type->sourceLoc, Diagnostics::unableToAutoMapCUDATypeToHostType, type, func);
+    {
+        sink->diagnose(Diagnostics::UnableToAutoMapCudaTypeToHostType{
+            .type = type,
+            .func = func,
+            .location = type->sourceLoc});
+    }
     return nullptr;
 }
 
@@ -1329,7 +1336,7 @@ void handleAutoBindNames(IRModule* module)
     //
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (globalInst->findDecoration<IRAutoPyBindCudaDecoration>())
+        if (auto autobindDecor = globalInst->findDecoration<IRAutoPyBindCudaDecoration>())
         {
             // Find an extern decoration on the original function, and append a prefix to the name.
             if (auto externCppHint = globalInst->findDecoration<IRExternCppDecoration>())
@@ -1342,6 +1349,8 @@ void handleAutoBindNames(IRModule* module)
                 externCppHint->removeAndDeallocate();
                 builder.addExternCppDecoration(globalInst, nameBuilder.getUnownedSlice());
             }
+
+            autobindDecor->removeAndDeallocate();
         }
     }
 }
@@ -1376,11 +1385,10 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
         if (!as<IRFunc>(globalInst))
             continue;
 
-        // Look for methods marked with auto-bind and are differentiable.
-        if (globalInst->findDecoration<IRAutoPyBindCudaDecoration>())
+        // Look for methods marked with auto-bind and have derivatives registered.
+        if (auto autoBindDecoration = globalInst->findDecoration<IRAutoPyBindCudaDecoration>())
         {
-            if (globalInst->findDecoration<IRForwardDifferentiableDecoration>() ||
-                globalInst->findDecoration<IRBackwardDifferentiableDecoration>())
+            if (autoBindDecoration->getFwdDiffFuncOperand())
             {
                 // We'll generate a wrapper for this method that calls fwd_diff(fn)
                 // but an important thing to note is that we won't actually employ the usual
@@ -1418,10 +1426,9 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
 
                 wrapperFunc->setFullType(func->getFullType());
 
-                auto fwdDiffFunc = builder.emitForwardDifferentiateInst(func->getFullType(), func);
                 auto fwdDiffCall = builder.emitCallInst(
                     func->getResultType(),
-                    fwdDiffFunc,
+                    autoBindDecoration->getFwdDiffFuncOperand(),
                     params.getCount(),
                     params.getBuffer());
 
@@ -1457,7 +1464,7 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
                 builder.addCudaKernelForwardDerivativeDecoration(func, wrapperFunc);
             }
 
-            if (globalInst->findDecoration<IRBackwardDifferentiableDecoration>())
+            if (autoBindDecoration->getBwdDiffFuncOperand())
             {
                 // The reasoning for the reverse-mode is the same as the forward-mode version
                 // (see above)
@@ -1485,14 +1492,13 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
 
                 wrapperFunc->setFullType(func->getFullType());
 
-                auto fwdDiffFunc = builder.emitBackwardDifferentiateInst(func->getFullType(), func);
-                auto fwdDiffCall = builder.emitCallInst(
+                auto bwdDiffCall = builder.emitCallInst(
                     func->getResultType(),
-                    fwdDiffFunc,
+                    autoBindDecoration->getBwdDiffFuncOperand(),
                     params.getCount(),
                     params.getBuffer());
 
-                builder.emitReturn(fwdDiffCall);
+                builder.emitReturn(bwdDiffCall);
 
                 // If the original func is a CUDA kernel, mark the wrapper as a CUDA kernel as well.
                 if (func->findDecoration<IRCudaKernelDecoration>())

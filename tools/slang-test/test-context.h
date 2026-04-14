@@ -16,6 +16,7 @@
 #include "options.h"
 #include "slang-com-ptr.h"
 
+#include <atomic>
 #include <mutex>
 
 typedef uint32_t PassThroughFlags;
@@ -171,8 +172,8 @@ public:
     /// TODO(JS): We could split the core module compilation from other actions, and have timeout
     /// specific for that. To do this we could have a 'compileCoreModule' RPC method.
     ///
-    /// Current default is 60 seconds.
-    Slang::Int connectionTimeOutInMs = 60 * 1000;
+    /// Current default is 120 seconds.
+    Slang::Int connectionTimeOutInMs = 120 * 1000;
 
     void setThreadIndex(int index);
     void setMaxTestRunnerThreadCount(int count);
@@ -188,6 +189,17 @@ public:
     std::mutex mutexFailedTests;
     Slang::List<Slang::RefPtr<FileTestInfo>> failedFileTests;
     Slang::List<Slang::String> failedUnitTests;
+
+    /// Set when too many consecutive failures indicate a systemic issue (e.g., GPU driver crash).
+    /// Checked by the parallel test loop to stop scheduling new tests.
+    std::atomic<bool> stopSchedulingTests{false};
+
+    /// Track consecutive failures per-thread to detect catastrophic GPU failure.
+    /// Returns true if the abort threshold was reached.
+    bool reportTestFailure();
+
+    /// Reset consecutive failure counter (called on test pass).
+    void reportTestPass();
 
     Slang::IFileCheck* getFileCheck() { return m_fileCheck; };
 

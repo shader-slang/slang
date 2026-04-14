@@ -1,0 +1,192 @@
+name: Populate sccache
+
+on:
+  schedule:
+    - cron: "*/30 * * * *" # Every 30 minutes
+  workflow_dispatch: # Allow manual trigger
+
+concurrency:
+  group: populate-sccache
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      should-build: ${{ steps.check.outputs.should-build }}
+      last-commit: ${{ steps.check.outputs.last-commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 10
+
+      - name: Check if all sccache caches exist
+        id: check
+        run: |
+          # Get current master HEAD
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          echo "last-commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+
+          # Check that all 8 sccache config caches exist for this commit
+          CONFIGS=(
+            "sccache-linux-gcc-x86_64-release-${CURRENT_COMMIT}"
+            "sccache-linux-gcc-x86_64-debug-${CURRENT_COMMIT}"
+            "sccache-macos-clang-aarch64-release-${CURRENT_COMMIT}"
+            "sccache-macos-clang-aarch64-debug-${CURRENT_COMMIT}"
+            "sccache-linux-gcc-aarch64-release-${CURRENT_COMMIT}"
+            "sccache-linux-gcc-aarch64-debug-${CURRENT_COMMIT}"
+            "sccache-windows-cl-x86_64-release-${CURRENT_COMMIT}"
+            "sccache-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
+          )
+
+          MISSING=0
+          for key in "${CONFIGS[@]}"; do
+            COUNT=$(gh api "repos/${{ github.repository }}/actions/caches?key=${key}" --jq '.total_count' 2>/dev/null || echo "0")
+            if [ "$COUNT" -eq 0 ]; then
+              echo "❌ Missing: ${key}"
+              MISSING=$((MISSING + 1))
+            else
+              echo "✅ Found: ${key}"
+            fi
+          done
+
+          if [ "$MISSING" -eq 0 ]; then
+            echo "✅ All 8 sccache caches exist for commit ${CURRENT_COMMIT}"
+            echo "should-build=false" >> $GITHUB_OUTPUT
+          else
+            echo "🔨 ${MISSING} cache(s) missing for commit ${CURRENT_COMMIT}, rebuilding all"
+            echo "should-build=true" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build-linux-release:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-build-container.yml
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
+    with:
+      config: release
+      runs-on: '["ubuntu-22.04"]'
+
+  build-linux-debug:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-build-container.yml
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
+    with:
+      config: debug
+      runs-on: '["ubuntu-22.04"]'
+
+  build-macos-release:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
+      warnings-as-errors: true
+      build-llvm: true
+      save-sccache: true
+
+  build-macos-debug:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
+      warnings-as-errors: true
+      build-llvm: true
+      save-sccache: true
+
+  build-linux-aarch64-release:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: release
+      runs-on: '["ubuntu-24.04-arm"]'
+      warnings-as-errors: false
+      build-llvm: true
+      save-sccache: true
+
+  build-linux-aarch64-debug:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: debug
+      runs-on: '["ubuntu-24.04-arm"]'
+      warnings-as-errors: false
+      build-llvm: true
+      save-sccache: true
+
+  build-windows-release:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "build"]'
+      warnings-as-errors: true
+      build-llvm: true
+      save-sccache: true
+
+  build-windows-debug:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "build"]'
+      warnings-as-errors: true
+      build-llvm: true
+      save-sccache: true

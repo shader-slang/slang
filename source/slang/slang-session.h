@@ -24,6 +24,7 @@
 #include "slang-content-assist-info.h"
 #include "slang-global-session.h"
 
+#include <mutex>
 #include <slang.h>
 
 namespace Slang
@@ -90,7 +91,16 @@ struct ContainerTypeKey
 class Linkage : public RefObject, public slang::ISession
 {
 public:
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_INTERFACE(
+        0xa3f29c15,
+        0x4e82,
+        0x47d1,
+        {0x9b, 0x53, 0x7c, 0xe6, 0x1f, 0x48, 0xd2, 0x07})
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE;
+    SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
+    SLANG_REF_OBJECT_IUNKNOWN_RELEASE
 
     CompilerOptionSet m_optionSet;
 
@@ -172,6 +182,8 @@ public:
     virtual SLANG_NO_THROW slang::IModule* SLANG_MCALL getLoadedModule(SlangInt index) override;
     virtual SLANG_NO_THROW bool SLANG_MCALL
     isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDeclSourceLocation(slang::DeclReflection* decl, slang::SourceLocation* outLocation) override;
 
     // Updates the supplied builder with linkage-related information, which includes preprocessor
     // defines, the compiler version, and other compiler options. This is then merged with the hash
@@ -217,6 +229,7 @@ public:
     NamePool* getNamePool() { return namePool; }
 
     ASTBuilder* getASTBuilder() { return m_astBuilder; }
+    std::recursive_mutex& getComponentTypeOperationMutex() { return m_componentTypeOperationMutex; }
 
     RefPtr<ASTBuilder> m_astBuilder;
 
@@ -228,6 +241,9 @@ public:
     void destroyTypeCheckingCache();
 
     RefPtr<RefObject> m_typeCheckingCache = nullptr;
+    // Front-end component-type operations still share linkage-owned mutable state and can
+    // re-enter one another, so they remain serialized even when backend emission is parallelized.
+    std::recursive_mutex m_componentTypeOperationMutex;
 
     // Modules that have been dynamically loaded via `import`
     //
@@ -246,6 +262,8 @@ public:
 
     // Counters for allocating sequential IDs to witness tables conforming to each interface type.
     Dictionary<String, uint32_t> mapInterfaceMangledNameToSequentialIDCounters;
+    // Witness-table sequential ID assignment updates both maps together.
+    std::mutex m_sequentialIDMapMutex;
 
     SearchDirectoryList searchDirectoryCache;
 

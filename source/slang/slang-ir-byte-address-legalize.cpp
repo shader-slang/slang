@@ -11,6 +11,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -265,11 +266,11 @@ struct ByteAddressBufferLegalizationContext
             {
                 return true;
             }
-            m_sink->diagnose(
-                offset->sourceLoc,
-                Slang::Diagnostics::byteAddressBufferUnaligned,
-                alignInst->getValue(),
-                alignmentVal);
+            m_sink->diagnose(Diagnostics::ByteAddressBufferUnaligned{
+                .alignment = alignInst->getValue(),
+                .elementSize = alignmentVal,
+                .location = offset->sourceLoc,
+            });
         }
         return false;
     }

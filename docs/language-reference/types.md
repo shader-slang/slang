@@ -68,14 +68,14 @@ Full type specifier, possibly declaring a new type:
   a [fundamental type](types-fundamental.md), [vector/matrix generic type](types-vector-and-matrix.md),
   user-defined type such as a named [structure type](types-struct.md), [interface type](types-interface.md),
   [enumeration type](types-enum.md), type alias, or a type provided by a module.
-- *`generic-params-decl`* is a generic parameters declaration. See [Generics (TODO)](TODO).
+- *`generic-params-decl`* is a [generic parameters declaration](generics.md).
 - **`'['`** [*`constant-index-expr`*] **`']'`** is an [array dimension declaration](types-array.md) with an
   optional constant integral expression specifying the dimension length.
 - **`'*'`** is a [pointer declaration](types-pointer.md).
 - *`param-list`* is a function parameter list. See [function parameter list (TODO)](TODO).
 - *`struct-decl`* is a [structure](types-struct.md) type declaration, possibly also defining the type.
 - *`class-decl`* is a [class (TODO)](types-class.md) type declaration, possibly also defining the type.
-- *`enum-decl`* is an [enumeration (TODO)](types-enum.md) type declaration, possibly also defining the type.
+- *`enum-decl`* is an [enumeration](types-enum.md) type declaration, possibly also defining the type.
 
 
 ### Description
@@ -91,7 +91,7 @@ specifiers are used in:
 - [function return value type (TODO)](TODO) declarations
 - [structure property](types-struct.md#property)
 - [structure subscript operator](types-struct.md#subscript-op)
-- [generic type parameter declarations (TODO)](TODO)
+- [generic type parameter declarations](generics.md)
 - [typealias](#alias) declarations
 
 Declaration of new types is allowed in:
@@ -137,7 +137,7 @@ A `typealias` declaration introduces a name for a type. A `typedef` declaration 
 also allows declaring a new type.
 
 A generic type alias declaration declares a parameterized alias for a generic type. This is described in
-[Generics (TODO)](TODO).
+[Generics](generics.md).
 
 
 ## Complete and Incomplete Types {#incomplete}

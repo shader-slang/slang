@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 struct MyType
 {
@@ -18,26 +18,39 @@ struct MyType
     int func1() { return member; }
 
     private __init() { member = 0; }
-    
+
     private __subscript(int i)->int
     {
         get { return member; }
         set { member = newValue; }
     }
-    // CHECK:{{.*}}([[# @LINE+1]]): error 30601:
+    // ERROR: public method in private struct
     public void publicMethod() {} // ERROR.
+//CHECK:        ^^^^^^^^^^^^ visibility higher than parent
+//CHECK:        ^^^^^^^^^^^^ 'publicMethod' cannot have a higher visibility than 'MyType'.
 }
 
 void test()
 {
     MyType t; // should leave uninitialized.
-    // CHECK-NOT:{{.*}}error
     t.func1(); // OK.
-    // CHECK:{{.*}}([[# @LINE+1]]): error 30600:
+    // ERROR: calling private method
     t.func(); // ERROR.
-    // CHECK:{{.*}}([[# @LINE+1]]): error 30600:
+/*CHECK:
+      ^^^^ declaration not accessible
+      ^^^^ 'func' is not accessible from the current context.
+*/
+    // ERROR: using private subscript
     t[0] = 1; // ERROR.
+/*CHECK:
+     ^ declaration not accessible
+     ^ 'operator[]' is not accessible from the current context.
+*/
 
-    // CHECK:{{.*}}([[# @LINE+1]]): error 30600:
+    // ERROR: accessing private member
     t.member = 2;
+/*CHECK:
+      ^^^^^^ declaration not accessible
+      ^^^^^^ 'member' is not accessible from the current context.
+*/
 }

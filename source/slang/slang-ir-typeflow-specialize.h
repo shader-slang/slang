@@ -1,9 +1,11 @@
 // slang-ir-typeflow-specialize.h
 #pragma once
 #include "slang-ir.h"
+#include "slang-target-program.h"
 
 namespace Slang
 {
+struct SpecializationContext;
 
 // Convert dynamic insts such as `LookupWitnessMethod`, `ExtractExistentialValue`,
 // `ExtractExistentialType`, `ExtractExistentialWitnessTable` and more into specialized versions
@@ -16,7 +18,12 @@ namespace Slang
 // This pass may generate more `Specialize` insts, so it should be run in a loop with
 // the standard specialization pass until a no more changes can be made.
 //
-bool specializeDynamicInsts(IRModule* module, DiagnosticSink* sink);
+bool specializeDynamicInsts(
+    IRModule* module,
+    TargetProgram* target,
+    DiagnosticSink* sink,
+    SpecializationContext* context,
+    bool shouldReportDynamicDispatchSites);
 
 bool isSetSpecializedGeneric(IRInst* callee);
 

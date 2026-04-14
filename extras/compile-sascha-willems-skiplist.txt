@@ -1,0 +1,16 @@
+# Shaders with known compilation issues in the Slang compiler.
+# Each entry is a relative path under shaders/slang/.
+# Blank lines and lines starting with '#' are ignored.
+# Remove entries as the underlying issues are fixed.
+
+# SV_PointSize cannot be used as input in fragment stage when
+# vertex/fragment share a struct (https://github.com/shader-slang/slang/issues/10473)
+computenbody/particle.slang
+computeparticles/particle.slang
+particlesystem/particle.slang
+
+# ShaderLayer/ShaderViewportIndex capabilities require SPIR-V 1.5+ but we
+# compile with spirv_1_4; Slang should use SPV_EXT_shader_viewport_index_layer
+# extension instead (https://github.com/shader-slang/slang/issues/10513)
+deferredshadows/shadow.slang
+viewportarray/scene.slang

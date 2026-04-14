@@ -6,6 +6,7 @@
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-util.h"
 #include "slang-mangled-lexer.h"
+#include "slang-rich-diagnostics.h"
 
 #include <assert.h>
 
@@ -204,7 +205,8 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             if (as<IRPtrTypeBase>(param->getDataType()) ||
                 as<IRHLSLStructuredBufferTypeBase>(param->getDataType()) ||
                 as<IRByteAddressBufferTypeBase>(param->getDataType()) ||
-                as<IRUniformParameterGroupType>(param->getDataType()))
+                as<IRUniformParameterGroupType>(param->getDataType()) ||
+                as<IRRaytracingAccelerationStructureType>(param->getDataType()))
             {
                 m_writer->emit(" [[buffer(");
                 m_writer->emit(rr->getOffset());
@@ -247,6 +249,24 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
 {
     auto stage = entryPointDecor->getProfile().getStage();
 
+    const auto emitRequiredThreadsPerThreadgroup = [&]()
+    {
+        if (getTargetCaps().implies(CapabilityAtom::metallib_4_0))
+        {
+            Int sizeAlongAxis[kThreadGroupAxisCount];
+            getComputeThreadGroupSize(irFunc, sizeAlongAxis);
+
+            m_writer->emit("[[required_threads_per_threadgroup(");
+            for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
+            {
+                if (ii != 0)
+                    m_writer->emit(", ");
+                m_writer->emit(sizeAlongAxis[ii]);
+            }
+            m_writer->emit(")]]\n");
+        }
+    };
+
     switch (stage)
     {
     case Stage::Fragment:
@@ -256,12 +276,15 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
         m_writer->emit("[[vertex]] ");
         break;
     case Stage::Compute:
+        emitRequiredThreadsPerThreadgroup();
         m_writer->emit("[[kernel]] ");
         break;
     case Stage::Mesh:
+        emitRequiredThreadsPerThreadgroup();
         m_writer->emit("[[mesh]] ");
         break;
     case Stage::Amplification:
+        emitRequiredThreadsPerThreadgroup();
         m_writer->emit("[[object]] ");
         break;
     default:
@@ -335,10 +358,9 @@ void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
     {
         if (as<IRVectorType>(textureType->getElementType()))
         {
-            getSink()->diagnose(
-                inst,
-                Diagnostics::unsupportedTargetIntrinsic,
-                "atomic operation on non-scalar texture");
+            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                .operation = "atomic operation on non-scalar texture",
+                .location = inst->sourceLoc});
         }
     }
     bool isArray = resourceType && getIntVal(resourceType->getIsArrayInst()) != 0;
@@ -359,10 +381,9 @@ void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
         }
         else
         {
-            getSink()->diagnose(
-                inst,
-                Diagnostics::unsupportedTargetIntrinsic,
-                "invalid image coordinate for atomic operation");
+            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                .operation = "invalid image coordinate for atomic operation",
+                .location = inst->sourceLoc});
         }
     }
     else
@@ -439,10 +460,9 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     };
     auto diagnoseFloatAtomic = [&]()
     {
-        getSink()->diagnose(
-            inst,
-            Diagnostics::unsupportedTargetIntrinsic,
-            "Unsupported floating point atomic operation");
+        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = "Unsupported floating point atomic operation",
+            .location = inst->sourceLoc});
     };
     switch (inst->getOp())
     {
@@ -817,12 +837,31 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     case kIROp_BitCast:
         {
             auto toType = inst->getDataType();
+            auto fromType = inst->getOperand(0)->getDataType();
 
-            m_writer->emit("as_type<");
-            emitType(toType);
-            m_writer->emit(">(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(")");
+            // Metal doesn't allow as_type<> casts involving pointer types.
+            // Use C-style cast for pointer-to-pointer, pointer-to-int, and int-to-pointer.
+            bool toIsPointer = as<IRPtrTypeBase>(toType) || as<IRRawPointerTypeBase>(toType);
+            bool fromIsPointer = as<IRPtrTypeBase>(fromType) || as<IRRawPointerTypeBase>(fromType);
+
+            if (toIsPointer || fromIsPointer)
+            {
+                // C-style cast for pointer conversions
+                m_writer->emit("(");
+                emitType(toType);
+                m_writer->emit(")(");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
+            else
+            {
+                // as_type<> for non-pointer bitcasts
+                m_writer->emit("as_type<");
+                emitType(toType);
+                m_writer->emit(">(");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
             return true;
         }
     case kIROp_StringLit:
@@ -1193,6 +1232,13 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("int");
             return;
         }
+
+    case kIROp_RayQueryType:
+        {
+            m_writer->emit("raytracing::intersection_query<raytracing::triangle_data, "
+                           "raytracing::instancing>");
+            return;
+        }
     case kIROp_ParameterBlockType:
     case kIROp_ConstantBufferType:
         {
@@ -1406,7 +1452,7 @@ bool MetalSourceEmitter::_emitUserSemantic(
     {
         m_writer->emit(" [[user(");
         m_writer->emit(String(semanticName).toUpper());
-        if (semanticIndex != 0)
+        if (semanticIndex > 0)
         {
             m_writer->emit("_");
             m_writer->emit(semanticIndex);

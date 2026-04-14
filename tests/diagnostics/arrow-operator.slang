@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -emit-spirv-directly
 
 struct Type
 {
@@ -16,10 +16,11 @@ void main()
 {
     Type val;
 
-    // CHECK: ([[# @LINE+1]]): error 30101
     val->member = 2; // Error.
+//diag:^^ cannot dereference type
+//diag:^^ cannot dereference type 'Type', do you mean to use '.'?
 
-    // CHECK-NOT: error
-    let a = cb->ptr->member; // OK.
+    // OK.
+    let a = cb->ptr->member;
 
 }

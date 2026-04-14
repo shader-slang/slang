@@ -7,6 +7,7 @@
 #include "../core/slang-type-text-util.h"
 #include "slang-ast-builder.h"
 #include "slang-lookup.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -837,6 +838,14 @@ void DocMarkdownWriter::writeExtensionConditions(
                             break;
                         }
                     }
+                    else if (auto valPackParamDecl = as<GenericValuePackParamDecl>(member))
+                    {
+                        if (valPackParamDecl->parameterIndex == parameterIndex)
+                        {
+                            originalParamDecl = valPackParamDecl;
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -1520,9 +1529,7 @@ void DocMarkdownWriter::writeCallableOverridable(
             {
                 auto decl = as<Decl>(entry->m_node);
                 m_sink->diagnose(
-                    decl->loc,
-                    Diagnostics::ignoredDocumentationOnOverloadCandidate,
-                    decl);
+                    Diagnostics::IgnoredDocumentationOnOverloadCandidate{.location = decl});
             }
         }
         else
@@ -1644,7 +1651,7 @@ void DocMarkdownWriter::writeCallableOverridable(
                 {
                     for (Decl* decl : genericDecl->getDirectMemberDecls())
                     {
-                        if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl))
+                        if (isGenericParam(decl))
                         {
                             genericDecls.add(decl);
                         }
@@ -2358,7 +2365,7 @@ void DeclDocumentation::writeGenericParameters(
     List<Decl*> params;
     for (Decl* member : genericDecl->getDirectMemberDecls())
     {
-        if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
+        if (isGenericParam(member))
         {
             params.add(member);
         }
@@ -2536,7 +2543,7 @@ DocumentPage* DocMarkdownWriter::findPageForToken(
                             outDecl = member;
                             if (as<GenericTypeParamDeclBase>(member))
                                 outSectionName = String("typeparam-") + token;
-                            else if (as<GenericValueParamDecl>(member))
+                            else if (isGenericValueParam(member))
                                 outSectionName = String("decl-") + token;
                             return currentPage;
                         }

@@ -1,6 +1,7 @@
 #include "slang-ir-check-recursion.h"
 
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -15,7 +16,11 @@ bool checkTypeRecursionImpl(
     {
         if (!stack.add(elementType))
         {
-            sink->diagnose(field ? field : type, Diagnostics::recursiveType, type);
+            if (sink)
+                sink->diagnose(Diagnostics::RecursiveType{
+                    .typeName = type,
+                    .location = (field ? field : type)->sourceLoc,
+                });
             return false;
         }
         if (checkedTypes.add(elementType))
@@ -34,6 +39,14 @@ bool checkTypeRecursionImpl(
                 return false;
     }
     return true;
+}
+
+bool isTypeRecursive(IRType* type)
+{
+    HashSet<IRInst*> checkedTypes;
+    HashSet<IRInst*> stack;
+    stack.add(type);
+    return !checkTypeRecursionImpl(checkedTypes, stack, type, nullptr, nullptr);
 }
 
 void checkTypeRecursion(HashSet<IRInst*>& checkedTypes, IRInst* type, DiagnosticSink* sink)
@@ -82,7 +95,9 @@ bool checkFunctionRecursionImpl(
                 continue;
             if (!callStack.add(callee))
             {
-                sink->diagnose(callInst, Diagnostics::unsupportedRecursion, callee);
+                sink->diagnose(Diagnostics::UnsupportedRecursion{
+                    .callee = callee,
+                    .location = callInst->sourceLoc});
                 return false;
             }
             if (checkedFuncs.add(callee))

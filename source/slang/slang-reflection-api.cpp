@@ -144,6 +144,14 @@ static inline ProgramLayout* convert(SlangReflection* program)
     return (SlangReflection*)program;
 }
 
+static bool isScalarType(Type* type)
+{
+    if (as<BasicExpressionType>(type))
+        return true;
+
+    return as<BFloat16Type>(type) || as<FloatE4M3Type>(type) || as<FloatE5M2Type>(type);
+}
+
 // user attribute
 
 static unsigned int getUserAttributeCount(Decl* decl)
@@ -402,7 +410,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
 
     // TODO(tfoley): Don't emit the same type more than once...
 
-    if (const auto basicType = as<BasicExpressionType>(type))
+    if (isScalarType(type))
     {
         return SLANG_TYPE_KIND_SCALAR;
     }
@@ -443,6 +451,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
         return SLANG_TYPE_KIND_SAMPLER_STATE;
     }
     else if (const auto textureType = as<TextureTypeBase>(type))
+    {
+        return SLANG_TYPE_KIND_RESOURCE;
+    }
+    else if (const auto subpassInputType = as<SubpassInputType>(type))
     {
         return SLANG_TYPE_KIND_RESOURCE;
     }
@@ -682,7 +694,7 @@ SLANG_API unsigned int spReflectionType_GetRowCount(SlangReflectionType* inType)
     {
         return 1;
     }
-    else if (const auto basicType = as<BasicExpressionType>(type))
+    else if (isScalarType(type))
     {
         return 1;
     }
@@ -704,7 +716,7 @@ SLANG_API unsigned int spReflectionType_GetColumnCount(SlangReflectionType* inTy
     {
         return (unsigned int)getIntVal(vectorType->getElementCount());
     }
-    else if (const auto basicType = as<BasicExpressionType>(type))
+    else if (isScalarType(type))
     {
         return 1;
     }
@@ -748,15 +760,23 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
             CASE(Half, FLOAT16);
             CASE(Float, FLOAT32);
             CASE(Double, FLOAT64);
+            CASE(IntPtr, INTPTR);
+            CASE(UIntPtr, UINTPTR);
 
 #undef CASE
 
         default:
             SLANG_REFLECTION_UNEXPECTED();
             return SLANG_SCALAR_TYPE_NONE;
-            break;
         }
     }
+
+    if (as<BFloat16Type>(type))
+        return SLANG_SCALAR_TYPE_BFLOAT16;
+    if (as<FloatE4M3Type>(type))
+        return SLANG_SCALAR_TYPE_FLOAT_E4M3;
+    if (as<FloatE5M2Type>(type))
+        return SLANG_SCALAR_TYPE_FLOAT_E5M2;
 
     return SLANG_SCALAR_TYPE_NONE;
 }
@@ -832,6 +852,12 @@ SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionTy
         return textureType->getShape();
     }
 
+    if (auto subpassInputType = as<SubpassInputType>(type))
+    {
+        return subpassInputType->isMultisample() ? SLANG_TEXTURE_SUBPASS_MULTISAMPLE
+                                                 : SLANG_TEXTURE_SUBPASS;
+    }
+
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, SHAPE, ACCESS) \
     else if (as<TYPE>(type)) do   \
@@ -879,6 +905,11 @@ SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflection
     if (auto textureType = as<TextureTypeBase>(type))
     {
         return textureType->getAccess();
+    }
+
+    if (as<SubpassInputType>(type))
+    {
+        return SLANG_RESOURCE_ACCESS_READ;
     }
 
     // TODO: need a better way to handle this stuff...
@@ -1223,6 +1254,11 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
     if (auto textureType = as<TextureTypeBase>(type))
     {
         return convert(textureType->getElementType());
+    }
+
+    if (auto subpassInputType = as<SubpassInputType>(type))
+    {
+        return convert(subpassInputType->getElementType());
     }
 
     // TODO: need a better way to handle this stuff...
@@ -4630,16 +4666,28 @@ SLANG_API SlangReflectionType* spReflection_specializeType(
     auto linkage = programLayout->getProgram()->getLinkage();
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    try
+    {
+        auto specializedType = linkage->specializeType(
+            unspecializedType,
+            specializationArgCount,
+            (Type* const*)specializationArgs,
+            &sink);
 
-    auto specializedType = linkage->specializeType(
-        unspecializedType,
-        specializationArgCount,
-        (Type* const*)specializationArgs,
-        &sink);
+        sink.getBlobIfNeeded(outDiagnostics);
 
-    sink.getBlobIfNeeded(outDiagnostics);
-
-    return convert(specializedType);
+        return convert(specializedType);
+    }
+    catch (const AbortCompilationException& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return nullptr;
+    }
+    catch (...)
+    {
+        outputExceptionDiagnostic(sink, outDiagnostics);
+        return nullptr;
+    }
 }
 
 
@@ -4661,51 +4709,63 @@ SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
     auto linkage = programLayout->getProgram()->getLinkage();
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-
-    List<Expr*> argExprs;
-    for (SlangInt i = 0; i < argCount; ++i)
+    try
     {
-        auto argType = argTypes[i];
-        auto arg = args[i];
-
-        switch (argType)
+        List<Expr*> argExprs;
+        for (SlangInt i = 0; i < argCount; ++i)
         {
-        case SLANG_GENERIC_ARG_TYPE:
+            auto argType = argTypes[i];
+            auto arg = args[i];
+
+            switch (argType)
             {
-                auto type = convert(arg.typeVal);
-                auto declRefType = as<DeclRefType>(type);
-                auto declRefExpr = astBuilder->create<DeclRefExpr>();
-                declRefExpr->declRef = declRefType->getDeclRef();
-                declRefExpr->type.type = astBuilder->getOrCreate<TypeType>(type);
-                argExprs.add(declRefExpr);
-                break;
+            case SLANG_GENERIC_ARG_TYPE:
+                {
+                    auto type = convert(arg.typeVal);
+                    auto declRefType = as<DeclRefType>(type);
+                    auto declRefExpr = astBuilder->create<DeclRefExpr>();
+                    declRefExpr->declRef = declRefType->getDeclRef();
+                    declRefExpr->type.type = astBuilder->getOrCreate<TypeType>(type);
+                    argExprs.add(declRefExpr);
+                    break;
+                }
+            case SLANG_GENERIC_ARG_INT:
+                {
+                    auto literalExpr = astBuilder->create<IntegerLiteralExpr>();
+                    literalExpr->value = args[i].intVal;
+                    literalExpr->type = astBuilder->getIntType();
+                    argExprs.add(literalExpr);
+                    break;
+                }
+            case SLANG_GENERIC_ARG_BOOL:
+                {
+                    auto literalExpr = astBuilder->create<BoolLiteralExpr>();
+                    literalExpr->value = args[i].boolVal;
+                    literalExpr->type = astBuilder->getBoolType();
+                    argExprs.add(literalExpr);
+                    break;
+                }
+            default:
+                // abort (TODO: throw a proper error)
+                return nullptr;
             }
-        case SLANG_GENERIC_ARG_INT:
-            {
-                auto literalExpr = astBuilder->create<IntegerLiteralExpr>();
-                literalExpr->value = args[i].intVal;
-                literalExpr->type = astBuilder->getIntType();
-                argExprs.add(literalExpr);
-                break;
-            }
-        case SLANG_GENERIC_ARG_BOOL:
-            {
-                auto literalExpr = astBuilder->create<BoolLiteralExpr>();
-                literalExpr->value = args[i].boolVal;
-                literalExpr->type = astBuilder->getBoolType();
-                argExprs.add(literalExpr);
-                break;
-            }
-        default:
-            // abort (TODO: throw a proper error)
-            return nullptr;
         }
+
+        auto specialized = linkage->specializeGeneric(slangGeneric, argExprs, &sink);
+        sink.getBlobIfNeeded(outDiagnostics);
+
+        return convertDeclToGeneric(specialized);
     }
-
-    auto specialized = linkage->specializeGeneric(slangGeneric, argExprs, &sink);
-    sink.getBlobIfNeeded(outDiagnostics);
-
-    return convertDeclToGeneric(specialized);
+    catch (const AbortCompilationException& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return nullptr;
+    }
+    catch (...)
+    {
+        outputExceptionDiagnostic(sink, outDiagnostics);
+        return nullptr;
+    }
 }
 
 

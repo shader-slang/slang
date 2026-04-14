@@ -1,12 +1,8 @@
 // bad-operator-call.slang
 
-//DIAGNOSTIC_TEST(windows):SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Test that bad calls to operators produce reasonable diagnostic messages.
-
-// Note: This test is currently Windows-only because our Linux builds
-// seem to print references to the core module code with paths that don't
-// match the Windows build (which generated our baseline).
 
 struct S {}
 
@@ -14,21 +10,39 @@ void test()
 {
 	int a;
     S b;
-    // CHECK:{{.*}}.slang(18): error {{.*}}:
     a += b;
-    // CHECK:{{.*}}.slang(20): error {{.*}}: no overload for '+' applicable to arguments of type (int, S)
+/*CHECK:
+         ^ type mismatch in expression
+         ^ expected an expression of type 'vector<int,1>', got 'S'
+    ^ argument must be l-value
+    ^ argument passed to parameter '0' must be l-value.
+    ^ argument was implicitly cast from 'int' to 'vector<int,1>', and Slang does not support using an implicit cast as an l-value with this type
+*/
     a = a + b;
-    // CHECK:{{.*}}.slang(22): error {{.*}}: no overload for '~' applicable to arguments of type (S)
+/*CHECK:
+          ^ no overload for '+' applicable to arguments of type (int, S)
+*/
 	a = ~b;
+/*CHECK:
+     ^ no overload for '~' applicable to arguments of type (S)
+*/
 
 	vector<int, 4> c;
     vector<float, 3> d;
-    // CHECK:{{.*}}.slang(27): error {{.*}}: argument passed to parameter '0' must be l-value.
 	a += c;
+/*CHECK:
+ ^ argument must be l-value
+ ^ argument passed to parameter '0' must be l-value.
+ ^ argument was implicitly cast from 'int' to 'vector<int,4>', and Slang does not support using an implicit cast as an l-value with this type
+*/
 
     c = a + c;
-    // CHECK:{{.*}}.slang(31): error {{.*}}: no overload for '+=' applicable to arguments of type (vector<float,3>, vector<int,4>)
     d += c;
-    // CHECK:{{.*}}.slang(33): error {{.*}}: no overload for '+' applicable to arguments of type (vector<int,4>, vector<float,3>)
+/*CHECK:
+      ^^ no overload for '+=' applicable to arguments of type (vector<float,3>, vector<int,4>)
+*/
 	d = c + d;
+/*CHECK:
+       ^ no overload for '+' applicable to arguments of type (vector<int,4>, vector<float,3>)
+*/
 }

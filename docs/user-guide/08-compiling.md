@@ -8,8 +8,8 @@ Compiling Code with Slang
 
 This chapter presents the ways that the Slang system supports compiling and composing shader code.
 We will start with a discussion of the mental model that Slang uses for compilation.
-Next we will cover the command-line Slang compiler, `slangc`, and how to use it to perform offline compilation.
-Finally we will discuss the Slang compilation API, which can be used to integrate Slang compilation into an application at runtime, or to build custom tools that implement application-specific compilation policy.
+Next, we will cover the command-line Slang compiler, `slangc`, and how to use it to perform offline compilation.
+Finally, we will discuss the Slang compilation API, which can be used to integrate Slang compilation into an application at runtime, or to build custom tools that implement application-specific compilation policy.
 
 ## Concepts
 
@@ -52,10 +52,10 @@ In this example, the `scaleValue()` function in `B.slang` can freely refer to th
 
 It is allowed, and indeed common, for a translation unit to contain only a single source unit.
 For example, when adapting an existing codebase with many `.hlsl` files, it is appropriate to compile each `.hlsl` file as its own translation unit.
-A modernized codebase that uses modular `include` feature as documented in [Modules and Access Control](modules) might decide to compile multiple `.slang` files in a single directory as a single translation unit.
+A modernized codebase that uses the modular `import` feature as documented in [Modules and Access Control](modules) might decide to compile multiple `.slang` files in a single directory as a single translation unit.
 
 The result of compiling a translation unit is a module in Slang's internal intermediate representation (IR). The compiled module can then be serialized to a `.slang-module` binary file. The binary file can then be loaded via the
-`ISession::loadModuleFromIRBlob` function or `import`ed in slang code the same way as modules written in `.slang` files.
+`ISession::loadModuleFromIRBlob` function or `import`ed in Slang code the same way as modules written in `.slang` files.
 
 ### Entry Points
 
@@ -89,7 +89,7 @@ A target includes information such as:
 
 * A _profile_ that specifies a general feature/capability level for the target: D3D Shader Model 5.1, GLSL version 4.60, etc.
 
-* Optional _capabilities_ that should be assumed available on the target: for example, specific Vulkan GLSL extensions
+* Optional _capabilities_ that should be assumed available on the target: for example, specific Vulkan GLSL extensions.
 
 * Options that impact code generation: floating-point strictness, level of debug information to generate, etc.
 
@@ -118,7 +118,7 @@ For the purposes of the compilation model it is important to note that the layou
 
 * The rules and constraints that the target imposes on layout.
 
-An important design choice in Slang is give the user of the compiler control over these choices.
+An important design choice in Slang is to give the user of the compiler control over these choices.
 
 ### Composition
 
@@ -128,11 +128,11 @@ A _component type_ is a unit of shader code composition; both modules and entry 
 A _composite_ component type is formed from a list of other component types (for example, one module and two entry points) and can be used to define a unit of shader code that is meant to be used together.
 
 Once a programmer has formed a composite of all the code they intend to use together, they can query the layout of the shader parameters in that composite, or invoke the linking step to
-resolve all cross module references.
+resolve all cross-module references.
 
 ### Linking
 
-A user-composed program may have transitive module dependencies and cross references between module boundaries. The linking step in Slang is to resolve all the cross references in the IR and produce a
+A user-composed program may have transitive module dependencies and cross-references across module boundaries. The linking step in Slang is to resolve all the cross-references in the IR and produce a
 new self-contained IR module that has everything needed for target code generation. The user will have an opportunity to specialize precompiled modules or provide additional compiler backend options
 at the linking step.
 
@@ -223,7 +223,7 @@ slangc hello-world.slang -entry computeMain -stage compute -target spirv -o hell
 ### `slangc` Targets
 
 Our example uses the option `-target spirv` to introduce a compilation target; in this case, code will be generated as SPIR-V.
-The argument of a `-target` option specified the format to use for the target; common values are `dxbc`, `dxil`, and `spirv`.
+The argument of a `-target` option specifies the format to use for the target; common values are `dxbc`, `dxil`, and `spirv`.
 
 Additional options for a target can be specified after the `-target` option.
 For example, a `-profile` option can be used to specify a profile that should be used.
@@ -231,7 +231,7 @@ Slang provides two main kinds of profiles for use with `slangc`:
 
 * Direct3D "Shader Model" profiles have names like `sm_5_1` and `sm_6_3`
 
-* GLSL versions can be used as profile with names like `glsl_430` and `glsl_460`
+* GLSL versions can be used as profiles with names like `glsl_430` and `glsl_460`
 
 ### `slangc` Kernels
 
@@ -267,9 +267,9 @@ The main other options are:
 
 * `-I<path>` or `-I <path>` can be used to introduce a _search path_ to be used when resolving `#include` directives and `import` declarations.
 
-* `-g` can be used to enable inclusion of debug information in output files (where possible and implemented)
+* `-g` can be used to enable inclusion of debug information in output files (where possible and implemented).
 
-* `-O<level>` can be used to control optimization levels when the Slang compiler invokes downstream code generator
+* `-O<level>` can be used to control optimization levels when the Slang compiler invokes a downstream code generator.
 
 See [slangc command line reference](https://github.com/shader-slang/slang/blob/master/docs/command-line-slangc-reference.md) for a complete list of compiler options supported by the `slangc` tool.
 
@@ -283,7 +283,7 @@ The mechanism used here is based on the `-X` mechanism used in GCC, to specify a
 -Xlinker option
 ```
 
-When used, `option` is not interpreted by GCC, but is passed to the linker once compilation is complete. Slang extends this idea in several ways. First there are many more 'downstream' stages available to Slang than just `linker`. These different stages are known as `SlangPassThrough` types in the API and have the following names
+When used, `option` is not interpreted by GCC, but is passed to the linker once compilation is complete. Slang extends this idea in several ways. First there are many more 'downstream' stages available to Slang than just `linker`. These different stages are known as `SlangPassThrough` types in the API and have the following names:
 
 * `fxc` - FXC HLSL compiler
 * `dxc` - DXC HLSL compiler
@@ -291,36 +291,36 @@ When used, `option` is not interpreted by GCC, but is passed to the linker once 
 * `visualstudio` - Visual Studio C/C++ compiler
 * `clang` - Clang C/C++ compiler
 * `gcc` - GCC C/C++ compiler
-* `genericcpp` - A generic C++ compiler (can be any one of visual studio, clang or gcc depending on system and availability)
+* `genericcpp` - A generic C++ compiler (can be any one of Visual Studio, Clang, or GCC depending on the system and availability)
 * `nvrtc` - NVRTC CUDA compiler
 
-The Slang command line allows you to specify an argument to these downstream compilers, by using their name after the `-X`. So for example to send an option `-Gfa` through to DXC you can use 
+The Slang command line allows you to specify an argument to these downstream compilers, by using their name after the `-X`. So for example, to send an option `-Gfa` through to DXC you can use:
 
 ```
 -Xdxc -Gfa
 ```
 
-Note that if an option is available via normal Slang command line options then these should be used. This will generally work across multiple targets, but also avoids options clashing which is undefined behavior currently. The `-X` mechanism is best used for options that are unavailable through normal Slang mechanisms. 
+Note that if an option is available via normal Slang command line options then these should be used. This will generally work across multiple targets, but also avoids options clashing which is undefined behavior currently. The `-X` mechanism is best used for options that are unavailable through normal Slang mechanisms.
 
-If you want to pass multiple options using this mechanism the `-Xdxc` needs to be in front of every options. For example 
+If you want to pass multiple options using this mechanism the `-Xdxc` needs to be in front of every option. For example:
 
 ```
 -Xdxc -Gfa -Xdxc -Vd
 ```
 
-Would reach `dxc` as 
+would reach `dxc` as:
 
 ```
 -Gfa -Vd
 ```
 
-This can get a little repetitive especially if there are many parameters, so Slang adds a mechanism to have multiple options passed by using an ellipsis `...`. The syntax is as follows
+This can get a little repetitive especially if there are many parameters, so Slang adds a mechanism to have multiple options passed by using an ellipsis `...`. The syntax is as follows:
 
 ```
 -Xdxc... -Gfa -Vd -X.
 ```
 
-The `...` at the end indicates all the following parameters should be sent to `dxc` until it reaches the matching terminating `-X.` or the end of the command line. 
+The `...` at the end indicates all the following parameters should be sent to `dxc` until it reaches the matching terminating `-X.` or the end of the command line.
 
 It is also worth noting that `-X...` options can be nested. This would allow a GCC downstream compilation to control linking, for example with
 
@@ -334,7 +334,7 @@ In this example gcc would see
 -Xlinker --split
 ```
 
-And the linker would see (as passed through by gcc) 
+And the linker would see (as passed through by GCC):
 
 ```
 --split
@@ -344,19 +344,19 @@ Setting options for tools that aren't used in a Slang compilation has no effect.
 
 NOTE! Not all tools that Slang uses downstream make command line argument parsing available. `FXC` and `GLSLANG` currently do not have any command line argument passing as part of their integration, although this could change in the future.
 
-The `-X` mechanism is also supported by render-test tool. In this usage `slang` becomes a downstream tool. Thus you can use the `dxc` option `-Gfa` in a render-test via 
+The `-X` mechanism is also supported by render-test tool. In this usage `slang` becomes a downstream tool. Thus, you can use the `dxc` option `-Gfa` in a render-test via
 
 ```
 -Xslang... -Xdxc -Gfa -X.
 ```
 
-Means that the dxc compilation in the render test (assuming dxc is invoked) will receive 
+This means that the dxc compilation in the render test (assuming dxc is invoked) will receive:
 
 ```
 -Gfa
 ```
 
-Some options are made available via the same mechanism for all downstream compilers. 
+Some options are made available via the same mechanism for all downstream compilers.
 
 * Use `-I` to specify include path for downstream compilers
 
@@ -413,7 +413,7 @@ Applications that need more control over compilation are encouraged to use the C
 
 #### Multiple targets and multiple entrypoints
 
-In this example, there are two shader entrypoints defined in one source file.
+In this example, there are two shader entry points defined in one source file.
 
 ```hlsl
 // targets.slang
@@ -440,12 +440,12 @@ VertexOutput vsMain()
 }
 ```
 
-A single entrypoint from the preceding shader can be compiled to both SPIR-V Assembly and HLSL targets in one command:
+A single entry point from the preceding shader can be compiled to both SPIR-V Assembly and HLSL targets in one command:
 ```bat
 slangc targets.slang -entry psMain -target spirv-asm -o targets.spv-asm -target hlsl -o targets.hlsl
 ```
 
-The following command compiles both entrypoints to SPIR-V:
+The following command compiles both entry points to SPIR-V:
 
 ```bat
 slangc targets.slang -entry vsMain -entry psMain -target spirv -o targets.spv
@@ -495,7 +495,7 @@ method
 #### Compiling and linking slang-modules
 
 This example demonstrates the compilation of a slang-module, and linking to a shader which uses that module.
-Two scenarios are provided, one in which the entry-point is compiled in the same `slangc` invocation that links in the dependent slang-module, and another scenario where linking is a separate invocation.
+Two scenarios are provided, one in which the entry point is compiled in the same `slangc` invocation that links in the dependent slang-module, and another scenario where linking is a separate invocation.
 
 ```hlsl
 // lib.slang
@@ -570,6 +570,27 @@ float4 psMain() : SV_Target
 slangc macrodefine.slang -entry psMain -target spirv-asm -o targets.spvasm -Dmymacro
 ```
 
+#### Cooperative Vector and Matrix on DXIL (SM6.10)
+
+When targeting DXIL with cooperative vector or matrix operations on SM6.10, Slang emits
+`#include "dx/linalg.h"`, because the emitted HLSL uses `linalg` namespace.
+This header is **not** shipped with Slang, and the user must provide DXC's include
+directory explicitly:
+
+```
+-Xdxc -I<path_to_dxc_includes>
+```
+
+For example, if DXC is installed at `/opt/dxc`:
+
+```
+slangc myshader.slang -target dxil -profile cs_6_10 -entry main -Xdxc -I/opt/dxc/include
+```
+
+When building Slang from source, the DXC headers are automatically copied to
+`build/dxc/include/` during the build, so you can use `-Xdxc -Ibuild/dxc/include`
+for local development and testing.
+
 ## Using the Compilation API
 
 The C++ API provided by Slang is meant to provide more complete control over compilation for applications that need it.
@@ -629,7 +650,7 @@ In particular, all compilation with a single session will share:
 * A list of pre-defined macros
 
 In addition, a session provides a scope for the loading and re-use of modules.
-If two pieces of code compiled in a session both `import`  the same module, then that module will only be loaded and compiled once.
+If two pieces of code compiled in a session both `import` the same module, then that module will only be loaded and compiled once.
 
 To create a session, use the `IGlobalSession::createSession()` method:
 
@@ -676,7 +697,7 @@ struct SessionDesc
 
     /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
     */
-    CompilerOptionEntry* compilerOptionEntries = nullptr;
+    CompilerOptionEntry const* compilerOptionEntries = nullptr;
 
     /** Number of additional compiler option entries.
     */
@@ -775,7 +796,7 @@ Slang::ComPtr<IModule> module(session->loadModule("MyShaders", diagnostics.write
 In this example, if any diagnostic messages were produced when loading `MyShaders`, then the `diagnostics` pointer will be set to a blob that contains the textual content of those diagnostics.
 
 The content of a blob can be accessed with `getBufferPointer()`, and the size of the content can be accessed with `getBufferSize()`.
-Diagnostic blobs produces by the Slang compiler are always null-terminated, so that they can be used with C-style string APIs:
+Diagnostic blobs produced by the Slang compiler are always null-terminated, so that they can be used with C-style string APIs:
 
 ```c++
 if(diagnostics)
@@ -822,7 +843,7 @@ session->createCompositeComponentType(components, 2, program.writeRef());
 
 As discussed earlier in this chapter, the composition operation serves two important purposes.
 First, it establishes which code is part of a compiled shader program and which is not.
-Second, it established an ordering for the code in a program, which can be used for layout.
+Second, it establishes an ordering for the code in a program, which can be used for layout.
 
 ### Layout and Reflection
 
@@ -834,7 +855,7 @@ slang::ProgramLayout* layout = program->getLayout();
 ```
 
 > #### Note ####
-> In  the current Slang API, the `ProgramLayout` type is not reference-counted.
+> In the current Slang API, the `ProgramLayout` type is not reference-counted.
 > Currently, the lifetime of a `ProgramLayout` is tied to the `IComponentType` that returned it.
 > An application must ensure that it retains the given `IComponentType` for as long as it uses the `ProgramLayout`.
 
@@ -887,7 +908,7 @@ In many cases `kernelBlob->getBufferPointer()` can be passed directly to the app
 
 ## Multithreading
 
-The only functions which are currently thread safe are 
+The following global-session creation helpers are thread-safe:
 
 ```C++
 SlangSession* spCreateSession(const char* deprecated);
@@ -901,15 +922,34 @@ const char* spGetBuildTagString();
 
 This assumes Slang has been built with the C++ multithreaded runtime, as is the default.
 
-All other functions and methods are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and can only execute on a single thread. More precisely, functions and methods can only be called on a *single* thread at *any one time*. This means for example a global session can be used across multiple threads, as long as some synchronization enforces that only one thread can be in a Slang call at any one time.
+Beyond those helpers, Slang should still be treated as non-reentrant by default on shared objects. Front-end operations such as loading modules, type checking, specialization, and `link()` are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and require external synchronization when multiple threads share a global session, a session, or objects created from them.
 
-Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). In strict COM, interfaces should be atomically reference counted. Currently *MOST* Slang API COM interfaces are *NOT* atomic reference counted. One exception is the `ISlangSharedLibrary` interface when produced from [host-callable](../cpu-target.md#host-callable). It is atomically reference counted, allowing it to persist and be used beyond the original compilation and be freed on a different thread. 
+Distinct global sessions may be used concurrently from different threads, even when those threads happen to call the same Slang API entry point at the same time.
 
+There is one important experimental exception for backend code generation. After an `IComponentType` has been fully specialized and linked, the following `IComponentType` methods are supported for concurrent use:
 
+```C++
+getEntryPointCode()
+getResultAsFileSystem()
+getTargetCode()
+getTargetMetadata()
+getEntryPointMetadata()
+```
+
+This enables a serial-frontend / parallel-backend workflow:
+
+1. Create sessions, load modules, specialize components, and call `link()` under external synchronization.
+2. Once you have fully linked component types, fan out backend compilation work across threads by calling the methods above for different entry points, targets, or specializations.
+
+This backend parallelism is still experimental. It is supported, but it should not yet be treated as fully hardened for every production workload.
+
+All other functions and methods should still be assumed non-reentrant when they operate on shared Slang objects. Unless documented otherwise, protect a shared global session, session, or object graph derived from them with external synchronization.
+
+Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). Strict COM expects atomic reference counting. Slang does not yet make that guarantee uniformly across every exposed interface. Many core compiler objects implemented via `RefObject` or `ComBaseObject` do use atomic reference counts, but some interfaces still use custom or singleton lifetime management. Unless documented otherwise, do not assume that an arbitrary Slang API object can be retained or released safely from unrelated threads solely because it is exposed as a COM interface. One explicit cross-thread lifetime guarantee is the `ISlangSharedLibrary` interface when produced from [host-callable](../cpu-target.md#host-callable). It is atomically reference counted, allowing it to persist and be used beyond the original compilation and be freed on a different thread.
 ## Compiler Options
 
-Both the `SessionDesc`, `TargetDesc` structures contain fields that encodes a `CompilerOptionEntry` array for additional compiler options to apply on the session or the target. In addition,
-the `IComponentType::linkWithOptions()` method allow you to specify additional compiler options when linking a program. All these places accepts the same encoding of compiler options, which is
+Both the `SessionDesc` and `TargetDesc` structures contain fields that encode a `CompilerOptionEntry` array for additional compiler options to apply on the session or the target. In addition,
+the `IComponentType::linkWithOptions()` method allows you to specify additional compiler options when linking a program. All these places accept the same encoding of compiler options, which is
 documented in this section.
 
 The `CompilerOptionEntry` structure is defined as follows:
@@ -921,7 +961,7 @@ struct CompilerOptionEntry
 };
 ```
 Where `CompilerOptionName` is an `enum` specifying the compiler option to set, and `value` encodes the value of the option.
-`CompilerOptionValue` is a structure that allows you to endcode up to two integer or string values for a compiler option:
+`CompilerOptionValue` is a structure that allows you to encode up to two integer or string values for a compiler option:
 ```c++
 enum class CompilerOptionValueKind
 {
@@ -956,41 +996,41 @@ meanings of their `CompilerOptionValue` encodings.
 | EnableWarning      | Specifies a list of warnings to enable. `stringValue0` encodes comma separated list of warning codes or names. |
 | DisableWarning     | Specify a warning to disable. `stringValue0` encodes the warning code or name. |
 | ReportDownstreamTime | Turn on/off downstream compilation time report. `intValue0` encodes a bool value for the setting. |
-| ReportPerfBenchmark | Turn on/off reporting of time spend in different parts of the compiler. `intValue0` encodes a bool value for the setting. |
-| SkipSPIRVValidation | Specifies whether or not to skip the validation step after emitting SPIRV. `intValue0` encodes a bool value for the setting. |
+| ReportPerfBenchmark | Turn on/off reporting of time spent in different parts of the compiler. `intValue0` encodes a bool value for the setting. |
+| SkipSPIRVValidation | Specifies whether or not to skip the validation step after emitting SPIR-V. `intValue0` encodes a bool value for the setting. |
 | Capability | Specify an additional capability available in the compilation target. `intValue0` encodes a capability defined in the `CapabilityName` enum. |
-| DefaultImageFormatUnknown | Whether or not to use `unknown` as the image format when emitting SPIRV for a texture/image resource parameter without a format specifier. `intValue0` encodes a bool value for the setting. |
+| DefaultImageFormatUnknown | Whether or not to use `unknown` as the image format when emitting SPIR-V for a texture/image resource parameter without a format specifier. `intValue0` encodes a bool value for the setting. |
 | DisableDynamicDispatch | (Internal use only) Disables generation of dynamic dispatch code. `intValue0` encodes a bool value for the setting. |
-| DisableSpecialization | (Internal use only) Disables specialization pass.  `intValue0` encodes a bool value for the setting. |
-| FloatingPointMode | Specifies the floating point mode. `intValue0` encodes the floating mode point defined in the `SlangFloatingPointMode` enum. |
-| DebugInformation | Specifies the level of debug information to include in the generated code. `intValue0` encodes an value defined in the  `SlangDebugInfoLevel` enum. |
-| LineDirectiveMode | Specifies the line directive mode to use the generated textual code such as HLSL or CUDA. `intValue0` encodes an value defined in the  `SlangLineDirectiveMode` enum. |
+| DisableSpecialization | (Internal use only) Disables specialization pass. `intValue0` encodes a bool value for the setting. |
+| FloatingPointMode | Specifies the floating-point mode. `intValue0` encodes the floating-point mode defined in the `SlangFloatingPointMode` enum. |
+| DebugInformation | Specifies the level of debug information to include in the generated code. `intValue0` encodes a value defined in the `SlangDebugInfoLevel` enum. |
+| LineDirectiveMode | Specifies the line directive mode for generated textual code such as HLSL or CUDA. `intValue0` encodes a value defined in the `SlangLineDirectiveMode` enum. |
 | Optimization | Specifies the optimization level. `intValue0` encodes the value for the setting defined in the `SlangOptimizationLevel` enum. |
 | Obfuscate | Specifies whether or not to turn on obfuscation. When obfuscation is on, Slang will strip variable and function names from the target code and replace them with hash values. `intValue0` encodes a bool value for the setting. |
 | VulkanBindShift | Specifies the `-fvk-bind-shift` option. `intValue0` (higher 8 bits): kind, `intValue0` (lower bits): set; `intValue1`: shift. |
 | VulkanBindGlobals | Specifies the `-fvk-bind-globals` option. `intValue0`: index, `intValue`: set. |
 | VulkanInvertY | Specifies the `-fvk-invert-y` option. `intValue0` specifies a bool value for the setting. |
 | VulkanUseDxPositionW | Specifies the `-fvk-use-dx-position-w` option. `intValue0` specifies a bool value for the setting. |
-| VulkanUseEntryPointName | When set, will keep the original name of entrypoints as they are defined in the source instead of renaming them to `main`. `intValue0` specifies a bool value for the setting. |
+| VulkanUseEntryPointName | When set, will keep the original name of entry points as they are defined in the source instead of renaming them to `main`. `intValue0` specifies a bool value for the setting. |
 | VulkanUseGLLayout | When set, will use std430 layout instead of D3D buffer layout for raw buffer load/stores. `intValue0` specifies a bool value for the setting. |
-| VulkanEmitReflection | Specifies the `-fspv-reflect` option. When set will include additional reflection instructions in the output SPIRV. `intValue0` specifies a bool value for the setting. |
-| GLSLForceScalarLayout | Specifies the `-force-glsl-scalar-layout` option. When set will use `scalar` layout for all buffers when generating SPIRV. `intValue0` specifies a bool value for the setting. |
+| VulkanEmitReflection | Specifies the `-fspv-reflect` option. When set will include additional reflection instructions in the output SPIR-V. `intValue0` specifies a bool value for the setting. |
+| GLSLForceScalarLayout | Specifies the `-force-glsl-scalar-layout` option. When set will use `scalar` layout for all buffers when generating SPIR-V. `intValue0` specifies a bool value for the setting. |
 | EnableEffectAnnotations | When set will turn on compatibility mode to parse legacy HLSL effect annotation syntax. `intValue0` specifies a bool value for the setting. |
-| EmitSpirvViaGLSL | When set will emit SPIRV by emitting GLSL first and then use glslang to produce the final SPIRV code. `intValue0` specifies a bool value for the setting. |
-| EmitSpirvDirectly | When set will use Slang's direct-to-SPIRV backend to generate SPIRV directly from Slang IR. `intValue0` specifies a bool value for the setting. |
-| SPIRVCoreGrammarJSON | When set will use the provided SPIRV grammar file to parse SPIRV assembly blocks. `stringValue0` specifies a path to the spirv core grammar json file. |
+| EmitSpirvViaGLSL | When set will emit SPIR-V by emitting GLSL first and then use glslang to produce the final SPIR-V code. `intValue0` specifies a bool value for the setting. |
+| EmitSpirvDirectly | When set will use Slang's direct-to-SPIR-V backend to generate SPIR-V directly from Slang IR. `intValue0` specifies a bool value for the setting. |
+| SPIRVCoreGrammarJSON | When set will use the provided SPIR-V grammar file to parse SPIR-V assembly blocks. `stringValue0` specifies a path to the spirv core grammar json file. |
 | IncompleteLibrary | When set will not issue an error when the linked program has unresolved extern function symbols. `intValue0` specifies a bool value for the setting. |
 | DownstreamArgs | Provide additional arguments to the downstream compiler. `stringValue0` encodes the downstream compiler name, `stringValue1` encodes the argument list, one argument per line. |
 | DumpIntermediates | When set will dump the intermediate source output. `intValue0` specifies a bool value for the setting. |
 | DumpIntermediatePrefix | The file name prefix for the intermediate source output. `stringValue0` specifies a string value for the setting. |
 | DebugInformationFormat | Specifies the format of debug info. `intValue0` a value defined in the `SlangDebugInfoFormat` enum. |
 | VulkanBindShiftAll | Specifies the `-fvk-bind-shift` option for all spaces. `intValue0`: kind, `intValue1`: shift. |
-| GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entrypoint. `intValue0` specifies a bool value for the setting. |
+| GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entry point. `intValue0` specifies a bool value for the setting. |
 | UseUpToDateBinaryModule | When set will only load precompiled modules if it is up-to-date with its source. `intValue0` specifies a bool value for the setting. |
 | ValidateUniformity | When set will perform [uniformity analysis](a1-05-uniformity.md).|
 
 ## Debugging
 
-Slang's SPIRV backend supports generating debug information using the [NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc).
-To enable debugging information when targeting SPIRV, specify the `-emit-spirv-directly` and the `-g2` argument when using `slangc` tool, or set `EmitSpirvDirectly` to `1` and `DebugInformation` to `SLANG_DEBUG_INFO_LEVEL_STANDARD` when using the API.
+Slang's SPIR-V backend supports generating debug information using the [NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc).
+To enable debugging information when targeting SPIR-V, specify the `-emit-spirv-directly` and the `-g2` argument when using `slangc` tool, or set `EmitSpirvDirectly` to `1` and `DebugInformation` to `SLANG_DEBUG_INFO_LEVEL_STANDARD` when using the API.
 Debugging support has been tested with RenderDoc.

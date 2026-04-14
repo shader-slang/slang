@@ -1,9 +1,101 @@
 -- Helper functions for defining diagnostics
 
+-- Calculate Levenshtein edit distance between two strings
+local function edit_distance(s1, s2)
+  local len1, len2 = #s1, #s2
+  if len1 == 0 then return len2 end
+  if len2 == 0 then return len1 end
+
+  local matrix = {}
+  for i = 0, len1 do
+    matrix[i] = { [0] = i }
+  end
+  for j = 0, len2 do
+    matrix[0][j] = j
+  end
+
+  for i = 1, len1 do
+    for j = 1, len2 do
+      local cost = (s1:sub(i, i) == s2:sub(j, j)) and 0 or 1
+      matrix[i][j] = math.min(
+        matrix[i-1][j] + 1,      -- deletion
+        matrix[i][j-1] + 1,      -- insertion
+        matrix[i-1][j-1] + cost  -- substitution
+      )
+    end
+  end
+
+  return matrix[len1][len2]
+end
+
+-- Find similar strings from a list based on edit distance
+-- Returns array of {name, distance} sorted by distance (ascending)
+local function find_similar(target, candidates, max_distance)
+  max_distance = max_distance or 3
+  local similar = {}
+  local target_lower = target:lower()
+
+  for _, candidate in ipairs(candidates) do
+    local dist = edit_distance(target_lower, candidate:lower())
+    if dist <= max_distance then
+      table.insert(similar, { name = candidate, distance = dist })
+    end
+  end
+
+  -- Sort by distance (ascending)
+  table.sort(similar, function(a, b) return a.distance < b.distance end)
+
+  return similar
+end
+
 -- Set to false to enable uniqueness checking for diagnostic codes.
 -- Currently set to true to allow duplicate codes during the transition period.
 -- See: https://github.com/shader-slang/slang/issues/6736
 local allow_duplicate_diagnostic_codes = true
+
+-- Enforce that diagnostics sharing a numeric code have the same severity.
+--
+-- The diagnostic ID map (m_idMap) stores only one entry per numeric code.
+-- When a user passes -warnings-disable <id> or -warnings-as-errors <id>,
+-- the lookup finds that single entry and checks its severity. If an error
+-- and a warning share the same code, the lookup may find the error, reject
+-- the severity mismatch, and report "unknown diagnostic" — even though
+-- the warning is perfectly valid. See: https://github.com/shader-slang/slang/issues/10583
+--
+-- Negative codes (e.g. -1) are excluded because they are internal sentinels
+-- that are never displayed to users and cannot be referenced by command-line options.
+local allow_severity_conflicts = false
+
+-- Helper function to check if a string is valid kebab-case
+-- Valid kebab-case: lowercase letters, numbers, and hyphens only
+-- Must not start or end with a hyphen, no consecutive hyphens
+local function is_valid_kebab_case(name)
+  if not name or #name == 0 then
+    return false, "name is empty"
+  end
+  if name:sub(1, 1) == "-" then
+    return false, "name cannot start with a hyphen"
+  end
+  if name:sub(-1) == "-" then
+    return false, "name cannot end with a hyphen"
+  end
+  if name:find("--", 1, true) then
+    return false, "name cannot contain consecutive hyphens"
+  end
+  if name:find("[^a-z0-9-]") then
+    if name:find(" ", 1, true) then
+      return false, "name contains spaces; use hyphens instead (kebab-case)"
+    end
+    if name:find("[A-Z]") then
+      return false, "name contains uppercase letters; use lowercase only (kebab-case)"
+    end
+    if name:find("_", 1, true) then
+      return false, "name contains underscores; use hyphens instead (kebab-case)"
+    end
+    return false, "name contains invalid characters; only lowercase letters, numbers, and hyphens are allowed"
+  end
+  return true, nil
+end
 
 local diagnostics = {}
 
@@ -240,8 +332,18 @@ end
 
 -- Note: This creates a standalone note-level diagnostic, not a note within another diagnostic.
 -- For notes within diagnostics, use the `note` function above (line 37).
-local function note_diagnostic(name, code, message, primary_span, ...)
+local function standalone_note(name, code, message, primary_span, ...)
   add_diagnostic(name, code, "note", message, primary_span, ...)
+end
+
+-- Helper function to add an internal error diagnostic
+local function internal(name, code, message, primary_span, ...)
+  add_diagnostic(name, code, "internal", message, primary_span, ...)
+end
+
+-- Helper function to add a fatal error diagnostic
+local function fatal(name, code, message, primary_span, ...)
+  add_diagnostic(name, code, "fatal", message, primary_span, ...)
 end
 
 -- Helper function to parse interpolated message strings
@@ -280,8 +382,17 @@ local function parse_message(message, known_params)
 
     while param_end + 1 <= #message do
       local char = message:sub(param_end + 1, param_end + 1)
-      if char:match("[%w_:.]+") then
+      if char:match("[%w_:]+") then
         param_end = param_end + 1
+      elseif char == "." then
+        -- Only include dot if it's followed by a word character (member access)
+        -- Don't include dot if it's followed by space or end of string (sentence punctuation)
+        local next_char = message:sub(param_end + 2, param_end + 2)
+        if next_char:match("[%w_]") then
+          param_end = param_end + 1
+        else
+          break
+        end
       else
         break
       end
@@ -388,11 +499,26 @@ end
 -- Helper function to validate diagnostic schema
 local function validate_diagnostic(diag, index)
   local errors = {}
-  local diagnostic_name = diag.name or ("diagnostic[" .. index .. "]")
+
+  -- Determine diagnostic_name safely for error messages
+  local diagnostic_name
+  if type(diag.name) == "string" then
+    diagnostic_name = diag.name
+  else
+    diagnostic_name = "diagnostic[" .. index .. "]"
+  end
 
   -- 1. Validate mandatory 'name' field
   if not diag.name or type(diag.name) ~= "string" then
-    table.insert(errors, "diagnostic[" .. index .. "].name must be a string")
+    table.insert(errors, "diagnostic[" .. index .. "].name must be a string (got " .. type(diag.name) .. ")")
+  end
+
+  -- 1b. Validate that name is in kebab-case format
+  if type(diag.name) == "string" then
+    local valid, reason = is_valid_kebab_case(diag.name)
+    if not valid then
+      table.insert(errors, "diagnostic[" .. index .. "].name '" .. diag.name .. "' is not valid kebab-case: " .. reason)
+    end
   end
 
   -- 2. Validate mandatory 'code' field
@@ -403,8 +529,8 @@ local function validate_diagnostic(diag, index)
   -- 3. Validate mandatory 'severity' field and allowed values
   if not diag.severity or type(diag.severity) ~= "string" then
     table.insert(errors, diagnostic_name .. ".severity must be a string")
-  elseif not (diag.severity == "error" or diag.severity == "warning") then
-    table.insert(errors, diagnostic_name .. ".severity must be one of: error, warning")
+  elseif not (diag.severity == "error" or diag.severity == "warning" or diag.severity == "note" or diag.severity == "internal" or diag.severity == "fatal") then
+    table.insert(errors, diagnostic_name .. ".severity must be one of: error, warning, note, internal, fatal")
   end
 
   -- 4. Validate mandatory 'message' field
@@ -490,7 +616,7 @@ local function process_diagnostics(diagnostics_table)
   local seen_codes = {}
 
   for i, diag in ipairs(diagnostics_table) do
-    local diagnostic_name = diag.name or ("diagnostic[" .. i .. "]")
+    local diagnostic_name = type(diag.name) == "string" and diag.name or ("diagnostic[" .. i .. "]")
     local errors = validate_diagnostic(diag, i)
 
     if #errors > 0 then
@@ -504,8 +630,22 @@ local function process_diagnostics(diagnostics_table)
         seen_names[diag.name] = i
       end
 
-      if seen_codes[diag.code] and not allow_duplicate_diagnostic_codes then
-        table.insert(all_errors, diagnostic_name .. " has duplicate code " .. diag.code)
+      if seen_codes[diag.code] then
+        if not allow_duplicate_diagnostic_codes then
+          table.insert(all_errors, diagnostic_name .. " has duplicate code " .. diag.code)
+        end
+        local prev = diagnostics_table[seen_codes[diag.code]]
+        if prev and prev.severity ~= diag.severity and diag.code >= 0 then
+          local msg = diagnostic_name .. " (code " .. diag.code .. ", severity '" .. diag.severity
+            .. "') conflicts with '" .. prev.name .. "' (severity '" .. prev.severity
+            .. "'). Diagnostics sharing a numeric code must have the same severity,"
+            .. " otherwise -warnings-disable / -warnings-as-errors cannot address them by number."
+          if allow_severity_conflicts then
+            io.stderr:write("warning: " .. msg .. "\n")
+          else
+            table.insert(all_errors, msg)
+          end
+        end
       else
         seen_codes[diag.code] = i
       end
@@ -608,8 +748,10 @@ local function process_diagnostics(diagnostics_table)
           for _, part in ipairs(container.message_parts) do
             if part.type == "interpolation" and not part.member_name then
               local param_type = seen_params[part.param_name]
-              -- Only add pointer types (type, decl, expr, stmt, val, name - not string or int)
-              if param_type and param_type ~= "string" and param_type ~= "int" then
+              -- Only add pointer types that don't have null-safe conversion functions.
+              -- Exclude: string, int (not pointers), type/qualtype/name/modifier (have null-safe converters)
+              -- Include: decl, expr, stmt, val (would crash if null)
+              if param_type and (param_type == "decl" or param_type == "expr" or param_type == "stmt" or param_type == "val") then
                 if not required_set[part.param_name] then
                   table.insert(required, part.param_name)
                   required_set[part.param_name] = true
@@ -684,8 +826,10 @@ local function process_diagnostics(diagnostics_table)
         for _, part in ipairs(main_parts) do
           if part.type == "interpolation" and not part.member_name then
             local param_type = seen_params[part.param_name]
-            -- Only add pointer types (not string or int)
-            if param_type and param_type ~= "string" and param_type ~= "int" then
+            -- Only add pointer types that don't have null-safe conversion functions.
+            -- Exclude: string, int (not pointers), type/qualtype/name/modifier (have null-safe converters)
+            -- Include: decl, expr, stmt, val (would crash if null)
+            if param_type and (param_type == "decl" or param_type == "expr" or param_type == "stmt" or param_type == "val") then
               table.insert(main_required, part.param_name)
             end
           end
@@ -705,8 +849,10 @@ local function process_diagnostics(diagnostics_table)
           for _, part in ipairs(diag.primary_span.message_parts) do
             if part.type == "interpolation" and not part.member_name then
               local param_type = seen_params[part.param_name]
-              -- Only add pointer types (not string or int)
-              if param_type and param_type ~= "string" and param_type ~= "int" then
+              -- Only add pointer types that don't have null-safe conversion functions.
+              -- Exclude: string, int (not pointers), type/qualtype/name/modifier (have null-safe converters)
+              -- Include: decl, expr, stmt, val (would crash if null)
+              if param_type and (param_type == "decl" or param_type == "expr" or param_type == "stmt" or param_type == "val") then
                 -- Avoid duplicates
                 local found = false
                 for _, existing in ipairs(primary_span_required) do
@@ -830,9 +976,15 @@ return {
   diagnostics = diagnostics,
   span = span,
   note = note,
+  standalone_note = standalone_note,
   variadic_span = variadic_span,
   variadic_note = variadic_note,
   err = err,
   warning = warning,
+  internal = internal,
+  fatal = fatal,
   process_diagnostics = process_diagnostics,
+  -- Utility functions for typo suggestions
+  edit_distance = edit_distance,
+  find_similar = find_similar,
 }

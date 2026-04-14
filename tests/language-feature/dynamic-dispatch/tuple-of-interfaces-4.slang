@@ -1,13 +1,14 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type -Xslang -Wno-41020
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 //
-// Test tuples of interface types (issue #9837):
+// Test tuples of interface types (issue #9837, #9971):
 // 1. Tuple of interfaces with dynamic dispatch
 // 2. Interface implementation with tuple fields
 // 3. Nested tuple containing interface with tuple field
+// 4. Interface implementation with Tuple<IBar, IBar> field (#9971)
 //
 
 interface IFoo
@@ -26,7 +27,7 @@ struct FooB : IFoo
     float eval() { return 2.0; }
 }
 
-// Implementation with tuple field
+// Implementation with concrete tuple field
 struct FooWithTuple : IFoo
 {
     Tuple<float, int> data;
@@ -37,6 +38,41 @@ struct FooWithTuple : IFoo
     }
 
     float eval() { return data._0; }
+}
+
+// Issue #9971: Interface implementation with Tuple<IBar, IBar> field
+interface IBar
+{
+    float getValue();
+}
+
+struct BarA : IBar
+{
+    float val;
+    __init(float v) { val = v; }
+    float getValue() { return val; }
+}
+
+struct BarB : IBar
+{
+    float val;
+    __init(float v) { val = v; }
+    float getValue() { return val * 2.0; }
+}
+
+struct FooWithInterfaceTuple : IFoo
+{
+    Tuple<IBar, IBar> bars;
+
+    __init(IBar b0, IBar b1)
+    {
+        bars = makeTuple<IBar, IBar>(b0, b1);
+    }
+
+    float eval()
+    {
+        return bars._0.getValue() + bars._1.getValue();
+    }
 }
 
 // Helper functions for tuple access (required pattern for dynamic dispatch)
@@ -110,5 +146,15 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
         float result = val + float(getMixedInt(nested));
         // 7.5 + 200.0 = 207.5
         outputBuffer[7] = result; // CHECK: 207.5
+    }
+
+    // Test 6 (issue #9971): FooWithInterfaceTuple through Tuple<IFoo, IFoo>
+    // BarA(3.0).getValue() + BarB(4.0).getValue() = 3.0 + 8.0 = 11.0
+    {
+        FooWithInterfaceTuple fwit = FooWithInterfaceTuple(BarA(3.0), BarB(4.0));
+        Tuple<IFoo, IFoo> pair = { fwit, FooA() };
+        float2 result = evalPair(pair);
+        outputBuffer[8] = result.x; // CHECK: 11.0
+        outputBuffer[9] = result.y; // CHECK: 1.0
     }
 }

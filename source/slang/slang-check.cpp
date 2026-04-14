@@ -7,6 +7,7 @@
 
 #include "../core/slang-type-text-util.h"
 #include "slang-check-impl.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -29,11 +30,11 @@ public:
             String filename = Path::getFileNameWithoutExt(path);
             if (filename == "dxil")
             {
-                m_sink->diagnose(SourceLoc(), Diagnostics::dxilNotFound);
+                m_sink->diagnose(Diagnostics::DxilNotFound{});
             }
             else
             {
-                m_sink->diagnose(SourceLoc(), Diagnostics::noteFailedToLoadDynamicLibrary, path);
+                m_sink->diagnose(Diagnostics::NoteFailedToLoadDynamicLibrary{.path = path});
             }
         }
         return res;
@@ -79,6 +80,9 @@ void Session::_setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
 
 void Session::resetDownstreamCompiler(PassThroughMode type)
 {
+    // The downstream compiler table is shared session state and may be reset concurrently.
+    std::lock_guard<std::recursive_mutex> lock(m_downstreamCompilerMutex);
+
     // Mark as initialized
     m_downstreamCompilerInitialized &= ~(1 << int(type));
     m_downstreamCompilers[int(type)].setNull();
@@ -88,6 +92,10 @@ IDownstreamCompiler* Session::getOrLoadDownstreamCompiler(
     PassThroughMode type,
     DiagnosticSink* sink)
 {
+    // Lazy downstream compiler loading mutates shared state, and GenericCCpp can re-enter
+    // this routine while probing specific C/C++ compilers.
+    std::lock_guard<std::recursive_mutex> lock(m_downstreamCompilerMutex);
+
     if (m_downstreamCompilerInitialized & (1 << int(type)))
     {
         return m_downstreamCompilers[int(type)];
@@ -141,7 +149,8 @@ IDownstreamCompiler* Session::getOrLoadDownstreamCompiler(
             //
             if (sink)
             {
-                sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDownstreamCompiler, type);
+                sink->diagnose(Diagnostics::FailedToLoadDownstreamCompiler{
+                    .compiler = TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough(type))});
             }
             SinkSharedLibraryLoader loader(m_sharedLibraryLoader, sink);
             locator(m_downstreamCompilerPaths[int(type)], &loader, m_downstreamCompilerSet);
@@ -190,7 +199,7 @@ void checkTranslationUnit(
 
     visitor.checkModule(translationUnit->getModuleDecl());
 
-    translationUnit->getModule()->_collectShaderParams();
+    translationUnit->getModule()->_collectShaderParams(translationUnit->compileRequest->getSink());
 }
 
 void SemanticsVisitor::dispatchStmt(Stmt* stmt, SemanticsContext const& context)

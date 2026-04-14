@@ -13,9 +13,8 @@ float get_thread_5_value(float v, uint group_thread_id)
     {
         // Using 'detach(v)' makes the error go away
         s_shared = v;
-        // CHECK: tests/autodiff/warn-on-shared-memory-access.slang([[# @LINE-1]]): error 41024: derivative is lost during assignment to non-differentiable location, use 'detach()' to clarify intention.
-        // CHECK: s_shared = v;
-        // CHECK:          ^
+        // CHECK: error[E41031]: derivative is lost during assignment
+        // CHECK: derivative is lost during assignment to non-differentiable location, use 'detach()' to clarify intention.
     }
     GroupMemoryBarrierWithGroupSync();
     return s_shared;
