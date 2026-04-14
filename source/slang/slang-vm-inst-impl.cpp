@@ -614,9 +614,10 @@ void loadHandler32(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 void loadHandler64(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
     SLANG_UNUSED(ctx);
-    auto dst = (uint64_t*)inst->getOperand(0).getPtr();
-    auto src = *(uint64_t**)inst->getOperand(1).getPtr();
-    *dst = *src;
+    auto dst = inst->getOperand(0).getPtr();
+    void* src;
+    memcpy(&src, inst->getOperand(1).getPtr(), sizeof(void*));
+    memcpy(dst, src, sizeof(uint64_t));
 }
 
 void generalLoadHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
@@ -671,9 +672,10 @@ void storeHandler32(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 void storeHandler64(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
     SLANG_UNUSED(ctx);
-    auto dst = *(uint64_t**)inst->getOperand(0).getPtr();
-    auto src = (uint64_t*)inst->getOperand(1).getPtr();
-    *dst = *src;
+    void* dst;
+    memcpy(&dst, inst->getOperand(0).getPtr(), sizeof(void*));
+    auto src = inst->getOperand(1).getPtr();
+    memcpy(dst, src, sizeof(uint64_t));
 }
 
 void generalStoreHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
