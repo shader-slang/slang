@@ -340,13 +340,6 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
         {
             auto coopType = as<IRCoopMatrixType>(type);
             auto result = emitWMMAFragmentType(coopType, out);
-            uint32_t rowCount =
-                (uint32_t)static_cast<IRIntLit*>(coopType->getRowCount())->getValue();
-            uint32_t colCount =
-                (uint32_t)static_cast<IRIntLit*>(coopType->getColumnCount())->getValue();
-            uint32_t matrixUse =
-                (uint32_t)static_cast<IRIntLit*>(coopType->getMatrixUse())->getValue();
-            FragmentShape shape = computeShapeCombination(matrixUse, rowCount, colCount);
             m_extensionTracker->requireSMVersion(SemanticVersion(8, 0));
             return result;
         }
