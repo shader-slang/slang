@@ -223,6 +223,24 @@ bool isInvalidExistentialSpecialization(IRInst* specializedValue)
         {
             for (auto inst : block->getOrdinaryInsts())
             {
+                // Detect ByteAddressBufferLoad/Store specialized with an interface type.
+                // When byteAddressBufferLoad<IFoo> is specialized, the result type of
+                // the load instruction (or an operand type of the store) will be an
+                // interface type, which is not supported.
+                if (inst->getOp() == kIROp_ByteAddressBufferLoad)
+                {
+                    if (as<IRInterfaceType>(inst->getDataType()))
+                        return true;
+                }
+                if (inst->getOp() == kIROp_ByteAddressBufferStore)
+                {
+                    // Operands: (buffer, offset, alignment, value).
+                    // The stored value is at index 3.
+                    if (inst->getOperandCount() > 3 &&
+                        as<IRInterfaceType>(inst->getOperand(3)->getDataType()))
+                        return true;
+                }
+
                 auto call = as<IRCall>(inst);
                 if (!call)
                     continue;
@@ -3740,10 +3758,11 @@ struct TypeFlowSpecializationContext
                             return;
                         }
 
-                        specializedSet.add(builder.emitSpecializeInst(
+                        auto newSpec = builder.emitSpecializeInst(
                             typeOfSpecialization,
                             arg,
-                            specializationArgs));
+                            specializationArgs);
+                        specializedSet.add(newSpec);
                     });
             }
             else
@@ -3751,8 +3770,9 @@ struct TypeFlowSpecializationContext
                 // Concrete case..
                 IRBuilder builder(module);
                 builder.setInsertInto(module);
-                specializedSet.add(
-                    builder.emitSpecializeInst(typeOfSpecialization, operand, specializationArgs));
+                auto newSpec =
+                    builder.emitSpecializeInst(typeOfSpecialization, operand, specializationArgs);
+                specializedSet.add(newSpec);
             }
 
             IRBuilder builder(module);
@@ -5118,6 +5138,9 @@ struct TypeFlowSpecializationContext
         HashSet<IRInst*> processedSet;
         while (globalWorkList.hasItems())
         {
+            if (sink->getErrorCount() > 0)
+                break;
+
             auto globalInst = globalWorkList.dequeue();
 
             switch (globalInst->getOp())
@@ -5131,6 +5154,10 @@ struct TypeFlowSpecializationContext
                     hasChanges |= removeAnnotations(func);
                     hasChanges |= eliminateDeadCode(func);
                     hasChanges |= specializeFunc(func, globalWorkList);
+
+                    if (sink->getErrorCount() > 0)
+                        break;
+
                     hasChanges |= eliminateDeadCode(func);
                     hasChanges |= resolveTypesInFunc(func);
 
@@ -6413,12 +6440,18 @@ struct TypeFlowSpecializationContext
                     globalsWorkList.enqueue(callee);
                 }
             }
+            else if (auto specCallee = as<IRSpecialize>(callee))
+            {
+                // The callee is an IRSpecialize that escaped both the dispatch-action
+                // and set-specialized-generic resolution paths. This happens when an
+                // existential type flows into an unconstrained generic (no interface
+                // constraint), so the typeflow pass cannot generate dispatch code.
+                emitExistentialSpecializationDiagnostic(specCallee, inst->sourceLoc, inst);
+                module->getContainerPool().free(&callArgs);
+                return false;
+            }
             else
             {
-                // If we reach here, then something is wrong. Our callee is an inst of
-                // tag-type, but we could not resolve it through the dispatch action
-                // collection or set-specialized generic paths.
-                //
                 SLANG_UNEXPECTED(
                     "Unexpected operand type for type-flow specialization of Call inst");
             }
@@ -7689,7 +7722,8 @@ struct TypeFlowSpecializationContext
 
         if (sink->getErrorCount() > 0)
         {
-            // If there were errors during propagation, we bail out early.
+            // If there are any diagnostics after propagation, don't continue into
+            // the mutating lowering phase.
             return false;
         }
 
