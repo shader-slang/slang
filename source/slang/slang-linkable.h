@@ -414,6 +414,7 @@ protected:
 
 protected:
     Linkage* m_linkage;
+    // Parallel backend emission shares these lazily populated target caches.
     mutable std::mutex m_cacheMutex;
 
     CompilerOptionSet m_optionSet;

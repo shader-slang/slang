@@ -33,6 +33,8 @@ struct ParallelThreadGate
 {
     void arriveAndWait(int threadCount)
     {
+        // Start every worker from the same point so the test reliably hits the backend race
+        // window that the production locks are meant to cover.
         std::unique_lock<std::mutex> lock(mutex);
         readyCount++;
         if (readyCount == threadCount)
@@ -42,6 +44,8 @@ struct ParallelThreadGate
 
     void releaseWhenReady(int threadCount)
     {
+        // Do not release the workers until every thread is queued, or the contention window for
+        // getEntryPointCode() becomes too small to exercise the fix.
         std::unique_lock<std::mutex> lock(mutex);
         condition.wait(lock, [&]() { return readyCount == threadCount; });
         shouldStart = true;

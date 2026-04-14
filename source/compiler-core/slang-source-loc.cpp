@@ -466,6 +466,7 @@ PathInfo SourceView::getPathInfo(SourceLoc loc, SourceLocType type)
 
 void SourceFile::setLineBreakOffsets(const uint32_t* offsets, UInt numOffsets)
 {
+    // Keep manual cache updates consistent with readers scanning the same SourceFile.
     std::lock_guard<std::mutex> lock(m_cacheMutex);
     m_lineBreakOffsets.clear();
     m_lineBreakOffsets.addRange(offsets, numOffsets);
@@ -473,6 +474,7 @@ void SourceFile::setLineBreakOffsets(const uint32_t* offsets, UInt numOffsets)
 
 const List<uint32_t>& SourceFile::getLineBreakOffsets()
 {
+    // Multiple threads can race the first line-break scan for the same SourceFile.
     std::lock_guard<std::mutex> lock(m_cacheMutex);
 
     // We now have a raw input file that we can search for line breaks.
@@ -675,6 +677,7 @@ SourceFile::~SourceFile() {}
 
 SHA1::Digest SourceFile::getDigest()
 {
+    // The digest is another lazy SourceFile cache that may be queried concurrently.
     std::lock_guard<std::mutex> lock(m_cacheMutex);
 
     if (m_digest == SHA1::Digest())

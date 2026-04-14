@@ -241,6 +241,8 @@ public:
     void destroyTypeCheckingCache();
 
     RefPtr<RefObject> m_typeCheckingCache = nullptr;
+    // Front-end component-type operations still share linkage-owned mutable state and can
+    // re-enter one another, so they remain serialized even when backend emission is parallelized.
     std::recursive_mutex m_componentTypeOperationMutex;
 
     // Modules that have been dynamically loaded via `import`
@@ -260,6 +262,7 @@ public:
 
     // Counters for allocating sequential IDs to witness tables conforming to each interface type.
     Dictionary<String, uint32_t> mapInterfaceMangledNameToSequentialIDCounters;
+    // Witness-table sequential ID assignment updates both maps together.
     std::mutex m_sequentialIDMapMutex;
 
     SearchDirectoryList searchDirectoryCache;

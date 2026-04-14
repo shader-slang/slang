@@ -4395,6 +4395,8 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
 
 ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 {
+    // Layout construction still walks shared linkage-owned front-end state, so serialize it with
+    // other component-type front-end operations.
     std::lock_guard<std::recursive_mutex> lock(
         m_program->getLinkage()->getComponentTypeOperationMutex());
 

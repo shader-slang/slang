@@ -951,6 +951,8 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                 // Get a sequential ID for the witness table using the map from the Linkage.
                 uint32_t seqID = 0;
                 {
+                    // Witness-table sequential ID allocation updates both linkage maps and the
+                    // generated-name counter, so keep the whole lookup/allocation/insertion atomic.
                     std::lock_guard<std::mutex> lock(linkage->m_sequentialIDMapMutex);
 
                     if (shouldUpdateSequentialIDMap)

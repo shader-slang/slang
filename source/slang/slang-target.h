@@ -161,6 +161,7 @@ private:
     CompilerOptionSet optionSet;
     CapabilitySet cookedCapabilities;
     RefPtr<HLSLToVulkanLayoutOptions> hlslToVulkanOptions;
+    // Layout/codegen threads share one TargetRequest and lazily initialize this derived state.
     std::mutex m_mutex;
 };
 

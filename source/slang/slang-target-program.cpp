@@ -44,6 +44,8 @@ IArtifact* TargetProgram::_createWholeProgramResult(
     }
 
     {
+        // Two threads may finish the same whole-program compile concurrently; publish only one
+        // cached result.
         std::lock_guard<std::mutex> lock(m_resultCacheMutex);
         if (m_wholeProgramResult)
             return m_wholeProgramResult;
@@ -81,6 +83,8 @@ IArtifact* TargetProgram::_createEntryPointResult(
     }
 
     {
+        // Parallel entry-point compiles can finish in either order, so guard the resize and
+        // cache publish together.
         std::lock_guard<std::mutex> lock(m_resultCacheMutex);
         if (entryPointIndex >= m_entryPointResults.getCount())
             m_entryPointResults.setCount(entryPointIndex + 1);
@@ -94,6 +98,7 @@ IArtifact* TargetProgram::_createEntryPointResult(
 IArtifact* TargetProgram::getOrCreateWholeProgramResult(DiagnosticSink* sink)
 {
     {
+        // Fast-path the whole-program cache without racing a concurrent publisher.
         std::lock_guard<std::mutex> lock(m_resultCacheMutex);
         if (m_wholeProgramResult)
             return m_wholeProgramResult;
@@ -117,6 +122,8 @@ IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, Diagn
         return nullptr;
 
     {
+        // Guard the cache probe and lazy result-array resize against concurrent entry-point
+        // compiles for this target program.
         std::lock_guard<std::mutex> lock(m_resultCacheMutex);
         if (entryPointIndex >= m_entryPointResults.getCount())
             m_entryPointResults.setCount(entryPointIndex + 1);
