@@ -17,7 +17,14 @@ on:
 
 jobs:
   # Run GPU tests in container with Vulkan and CUDA support.
-  # Requires mounting host NVIDIA Vulkan ICD and EGL vendor config for Vulkan to work.
+  #
+  # Vulkan ICD: We use libEGL_nvidia.so.0 as the Vulkan ICD instead of the
+  # default libGLX_nvidia.so.0 to avoid an intermittent crash in the EGL
+  # initialization path of driver 580.x. Both libraries export vk_icd* symbols.
+  # The default ICD causes the driver to load libEGL_nvidia.so via libglvnd's
+  # EGL vendor dispatch, which has a null-deref bug that crashes test-server
+  # processes. Using libEGL_nvidia directly as the ICD skips the EGL vendor
+  # dispatch entirely, so the buggy code path is never reached.
   test-slang:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 60
@@ -38,9 +45,7 @@ jobs:
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
-        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
-        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
 
     defaults:
       run:
@@ -55,6 +60,40 @@ jobs:
             exit 1
           fi
           echo "GPU: $output"
+
+      - name: Setup Vulkan ICD
+        run: |
+          # See job-level comment for why we override the Vulkan ICD.
+          # Read the existing NVIDIA ICD JSON (injected by the container toolkit)
+          # and swap only the library_path, preserving api_version and formatting.
+          source_icd=""
+          for candidate in \
+            /etc/vulkan/icd.d/nvidia_icd.json \
+            /usr/share/vulkan/icd.d/nvidia_icd.json; do
+            if [ -f "$candidate" ]; then
+              source_icd="$candidate"
+              break
+            fi
+          done
+          if [ -z "$source_icd" ]; then
+            echo "::warning::No existing NVIDIA ICD JSON found, using defaults"
+            source_icd=""
+          fi
+          mkdir -p /etc/vulkan/icd.d
+          python3 -c "
+          import json, sys
+          if '$source_icd':
+              with open('$source_icd') as f:
+                  icd = json.load(f)
+          else:
+              icd = {'file_format_version': '1.0.1', 'ICD': {'api_version': '1.4.312'}}
+          icd['ICD']['library_path'] = 'libEGL_nvidia.so.0'
+          with open('/etc/vulkan/icd.d/nvidia_icd.json', 'w') as f:
+              json.dump(icd, f, indent=4)
+              f.write('\n')
+          print(f\"Vulkan ICD configured: libEGL_nvidia.so.0 (api_version={icd['ICD'].get('api_version', 'unknown')})\")
+          "
+          rm -f /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null || true
 
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
@@ -183,9 +222,7 @@ jobs:
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
-        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
-        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
 
     defaults:
       run:
@@ -200,6 +237,38 @@ jobs:
             exit 1
           fi
           echo "GPU: $output"
+
+      - name: Setup Vulkan ICD
+        run: |
+          # See test-slang job comment for why we override the Vulkan ICD.
+          source_icd=""
+          for candidate in \
+            /etc/vulkan/icd.d/nvidia_icd.json \
+            /usr/share/vulkan/icd.d/nvidia_icd.json; do
+            if [ -f "$candidate" ]; then
+              source_icd="$candidate"
+              break
+            fi
+          done
+          if [ -z "$source_icd" ]; then
+            echo "::warning::No existing NVIDIA ICD JSON found, using defaults"
+            source_icd=""
+          fi
+          mkdir -p /etc/vulkan/icd.d
+          python3 -c "
+          import json, sys
+          if '$source_icd':
+              with open('$source_icd') as f:
+                  icd = json.load(f)
+          else:
+              icd = {'file_format_version': '1.0.1', 'ICD': {'api_version': '1.4.312'}}
+          icd['ICD']['library_path'] = 'libEGL_nvidia.so.0'
+          with open('/etc/vulkan/icd.d/nvidia_icd.json', 'w') as f:
+              json.dump(icd, f, indent=4)
+              f.write('\n')
+          print(f\"Vulkan ICD configured: libEGL_nvidia.so.0 (api_version={icd['ICD'].get('api_version', 'unknown')})\")
+          "
+          rm -f /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null || true
 
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
