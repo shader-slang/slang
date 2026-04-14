@@ -14272,6 +14272,7 @@ bool SemanticsDeclBasesVisitor::_funcExtensionForwardDiff(
     Type* baseFuncAsType,
     DeclVisibility visibility)
 {
+    SLANG_UNUSED(visibility);
     auto astBuilder = getASTBuilder();
 
     auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
