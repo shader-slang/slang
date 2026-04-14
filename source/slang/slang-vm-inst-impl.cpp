@@ -592,7 +592,7 @@ static void offsetPtrHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*
     memcpy(&basePtr, inst->getOperand(1).getPtr(), sizeof(void*));
     int32_t offset;
     memcpy(&offset, inst->getOperand(2).getPtr(), sizeof(offset));
-    void* result = basePtr + offset * inst->opcodeExtension;
+    void* result = basePtr + (int64_t)offset * (int64_t)inst->opcodeExtension;
     memcpy(inst->getOperand(0).getPtr(), &result, sizeof(void*));
 }
 
