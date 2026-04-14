@@ -19,3 +19,8 @@
 #   cmake/lsan-suppressions.txt        -- suppresses leak reports at LSan level
 #   cmake/sanitizer-ignorelist.txt     -- suppresses UBSan checks at compile level
 #   This file                          -- accepts real findings as known issues
+
+# #10828: Preprocessor ExpansionInputStream leak during slangc-test
+# 20064 bytes in 115 allocations from _maybeBeginMacroInvocation() and
+# type layout objects created during compilation.
+AddressSanitizer: 20064 byte(s) leaked in 115 allocation(s)
