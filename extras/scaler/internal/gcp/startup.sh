@@ -111,10 +111,10 @@ fi
 # with "Failed to initialize NVML: Unknown Error".
 # See: https://github.com/NVIDIA/nvidia-docker/issues/1730
 log "  Creating /dev/char symlinks..."
-if nvidia-ctk system create-dev-char-symlinks --create-all >/dev/null 2>&1; then
+if ctk_out="$(nvidia-ctk system create-dev-char-symlinks --create-all 2>&1)"; then
   log "  /dev/char symlinks created."
 else
-  log "WARNING: Failed to create /dev/char symlinks (nvidia-ctk may not be installed)"
+  log "WARNING: Failed to create /dev/char symlinks: ${ctk_out}"
 fi
 
 # Verify GPU devices
