@@ -2476,7 +2476,23 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitDifferentialPairType(DifferentialPairType* pairType)
     {
         IRType* primalType = lowerType(context, pairType->getPrimalType());
-        if (as<IRAssociatedType>(primalType) || as<IRThisType>(primalType))
+        if (as<IRInterfaceType>(primalType))
+        {
+            // Existential differential pairs are handled specially later in autodiff lowering:
+            // their differential type is modeled as `IDifferentiable`, and the witness operand
+            // on `DifferentialPair<interface>` is not consulted.
+            //
+            // If we eagerly lower the original front-end witness here, interface-inheritance
+            // chains like `IDerived : IBase : IDifferentiable` can try to lower the inherited
+            // conformance through an interface requirement key, which is not a witness table and
+            // can trigger an ICE before the later existential-specific lowering runs.
+            auto diffInterfaceType =
+                lowerType(context, context->astBuilder->getDifferentiableInterfaceType());
+            auto poisonWitness =
+                getBuilder()->emitPoison(getBuilder()->getWitnessTableType(diffInterfaceType));
+            return getBuilder()->getDifferentialPairType(primalType, poisonWitness);
+        }
+        else if (as<IRAssociatedType>(primalType) || as<IRThisType>(primalType))
         {
             List<IRInst*> operands;
             SubstitutionSet(pairType->getDeclRef())
