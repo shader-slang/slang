@@ -105,6 +105,18 @@ else
   log "WARNING: Failed to enable GPU persistence mode: ${pm_out}"
 fi
 
+# Create /dev/char symlinks for all NVIDIA device nodes. Recent runc versions
+# with cgroup v2 require these symlinks to properly inject devices into
+# containers. Without them, containers can intermittently lose GPU access
+# with "Failed to initialize NVML: Unknown Error".
+# See: https://github.com/NVIDIA/nvidia-docker/issues/1730
+log "  Creating /dev/char symlinks..."
+if nvidia-ctk system create-dev-char-symlinks --create-all >/dev/null 2>&1; then
+  log "  /dev/char symlinks created."
+else
+  log "WARNING: Failed to create /dev/char symlinks (nvidia-ctk may not be installed)"
+fi
+
 # Verify GPU devices
 log "  GPU devices:"
 ls -la /dev/nvidia* 2>&1 | while read -r line; do log "    $line"; done || true
