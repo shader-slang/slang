@@ -2517,7 +2517,6 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
     // First, register all external symbols in the current module.
     insertGlobalValueSymbols(&sharedContext, irModule);
 
-    List<KeyValuePair<IRInst*, IRInst*>> pendingReplacements;
     for (auto originalInst : externalSymbolsToLink)
     {
         // originalInst is the function in the imported module to clone.
@@ -2533,14 +2532,13 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
         existingInst->removeFromParent();
 
         auto cloned = cloneValue(&specContext, originalInst);
-        pendingReplacements.add(KeyValuePair<IRInst*, IRInst*>(existingInst, cloned));
-    }
 
-    // Now we can replace all the inlined extern symbols with the cloned values.
-    for (auto kv : pendingReplacements)
-    {
-        kv.key->replaceUsesWith(kv.value);
-        kv.key->removeAndDeallocate();
+        // Replace uses and deallocate immediately rather than deferring to a second pass.
+        // Deferring causes crashes when existingInst A is a user of existingInst B: both
+        // get removed from parent in the first pass, then B's replaceUsesWith encounters
+        // orphaned A (no module) and crashes in the dedup/hoisting logic.
+        existingInst->replaceUsesWith(cloned);
+        existingInst->removeAndDeallocate();
     }
 }
 
