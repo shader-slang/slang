@@ -66,6 +66,14 @@ namespace SlangRecord
     if (!arg)                                   \
     arg = &_temp_##arg
 
+// Prepare a pointer input parameter (T* style, e.g. SessionDesc*)
+// During replay, callWithDefaults passes nullptr for pointer args. This macro
+// provides a stack-allocated default so RECORD_INPUT(*arg) can read into it.
+#define PREPARE_POINTER_INPUT(arg)              \
+    std::decay_t<decltype(*arg)> _temp_##arg{}; \
+    if (!arg)                                   \
+    arg = &_temp_##arg
+
 // Record an output parameter (for T** style outputs, dereferences and wraps)
 #define RECORD_COM_OUTPUT(arg) _ctx.record(RecordFlag::Output, *arg)
 
