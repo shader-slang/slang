@@ -57,8 +57,13 @@ extension RemovedStruct
     }
 }
 
-[RemovedSince(-1, "This function is removed")]
-void removedFunction()
+[RemovedSince(-1, "This function overload is removed")]
+void someFunction(int a)
+{
+}
+
+// not removed
+void someFunction(double a)
 {
 }
 
@@ -92,11 +97,15 @@ void main(uint3 threadId : SV_DispatchThreadID)
 //CHECK:     ^^^^^^^^ use of removed declaration
 //CHECK:     ^^^^^^^^ IRemoved has been removed since language version '-1': This interface is removed
 
-    removedFunction();
+    someFunction(5);
 /*CHECK:
-    ^^^^^^^^^^^^^^^ use of removed declaration
-    ^^^^^^^^^^^^^^^ removedFunction has been removed since language version '-1': This function is removed
+    ^^^^^^^^^^^^ use of removed declaration
+    ^^^^^^^^^^^^ someFunction has been removed since language version '-1': This function overload is removed
 */
+
+    // calling this is ok
+    someFunction(5.0);
+
 
     s.removedExtendedFunction();
 /*CHECK:

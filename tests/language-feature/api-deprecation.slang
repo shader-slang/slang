@@ -57,8 +57,13 @@ extension DeprecatedStruct
     }
 }
 
-[deprecated("This function is deprecated")]
-void deprecatedFunction()
+[deprecated("This function overload is deprecated")]
+void someFunction(int a)
+{
+}
+
+// calling this won't warn
+void someFunction(double a)
 {
 }
 
@@ -92,11 +97,15 @@ void main(uint3 threadId : SV_DispatchThreadID)
 //CHECK:     ^^^^^^^^^^^ use of deprecated declaration
 //CHECK:     ^^^^^^^^^^^ IDeprecated has been deprecated: This interface is deprecated
 
-    deprecatedFunction();
+    someFunction(5);
 /*CHECK:
-    ^^^^^^^^^^^^^^^^^^ use of deprecated declaration
-    ^^^^^^^^^^^^^^^^^^ deprecatedFunction has been deprecated: This function is deprecated
+    ^^^^^^^^^^^^ use of deprecated declaration
+    ^^^^^^^^^^^^ someFunction has been deprecated: This function overload is deprecated
 */
+
+    // no warning from this
+    someFunction(5.0);
+
 
     s.deprecatedExtendedFunction();
 /*CHECK:
