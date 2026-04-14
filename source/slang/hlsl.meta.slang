@@ -27773,44 +27773,6 @@ struct CoopMat
         }
     }
 
-    //
-    // Native register store/load for shared memory.
-    // Dumps/restores raw CoopMat registers without preserving matrix layout,
-    // so the stored data is only usable for element-wise operations (e.g.
-    // cross-warp reduction), not for subsequent MMA.
-    //
-
-    /// Stores raw registers to groupshared memory in native layout.
-    /// Each lane writes its registers contiguously at data[offset + laneId * RegsPerLane].
-    [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
-    void storeNative<U, let V : int>(__ref groupshared U[V] data, uint offset)
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm "($0).storeNative(($1)->m_data, $2)";
-        default:
-            // Stride is in units of U (the array element type). For RowMajor,
-            // stride = number of U elements per row = N * sizeof(T) / sizeof(U).
-            Store<CoopMatMatrixLayout.RowMajor>(data, offset, N * sizeof(T) / sizeof(U));
-        }
-    }
-
-    /// Loads raw registers from groupshared memory in native layout.
-    [ForceInline]
-    [mutating]
-    [require(cooperative_matrix, subgroup_basic)]
-    void loadNative<U, let V : int>(__constref groupshared U[V] data, uint offset)
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm "($0)->loadNative(($1)->m_data, $2)";
-        default:
-            this = This.Load<CoopMatMatrixLayout.RowMajor>(data, offset, N * sizeof(T) / sizeof(U));
-        }
-    }
 
     //
     // CoopMat operations
@@ -27837,97 +27799,6 @@ struct CoopMat
             {
                 result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
             };
-        }
-    }
-
-    [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
-    void StoreRaw(RWStructuredBuffer<T> buffer, uint element)
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm "($0).StoreRaw(($1).data + $2)";
-        default:
-            Store<CoopMatMatrixLayout.RowMajor>(buffer, element, N);
-        }
-    }
-
-    [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
-    void StoreRaw(T* buffer, uint element)
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm "($0).StoreRaw($1 + $2)";
-        default:
-            Store<CoopMatMatrixLayout.RowMajor>(buffer, element, N);
-        }
-    }
-
-    [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
-    static This LoadRaw(RWStructuredBuffer<T> buffer, uint element)
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm "$TR::LoadRaw(($0).data + $1)";
-        default:
-            return Load<CoopMatMatrixLayout.RowMajor>(buffer, element, N);
-        }
-    }
-
-    [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
-    static This LoadRaw(StructuredBuffer<T> buffer, uint element)
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm "$TR::LoadRaw(($0).data + $1)";
-        default:
-            return Load<CoopMatMatrixLayout.RowMajor>(buffer, element, N);
-        }
-    }
-
-    [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
-    static This LoadRaw(T* buffer, uint element)
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm "$TR::LoadRaw($0 + $1)";
-        default:
-            return Load<CoopMatMatrixLayout.RowMajor>(buffer, element, N);
-        }
-    }
-
-    [ForceInline]
-    [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-    void StoreRaw<U, let V : int>(__ref groupshared U[V] data, uint element)
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm "($0).storeNative(($1)->m_data, $2)";
-        default:
-            Store<CoopMatMatrixLayout.RowMajor>(data, element, N * sizeof(T) / sizeof(U));
-        }
-    }
-
-    [ForceInline]
-    [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-    static This LoadRaw<U, let V : int>(__constref groupshared U[V] data, uint element)
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm "$TR::loadNative(($0)->m_data, $1)";
-        default:
-            return This.Load<CoopMatMatrixLayout.RowMajor>(data, element, N * sizeof(T) / sizeof(U));
         }
     }
 
@@ -28140,61 +28011,6 @@ struct CoopMat
         }
     }
 
-    /// Constructs MatA (16x16) fragments for both 16-thread groups simultaneously
-    /// using optimized shuffle (1 shuffle per packed column instead of 2).
-    /// No matIndex parameter — both groups are produced in one call.
-    ///
-    /// @param localRow Array of N elements representing one row per thread.
-    /// @param outTiles Output array of 2 fragments: [0] = group 0, [1] = group 1.
-    [require(cuda)]
-    static void FromLocalRowPack(T localRow[N], inout This outTiles[2])
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaBatchFromArray_MatA_16x16<16>(&((*($1))[0]), (const uint32_t*)($0).m_data))";
-        }
-    }
-
-    /// Constructs MatA (16x16) fragments directly from a sub-array at the given
-    /// element offset, without copying to a temporary. Avoids half pack/unpack overhead.
-    ///
-    /// @param data Source array (larger than 16 elements).
-    /// @param elementOffset Starting element index (must be aligned to 2 for half packing).
-    /// @param outTiles Output array of 2 fragments.
-    [require(cuda)]
-    static void FromLocalRowPackOffset<int ArraySize>(T data[ArraySize], int elementOffset, inout This outTiles[2])
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaBatchFromArray_MatA_16x16<16>(&((*($2))[0]), (const uint32_t*)&(($0).m_data[$1 / 2])))";
-        }
-    }
-
-    /// Writes 2 MatA fragments directly into a destination array at outOffset,
-    /// reading from a source array at elementOffset. No intermediate temporaries.
-    [require(cuda)]
-    static void FromLocalRowPackOffsetInto<int ArraySize, int OutN>(T data[ArraySize], int elementOffset, inout This outArray[OutN], int outOffset)
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaBatchFromArray_MatA_16x16<16>(&((*($2))[$3]), (const uint32_t*)&(($0).m_data[$1 / 2])))";
-        }
-    }
-
-    /// Writes 2 MatA fragments directly into a destination array at outOffset
-    /// from a local row. No intermediate temporaries.
-    [require(cuda)]
-    static void FromLocalRowPackInto<int OutN>(T localRow[N], inout This outArray[OutN], int outOffset)
-    {
-        __target_switch
-        {
-        case cuda:
-            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaBatchFromArray_MatA_16x16<16>(&((*($1))[$2]), (const uint32_t*)($0).m_data))";
-        }
-    }
 
     /// Extracts the lower 16x8 half (columns 0-7) of a ChangeMajor'd MatA as MatB.
     /// Used to split a 16x16 col-major tile into two 16x8 MatB tiles for m16n8k16 MMA.
