@@ -347,10 +347,7 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             uint32_t matrixUse =
                 (uint32_t)static_cast<IRIntLit*>(coopType->getMatrixUse())->getValue();
             FragmentShape shape = computeShapeCombination(matrixUse, rowCount, colCount);
-            if (shape.m == 16 && shape.n == 16 && shape.k == 16)
-                m_extensionTracker->requireSMVersion(SemanticVersion(8, 0));
-            else
-                m_extensionTracker->requireSMVersion(SemanticVersion(7, 5));
+            m_extensionTracker->requireSMVersion(SemanticVersion(8, 0));
             return result;
         }
     case kIROp_FloatE4M3Type:
@@ -1578,68 +1575,28 @@ static UnownedStringSlice getMatrixUseName(uint32_t matrixUse)
 /*
  * Shape Validation Strategy:
  * Maps CoopMat dimensions to the canonical MMA shape (m, n, k).
- * Supports WMMA shapes and MMA m16n16k16 (internally 2x m16n8k16).
+ * Only m16n16k16 is supported (internally uses 2x mma.sync.m16n8k16).
  *
  * Supported shapes:
- *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16) [MMA]
- *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16) [WMMA]
- *   - m8n32k16:  Matrix A (8x16),  Matrix B (16x32), Matrix C/D (8x32)  [WMMA]
- *   - m32n8k16:  Matrix A (32x16), Matrix B (16x8),  Matrix C/D (32x8)  [WMMA]
- *
- * Note: m16n8k16 is not directly exposed. m16n16k16 uses 2x m16n8k16 internally.
+ *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16)
  */
 inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col)
 {
     switch (matrixUse)
     {
     case SLANG_COOPERATIVE_MATRIX_USE_A: // Matrix A: row=m, col=k
-        {
-            if (col != 16)
-            {
-                return {0, 0, 0}; // Invalid
-            }
-            switch (row)
-            {
-            case 16:
-                return {16, 16, 16}; // m16n16k16 (internally 2x m16n8k16)
-            case 8:
-                return {8, 32, 16};
-            case 32:
-                return {32, 8, 16};
-            default:
-                return {0, 0, 0}; // Invalid
-            }
-        }
+        if (row == 16 && col == 16)
+            return {16, 16, 16};
+        return {0, 0, 0};
     case SLANG_COOPERATIVE_MATRIX_USE_B: // Matrix B: row=k, col=n
-        {
-            if (row != 16)
-            {
-                return {0, 0, 0}; // Invalid
-            }
-            switch (col)
-            {
-            case 16:
-                return {16, 16, 16};
-            case 32:
-                return {8, 32, 16};
-            case 8:
-                return {32, 8, 16};
-            default:
-                return {0, 0, 0}; // Invalid
-            }
-        }
+        if (row == 16 && col == 16)
+            return {16, 16, 16};
+        return {0, 0, 0};
     case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR: // Matrix C/D: row=m, col=n
     default:
-        {
-            if (row == 16 && col == 16)
-                return {16, 16, 16};
-            else if (row == 8 && col == 32)
-                return {8, 32, 16};
-            else if (row == 32 && col == 8)
-                return {32, 8, 16};
-            else
-                return {0, 0, 0}; // Invalid
-        }
+        if (row == 16 && col == 16)
+            return {16, 16, 16};
+        return {0, 0, 0};
     }
 }
 

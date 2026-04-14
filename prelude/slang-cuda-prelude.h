@@ -6600,14 +6600,11 @@ __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
 // This implementation can only be enabled on CUDA Toolkit 12.5+
 #if ((__CUDACC_VER_MAJOR__ > 12) || (__CUDACC_VER_MAJOR__ == 12 && __CUDACC_VER_MINOR__ >= 5)) || \
     (CUDA_VERSION >= 12050)
-// The reason we have to implement our own wmma operation on CUDA is the interface
-// design of cooperative_matrix on Vulkan is quite different from CUDA WMMA API, where
-// SPIRV spec doesn't require the matrix layout during declaration of the cooperative_matrix,
-// instead it is only required during load/store operations. However, in CUDA WMMA API, the layout
-// has to be specified during the declaration of the fragment itself. Slang's interface desgin
-// is more similar to SPIRV's cooperative_matrix. So to bridge this gap, we have to implement our
-// wmma operation by using PTX wmma instructions directly, because PTX wmma instructions is quite
-// similar to SPIRV's cooperative_matrix spec.
+// Cooperative matrix support using mma.sync.aligned.m16n8k16 PTX instructions.
+// Only the m16n16k16 shape is supported (implemented as 2x m16n8k16 internally).
+// Load/Store use warp shuffle redistribution instead of wmma.load/wmma.store,
+// matching SPIRV's cooperative_matrix interface where layout is specified at
+// load/store time rather than at fragment declaration.
 namespace Slang_CUDA_WMMA
 {
 
@@ -6631,128 +6628,6 @@ enum Layout : int
     ColMajor = 1
 };
 
-enum ShapeCombination : int
-{
-    m16n16k16 = 0,
-    m8n32k16 = 1,
-    m32n8k16 = 2,
-};
-
-// ====================================================================================
-// PTX Name Helpers
-// ====================================================================================
-
-// Shape names
-template<int M, int N, int K>
-struct PtxShapeName;
-template<>
-struct PtxShapeName<16, 16, 16>
-{
-    static constexpr const char name[] = "m16n16k16";
-};
-template<>
-struct PtxShapeName<8, 32, 16>
-{
-    static constexpr const char name[] = "m8n32k16";
-};
-template<>
-struct PtxShapeName<32, 8, 16>
-{
-    static constexpr const char name[] = "m32n8k16";
-};
-
-// Matrix role names
-template<MatrixUse use>
-struct PtxMatrixRoleName;
-template<>
-struct PtxMatrixRoleName<MatrixUse::MatrixA>
-{
-    static constexpr const char name[] = "a";
-};
-template<>
-struct PtxMatrixRoleName<MatrixUse::MatrixB>
-{
-    static constexpr const char name[] = "b";
-};
-template<>
-struct PtxMatrixRoleName<MatrixUse::MatrixC>
-{
-    static constexpr const char name[] = "c";
-};
-template<>
-struct PtxMatrixRoleName<MatrixUse::MatrixD>
-{
-    static constexpr const char name[] = "d";
-};
-
-// Layout names
-template<Layout layout>
-struct PtxLayoutName;
-template<>
-struct PtxLayoutName<Layout::RowMajor>
-{
-    static constexpr const char name[] = "row";
-};
-template<>
-struct PtxLayoutName<Layout::ColMajor>
-{
-    static constexpr const char name[] = "col";
-};
-
-// Type names
-template<typename T>
-struct PtxTypeName;
-
-#if SLANG_CUDA_ENABLE_HALF
-template<>
-struct PtxTypeName<half>
-{
-    static constexpr const char name[] = "f16";
-};
-#endif // #if SLANG_CUDA_ENABLE_HALF
-
-#if SLANG_CUDA_ENABLE_FP8
-template<>
-struct PtxTypeName<__nv_fp8_e4m3>
-{
-    static constexpr const char name[] = "f8e4m3";
-};
-template<>
-struct PtxTypeName<__nv_fp8_e5m2>
-{
-    static constexpr const char name[] = "f8e5m2";
-};
-#endif // #if SLANG_CUDA_ENABLE_FP8
-
-#if SLANG_CUDA_ENABLE_BF16
-template<>
-struct PtxTypeName<__nv_bfloat16>
-{
-    static constexpr const char name[] = "bf16";
-};
-#endif
-
-template<>
-struct PtxTypeName<float>
-{
-    static constexpr const char name[] = "f32";
-};
-template<>
-struct PtxTypeName<char>
-{
-    static constexpr const char name[] = "s8";
-};
-template<>
-struct PtxTypeName<unsigned char>
-{
-    static constexpr const char name[] = "u8";
-};
-template<>
-struct PtxTypeName<int32_t>
-{
-    static constexpr const char name[] = "s32";
-};
-
 // ====================================================================================
 // Register Counts for different matrices
 // ====================================================================================
@@ -6760,28 +6635,7 @@ template<typename ElemT, int M, int N, int K, MatrixUse use>
 struct RegisterCount;
 
 #if SLANG_CUDA_ENABLE_HALF
-// Half (f16) - generic: 8 regs for A/B (WMMA fragment size), 4 regs for C/D
-template<int M, int N, int K>
-struct RegisterCount<half, M, N, K, MatrixUse::MatrixA>
-{
-    static constexpr int value = 8;
-};
-template<int M, int N, int K>
-struct RegisterCount<half, M, N, K, MatrixUse::MatrixB>
-{
-    static constexpr int value = 8;
-};
-template<int M, int N, int K>
-struct RegisterCount<half, M, N, K, MatrixUse::MatrixC>
-{
-    static constexpr int value = 4;
-};
-template<int M, int N, int K>
-struct RegisterCount<half, M, N, K, MatrixUse::MatrixD>
-{
-    static constexpr int value = 4;
-};
-// m16n16k16: 4 regs for A/B (mma.sync.m16n8k16 register layout)
+// Half (f16) - m16n16k16: 4 regs for A/B (mma.sync.m16n8k16 register layout), 4 regs for C/D
 template<>
 struct RegisterCount<half, 16, 16, 16, MatrixUse::MatrixA>
 {
@@ -6789,6 +6643,16 @@ struct RegisterCount<half, 16, 16, 16, MatrixUse::MatrixA>
 };
 template<>
 struct RegisterCount<half, 16, 16, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<half, 16, 16, 16, MatrixUse::MatrixC>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<half, 16, 16, 16, MatrixUse::MatrixD>
 {
     static constexpr int value = 4;
 };
@@ -6804,7 +6668,7 @@ struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixA>
 template<int M, int N, int K>
 struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixB>
 {
-    static constexpr int value = 8;
+    static constexpr int value = 4;
 };
 template<int M, int N, int K>
 struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixC>
@@ -6853,26 +6717,6 @@ struct RegisterCount<unsigned char, 16, 16, 16, MatrixUse::MatrixB>
 {
     static constexpr int value = 2;
 };
-template<>
-struct RegisterCount<unsigned char, 8, 32, 16, MatrixUse::MatrixA>
-{
-    static constexpr int value = 1;
-};
-template<>
-struct RegisterCount<unsigned char, 8, 32, 16, MatrixUse::MatrixB>
-{
-    static constexpr int value = 4;
-};
-template<>
-struct RegisterCount<unsigned char, 32, 8, 16, MatrixUse::MatrixA>
-{
-    static constexpr int value = 4;
-};
-template<>
-struct RegisterCount<unsigned char, 32, 8, 16, MatrixUse::MatrixB>
-{
-    static constexpr int value = 1;
-};
 
 // Int8 (s8) - same as u8
 template<>
@@ -6884,26 +6728,6 @@ template<>
 struct RegisterCount<char, 16, 16, 16, MatrixUse::MatrixB>
 {
     static constexpr int value = 2;
-};
-template<>
-struct RegisterCount<char, 8, 32, 16, MatrixUse::MatrixA>
-{
-    static constexpr int value = 1;
-};
-template<>
-struct RegisterCount<char, 8, 32, 16, MatrixUse::MatrixB>
-{
-    static constexpr int value = 4;
-};
-template<>
-struct RegisterCount<char, 32, 8, 16, MatrixUse::MatrixA>
-{
-    static constexpr int value = 4;
-};
-template<>
-struct RegisterCount<char, 32, 8, 16, MatrixUse::MatrixB>
-{
-    static constexpr int value = 1;
 };
 
 #if SLANG_CUDA_ENABLE_FP8
@@ -6919,27 +6743,6 @@ struct RegisterCount<__nv_fp8_e4m3, 16, 16, 16, MatrixUse::MatrixB>
     static constexpr int value = 2;
 };
 template<>
-struct RegisterCount<__nv_fp8_e4m3, 8, 32, 16, MatrixUse::MatrixA>
-{
-    static constexpr int value = 1;
-};
-template<>
-struct RegisterCount<__nv_fp8_e4m3, 8, 32, 16, MatrixUse::MatrixB>
-{
-    static constexpr int value = 4;
-};
-template<>
-struct RegisterCount<__nv_fp8_e4m3, 32, 8, 16, MatrixUse::MatrixA>
-{
-    static constexpr int value = 4;
-};
-template<>
-struct RegisterCount<__nv_fp8_e4m3, 32, 8, 16, MatrixUse::MatrixB>
-{
-    static constexpr int value = 1;
-};
-
-template<>
 struct RegisterCount<__nv_fp8_e5m2, 16, 16, 16, MatrixUse::MatrixA>
 {
     static constexpr int value = 2;
@@ -6949,158 +6752,10 @@ struct RegisterCount<__nv_fp8_e5m2, 16, 16, 16, MatrixUse::MatrixB>
 {
     static constexpr int value = 2;
 };
-template<>
-struct RegisterCount<__nv_fp8_e5m2, 8, 32, 16, MatrixUse::MatrixA>
-{
-    static constexpr int value = 1;
-};
-template<>
-struct RegisterCount<__nv_fp8_e5m2, 8, 32, 16, MatrixUse::MatrixB>
-{
-    static constexpr int value = 4;
-};
-template<>
-struct RegisterCount<__nv_fp8_e5m2, 32, 8, 16, MatrixUse::MatrixA>
-{
-    static constexpr int value = 4;
-};
-template<>
-struct RegisterCount<__nv_fp8_e5m2, 32, 8, 16, MatrixUse::MatrixB>
-{
-    static constexpr int value = 1;
-};
 #endif
 
 
 
-// ====================================================================================
-// Saturation at the output for integer MMA
-// ====================================================================================
-template<bool saturatingAccumulation>
-struct IsSaturated;
-
-template<>
-struct IsSaturated<true>
-{
-    static constexpr const char name[] = ".satfinite";
-};
-
-template<>
-struct IsSaturated<false>
-{
-    static constexpr const char name[] = "";
-};
-
-// ====================================================================================
-// WMMA Load - Inline PTX
-// ====================================================================================
-
-template<typename ElemT, int M, int N, int K, MatrixUse use, Layout layout>
-__device__ inline void wmmaLoad(uint32_t* regs, const void* ptr, int stride)
-{
-    constexpr int nregs = RegisterCount<ElemT, M, N, K, use>::value;
-
-    switch (nregs)
-    {
-    case 1:
-        asm volatile("wmma.load.%1.sync.aligned.%2.%3.%4 {%0}, [%5], %6;\n"
-                     : "=r"(regs[0])
-                     : "C"(PtxMatrixRoleName<use>::name),
-                       "C"(PtxLayoutName<layout>::name),
-                       "C"(PtxShapeName<M, N, K>::name),
-                       "C"(PtxTypeName<ElemT>::name),
-                       "l"(ptr),
-                       "r"(stride));
-        break;
-
-    case 2:
-        asm volatile("wmma.load.%2.sync.aligned.%3.%4.%5 {%0, %1}, [%6], %7;\n"
-                     : "=r"(regs[0]), "=r"(regs[1])
-                     : "C"(PtxMatrixRoleName<use>::name),
-                       "C"(PtxLayoutName<layout>::name),
-                       "C"(PtxShapeName<M, N, K>::name),
-                       "C"(PtxTypeName<ElemT>::name),
-                       "l"(ptr),
-                       "r"(stride));
-        break;
-
-    case 4:
-        asm volatile("wmma.load.%4.sync.aligned.%5.%6.%7 {%0, %1, %2, %3}, [%8], %9;\n"
-                     : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3])
-                     : "C"(PtxMatrixRoleName<use>::name),
-                       "C"(PtxLayoutName<layout>::name),
-                       "C"(PtxShapeName<M, N, K>::name),
-                       "C"(PtxTypeName<ElemT>::name),
-                       "l"(ptr),
-                       "r"(stride));
-        break;
-
-    case 8:
-        asm volatile("wmma.load.%8.sync.aligned.%9.%10.%11 "
-                     "{%0, %1, %2, %3, %4, %5, %6, %7}, [%12], %13;\n"
-                     : "=r"(regs[0]),
-                       "=r"(regs[1]),
-                       "=r"(regs[2]),
-                       "=r"(regs[3]),
-                       "=r"(regs[4]),
-                       "=r"(regs[5]),
-                       "=r"(regs[6]),
-                       "=r"(regs[7])
-                     : "C"(PtxMatrixRoleName<use>::name),
-                       "C"(PtxLayoutName<layout>::name),
-                       "C"(PtxShapeName<M, N, K>::name),
-                       "C"(PtxTypeName<ElemT>::name),
-                       "l"(ptr),
-                       "r"(stride));
-        break;
-    }
-}
-
-// ====================================================================================
-// WMMA Store - Inline PTX
-// ====================================================================================
-
-template<typename ElemT, int M, int N, int K, Layout layout>
-__device__ inline void wmmaStore(void* ptr, const uint32_t* regs, int stride)
-{
-    constexpr int nregs = RegisterCount<ElemT, M, N, K, MatrixUse::MatrixD>::value;
-
-    switch (nregs)
-    {
-    case 4:
-        asm volatile("wmma.store.d.sync.aligned.%0.%1.%2 [%3], {%4, %5, %6, %7}, %8;\n"
-                     :
-                     : "C"(PtxLayoutName<layout>::name),
-                       "C"(PtxShapeName<M, N, K>::name),
-                       "C"(PtxTypeName<ElemT>::name),
-                       "l"(ptr),
-                       "r"(regs[0]),
-                       "r"(regs[1]),
-                       "r"(regs[2]),
-                       "r"(regs[3]),
-                       "r"(stride));
-        break;
-
-    case 8:
-        asm volatile("wmma.store.d.sync.aligned.%0.%1.%2 "
-                     "[%3], {%4, %5, %6, %7, %8, %9, %10, %11}, %12;\n"
-                     :
-                     : "C"(PtxLayoutName<layout>::name),
-                       "C"(PtxShapeName<M, N, K>::name),
-                       "C"(PtxTypeName<ElemT>::name),
-                       "l"(ptr),
-                       "r"(regs[0]),
-                       "r"(regs[1]),
-                       "r"(regs[2]),
-                       "r"(regs[3]),
-                       "r"(regs[4]),
-                       "r"(regs[5]),
-                       "r"(regs[6]),
-                       "r"(regs[7]),
-                       "r"(stride));
-        break;
-    }
-}
 
 // ====================================================================================
 // MMA m16n8k16 Load/Store
@@ -7109,30 +6764,6 @@ __device__ inline void wmmaStore(void* ptr, const uint32_t* regs, int stride)
 // Falls back to element-wise access for column-major layouts where data is non-contiguous.
 // ====================================================================================
 
-__device__ inline uint32_t mmaPack2x16(const void* lo, const void* hi)
-{
-    uint16_t u0, u1;
-    memcpy(&u0, lo, 2);
-    memcpy(&u1, hi, 2);
-    return (uint32_t)u0 | ((uint32_t)u1 << 16);
-}
-
-__device__ inline void mmaUnpack2x16(uint32_t packed, void* lo, void* hi)
-{
-    uint16_t u0 = (uint16_t)(packed & 0xFFFF);
-    uint16_t u1 = (uint16_t)(packed >> 16);
-    memcpy(lo, &u0, 2);
-    memcpy(hi, &u1, 2);
-}
-
-template<Layout layout>
-__device__ inline int mmaAddr(int row, int col, int stride)
-{
-    if constexpr (layout == Layout::RowMajor)
-        return row * stride + col;
-    else
-        return col * stride + row;
-}
 
 // ====================================================================================
 // MMA m16n8k16 Matrix A Load (f16, 16x16)
@@ -7284,76 +6915,6 @@ __device__ inline void mmaShuffleMatrixA_16x16(
         h0 = (uint16_t)(s[k][5] >> shift);
         h1 = (uint16_t)(s[k][7] >> shift);
         regs[3] = (uint32_t)h0 | ((uint32_t)h1 << 16);
-    }
-}
-
-// Inverse shuffle: converts MMA fragment registers back to the pre-shuffle loaded format.
-template<Layout layout>
-__device__ inline void mmaUnshuffleMatrixA_16x16(
-    uint32_t* loaded,
-    const uint32_t* regs,
-    unsigned laneid,
-    unsigned gid,
-    unsigned tid)
-{
-    const uint32_t mask = 0xFFFFFFFF;
-    if constexpr (layout == Layout::RowMajor)
-    {
-        unsigned g = laneid >> 1;
-        unsigned side = laneid & 1;
-        unsigned reg_sel = side * 2 + (g >= 8 ? 1 : 0);
-        unsigned g_adj = (g >= 8) ? (g - 8) : g;
-        #pragma unroll
-        for (int k = 0; k < 4; k++)
-            loaded[k] = __shfl_sync(mask, regs[reg_sel], g_adj * 4 + k);
-    }
-    else
-    {
-        unsigned g = laneid >> 1;
-        unsigned side = laneid & 1;
-        unsigned g_adj = (g >= 8) ? (g - 8) : g;
-        unsigned reg_base = side * 2 + (g >= 8 ? 1 : 0);
-        // Column-major loaded was indexed as loaded[ki] from 128-bit column load.
-        // Inverse of the column-major forward shuffle with half-extraction.
-        // Each thread originally loaded from col=laneid>>1, side=laneid&1.
-        // Reconstruct by gathering from the 4 threads that used each loaded[ki].
-        #pragma unroll
-        for (int ki = 0; ki < 4; ki++)
-        {
-            // In forward: s[ki][j] = shfl(loaded[ki], tid*4+offset[j])
-            // regs depend on k=gid>>1, half_sel=gid&1.
-            // For inverse, collect from threads that consumed our loaded[ki].
-            // Thread tid*4+{0..3,16..19} read our loaded[ki].
-            // We need to reconstruct loaded[ki] = packed f16x2 from original memory.
-            // Use the forward relationship: thread (tid*4+j) has s[ki][j] = our loaded[ki].
-            // But s[ki][j] was combined with extraction, so direct inverse is complex.
-            // Fall back to gathering via regs.
-            uint32_t val = 0;
-            for (int bit = 0; bit < 2; bit++)
-            {
-                // Element at position ki*2+bit in the 8-half loaded vector.
-                // In the original column-major load, this corresponds to a specific (row, col).
-                // Map through the fragment layout to find which thread+reg holds it.
-                unsigned elem_row = (side * 8) + ki * 2 + bit;
-                unsigned elem_col = g;
-                // Fragment mapping for A 16x16:
-                //   row < 8: gid_owner = row, reg_pair = 0,1 (a0a1 or a4a5)
-                //   row >= 8: gid_owner = row-8, reg_pair = 2,3 (a2a3 or a6a7)
-                //   col < 8: tid_owner = col/2, half_in_reg = col%2, reg_offset = 0
-                //   col >= 8: tid_owner = (col-8)/2, half_in_reg = (col-8)%2, reg_offset = 2
-                unsigned gid_owner = (elem_row < 8) ? elem_row : (elem_row - 8);
-                unsigned row_reg_offset = (elem_row < 8) ? 0 : 1;
-                unsigned tid_owner = (elem_col < 8) ? (elem_col / 2) : ((elem_col - 8) / 2);
-                unsigned half_in_reg = (elem_col < 8) ? (elem_col % 2) : ((elem_col - 8) % 2);
-                unsigned col_reg_offset = (elem_col < 8) ? 0 : 2;
-                unsigned src_reg = row_reg_offset + col_reg_offset;
-                unsigned src_lane = gid_owner * 4 + tid_owner;
-                uint32_t src_val = __shfl_sync(mask, regs[src_reg], src_lane);
-                uint16_t half_val = (uint16_t)(src_val >> (half_in_reg * 16));
-                val |= ((uint32_t)half_val << (bit * 16));
-            }
-            loaded[ki] = val;
-        }
     }
 }
 
@@ -7523,57 +7084,6 @@ __device__ inline void mmaShuffleMatrixB_16x8(
     }
 }
 
-// Inverse shuffle for Matrix B (16x8 f16).
-template<Layout layout>
-__device__ inline void mmaUnshuffleMatrixB_16x8(
-    uint32_t* loaded,
-    const uint32_t* regs,
-    unsigned laneid,
-    unsigned gid,
-    unsigned tid)
-{
-    const uint32_t mask = 0xFFFFFFFF;
-    if constexpr (layout == Layout::ColMajor)
-    {
-        unsigned side = laneid & 1;
-        unsigned g_half = laneid >> 1;
-        #pragma unroll
-        for (int k = 0; k < 4; k++)
-            loaded[k] = __shfl_sync(mask, regs[side], g_half * 4 + k);
-    }
-    else
-    {
-        // Row-major: inverse of the extraction-based shuffle.
-        // Each thread originally loaded row laneid&15, with 4 uint32 (8 halves = full row).
-        // Fragment B layout: reg[0]={B[tid*2][gid], B[tid*2+1][gid]}, reg[1]={B[tid*2+8][gid], ...}
-        unsigned row = laneid & 15;
-        #pragma unroll
-        for (int ki = 0; ki < 4; ki++)
-        {
-            // loaded[ki] originally held {B[row][2*ki], B[row][2*ki+1]} packed as f16x2.
-            // B[row][col] is in fragment of thread with tid_owner and gid_owner:
-            //   tid_owner = row/2 (if row<8) or (row-8)/2 (if row>=8)
-            //   reg_idx = 0 (if row<8) or 1 (if row>=8)
-            //   gid_owner such that gid_owner=col (since gid maps to column in B)
-            //   half within reg: if row is even -> low half, if odd -> high half
-            uint32_t val = 0;
-            for (int bit = 0; bit < 2; bit++)
-            {
-                unsigned col = ki * 2 + bit;
-                unsigned tid_owner = (row < 8) ? (row / 2) : ((row - 8) / 2);
-                unsigned reg_idx = (row < 8) ? 0 : 1;
-                unsigned half_in_reg = row & 1;
-                unsigned gid_owner = col;
-                unsigned src_lane = gid_owner * 4 + tid_owner;
-                uint32_t src_val = __shfl_sync(mask, regs[reg_idx], src_lane);
-                uint16_t half_val = (uint16_t)(src_val >> (half_in_reg * 16));
-                val |= ((uint32_t)half_val << (bit * 16));
-            }
-            loaded[ki] = val;
-        }
-    }
-}
-
 template<typename ElemT, Layout layout>
 __device__ inline void mmaLoadMatrixB_16x8(
     uint32_t* regs,
@@ -7668,64 +7178,6 @@ __device__ inline void mmaShuffleMatrixCD_f32_16x8(
     }
 }
 
-// Inverse shuffle for Matrix C/D (f32, 16x8).
-template<Layout layout>
-__device__ inline void mmaUnshuffleMatrixCD_f32_16x8(
-    uint32_t* loaded,
-    const uint32_t* regs,
-    unsigned laneid,
-    unsigned gid,
-    unsigned tid)
-{
-    const uint32_t mask = 0xFFFFFFFF;
-    if constexpr (layout == Layout::RowMajor)
-    {
-        // Forward: loaded from buffer[row*stride + side*4], row=laneid>>1, side=laneid&1.
-        // regs[0] = s[k_base][src_base] where k_base=(tid&1)*2, src_base=(tid>>1)*2.
-        // Fragment: regs[0]=C[gid][tid*2], regs[1]=C[gid][tid*2+1],
-        //           regs[2]=C[gid+8][tid*2], regs[3]=C[gid+8][tid*2+1].
-        // loaded[k] originally held 4 consecutive floats from one row-half.
-        unsigned row = laneid >> 1;
-        unsigned side = laneid & 1;
-        // loaded[k] = C[row][side*4 + k] as float (one f32 per uint32)
-        #pragma unroll
-        for (int k = 0; k < 4; k++)
-        {
-            unsigned col = side * 4 + k;
-            // C[row][col] is held by thread with gid_owner, tid_owner:
-            //   gid_owner = row (if row<8) or row-8 (if row>=8)
-            //   reg_idx = 0,1 (if row<8) or 2,3 (if row>=8)
-            //   tid_owner such that tid*2=col or tid*2+1=col
-            //   tid_owner = col/2, reg_offset = col%2
-            unsigned gid_owner = (row < 8) ? row : (row - 8);
-            unsigned row_reg_offset = (row < 8) ? 0 : 2;
-            unsigned tid_owner = col / 2;
-            unsigned col_reg_offset = col & 1;
-            unsigned src_reg = row_reg_offset + col_reg_offset;
-            unsigned src_lane = gid_owner * 4 + tid_owner;
-            loaded[k] = __shfl_sync(mask, regs[src_reg], src_lane);
-        }
-    }
-    else
-    {
-        // Column-major: loaded from buffer[col*stride + chunk*4], col=laneid>>2, chunk=laneid&3.
-        unsigned col = laneid >> 2;
-        unsigned chunk = laneid & 3;
-        #pragma unroll
-        for (int k = 0; k < 4; k++)
-        {
-            unsigned row = chunk * 4 + k;
-            unsigned gid_owner = (row < 8) ? row : (row - 8);
-            unsigned row_reg_offset = (row < 8) ? 0 : 2;
-            unsigned tid_owner = col / 2;
-            unsigned col_reg_offset = col & 1;
-            unsigned src_reg = row_reg_offset + col_reg_offset;
-            unsigned src_lane = gid_owner * 4 + tid_owner;
-            loaded[k] = __shfl_sync(mask, regs[src_reg], src_lane);
-        }
-    }
-}
-
 template<Layout layout>
 __device__ inline void mmaLoadMatrixCD_f32_16x8(
     uint32_t* regs,
@@ -7808,67 +7260,6 @@ __device__ inline void mmaShuffleMatrixCD_f16_16x8(
         h0 = (uint16_t)(s[k][1] >> shift);
         h1 = (uint16_t)(s[k][3] >> shift);
         regs[1] = (uint32_t)h0 | ((uint32_t)h1 << 16);
-    }
-}
-
-// Inverse shuffle for Matrix C/D (f16, 16x8).
-template<Layout layout>
-__device__ inline void mmaUnshuffleMatrixCD_f16_16x8(
-    uint32_t* loaded,
-    const uint32_t* regs,
-    unsigned laneid,
-    unsigned gid,
-    unsigned tid)
-{
-    const uint32_t mask = 0xFFFFFFFF;
-    if constexpr (layout == Layout::RowMajor)
-    {
-        // Forward: row = laneid & 15, loaded = 128 bits from buffer[row*stride] (8 halves).
-        // Fragment CD f16: regs[0]={C[gid][tid*2],C[gid][tid*2+1]}, regs[1]={C[gid+8]...}
-        unsigned row = laneid & 15;
-        #pragma unroll
-        for (int ki = 0; ki < 4; ki++)
-        {
-            // loaded[ki] held {C[row][2*ki], C[row][2*ki+1]} as f16x2.
-            uint32_t val = 0;
-            for (int bit = 0; bit < 2; bit++)
-            {
-                unsigned col = ki * 2 + bit;
-                unsigned gid_owner = (row < 8) ? row : (row - 8);
-                unsigned reg_idx = (row < 8) ? 0 : 1;
-                unsigned tid_owner = col / 2;
-                unsigned half_in_reg = col & 1;
-                unsigned src_lane = gid_owner * 4 + tid_owner;
-                uint32_t src_val = __shfl_sync(mask, regs[reg_idx], src_lane);
-                uint16_t half_val = (uint16_t)(src_val >> (half_in_reg * 16));
-                val |= ((uint32_t)half_val << (bit * 16));
-            }
-            loaded[ki] = val;
-        }
-    }
-    else
-    {
-        // Column-major: col = (laneid&15)>>1, side = laneid&1
-        unsigned col = (laneid & 15) >> 1;
-        unsigned side = laneid & 1;
-        #pragma unroll
-        for (int ki = 0; ki < 4; ki++)
-        {
-            uint32_t val = 0;
-            for (int bit = 0; bit < 2; bit++)
-            {
-                unsigned row = side * 8 + ki * 2 + bit;
-                unsigned gid_owner = (row < 8) ? row : (row - 8);
-                unsigned reg_idx = (row < 8) ? 0 : 1;
-                unsigned tid_owner = col / 2;
-                unsigned half_in_reg = col & 1;
-                unsigned src_lane = gid_owner * 4 + tid_owner;
-                uint32_t src_val = __shfl_sync(mask, regs[reg_idx], src_lane);
-                uint16_t half_val = (uint16_t)(src_val >> (half_in_reg * 16));
-                val |= ((uint32_t)half_val << (bit * 16));
-            }
-            loaded[ki] = val;
-        }
     }
 }
 
@@ -8125,25 +7516,6 @@ __device__ inline void mmaStore(void* ptr, const uint32_t* regs, int stride)
         }
     }
 }
-
-// Helper to get M, N, K from ShapeCombination
-template<ShapeCombination shape>
-struct ShapeToMNK;
-template<>
-struct ShapeToMNK<ShapeCombination::m16n16k16>
-{
-    static constexpr int M = 16, N = 16, K = 16;
-};
-template<>
-struct ShapeToMNK<ShapeCombination::m8n32k16>
-{
-    static constexpr int M = 8, N = 32, K = 16;
-};
-template<>
-struct ShapeToMNK<ShapeCombination::m32n8k16>
-{
-    static constexpr int M = 32, N = 8, K = 16;
-};
 
 template<typename T>
 inline unsigned __device__ Pack32Helper(T value);
@@ -8485,40 +7857,42 @@ struct WmmaFragment
     __device__ void FragmentWrite(int regIndex, unsigned value) { regs[regIndex] = value; }
     __device__ unsigned FragmentRead(int regIndex) const { return regs[regIndex]; }
 
+    __device__ void ChangeMajor()
+    {
+        if constexpr (RegsCount == 4 && (R == MatrixUse::MatrixA || R == MatrixUse::MatrixB))
+        {
+            uint32_t t0, t1, t2, t3;
+            asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t0) : "r"(regs[0]));
+            asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t1) : "r"(regs[1]));
+            asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t2) : "r"(regs[2]));
+            asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t3) : "r"(regs[3]));
+            regs[0] = t0;
+            regs[1] = t1;
+            regs[2] = t2;
+            regs[3] = t3;
+        }
+    }
+
     template<Layout layout>
     void __device__ Store(T* buffer, uint element, uint stride)
     {
-        // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        if constexpr (M == 16 && N == 16 && K == 16)
-            mmaStore<T, M, N, K, layout>(buffer + element, regs, stride);
-        else
-            wmmaStore<T, M, N, K, layout>(buffer + element, regs, stride);
+        mmaStore<T, M, N, K, layout>(buffer + element, regs, stride);
     }
 
     template<Layout layout, typename U>
     void __device__ Store(U* buffer, uint stride)
     {
-        // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        if constexpr (M == 16 && N == 16 && K == 16)
-            mmaStore<T, M, N, K, layout>(buffer, regs, stride * sizeof(U) / sizeof(T));
-        else
-            wmmaStore<T, M, N, K, layout>(buffer, regs, stride * sizeof(U) / sizeof(T));
+        mmaStore<T, M, N, K, layout>(buffer, regs, stride * sizeof(U) / sizeof(T));
     }
 
     template<Layout layout>
     static This __device__ Load(T* buffer, uint element, uint stride)
     {
         WmmaFragment<T, M, N, K, R> fragment;
-
-        // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        if constexpr (M == 16 && N == 16 && K == 16)
-            mmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer + element, stride);
-        else
-            wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer + element, stride);
-        fragment.m_layout = layout;
+        mmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer + element, stride);
         return fragment;
     }
 
@@ -8526,14 +7900,8 @@ struct WmmaFragment
     static This __device__ Load(U* buffer, uint stride)
     {
         WmmaFragment<T, M, N, K, R> fragment;
-
-        // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        if constexpr (M == 16 && N == 16 && K == 16)
-            mmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride * sizeof(U) / sizeof(T));
-        else
-            wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride * sizeof(U) / sizeof(T));
-        fragment.m_layout = layout;
+        mmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride * sizeof(U) / sizeof(T));
         return fragment;
     }
 
@@ -8559,19 +7927,16 @@ struct WmmaFragment
             *reinterpret_cast<uint4*>(fragment.regs + 4) = *reinterpret_cast<const uint4*>(src + 4);
         }
 
-        fragment.m_layout = Layout::RowMajor;
         return fragment;
     }
 
     static constexpr __device__ uint32_t GetLength() { return This::elements_per_thread; }
     static constexpr __device__ int GetPackedFragmentCount() { return RegsCount; }
 
-    // For referencing those template parameters outside the struct
     using ElementType = T;
     static constexpr int m_M = M;
     static constexpr int m_N = N;
     static constexpr int m_K = K;
-    Layout m_layout = Layout::RowMajor;
 
     // Register Count requirement
     static constexpr int RegsCount = RegisterCount<T, M, N, K, R>::value;
@@ -8585,413 +7950,12 @@ struct WmmaFragment
 // FP16 MMA Helper - For half x half inputs
 // Specialized on CType and DType (accumulator types)
 //
-// PTX Syntax: wmma.mma.sync.aligned.alayout.blayout.shape.dtype.ctype d, a, b, c;
-//   where:
-//     dtype = type of d (output accumulator): {.f16, .f32}
-//     ctype = type of c (input accumulator):  {.f16, .f32}
-//
-// These generic specializations use the WMMA API and handle all shapes.
-// The m16n16k16 shape has additional explicit specializations (defined later)
-// that use the more efficient mma.sync.m16n8k16 instruction.
+// Uses mma.sync.aligned.m16n8k16 instructions (2x per m16n16k16 tile).
+// Only the m16n16k16 shape is supported.
 // ====================================================================================
 
-template<typename CType, typename DType, int M, int N, int K, Layout LayoutA, Layout LayoutB>
+template<typename CType, typename DType, int M, int N, int K>
 struct Fp16MMAHelper;
-
-#if SLANG_CUDA_ENABLE_HALF
-// Specialization: c=half, d=half (f16.f16)
-template<int M, int N, int K, Layout LayoutA, Layout LayoutB>
-struct Fp16MMAHelper<half, half, M, N, K, LayoutA, LayoutB>
-{
-    __device__ static void eval(
-        WmmaFragment<half, M, N, K, MatrixC>& d,
-        const WmmaFragment<half, M, N, K, MatrixUse::MatrixA>& a,
-        const WmmaFragment<half, M, N, K, MatrixUse::MatrixB>& b,
-        const WmmaFragment<half, M, N, K, MatrixUse::MatrixC>& c)
-    {
-        asm volatile("wmma.mma.sync.aligned.%4.%5.%6.%7.%8 "
-                     "{%0, %1, %2, %3}, "
-                     "{%9, %10, %11, %12, %13, %14, %15, %16}, "
-                     "{%17, %18, %19, %20, %21, %22, %23, %24}, "
-                     "{%25, %26, %27, %28};\n"
-                     : "=r"(d.regs[0]), "=r"(d.regs[1]), "=r"(d.regs[2]), "=r"(d.regs[3])
-                     : "C"(PtxLayoutName<LayoutA>::name),
-                       "C"(PtxLayoutName<LayoutB>::name),
-                       "C"(PtxShapeName<M, N, K>::name),
-                       "C"(PtxTypeName<half>::name),
-                       "C"(PtxTypeName<half>::name),
-                       "r"(a.regs[0]),
-                       "r"(a.regs[1]),
-                       "r"(a.regs[2]),
-                       "r"(a.regs[3]),
-                       "r"(a.regs[4]),
-                       "r"(a.regs[5]),
-                       "r"(a.regs[6]),
-                       "r"(a.regs[7]),
-                       "r"(b.regs[0]),
-                       "r"(b.regs[1]),
-                       "r"(b.regs[2]),
-                       "r"(b.regs[3]),
-                       "r"(b.regs[4]),
-                       "r"(b.regs[5]),
-                       "r"(b.regs[6]),
-                       "r"(b.regs[7]),
-                       "r"(c.regs[0]),
-                       "r"(c.regs[1]),
-                       "r"(c.regs[2]),
-                       "r"(c.regs[3]));
-    }
-};
-
-// Specialization: c=float, d=half (f16.f32)
-template<int M, int N, int K, Layout LayoutA, Layout LayoutB>
-struct Fp16MMAHelper<float, half, M, N, K, LayoutA, LayoutB>
-{
-    __device__ static void eval(
-        WmmaFragment<half, M, N, K, MatrixUse::MatrixC>& d,
-        const WmmaFragment<half, M, N, K, MatrixUse::MatrixA>& a,
-        const WmmaFragment<half, M, N, K, MatrixUse::MatrixB>& b,
-        const WmmaFragment<float, M, N, K, MatrixUse::MatrixC>& c)
-    {
-        asm volatile("wmma.mma.sync.aligned.%4.%5.%6.%7.%8 "
-                     "{%0, %1, %2, %3}, "
-                     "{%9, %10, %11, %12, %13, %14, %15, %16}, "
-                     "{%17, %18, %19, %20, %21, %22, %23, %24}, "
-                     "{%25, %26, %27, %28, %29, %30, %31, %32};\n"
-                     : "=r"(d.regs[0]), "=r"(d.regs[1]), "=r"(d.regs[2]), "=r"(d.regs[3])
-                     : "C"(PtxLayoutName<LayoutA>::name),
-                       "C"(PtxLayoutName<LayoutB>::name),
-                       "C"(PtxShapeName<M, N, K>::name),
-                       "C"(PtxTypeName<half>::name),
-                       "C"(PtxTypeName<float>::name),
-                       "r"(a.regs[0]),
-                       "r"(a.regs[1]),
-                       "r"(a.regs[2]),
-                       "r"(a.regs[3]),
-                       "r"(a.regs[4]),
-                       "r"(a.regs[5]),
-                       "r"(a.regs[6]),
-                       "r"(a.regs[7]),
-                       "r"(b.regs[0]),
-                       "r"(b.regs[1]),
-                       "r"(b.regs[2]),
-                       "r"(b.regs[3]),
-                       "r"(b.regs[4]),
-                       "r"(b.regs[5]),
-                       "r"(b.regs[6]),
-                       "r"(b.regs[7]),
-                       "r"(c.regs[0]),
-                       "r"(c.regs[1]),
-                       "r"(c.regs[2]),
-                       "r"(c.regs[3]),
-                       "r"(c.regs[4]),
-                       "r"(c.regs[5]),
-                       "r"(c.regs[6]),
-                       "r"(c.regs[7]));
-    }
-};
-
-// Specialization: c=half, d=float (f32.f16)
-template<int M, int N, int K, Layout LayoutA, Layout LayoutB>
-struct Fp16MMAHelper<half, float, M, N, K, LayoutA, LayoutB>
-{
-    __device__ static void eval(
-        WmmaFragment<float, M, N, K, MatrixUse::MatrixC>& d,
-        const WmmaFragment<half, M, N, K, MatrixUse::MatrixA>& a,
-        const WmmaFragment<half, M, N, K, MatrixUse::MatrixB>& b,
-        const WmmaFragment<half, M, N, K, MatrixUse::MatrixC>& c)
-    {
-        asm volatile("wmma.mma.sync.aligned.%8.%9.%10.%11.%12 "
-                     "{%0, %1, %2, %3, %4, %5, %6, %7}, "
-                     "{%13, %14, %15, %16, %17, %18, %19, %20}, "
-                     "{%21, %22, %23, %24, %25, %26, %27, %28}, "
-                     "{%29, %30, %31, %32};\n"
-                     : "=r"(d.regs[0]),
-                       "=r"(d.regs[1]),
-                       "=r"(d.regs[2]),
-                       "=r"(d.regs[3]),
-                       "=r"(d.regs[4]),
-                       "=r"(d.regs[5]),
-                       "=r"(d.regs[6]),
-                       "=r"(d.regs[7])
-                     : "C"(PtxLayoutName<LayoutA>::name),
-                       "C"(PtxLayoutName<LayoutB>::name),
-                       "C"(PtxShapeName<M, N, K>::name),
-                       "C"(PtxTypeName<float>::name),
-                       "C"(PtxTypeName<half>::name),
-                       "r"(a.regs[0]),
-                       "r"(a.regs[1]),
-                       "r"(a.regs[2]),
-                       "r"(a.regs[3]),
-                       "r"(a.regs[4]),
-                       "r"(a.regs[5]),
-                       "r"(a.regs[6]),
-                       "r"(a.regs[7]),
-                       "r"(b.regs[0]),
-                       "r"(b.regs[1]),
-                       "r"(b.regs[2]),
-                       "r"(b.regs[3]),
-                       "r"(b.regs[4]),
-                       "r"(b.regs[5]),
-                       "r"(b.regs[6]),
-                       "r"(b.regs[7]),
-                       "r"(c.regs[0]),
-                       "r"(c.regs[1]),
-                       "r"(c.regs[2]),
-                       "r"(c.regs[3]));
-    }
-};
-
-// Specialization: c=float, d=float (f32.f32)
-template<int M, int N, int K, Layout LayoutA, Layout LayoutB>
-struct Fp16MMAHelper<float, float, M, N, K, LayoutA, LayoutB>
-{
-    __device__ static void eval(
-        WmmaFragment<float, M, N, K, MatrixUse::MatrixC>& d,
-        const WmmaFragment<half, M, N, K, MatrixUse::MatrixA>& a,
-        const WmmaFragment<half, M, N, K, MatrixUse::MatrixB>& b,
-        const WmmaFragment<float, M, N, K, MatrixUse::MatrixC>& c)
-    {
-        asm volatile("wmma.mma.sync.aligned.%8.%9.%10.%11.%12 "
-                     "{%0, %1, %2, %3, %4, %5, %6, %7}, "
-                     "{%13, %14, %15, %16, %17, %18, %19, %20}, "
-                     "{%21, %22, %23, %24, %25, %26, %27, %28}, "
-                     "{%29, %30, %31, %32, %33, %34, %35, %36};\n"
-                     : "=r"(d.regs[0]),
-                       "=r"(d.regs[1]),
-                       "=r"(d.regs[2]),
-                       "=r"(d.regs[3]),
-                       "=r"(d.regs[4]),
-                       "=r"(d.regs[5]),
-                       "=r"(d.regs[6]),
-                       "=r"(d.regs[7])
-                     : "C"(PtxLayoutName<LayoutA>::name),
-                       "C"(PtxLayoutName<LayoutB>::name),
-                       "C"(PtxShapeName<M, N, K>::name),
-                       "C"(PtxTypeName<float>::name),
-                       "C"(PtxTypeName<float>::name),
-                       "r"(a.regs[0]),
-                       "r"(a.regs[1]),
-                       "r"(a.regs[2]),
-                       "r"(a.regs[3]),
-                       "r"(a.regs[4]),
-                       "r"(a.regs[5]),
-                       "r"(a.regs[6]),
-                       "r"(a.regs[7]),
-                       "r"(b.regs[0]),
-                       "r"(b.regs[1]),
-                       "r"(b.regs[2]),
-                       "r"(b.regs[3]),
-                       "r"(b.regs[4]),
-                       "r"(b.regs[5]),
-                       "r"(b.regs[6]),
-                       "r"(b.regs[7]),
-                       "r"(c.regs[0]),
-                       "r"(c.regs[1]),
-                       "r"(c.regs[2]),
-                       "r"(c.regs[3]),
-                       "r"(c.regs[4]),
-                       "r"(c.regs[5]),
-                       "r"(c.regs[6]),
-                       "r"(c.regs[7]));
-    }
-};
-#endif // #if SLANG_CUDA_ENABLE_HALF
-
-// ====================================================================================
-// Integer MMA Helper - For int8/uint8 inputs
-// Specialized on shape (register counts depend on shape)
-//
-// PTX Syntax: wmma.mma.sync.aligned.alayout.blayout.shape.s32.atype.btype.s32{.satfinite} d, a, b,
-// c;
-//   where:
-//     atype = type of a (input matrix A): {.s8, .u8}
-//     btype = type of b (input matrix B): {.s8, .u8}
-//     C and D are always s32 (int32)
-//
-// Note: Unlike FP16, integer operations explicitly specify atype and btype in the instruction.
-//       We must specialize on shape because register counts vary:
-//         m16n16k16: a=2 regs, b=2 regs
-//         m8n32k16:  a=1 reg,  b=4 regs
-//         m32n8k16:  a=4 regs, b=1 reg
-//       C and D always use 8 registers (int32).
-// ====================================================================================
-
-template<
-    typename AType,
-    typename BType,
-    ShapeCombination shape,
-    Layout LayoutA,
-    Layout LayoutB,
-    bool saturatingAccumulation>
-struct IntegerMMAHelper;
-
-// Specialization: m16n16k16 (a=2 regs, b=2 regs)
-template<
-    typename AType,
-    typename BType,
-    Layout LayoutA,
-    Layout LayoutB,
-    bool saturatingAccumulation>
-struct IntegerMMAHelper<
-    AType,
-    BType,
-    ShapeCombination::m16n16k16,
-    LayoutA,
-    LayoutB,
-    saturatingAccumulation>
-{
-    __device__ static void eval(
-        WmmaFragment<int, 16, 16, 16, MatrixUse::MatrixC>& d,
-        const WmmaFragment<AType, 16, 16, 16, MatrixUse::MatrixA>& a,
-        const WmmaFragment<BType, 16, 16, 16, MatrixUse::MatrixB>& b,
-        const WmmaFragment<int, 16, 16, 16, MatrixUse::MatrixC>& c)
-    {
-        asm volatile("wmma.mma.sync.aligned.%8.%9.%10.s32.%11.%12.s32%13 "
-                     "{%0, %1, %2, %3, %4, %5, %6, %7}, "
-                     "{%14, %15}, "
-                     "{%16, %17}, "
-                     "{%18, %19, %20, %21, %22, %23, %24, %25};\n"
-                     : "=r"(d.regs[0]),
-                       "=r"(d.regs[1]),
-                       "=r"(d.regs[2]),
-                       "=r"(d.regs[3]),
-                       "=r"(d.regs[4]),
-                       "=r"(d.regs[5]),
-                       "=r"(d.regs[6]),
-                       "=r"(d.regs[7])
-                     : "C"(PtxLayoutName<LayoutA>::name),
-                       "C"(PtxLayoutName<LayoutB>::name),
-                       "C"(PtxShapeName<16, 16, 16>::name),
-                       "C"(PtxTypeName<AType>::name),
-                       "C"(PtxTypeName<BType>::name),
-                       "C"(IsSaturated<saturatingAccumulation>::name),
-                       "r"(a.regs[0]),
-                       "r"(a.regs[1]),
-                       "r"(b.regs[0]),
-                       "r"(b.regs[1]),
-                       "r"(c.regs[0]),
-                       "r"(c.regs[1]),
-                       "r"(c.regs[2]),
-                       "r"(c.regs[3]),
-                       "r"(c.regs[4]),
-                       "r"(c.regs[5]),
-                       "r"(c.regs[6]),
-                       "r"(c.regs[7]));
-    }
-};
-
-// Specialization: m8n32k16 (a=1 reg, b=4 regs)
-template<
-    typename AType,
-    typename BType,
-    Layout LayoutA,
-    Layout LayoutB,
-    bool saturatingAccumulation>
-struct IntegerMMAHelper<
-    AType,
-    BType,
-    ShapeCombination::m8n32k16,
-    LayoutA,
-    LayoutB,
-    saturatingAccumulation>
-{
-    __device__ static void eval(
-        WmmaFragment<int, 8, 32, 16, MatrixUse::MatrixC>& d,
-        const WmmaFragment<AType, 8, 32, 16, MatrixUse::MatrixA>& a,
-        const WmmaFragment<BType, 8, 32, 16, MatrixUse::MatrixB>& b,
-        const WmmaFragment<int, 8, 32, 16, MatrixUse::MatrixC>& c)
-    {
-        asm volatile("wmma.mma.sync.aligned.%8.%9.%10.s32.%11.%12.s32%13 "
-                     "{%0, %1, %2, %3, %4, %5, %6, %7}, "
-                     "{%14}, "
-                     "{%15, %16, %17, %18}, "
-                     "{%19, %20, %21, %22, %23, %24, %25, %26};\n"
-                     : "=r"(d.regs[0]),
-                       "=r"(d.regs[1]),
-                       "=r"(d.regs[2]),
-                       "=r"(d.regs[3]),
-                       "=r"(d.regs[4]),
-                       "=r"(d.regs[5]),
-                       "=r"(d.regs[6]),
-                       "=r"(d.regs[7])
-                     : "C"(PtxLayoutName<LayoutA>::name),
-                       "C"(PtxLayoutName<LayoutB>::name),
-                       "C"(PtxShapeName<8, 32, 16>::name),
-                       "C"(PtxTypeName<AType>::name),
-                       "C"(PtxTypeName<BType>::name),
-                       "C"(IsSaturated<saturatingAccumulation>::name),
-                       "r"(a.regs[0]),
-                       "r"(b.regs[0]),
-                       "r"(b.regs[1]),
-                       "r"(b.regs[2]),
-                       "r"(b.regs[3]),
-                       "r"(c.regs[0]),
-                       "r"(c.regs[1]),
-                       "r"(c.regs[2]),
-                       "r"(c.regs[3]),
-                       "r"(c.regs[4]),
-                       "r"(c.regs[5]),
-                       "r"(c.regs[6]),
-                       "r"(c.regs[7]));
-    }
-};
-
-// Specialization: m32n8k16 (a=4 regs, b=1 reg)
-template<
-    typename AType,
-    typename BType,
-    Layout LayoutA,
-    Layout LayoutB,
-    bool saturatingAccumulation>
-struct IntegerMMAHelper<
-    AType,
-    BType,
-    ShapeCombination::m32n8k16,
-    LayoutA,
-    LayoutB,
-    saturatingAccumulation>
-{
-    __device__ static void eval(
-        WmmaFragment<int, 32, 8, 16, MatrixUse::MatrixC>& d,
-        const WmmaFragment<AType, 32, 8, 16, MatrixUse::MatrixA>& a,
-        const WmmaFragment<BType, 32, 8, 16, MatrixUse::MatrixB>& b,
-        const WmmaFragment<int, 32, 8, 16, MatrixUse::MatrixC>& c)
-    {
-        asm volatile("wmma.mma.sync.aligned.%8.%9.%10.s32.%11.%12.s32%13 "
-                     "{%0, %1, %2, %3, %4, %5, %6, %7}, "
-                     "{%14, %15, %16, %17}, "
-                     "{%18}, "
-                     "{%19, %20, %21, %22, %23, %24, %25, %26};\n"
-                     : "=r"(d.regs[0]),
-                       "=r"(d.regs[1]),
-                       "=r"(d.regs[2]),
-                       "=r"(d.regs[3]),
-                       "=r"(d.regs[4]),
-                       "=r"(d.regs[5]),
-                       "=r"(d.regs[6]),
-                       "=r"(d.regs[7])
-                     : "C"(PtxLayoutName<LayoutA>::name),
-                       "C"(PtxLayoutName<LayoutB>::name),
-                       "C"(PtxShapeName<32, 8, 16>::name),
-                       "C"(PtxTypeName<AType>::name),
-                       "C"(PtxTypeName<BType>::name),
-                       "C"(IsSaturated<saturatingAccumulation>::name),
-                       "r"(a.regs[0]),
-                       "r"(a.regs[1]),
-                       "r"(a.regs[2]),
-                       "r"(a.regs[3]),
-                       "r"(b.regs[0]),
-                       "r"(c.regs[0]),
-                       "r"(c.regs[1]),
-                       "r"(c.regs[2]),
-                       "r"(c.regs[3]),
-                       "r"(c.regs[4]),
-                       "r"(c.regs[5]),
-                       "r"(c.regs[6]),
-                       "r"(c.regs[7]));
-    }
-};
 
 
 // ====================================================================================
@@ -9081,40 +8045,6 @@ __device__ inline void mmaBatchFromArray_MatA_16x16(
 }
 #endif
 
-// ====================================================================================
-// MMA m16n8k16 ChangeMajor (in-register transpose) for Matrix A (16x16, f16)
-// ====================================================================================
-
-#if SLANG_CUDA_ENABLE_HALF
-template<int M, int N, int K, MatrixUse R>
-__device__ inline void mmaChangeMajor(WmmaFragment<half, M, N, K, R>& frag)
-{
-    if constexpr (M == 16 && K == 16 && R == MatrixUse::MatrixA)
-    {
-        uint32_t t0, t1, t2, t3;
-        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t0) : "r"(frag.regs[0]));
-        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t1) : "r"(frag.regs[1]));
-        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t2) : "r"(frag.regs[2]));
-        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t3) : "r"(frag.regs[3]));
-        frag.regs[0] = t0;
-        frag.regs[1] = t1;
-        frag.regs[2] = t2;
-        frag.regs[3] = t3;
-    }
-    else if constexpr (M == 16 && N == 16 && K == 16 && R == MatrixUse::MatrixB)
-    {
-        uint32_t t0, t1, t2, t3;
-        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t0) : "r"(frag.regs[0]));
-        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t1) : "r"(frag.regs[1]));
-        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t2) : "r"(frag.regs[2]));
-        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t3) : "r"(frag.regs[3]));
-        frag.regs[0] = t0;
-        frag.regs[1] = t1;
-        frag.regs[2] = t2;
-        frag.regs[3] = t3;
-    }
-}
-#endif // #if SLANG_CUDA_ENABLE_HALF
 
 // ====================================================================================
 // Fp16MMAHelper m16n16k16 specializations (via 2x mma.sync.m16n8k16)
@@ -9162,8 +8092,8 @@ __device__ inline void mma_m16n8k16(
     }
 }
 
-template<Layout LayoutA, Layout LayoutB>
-struct Fp16MMAHelper<half, half, 16, 16, 16, LayoutA, LayoutB>
+template<>
+struct Fp16MMAHelper<half, half, 16, 16, 16>
 {
     __device__ static void eval(
         WmmaFragment<half, 16, 16, 16, MatrixC>& d,
@@ -9176,8 +8106,8 @@ struct Fp16MMAHelper<half, half, 16, 16, 16, LayoutA, LayoutB>
     }
 };
 
-template<Layout LayoutA, Layout LayoutB>
-struct Fp16MMAHelper<float, float, 16, 16, 16, LayoutA, LayoutB>
+template<>
+struct Fp16MMAHelper<float, float, 16, 16, 16>
 {
     __device__ static void eval(
         WmmaFragment<float, 16, 16, 16, MatrixC>& d,
@@ -9190,8 +8120,8 @@ struct Fp16MMAHelper<float, float, 16, 16, 16, LayoutA, LayoutB>
     }
 };
 
-template<Layout LayoutA, Layout LayoutB>
-struct Fp16MMAHelper<half, float, 16, 16, 16, LayoutA, LayoutB>
+template<>
+struct Fp16MMAHelper<half, float, 16, 16, 16>
 {
     __device__ static void eval(
         WmmaFragment<float, 16, 16, 16, MatrixC>& d,
@@ -9213,8 +8143,8 @@ struct Fp16MMAHelper<half, float, 16, 16, 16, LayoutA, LayoutB>
     }
 };
 
-template<Layout LayoutA, Layout LayoutB>
-struct Fp16MMAHelper<float, half, 16, 16, 16, LayoutA, LayoutB>
+template<>
+struct Fp16MMAHelper<float, half, 16, 16, 16>
 {
     __device__ static void eval(
         WmmaFragment<half, 16, 16, 16, MatrixC>& d,
@@ -9246,47 +8176,6 @@ template<
     typename BType,
     typename CType,
     typename DType,
-    ShapeCombination shape,
-    Layout LayoutA,
-    Layout LayoutB,
-    bool saturatingAccumulation>
-struct MMAHelper
-{
-    static constexpr int M = ShapeToMNK<shape>::M;
-    static constexpr int N = ShapeToMNK<shape>::N;
-    static constexpr int K = ShapeToMNK<shape>::K;
-
-    __device__ static void eval(
-        WmmaFragment<DType, M, N, K, MatrixUse::MatrixC>& d,
-        const WmmaFragment<AType, M, N, K, MatrixUse::MatrixA>& a,
-        const WmmaFragment<BType, M, N, K, MatrixUse::MatrixB>& b,
-        const WmmaFragment<CType, M, N, K, MatrixUse::MatrixC>& c,
-        bool saturate = false)
-    {
-        // Dispatch to appropriate helper based on input types
-        if constexpr (sizeof(AType) == 2 && sizeof(BType) == 2)
-        {
-            // FP16 inputs: dispatch to Fp16MMAHelper
-            Fp16MMAHelper<CType, DType, M, N, K, LayoutA, LayoutB>::eval(d, a, b, c);
-        }
-        else
-        {
-            // Integer inputs (int8/uint8): dispatch to IntegerMMAHelper
-            IntegerMMAHelper<AType, BType, shape, LayoutA, LayoutB, saturatingAccumulation>::eval(
-                d,
-                a,
-                b,
-                c);
-        }
-    }
-};
-
-//
-template<
-    typename AType,
-    typename BType,
-    typename CType,
-    typename DType,
     int M,
     int N,
     int K,
@@ -9297,63 +8186,7 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
     WmmaFragment<CType, M, N, K, MatrixUse::MatrixC> matC)
 {
     WmmaFragment<DType, M, N, K, MatrixC> matD;
-
-    constexpr ShapeCombination shape =
-        (M == 16 && N == 16 && K == 16) ? ShapeCombination::m16n16k16
-        : (M == 8 && N == 32 && K == 16) ? ShapeCombination::m8n32k16
-                                          : ShapeCombination::m32n8k16;
-
-    uint32_t encodedLayout = (matA.m_layout == Layout::RowMajor ? 1 : 0) << 1 |
-                             (matB.m_layout == Layout::RowMajor ? 1 : 0);
-
-    switch (encodedLayout)
-    {
-    case 0x3:
-        MMAHelper<
-            AType,
-            BType,
-            CType,
-            DType,
-            shape,
-            Layout::RowMajor,
-            Layout::RowMajor,
-            saturatingAccumulation>::eval(matD, matA, matB, matC);
-        break;
-    case 0x2:
-        MMAHelper<
-            AType,
-            BType,
-            CType,
-            DType,
-            shape,
-            Layout::RowMajor,
-            Layout::ColMajor,
-            saturatingAccumulation>::eval(matD, matA, matB, matC);
-        break;
-    case 0x01:
-        MMAHelper<
-            AType,
-            BType,
-            CType,
-            DType,
-            shape,
-            Layout::ColMajor,
-            Layout::RowMajor,
-            saturatingAccumulation>::eval(matD, matA, matB, matC);
-        break;
-    case 0x00:
-        MMAHelper<
-            AType,
-            BType,
-            CType,
-            DType,
-            shape,
-            Layout::ColMajor,
-            Layout::ColMajor,
-            saturatingAccumulation>::eval(matD, matA, matB, matC);
-        break;
-    }
-
+    Fp16MMAHelper<CType, DType, M, N, K>::eval(matD, matA, matB, matC);
     return matD;
 }
 

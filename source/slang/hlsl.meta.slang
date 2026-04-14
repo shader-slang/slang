@@ -27428,16 +27428,14 @@ matrix extensions.
 @param R The matrix use specifier indicating whether this is a Matrix A, Matrix B, or accumulator matrix.
 
 @remarks
-The dimensions M and N must match hardware-supported fragment shapes. For CUDA WMMA,
-valid shape combinations are (where k is always 16):
+The dimensions M and N must match hardware-supported fragment shapes. For CUDA (mma.sync.m16n8k16),
+only the m16n16k16 shape is supported:
 - Shape m16n16k16: Matrix A (16×16), Matrix B (16×16), Accumulator (16×16)
-- Shape m8n32k16:  Matrix A (8×16),  Matrix B (16×32), Accumulator (8×32)
-- Shape m32n8k16:  Matrix A (32×16), Matrix B (16×8),  Accumulator (32×8)
 
 Matrix A dimensions are (m×k), Matrix B dimensions are (k×n), and Accumulator dimensions are (m×n).
-For all CUDA WMMA shapes listed above:
-- Matrix A and B support: half, uint8, int8
-- Accumulator (Matrix C) supports: float, half, int
+For CUDA m16n16k16:
+- Matrix A and B support: half
+- Accumulator (Matrix C) supports: float, half
 
 All matrices involved in a multiply-accumulate operation must use the same shape combination.
 The actual physical layout and distribution of elements across threads is hardware-specific.
@@ -27980,7 +27978,7 @@ struct CoopMat
         __target_switch
         {
         case cuda:
-            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaChangeMajor(*$0))";
+            __intrinsic_asm R"(($0)->ChangeMajor())";
         }
     }
 
