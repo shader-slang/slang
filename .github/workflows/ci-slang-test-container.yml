@@ -64,18 +64,36 @@ jobs:
       - name: Setup Vulkan ICD
         run: |
           # See job-level comment for why we override the Vulkan ICD.
+          # Read the existing NVIDIA ICD JSON (injected by the container toolkit)
+          # and swap only the library_path, preserving api_version and formatting.
+          source_icd=""
+          for candidate in \
+            /etc/vulkan/icd.d/nvidia_icd.json \
+            /usr/share/vulkan/icd.d/nvidia_icd.json; do
+            if [ -f "$candidate" ]; then
+              source_icd="$candidate"
+              break
+            fi
+          done
+          if [ -z "$source_icd" ]; then
+            echo "::warning::No existing NVIDIA ICD JSON found, using defaults"
+            source_icd=""
+          fi
           mkdir -p /etc/vulkan/icd.d
-          cat > /etc/vulkan/icd.d/nvidia_icd.json <<'EOF'
-          {
-              "file_format_version": "1.0.1",
-              "ICD": {
-                  "library_path": "libEGL_nvidia.so.0",
-                  "api_version": "1.4.312"
-              }
-          }
-          EOF
+          python3 -c "
+          import json, sys
+          if '$source_icd':
+              with open('$source_icd') as f:
+                  icd = json.load(f)
+          else:
+              icd = {'file_format_version': '1.0.1', 'ICD': {'api_version': '1.4.312'}}
+          icd['ICD']['library_path'] = 'libEGL_nvidia.so.0'
+          with open('/etc/vulkan/icd.d/nvidia_icd.json', 'w') as f:
+              json.dump(icd, f, indent=4)
+              f.write('\n')
+          print(f\"Vulkan ICD configured: libEGL_nvidia.so.0 (api_version={icd['ICD'].get('api_version', 'unknown')})\")
+          "
           rm -f /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null || true
-          echo "Vulkan ICD configured: libEGL_nvidia.so.0"
 
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
@@ -223,18 +241,34 @@ jobs:
       - name: Setup Vulkan ICD
         run: |
           # See test-slang job comment for why we override the Vulkan ICD.
+          source_icd=""
+          for candidate in \
+            /etc/vulkan/icd.d/nvidia_icd.json \
+            /usr/share/vulkan/icd.d/nvidia_icd.json; do
+            if [ -f "$candidate" ]; then
+              source_icd="$candidate"
+              break
+            fi
+          done
+          if [ -z "$source_icd" ]; then
+            echo "::warning::No existing NVIDIA ICD JSON found, using defaults"
+            source_icd=""
+          fi
           mkdir -p /etc/vulkan/icd.d
-          cat > /etc/vulkan/icd.d/nvidia_icd.json <<'EOF'
-          {
-              "file_format_version": "1.0.1",
-              "ICD": {
-                  "library_path": "libEGL_nvidia.so.0",
-                  "api_version": "1.4.312"
-              }
-          }
-          EOF
+          python3 -c "
+          import json, sys
+          if '$source_icd':
+              with open('$source_icd') as f:
+                  icd = json.load(f)
+          else:
+              icd = {'file_format_version': '1.0.1', 'ICD': {'api_version': '1.4.312'}}
+          icd['ICD']['library_path'] = 'libEGL_nvidia.so.0'
+          with open('/etc/vulkan/icd.d/nvidia_icd.json', 'w') as f:
+              json.dump(icd, f, indent=4)
+              f.write('\n')
+          print(f\"Vulkan ICD configured: libEGL_nvidia.so.0 (api_version={icd['ICD'].get('api_version', 'unknown')})\")
+          "
           rm -f /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null || true
-          echo "Vulkan ICD configured: libEGL_nvidia.so.0"
 
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
