@@ -33,11 +33,13 @@ extension<T : __BuiltinFloatingPointType> MyVector<T> : IDifferentiable
 {
     typedef MyVector<T> Differential;
 
+    [Differentiable]
     static Differential dzero()
     {
         return MyVector<T>(T(0), T(0));
     }
 
+    [Differentiable]
     static Differential dadd(Differential a, Differential b)
     {
         return MyVector<T>(a.x + b.x, a.y + b.y);
