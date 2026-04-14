@@ -838,9 +838,11 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         //
 
         // We use the result type and the type of the operand
+        auto interfaceType = inst->getOperand(0);
         auto srcSeqID = inst->getOperand(1);
 
         Dictionary<UInt, UInt> mapping;
+        Dictionary<uint32_t, IRInst*> witnessTableForSequentialID;
 
         // Map from sequential ID to unique ID
         auto destSet = cast<IRSetTagType>(inst->getDataType())->getSet();
@@ -858,8 +860,23 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                 auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
                 if (seqDecoration)
                 {
-                    auto inputId = seqDecoration->getSequentialID();
-                    mapping[inputId] = outputId; // Map ID to itself for now
+                    auto inputId = uint32_t(seqDecoration->getSequentialID());
+                    if (auto previousWitnessTable =
+                            witnessTableForSequentialID.tryGetValue(inputId))
+                    {
+                        if (*previousWitnessTable != table)
+                        {
+                            diagnoseDuplicateSequentialID(
+                                interfaceType,
+                                table,
+                                *previousWitnessTable,
+                                inputId);
+                        }
+                        return;
+                    }
+
+                    witnessTableForSequentialID.add(inputId, table);
+                    mapping[inputId] = outputId; // Map the global sequential ID to the local tag.
                 }
             });
 
@@ -1041,56 +1058,9 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         }
     }
 
-    void validateUniqueWitnessTableSequentialIDs()
-    {
-        Dictionary<IRInst*, Dictionary<uint32_t, IRInst*>> witnessTableForSequentialID;
-
-        for (auto inst : module->getGlobalInsts())
-        {
-            if (inst->getOp() != kIROp_WitnessTable)
-                continue;
-
-            auto witnessTableType = as<IRWitnessTableType>(inst->getDataType());
-            if (!witnessTableType)
-                continue;
-
-            auto interfaceType = witnessTableType->getConformanceType();
-            if (!as<IRInterfaceType>(interfaceType))
-                continue;
-
-            auto seqDecoration = inst->findDecoration<IRSequentialIDDecoration>();
-            if (!seqDecoration)
-                continue;
-
-            auto sequentialID = uint32_t(seqDecoration->getSequentialID());
-            auto witnessTablesForInterface = witnessTableForSequentialID.tryGetValue(interfaceType);
-            if (!witnessTablesForInterface)
-            {
-                witnessTableForSequentialID.add(interfaceType, Dictionary<uint32_t, IRInst*>());
-                witnessTablesForInterface = witnessTableForSequentialID.tryGetValue(interfaceType);
-            }
-
-            if (auto previousWitnessTable = witnessTablesForInterface->tryGetValue(sequentialID))
-            {
-                if (*previousWitnessTable != inst)
-                {
-                    diagnoseDuplicateSequentialID(
-                        interfaceType,
-                        inst,
-                        *previousWitnessTable,
-                        sequentialID);
-                }
-                continue;
-            }
-
-            witnessTablesForInterface->add(sequentialID, inst);
-        }
-    }
-
     void processModule()
     {
         ensureWitnessTableSequentialIDs();
-        validateUniqueWitnessTableSequentialIDs();
 
         processInstsOfType<IRGetTagFromSequentialID>(
             kIROp_GetTagFromSequentialID,
