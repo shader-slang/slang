@@ -599,36 +599,68 @@ SLANG_CUDA_VECTOR_INT_OPS(ulonglong)
     SLANG_CUDA_VECTOR_UNARY_OP(T, n, -)
 /* Special case __half2: use CUDA intrinsics (__hadd2, __hsub2, etc.) so we get one add.f16x2
    per op; generic macro would give two add.f16. Compare/logical stay element-wise for bool2. */
-#define SLANG_CUDA_VECTOR_FLOAT_OP_HALF2 \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator+(const __half2& lh, const __half2& rh) { return __hadd2(lh, rh); } \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& lh, const __half2& rh) { return __hsub2(lh, rh); } \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator*(const __half2& lh, const __half2& rh) { return __hmul2(lh, rh); } \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator/(const __half2& lh, const __half2& rh) { return __h2div(lh, rh); } \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& h) { return __hneg2(h); } \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator+=(__half2& lh, const __half2& rh) { lh = __hadd2(lh, rh); return lh; } \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator-=(__half2& lh, const __half2& rh) { lh = __hsub2(lh, rh); return lh; } \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator*=(__half2& lh, const __half2& rh) { lh = __hmul2(lh, rh); return lh; } \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator/=(__half2& lh, const __half2& rh) { lh = __h2div(lh, rh); return lh; } \
-    SLANG_CUDA_VECTOR_BINARY_OP(__half, 2, &&) \
-    SLANG_CUDA_VECTOR_BINARY_OP(__half, 2, ||) \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, >) \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, <) \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, >=) \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, <=) \
-    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, ==) \
+#define SLANG_CUDA_VECTOR_FLOAT_OP_HALF2                                                       \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator+(const __half2& lh, const __half2& rh) \
+    {                                                                                          \
+        return __hadd2(lh, rh);                                                                \
+    }                                                                                          \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& lh, const __half2& rh) \
+    {                                                                                          \
+        return __hsub2(lh, rh);                                                                \
+    }                                                                                          \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator*(const __half2& lh, const __half2& rh) \
+    {                                                                                          \
+        return __hmul2(lh, rh);                                                                \
+    }                                                                                          \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator/(const __half2& lh, const __half2& rh) \
+    {                                                                                          \
+        return __h2div(lh, rh);                                                                \
+    }                                                                                          \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& h)                     \
+    {                                                                                          \
+        return __hneg2(h);                                                                     \
+    }                                                                                          \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator+=(__half2& lh, const __half2& rh)     \
+    {                                                                                          \
+        lh = __hadd2(lh, rh);                                                                  \
+        return lh;                                                                             \
+    }                                                                                          \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator-=(__half2& lh, const __half2& rh)     \
+    {                                                                                          \
+        lh = __hsub2(lh, rh);                                                                  \
+        return lh;                                                                             \
+    }                                                                                          \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator*=(__half2& lh, const __half2& rh)     \
+    {                                                                                          \
+        lh = __hmul2(lh, rh);                                                                  \
+        return lh;                                                                             \
+    }                                                                                          \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator/=(__half2& lh, const __half2& rh)     \
+    {                                                                                          \
+        lh = __h2div(lh, rh);                                                                  \
+        return lh;                                                                             \
+    }                                                                                          \
+    SLANG_CUDA_VECTOR_BINARY_OP(__half, 2, &&)                                                 \
+    SLANG_CUDA_VECTOR_BINARY_OP(__half, 2, ||)                                                 \
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, >)                                          \
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, <)                                          \
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, >=)                                         \
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, <=)                                         \
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, ==)                                         \
     SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, !=)
-/* Explicit per-type expansion (no dispatch, no token-paste with __half) so NVRTC and all compilers behave. */
+/* Explicit per-type expansion (no dispatch, no token-paste with __half) so NVRTC and all compilers
+ * behave. */
 #define SLANG_CUDA_VECTOR_FLOAT_OPS_float \
-    SLANG_CUDA_VECTOR_FLOAT_OP(float, 2) \
-    SLANG_CUDA_VECTOR_FLOAT_OP(float, 3) \
+    SLANG_CUDA_VECTOR_FLOAT_OP(float, 2)  \
+    SLANG_CUDA_VECTOR_FLOAT_OP(float, 3)  \
     SLANG_CUDA_VECTOR_FLOAT_OP(float, 4)
 #define SLANG_CUDA_VECTOR_FLOAT_OPS_double \
-    SLANG_CUDA_VECTOR_FLOAT_OP(double, 2) \
-    SLANG_CUDA_VECTOR_FLOAT_OP(double, 3) \
+    SLANG_CUDA_VECTOR_FLOAT_OP(double, 2)  \
+    SLANG_CUDA_VECTOR_FLOAT_OP(double, 3)  \
     SLANG_CUDA_VECTOR_FLOAT_OP(double, 4)
 #define SLANG_CUDA_VECTOR_FLOAT_OPS___half \
-    SLANG_CUDA_VECTOR_FLOAT_OP_HALF2 \
-    SLANG_CUDA_VECTOR_FLOAT_OP(__half, 3) \
+    SLANG_CUDA_VECTOR_FLOAT_OP_HALF2       \
+    SLANG_CUDA_VECTOR_FLOAT_OP(__half, 3)  \
     SLANG_CUDA_VECTOR_FLOAT_OP(__half, 4)
 #define SLANG_CUDA_VECTOR_FLOAT_OPS(T) SLANG_CUDA_VECTOR_FLOAT_OPS_##T
 
@@ -6609,9 +6641,15 @@ namespace Slang_CUDA_WMMA
 {
 
 template<typename A, typename B>
-struct IsSameType { static constexpr bool value = false; };
+struct IsSameType
+{
+    static constexpr bool value = false;
+};
 template<typename A>
-struct IsSameType<A, A> { static constexpr bool value = true; };
+struct IsSameType<A, A>
+{
+    static constexpr bool value = true;
+};
 
 // Enums for template specialization
 enum MatrixUse : int
@@ -6755,8 +6793,6 @@ struct RegisterCount<__nv_fp8_e5m2, 16, 16, 16, MatrixUse::MatrixB>
 #endif
 
 
-
-
 // ====================================================================================
 // MMA m16n8k16 Load/Store
 // Uses 128-bit vectorized loads with warp shuffle redistribution for Matrix A,
@@ -6775,81 +6811,89 @@ struct RegisterCount<__nv_fp8_e5m2, 16, 16, 16, MatrixUse::MatrixB>
 // Target MMA fragment layout:
 //
 //          |<----------- columns 0-7 ----------->|<---------- columns 8-15 ----------->|
-// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15   |
+// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15 |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
-// row  0   |  T0:a0a1 |  T1:a0a1 |  T2:a0a1 |  T3:a0a1 ||  T0:a4a5 |  T1:a4a5 |  T2:a4a5 |  T3:a4a5 |
-// row  1   |  T4:a0a1 |  T5:a0a1 |  T6:a0a1 |  T7:a0a1 ||  T4:a4a5 |  T5:a4a5 |  T6:a4a5 |  T7:a4a5 |
-//   ..     |    ..    |    ..    |    ..    |    ..    ||    ..    |    ..    |    ..    |    ..    |
-// row  7   | T28:a0a1 | T29:a0a1 | T30:a0a1 | T31:a0a1 || T28:a4a5 | T29:a4a5 | T30:a4a5 | T31:a4a5 |
+// row  0   |  T0:a0a1 |  T1:a0a1 |  T2:a0a1 |  T3:a0a1 ||  T0:a4a5 |  T1:a4a5 |  T2:a4a5 |  T3:a4a5
+// | row  1   |  T4:a0a1 |  T5:a0a1 |  T6:a0a1 |  T7:a0a1 ||  T4:a4a5 |  T5:a4a5 |  T6:a4a5 |
+// T7:a4a5 |
+//   ..     |    ..    |    ..    |    ..    |    ..    ||    ..    |    ..    |    ..    |    .. |
+// row  7   | T28:a0a1 | T29:a0a1 | T30:a0a1 | T31:a0a1 || T28:a4a5 | T29:a4a5 | T30:a4a5 | T31:a4a5
+// |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
-// row  8   |  T0:a2a3 |  T1:a2a3 |  T2:a2a3 |  T3:a2a3 ||  T0:a6a7 |  T1:a6a7 |  T2:a6a7 |  T3:a6a7 |
-// row  9   |  T4:a2a3 |  T5:a2a3 |  T6:a2a3 |  T7:a2a3 ||  T4:a6a7 |  T5:a6a7 |  T6:a6a7 |  T7:a6a7 |
-//   ..     |    ..    |    ..    |    ..    |    ..    ||    ..    |    ..    |    ..    |    ..    |
-// row 15   | T28:a2a3 | T29:a2a3 | T30:a2a3 | T31:a2a3 || T28:a6a7 | T29:a6a7 | T30:a6a7 | T31:a6a7 |
+// row  8   |  T0:a2a3 |  T1:a2a3 |  T2:a2a3 |  T3:a2a3 ||  T0:a6a7 |  T1:a6a7 |  T2:a6a7 |  T3:a6a7
+// | row  9   |  T4:a2a3 |  T5:a2a3 |  T6:a2a3 |  T7:a2a3 ||  T4:a6a7 |  T5:a6a7 |  T6:a6a7 |
+// T7:a6a7 |
+//   ..     |    ..    |    ..    |    ..    |    ..    ||    ..    |    ..    |    ..    |    .. |
+// row 15   | T28:a2a3 | T29:a2a3 | T30:a2a3 | T31:a2a3 || T28:a6a7 | T29:a6a7 | T30:a6a7 | T31:a6a7
+// |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
 //
 // Initial state after 128-bit load (each thread holds one row-half):
 //
 //          |<----------- columns 0-7 ----------->|<---------- columns 8-15 ----------->|
-// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15   |
+// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15 |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
-// row  0   |  T0:a0a1 |  T0:a2a3 |  T0:a4a5 |  T0:a6a7 ||  T1:a0a1 |  T1:a2a3 |  T1:a4a5 |  T1:a6a7 |
-// row  1   |  T2:a0a1 |  T2:a2a3 |  T2:a4a5 |  T2:a6a7 ||  T3:a0a1 |  T3:a2a3 |  T3:a4a5 |  T3:a6a7 |
-//   ..     |    ..    |    ..    |    ..    |    ..    ||    ..    |    ..    |    ..    |    ..    |
-// row  7   | T14:a0a1 | T14:a2a3 | T14:a4a5 | T14:a6a7 || T15:a0a1 | T15:a2a3 | T15:a4a5 | T15:a6a7 |
+// row  0   |  T0:a0a1 |  T0:a2a3 |  T0:a4a5 |  T0:a6a7 ||  T1:a0a1 |  T1:a2a3 |  T1:a4a5 |  T1:a6a7
+// | row  1   |  T2:a0a1 |  T2:a2a3 |  T2:a4a5 |  T2:a6a7 ||  T3:a0a1 |  T3:a2a3 |  T3:a4a5 |
+// T3:a6a7 |
+//   ..     |    ..    |    ..    |    ..    |    ..    ||    ..    |    ..    |    ..    |    .. |
+// row  7   | T14:a0a1 | T14:a2a3 | T14:a4a5 | T14:a6a7 || T15:a0a1 | T15:a2a3 | T15:a4a5 | T15:a6a7
+// |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
-// row  8   | T16:a0a1 | T16:a2a3 | T16:a4a5 | T16:a6a7 || T17:a0a1 | T17:a2a3 | T17:a4a5 | T17:a6a7 |
-// row  9   | T18:a0a1 | T18:a2a3 | T18:a4a5 | T18:a6a7 || T19:a0a1 | T19:a2a3 | T19:a4a5 | T19:a6a7 |
-//   ..     |    ..    |    ..    |    ..    |    ..    ||    ..    |    ..    |    ..    |    ..    |
-// row 15   | T30:a0a1 | T30:a2a3 | T30:a4a5 | T30:a6a7 || T31:a0a1 | T31:a2a3 | T31:a4a5 | T31:a6a7 |
+// row  8   | T16:a0a1 | T16:a2a3 | T16:a4a5 | T16:a6a7 || T17:a0a1 | T17:a2a3 | T17:a4a5 | T17:a6a7
+// | row  9   | T18:a0a1 | T18:a2a3 | T18:a4a5 | T18:a6a7 || T19:a0a1 | T19:a2a3 | T19:a4a5 |
+// T19:a6a7 |
+//   ..     |    ..    |    ..    |    ..    |    ..    ||    ..    |    ..    |    ..    |    .. |
+// row 15   | T30:a0a1 | T30:a2a3 | T30:a4a5 | T30:a6a7 || T31:a0a1 | T31:a2a3 | T31:a4a5 | T31:a6a7
+// |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
 //
 // After Round k=0 (shuffle loaded[0] -- captures col pairs 0,1 and 8,9):
 //
 //          |<----------- columns 0-7 ----------->|<---------- columns 8-15 ----------->|
-// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15   |
+// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15 |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
-// row  0   |  T0:a0a1 |          |          |          ||  T0:a4a5 |          |          |          |
-// row  1   |  T4:a0a1 |          |          |          ||  T4:a4a5 |          |          |          |
-//   ..     |    ..    |          |          |          ||    ..    |          |          |          |
-// row  7   | T28:a0a1 |          |          |          || T28:a4a5 |          |          |          |
+// row  0   |  T0:a0a1 |          |          |          ||  T0:a4a5 |          |          | | row  1
+// |  T4:a0a1 |          |          |          ||  T4:a4a5 |          |          |          |
+//   ..     |    ..    |          |          |          ||    ..    |          |          | |
+// row  7   | T28:a0a1 |          |          |          || T28:a4a5 |          |          | |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
-// row  8   |  T0:a2a3 |          |          |          ||  T0:a6a7 |          |          |          |
-// row  9   |  T4:a2a3 |          |          |          ||  T4:a6a7 |          |          |          |
-//   ..     |    ..    |          |          |          ||    ..    |          |          |          |
-// row 15   | T28:a2a3 |          |          |          || T28:a6a7 |          |          |          |
+// row  8   |  T0:a2a3 |          |          |          ||  T0:a6a7 |          |          | | row  9
+// |  T4:a2a3 |          |          |          ||  T4:a6a7 |          |          |          |
+//   ..     |    ..    |          |          |          ||    ..    |          |          | |
+// row 15   | T28:a2a3 |          |          |          || T28:a6a7 |          |          | |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
 //
 // After Round k=1 (shuffle loaded[1] -- adds col pairs 2,3 and 10,11):
 //
 //          |<----------- columns 0-7 ----------->|<---------- columns 8-15 ----------->|
-// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15   |
+// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15 |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
-// row  0   |  T0:a0a1 |  T1:a0a1 |          |          ||  T0:a4a5 |  T1:a4a5 |          |          |
-// row  1   |  T4:a0a1 |  T5:a0a1 |          |          ||  T4:a4a5 |  T5:a4a5 |          |          |
-//   ..     |    ..    |    ..    |          |          ||    ..    |    ..    |          |          |
-// row  7   | T28:a0a1 | T29:a0a1 |          |          || T28:a4a5 | T29:a4a5 |          |          |
+// row  0   |  T0:a0a1 |  T1:a0a1 |          |          ||  T0:a4a5 |  T1:a4a5 |          | | row  1
+// |  T4:a0a1 |  T5:a0a1 |          |          ||  T4:a4a5 |  T5:a4a5 |          |          |
+//   ..     |    ..    |    ..    |          |          ||    ..    |    ..    |          | |
+// row  7   | T28:a0a1 | T29:a0a1 |          |          || T28:a4a5 | T29:a4a5 |          | |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
-// row  8   |  T0:a2a3 |  T1:a2a3 |          |          ||  T0:a6a7 |  T1:a6a7 |          |          |
-// row  9   |  T4:a2a3 |  T5:a2a3 |          |          ||  T4:a6a7 |  T5:a6a7 |          |          |
-//   ..     |    ..    |    ..    |          |          ||    ..    |    ..    |          |          |
-// row 15   | T28:a2a3 | T29:a2a3 |          |          || T28:a6a7 | T29:a6a7 |          |          |
+// row  8   |  T0:a2a3 |  T1:a2a3 |          |          ||  T0:a6a7 |  T1:a6a7 |          | | row  9
+// |  T4:a2a3 |  T5:a2a3 |          |          ||  T4:a6a7 |  T5:a6a7 |          |          |
+//   ..     |    ..    |    ..    |          |          ||    ..    |    ..    |          | |
+// row 15   | T28:a2a3 | T29:a2a3 |          |          || T28:a6a7 | T29:a6a7 |          | |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
 //
 // After Round k=2 (shuffle loaded[2] -- adds col pairs 4,5 and 12,13):
 //
 //          |<----------- columns 0-7 ----------->|<---------- columns 8-15 ----------->|
-// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15   |
+// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15 |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
-// row  0   |  T0:a0a1 |  T1:a0a1 |  T2:a0a1 |          ||  T0:a4a5 |  T1:a4a5 |  T2:a4a5 |          |
-// row  1   |  T4:a0a1 |  T5:a0a1 |  T6:a0a1 |          ||  T4:a4a5 |  T5:a4a5 |  T6:a4a5 |          |
-//   ..     |    ..    |    ..    |    ..    |          ||    ..    |    ..    |    ..    |          |
-// row  7   | T28:a0a1 | T29:a0a1 | T30:a0a1 |          || T28:a4a5 | T29:a4a5 | T30:a4a5 |          |
+// row  0   |  T0:a0a1 |  T1:a0a1 |  T2:a0a1 |          ||  T0:a4a5 |  T1:a4a5 |  T2:a4a5 | | row  1
+// |  T4:a0a1 |  T5:a0a1 |  T6:a0a1 |          ||  T4:a4a5 |  T5:a4a5 |  T6:a4a5 |          |
+//   ..     |    ..    |    ..    |    ..    |          ||    ..    |    ..    |    ..    | |
+// row  7   | T28:a0a1 | T29:a0a1 | T30:a0a1 |          || T28:a4a5 | T29:a4a5 | T30:a4a5 | |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
-// row  8   |  T0:a2a3 |  T1:a2a3 |  T2:a2a3 |          ||  T0:a6a7 |  T1:a6a7 |  T2:a6a7 |          |
-// row  9   |  T4:a2a3 |  T5:a2a3 |  T6:a2a3 |          ||  T4:a6a7 |  T5:a6a7 |  T6:a6a7 |          |
-//   ..     |    ..    |    ..    |    ..    |          ||    ..    |    ..    |    ..    |          |
-// row 15   | T28:a2a3 | T29:a2a3 | T30:a2a3 |          || T28:a6a7 | T29:a6a7 | T30:a6a7 |          |
+// row  8   |  T0:a2a3 |  T1:a2a3 |  T2:a2a3 |          ||  T0:a6a7 |  T1:a6a7 |  T2:a6a7 | | row  9
+// |  T4:a2a3 |  T5:a2a3 |  T6:a2a3 |          ||  T4:a6a7 |  T5:a6a7 |  T6:a6a7 |          |
+//   ..     |    ..    |    ..    |    ..    |          ||    ..    |    ..    |    ..    | |
+// row 15   | T28:a2a3 | T29:a2a3 | T30:a2a3 |          || T28:a6a7 | T29:a6a7 | T30:a6a7 | |
 // ---------+----------+----------+----------+----------++----------+----------+----------+----------+
 //
 // After Round k=3 (shuffle loaded[3] -- adds col pairs 6,7 and 14,15 -- COMPLETE):
@@ -6870,26 +6914,38 @@ struct MMALoadHelper;
 template<typename ElemT, Layout layout>
 struct MMALoadHelper<ElemT, layout, 16, 16, MatrixUse::MatrixA>
 {
-    static __device__ inline void exec(uint32_t* regs, const ElemT* buffer, int stride,
-                                       unsigned laneid, unsigned gid, unsigned tid)
+    static __device__ inline void exec(
+        uint32_t* regs,
+        const ElemT* buffer,
+        int stride,
+        unsigned laneid,
+        unsigned gid,
+        unsigned tid)
     {
         unsigned row = laneid >> 1;
         unsigned side = laneid & 1;
-        uint4 loaded_v =
-            *reinterpret_cast<const uint4*>(&buffer[row * stride + side * 8]);
+        uint4 loaded_v = *reinterpret_cast<const uint4*>(&buffer[row * stride + side * 8]);
         uint32_t* loaded = reinterpret_cast<uint32_t*>(&loaded_v);
 
         const uint32_t mask = 0xFFFFFFFF;
         if constexpr (layout == Layout::RowMajor)
         {
             uint32_t tmp;
-            #pragma unroll
+#pragma unroll
             for (int k = 0; k < 4; k++)
             {
-                tmp = __shfl_sync(mask, loaded[k], gid * 2);       if (tid == k) regs[0] = tmp;
-                tmp = __shfl_sync(mask, loaded[k], (gid + 8) * 2); if (tid == k) regs[1] = tmp;
-                tmp = __shfl_sync(mask, loaded[k], gid * 2 + 1);   if (tid == k) regs[2] = tmp;
-                tmp = __shfl_sync(mask, loaded[k], (gid+8)*2 + 1); if (tid == k) regs[3] = tmp;
+                tmp = __shfl_sync(mask, loaded[k], gid * 2);
+                if (tid == k)
+                    regs[0] = tmp;
+                tmp = __shfl_sync(mask, loaded[k], (gid + 8) * 2);
+                if (tid == k)
+                    regs[1] = tmp;
+                tmp = __shfl_sync(mask, loaded[k], gid * 2 + 1);
+                if (tid == k)
+                    regs[2] = tmp;
+                tmp = __shfl_sync(mask, loaded[k], (gid + 8) * 2 + 1);
+                if (tid == k)
+                    regs[3] = tmp;
             }
         }
         else
@@ -6898,7 +6954,7 @@ struct MMALoadHelper<ElemT, layout, 16, 16, MatrixUse::MatrixA>
             unsigned half_sel = gid & 1;
 
             uint32_t s[4][8];
-            #pragma unroll
+#pragma unroll
             for (int ki = 0; ki < 4; ki++)
             {
                 s[ki][0] = __shfl_sync(mask, loaded[ki], tid * 4);
@@ -6934,8 +6990,13 @@ struct MMALoadHelper<ElemT, layout, 16, 16, MatrixUse::MatrixA>
 template<typename ElemT, Layout layout>
 struct MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixB>
 {
-    static __device__ inline void exec(uint32_t* regs, const ElemT* buffer, int stride,
-                                       unsigned laneid, unsigned gid, unsigned tid)
+    static __device__ inline void exec(
+        uint32_t* regs,
+        const ElemT* buffer,
+        int stride,
+        unsigned laneid,
+        unsigned gid,
+        unsigned tid)
     {
         uint4 loaded_v;
         if constexpr (layout == Layout::ColMajor)
@@ -6955,17 +7016,21 @@ struct MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixB>
         if constexpr (layout == Layout::ColMajor)
         {
             uint32_t tmp;
-            #pragma unroll
+#pragma unroll
             for (int k = 0; k < 4; k++)
             {
-                tmp = __shfl_sync(mask, loaded[k], gid * 2);     if (tid == k) regs[0] = tmp;
-                tmp = __shfl_sync(mask, loaded[k], gid * 2 + 1); if (tid == k) regs[1] = tmp;
+                tmp = __shfl_sync(mask, loaded[k], gid * 2);
+                if (tid == k)
+                    regs[0] = tmp;
+                tmp = __shfl_sync(mask, loaded[k], gid * 2 + 1);
+                if (tid == k)
+                    regs[1] = tmp;
             }
         }
         else
         {
             uint32_t s[4][4];
-            #pragma unroll
+#pragma unroll
             for (int ki = 0; ki < 4; ki++)
             {
                 s[ki][0] = __shfl_sync(mask, loaded[ki], tid * 2);
@@ -6991,22 +7056,50 @@ struct MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixB>
 template<typename ElemT, Layout layout>
 struct MMALoadHelper<ElemT, layout, 16, 16, MatrixUse::MatrixB>
 {
-    static __device__ inline void exec(uint32_t* regs, const ElemT* buffer, int stride,
-                                       unsigned laneid, unsigned gid, unsigned tid)
+    static __device__ inline void exec(
+        uint32_t* regs,
+        const ElemT* buffer,
+        int stride,
+        unsigned laneid,
+        unsigned gid,
+        unsigned tid)
     {
-        MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixB>::exec(regs, buffer, stride, laneid, gid, tid);
+        MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixB>::exec(
+            regs,
+            buffer,
+            stride,
+            laneid,
+            gid,
+            tid);
         if constexpr (layout == Layout::RowMajor)
-            MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixB>::exec(regs + 2, buffer + 8, stride, laneid, gid, tid);
+            MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixB>::exec(
+                regs + 2,
+                buffer + 8,
+                stride,
+                laneid,
+                gid,
+                tid);
         else
-            MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixB>::exec(regs + 2, buffer + 8 * stride, stride, laneid, gid, tid);
+            MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixB>::exec(
+                regs + 2,
+                buffer + 8 * stride,
+                stride,
+                laneid,
+                gid,
+                tid);
     }
 };
 
 template<typename ElemT, Layout layout>
 struct MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>
 {
-    static __device__ inline void exec(uint32_t* regs, const ElemT* buffer, int stride,
-                                       unsigned laneid, unsigned gid, unsigned tid)
+    static __device__ inline void exec(
+        uint32_t* regs,
+        const ElemT* buffer,
+        int stride,
+        unsigned laneid,
+        unsigned gid,
+        unsigned tid)
     {
         if constexpr (sizeof(ElemT) == 4)
         {
@@ -7032,19 +7125,23 @@ struct MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>
                 uint32_t tmp;
                 unsigned kb = (tid & 1) * 2;
                 unsigned sb = (tid >> 1) * 2;
-                #pragma unroll
+#pragma unroll
                 for (int k = 0; k < 4; k++)
                 {
-                    #pragma unroll
+#pragma unroll
                     for (int j = 0; j < 4; j++)
                     {
                         unsigned srcLane = (j < 2) ? ((j == 0) ? gid * 2 : (gid + 8) * 2)
                                                    : ((j == 2) ? gid * 2 + 1 : (gid + 8) * 2 + 1);
                         tmp = __shfl_sync(mask, loaded[k], srcLane);
-                        if (k == kb     && j == sb)     regs[0] = tmp;
-                        if (k == kb + 1 && j == sb)     regs[1] = tmp;
-                        if (k == kb     && j == sb + 1) regs[2] = tmp;
-                        if (k == kb + 1 && j == sb + 1) regs[3] = tmp;
+                        if (k == kb && j == sb)
+                            regs[0] = tmp;
+                        if (k == kb + 1 && j == sb)
+                            regs[1] = tmp;
+                        if (k == kb && j == sb + 1)
+                            regs[2] = tmp;
+                        if (k == kb + 1 && j == sb + 1)
+                            regs[3] = tmp;
                     }
                 }
             }
@@ -7052,13 +7149,21 @@ struct MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>
             {
                 uint32_t tmp;
                 unsigned k = gid & 3;
-                #pragma unroll
+#pragma unroll
                 for (int ki = 0; ki < 4; ki++)
                 {
-                    tmp = __shfl_sync(mask, loaded[ki], tid * 8 + gid / 4);     if (ki == k) regs[0] = tmp;
-                    tmp = __shfl_sync(mask, loaded[ki], tid * 8 + 4 + gid / 4); if (ki == k) regs[1] = tmp;
-                    tmp = __shfl_sync(mask, loaded[ki], tid * 8 + 2 + gid / 4); if (ki == k) regs[2] = tmp;
-                    tmp = __shfl_sync(mask, loaded[ki], tid * 8 + 6 + gid / 4); if (ki == k) regs[3] = tmp;
+                    tmp = __shfl_sync(mask, loaded[ki], tid * 8 + gid / 4);
+                    if (ki == k)
+                        regs[0] = tmp;
+                    tmp = __shfl_sync(mask, loaded[ki], tid * 8 + 4 + gid / 4);
+                    if (ki == k)
+                        regs[1] = tmp;
+                    tmp = __shfl_sync(mask, loaded[ki], tid * 8 + 2 + gid / 4);
+                    if (ki == k)
+                        regs[2] = tmp;
+                    tmp = __shfl_sync(mask, loaded[ki], tid * 8 + 6 + gid / 4);
+                    if (ki == k)
+                        regs[3] = tmp;
                 }
             }
         }
@@ -7082,17 +7187,21 @@ struct MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>
             if constexpr (layout == Layout::RowMajor)
             {
                 uint32_t tmp;
-                #pragma unroll
+#pragma unroll
                 for (int k = 0; k < 4; k++)
                 {
-                    tmp = __shfl_sync(mask, loaded[k], gid);     if (tid == k) regs[0] = tmp;
-                    tmp = __shfl_sync(mask, loaded[k], gid + 8); if (tid == k) regs[1] = tmp;
+                    tmp = __shfl_sync(mask, loaded[k], gid);
+                    if (tid == k)
+                        regs[0] = tmp;
+                    tmp = __shfl_sync(mask, loaded[k], gid + 8);
+                    if (tid == k)
+                        regs[1] = tmp;
                 }
             }
             else
             {
                 uint32_t s[4][4];
-                #pragma unroll
+#pragma unroll
                 for (int ki = 0; ki < 4; ki++)
                 {
                     s[ki][0] = __shfl_sync(mask, loaded[ki], tid * 4);
@@ -7119,21 +7228,46 @@ struct MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>
 template<typename ElemT, Layout layout>
 struct MMALoadHelper<ElemT, layout, 16, 16, MatrixUse::MatrixC>
 {
-    static __device__ inline void exec(uint32_t* regs, const ElemT* buffer, int stride,
-                                       unsigned laneid, unsigned gid, unsigned tid)
+    static __device__ inline void exec(
+        uint32_t* regs,
+        const ElemT* buffer,
+        int stride,
+        unsigned laneid,
+        unsigned gid,
+        unsigned tid)
     {
         constexpr int regsPerHalf = (sizeof(ElemT) == 4) ? 4 : 2;
-        MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>::exec(regs, buffer, stride, laneid, gid, tid);
+        MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>::exec(
+            regs,
+            buffer,
+            stride,
+            laneid,
+            gid,
+            tid);
         if constexpr (layout == Layout::RowMajor)
-            MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>::exec(regs + regsPerHalf, buffer + 8, stride, laneid, gid, tid);
+            MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>::exec(
+                regs + regsPerHalf,
+                buffer + 8,
+                stride,
+                laneid,
+                gid,
+                tid);
         else
-            MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>::exec(regs + regsPerHalf, buffer + 8 * stride, stride, laneid, gid, tid);
+            MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>::exec(
+                regs + regsPerHalf,
+                buffer + 8 * stride,
+                stride,
+                laneid,
+                gid,
+                tid);
     }
 };
 
 template<typename ElemT, Layout layout, int Row, int Col>
 struct MMALoadHelper<ElemT, layout, Row, Col, MatrixUse::MatrixD>
-    : MMALoadHelper<ElemT, layout, Row, Col, MatrixUse::MatrixC> {};
+    : MMALoadHelper<ElemT, layout, Row, Col, MatrixUse::MatrixC>
+{
+};
 
 template<typename ElemT, Layout layout, int Row, int Col, MatrixUse use>
 __device__ inline void mmaLoad(uint32_t* regs, const void* ptr, int stride)
@@ -7156,8 +7290,11 @@ struct MMAStoreHelper;
 template<typename ElemT, Layout layout>
 struct MMAStoreHelper<ElemT, layout, 16, 8>
 {
-    static __device__ inline void exec(ElemT* buffer, const uint32_t* regs, int stride,
-                                       unsigned laneid)
+    static __device__ inline void exec(
+        ElemT* buffer,
+        const uint32_t* regs,
+        int stride,
+        unsigned laneid)
     {
         if constexpr (sizeof(ElemT) == 4)
         {
@@ -7184,13 +7321,17 @@ struct MMAStoreHelper<ElemT, layout, 16, 8>
                 uint32_t* out = reinterpret_cast<uint32_t*>(&out_v);
                 if (write_row < 8)
                 {
-                    out[0] = r0_s0; out[1] = r1_s0;
-                    out[2] = r0_s1; out[3] = r1_s1;
+                    out[0] = r0_s0;
+                    out[1] = r1_s0;
+                    out[2] = r0_s1;
+                    out[3] = r1_s1;
                 }
                 else
                 {
-                    out[0] = r2_s0; out[1] = r3_s0;
-                    out[2] = r2_s1; out[3] = r3_s1;
+                    out[0] = r2_s0;
+                    out[1] = r3_s0;
+                    out[2] = r2_s1;
+                    out[3] = r3_s1;
                 }
 
                 *reinterpret_cast<uint4*>(&fbuf[write_row * stride + write_side * 4]) = out_v;
@@ -7205,7 +7346,7 @@ struct MMAStoreHelper<ElemT, layout, 16, 8>
 
                 const uint32_t mask = 0xFFFFFFFF;
                 uint32_t s[4][4];
-                #pragma unroll
+#pragma unroll
                 for (int r = 0; r < 4; r++)
                 {
                     s[r][0] = __shfl_sync(mask, regs[r], (gid_base + 0) * 4 + source_tid_val);
@@ -7232,7 +7373,7 @@ struct MMAStoreHelper<ElemT, layout, 16, 8>
 
                 const uint32_t mask = 0xFFFFFFFF;
                 uint32_t s[4][2];
-                #pragma unroll
+#pragma unroll
                 for (int k = 0; k < 4; k++)
                 {
                     s[k][0] = __shfl_sync(mask, regs[0], write_row * 4 + k);
@@ -7243,13 +7384,17 @@ struct MMAStoreHelper<ElemT, layout, 16, 8>
                 uint32_t* out = reinterpret_cast<uint32_t*>(&out_v);
                 if (write_row < 8)
                 {
-                    out[0] = s[0][0]; out[1] = s[1][0];
-                    out[2] = s[2][0]; out[3] = s[3][0];
+                    out[0] = s[0][0];
+                    out[1] = s[1][0];
+                    out[2] = s[2][0];
+                    out[3] = s[3][0];
                 }
                 else
                 {
-                    out[0] = s[0][1]; out[1] = s[1][1];
-                    out[2] = s[2][1]; out[3] = s[3][1];
+                    out[0] = s[0][1];
+                    out[1] = s[1][1];
+                    out[2] = s[2][1];
+                    out[3] = s[3][1];
                 }
 
                 *reinterpret_cast<uint4*>(&buffer[write_row * stride]) = out_v;
@@ -7263,7 +7408,7 @@ struct MMAStoreHelper<ElemT, layout, 16, 8>
 
                 const uint32_t mask = 0xFFFFFFFF;
                 uint32_t from_r0[8], from_r1[8];
-                #pragma unroll
+#pragma unroll
                 for (int k = 0; k < 4; k++)
                 {
                     unsigned src_even = (2 * k) * 4 + source_tid_val;
@@ -7276,12 +7421,11 @@ struct MMAStoreHelper<ElemT, layout, 16, 8>
 
                 uint4 out_v;
                 uint32_t* out = reinterpret_cast<uint32_t*>(&out_v);
-                #pragma unroll
+#pragma unroll
                 for (int k = 0; k < 4; k++)
                 {
                     uint32_t val_even = (write_side == 0) ? from_r0[2 * k] : from_r1[2 * k];
-                    uint32_t val_odd =
-                        (write_side == 0) ? from_r0[2 * k + 1] : from_r1[2 * k + 1];
+                    uint32_t val_odd = (write_side == 0) ? from_r0[2 * k + 1] : from_r1[2 * k + 1];
                     uint16_t h0 = (uint16_t)(val_even >> col_shift);
                     uint16_t h1 = (uint16_t)(val_odd >> col_shift);
                     out[k] = (uint32_t)h0 | ((uint32_t)h1 << 16);
@@ -7296,15 +7440,26 @@ struct MMAStoreHelper<ElemT, layout, 16, 8>
 template<typename ElemT, Layout layout>
 struct MMAStoreHelper<ElemT, layout, 16, 16>
 {
-    static __device__ inline void exec(ElemT* buffer, const uint32_t* regs, int stride,
-                                       unsigned laneid)
+    static __device__ inline void exec(
+        ElemT* buffer,
+        const uint32_t* regs,
+        int stride,
+        unsigned laneid)
     {
         constexpr int regsPerHalf = (sizeof(ElemT) == 4) ? 4 : 2;
         MMAStoreHelper<ElemT, layout, 16, 8>::exec(buffer, regs, stride, laneid);
         if constexpr (layout == Layout::RowMajor)
-            MMAStoreHelper<ElemT, layout, 16, 8>::exec(buffer + 8, regs + regsPerHalf, stride, laneid);
+            MMAStoreHelper<ElemT, layout, 16, 8>::exec(
+                buffer + 8,
+                regs + regsPerHalf,
+                stride,
+                laneid);
         else
-            MMAStoreHelper<ElemT, layout, 16, 8>::exec(buffer + 8 * stride, regs + regsPerHalf, stride, laneid);
+            MMAStoreHelper<ElemT, layout, 16, 8>::exec(
+                buffer + 8 * stride,
+                regs + regsPerHalf,
+                stride,
+                laneid);
     }
 };
 
@@ -7405,7 +7560,7 @@ struct WmmaFragment
         {
             __half bh = *reinterpret_cast<const __half*>(&b);
             __half2 bv = __half2half2(bh);
-            #pragma unroll
+#pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
                 __half2 r = __hmul2(*reinterpret_cast<const __half2*>(&regs[i]), bv);
@@ -7427,11 +7582,12 @@ struct WmmaFragment
 #if SLANG_CUDA_ENABLE_HALF
         if (sizeof(T) == 2)
         {
-            #pragma unroll
+#pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __hmul2(*reinterpret_cast<const __half2*>(&regs[i]),
-                                    *reinterpret_cast<const __half2*>(&b.regs[i]));
+                __half2 r = __hmul2(
+                    *reinterpret_cast<const __half2*>(&regs[i]),
+                    *reinterpret_cast<const __half2*>(&b.regs[i]));
                 memcpy(&result.regs[i], &r, 4);
             }
         }
@@ -7450,11 +7606,12 @@ struct WmmaFragment
 #if SLANG_CUDA_ENABLE_HALF
         if (sizeof(T) == 2)
         {
-            #pragma unroll
+#pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __h2div(*reinterpret_cast<const __half2*>(&regs[i]),
-                                    *reinterpret_cast<const __half2*>(&other.regs[i]));
+                __half2 r = __h2div(
+                    *reinterpret_cast<const __half2*>(&regs[i]),
+                    *reinterpret_cast<const __half2*>(&other.regs[i]));
                 memcpy(&result.regs[i], &r, 4);
             }
         }
@@ -7473,11 +7630,12 @@ struct WmmaFragment
 #if SLANG_CUDA_ENABLE_HALF
         if (sizeof(T) == 2)
         {
-            #pragma unroll
+#pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __hsub2(*reinterpret_cast<const __half2*>(&regs[i]),
-                                    *reinterpret_cast<const __half2*>(&other.regs[i]));
+                __half2 r = __hsub2(
+                    *reinterpret_cast<const __half2*>(&regs[i]),
+                    *reinterpret_cast<const __half2*>(&other.regs[i]));
                 memcpy(&result.regs[i], &r, 4);
             }
         }
@@ -7496,7 +7654,7 @@ struct WmmaFragment
 #if SLANG_CUDA_ENABLE_HALF
         if (sizeof(T) == 2)
         {
-            #pragma unroll
+#pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
                 __half2 r = __hneg2(*reinterpret_cast<const __half2*>(&regs[i]));
@@ -7518,11 +7676,12 @@ struct WmmaFragment
 #if SLANG_CUDA_ENABLE_HALF
         if (sizeof(T) == 2)
         {
-            #pragma unroll
+#pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __hadd2(*reinterpret_cast<const __half2*>(&regs[i]),
-                                    *reinterpret_cast<const __half2*>(&other.regs[i]));
+                __half2 r = __hadd2(
+                    *reinterpret_cast<const __half2*>(&regs[i]),
+                    *reinterpret_cast<const __half2*>(&other.regs[i]));
                 memcpy(&result.regs[i], &r, 4);
             }
         }
@@ -7556,11 +7715,12 @@ struct WmmaFragment
             else if constexpr (RegsCount == 8)
             {
                 *reinterpret_cast<uint4*>(regs) = *reinterpret_cast<const uint4*>(other.regs);
-                *reinterpret_cast<uint4*>(regs + 4) = *reinterpret_cast<const uint4*>(other.regs + 4);
+                *reinterpret_cast<uint4*>(regs + 4) =
+                    *reinterpret_cast<const uint4*>(other.regs + 4);
             }
             else
             {
-                #pragma unroll
+#pragma unroll
                 for (int i = 0; i < RegsCount; i++)
                     regs[i] = other.regs[i];
             }
@@ -7727,7 +7887,6 @@ struct WmmaFragment
     unsigned regs[RegsCount] = {};
 
     static constexpr uint32_t elements_per_thread = RegsCount * (4 / sizeof(T));
-
 };
 
 // ====================================================================================
@@ -7740,8 +7899,6 @@ struct WmmaFragment
 
 template<typename CType, typename DType, int M, int N, int K>
 struct Fp16MMAHelper;
-
-
 
 
 // ====================================================================================
@@ -7761,12 +7918,14 @@ struct Fp16MMAHelper;
 #if SLANG_CUDA_ENABLE_HALF
 
 template<typename AccumT, int M, int N, int K>
-__device__ inline void mma(
-    uint32_t* d, const uint32_t* a, const uint32_t* b, const uint32_t* c);
+__device__ inline void mma(uint32_t* d, const uint32_t* a, const uint32_t* b, const uint32_t* c);
 
 template<>
 __device__ inline void mma<float, 16, 8, 16>(
-    uint32_t* d, const uint32_t* a, const uint32_t* b, const uint32_t* c)
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
 {
     asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
                  "{%0, %1, %2, %3}, "
@@ -7774,24 +7933,33 @@ __device__ inline void mma<float, 16, 8, 16>(
                  "{%8, %9}, "
                  "{%10, %11, %12, %13};\n"
                  : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
-                 : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]),
-                   "r"(b[0]), "r"(b[1]),
-                   "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
+                 : "r"(a[0]),
+                   "r"(a[1]),
+                   "r"(a[2]),
+                   "r"(a[3]),
+                   "r"(b[0]),
+                   "r"(b[1]),
+                   "r"(c[0]),
+                   "r"(c[1]),
+                   "r"(c[2]),
+                   "r"(c[3]));
 }
 
 template<>
 __device__ inline void mma<half, 16, 8, 16>(
-    uint32_t* d, const uint32_t* a, const uint32_t* b, const uint32_t* c)
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
 {
-    asm volatile("mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16 "
-                 "{%0, %1}, "
-                 "{%2, %3, %4, %5}, "
-                 "{%6, %7}, "
-                 "{%8, %9};\n"
-                 : "=r"(d[0]), "=r"(d[1])
-                 : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]),
-                   "r"(b[0]), "r"(b[1]),
-                   "r"(c[0]), "r"(c[1]));
+    asm volatile(
+        "mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16 "
+        "{%0, %1}, "
+        "{%2, %3, %4, %5}, "
+        "{%6, %7}, "
+        "{%8, %9};\n"
+        : "=r"(d[0]), "=r"(d[1])
+        : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]), "r"(c[0]), "r"(c[1]));
 }
 
 template<>
@@ -7832,7 +8000,7 @@ struct Fp16MMAHelper<half, float, 16, 16, 16>
         const WmmaFragment<half, 16, 16, 16, MatrixC>& c)
     {
         uint32_t fc[8];
-        #pragma unroll
+#pragma unroll
         for (int i = 0; i < 4; i++)
         {
             half lo = __ushort_as_half((unsigned short)(c.regs[i] & 0xFFFF));
@@ -7857,7 +8025,7 @@ struct Fp16MMAHelper<float, half, 16, 16, 16>
         uint32_t fd[8];
         mma<float, 16, 8, 16>(fd, a.regs, b.regs, c.regs);
         mma<float, 16, 8, 16>(fd + 4, a.regs, b.regs + 2, c.regs + 4);
-        #pragma unroll
+#pragma unroll
         for (int i = 0; i < 4; i++)
         {
             half lo = __float2half(__uint_as_float(fd[2 * i]));
