@@ -558,9 +558,8 @@ static void jumpIfHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
 static void getWorkingSetPtrHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
 {
     auto ctx = convert(inCtx);
-    auto dst = (void**)inst->getOperand(0).getPtr();
-    auto ptr = (uint8_t*)ctx->m_currentWorkingSet + inst->opcodeExtension;
-    *dst = ptr;
+    void* ptr = (uint8_t*)ctx->m_currentWorkingSet + inst->opcodeExtension;
+    memcpy(inst->getOperand(0).getPtr(), &ptr, sizeof(void*));
 }
 
 static void getElementPtrHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
@@ -577,10 +576,10 @@ static void getElementPtrHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, v
 static void getElementHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
     SLANG_UNUSED(ctx);
-    auto dst = (void*)inst->getOperand(0).getPtr();
     auto basePtr = (uint8_t*)inst->getOperand(1).getPtr();
-    auto elementIndex = *(uint32_t*)inst->getOperand(2).getPtr();
-    memcpy(dst, basePtr + elementIndex * inst->opcodeExtension, inst->opcodeExtension);
+    uint32_t elementIndex;
+    memcpy(&elementIndex, inst->getOperand(2).getPtr(), sizeof(elementIndex));
+    memcpy(inst->getOperand(0).getPtr(), basePtr + elementIndex * inst->opcodeExtension, inst->opcodeExtension);
 }
 
 static void offsetPtrHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
@@ -636,7 +635,7 @@ void generalLoadHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
     SLANG_UNUSED(ctx);
     void* src;
     memcpy(&src, inst->getOperand(1).getPtr(), sizeof(void*));
-    memcpy(inst->getOperand(0).getPtr(), src, inst->opcodeExtension);
+    memmove(inst->getOperand(0).getPtr(), src, inst->opcodeExtension);
 }
 
 VMExtFunction getLoadHandler(uint32_t extCode)
@@ -701,7 +700,7 @@ void generalStoreHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
     SLANG_UNUSED(ctx);
     void* dst;
     memcpy(&dst, inst->getOperand(0).getPtr(), sizeof(void*));
-    memcpy(dst, inst->getOperand(1).getPtr(), inst->opcodeExtension);
+    memmove(dst, inst->getOperand(1).getPtr(), inst->opcodeExtension);
 }
 
 VMExtFunction getStoreHandler(uint32_t extCode)
