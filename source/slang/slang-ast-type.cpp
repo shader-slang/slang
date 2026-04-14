@@ -797,7 +797,9 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         auto resultType = astBuilder->getVoidType();
         auto errorType = funcType->getErrorType();
 
-        // Handle this-type explicitly (bwd_diff is static, so this becomes a parameter).
+        // For non-static member methods, include the this-type as an explicit parameter
+        // (bwd_diff is static in the interface, so non-static `this` becomes a parameter).
+        // Static functions should have null thisParamType in the witness.
         auto thisParamType = diffTypeWitness->getThisParamType();
         auto [thisParamValueType, thisParamDirection] =
             splitParameterTypeAndDirection(astBuilder, thisParamType);
