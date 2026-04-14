@@ -19,12 +19,12 @@ jobs:
   # Run GPU tests in container with Vulkan and CUDA support.
   #
   # Vulkan ICD: We use libEGL_nvidia.so.0 as the Vulkan ICD instead of the
-  # default libGLX_nvidia.so.0. This avoids a TOCTOU race in libEGL_nvidia.so's
-  # EGL initialization path (driver 580.x) that causes intermittent segfaults
-  # when libglvnd loads the EGL vendor. Using libEGL_nvidia as the ICD directly
-  # (it exports vk_icd* symbols) bypasses the buggy EGL init code path.
-  # We also skip mounting the EGL vendor JSON (10_nvidia.json) to prevent
-  # libglvnd from triggering EGL initialization.
+  # default libGLX_nvidia.so.0 to avoid an intermittent crash in the EGL
+  # initialization path of driver 580.x. Both libraries export vk_icd* symbols.
+  # The default ICD causes the driver to load libEGL_nvidia.so via libglvnd's
+  # EGL vendor dispatch, which has a null-deref bug that crashes test-server
+  # processes. Using libEGL_nvidia directly as the ICD skips the EGL vendor
+  # dispatch entirely, so the buggy code path is never reached.
   test-slang:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 60
@@ -63,13 +63,7 @@ jobs:
 
       - name: Setup Vulkan ICD
         run: |
-          # Use libEGL_nvidia.so.0 as the Vulkan ICD instead of the default
-          # libGLX_nvidia.so.0. Both export vk_icd* symbols. The default ICD
-          # (libGLX) causes the NVIDIA driver to internally initialize EGL via
-          # libglvnd, which hits a TOCTOU race in libEGL_nvidia.so (driver
-          # 580.x) that intermittently segfaults test-server processes.
-          # Using libEGL_nvidia directly as the ICD avoids the libglvnd EGL
-          # vendor dispatch path entirely.
+          # See job-level comment for why we override the Vulkan ICD.
           mkdir -p /etc/vulkan/icd.d
           cat > /etc/vulkan/icd.d/nvidia_icd.json <<'EOF'
           {
@@ -228,8 +222,7 @@ jobs:
 
       - name: Setup Vulkan ICD
         run: |
-          # Use libEGL_nvidia.so.0 as the Vulkan ICD instead of the default
-          # libGLX_nvidia.so.0. See test-slang job comment for details.
+          # See test-slang job comment for why we override the Vulkan ICD.
           mkdir -p /etc/vulkan/icd.d
           cat > /etc/vulkan/icd.d/nvidia_icd.json <<'EOF'
           {
