@@ -304,6 +304,19 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     SourceLoc loc,
     Expr* originalExpr)
 {
+    // Resolve the module for the context
+    ModuleDecl* moduleDecl = getModuleDecl(getOuterScope());
+
+    // If we don't get the module declaration from the outer scope, we'll
+    // try the visitor context
+    if (!moduleDecl && getShared() && getShared()->getModule())
+        moduleDecl = getShared()->getModule()->getModuleDecl();
+
+    // And if we can't figure out a module, we're called in a context where we
+    // don't care about the deprecation attributes
+    if (!moduleDecl)
+        return;
+
     // This is slightly subtle, because we don't want to warn more than
     // once for the same occurrence, however in some cases this function is
     // called more than once for the same declref (specifically in the case
@@ -337,27 +350,15 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     // Check whether we're using a removed declaration
     if (auto removedSinceAttr = declRef.getDecl()->findModifier<RemovedSinceAttribute>())
     {
-        // resolve the effective scope for the expression
-        Scope* exprScope = nullptr;
-        if (auto declRefExpr = as<DeclRefExpr>(originalExpr))
-            exprScope = declRefExpr->scope;
-        if (!exprScope)
-            exprScope = getOuterScope();
-
-        // Then figure out the module where the scope belongs. That's what we'll
-        // use for the language version.
-        if (auto exprModule = exprScope ? getModuleDecl(exprScope) : nullptr)
+        if (moduleDecl->languageVersion >= removedSinceAttr->sinceVersion)
         {
-            if (exprModule->languageVersion >= removedSinceAttr->sinceVersion)
-            {
-                getSink()->diagnose(Diagnostics::RemovedUsage{
-                        .declName = declRef.getName(),
-                        .sinceVersion = removedSinceAttr->sinceVersion,
-                        .message = removedSinceAttr->message,
-                        .location = loc});
+            getSink()->diagnose(Diagnostics::RemovedUsage{
+                    .declName = declRef.getName(),
+                    .sinceVersion = removedSinceAttr->sinceVersion,
+                    .message = removedSinceAttr->message,
+                    .location = loc});
 
-                return;
-            }
+            return;
         }
     }
 
