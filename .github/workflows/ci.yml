@@ -327,7 +327,7 @@ jobs:
   # Capped at 2 automatic retries via run_attempt check.
   retry-on-gpu-failure:
     needs: [check-ci]
-    if: failure() && fromJSON(github.run_attempt) < 3
+    if: failure() && github.event_name == 'merge_group' && fromJSON(github.run_attempt) < 3
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -335,7 +335,7 @@ jobs:
       - name: Check for GPU health check failures and dispatch retry
         env:
           GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ secrets.SLANGBOT_PAT }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           gpu_failures=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
             --jq '[.jobs[]
