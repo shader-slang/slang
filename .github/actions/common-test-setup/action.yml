@@ -118,6 +118,16 @@ runs:
         # Platform-specific API checks - fail if APIs are not available
         if [[ "${{ inputs.os }}" == "macos" ]]; then
           check_api_support "mtl,metal"
+
+          # Structured environment dump (matches Linux print-env-info format)
+          echo "ENV_INFO_START"
+          echo "gpu_name=$(system_profiler SPDisplaysDataType 2>/dev/null | grep 'Chipset Model\|Chip:' | head -1 | sed 's/.*: //' || echo 'unknown')"
+          echo "gpu_memory=$(system_profiler SPDisplaysDataType 2>/dev/null | grep 'VRAM\|Memory:' | head -1 | sed 's/.*: //' || echo 'unknown')"
+          echo "metal_support=$(system_profiler SPDisplaysDataType 2>/dev/null | grep 'Metal Support' | head -1 | sed 's/.*: //' || echo 'unknown')"
+          echo "macos_version=$(sw_vers -productVersion 2>/dev/null || echo 'unknown')"
+          echo "runner_name=${RUNNER_NAME:-unknown}"
+          echo "os=macos"
+          echo "ENV_INFO_END"
         elif [[ "${{ inputs.os }}" == "windows" ]]; then
           check_api_support "vk,vulkan" "dx12,d3d12" "dx11,d3d11" "cuda"
 
@@ -127,6 +137,17 @@ runs:
           nvidia-smi -q | grep Version || (echo "ERROR: NVIDIA driver (nvidia-smi) not available on Windows" && exit 1)
           echo "Printing Vulkan SDK version: ..."
           vulkaninfo | grep -i version || (echo "ERROR: Vulkan SDK (vulkaninfo) not available on Windows" && exit 1)
-        fi        
+
+          # Structured environment dump (matches Linux print-env-info format)
+          echo "ENV_INFO_START"
+          echo "driver_version=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null || echo 'unknown')"
+          echo "gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || echo 'unknown')"
+          echo "gpu_memory=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null || echo 'unknown')"
+          echo "cuda_version=$(nvcc --version 2>&1 | grep -o 'release [0-9.]*' | cut -d' ' -f2 || echo 'unknown')"
+          echo "vulkan_sdk=${VULKAN_SDK:-not_set}"
+          echo "runner_name=${RUNNER_NAME:-unknown}"
+          echo "os=windows"
+          echo "ENV_INFO_END"
+        fi
         echo "All environment variables:"
         env | sort
