@@ -109,22 +109,25 @@ Expr* SemanticsVisitor::moveTemp(Expr* const& expr, F const& func)
 
 /// Execute `func` on a variable with the value of `expr`.
 ///
-/// If `expr` is just a reference to an immutable (e.g., `let`) variable
-/// then this might use the existing variable. Otherwise it will create
-/// a new variable to hold `expr`, using `moveTemp()`.
+/// If `expr` is just a reference to a variable then this will use the
+/// existing variable. Otherwise it will create a new variable to hold
+/// `expr`, using `moveTemp()`.
+///
+/// Note: We accept any `VarDeclBase` (not just `LetDecl`) so that
+/// existential openings on the same variable always produce the same
+/// `ExtractExistentialType` instance. This ensures that associated types
+/// like `obj.Element` resolve consistently across multiple accesses to
+/// the same interface-typed variable, regardless of whether it was
+/// declared with `let`, `var`, or an explicit type annotation.
+/// See https://github.com/shader-slang/slang/issues/10004.
 ///
 template<typename F>
 Expr* SemanticsVisitor::maybeMoveTemp(Expr* const& expr, F const& func)
 {
-    // TODO: Eventually this operation could consider any case where the
-    // input `expr` names an immutable "path": one that starts at an
-    // immutable binding and follows a (possibly empty) chain of accesses
-    // to immutable members.
-
     if (auto varExpr = as<VarExpr>(expr))
     {
         auto declRef = varExpr->declRef;
-        if (auto varDeclRef = declRef.as<LetDecl>())
+        if (auto varDeclRef = declRef.as<VarDeclBase>())
             return func(varDeclRef);
     }
 
