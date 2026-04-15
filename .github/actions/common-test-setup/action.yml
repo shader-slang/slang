@@ -121,9 +121,14 @@ runs:
 
           # Structured environment dump (matches Linux print-env-info format)
           echo "ENV_INFO_START"
-          echo "gpu_name=$(system_profiler SPDisplaysDataType 2>/dev/null | grep 'Chipset Model\|Chip:' | head -1 | sed 's/.*: //' || echo 'unknown')"
-          echo "gpu_memory=$(system_profiler SPDisplaysDataType 2>/dev/null | grep 'VRAM\|Memory:' | head -1 | sed 's/.*: //' || echo 'unknown')"
-          echo "metal_support=$(system_profiler SPDisplaysDataType 2>/dev/null | grep 'Metal Support' | head -1 | sed 's/.*: //' || echo 'unknown')"
+          gpu_info=$(system_profiler SPDisplaysDataType 2>/dev/null || true)
+          gpu_name=$(echo "$gpu_info" | grep 'Chipset Model' | head -1 | sed 's/.*: //')
+          if [[ -z "$gpu_name" ]]; then
+            gpu_name=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo 'unknown')
+          fi
+          echo "gpu_name=$gpu_name"
+          echo "gpu_cores=$(echo "$gpu_info" | grep 'Total Number of Cores' | head -1 | sed 's/.*: //' || echo 'unknown')"
+          echo "metal_support=$(echo "$gpu_info" | grep 'Metal Support' | head -1 | sed 's/.*: //' || echo 'unknown')"
           echo "macos_version=$(sw_vers -productVersion 2>/dev/null || echo 'unknown')"
           echo "runner_name=${RUNNER_NAME:-unknown}"
           echo "os=macos"
