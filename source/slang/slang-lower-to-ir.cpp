@@ -6355,8 +6355,17 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
                 {
-                    context->getSink()->diagnose(
-                        Diagnostics::InterfaceDefaultInitializer{.expr = expr});
+                    if (context->getMainModuleDecl()->languageVersion >=
+                        SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2026)
+                    {
+                        context->getSink()->diagnose(
+                            Diagnostics::InterfaceDefaultInitializerError{.expr = expr});
+                    }
+                    else
+                    {
+                        context->getSink()->diagnose(
+                            Diagnostics::InterfaceDefaultInitializer{.expr = expr});
+                    }
                 }
             }
 

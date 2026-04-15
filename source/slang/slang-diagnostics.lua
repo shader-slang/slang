@@ -3130,6 +3130,13 @@ warning(
     span { loc = "expr:Expr", message = "initializing an interface variable with defaults is deprecated and may cause unexpected behavior. Please provide a compatible initializer or leave the variable uninitialized" }
 )
 
+err(
+    "interface-default-initializer-error",
+    30515,
+    "cannot initialize an interface variable with defaults",
+    span { loc = "expr:Expr", message = "initializing an interface variable with defaults is not supported. Please provide a compatible initializer or leave the variable uninitialized" }
+)
+
 --
 -- 3062x: variables
 --

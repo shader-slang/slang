@@ -1,10 +1,9 @@
 // This test verifies that a warning is emitted if an interface
 // variable is initialized with defaults.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry computeMain -stage compute
-
-//Disabled due to issue 9462
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry computeMain -stage compute -std 2025 -DEXPECT_ERROR=0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry computeMain -stage compute -std 2025 -DEXPECT_ERROR=0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECKERR): -target hlsl -entry computeMain -stage compute -std 2026 -DEXPECT_ERROR=1
 
 
 interface IHelper
@@ -37,9 +36,16 @@ IHelper test(int val)
 {
     // check for the presense of the warning
 
+#if EXPECT_ERROR
+    IHelper ret = { };
+//CHECKERR:       ^ cannot initialize an interface variable with defaults
+//CHECKERR:       ^ initializing an interface variable with defaults is not supported. Please provide a compatible initializer or leave the variable uninitialized
+
+#else
     IHelper ret = { };
 //CHECK:          ^ initializing an interface variable with defaults is deprecated and may cause unexpected behavior
 //CHECK:          ^ initializing an interface variable with defaults is deprecated and may cause unexpected behavior. Please provide a compatible initializer or leave the variable uninitialized
+#endif
 
     switch (val % 4)
     {
