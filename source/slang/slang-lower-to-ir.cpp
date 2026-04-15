@@ -2476,23 +2476,21 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitDifferentialPairType(DifferentialPairType* pairType)
     {
         IRType* primalType = lowerType(context, pairType->getPrimalType());
-        if (as<IRInterfaceType>(primalType))
+        if (isDeclRefTypeOf<InterfaceDecl>(pairType->getPrimalType()))
         {
             // Existential differential pairs are handled specially later in autodiff lowering:
             // their differential type is modeled as `IDifferentiable`, and the witness operand
             // on `DifferentialPair<interface>` is not consulted.
             //
-            // If we eagerly lower the original front-end witness here, interface-inheritance
-            // chains like `IDerived : IBase : IDifferentiable` can try to lower the inherited
-            // conformance through an interface requirement key, which is not a witness table and
-            // can trigger an ICE before the later existential-specific lowering runs.
-            auto diffInterfaceType =
-                lowerType(context, context->astBuilder->getDifferentiableInterfaceType());
-            auto poisonWitness =
-                getBuilder()->emitPoison(getBuilder()->getWitnessTableType(diffInterfaceType));
+            // We intentionally lower a poison witness for any interface primal so we don't try to
+            // eagerly materialize front-end interface conformance through this operand.
+            //
+            // Use a sub-builder so that the insert point isn't affected.
+            IRBuilder subBuilder(context->irBuilder->getModule());
+            auto poisonWitness = getUnitPoisonVal(&subBuilder, context->irBuilder->getModule());
             return getBuilder()->getDifferentialPairType(primalType, poisonWitness);
         }
-        else if (as<IRAssociatedType>(primalType) || as<IRThisType>(primalType))
+        if (as<IRAssociatedType>(primalType) || as<IRThisType>(primalType))
         {
             List<IRInst*> operands;
             SubstitutionSet(pairType->getDeclRef())
@@ -2507,8 +2505,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             auto undefined = getBuilder()->emitPoison(operands[1]->getFullType());
             return getBuilder()->getDifferentialPairType(primalType, undefined);
         }
-        else
-            return lowerSimpleIntrinsicType(pairType);
+
+        return lowerSimpleIntrinsicType(pairType);
     }
 
     IRFuncType* visitFuncType(FuncType* type)
