@@ -1,6 +1,6 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-// Test: __func_extension apply for a generic member method.
+// Test: __func_extension __apply for a generic member method.
 // The this parameter is implicit — the apply body accesses it via `this`.
 
 struct MyVec<T : __BuiltinFloatingPointType> : IDifferentiable
@@ -29,7 +29,7 @@ struct DotCtx
 typedef MyVec<float> V;
 
 // apply for MyVec<float>::dot — `this` is implicit
-__func_extension apply(V::dot)(V other) -> Tuple<float, DotCtx>
+__func_extension __apply(V::dot)(V other) -> Tuple<float, DotCtx>
 {
     let result = this.dot(other); // this.x * other.x + this.y * other.y
     return makeTuple(result, DotCtx(this.x, this.y, other.x, other.y));

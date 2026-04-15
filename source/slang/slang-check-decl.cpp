@@ -14381,11 +14381,11 @@ bool SemanticsDeclBasesVisitor::_funcExtensionBackwardDiff(
     return true;
 }
 
-// Populate the extension for a custom apply (forward pass) func_extension.
+// Populate the extension for a custom __apply (forward pass) func_extension.
 //
 // Input:
 //   struct MyCtx { void operator()(out float dx, float dOut) { ... } };
-//   __func_extension apply(foo)(float x) -> Tuple<float, MyCtx> { ... }
+//   __func_extension __apply(foo)(float x) -> Tuple<float, MyCtx> { ... }
 //
 // Output:
 //   extension foo : IBackwardDifferentiable<foo>
@@ -14423,7 +14423,7 @@ bool SemanticsDeclBasesVisitor::_funcExtensionApply(
     if (!tupleType || tupleType->getMemberCount() != 2)
     {
         getSink()->diagnose(Diagnostics::Unimplemented{
-            .feature = "__func_extension apply: return type must be Tuple<RetType, CtxType>",
+            .feature = "__func_extension __apply: return type must be Tuple<RetType, CtxType>",
             .location = loc});
         return false;
     }

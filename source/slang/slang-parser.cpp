@@ -2882,7 +2882,7 @@ static NodeBase* parseBackwardDifferentiate(Parser* parser, void* /* unused */)
     return parseBackwardDifferentiate(parser);
 }
 
-/// Parse an expression of the form apply(fn) where fn is an
+/// Parse an expression of the form __apply(fn) where fn is an
 /// identifier pointing to a function.
 static Expr* parseApplyForBwd(Parser* parser)
 {
@@ -10370,7 +10370,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("__func_as_type", parseFuncAsTypeExpr),
     _makeParseExpr("fwd_diff", parseForwardDifferentiate),
     _makeParseExpr("bwd_diff", parseBackwardDifferentiate),
-    _makeParseExpr("apply", parseApplyForBwd),
+    _makeParseExpr("__apply", parseApplyForBwd),
     _makeParseExpr("__dispatch_kernel", parseDispatchKernel),
     _makeParseExpr("sizeof", parseSizeOfExpr),
     _makeParseExpr("alignof", parseAlignOfExpr),

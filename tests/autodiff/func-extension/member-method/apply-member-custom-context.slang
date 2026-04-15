@@ -1,6 +1,6 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-// Test: verify that apply's custom context is ACTUALLY used for a member method.
+// Test: verify that __apply's custom context is ACTUALLY used for a member method.
 // The context stores a deliberately wrong value — if auto-synthesis kicked in,
 // we'd get the correct derivative, not our intentional magic number.
 
@@ -22,7 +22,7 @@ struct MagicCtx
     }
 };
 
-__func_extension apply(MyVec::lengthSquared)() -> Tuple<float, MagicCtx>
+__func_extension __apply(MyVec::lengthSquared)() -> Tuple<float, MagicCtx>
 {
     return makeTuple(this.x * this.x + this.y * this.y, MagicCtx());
 }
@@ -37,7 +37,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     var dpv = diffPair(v, MyVec(0.0, 0.0));
     bwd_diff(MyVec::lengthSquared)(dpv, 1.0);
 
-    // If custom apply is used: dpv.d = (777, 888)
+    // If custom __apply is used: dpv.d = (777, 888)
     // If auto-synthesis were used: dpv.d = (6, 8)
     outputBuffer[0] = dpv.d.x;
     outputBuffer[1] = dpv.d.y;

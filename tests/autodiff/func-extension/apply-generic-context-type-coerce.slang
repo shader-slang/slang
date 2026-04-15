@@ -1,6 +1,6 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-// Test: __func_extension apply with a generic context type that uses
+// Test: __func_extension __apply with a generic context type that uses
 // T instead of T.Differential in the operator() signature, relying
 // on the where T.Differential == T constraint for coercion.
 T cube<T : IArithmetic>(T x) { return x * x * x; }
@@ -15,7 +15,7 @@ struct CubeContext<T : IFloat>
     }
 };
 
-__func_extension<T : IFloat> apply(cube<T>)(T x) -> Tuple<T, CubeContext<T>>
+__func_extension<T : IFloat> __apply(cube<T>)(T x) -> Tuple<T, CubeContext<T>>
     where T.Differential == T
 {
     let sqr = x * x;

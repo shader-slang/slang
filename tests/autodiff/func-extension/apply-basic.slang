@@ -1,8 +1,8 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-// Test: __func_extension apply(fn) — custom forward pass with context
+// Test: __func_extension __apply(fn) — custom forward pass with context
 // Note: cube is NOT [Differentiable] — the derivative comes solely
-// from the __func_extension apply.
+// from the __func_extension __apply.
 
 float cube(float x) { return x * x * x; }
 
@@ -15,7 +15,7 @@ struct CubeContext
     }
 };
 
-__func_extension apply(cube)(float x) -> Tuple<float, CubeContext>
+__func_extension __apply(cube)(float x) -> Tuple<float, CubeContext>
 {
     let sqr = x * x;
     return makeTuple(sqr * x, CubeContext(sqr));

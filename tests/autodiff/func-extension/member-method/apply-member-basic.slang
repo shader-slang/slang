@@ -1,6 +1,6 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-// Test: __func_extension apply for a member method.
+// Test: __func_extension __apply for a member method.
 // The this parameter is implicit — the apply body accesses it via `this`.
 
 struct MyVec : IDifferentiable
@@ -23,7 +23,7 @@ struct LengthSqCtx
 };
 
 // apply for MyVec::lengthSquared — `this` is implicit
-__func_extension apply(MyVec::lengthSquared)() -> Tuple<float, LengthSqCtx>
+__func_extension __apply(MyVec::lengthSquared)() -> Tuple<float, LengthSqCtx>
 {
     // `this` refers to the MyVec instance
     return makeTuple(this.x * this.x + this.y * this.y, LengthSqCtx(this.x, this.y));

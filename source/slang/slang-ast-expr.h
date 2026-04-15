@@ -779,7 +779,7 @@ class BackwardDifferentiateExpr : public DifferentiateExpr
     FIDDLE(...)
 };
 
-/// An expression of the form `apply(fn)` to access the
+/// An expression of the form `__apply(fn)` to access the
 /// apply-for-backward version of the function `fn`.
 /// Used in __func_extension to define a custom forward pass
 /// that returns a context for the backward pass.

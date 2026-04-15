@@ -2580,7 +2580,7 @@ local insts = {
 		{ MakeIDifferentiableWitness = { min_operands = 1 } },
 		{ SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc = { min_operands = 2 } },
 
-		-- For user-provided apply (__func_extension apply(fn)).
+		-- For user-provided apply (__func_extension __apply(fn)).
 		-- Identity remat for when MinimalContext == BwdCallable.
 		{ IdentityRemat = { min_operands = 1 } },
 	} },

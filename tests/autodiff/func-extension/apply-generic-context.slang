@@ -1,7 +1,7 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-// Test: __func_extension apply with a generic function, where the context type
-// stores intermediate values. The apply extension is specialized for float,
+// Test: __func_extension __apply with a generic function, where the context type
+// stores intermediate values. The __apply extension is specialized for float,
 // with a concrete context type.
 
 T cube<T : IArithmetic>(T x) { return x * x * x; }
@@ -16,7 +16,7 @@ struct CubeCtxFloat
     }
 };
 
-__func_extension apply(cube<float>)(float x) -> Tuple<float, CubeCtxFloat>
+__func_extension __apply(cube<float>)(float x) -> Tuple<float, CubeCtxFloat>
 {
     let sqr = x * x;
     return makeTuple(sqr * x, CubeCtxFloat(sqr));

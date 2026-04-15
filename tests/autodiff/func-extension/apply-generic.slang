@@ -1,6 +1,6 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-// Test: __func_extension apply with generic specialization
+// Test: __func_extension __apply with generic specialization
 
 T sqr<T : IArithmetic>(T x) { return x * x; }
 
@@ -13,8 +13,8 @@ struct SqrContextF
     }
 };
 
-// apply only for float specialization
-__func_extension apply(sqr<float>)(float x) -> Tuple<float, SqrContextF>
+// __apply only for float specialization
+__func_extension __apply(sqr<float>)(float x) -> Tuple<float, SqrContextF>
 {
     return makeTuple(x * x, SqrContextF(x));
 }

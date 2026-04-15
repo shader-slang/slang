@@ -4911,7 +4911,7 @@ struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        // apply(fn) takes the same params as fn (not wrapped in DifferentialPair).
+        // __apply(fn) takes the same params as fn (not wrapped in DifferentialPair).
         // Give it the base function type so overload resolution works with original args.
         resultExpr->type = baseFuncType;
     }

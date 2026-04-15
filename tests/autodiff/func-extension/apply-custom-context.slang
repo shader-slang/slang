@@ -1,6 +1,6 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-// Test: verify that apply's custom context is ACTUALLY used, not auto-synthesis.
+// Test: verify that __apply's custom context is ACTUALLY used, not auto-synthesis.
 // The context stores a deliberately wrong "cached" value (999.0) that the
 // backward pass uses. If auto-synthesis kicked in instead, it would compute
 // the correct mathematical derivative (2*x = 6.0), not our intentionally
@@ -21,7 +21,7 @@ struct SqrContext
     }
 };
 
-__func_extension apply(sqr)(float x) -> Tuple<float, SqrContext>
+__func_extension __apply(sqr)(float x) -> Tuple<float, SqrContext>
 {
     // Return the correct primal value, but store a bogus context.
     return makeTuple(x * x, SqrContext(999.0));
@@ -36,7 +36,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     var dpx = diffPair(3.0, 0.0);
     bwd_diff(sqr)(dpx, 1.0);
 
-    // If our custom apply is used: dpx.d = 999.0 (from the magic context)
+    // If our custom __apply is used: dpx.d = 999.0 (from the magic context)
     // If auto-synthesis were used: dpx.d = 6.0 (correct derivative 2*x)
     outputBuffer[0] = dpx.d;
     // CHECK: 999.0
