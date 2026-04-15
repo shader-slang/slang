@@ -2639,11 +2639,14 @@ public:
     Type* getBackwardDiffFuncInterfaceType(Type* baseType);
     Type* getBwdCallableBaseType(Type* baseType);
 
+    // Priority levels for constraint solving. Lower numeric values indicate
+    // higher priority — a Required constraint overrides Optional, which
+    // overrides Default.
     enum class ConstraintPriority
     {
-        Required = 0,
-        Optional,
-        Default
+        Required = 0, // constraints from explicit parameters, inferred argument types or where-clauses
+        Optional,     // hint values from value unification when the constraint is non-binding
+        Default       // default generic argument values (e.g., T = int)
     };
 
     struct Constraint
@@ -2667,7 +2670,10 @@ public:
         // substituting types.
         bool isEquality = false;
 
-        // Can `val` itself depend on other constraints? E.g. `<T, U = T>`
+        // Marks that `val` can depend on other constraints. E.g. `<T, U = T>`
+        // `potentiallyDependent` constraints must occur after the constraints
+        // that they depend on, otherwise results may be invalid as the prior
+        // constraints haven't been resolved yet.
         bool potentiallyDependent = false;
     };
 
