@@ -450,6 +450,18 @@ struct AssignValsFromLayoutContext
         // Keep buffer alive in resource context
         resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
 
+        // User intended to pass this buffer via a T.Handle
+        if (srcBuffer.isHandle)
+        {
+            DescriptorHandle handle;
+            auto access = getDescriptorHandleAccess(
+                dstCursor.getTypeLayout()->getType()->getResourceAccess());
+            bufferResource->getDescriptorHandle(access, srcBuffer.format, kEntireBuffer, &handle);
+            dstCursor.setDescriptorHandle(handle);
+            maybeAddOutput(dstCursor, srcVal, bufferResource);
+            return SLANG_OK;
+        }
+
         // Check for device address/pointer FIRST (before descriptor handles)
         // This ensures plain uint64/pointer types use device addresses, not descriptor handles
         if ((dstCursor.getTypeLayout()->getType()->getKind() ==
