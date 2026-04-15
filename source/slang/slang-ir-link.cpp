@@ -2528,7 +2528,7 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
         specContext.builder->setInsertBefore(existingInst);
 
         // Strip the linkage decoration from existingInst so that checkIRDuplicate
-        // (debug-only) won't find a name conflict when the clone is created.
+        // won't find a name conflict when the clone is created.
         // We intentionally keep existingInst in the module tree so that its children
         // (e.g. Specialize insts inside a Generic's body that reference the Generic
         // itself) remain connected to the module during replaceUsesWith. Removing it
