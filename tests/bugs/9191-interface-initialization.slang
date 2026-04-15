@@ -4,6 +4,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry computeMain -stage compute -std 2025 -DEXPECT_ERROR=0
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry computeMain -stage compute -std 2025 -DEXPECT_ERROR=0
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKERR): -target hlsl -entry computeMain -stage compute -std 2026 -DEXPECT_ERROR=1
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECKERR): -target spirv -entry computeMain -stage compute -std 2026 -DEXPECT_ERROR=1
 
 
 interface IHelper
@@ -30,6 +31,24 @@ struct HelperImpl3 : IHelper
     int storedVal;
 
     int getVal() { return storedVal + 2; }
+}
+
+struct StructWithIfaceField
+{
+#if EXPECT_ERROR
+    IHelper ifaceField = { };
+//CHECKERR:              ^ cannot initialize an interface variable with defaults
+//CHECKERR:              ^ initializing an interface variable with defaults is not supported. Please provide a compatible initializer or leave the variable uninitialized
+#else
+    IHelper ifaceField = { };
+//CHECK:                 ^ initializing an interface variable with defaults is deprecated and may cause unexpected behavior
+//CHECK:                 ^ initializing an interface variable with defaults is deprecated and may cause unexpected behavior. Please provide a compatible initializer or leave the variable uninitialized
+#endif
+}
+
+struct StructWithIfaceField2
+{
+    IHelper ifaceField;
 }
 
 IHelper test(int val)
@@ -74,6 +93,44 @@ IHelper test(int val)
         break;
     }
 
+    return ret;
+}
+
+StructWithIfaceField test2(int val)
+{
+    StructWithIfaceField ret = { };
+
+    if (val == 0)
+    {
+        ret.ifaceField = HelperImpl1(val);
+    }
+    else
+    {
+        ret.ifaceField = HelperImpl2(val);
+    }
+    return ret;
+}
+
+StructWithIfaceField test3(int val)
+{
+#if EXPECT_ERROR
+    StructWithIfaceField ret = { { } };
+//CHECKERR:                      ^ cannot initialize an interface variable with defaults
+//CHECKERR:                      ^ initializing an interface variable with defaults is not supported. Please provide a compatible initializer or leave the variable uninitialized
+#else
+    StructWithIfaceField ret = { { } };
+//CHECK:                         ^ initializing an interface variable with defaults is deprecated and may cause unexpected behavior
+//CHECK:                         ^ initializing an interface variable with defaults is deprecated and may cause unexpected behavior. Please provide a compatible initializer or leave the variable uninitialized
+#endif
+
+    if (val == 0)
+    {
+        ret.ifaceField = HelperImpl1(val);
+    }
+    else
+    {
+        ret.ifaceField = HelperImpl2(val);
+    }
     return ret;
 }
 
