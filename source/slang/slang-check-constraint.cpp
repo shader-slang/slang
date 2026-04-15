@@ -502,8 +502,7 @@ bool addHasDiffTypeInfoWitnessToArgs(
 struct SolvedArg
 {
     Val* val = nullptr;
-    SemanticsVisitor::ConstraintPriority priority =
-        SemanticsVisitor::ConstraintPriority::Default;
+    SemanticsVisitor::ConstraintPriority priority = SemanticsVisitor::ConstraintPriority::Default;
     ShortList<QualType, 8> types;
 };
 
@@ -730,9 +729,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
                 if (valParam->initExpr && valParam->parameterIndex >= knownGenericArgCount)
                 {
-                    ConstantFoldingCircularityInfo newCircularityInfo(
-                        makeDeclRef(member),
-                        nullptr);
+                    ConstantFoldingCircularityInfo newCircularityInfo(makeDeclRef(member), nullptr);
 
                     Constraint c;
                     c.decl = member;
@@ -1403,9 +1400,8 @@ bool SemanticsVisitor::TryUnifyTypeParam(
     constraint.indexInPack = unificationContext.indexInTypePack;
     constraint.val = type;
     constraint.isUsedAsLValue = type.isLeftValue;
-    constraint.priority = unificationContext.optionalConstraint ?
-        ConstraintPriority::Optional :
-        ConstraintPriority::Required;
+    constraint.priority = unificationContext.optionalConstraint ? ConstraintPriority::Optional
+                                                                : ConstraintPriority::Required;
     constraint.isEquality = unificationContext.equalityConstraint;
     constraints.constraints.add(constraint);
 
@@ -1462,9 +1458,8 @@ bool SemanticsVisitor::TryUnifyIntParam(
         Constraint constraint;
         constraint.decl = genericValuePackParamRef.getDecl();
         constraint.val = val;
-        constraint.priority = unifyCtx.optionalConstraint ?
-            ConstraintPriority::Optional :
-            ConstraintPriority::Required;
+        constraint.priority = unifyCtx.optionalConstraint ? ConstraintPriority::Optional
+                                                          : ConstraintPriority::Required;
         constraints.constraints.add(constraint);
         return true;
     }

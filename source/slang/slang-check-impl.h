@@ -2644,9 +2644,12 @@ public:
     // overrides Default.
     enum class ConstraintPriority
     {
-        Required = 0, // constraints from explicit parameters, inferred argument types or where-clauses
-        Optional,     // hint values from value unification when the constraint is non-binding
-        Default       // default generic argument values (e.g., T = int)
+        // constraints from explicit parameters, inferred argument types or where-clauses
+        Required = 0,
+        // hint values from value unification when the constraint is non-binding
+        Optional,
+        // default generic argument values (e.g., T = int)
+        Default
     };
 
     struct Constraint
