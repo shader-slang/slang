@@ -145,11 +145,11 @@ runs:
 
           # Structured environment dump (matches Linux print-env-info format)
           echo "ENV_INFO_START"
-          driver_version=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null || true)
+          driver_version=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1 || true)
           echo "driver_version=${driver_version:-unknown}"
-          gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || true)
+          gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || true)
           echo "gpu_name=${gpu_name:-unknown}"
-          gpu_memory=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null || true)
+          gpu_memory=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null | head -1 || true)
           echo "gpu_memory=${gpu_memory:-unknown}"
           cuda_version=$(nvcc --version 2>&1 | grep -o 'release [0-9.]*' | cut -d' ' -f2 || true)
           echo "cuda_version=${cuda_version:-unknown}"
