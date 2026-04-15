@@ -1,0 +1,79 @@
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v20[2-9][0-9].[0-9]*"
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: "0 2 * * *"
+
+name: Linux glibc 2.28 Release
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - platform: x86_64
+            runs-on: ubuntu-22.04
+            docker-image: "quay.io/pypa/manylinux_2_28_x86_64"
+          - platform: aarch64
+            runs-on: ubuntu-22.04-arm
+            docker-image: "quay.io/pypa/manylinux_2_28_aarch64"
+      fail-fast: false
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "0"
+          fetch-tags: true
+
+      - name: Build
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/home/app \
+            -v /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt \
+            ${{ matrix.docker-image }} \
+            bash -euo pipefail -c '
+              yum install -y gcc-toolset-11-gcc gcc-toolset-11-gcc-c++
+              source /opt/rh/gcc-toolset-11/enable
+              pip3 install cmake==3.25.0 ninja==1.11.1.4
+              cd /home/app
+              git config --global --add safe.directory /home/app
+              cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+              cmake --build --preset release -j $(nproc)
+              cpack --preset release -G ZIP
+              cpack --preset release -G TGZ
+            '
+
+      - name: Package Slang
+        id: package
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          triggering_ref=${{ github.ref_name }}
+          if [[ $triggering_ref =~ ^v[0-9] ]]; then
+            version=${triggering_ref#v}
+          else
+            version=$triggering_ref
+          fi
+          # Sanitize version for use in filenames (replace path separators)
+          version=${version//\//-}
+          base=$(pwd)/slang-${version}-linux-${{ matrix.platform }}-glibc-2.28
+          sudo mv "$(pwd)/build/dist-release/slang.zip" "${base}.zip"
+          echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
+          sudo mv "$(pwd)/build/dist-release/slang.tar.gz" "${base}.tar.gz"
+          echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> "$GITHUB_OUTPUT"
+      - name: File check
+        run: |
+          find "build/dist-release" -type f ! -iname '*.md' ! -iname '*.h' -print0 | xargs -0 file
+      - name: UploadBinary
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          draft: ${{contains(github.ref, 'draft')}}
+          prerelease: ${{contains(github.ref, 'draft')}}
+          files: |
+            ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_ZIP }}
+            ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_TAR }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
