@@ -1,13 +1,12 @@
 // When the return value of an interface method (whose type is an associated
 // type) is passed to an unconstrained generic function, the type parameter
-// cannot be statically resolved. The compiler should emit error 33180, but
-// currently produces an internal compiler error (99999) instead.
+// cannot be statically resolved. The compiler must emit error 33180 instead
+// of crashing.
 
-// Disabled: ICE -- should emit error 33180 but crashes with error 99999
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target glsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -stage compute -entry computeMain
 
 #lang slang 2025
 
@@ -45,7 +44,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     ITransform obj = factory(dispatchThreadID.x);
     var result = obj.transform(1.0);
-    // CHECK: ([[# @LINE+1]]): error 33180
     let processed = process(result);
+//CHECK:                   ^ cannot specialize generic with existential type
+//CHECK:                   ^ specializing 'process' with an existential type is not allowed. All generic arguments must be statically resolvable at compile time.
     outputBuffer[0] = 0;
 }

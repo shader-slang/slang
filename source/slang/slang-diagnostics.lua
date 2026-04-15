@@ -1447,6 +1447,13 @@ err(
 )
 
 err(
+    "is-as-on-unrelated-concrete-types",
+    30304,
+    "'is'/'as' on unrelated concrete types",
+    span { loc = "expr:Expr", message = "'is'/'as' on unrelated concrete types will never succeed. Use an interface-typed expression for runtime type checks." }
+)
+
+err(
     "expected-function",
     33070,
     "expected a function",
@@ -2592,10 +2599,24 @@ err(
 )
 
 err(
+    "removed-usage",
+    31207,
+    "use of removed declaration",
+    span { loc = "location", message = "~declName:Name has been removed since language version '~sinceVersion:Int': ~message" }
+)
+
+err(
     "require-input-decorated-var-for-parameter",
     31208,
     "shader input required",
     span { loc = "expr:Expr", message = "~func:Decl expects for argument ~paramNumber:Int a type which is a shader input (`in`) variable." }
+)
+
+err(
+    "removed-since-bad-version",
+    31209,
+    "'RemovedSince' argument 'version' is outside allowed range",
+    span { loc = "location", message = "valid range: [~minVersion:Int, ~maxVersion:Int]" }
 )
 
 -- 3121x - Derivative group requirements

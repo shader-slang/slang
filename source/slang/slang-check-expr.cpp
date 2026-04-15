@@ -299,11 +299,24 @@ ContainerDecl* isStaticScopeDecl(Decl* decl)
     return nullptr;
 }
 
-void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
+void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     DeclRef<Decl> declRef,
     SourceLoc loc,
     Expr* originalExpr)
 {
+    // Resolve the module for the context
+    ModuleDecl* moduleDecl = getModuleDecl(getOuterScope());
+
+    // If we don't get the module declaration from the outer scope, we'll
+    // try the visitor context
+    if (!moduleDecl && getShared() && getShared()->getModule())
+        moduleDecl = getShared()->getModule()->getModuleDecl();
+
+    // And if we can't figure out a module, we're called in a context where we
+    // don't care about the deprecation attributes
+    if (!moduleDecl)
+        return;
+
     // This is slightly subtle, because we don't want to warn more than
     // once for the same occurrence, however in some cases this function is
     // called more than once for the same declref (specifically in the case
@@ -325,6 +338,31 @@ void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
     {
         return;
     }
+
+    // If the expression location is the same as the declaration location, don't
+    // diagnose. This avoids diagnosing struct member fields which get
+    // referenced by synthesized constructors etc.
+    if (declRef.getDecl() && originalExpr && (declRef.getDecl()->getNameLoc() == originalExpr->loc))
+    {
+        return;
+    }
+
+    // Check whether we're using a removed declaration
+    if (auto removedSinceAttr = declRef.getDecl()->findModifier<RemovedSinceAttribute>())
+    {
+        if (moduleDecl->languageVersion >= removedSinceAttr->sinceVersion)
+        {
+            getSink()->diagnose(Diagnostics::RemovedUsage{
+                .declName = declRef.getName(),
+                .sinceVersion = removedSinceAttr->sinceVersion,
+                .message = removedSinceAttr->message,
+                .location = loc});
+
+            return;
+        }
+    }
+
+    // Check whether we're using a deprecated declaration
     if (auto deprecatedAttr = declRef.getDecl()->findModifier<DeprecatedAttribute>())
     {
         getSink()->diagnose(Diagnostics::DeprecatedUsage{
@@ -378,7 +416,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     // This is the bottleneck for using declarations which might be
     // deprecated, diagnose here.
     if (getSink())
-        diagnoseDeprecatedDeclRefUsage(declRef, loc, originalExpr);
+        diagnoseDeprecatedAndRemovedDeclRefUsage(declRef, loc, originalExpr);
 
     // Construct an appropriate expression based on the structured of
     // the declaration reference.
@@ -6292,6 +6330,35 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
     return expr;
 }
 
+static bool _isTypeParametric(Type* type)
+{
+    if (!type)
+        return false;
+    if (as<ThisType>(type))
+        return true;
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        auto decl = declRefType->getDeclRef().getDecl();
+        if (as<GenericTypeParamDeclBase>(decl) || as<AssocTypeDecl>(decl) ||
+            as<ThisTypeDecl>(decl) || as<GlobalGenericParamDecl>(decl))
+            return true;
+        // Check generic arguments for parametric types.
+        // E.g., Container<T> contains the generic param T.
+        if (auto genericApp = as<GenericAppDeclRef>(declRefType->getDeclRefBase()))
+        {
+            for (Index i = 0; i < genericApp->getArgCount(); i++)
+            {
+                if (auto argType = as<Type>(genericApp->getArg(i)))
+                {
+                    if (_isTypeParametric(argType))
+                        return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
 {
     expr->typeExpr = CheckProperType(expr->typeExpr);
@@ -6342,6 +6409,19 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
         }
         return expr;
     }
+
+    // If we reach here with no witness and both the value type and target type are concrete
+    // (not generic type parameters, associated types, or ThisType), the `is` check is always
+    // statically false and the user is using `is` incorrectly on unrelated concrete types.
+    // Note: _isTypeParametric only handles DeclRefType-based types (incl. recursive generic args).
+    // Builtin composite types like arrays or vectors with embedded generic params are not checked,
+    // but these are unlikely to appear in `is`/`as` expressions in practice.
+    if (!as<ErrorType>(valueType) && !as<ErrorType>(expr->typeExpr.type) &&
+        !isInterfaceType(valueType) && !_isTypeParametric(valueType) &&
+        !_isTypeParametric(expr->typeExpr.type))
+    {
+        getSink()->diagnose(Diagnostics::IsAsOnUnrelatedConcreteTypes{.expr = expr});
+    }
     return expr;
 }
 
@@ -6388,6 +6468,17 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
         }
         expr->value = maybeOpenExistential(expr->value);
         return expr;
+    }
+
+    // If we reach here with no witness and both the value type and target type are concrete
+    // (not generic type parameters, associated types, or ThisType), the `as` cast always
+    // fails and the user is using `as` incorrectly on unrelated concrete types.
+    auto asValueType = expr->value->type.type;
+    if (!as<ErrorType>(asValueType) && !as<ErrorType>(typeExpr.type) &&
+        !isInterfaceType(asValueType) && !_isTypeParametric(asValueType) &&
+        !_isTypeParametric(typeExpr.type))
+    {
+        getSink()->diagnose(Diagnostics::IsAsOnUnrelatedConcreteTypes{.expr = expr});
     }
 
     expr->typeExpr = typeExpr.exp;

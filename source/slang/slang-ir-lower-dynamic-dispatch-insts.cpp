@@ -11,6 +11,8 @@
 #include "slang-rich-diagnostics.h"
 #include "slang-target.h"
 
+#include <atomic>
+
 namespace Slang
 {
 
@@ -953,14 +955,14 @@ struct SequentialIDTagLoweringContext : public InstPassBase
     //
     void ensureWitnessTableSequentialIDs()
     {
-        StringBuilder generatedMangledName;
-
         auto linkage = getLinkage();
         for (auto inst : module->getGlobalInsts())
         {
             if (inst->getOp() == kIROp_WitnessTable)
             {
+                StringBuilder generatedMangledName;
                 UnownedStringSlice witnessTableMangledName;
+                bool shouldUpdateSequentialIDMap = false;
                 if (auto instLinkage = inst->findDecoration<IRLinkageDecoration>())
                 {
                     witnessTableMangledName = instLinkage->getMangledName();
@@ -986,14 +988,11 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                     }
 
                     // generate a unique linkage for it.
-                    static int32_t uniqueId = 0;
-                    uniqueId++;
                     if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
                     {
                         generatedMangledName << nameHint->getName();
                     }
-                    generatedMangledName << "_generated_witness_uuid_" << uniqueId;
-                    witnessTableMangledName = generatedMangledName.getUnownedSlice();
+                    shouldUpdateSequentialIDMap = true;
                 }
 
                 auto interfaceType =
@@ -1008,45 +1007,62 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                     interfaceName = interfaceLinkage->getMangledName();
                 }
 
-                // If the inst already has a SequentialIDDecoration, stop now.
-                if (auto seqDecoration = inst->findDecoration<IRSequentialIDDecoration>())
-                {
-                    if (interfaceName.getLength())
-                    {
-                        linkage->registerTypeConformanceWitnessSequentialID(
-                            String(witnessTableMangledName),
-                            interfaceName,
-                            uint32_t(seqDecoration->getSequentialID()));
-                    }
-                    continue;
-                }
-
-                // Get a sequential ID for the witness table using the map from the Linkage.
+                // Get or register the sequential ID for the witness table using the maps from the
+                // Linkage. This updates shared linkage state, so keep name generation, lookup, and
+                // insertion atomic.
                 uint32_t seqID = 0;
-                if (!linkage->mapMangledNameToRTTIObjectIndex.tryGetValue(
-                        witnessTableMangledName,
-                        seqID))
                 {
-                    if (as<IRInterfaceType>(interfaceType))
+                    std::lock_guard<std::mutex> lock(linkage->m_sequentialIDMapMutex);
+
+                    if (shouldUpdateSequentialIDMap)
                     {
-                        seqID =
-                            linkage->getFirstFreeTypeConformanceWitnessSequentialID(interfaceName);
+                        static std::atomic<int32_t> uniqueId = 0;
+                        auto currentUniqueId = uniqueId.fetch_add(1, std::memory_order_relaxed) + 1;
+                        generatedMangledName << "_generated_witness_uuid_" << currentUniqueId;
+                        witnessTableMangledName = generatedMangledName.getUnownedSlice();
                     }
-                    else
+
+                    // If the inst already has a SequentialIDDecoration, make sure the linkage-side
+                    // bookkeeping reflects that explicit ID before moving on.
+                    if (auto seqDecoration = inst->findDecoration<IRSequentialIDDecoration>())
                     {
-                        // NoneWitness, has special ID of -1.
-                        seqID = uint32_t(-1);
+                        seqID = uint32_t(seqDecoration->getSequentialID());
+                        if (interfaceName.getLength())
+                        {
+                            linkage->registerTypeConformanceWitnessSequentialID(
+                                String(witnessTableMangledName),
+                                interfaceName,
+                                seqID);
+                        }
+                        continue;
                     }
-                    if (interfaceName.getLength())
+
+                    if (!linkage->mapMangledNameToRTTIObjectIndex.tryGetValue(
+                            witnessTableMangledName,
+                            seqID))
                     {
-                        linkage->registerTypeConformanceWitnessSequentialID(
-                            String(witnessTableMangledName),
-                            interfaceName,
-                            seqID);
-                    }
-                    else
-                    {
-                        linkage->mapMangledNameToRTTIObjectIndex[witnessTableMangledName] = seqID;
+                        if (as<IRInterfaceType>(interfaceType))
+                        {
+                            seqID = linkage->getFirstFreeTypeConformanceWitnessSequentialID(
+                                interfaceName);
+                        }
+                        else
+                        {
+                            // NoneWitness, has special ID of -1.
+                            seqID = uint32_t(-1);
+                        }
+                        if (interfaceName.getLength())
+                        {
+                            linkage->registerTypeConformanceWitnessSequentialID(
+                                String(witnessTableMangledName),
+                                interfaceName,
+                                seqID);
+                        }
+                        else
+                        {
+                            linkage->mapMangledNameToRTTIObjectIndex[witnessTableMangledName] =
+                                seqID;
+                        }
                     }
                 }
 
