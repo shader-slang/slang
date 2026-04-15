@@ -4539,8 +4539,8 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
         }
         else
         {
-            paramTypes.add(m_astBuilder->getModifiedType(
-                thisType, {m_astBuilder->getNoDiffModifierVal()}));
+            paramTypes.add(
+                m_astBuilder->getModifiedType(thisType, {m_astBuilder->getNoDiffModifierVal()}));
         }
     }
 
@@ -4679,7 +4679,8 @@ struct HigherOrderInvokeExprCheckingActions
             if (auto genDecl = as<GenericDecl>(declRef.getDecl()))
             {
                 declRef = semantics->getASTBuilder()->getMemberDeclRef(
-                    declRef.as<GenericDecl>(), genDecl->inner);
+                    declRef.as<GenericDecl>(),
+                    genDecl->inner);
             }
             if (auto callableDeclRef = declRef.as<FunctionDeclBase>())
             {
@@ -7735,12 +7736,10 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
                     // struct type of that member function, not the function type itself.
                     // Use the target function's DeclRef to get the correctly
                     // substituted parent type (e.g., MyVec<float> not MyVec<T>).
-                    if (auto targetDeclRefType =
-                            as<DeclRefType>(parentExtDecl->targetType.type))
+                    if (auto targetDeclRefType = as<DeclRefType>(parentExtDecl->targetType.type))
                     {
                         auto targetDeclRef = targetDeclRefType->getDeclRef();
-                        if (auto targetFuncDecl =
-                                as<FunctionDeclBase>(targetDeclRef.getDecl()))
+                        if (auto targetFuncDecl = as<FunctionDeclBase>(targetDeclRef.getDecl()))
                         {
                             if (auto parentTypeDecl =
                                     as<AggTypeDeclBase>(targetFuncDecl->parentDecl))

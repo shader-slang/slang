@@ -9067,8 +9067,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     {
         if (auto conformingDeclRefType = as<DeclRefType>(context->conformingType))
         {
-            auto structDecl =
-                as<AggTypeDecl>(conformingDeclRefType->getDeclRef().getDecl());
+            auto structDecl = as<AggTypeDecl>(conformingDeclRefType->getDeclRef().getDecl());
             if (structDecl)
             {
                 auto substSet = SubstitutionSet(conformingDeclRefType->getDeclRef());
@@ -9086,16 +9085,15 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
                     if (tryGetDifferentialType(m_astBuilder, fieldType))
                         continue;
 
-                    auto substitutedType =
-                        as<Type>(fieldType->substitute(m_astBuilder, substSet));
+                    auto substitutedType = as<Type>(fieldType->substitute(m_astBuilder, substSet));
                     if (!substitutedType)
                         continue;
                     auto diffType = tryGetDifferentialType(m_astBuilder, substitutedType);
                     if (diffType)
                     {
-                        getSink()->diagnose(
-                            Diagnostics::SynthesizedDifferentialMethodMissingField{
-                                .fieldType = substitutedType, .field = field});
+                        getSink()->diagnose(Diagnostics::SynthesizedDifferentialMethodMissingField{
+                            .fieldType = substitutedType,
+                            .field = field});
                     }
                 }
             }
@@ -11463,9 +11461,8 @@ void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     decl->body = maybeParseStmt(decl->body, newContext);
     if (const auto body = decl->body)
     {
-        bool isSynthesizedDiffMethod =
-            decl->findModifier<SynthesizedModifier>() &&
-            decl->findModifier<BackwardDifferentiableAttribute>();
+        bool isSynthesizedDiffMethod = decl->findModifier<SynthesizedModifier>() &&
+                                       decl->findModifier<BackwardDifferentiableAttribute>();
         auto errorCountBefore = isSynthesizedDiffMethod ? getSink()->getErrorCount() : 0;
 
         checkStmt(decl->body, newContext);
@@ -14293,12 +14290,12 @@ bool SemanticsDeclBasesVisitor::_funcExtensionForwardDiff(
 // Output:
 //   extension foo : IBackwardDifferentiable<foo>
 //   {
-//       static userBwdFunc(inout DifferentialPair<float> x, float dOut) -> void { ... }  // user body
-//       static bwd_diff  = FunctionCopy(userBwdFunc)              // typed as BwdDiffFuncType<foo>
-//       struct BwdCallable  : IBwdCallable<foo> { ... }           // synthesized from bwd_diff
-//       struct MinimalContext { ... }                              // synthesized from bwd_diff
-//       apply_bwd = BackwardPrimalFromLegacyBwdDiffFunc(...)      // synthesized
-//       static remat = BackwardRematFromLegacyBwdDiffFunc(...)    // synthesized
+//       static userBwdFunc(inout DifferentialPair<float> x, float dOut) -> void { ... }  // user
+//       body static bwd_diff  = FunctionCopy(userBwdFunc)              // typed as
+//       BwdDiffFuncType<foo> struct BwdCallable  : IBwdCallable<foo> { ... }           //
+//       synthesized from bwd_diff struct MinimalContext { ... }                              //
+//       synthesized from bwd_diff apply_bwd = BackwardPrimalFromLegacyBwdDiffFunc(...)      //
+//       synthesized static remat = BackwardRematFromLegacyBwdDiffFunc(...)    // synthesized
 //   }
 //
 bool SemanticsDeclBasesVisitor::_funcExtensionBackwardDiff(
@@ -14334,9 +14331,8 @@ bool SemanticsDeclBasesVisitor::_funcExtensionBackwardDiff(
         getCalculatedDiffFuncType("BwdDiffFuncType", baseFuncAsType),
         true,
         visibility);
-    synBwdDiffFunc =
-        createDefaultSubstitutionsIfNeeded(astBuilder, this, synBwdDiffFunc)
-            .as<SynthesizedFuncDecl>();
+    synBwdDiffFunc = createDefaultSubstitutionsIfNeeded(astBuilder, this, synBwdDiffFunc)
+                         .as<SynthesizedFuncDecl>();
 
     auto synContextStruct = addOrExtendSynthesizedStruct(
         this,
@@ -14394,10 +14390,12 @@ bool SemanticsDeclBasesVisitor::_funcExtensionBackwardDiff(
 //       apply_bwd  = FunctionCopy(userApplyFunc)                  // typed as ApplyForBwdFuncType
 //       typealias BwdCallable = MyCtx;
 //       typealias MinimalContext = MyCtx;
-//       static remat = IdentityRemat(apply_bwd)                   // identity (MinCtx == BwdCallable)
+//       static remat = IdentityRemat(apply_bwd)                   // identity (MinCtx ==
+//       BwdCallable)
 //       // bwd_diff is synthesized later by LegacyBackwardDerivativeFunc requirement
 //   }
-//   extension MyCtx : IBwdCallable<foo> { }                       // conformance for the context type
+//   extension MyCtx : IBwdCallable<foo> { }                       // conformance for the context
+//   type
 //
 bool SemanticsDeclBasesVisitor::_funcExtensionApply(
     ExtensionDecl* extensionDecl,
@@ -14443,9 +14441,8 @@ bool SemanticsDeclBasesVisitor::_funcExtensionApply(
         getCalculatedDiffFuncType("ApplyForBwdFuncType", baseFuncAsType, ctxType),
         false,
         visibility);
-    synApplyBwdFunc =
-        createDefaultSubstitutionsIfNeeded(astBuilder, this, synApplyBwdFunc)
-            .as<SynthesizedFuncDecl>();
+    synApplyBwdFunc = createDefaultSubstitutionsIfNeeded(astBuilder, this, synApplyBwdFunc)
+                          .as<SynthesizedFuncDecl>();
 
     auto bwdCallableAlias = astBuilder->create<TypeAliasDecl>();
     bwdCallableAlias->nameAndLoc.name = getName("BwdCallable");
@@ -14518,7 +14515,8 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     // E.g.:
     //   __func_extension<T:IFloat> fwd_diff(foo<T>)(...) -> ... { ... }
     // becomes:
-    //   extension<T:IFloat> foo<T> : IForwardDifferentiable<foo<T>> { fwd_diff(...) -> ... { ... } }
+    //   extension<T:IFloat> foo<T> : IForwardDifferentiable<foo<T>> { fwd_diff(...) -> ... { ... }
+    //   }
 
     auto astBuilder = getASTBuilder();
 
@@ -14629,10 +14627,19 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
         success = _funcExtensionForwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
     else if (as<BackwardDifferentiateExpr>(diffExpr))
         success = _funcExtensionBackwardDiff(
-            extensionDecl, innerFunc, baseFuncAsType, visibility, isStaticFunc);
+            extensionDecl,
+            innerFunc,
+            baseFuncAsType,
+            visibility,
+            isStaticFunc);
     else if (as<ApplyForBwdExpr>(diffExpr))
         success = _funcExtensionApply(
-            extensionDecl, innerFunc, baseFuncAsType, visibility, isStaticFunc, decl->loc);
+            extensionDecl,
+            innerFunc,
+            baseFuncAsType,
+            visibility,
+            isStaticFunc,
+            decl->loc);
     else
         getSink()->diagnose(Diagnostics::Unimplemented{
             .feature = "unsupported operator in __func_extension",
