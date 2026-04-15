@@ -42,8 +42,10 @@ void computeMain()
 }
 
 // Verify dispatch code is generated with both conformance types.
-// HLSL: ImplA_getValue
-// HLSL: ImplB_getValue
+// The order of ImplA/ImplB in the output depends on witness table
+// unique IDs, which may vary across platforms, so use DAG checks.
+// HLSL-DAG: ImplA_getValue
+// HLSL-DAG: ImplB_getValue
 // HLSL: s_dispatch_IFoo_getValue
 // HLSL: switch(
 // HLSL: void computeMain

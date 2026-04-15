@@ -4427,24 +4427,27 @@ struct TypeFlowSpecializationContext
                     }
                     else
                     {
-                    List<IRInst*>& funcs = *module->getContainerPool().getList<IRInst>();
-                    forEachInSet(module, eos->getSet(), [&](IRInst* func) { funcs.add(func); });
+                        List<IRInst*>& funcs = *module->getContainerPool().getList<IRInst>();
+                        forEachInSet(
+                            module,
+                            eos->getSet(),
+                            [&](IRInst* func) { funcs.add(func); });
 
-                    for (auto func : funcs)
-                    {
-                        auto resolvedFunc = translationContext.resolveInst(func);
-                        if (!resolvedFunc)
+                        for (auto func : funcs)
                         {
-                            module->getContainerPool().free(&funcs);
-                            return none();
+                            auto resolvedFunc = translationContext.resolveInst(func);
+                            if (!resolvedFunc)
+                            {
+                                module->getContainerPool().free(&funcs);
+                                return none();
+                            }
+                            auto paramInfos = convertArgInfosToParamInfos(
+                                cast<IRFuncType>(resolvedFunc->getDataType()));
+                            if (auto boundCallee =
+                                    maybeGetBoundFunc(resolvedFunc, paramInfos, workQueue))
+                                propagateToCallSite(boundCallee);
                         }
-                        auto paramInfos = convertArgInfosToParamInfos(
-                            cast<IRFuncType>(resolvedFunc->getDataType()));
-                        if (auto boundCallee =
-                                maybeGetBoundFunc(resolvedFunc, paramInfos, workQueue))
-                            propagateToCallSite(boundCallee);
-                    }
-                    module->getContainerPool().free(&funcs);
+                        module->getContainerPool().free(&funcs);
                     }
                 }
                 else if (as<IRExtractExistentialWitnessTable>(lookupInst->getWitnessTable()))
