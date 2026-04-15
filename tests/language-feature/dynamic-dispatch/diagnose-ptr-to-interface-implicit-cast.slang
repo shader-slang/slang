@@ -5,7 +5,7 @@
 // 3. Ptr<struct> -> Ptr<struct>    (no struct inheritance in Slang)
 // 4. Ptr<interface supertype> -> Ptr<interface subtype> (narrowing)
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 
 interface IBase
 {
@@ -45,17 +45,20 @@ void computeMain()
 
     // 2. Ptr<interface> -> Ptr<struct>: rejected
     // CHECK: error[E30019]
+    // CHECK-NOT: not bit equivalent
     Foo* pf2 = ip;
 
     // 3. Ptr<struct> -> Ptr<another struct>: rejected (no struct inheritance)
     Bar b;
     // CHECK: error[E30019]
+    // CHECK-NOT: not bit equivalent
     Foo* pf3 = &b;
 
     // 4. Ptr<interface supertype> -> Ptr<interface subtype>: rejected (narrowing)
     IBase ib;
     IBase* ibp = &ib;
     // CHECK: error[E30019]
+    // CHECK-NOT: not bit equivalent
     IDerived* dp = ibp;
 
     outputBuffer[0] = 0;
