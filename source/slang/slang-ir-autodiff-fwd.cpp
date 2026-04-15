@@ -3041,9 +3041,7 @@ struct ForwardDiffTranslationContext
                         getDifferentialZeroOfType(
                             builder,
                             as<IRDifferentialPairType>(diffType)->getValueType()));
-                    builder->markInstAsDifferential(
-                        makeDiffPair,
-                        as<IRDifferentialPairType>(diffType)->getValueType());
+                    builder->markInstAsDifferential(makeDiffPair, primalType);
                     return makeDiffPair;
                 }
             }
