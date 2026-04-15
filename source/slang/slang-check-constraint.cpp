@@ -863,8 +863,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                     // New constraint has lower priority, so it doesn't override.
                     else if (c.priority > typeConstraintPriority)
                         joinType = type;
-                    // Equality constraint; latter overrides, failures are
-                    // checked during type substitutions later.
+                    // Equality constraint with equal priority; keep earlier type.
                     else if (c.isEquality)
                         joinType = type;
                     else
