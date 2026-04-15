@@ -581,7 +581,7 @@ static void getElementHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void
     uint32_t elementIndex;
     memcpy(&elementIndex, inst->getOperand(2).getPtr(), sizeof(elementIndex));
     auto byteOffset = (uint64_t)elementIndex * (uint64_t)inst->opcodeExtension;
-    memcpy(inst->getOperand(0).getPtr(), basePtr + byteOffset, inst->opcodeExtension);
+    memmove(inst->getOperand(0).getPtr(), basePtr + byteOffset, inst->opcodeExtension);
 }
 
 static void offsetPtrHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
@@ -974,7 +974,7 @@ void printHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void* userData
     auto ctx = convert(inCtx);
     SLANG_UNUSED(userData);
     const char* formatString = nullptr;
-    formatString = *(const char**)inst->getOperand(0).getPtr();
+    memcpy(&formatString, inst->getOperand(0).getPtr(), sizeof(const char*));
 
     List<List<uint8_t>> args;
     List<const void*> argPtrs;
