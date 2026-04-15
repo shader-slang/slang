@@ -2554,7 +2554,7 @@ err(
     span { loc = "location", message = "interface '~decl:Decl' cannot be used as a constraint on a function type because it does not have the [__FunctionInterface] attribute." }
 )
 
--- 312xx - Modifiers and Deprecation
+-- 312xx - Modifiers and Deprecation (part 1)
 
 warning(
     "deprecated-usage",
@@ -2606,10 +2606,10 @@ err(
 )
 
 err(
-    "removed-modifier-usage",
+    "removed-usage",
     31207,
-    "use of removed modifier",
-    span { loc = "location", message = "modifier '~modifierName' has been removed from the language. ~message" }
+    "use of removed declaration",
+    span { loc = "location", message = "~declName:Name has been removed since language version '~sinceVersion:Int': ~message" }
 )
 
 err(
@@ -2619,11 +2619,11 @@ err(
     span { loc = "expr:Expr", message = "~func:Decl expects for argument ~paramNumber:Int a type which is a shader input (`in`) variable." }
 )
 
-warning(
-    "deprecated-modifier-usage",
+err(
+    "removed-since-bad-version",
     31209,
-    "use of deprecated modifier",
-    span { loc = "location", message = "modifier '~modifierName' has been deprecated: ~message" }
+    "'RemovedSince' argument 'version' is outside allowed range",
+    span { loc = "location", message = "valid range: [~minVersion:Int, ~maxVersion:Int]" }
 )
 
 -- 3121x - Derivative group requirements
@@ -2748,6 +2748,22 @@ err(
     31225,
     "missing initializer for static const",
     span { loc = "decl:Decl", message = "static const variable '~decl' must have an initializer" }
+)
+
+-- 3123x - Modifiers and Deprecation (part 2)
+
+err(
+    "removed-modifier-usage",
+    31230,
+    "use of removed modifier",
+    span { loc = "location", message = "modifier '~modifierName' has been removed from the language. ~message" }
+)
+
+warning(
+    "deprecated-modifier-usage",
+    31231,
+    "use of deprecated modifier",
+    span { loc = "location", message = "modifier '~modifierName' has been deprecated: ~message" }
 )
 
 -- Enums (320xx)
