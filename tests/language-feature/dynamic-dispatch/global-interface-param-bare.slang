@@ -1,8 +1,11 @@
 // Bare `uniform IFoo` at global scope with conformances should support
 // dynamic dispatch, just like ConstantBuffer<IFoo> (global-interface-param.slang).
 //
-// Currently only single conformance works. Multi-conformance dispatch for
-// bare `uniform IFoo` globals remains a follow-up to #10314.
+// Single conformance works. Multi-conformance dispatch for bare `uniform IFoo`
+// globals remains a follow-up to #10314.
+
+//TEST:SIMPLE(filecheck=SINGLE): -target spirv-asm -stage compute -entry computeMain -conformance "ImplA:IFoo=0"
+//TEST:SIMPLE(filecheck=SINGLE): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0"
 
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
@@ -35,4 +38,5 @@ void computeMain()
     outputBuffer[0] = gFoo.getValue();
 }
 
+// SINGLE: computeMain
 // CHECK: computeMain

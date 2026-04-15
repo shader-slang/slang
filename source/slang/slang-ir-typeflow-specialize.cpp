@@ -3165,6 +3165,25 @@ struct TypeFlowSpecializationContext
         auto witnessTable = inst->getWitnessTable();
         auto witnessTableInfo = tryGetInfo(context, witnessTable);
 
+        // Fallback for module-scope extractExistentialWitnessTable on a global
+        // interface param. The typeflow pass doesn't analyze module-scope instructions,
+        // so their info is never set. We analyze the chain on-the-fly here.
+        // This must run before the elementOfSetType check so that both the normal
+        // and global-param-fallback paths share a single processing block.
+        if (!witnessTableInfo)
+        {
+            if (auto extractWT = as<IRExtractExistentialWitnessTable>(witnessTable))
+            {
+                auto taggedUnion =
+                    tryMakeTaggedUnionForGlobalInterfaceParam(extractWT->getOperand(0));
+                if (taggedUnion)
+                {
+                    witnessTableInfo = makeElementOfSetType(
+                        as<IRTaggedUnionType>(taggedUnion)->getWitnessTableSet());
+                }
+            }
+        }
+
         if (auto elementOfSetType = as<IRElementOfSetType>(witnessTableInfo))
         {
             IRBuilder builder(module);
@@ -3194,15 +3213,16 @@ struct TypeFlowSpecializationContext
                     // TODO: Make 'none witness' values a proper thing instead of three different
                     // possibilities..
                     //
+                    auto witnessTab = as<IRWitnessTable>(resolvedTable);
                     if (as<IRNoneWitnessTableElement>(table) || as<IRVoidLit>(table) ||
-                        (as<IRWitnessTable>(resolvedTable)->getConformanceType()->getOp() ==
-                         kIROp_VoidType))
+                        !witnessTab ||
+                        (witnessTab->getConformanceType()->getOp() == kIROp_VoidType))
                     {
                         results.add(builder.getVoidValue());
                         return;
                     }
 
-                    results.add(findWitnessTableEntry(cast<IRWitnessTable>(resolvedTable), key));
+                    results.add(findWitnessTableEntry(witnessTab, key));
                 });
 
             auto setOp = getSetOpFromType(inst->getDataType());
@@ -3212,89 +3232,18 @@ struct TypeFlowSpecializationContext
             return resultSetType;
         }
 
-        if (!witnessTableInfo)
-        {
-            // Handle module-scope extractExistentialWitnessTable on a global interface param.
-            // The typeflow pass doesn't analyze module-scope instructions, so their info
-            // is never set. We analyze the chain on-the-fly here.
-            if (auto extractWT = as<IRExtractExistentialWitnessTable>(witnessTable))
-            {
-                auto taggedUnion =
-                    tryMakeTaggedUnionForGlobalInterfaceParam(extractWT->getOperand(0));
-                if (taggedUnion)
-                {
-                    witnessTableInfo = makeElementOfSetType(
-                        as<IRTaggedUnionType>(taggedUnion)->getWitnessTableSet());
-                }
-            }
-        }
         if (!witnessTableInfo)
             return none();
-
-        // Re-check after the global interface param fallback above.
-        if (auto elementOfSetType = as<IRElementOfSetType>(witnessTableInfo))
-        {
-            IRBuilder builder(module);
-            HashSet<IRInst*>& results = *module->getContainerPool().getHashSet<IRInst>();
-            forEachInSet(
-                module,
-                cast<IRWitnessTableSet>(elementOfSetType->getSet()),
-                [&](IRInst* table)
-                {
-                    if (as<IRUnboundedWitnessTableElement>(table))
-                    {
-                        if (inst->getDataType()->getOp() == kIROp_FuncType)
-                            results.add(builder.getUnboundedFuncElement());
-                        else if (inst->getDataType()->getOp() == kIROp_WitnessTableType)
-                            results.add(builder.getUnboundedWitnessTableElement(
-                                as<IRWitnessTableType>(inst->getDataType())->getConformanceType()));
-                        else if (inst->getDataType()->getOp() == kIROp_TypeKind)
-                        {
-                            SLANG_UNEXPECTED(
-                                "TypeKind result from LookupWitnessMethod not supported");
-                        }
-                        return;
-                    }
-
-                    auto resolvedTable = translationContext.resolveInst(table);
-
-                    if (as<IRNoneWitnessTableElement>(table) || as<IRVoidLit>(table) ||
-                        (as<IRWitnessTable>(resolvedTable)->getConformanceType()->getOp() ==
-                         kIROp_VoidType))
-                    {
-                        results.add(builder.getVoidValue());
-                        return;
-                    }
-
-                    results.add(findWitnessTableEntry(cast<IRWitnessTable>(resolvedTable), key));
-                });
-
-            auto setOp = getSetOpFromType(inst->getDataType());
-            auto resultSetType = makeElementOfSetType(builder.getSet(setOp, results));
-            module->getContainerPool().free(&results);
-            return resultSetType;
-        }
 
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeLookupWitnessMethod");
     }
 
-    // Check if an operand is a global interface parameter with registered conformances,
-    // without creating any IR instructions. Use this for predicate checks where the
-    // TaggedUnionType itself is not needed.
+    // Check if an operand is a global interface parameter with registered conformances.
+    // Delegates to tryMakeTaggedUnionForGlobalInterfaceParam to avoid duplicating the
+    // guard logic. Note: this does create IR instructions as a side effect.
     bool isGlobalInterfaceParamWithConformances(IRInst* operand)
     {
-        auto interfaceType = as<IRInterfaceType>(operand->getDataType());
-        if (!interfaceType || isComInterfaceType(interfaceType))
-            return false;
-
-        if (!as<IRGlobalParam>(operand) && !(as<IRLoad>(operand) && isGlobalInst(operand)))
-            return false;
-
-        HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
-        collectExistentialTables(interfaceType, tables);
-        bool hasConformances = tables.getCount() > 0;
-        module->getContainerPool().free(&tables);
-        return hasConformances;
+        return tryMakeTaggedUnionForGlobalInterfaceParam(operand) != nullptr;
     }
 
     // Helper: create a TaggedUnionType for a module-scope instruction with interface type.
@@ -4472,6 +4421,12 @@ struct TypeFlowSpecializationContext
                 if (auto eos = as<IRElementOfSetType>(lookupInfo))
                 {
                     handled = true;
+                    if (eos->getSet()->isUnbounded())
+                    {
+                        // Don't propagate for unbounded callee sets.
+                    }
+                    else
+                    {
                     List<IRInst*>& funcs = *module->getContainerPool().getList<IRInst>();
                     forEachInSet(module, eos->getSet(), [&](IRInst* func) { funcs.add(func); });
 
@@ -4490,6 +4445,7 @@ struct TypeFlowSpecializationContext
                             propagateToCallSite(boundCallee);
                     }
                     module->getContainerPool().free(&funcs);
+                    }
                 }
                 else if (as<IRExtractExistentialWitnessTable>(lookupInst->getWitnessTable()))
                 {
