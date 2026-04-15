@@ -1,4 +1,7 @@
 // Test backward differentiation through existential dispatch using CPU target.
+// Unlike dynamic-dispatch-bwd-diff.slang (which uses createDynamicObject<> and
+// GPU backends), this test uses manual if/else existential construction with
+// no_diff() wrappers to exercise a distinct code path.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 
