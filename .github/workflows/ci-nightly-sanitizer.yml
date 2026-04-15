@@ -16,6 +16,7 @@ jobs:
       # CPU, SPIRV-emit, and diagnostic tests under sanitizer.
       test-category: full
       server-count: 1
+      timeout-minutes: 45
     secrets: inherit
 
   notify:

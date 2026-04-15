@@ -14,11 +14,15 @@ on:
         required: false
         type: string
         default: smoke
+      timeout-minutes:
+        required: false
+        type: number
+        default: 120
 
 jobs:
   sanitizer:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 120
+    timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
       id-token: write
       contents: read
