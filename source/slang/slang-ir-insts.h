@@ -3400,7 +3400,8 @@ $(type_info.return_type) $(type_info.method_name)(
             ptrTypeOp,
             valueType,
             oldPtrType->getAccessQualifier(),
-            oldPtrType->getAddressSpace());
+            oldPtrType->getAddressSpace(),
+            oldPtrType->getDataLayout());
     }
 
     /// Get a GLSL output parameter group type
