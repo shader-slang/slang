@@ -11,6 +11,8 @@
 #include "slang-source-map.h"
 #include "slang.h"
 
+#include <mutex>
+
 namespace Slang
 {
 
@@ -361,6 +363,8 @@ protected:
     // we will cache the starting offset of each line break in
     // the input file:
     List<uint32_t> m_lineBreakOffsets;
+    // Parallel diagnostics and backend work can lazily populate these SourceFile caches.
+    std::mutex m_cacheMutex;
 
     // If set then the locations in this file are really from locations from elsewhere,
     // where the SourceMap specifies that mapping
