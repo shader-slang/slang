@@ -14,8 +14,9 @@ struct IRModule;
 
 // Recursively visit the entire module and mark IRSpecialize instructions that use an existential
 // or interface type as a specialization argument. Recognized argument patterns include
-// ExtractExistentialType, ExtractExistentialWitnessTable, MakeExistential, InterfaceType, and
-// TypeEqualityWitness whose first operand is an InterfaceType.
+// ExtractExistentialType, ExtractExistentialWitnessTable, MakeExistential, InterfaceType,
+// TypeEqualityWitness whose first operand is an InterfaceType, and LookupWitnessMethod whose
+// witness table is an ExtractExistentialWitnessTable (associated-type pattern, #9934).
 // The actual diagnostic is emitted later by the typeflow or specialize passes.
 void addDecorationsForGenericsSpecializedWithExistentialsRec(IRInst* parent, DiagnosticSink* sink)
 {
@@ -47,6 +48,23 @@ void addDecorationsForGenericsSpecializedWithExistentialsRec(IRInst* parent, Dia
                     case kIROp_TypeEqualityWitness:
                         {
                             if (!as<IRInterfaceType>(specArg->getOperand(0)))
+                                continue;
+
+                            IRBuilder builder(parent->getModule());
+                            builder.addDecoration(
+                                specialize,
+                                kIROp_DisallowSpecializationWithExistentialsDecoration);
+                            goto nextInst;
+                        }
+                    case kIROp_LookupWitnessMethod:
+                        {
+                            // Associated type looked up from an existential witness table:
+                            //   lookupWitness(extractExistentialWitnessTable(obj), key)
+                            // This produces an existential-derived type that cannot be
+                            // statically resolved for unconstrained generics (#9934).
+                            auto lookupWitness = as<IRLookupWitnessMethod>(specArg);
+                            if (lookupWitness->getWitnessTable()->getOp() !=
+                                kIROp_ExtractExistentialWitnessTable)
                                 continue;
 
                             IRBuilder builder(parent->getModule());

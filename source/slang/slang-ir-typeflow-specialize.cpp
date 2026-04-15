@@ -278,6 +278,14 @@ bool isInvalidExistentialSpecialization(IRInst* specializedValue)
             if (as<IRInterfaceType>(arg->getOperand(0)))
                 return true;
             break;
+        case kIROp_LookupWitnessMethod:
+            if (auto lookupWitness = as<IRLookupWitnessMethod>(arg))
+            {
+                if (lookupWitness->getWitnessTable()->getOp() ==
+                    kIROp_ExtractExistentialWitnessTable)
+                    return true;
+            }
+            break;
         default:
             break;
         }
