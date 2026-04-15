@@ -4375,6 +4375,11 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
 {
     genericDecl->setCheckState(DeclCheckState::ReadyForLookup);
 
+    // Start by hiding all member decls from lookup; this is needed to prevent
+    // parameters referencing each other out-of-order, e.g., `<T=U,U>`.
+    for (auto& m : genericDecl->getDirectMemberDecls())
+        m->hiddenFromLookup = true;
+
     // NOTE! We purposefully do not iterate with the for(auto m : genericDecl->members) here,
     // because the visitor may add to `members` whilst iteration takes place, invalidating the
     // iterator and likely a crash.
@@ -4385,6 +4390,7 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
     for (Index i = 0; i < genericDecl->getDirectMemberDeclCount(); ++i)
     {
         Decl* m = genericDecl->getDirectMemberDecl(i);
+        m->hiddenFromLookup = false;
 
         if (auto typeParam = as<GenericTypeParamDeclBase>(m))
         {

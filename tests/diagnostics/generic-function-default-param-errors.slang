@@ -17,6 +17,12 @@ void invalidDefault<T : IFoo = NotIFoo>()
 {
 }
 
+void badDefaultOrder<A=B,B=int>()
+//diag:                ^ undefined identifier
+//diag:                ^ undefined identifier 'B'.
+{
+}
+
 void other()
 {
     invalidDefault();

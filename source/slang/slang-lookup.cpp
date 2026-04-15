@@ -228,7 +228,7 @@ static void _lookUpDirectAndTransparentMembers(
             if (!request.shouldConsiderAllLocalNames() && request.semantics &&
                 _isUncheckedLocalVar(m))
                 continue;
-            if (m == request.declToExclude)
+            if (m == request.declToExclude || m->hiddenFromLookup)
                 continue;
 
             if (!DeclPassesLookupMask(m, request.mask))

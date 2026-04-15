@@ -767,6 +767,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         {
             // Return value intentionally ignored: partial args are sufficient
             // for substituting references to already-solved parameters.
+            // Missing args aren't an issue, they're checked for e.g., in
+            // `maybeSubstituteGenericParam`.
             constraintSystemSolverUnpackArgs(
                 this,
                 genericDecls,
