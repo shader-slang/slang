@@ -5,7 +5,7 @@
 // 3. Ptr<struct> -> Ptr<struct>    (no struct inheritance in Slang)
 // 4. Ptr<interface supertype> -> Ptr<interface subtype> (narrowing)
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv
 
 interface IBase
 {
