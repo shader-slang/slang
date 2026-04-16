@@ -1711,6 +1711,24 @@ static bool _isTrivialLookupFromInterfaceThis(IRGenContext* context, DeclRefBase
     return context->thisTypeWitness == nullptr;
 }
 
+// Flatten a transitive witness chain into a list of leaf (non-transitive)
+// witness steps.  E.g. transitive(A:>B, transitive(B:>C, C:>D)) becomes
+// [A:>B, B:>C, C:>D].
+static void flattenTransitiveWitness(
+    SubtypeWitness* witness,
+    List<SubtypeWitness*>& outSteps)
+{
+    if (auto transitive = as<TransitiveSubtypeWitness>(witness))
+    {
+        flattenTransitiveWitness(transitive->getSubToMid(), outSteps);
+        flattenTransitiveWitness(transitive->getMidToSup(), outSteps);
+    }
+    else
+    {
+        outSteps.add(witness);
+    }
+}
+
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredValInfo>
 {
     IRGenContext* context;
@@ -2265,43 +2283,46 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitTransitiveSubtypeWitness(TransitiveSubtypeWitness* val)
     {
-        // The base (subToMid) will turn into a value with
-        // witness-table type.
-        IRInst* baseWitnessTable = lowerSimpleVal(context, val->getSubToMid());
-        IRInst* midToSup = nullptr;
+        // Flatten the transitive witness chain into individual steps.
+        // This handles multi-level interface inheritance chains (e.g.
+        // IC : IB : IA) where the old recursive approach would try to
+        // pass a StructKey as a witness table to lookupWitnessMethod.
+        // By flattening, each lookupWitnessMethod uses the result of
+        // the previous lookup as its witness table argument.
+        List<SubtypeWitness*> steps;
+        flattenTransitiveWitness(val, steps);
 
-        // The next step should map to an interface requirement
-        // that is itself an interface conformance, so the result
-        // of lowering this value should be a "key" that we can
-        // use to look up a witness table.
-        //
-        // TODO: There are some ugly cases here if `midToSup` is allowed
-        // to be an arbitrary witness, rather than just a declared one,
-        // and we probably need to change the logic here so that we
-        // instead think in terms of applying a subtype witness to
-        // either a value or a witness table, to perform the appropriate
-        // casting/lookup logic.
-        //
-        // For now we rely on the fact that the front-end doesn't
-        // produce transitive witnesses in shapes that will cuase us
-        // problems here.
-        //
-        SLANG_RELEASE_ASSERT(baseWitnessTable);
+        SLANG_RELEASE_ASSERT(steps.getCount() >= 2);
 
-        if (auto declaredMidToSup = as<DeclaredSubtypeWitness>(val->getMidToSup()))
+        // The first step produces the base witness table (e.g. a
+        // concrete witness table for Impl:>IC, or a StructKey for
+        // an interface requirement).
+        IRInst* currentWT = lowerSimpleVal(context, steps[0]);
+        SLANG_RELEASE_ASSERT(currentWT);
+
+        // Each subsequent step looks up from the current witness table.
+        for (Index i = 1; i < steps.getCount(); i++)
         {
-            midToSup =
-                getInterfaceRequirementKey(context, declaredMidToSup->getDeclRef().getDecl());
-        }
-        else
-        {
-            midToSup = lowerSimpleVal(context, val->getMidToSup());
+            IRInst* key = nullptr;
+            if (auto declared = as<DeclaredSubtypeWitness>(steps[i]))
+            {
+                key = getInterfaceRequirementKey(
+                    context,
+                    declared->getDeclRef().getDecl());
+            }
+            else
+            {
+                key = lowerSimpleVal(context, steps[i]);
+            }
+
+            auto supType = lowerType(context, steps[i]->getSup());
+            currentWT = getBuilder()->emitLookupInterfaceMethodInst(
+                getBuilder()->getWitnessTableType(supType),
+                currentWT,
+                key);
         }
 
-        return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(
-            getBuilder()->getWitnessTableType(lowerType(context, val->getSup())),
-            baseWitnessTable,
-            midToSup));
+        return LoweredValInfo::simple(currentWT);
     }
 
     LoweredValInfo visitForwardDifferentiateVal(ForwardDifferentiateVal* val)
@@ -6744,6 +6765,86 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
+    // Resolve an interface-to-interface witness chain against an actual
+    // witness table extracted from an existential.  Handles transitive
+    // witnesses, declared witnesses that span multiple levels (e.g.
+    // IC:>IA via IB where the key belongs to IB, not IC), and chains
+    // lookupWitnessMethod calls.
+    IRInst* resolveInterfaceWitnessChain(
+        IRInst* sourceWT,
+        IRType* sourceIface,
+        SubtypeWitness* witness)
+    {
+        auto builder = getBuilder();
+
+        if (auto transitive = as<TransitiveSubtypeWitness>(witness))
+        {
+            auto midType = lowerType(context, transitive->getSubToMid()->getSup());
+            auto midIface = as<IRInterfaceType>(midType);
+            auto midWT = resolveInterfaceWitnessChain(
+                sourceWT, sourceIface, transitive->getSubToMid());
+            return resolveInterfaceWitnessChain(
+                midWT, midIface, transitive->getMidToSup());
+        }
+        else if (auto declared = as<DeclaredSubtypeWitness>(witness))
+        {
+            auto key = getInterfaceRequirementKey(
+                context, declared->getDeclRef().getDecl());
+
+            // Check if the key's declaring interface differs from the source.
+            // For example, IC:>IA may have a DeclRef to IB's InheritanceDecl
+            // for IA.  In that case, we need to first look up IC.$inheritance
+            // to get IB's witness table, then use IB.$inheritance to get IA's.
+            auto declParent = declared->getDeclRef().getDecl()->parentDecl;
+            if (auto parentIface = as<InterfaceDecl>(declParent))
+            {
+                auto parentIfaceType = lowerType(context, DeclRefType::create(
+                    getASTBuilder(), makeDeclRef(parentIface)));
+                if (parentIfaceType != sourceIface)
+                {
+                    // Traverse the source interface's inheritance requirements
+                    // to find a path to the parent interface.
+                    for (UInt i = 0; i < sourceIface->getOperandCount(); i++)
+                    {
+                        auto entry = sourceIface->getOperand(i);
+                        if (entry->getOp() == kIROp_InterfaceRequirementEntry)
+                        {
+                            auto reqValType = entry->getOperand(1);
+                            if (auto wtType = as<IRWitnessTableType>(reqValType))
+                            {
+                                auto ifaceType = wtType->getConformanceType();
+                                if (ifaceType == parentIfaceType)
+                                {
+                                    // Found path: source -> parent
+                                    auto inheritKey = entry->getOperand(0);
+                                    auto midWT = builder->emitLookupInterfaceMethodInst(
+                                        wtType, sourceWT, inheritKey);
+                                    // Look up the target from the parent WT
+                                    auto supType = lowerType(context, witness->getSup());
+                                    return builder->emitLookupInterfaceMethodInst(
+                                        builder->getWitnessTableType(supType),
+                                        midWT,
+                                        key);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            auto supType = lowerType(context, witness->getSup());
+            return builder->emitLookupInterfaceMethodInst(
+                builder->getWitnessTableType(supType), sourceWT, key);
+        }
+        else
+        {
+            auto lowered = lowerSimpleVal(context, witness);
+            auto supType = lowerType(context, witness->getSup());
+            return builder->emitLookupInterfaceMethodInst(
+                builder->getWitnessTableType(supType), sourceWT, lowered);
+        }
+    }
+
     LoweredValInfo visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
     {
         auto superType = lowerType(context, expr->type);
@@ -6778,6 +6879,32 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             auto declRef = declRefType->getDeclRef();
             if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
             {
+                auto concreteValue = getSimpleVal(context, value);
+
+                // When the source value is an interface existential, we have
+                // an interface-to-interface upcast.  The witness chain may
+                // contain StructKeys or span multiple inheritance levels
+                // (e.g. IC :> IA via IB).  Extract the concrete value and
+                // witness table from the source existential, resolve the
+                // witness chain through the interface hierarchy, and re-box.
+                auto sourceIfaceType = as<IRInterfaceType>(concreteValue->getDataType());
+                if (sourceIfaceType)
+                {
+                    auto builder = getBuilder();
+                    auto extractedType = builder->emitExtractExistentialType(concreteValue);
+                    auto extractedValue =
+                        builder->emitExtractExistentialValue(extractedType, concreteValue);
+                    auto sourceWT = builder->emitExtractExistentialWitnessTable(concreteValue);
+
+                    auto witness = as<SubtypeWitness>(expr->witnessArg);
+                    auto targetWT = resolveInterfaceWitnessChain(
+                        sourceWT, sourceIfaceType, witness);
+
+                    auto existentialValue =
+                        builder->emitMakeExistential(superType, extractedValue, targetWT);
+                    return LoweredValInfo::simple(existentialValue);
+                }
+
                 // We have an expression that is "up-casting" some concrete value
                 // to an existential type (aka interface type), using a subtype witness
                 // (which will lower as a witness table) to show that the conversion
@@ -6796,7 +6923,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // we should probably extend the AST and IR mechanism here to accept
                 // a sequence of witness tables.
                 //
-                auto concreteValue = getSimpleVal(context, value);
                 auto existentialValue =
                     getBuilder()->emitMakeExistential(superType, concreteValue, witnessTable);
                 return LoweredValInfo::simple(existentialValue);
