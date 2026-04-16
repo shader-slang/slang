@@ -1383,13 +1383,6 @@ err(
 )
 
 err(
-    "cannot-reassign-var-after-existential-opened",
-    33181,
-    "cannot reassign variable after opening existential type",
-    span { loc = "location", message = "cannot reassign '~variable:Name' after its existential type has been opened. Use a 'let' binding, or avoid accessing associated types before reassignment." }
-)
-
-err(
     "static-ref-to-non-static-member",
     30100,
     "type cannot refer to non-static member",

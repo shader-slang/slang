@@ -123,8 +123,9 @@ Expr* SemanticsVisitor::moveTemp(Expr* const& expr, F const& func)
 /// See https://github.com/shader-slang/slang/issues/10004.
 ///
 /// When we reuse a `VarDecl` directly, we mark it with
-/// `ExistentialOpenedOnVarModifier` so that a later reassignment can be
-/// diagnosed as an error (since it would invalidate the opened type identity).
+/// `ExistentialOpenedOnVarModifier` to track that it has been opened.
+/// If the variable is later reassigned, `VarReassignedModifier` is added,
+/// and subsequent calls to `maybeMoveTemp` will fall through to `moveTemp`.
 ///
 template<typename F>
 Expr* SemanticsVisitor::maybeMoveTemp(Expr* const& expr, F const& func)
@@ -3490,20 +3491,14 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     expr->right = coerce(CoercionSite::Assignment, type, right, getSink());
 
     // Track reassignment of `VarDecl`s for single-assignment detection.
-    // If a `var` had its existential type opened (ExistentialOpenedOnVarModifier),
-    // reassigning it would invalidate the opened type identity.
+    // After reassignment, `maybeMoveTemp` will fall through to `moveTemp`
+    // (creating a fresh temporary) instead of reusing the variable directly.
     if (auto varExpr = as<VarExpr>(expr->left))
     {
         if (auto varDecl = as<VarDecl>(varExpr->declRef.getDecl()))
         {
             if (!as<LetDecl>(varDecl))
             {
-                if (varDecl->hasModifier<ExistentialOpenedOnVarModifier>())
-                {
-                    getSink()->diagnose(Diagnostics::CannotReassignVarAfterExistentialOpened{
-                        .variable = varDecl->getName(),
-                        .location = expr->loc});
-                }
                 if (!varDecl->hasModifier<VarReassignedModifier>())
                     addModifier(varDecl, m_astBuilder->create<VarReassignedModifier>());
             }
