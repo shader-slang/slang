@@ -676,14 +676,12 @@ struct AnyValueMarshallingContext
                             kIROp_CastDescriptorHandleToUInt64,
                             1,
                             &srcVal);
-                        auto lowBits =
-                            builder->emitCast(builder->getUIntType(), uint64Val);
+                        auto lowBits = builder->emitCast(builder->getUIntType(), uint64Val);
                         auto highBits = builder->emitShr(
                             builder->getUInt64Type(),
                             uint64Val,
                             builder->getIntValue(builder->getIntType(), 32));
-                        highBits =
-                            builder->emitCast(builder->getUIntType(), highBits);
+                        highBits = builder->emitCast(builder->getUIntType(), highBits);
 
                         auto dstAddr0 = builder->emitFieldAddress(
                             uintPtrType,
@@ -698,6 +696,9 @@ struct AnyValueMarshallingContext
                     }
                     else
                     {
+                        // Metal pointers are always 8 bytes; bitcast is invalid for
+                        // pointers on Metal so this path must not be reached.
+                        SLANG_ASSERT(!isMetalTarget(targetRequest));
                         // CUDA/CPU: bitcast works for non-pointer native handles
                         auto uintVectorType =
                             builder->getVectorType(builder->getUIntType(), numFieldsNeeded);
@@ -1092,18 +1093,14 @@ struct AnyValueMarshallingContext
                             anyValInfo->fieldKeys[fieldOffset + 1]);
                         auto highBits = builder->emitLoad(srcAddr1);
 
-                        auto lowBits64 =
-                            builder->emitCast(builder->getUInt64Type(), lowBits);
-                        auto highBits64 =
-                            builder->emitCast(builder->getUInt64Type(), highBits);
+                        auto lowBits64 = builder->emitCast(builder->getUInt64Type(), lowBits);
+                        auto highBits64 = builder->emitCast(builder->getUInt64Type(), highBits);
                         auto shiftedHigh = builder->emitShl(
                             builder->getUInt64Type(),
                             highBits64,
                             builder->getIntValue(builder->getIntType(), 32));
-                        auto combined = builder->emitBitOr(
-                            builder->getUInt64Type(),
-                            lowBits64,
-                            shiftedHigh);
+                        auto combined =
+                            builder->emitBitOr(builder->getUInt64Type(), lowBits64, shiftedHigh);
 
                         auto result = builder->emitIntrinsicInst(
                             dataType,
@@ -1114,6 +1111,9 @@ struct AnyValueMarshallingContext
                     }
                     else
                     {
+                        // Metal pointers are always 8 bytes; bitcast is invalid for
+                        // pointers on Metal so this path must not be reached.
+                        SLANG_ASSERT(!isMetalTarget(targetRequest));
                         // CUDA/CPU: bitcast works for non-pointer native handles
                         auto uintVectorType =
                             builder->getVectorType(builder->getUIntType(), numFieldsNeeded);
@@ -1128,10 +1128,8 @@ struct AnyValueMarshallingContext
                             components[i] = builder->emitLoad(srcAddr);
                         }
 
-                        auto uintVecVal = builder->emitMakeVector(
-                            uintVectorType,
-                            numFieldsNeeded,
-                            components);
+                        auto uintVecVal =
+                            builder->emitMakeVector(uintVectorType, numFieldsNeeded, components);
                         auto result = builder->emitBitCast(dataType, uintVecVal);
                         builder->emitStore(concreteVar, result);
                     }
