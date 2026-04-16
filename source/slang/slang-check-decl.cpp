@@ -3972,12 +3972,12 @@ struct CollectReferencedDeclsVisitor
 };
 
 // General utility function to collect all referenced declarations from a syntax node
-void collectReferencedDecls(SemanticsContext& context, NodeBase* node, HashSet<Decl*>& outDecls)
+void collectReferencedDecls(SemanticsVisitor* context, NodeBase* node, HashSet<Decl*>& outDecls)
 {
     if (!node)
         return;
 
-    CollectReferencedDeclsVisitor visitor(outDecls, context);
+    CollectReferencedDeclsVisitor visitor(outDecls, *context);
 
     if (auto val = as<Val>(node))
         visitor.dispatchIfNotNull(val);
@@ -4039,7 +4039,7 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericDecl(
 
     // Collect all referenced declarations from the constraint's superior type
     HashSet<Decl*> referencedDecls;
-    collectReferencedDecls(*this, val ? as<NodeBase>(val) : as<NodeBase>(expr), referencedDecls);
+    collectReferencedDecls(this, val ? as<NodeBase>(val) : as<NodeBase>(expr), referencedDecls);
 
     // Check if any of the referenced declarations are forward references (not in our "declared so
     // far" set)
@@ -14188,7 +14188,7 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
 
         // Collect all declarations referenced by the target type
         HashSet<Decl*> genericParamsReferencedByTargetType;
-        collectReferencedDecls(*this, decl->targetType.type, genericParamsReferencedByTargetType);
+        collectReferencedDecls(this, decl->targetType.type, genericParamsReferencedByTargetType);
 
         HashSet<Decl*> genericParamsReferencedByConstraints;
 
@@ -14197,7 +14197,7 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
              getMembersOfType<GenericTypeConstraintDecl>(getASTBuilder(), genericDecl))
         {
             collectReferencedDecls(
-                *this,
+                this,
                 constraint.getDecl()->sup.type,
                 genericParamsReferencedByConstraints);
         }
