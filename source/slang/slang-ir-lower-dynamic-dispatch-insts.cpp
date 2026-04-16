@@ -1069,6 +1069,18 @@ void lowerTagTypes(IRModule* module)
     context.processModule();
 }
 
+// Extract the element type from a pointer-like data type.
+// Handles both IRPtrTypeBase (regular pointers like Ptr<T>) and
+// IRPointerLikeType (ConstantBuffer<T>, ParameterBlock<T>).
+static IRType* getPointerElementType(IRType* ptrDataType)
+{
+    if (auto ptrType = as<IRPtrTypeBase>(ptrDataType))
+        return ptrType->getValueType();
+    if (auto pointerLikeType = as<IRPointerLikeType>(ptrDataType))
+        return pointerLikeType->getElementType();
+    return nullptr;
+}
+
 bool isEffectivelyComPtrType(IRType* type)
 {
     if (!type)
@@ -1088,18 +1100,6 @@ bool isEffectivelyComPtrType(IRType* type)
     }
 
     return false;
-}
-
-// Extract the element type from a pointer-like data type, handling both
-// IRPtrTypeBase (regular pointers) and IRPointerLikeType (ConstantBuffer,
-// ParameterBlock, etc.).
-static IRType* getPointerElementType(IRType* ptrDataType)
-{
-    if (auto ptrType = as<IRPtrTypeBase>(ptrDataType))
-        return ptrType->getValueType();
-    if (auto pointerLikeType = as<IRPointerLikeType>(ptrDataType))
-        return pointerLikeType->getElementType();
-    return nullptr;
 }
 
 // This context lowers `CastInterfaceToTaggedUnionPtr` by finding all `IRLoad` and
@@ -1253,8 +1253,9 @@ struct TaggedUnionLoweringContext : public InstPassBase
                             getPointerElementType(baseInterfacePtr->getDataType()));
                         if (!baseInterfaceType)
                         {
-                            SLANG_UNEXPECTED("Expected interface-typed pointer for "
-                                             "CastInterfaceToTaggedUnionPtr load.");
+                            SLANG_UNEXPECTED(
+                                "CastInterfaceToTaggedUnionPtr load: pointer element is not an "
+                                "interface type");
                         }
 
                         // Rewrite the load to use the original ptr and load
@@ -1289,8 +1290,9 @@ struct TaggedUnionLoweringContext : public InstPassBase
                             getPointerElementType(baseInterfacePtr->getDataType()));
                         if (!baseInterfaceType)
                         {
-                            SLANG_UNEXPECTED("Expected interface-typed pointer for "
-                                             "CastInterfaceToTaggedUnionPtr store.");
+                            SLANG_UNEXPECTED(
+                                "CastInterfaceToTaggedUnionPtr store: pointer element is not an "
+                                "interface type");
                         }
 
                         // Rewrite the store to use the original ptr and store

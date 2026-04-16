@@ -368,9 +368,6 @@ struct CollectGlobalUniformParametersContext
 
                 // Whatever replacement value we computed, we need
                 // to install it as the value to be used at the use site.
-                // Use replaceOperand rather than use->set() to correctly
-                // handle hoistable instructions (e.g., extractExistentialType
-                // on an interface-typed global param).
                 //
                 builder->replaceOperand(use, value);
             }
