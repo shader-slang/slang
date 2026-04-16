@@ -3500,10 +3500,9 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
             {
                 if (varDecl->hasModifier<ExistentialOpenedOnVarModifier>())
                 {
-                    getSink()->diagnose(
-                        Diagnostics::CannotReassignVarAfterExistentialOpened{
-                            .variable = varDecl->getName(),
-                            .location = expr->loc});
+                    getSink()->diagnose(Diagnostics::CannotReassignVarAfterExistentialOpened{
+                        .variable = varDecl->getName(),
+                        .location = expr->loc});
                 }
                 if (!varDecl->hasModifier<VarReassignedModifier>())
                     addModifier(varDecl, m_astBuilder->create<VarReassignedModifier>());
