@@ -4051,13 +4051,13 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericDecl(Decl* decl,
             continue;
 
         // Found a forward reference, report an error.
-        if (auto typeParam = as<GenericTypeParamDeclBase>(referencedDecl))
+        if (as<GenericTypeParamDeclBase>(referencedDecl) || as<GenericValueParamDecl>(referencedDecl))
         {
             if (auto typeConstraint = as<GenericTypeConstraintDecl>(decl))
             {
                 getSink()->diagnose(Diagnostics::ForwardReferenceInGenericConstraint{
                     .param = typeConstraint->sub.type,
-                    .referenced = typeParam,
+                    .referenced = referencedDecl,
                     .expr = expr});
             }
             else if (as<GenericTypeParamDecl>(decl))
@@ -4067,13 +4067,13 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericDecl(Decl* decl,
                     .referenced = referencedDecl,
                     .expr = expr});
             }
-        }
-        else if (as<GenericValueParamDecl>(referencedDecl) && as<GenericValueParamDecl>(decl))
-        {
-            getSink()->diagnose(Diagnostics::ForwardReferenceInGenericDefaultInitializer{
-                .param = decl,
-                .referenced = referencedDecl,
-                .expr = expr});
+            else if (as<GenericValueParamDecl>(decl))
+            {
+                getSink()->diagnose(Diagnostics::ForwardReferenceInGenericDefaultInitializer{
+                    .param = decl,
+                    .referenced = referencedDecl,
+                    .expr = expr});
+            }
         }
     }
 }
