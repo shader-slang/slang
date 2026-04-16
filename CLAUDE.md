@@ -33,7 +33,11 @@ cmake --preset default
 # Configure with visual studio 2022 settings (Preferred on Windows)
 # On Windows, include -DSLANG_IGNORE_ABORT_MSG=ON to suppress
 # modal abort dialogs during unattended/LLM-driven builds.
-cmake.exe --preset vs2022 -DSLANG_IGNORE_ABORT_MSG=ON
+# Use -DSLANG_EMBED_CORE_MODULE=OFF to keep core module compilation separate
+# from C++ source compilation. This way errors in *.meta.slang files (e.g.
+# hlsl.meta.slang) do not break the C++ build — slangc and slang-test still
+# compile successfully and the module errors surface at runtime instead.
+cmake.exe --preset vs2022 -DSLANG_IGNORE_ABORT_MSG=ON -DSLANG_EMBED_CORE_MODULE=OFF
 
 # Build Release/Debug binaries.
 # It can take from 5 minutes to 20 minutes depending on the machine.
