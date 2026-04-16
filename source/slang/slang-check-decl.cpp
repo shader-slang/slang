@@ -3962,14 +3962,11 @@ struct CollectReferencedDeclsVisitor
     HashSet<Decl*>* outDecls;
 
     CollectReferencedDeclsVisitor(HashSet<Decl*>& outDecls, SemanticsContext& outer)
-    : Base(outer), outDecls(&outDecls)
+        : Base(outer), outDecls(&outDecls)
     {
     }
 
-    virtual void processReferencedDecl(Decl* decl) override
-    {
-        outDecls->add(decl);
-    }
+    virtual void processReferencedDecl(Decl* decl) override { outDecls->add(decl); }
 
     virtual void processDeclModifiers(Decl*, SourceLoc) override {}
 };
@@ -3992,7 +3989,10 @@ void collectReferencedDecls(SemanticsContext& context, NodeBase* node, HashSet<D
         visitor.dispatchIfNotNull(decl);
 }
 
-void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericDecl(Decl* decl, Expr* expr, Val* val)
+void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericDecl(
+    Decl* decl,
+    Expr* expr,
+    Val* val)
 {
     // Check if this constraint references type parameters that appear later
     // in the same GenericDecl's parameter list and report a forward reference error
@@ -4047,11 +4047,13 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericDecl(Decl* decl,
     {
         // If this type parameter doesn't belong to the same generic or is in
         // our "declared so far" set, it's OK.
-        if (referencedDecl->parentDecl != parentGeneric || declaredBeforeConstraint.contains(referencedDecl))
+        if (referencedDecl->parentDecl != parentGeneric ||
+            declaredBeforeConstraint.contains(referencedDecl))
             continue;
 
         // Found a forward reference, report an error.
-        if (as<GenericTypeParamDeclBase>(referencedDecl) || as<GenericValueParamDecl>(referencedDecl))
+        if (as<GenericTypeParamDeclBase>(referencedDecl) ||
+            as<GenericValueParamDecl>(referencedDecl))
         {
             if (auto typeConstraint = as<GenericTypeConstraintDecl>(decl))
             {
