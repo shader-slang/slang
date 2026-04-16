@@ -130,6 +130,7 @@ function(set_default_compile_options target)
                 APPEND
                 warning_flags
                 -Wno-class-memaccess
+                -Wno-nontrivial-memcall
                 -Wno-unused-variable
                 -Wno-unused-parameter
                 -Wno-sign-compare
