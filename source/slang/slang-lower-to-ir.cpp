@@ -6784,6 +6784,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             auto midType = lowerType(context, transitive->getSubToMid()->getSup());
             auto midIface = as<IRInterfaceType>(midType);
+            SLANG_ASSERT(midIface);
             auto midWT = resolveInterfaceWitnessChain(
                 sourceWT, sourceIface, transitive->getSubToMid());
             return resolveInterfaceWitnessChain(
