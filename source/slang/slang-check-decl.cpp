@@ -3981,11 +3981,11 @@ void collectReferencedDecls(SemanticsVisitor* context, NodeBase* node, HashSet<D
 
     if (auto val = as<Val>(node))
         visitor.dispatchIfNotNull(val);
-    if (auto stmt = as<Stmt>(node))
+    else if (auto stmt = as<Stmt>(node))
         visitor.dispatchIfNotNull(stmt);
-    if (auto expr = as<Expr>(node))
+    else if (auto expr = as<Expr>(node))
         visitor.dispatchIfNotNull(expr);
-    if (auto decl = as<Decl>(node))
+    else if (auto decl = as<Decl>(node))
         visitor.dispatchIfNotNull(decl);
 }
 
