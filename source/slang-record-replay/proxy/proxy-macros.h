@@ -66,9 +66,13 @@ namespace SlangRecord
     if (!arg)                                   \
     arg = &_temp_##arg
 
-// Prepare a pointer input parameter (T* style, e.g. SessionDesc*)
+// Prepare a pointer input parameter (T* style)
 // During replay, callWithDefaults passes nullptr for pointer args. This macro
 // provides a stack-allocated default so RECORD_INPUT(*arg) can read into it.
+// The temporary lives until the end of the enclosing scope, so this macro
+// must be used at function-body scope (not inside an inner block) to ensure
+// the temporary outlives all subsequent uses of `arg`.
+// Usage: PREPARE_POINTER_INPUT(sessionDesc) where sessionDesc is SessionDesc*
 #define PREPARE_POINTER_INPUT(arg)              \
     std::decay_t<decltype(*arg)> _temp_##arg{}; \
     if (!arg)                                   \

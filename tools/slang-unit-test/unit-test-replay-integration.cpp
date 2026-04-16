@@ -334,7 +334,8 @@ SLANG_UNIT_TEST(replayContextRecordGetSessionDescDigestCall)
 
     slang::SessionDesc sessionDesc = {};
     Slang::ComPtr<ISlangBlob> digestBlob;
-    SlangResult digestResult = globalSession->getSessionDescDigest(&sessionDesc, digestBlob.writeRef());
+    SlangResult digestResult =
+        globalSession->getSessionDescDigest(&sessionDesc, digestBlob.writeRef());
     SLANG_CHECK(SLANG_SUCCEEDED(digestResult));
     SLANG_CHECK(digestBlob != nullptr);
 
@@ -344,6 +345,7 @@ SLANG_UNIT_TEST(replayContextRecordGetSessionDescDigestCall)
     // signature + this handle + global desc + output handle + result
     const char* signature = nullptr;
     ctx().record(RecordFlag::Input, signature);
+    SLANG_CHECK(signature != nullptr);
     SLANG_CHECK(strcmp(signature, "slang_createGlobalSession2") == 0);
     uint64_t thisHandle = 0;
     ctx().recordHandle(RecordFlag::Input, thisHandle);
@@ -362,6 +364,7 @@ SLANG_UNIT_TEST(replayContextRecordGetSessionDescDigestCall)
     // - output blob (hash)
     // - return value
     ctx().record(RecordFlag::Input, signature);
+    SLANG_CHECK(signature != nullptr);
     SLANG_CHECK(strstr(signature, "getSessionDescDigest") != nullptr);
     ctx().recordHandle(RecordFlag::Input, thisHandle);
     SLANG_CHECK(thisHandle == globalContextHandle);
@@ -370,9 +373,14 @@ SLANG_UNIT_TEST(replayContextRecordGetSessionDescDigestCall)
     SLANG_CHECK(readDesc.targetCount == sessionDesc.targetCount);
     SLANG_CHECK(readDesc.searchPathCount == sessionDesc.searchPathCount);
 
-    // Read output blob (recorded as content hash)
-    ISlangBlob* readBlob = nullptr;
-    ctx().record(RecordFlag::Output, readBlob);
+    // Read output blob (recorded as content hash). recordBlobByHash detaches
+    // a new ComPtr into the raw pointer during playback, so we need to adopt
+    // ownership to avoid leaking the blob.
+    ISlangBlob* readBlobRaw = nullptr;
+    ctx().record(RecordFlag::Output, readBlobRaw);
+    Slang::ComPtr<ISlangBlob> readBlob;
+    readBlob.attach(readBlobRaw);
+    SLANG_CHECK(readBlob != nullptr);
 
     // Read return value
     SlangResult readResult;
@@ -394,8 +402,6 @@ SLANG_UNIT_TEST(replayContextGetSessionDescDigestPlayback)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    ctx().enable();
-    ctx().reset();
     ctx().setMode(Mode::Record);
 
     Slang::ComPtr<slang::IGlobalSession> globalSession;
@@ -405,7 +411,8 @@ SLANG_UNIT_TEST(replayContextGetSessionDescDigestPlayback)
 
     slang::SessionDesc sessionDesc = {};
     Slang::ComPtr<ISlangBlob> digestBlob;
-    SLANG_CHECK(SLANG_SUCCEEDED(globalSession->getSessionDescDigest(&sessionDesc, digestBlob.writeRef())));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(globalSession->getSessionDescDigest(&sessionDesc, digestBlob.writeRef())));
     SLANG_CHECK(digestBlob != nullptr);
 
     size_t recordedDigestSize = digestBlob->getBufferSize();
@@ -418,6 +425,10 @@ SLANG_UNIT_TEST(replayContextGetSessionDescDigestPlayback)
     // PREPARE_POINTER_INPUT ensures the null SessionDesc* is patched
     // to valid storage before RECORD_INPUT dereferences it.
     ctx().executeAll();
+
+    // Confirm the whole recorded stream was consumed. A partial replay
+    // (e.g. getSessionDescDigest silently skipped) would otherwise go unnoticed.
+    SLANG_CHECK(ctx().getStream().atEnd());
 
     ctx().disable();
 }
