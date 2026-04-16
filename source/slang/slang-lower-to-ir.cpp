@@ -2461,6 +2461,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(emitNonEmptyPackWitness(loweredPack));
     }
 
+    LoweredValInfo visitHasDiffTypeInfoWitness(HasDiffTypeInfoWitness* witness)
+    {
+        SLANG_UNUSED(witness);
+        return LoweredValInfo::simple(getBuilder()->getVoidValue());
+    }
+
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
     {
         auto type = lowerType(context, val->getType());
@@ -5027,6 +5033,16 @@ struct ExprLoweringContext
                         subContext,
                         genSubst,
                         nonEmptyConstraintDecl,
+                        argCounter++);
+                }
+                else if (
+                    auto hasDiffTypeInfoConstraintDecl =
+                        as<HasDiffTypeInfoConstraintDecl>(memberDecl))
+                {
+                    _lowerSubstitutionArg(
+                        subContext,
+                        genSubst,
+                        hasDiffTypeInfoConstraintDecl,
                         argCounter++);
                 }
             }
@@ -11885,6 +11901,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
     }
 
+    void emitGenericConstraintDecl(
+        IRGenContext* subContext,
+        HasDiffTypeInfoConstraintDecl* constraintDecl)
+    {
+        auto subBuilder = subContext->irBuilder;
+        auto param = subBuilder->emitParam(subBuilder->getVoidType());
+        addNameHint(context, param, constraintDecl);
+        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
+    }
+
     IRGeneric* emitOuterGeneric(IRGenContext* subContext, GenericDecl* genericDecl, Decl* leafDecl)
     {
         auto subBuilder = subContext->irBuilder;
@@ -11948,6 +11974,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
             {
                 emitGenericConstraintDecl(subContext, nonEmptyConstraintDecl);
+            }
+            else if (
+                auto hasDiffTypeInfoConstraintDecl =
+                    as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+            {
+                emitGenericConstraintDecl(subContext, hasDiffTypeInfoConstraintDecl);
             }
         }
 
@@ -15068,10 +15100,10 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     if (m_irModuleForLayout)
         return m_irModuleForLayout;
 
+    // `getOrCreateIRModuleForLayout()` is responsible for ensuring layout creation first.
+    SLANG_ASSERT(m_layout);
 
-    // Okay, now we need to fill it in.
-
-    auto programLayout = getOrCreateLayout(sink);
+    auto programLayout = m_layout;
     if (!programLayout)
         return nullptr;
 

@@ -56,8 +56,11 @@ elseif(NOT SLANG_EMBED_CORE_MODULE)
     set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
     set(SLANG_COMPILER_EXTRA_DEPS generate_core_module_headers)
 elseif(SLANG_ENABLE_SLANGC)
-    set(SLANG_COMPILER slangc)
-    set(SLANG_COMPILER_DEPENDENCY slangc)
+    set(SLANG_COMPILER "$<TARGET_FILE:slangc>")
+    set(SLANG_COMPILER_DEPENDENCY
+        slangc
+        slang
+    )
     set(SLANG_COMPILER_EXTRA_DEPS)
 else()
     # As a fallback, use the system-installed `slangc` compiler

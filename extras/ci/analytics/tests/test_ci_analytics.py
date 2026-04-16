@@ -270,6 +270,56 @@ class TestStatisticsRunnerNamePrefixes(unittest.TestCase):
 
         self.assertIn("Windows Build (GCP)", html)
 
+    def test_statistics_range_filter_wires_parallel_and_queue_percentile_charts(self):
+        """Range selector must update Average Concurrent Runners and queue percentiles."""
+        config = {
+            "label_groups": [],
+            "runner_name_prefixes": [
+                {"prefix": "linux-runner-", "name": "Linux GPU (GCP)", "self_hosted": True},
+            ],
+            "non_production_periods": {"runners": {}},
+        }
+
+        base = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
+        jobs = []
+        for offset in (3, 2):
+            created = (base - ci_health.timedelta(days=offset)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            completed = (
+                base - ci_health.timedelta(days=offset) + ci_health.timedelta(minutes=30)
+            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+            jobs.append(
+                {
+                    "name": "build-linux-debug",
+                    "workflow_name": "CI",
+                    "run_id": offset,
+                    "run_created_at": created,
+                    "created_at": created,
+                    "started_at": created,
+                    "completed_at": completed,
+                    "conclusion": "success",
+                    "event": "push",
+                    "head_branch": "main",
+                    "labels": [],
+                    "runner_name": "linux-runner-1",
+                    "duration_seconds": 1800,
+                    "queued_seconds": offset * 60,
+                    "html_url": "",
+                }
+            )
+
+        data = ci_visualization.process_jobs(jobs, config)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_visualization.generate_statistics(data, config, tmp)
+            with open(os.path.join(tmp, "statistics.html"), encoding="utf-8") as f:
+                html = f.read()
+
+        self.assertIn("makeChart('parallelRate_canvas', 'line'", html)
+        self.assertIn("_allData", html)
+        self.assertIn("const allQueueWaitAvg =", html)
+        self.assertIn("const allQueueWaitP95 =", html)
+        self.assertIn("makeChart('queueWait_canvas', 'line'", html)
+
 
 class TestPRsMergedChart(unittest.TestCase):
     def test_statistics_includes_prs_merged_chart_when_data_present(self):

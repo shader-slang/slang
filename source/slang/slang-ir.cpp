@@ -1861,7 +1861,19 @@ IRInst* IRBuilder::_createInst(
     m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
     type = (IRType*)instReplacement;
 
-    if (isInstHoistable(op, type, fixedArgs))
+    if (type && shouldHaveSpecConstRate(op, type, fixedArgCount, fixedArgs))
+    {
+        type = ensureSpecConstRate(this, type);
+        return _findOrEmitHoistableInst(
+            type,
+            op,
+            fixedArgCount,
+            fixedArgs,
+            varArgListCount,
+            listArgCounts,
+            listArgs);
+    }
+    else if (isInstHoistable(op))
     {
         return _findOrEmitHoistableInst(
             type,
@@ -9303,7 +9315,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_DetachDerivative:
     case kIROp_FuncTypeOf:
     case kIROp_MakeIDifferentiableWitness:
-    case kIROp_SpecializeExistentials:
+    case kIROp_SpecializeExistentialsInFunc:
+    case kIROp_SpecializeExistentialsInType:
         return false;
 
     case kIROp_Div:
