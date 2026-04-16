@@ -4729,6 +4729,25 @@ IRInst* IRBuilder::emitMakeTensorView(IRType* type, IRInst* val)
 
 IRInst* IRBuilder::emitMakeExistential(IRType* type, IRInst* value, IRInst* witnessTable)
 {
+    // When the value being wrapped is already an existential (interface type),
+    // we have an interface-to-interface upcast (e.g. IDerived -> IBase).
+    // The "witnessTable" argument in that case is actually the inheritance
+    // requirement key (a StructKey).  We must re-box by extracting the
+    // concrete value and witness table from the source existential, then
+    // looking up the target interface's witness table through the key.
+    auto sourceIface = as<IRInterfaceType>(value->getDataType());
+    auto targetIface = as<IRInterfaceType>(type);
+    if (sourceIface && targetIface && sourceIface != targetIface)
+    {
+        auto extractedType = emitExtractExistentialType(value);
+        auto extractedValue = emitExtractExistentialValue(extractedType, value);
+        auto sourceWT = emitExtractExistentialWitnessTable(value);
+        auto targetWT =
+            emitLookupInterfaceMethodInst(getWitnessTableType(targetIface), sourceWT, witnessTable);
+        value = extractedValue;
+        witnessTable = targetWT;
+    }
+
     IRInst* args[] = {value, witnessTable};
     return emitIntrinsicInst(type, kIROp_MakeExistential, SLANG_COUNT_OF(args), args);
 }

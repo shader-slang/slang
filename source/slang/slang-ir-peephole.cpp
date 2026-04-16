@@ -1317,12 +1317,40 @@ struct PeepholeContext : InstPassBase
             break;
         case kIROp_MakeExistential:
             {
-                if (inst->getOperand(0)->getOp() == kIROp_ExtractExistentialValue)
+                // Fold makeExistential(extractExistentialValue(x), wt) → x
+                // only when wt == extractExistentialWitnessTable(x), i.e. the
+                // value and witness table come from the same existential.
+                // When the witness tables differ (e.g. interface upcast from
+                // IDerived to IBase), folding is incorrect because the result
+                // existential type is different from the source.
+                auto val = inst->getOperand(0);
+                auto wt = inst->getOperand(1);
+                if (val->getOp() == kIROp_ExtractExistentialValue &&
+                    wt->getOp() == kIROp_ExtractExistentialWitnessTable &&
+                    val->getOperand(0) == wt->getOperand(0))
                 {
-                    inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
+                    inst->replaceUsesWith(val->getOperand(0));
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }
+            }
+            break;
+        case kIROp_ExtractExistentialValue:
+            // Fold extractExistentialValue(makeExistential(val, wt)) → val
+            if (inst->getOperand(0)->getOp() == kIROp_MakeExistential)
+            {
+                inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
+        case kIROp_ExtractExistentialWitnessTable:
+            // Fold extractExistentialWitnessTable(makeExistential(val, wt)) → wt
+            if (inst->getOperand(0)->getOp() == kIROp_MakeExistential)
+            {
+                inst->replaceUsesWith(inst->getOperand(0)->getOperand(1));
+                maybeRemoveOldInst(inst);
+                changed = true;
             }
             break;
         case kIROp_LookupWitnessMethod:
