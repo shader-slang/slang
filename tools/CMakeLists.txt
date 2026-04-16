@@ -228,6 +228,7 @@ if(SLANG_ENABLE_GFX)
         VERBATIM
     )
     set_target_properties(copy-gfx-slang-modules PROPERTIES FOLDER generators)
+    add_dependencies(gfx copy-gfx-slang-modules)
     install(
         FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
         DESTINATION ${runtime_subdir}
@@ -289,10 +290,6 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         DIRECTORY ${slang_SOURCE_DIR}
         PROPERTY VS_STARTUP_PROJECT slang-test
     )
-
-    if(SLANG_ENABLE_GFX)
-        add_dependencies(slang-test copy-gfx-slang-modules)
-    endif()
 
     include(CTest)
     add_test(
