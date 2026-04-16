@@ -508,7 +508,7 @@ bool isGlobalInst(IRInst* inst)
 // accept the refinement (this is useful in cases like `UnsizedArrayType`, where
 // we only want to refine it if we can determine a concrete size).
 //
-bool isConcreteType(IRInst* inst)
+static bool isConcreteTypeImpl(IRInst* inst, HashSet<IRInst*>* visiting)
 {
     if (!inst)
         return false;
@@ -536,10 +536,10 @@ bool isConcreteType(IRInst* inst)
                                // methods that do use this
         return false;
     case kIROp_ArrayType:
-        return isConcreteType(cast<IRArrayType>(inst)->getElementType()) &&
+        return isConcreteTypeImpl(cast<IRArrayType>(inst)->getElementType(), visiting) &&
                isGlobalInst(cast<IRArrayType>(inst)->getElementCount());
     case kIROp_OptionalType:
-        return isConcreteType(cast<IROptionalType>(inst)->getValueType());
+        return isConcreteTypeImpl(cast<IROptionalType>(inst)->getValueType(), visiting);
     case kIROp_ConditionalType:
         {
             auto conditionalType = cast<IRConditionalType>(inst);
@@ -548,26 +548,47 @@ bool isConcreteType(IRInst* inst)
             {
                 if (!boolLit->getValue())
                     return true;
-                return isConcreteType(conditionalType->getValueType());
+                return isConcreteTypeImpl(conditionalType->getValueType(), visiting);
             }
             else if (auto intLit = as<IRIntLit>(hasValueInst))
             {
                 if (getIntVal(intLit) == 0)
                     return true;
-                return isConcreteType(conditionalType->getValueType());
+                return isConcreteTypeImpl(conditionalType->getValueType(), visiting);
             }
             return false;
         }
     case kIROp_DifferentialPairType:
-        return isConcreteType(cast<IRDifferentialPairTypeBase>(inst)->getValueType());
+        return isConcreteTypeImpl(cast<IRDifferentialPairTypeBase>(inst)->getValueType(), visiting);
     case kIROp_AttributedType:
-        return isConcreteType(cast<IRAttributedType>(inst)->getBaseType());
+        return isConcreteTypeImpl(cast<IRAttributedType>(inst)->getBaseType(), visiting);
     case kIROp_TupleType:
         {
             // Tuple is concrete if all element types are concrete
             for (UInt i = 0; i < inst->getOperandCount(); i++)
             {
-                if (!isConcreteType(inst->getOperand(i)))
+                if (!isConcreteTypeImpl(inst->getOperand(i), visiting))
+                    return false;
+            }
+            return true;
+        }
+    case kIROp_StructType:
+        {
+            // Struct is concrete only if all field types are concrete.
+            // A struct containing an interface-typed field is non-concrete
+            // and needs type-flow specialization.
+            // Use a visited set to guard against cyclic types (e.g. pack-branch
+            // types that resolve back to the same struct).
+            HashSet<IRInst*> localVisiting;
+            if (!visiting)
+                visiting = &localVisiting;
+            if (visiting->contains(inst))
+                return true; // Cycle detected: conservatively treat as concrete
+            visiting->add(inst);
+            auto structType = cast<IRStructType>(inst);
+            for (auto field : structType->getFields())
+            {
+                if (!isConcreteTypeImpl(field->getFieldType(), visiting))
                     return false;
             }
             return true;
@@ -580,7 +601,7 @@ bool isConcreteType(IRInst* inst)
     {
         if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
             return true; // Don't refine user pointers (for now)
-        return isConcreteType(ptrType->getValueType());
+        return isConcreteTypeImpl(ptrType->getValueType(), visiting);
     }
 
     if (auto generic = as<IRGeneric>(inst))
@@ -590,6 +611,11 @@ bool isConcreteType(IRInst* inst)
     }
 
     return true;
+}
+
+bool isConcreteType(IRInst* inst)
+{
+    return isConcreteTypeImpl(inst, nullptr);
 }
 
 // Create info for a concrete type, using `paramType` as a union mask to determine
@@ -3887,8 +3913,14 @@ struct TypeFlowSpecializationContext
 
             if (!paramInfo)
             {
-                // Non-concrete param with no info yet - not ready to propagate.
-                return nullptr;
+                // Non-concrete param with no info yet - use VoidLit so the
+                // interprocedural edge is still registered. This allows
+                // propagation to proceed (e.g. diagnostics for __ref params
+                // with dynamic dispatch types) even before full info arrives.
+                IRBuilder builder(module);
+                bindings.add(builder.getVoidValue());
+                argIndex++;
+                continue;
             }
 
             hasAnyBinding = true;
@@ -6350,9 +6382,16 @@ struct TypeFlowSpecializationContext
         if (auto setTag = as<IRSetTagType>(callee->getDataType()))
         {
             // Expect a callee-set to be associated with call.
-            auto calleeSet =
-                cast<IRElementOfSetType>(this->callSiteInfo[InstWithContext(context, inst)])
-                    ->getSet();
+            // The info-propagation phase may not record this call site when a
+            // struct with an existential field is passed by value — bail out
+            // gracefully instead of crashing on a missing dictionary entry.
+            auto callSiteInfoPtr = this->callSiteInfo.tryGetValue(InstWithContext(context, inst));
+            if (!callSiteInfoPtr || !*callSiteInfoPtr)
+            {
+                module->getContainerPool().free(&callArgs);
+                return false;
+            }
+            auto calleeSet = cast<IRElementOfSetType>(*callSiteInfoPtr)->getSet();
             if (!calleeSet->isSingleton() && !calleeSet->isEmpty())
             {
                 // Multiple callees case:
@@ -6483,9 +6522,13 @@ struct TypeFlowSpecializationContext
         }
         else if (isGlobalInst(callee))
         {
-            auto calleeSet =
-                as<IRElementOfSetType>(this->callSiteInfo[InstWithContext(context, inst)])
-                    ->getSet();
+            auto callSiteInfoPtr = this->callSiteInfo.tryGetValue(InstWithContext(context, inst));
+            if (!callSiteInfoPtr || !*callSiteInfoPtr)
+            {
+                module->getContainerPool().free(&callArgs);
+                return false;
+            }
+            auto calleeSet = as<IRElementOfSetType>(*callSiteInfoPtr)->getSet();
             SLANG_ASSERT(calleeSet->isSingleton());
 
             if (isIntrinsic(callee))
