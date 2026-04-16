@@ -278,6 +278,7 @@ if(
             INTERFACE "${SLANG_OVERRIDE_IMGUI_PATH}/imgui"
         )
     endif()
+    add_supported_cxx_flags(imgui INTERFACE -Wno-nontrivial-memcall)
 
     # stb
     add_library(stb INTERFACE)
