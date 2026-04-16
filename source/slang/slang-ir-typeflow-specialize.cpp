@@ -2631,8 +2631,8 @@ struct TypeFlowSpecializationContext
                         collectExistentialTables(interfaceType, tables);
                         if (tables.getCount() > 0)
                         {
-                            auto valueInfo = makeTaggedUnionType(
-                                as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
+                            auto valueInfo = makeTaggedUnionType(as<IRWitnessTableSet>(
+                                builder.getSet(kIROp_WitnessTableSet, tables)));
                             module->getContainerPool().free(&tables);
                             return builder.getPtrTypeWithAddressSpace(
                                 (IRType*)valueInfo,
@@ -2682,8 +2682,8 @@ struct TypeFlowSpecializationContext
                     collectExistentialTables(interfaceType, tables);
                     if (tables.getCount() > 0)
                     {
-                        auto result = makeTaggedUnionType(
-                            as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
+                        auto result = makeTaggedUnionType(as<IRWitnessTableSet>(
+                            builder.getSet(kIROp_WitnessTableSet, tables)));
                         module->getContainerPool().free(&tables);
                         return result;
                     }
