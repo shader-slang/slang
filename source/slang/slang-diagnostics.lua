@@ -3749,7 +3749,7 @@ err(
     span { loc = "param:Decl", message = "parameter '~param' direction '~actualDirection:ParamPassingMode' does not match interface requirement '~expectedDirection:ParamPassingMode'." }
 )
 
-err(
+warning(
     "non-copyable-type-cannot-conform-to-interface",
     38109,
     "non-copyable type cannot conform to interface",
