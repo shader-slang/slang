@@ -3782,8 +3782,8 @@ err(
 warning(
     "non-copyable-type-cannot-conform-to-interface",
     38109,
-    "non-copyable type cannot conform to interface",
-    span { loc = "inheritance:Decl", message = "non-copyable type '~type:Type' cannot conform to interface '~interface:Decl' because interfaces are copyable by default." }
+    "non-copyable interface conformance is not fully supported",
+    span { loc = "inheritance:Decl", message = "conforming non-copyable type '~type:Type' to interface '~interface:Decl' is not properly supported and may lead to compiler crashes." }
 )
 
 --

@@ -6,8 +6,8 @@ interface IRayQuery
 
 __generic<let Flags : RAY_FLAG>
 extension RayQuery<Flags> : IRayQuery
-//CHECK:                    ^^^^^^^^^ non-copyable type cannot conform to interface
-//CHECK:                    ^^^^^^^^^ non-copyable type 'RayQuery<Flags>' cannot conform to interface 'IRayQuery' because interfaces are copyable by default.
+//CHECK:                    ^^^^^^^^^ non-copyable interface conformance is not fully supported
+//CHECK:                    ^^^^^^^^^ conforming non-copyable type 'RayQuery<Flags>' to interface 'IRayQuery' is not properly supported and may lead to compiler crashes.
 {
 }
 
