@@ -1658,8 +1658,10 @@ struct TypeFlowSpecializationContext
             info = analyzeSpecialize(context, as<IRSpecialize>(inst));
             break;
         case kIROp_BitCast:
-            diagnoseUnsupportedBitCast(inst);
-            return;
+            info = analyzeBitCastToInterface(context, inst);
+            if (!info)
+                return;
+            break;
         case kIROp_Load:
         case kIROp_RWStructuredBufferLoad:
         case kIROp_StructuredBufferLoad:
@@ -2055,6 +2057,36 @@ struct TypeFlowSpecializationContext
             SLANG_UNEXPECTED("Unhandled interprocedural edge direction");
             return;
         }
+    }
+
+    // Analyze bit_cast TO an interface type. When the result type is an interface,
+    // we need to propagate type information so that the specialization phase can
+    // build the correct tagged union representation.
+    IRInst* analyzeBitCastToInterface(IRInst* context, IRInst* inst)
+    {
+        SLANG_UNUSED(context);
+
+        auto resultType = inst->getFullType();
+        auto interfaceType = as<IRInterfaceType>(resultType);
+        if (!interfaceType)
+            return none();
+
+        if (isComInterfaceType(interfaceType))
+            return none();
+
+        // Collect all witness tables that conform to this interface and build a
+        // TaggedUnionType. This is the same info type that MakeExistential produces.
+        IRBuilder builder(module);
+        HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+        collectExistentialTables(interfaceType, tables);
+        if (tables.getCount() == 0)
+        {
+            module->getContainerPool().free(&tables);
+            return none();
+        }
+        auto witnessTableSet = as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables));
+        module->getContainerPool().free(&tables);
+        return makeTaggedUnionType(witnessTableSet);
     }
 
     IRInst* analyzeCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)
@@ -5114,6 +5146,7 @@ struct TypeFlowSpecializationContext
 
     bool performDynamicInstLowering()
     {
+
         WorkQueue<IRInst*> globalWorkList;
         List<IRStructType*> structsToProcess;
 
@@ -5150,6 +5183,7 @@ struct TypeFlowSpecializationContext
                     auto func = as<IRFunc>(globalInst);
                     if (processedSet.contains(globalInst))
                         continue;
+                    processedSet.add(globalInst);
 
                     hasChanges |= removeAnnotations(func);
                     hasChanges |= eliminateDeadCode(func);
@@ -5160,8 +5194,6 @@ struct TypeFlowSpecializationContext
 
                     hasChanges |= eliminateDeadCode(func);
                     hasChanges |= resolveTypesInFunc(func);
-
-                    processedSet.add(globalInst);
                     break;
                 }
             case kIROp_Specialize:
@@ -5397,6 +5429,13 @@ struct TypeFlowSpecializationContext
             return specializeDifferentialPairGetPrimal(
                 context,
                 as<IRDifferentialPairGetPrimal>(inst));
+        case kIROp_BitCast:
+            {
+                bool changed = specializeBitCastToInterface(context, inst);
+                if (!changed)
+                    changed = specializeBitCastFromTaggedUnion(context, inst);
+                return changed;
+            }
         default:
             {
                 // Default case: replace inst type with specialized type (if available)
@@ -6873,7 +6912,6 @@ struct TypeFlowSpecializationContext
         auto taggedUnion = as<IRTaggedUnionType>(info);
         if (!taggedUnion)
             return false;
-
         auto taggedUnionType = as<IRTaggedUnionType>(getLoweredType(taggedUnion));
 
         IRBuilder builder(inst);
@@ -6909,6 +6947,164 @@ struct TypeFlowSpecializationContext
 
         inst->replaceUsesWith(newInst);
         inst->removeAndDeallocate();
+        return true;
+    }
+
+    // Specialize bit_cast TO an interface type: bit_cast<IFoo>(rawValue).
+    // The operand is raw bytes, the result should be a tagged union.
+    // We bit_cast the raw bytes into the existential tuple type first,
+    // then extract components to construct the tagged union.
+    bool specializeBitCastToInterface(IRInst* context, IRInst* inst)
+    {
+        auto resultType = inst->getFullType();
+        auto interfaceType = as<IRInterfaceType>(resultType);
+        if (!interfaceType)
+            return false;
+
+        auto info = tryGetInfo(context, inst);
+        if (!info)
+            return false;
+
+        auto taggedUnionType = as<IRTaggedUnionType>(info);
+        if (!taggedUnionType)
+            return false;
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+
+        auto anyValueSize = getInterfaceAnyValueSize(interfaceType, inst->sourceLoc);
+
+        // Build the existential tuple type from which we'll extract components.
+        auto rttiType = builder.getRTTIHandleType();
+        auto witnessTableIDType = builder.getWitnessTableIDType((IRType*)interfaceType);
+        auto anyValueType = builder.getAnyValueType(anyValueSize);
+
+        auto operand = inst->getOperand(0);
+
+        // Extract components from raw bytes (via bit_cast to existential tuple):
+        // The operand is raw bytes that contain (RTTI, WitnessTableID, AnyValue).
+        auto existentialTupleType =
+            builder.getTupleType((IRType*)rttiType, (IRType*)witnessTableIDType, anyValueType);
+        auto existentialTuple = builder.emitBitCast(existentialTupleType, operand);
+
+        // Extract WitnessTableID element (index 1) and get sequential ID from it.
+        auto witnessTableIDVal =
+            builder.emitGetTupleElement((IRType*)witnessTableIDType, existentialTuple, 1);
+
+        // WitnessTableID is lowered to Vec(UInt,2); element 0 is the sequential ID.
+        auto uintType = builder.getBasicType(BaseType::UInt);
+        auto vec2UintType =
+            builder.getVectorType(uintType, builder.getIntValue(builder.getIntType(), 2));
+        auto witnessTableIDVecVal = builder.emitBitCast(vec2UintType, witnessTableIDVal);
+        auto seqID = builder.emitElementExtract(
+            uintType,
+            witnessTableIDVecVal,
+            builder.getIntValue(builder.getIntType(), 0));
+
+        // Convert sequential ID to local tag within the witness table set.
+        // The result type must be SetTagType(witnessTableSet), not uint.
+        auto tableSet = taggedUnionType->getWitnessTableSet();
+        IRInst* tagArgs[] = {(IRInst*)interfaceType, seqID};
+        auto witnessTableTag = builder.emitIntrinsicInst(
+            (IRType*)makeTagType(tableSet),
+            kIROp_GetTagFromSequentialID,
+            2,
+            tagArgs);
+
+        // Extract the payload (AnyValue) and reinterpret it.
+        auto anyVal = builder.emitGetTupleElement(anyValueType, existentialTuple, 2);
+
+        // Build the tagged union from (typeTag, witnessTableTag, value).
+        auto typeSet = taggedUnionType->getTypeSet();
+        auto payload =
+            builder.emitReinterpret((IRType*)builder.getUntaggedUnionType(typeSet), anyVal);
+        auto finalResult = builder.emitMakeTaggedUnion(
+            taggedUnionType,
+            builder.emitPoison(makeTagType(typeSet)),
+            witnessTableTag,
+            payload);
+
+        inst->replaceUsesWith(finalResult);
+        inst->removeAndDeallocate();
+        return true;
+    }
+
+    // Specialize bit_cast FROM a tagged union: bit_cast<T>(taggedUnionValue).
+    // When the operand has already been converted to a tagged union by a prior
+    // iteration, reconstruct the full existential tuple so that lowerBitCast
+    // can produce correct raw bytes.
+    bool specializeBitCastFromTaggedUnion(IRInst* /*context*/, IRInst* inst)
+    {
+        auto operand = inst->getOperand(0);
+        auto taggedUnionType = as<IRTaggedUnionType>(operand->getDataType());
+        if (!taggedUnionType)
+            return false;
+
+        // The result type should NOT be an interface (that's handled by
+        // specializeBitCastToInterface).
+        if (as<IRInterfaceType>(inst->getFullType()))
+            return false;
+
+        // Find the interface type that this tagged union represents.
+        auto witnessTableSet = taggedUnionType->getWitnessTableSet();
+        if (!witnessTableSet)
+            return false;
+
+        IRInterfaceType* interfaceType = nullptr;
+        if (witnessTableSet->getCount() > 0)
+        {
+            if (auto witnessTable = as<IRWitnessTable>(witnessTableSet->getElement(0)))
+                interfaceType = as<IRInterfaceType>(witnessTable->getConformanceType());
+        }
+        if (!interfaceType)
+            return false;
+
+        auto anyValueSize = getInterfaceAnyValueSize(interfaceType, inst->sourceLoc);
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+
+        // Build the existential tuple type: (RTTI, WitnessTableID, AnyValue(N))
+        auto rttiType = builder.getRTTIHandleType();
+        auto witnessTableIDType = builder.getWitnessTableIDType((IRType*)interfaceType);
+        auto anyValueType = builder.getAnyValueType(anyValueSize);
+        auto existentialTupleType =
+            builder.getTupleType((IRType*)rttiType, (IRType*)witnessTableIDType, anyValueType);
+
+        // Extract the tag from the tagged union → convert to sequential ID → build
+        // WitnessTableID. Then extract the payload → convert to AnyValue.
+        auto tag = builder.emitGetTagFromTaggedUnion(operand);
+
+        // Convert local tag → sequential ID.
+        auto uintType = builder.getBasicType(BaseType::UInt);
+        IRInst* seqIDArgs[] = {(IRInst*)interfaceType, tag};
+        auto seqID =
+            builder.emitIntrinsicInst(uintType, kIROp_GetSequentialIDFromTag, 2, seqIDArgs);
+
+        // Build RTTI handle (zeros — RTTI is opaque at this level)
+        auto rttiVal = builder.emitDefaultConstruct((IRType*)rttiType);
+
+        // Build WitnessTableID from sequential ID.
+        // WitnessTableID is lowered to Vec(UInt,2); element 0 = seqID, element 1 = 0.
+        auto vec2UintType =
+            builder.getVectorType(uintType, builder.getIntValue(builder.getIntType(), 2));
+        auto zero = builder.getIntValue(uintType, 0);
+        IRInst* vecArgs[] = {seqID, zero};
+        auto witnessTableIDVec = builder.emitMakeVector(vec2UintType, 2, vecArgs);
+        auto witnessTableIDVal =
+            builder.emitBitCast((IRType*)witnessTableIDType, witnessTableIDVec);
+
+        // Extract payload from tagged union → reinterpret as AnyValue
+        auto payload = builder.emitGetValueFromTaggedUnion(operand);
+        auto anyVal = builder.emitReinterpret(anyValueType, payload);
+
+        // Construct existential tuple
+        IRInst* tupleArgs[] = {rttiVal, witnessTableIDVal, anyVal};
+        auto existentialTuple = builder.emitMakeTuple(existentialTupleType, 3, tupleArgs);
+
+        // Replace the bit_cast operand with the existential tuple.
+        // The bit_cast now goes from existential tuple → target type, which has matching size.
+        inst->setOperand(0, existentialTuple);
         return true;
     }
 
@@ -7821,6 +8017,7 @@ struct TypeFlowSpecializationContext
     // Set of already discovered contexts.
     HashSet<IRInst*> availableContexts;
 
+    // Set of bit_cast operands that should NOT be converted to tagged unions.
     // Cache for SpecializeExistentialsInFunc: maps from base function to all
     // SpecializeExistentialsInFunc contexts created for it. This is used to
     // oppourtunistically merge variants of the same function depending on policy

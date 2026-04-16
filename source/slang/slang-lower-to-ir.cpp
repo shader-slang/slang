@@ -926,6 +926,19 @@ LoweredValInfo emitCallToDeclRef(
         case kIROp_GetOffsetPtr:
             SLANG_ASSERT(argCount == 2);
             return LoweredValInfo::simple(builder->emitGetOffsetPtr(args[0], args[1]));
+        case kIROp_BitCast:
+            {
+                // For bit_cast, we need the full existential representation (the tuple
+                // of RTTI + WitnessTableID + AnyValue), not the extracted concrete value.
+                // The semantic checker wraps interface-typed arguments with
+                // ExtractExistentialValueExpr, which emits extractExistentialValue in the
+                // IR. Look through that extraction to get the original existential value.
+                SLANG_ASSERT(argCount == 1);
+                auto arg = args[0];
+                if (arg->getOp() == kIROp_ExtractExistentialValue)
+                    arg = arg->getOperand(0);
+                return LoweredValInfo::simple(builder->emitBitCast(type, arg));
+            }
         default:
             return LoweredValInfo::simple(
                 builder->emitIntrinsicInst(type, intrinsicOp, argCount, args));

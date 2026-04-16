@@ -1,19 +1,18 @@
 // bit_cast between interface-typed values and their raw memory representation.
 //
-// Currently, the compiler lowers interface-typed existentials to a compact
-// tagged-union representation when the concrete type set is known, rather than
-// the full existential tuple (RTTI + WitnessTableID + AnyValue).  Because the
-// tagged-union size depends on the conforming types, bit_cast round-tripping
-// through an interface-typed existential is not currently supported.
+// Validates that bit_cast<RawType>(interfaceValue) and
+// bit_cast<IFoo>(rawValue) produce correct round-trip results, preserving
+// the full existential representation (RTTI + WitnessTableID + AnyValue).
 //
-// Two sub-issues block this feature:
-//   #10221 — bit_cast extracts concrete payload instead of full existential
-//   #10222 — specialization lowers existential to compact tagged-union
-//
-// Once resolved, bit_cast<RawType>(interfaceValue) and
-// bit_cast<IFoo>(rawValue) should produce correct round-trip results.
+// Fixes: #10221, #10222 (parent: #9920)
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+
+//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<float> outputBuffer;
+
+//TEST_INPUT: type_conformance FooA:IFoo = 0
+//TEST_INPUT: type_conformance FooB:IFoo = 1
 
 [anyValueSize(16)]
 interface IFoo
@@ -47,14 +46,17 @@ float testRoundTrip(int typeId, float val)
     IFoo foo = createDynamicObject<IFoo>(typeId, val);
     RawExistential raw = bit_cast<RawExistential>(foo);
     IFoo foo2 = bit_cast<IFoo>(raw);
-//CHECK:                      ^ cannot bit-cast to existential (non-concrete) type
     return foo2.eval();
 }
-
-RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
-    outputBuffer[0] = testRoundTrip(id, 3.0);
+    // FooA.eval() returns x directly: 3.0
+    outputBuffer[0] = testRoundTrip(0, 3.0);
+    // CHECK: 3.0
+
+    // FooB.eval() returns x * 2.0: 6.0
+    outputBuffer[1] = testRoundTrip(1, 3.0);
+    // CHECK: 6.0
 }

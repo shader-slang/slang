@@ -1,12 +1,18 @@
 // Manual serialization of interface-typed values into a raw uint buffer using
 // bit_cast, then deserialization back to interface type.
 //
-// Blocked on the same two sub-issues as bit-cast-interface-roundtrip:
-//   #10221 — bit_cast extracts concrete payload instead of full existential
-//   #10222 — specialization lowers existential to compact tagged-union
-// See parent issue #9920.
+// Fixes: #10221, #10222 (parent: #9920)
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<float> outputBuffer;
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):name=storageBuf
+RWStructuredBuffer<uint> storageBuf;
+
+//TEST_INPUT: type_conformance FooA:IFoo = 0
+//TEST_INPUT: type_conformance FooB:IFoo = 1
 
 [anyValueSize(16)]
 interface IFoo
@@ -46,17 +52,14 @@ IFoo deserialize(RWStructuredBuffer<uint> buf, int baseSlot)
     for (int i = 0; i < kRawUints; i++)
         raw.data[i] = buf[baseSlot + i];
     return bit_cast<IFoo>(raw);
-//CHECK:                 ^ cannot bit-cast to existential (non-concrete) type
 }
-
-RWStructuredBuffer<float> outputBuffer;
-RWStructuredBuffer<uint> storageBuf;
 
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
-    IFoo fooA = createDynamicObject<IFoo>(id, 3.0);
+    IFoo fooA = createDynamicObject<IFoo>(0, 3.0);
     serialize(fooA, storageBuf, 0);
     IFoo restored = deserialize(storageBuf, 0);
     outputBuffer[0] = restored.eval();
+    // CHECK: 3.0
 }
