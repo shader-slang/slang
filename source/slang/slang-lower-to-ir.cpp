@@ -6801,8 +6801,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             auto declParent = declared->getDeclRef().getDecl()->parentDecl;
             if (auto parentIface = as<InterfaceDecl>(declParent))
             {
-                auto parentIfaceType = lowerType(context, DeclRefType::create(
-                    getASTBuilder(), makeDeclRef(parentIface)));
+                auto parentIfaceType = lowerType(
+                    context,
+                    DeclRefType::create(getASTBuilder(), makeDeclRef(parentIface)));
                 if (parentIfaceType != sourceIface)
                 {
                     // Traverse the source interface's inheritance requirements
@@ -6821,7 +6822,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                                 {
                                     auto inheritKey = entry->getOperand(0);
                                     midWT = builder->emitLookupInterfaceMethodInst(
-                                        wtType, sourceWT, inheritKey);
+                                        wtType,
+                                        sourceWT,
+                                        inheritKey);
                                     break;
                                 }
                             }
@@ -6838,14 +6841,18 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
             auto supType = lowerType(context, witness->getSup());
             return builder->emitLookupInterfaceMethodInst(
-                builder->getWitnessTableType(supType), sourceWT, key);
+                builder->getWitnessTableType(supType),
+                sourceWT,
+                key);
         }
         else
         {
             auto lowered = lowerSimpleVal(context, witness);
             auto supType = lowerType(context, witness->getSup());
             return builder->emitLookupInterfaceMethodInst(
-                builder->getWitnessTableType(supType), sourceWT, lowered);
+                builder->getWitnessTableType(supType),
+                sourceWT,
+                lowered);
         }
     }
 
@@ -6901,8 +6908,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     auto sourceWT = builder->emitExtractExistentialWitnessTable(concreteValue);
 
                     auto witness = as<SubtypeWitness>(expr->witnessArg);
-                    auto targetWT = resolveInterfaceWitnessChain(
-                        sourceWT, sourceIfaceType, witness);
+                    auto targetWT =
+                        resolveInterfaceWitnessChain(sourceWT, sourceIfaceType, witness);
 
                     auto existentialValue =
                         builder->emitMakeExistential(superType, extractedValue, targetWT);
