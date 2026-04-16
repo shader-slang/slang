@@ -37,6 +37,11 @@ struct Params
 
 RWStructuredBuffer<float> outputBuffer;
 
+void takeRef(inout IFoo f, RWStructuredBuffer<float> buf)
+{
+    buf[1] = f.getValue();
+}
+
 // HLSL: s_dispatch_IFoo{{.*}}getValue
 // HLSL: void computeMain
 // GLSL: void main()
@@ -45,4 +50,5 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain(uniform Params p)
 {
     outputBuffer[0] = p.foo.getValue() * p.scale;
+    takeRef(p.foo, outputBuffer);
 }

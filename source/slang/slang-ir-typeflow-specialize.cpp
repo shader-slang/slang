@@ -2641,6 +2641,17 @@ struct TypeFlowSpecializationContext
                         module->getContainerPool().free(&tables);
                     }
                 }
+                else if (
+                    auto boundInterfaceType = as<IRBoundInterfaceType>(structField->getFieldType()))
+                {
+                    auto valueInfo =
+                        makeTaggedUnionType(cast<IRWitnessTableSet>(builder.getSingletonSet(
+                            kIROp_WitnessTableSet,
+                            boundInterfaceType->getWitnessTable())));
+                    return builder.getPtrTypeWithAddressSpace(
+                        (IRType*)valueInfo,
+                        as<IRPtrTypeBase>(fieldAddress->getDataType()));
+                }
             }
         }
 
@@ -2682,13 +2693,20 @@ struct TypeFlowSpecializationContext
                     collectExistentialTables(interfaceType, tables);
                     if (tables.getCount() > 0)
                     {
-                        auto result = makeTaggedUnionType(as<IRWitnessTableSet>(
-                            builder.getSet(kIROp_WitnessTableSet, tables)));
+                        auto result = makeTaggedUnionType(
+                            as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
                         module->getContainerPool().free(&tables);
                         return result;
                     }
                     module->getContainerPool().free(&tables);
                 }
+            }
+            else if (
+                auto boundInterfaceType = as<IRBoundInterfaceType>(structField->getFieldType()))
+            {
+                return makeTaggedUnionType(cast<IRWitnessTableSet>(builder.getSingletonSet(
+                    kIROp_WitnessTableSet,
+                    boundInterfaceType->getWitnessTable())));
             }
         }
         return none();
