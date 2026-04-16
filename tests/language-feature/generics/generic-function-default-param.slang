@@ -160,8 +160,8 @@ void computeMain()
     outputBuffer[9] = defaultedConstrainedType<Foo2>();
     // CHECK: 1
     outputBuffer[10] = defaultedTypeWithArg(42);
-    // CHECK: 0
-    outputBuffer[11] = defaultedTypeWithArg(42.0);
+    // CHECK: 2
+    outputBuffer[11] = defaultedTypeWithArg(int2(42));
     // CHECK: 16
     outputBuffer[12] = dependentDefault<float4>();  // U defaults to float4
     // CHECK: 16
