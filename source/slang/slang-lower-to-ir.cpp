@@ -1714,9 +1714,7 @@ static bool _isTrivialLookupFromInterfaceThis(IRGenContext* context, DeclRefBase
 // Flatten a transitive witness chain into a list of leaf (non-transitive)
 // witness steps.  E.g. transitive(A:>B, transitive(B:>C, C:>D)) becomes
 // [A:>B, B:>C, C:>D].
-static void flattenTransitiveWitness(
-    SubtypeWitness* witness,
-    List<SubtypeWitness*>& outSteps)
+static void flattenTransitiveWitness(SubtypeWitness* witness, List<SubtypeWitness*>& outSteps)
 {
     if (auto transitive = as<TransitiveSubtypeWitness>(witness))
     {
@@ -2309,9 +2307,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             IRInst* key = nullptr;
             if (auto declared = as<DeclaredSubtypeWitness>(steps[i]))
             {
-                key = getInterfaceRequirementKey(
-                    context,
-                    declared->getDeclRef().getDecl());
+                key = getInterfaceRequirementKey(context, declared->getDeclRef().getDecl());
             }
             else
             {
@@ -6785,15 +6781,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             auto midType = lowerType(context, transitive->getSubToMid()->getSup());
             auto midIface = as<IRInterfaceType>(midType);
             SLANG_ASSERT(midIface);
-            auto midWT = resolveInterfaceWitnessChain(
-                sourceWT, sourceIface, transitive->getSubToMid());
-            return resolveInterfaceWitnessChain(
-                midWT, midIface, transitive->getMidToSup());
+            auto midWT =
+                resolveInterfaceWitnessChain(sourceWT, sourceIface, transitive->getSubToMid());
+            return resolveInterfaceWitnessChain(midWT, midIface, transitive->getMidToSup());
         }
         else if (auto declared = as<DeclaredSubtypeWitness>(witness))
         {
-            auto key = getInterfaceRequirementKey(
-                context, declared->getDeclRef().getDecl());
+            auto key = getInterfaceRequirementKey(context, declared->getDeclRef().getDecl());
 
             // Check if the key's declaring interface differs from the source.
             // For example, IC:>IA may have a DeclRef to IB's InheritanceDecl
