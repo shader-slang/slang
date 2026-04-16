@@ -554,6 +554,68 @@ struct TagOpsLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
+    // Lower a `lookupWitness` whose result is a plain value type (e.g. Int from
+    // `static const int`). The typeflow specialization pass only handles function,
+    // type, and witness-table results; value-type lookups survive unresolved.
+    // At this point in the pipeline the witness-table operand still carries
+    // SetTagType(WitnessTableSet), so we can map each table's entry to a
+    // concrete value via an integer mapping function.
+    void lowerLookupWitnessForValue(IRLookupWitnessMethod* inst)
+    {
+        auto witnessTableOp = inst->getWitnessTable();
+        auto setTagType = as<IRSetTagType>(witnessTableOp->getDataType());
+        if (!setTagType)
+            return;
+
+        auto witnessTableSet = as<IRWitnessTableSet>(setTagType->getOperand(0));
+        if (!witnessTableSet)
+            return;
+
+        // Only handle value-type results (not functions, types, or witness tables
+        // which are handled by the typeflow specialization pass).
+        auto resultType = inst->getDataType();
+        if (as<IRFuncType>(resultType) || as<IRWitnessTableType>(resultType))
+            return;
+        if (resultType->getOp() == kIROp_TypeKind || resultType->getOp() == kIROp_TypeType)
+            return;
+
+        auto key = inst->getRequirementKey();
+
+        IRBuilder builder(module);
+        Dictionary<UInt, UInt> mapping;
+
+        for (UInt i = 0; i < witnessTableSet->getCount(); i++)
+        {
+            auto table = as<IRWitnessTable>(witnessTableSet->getElement(i));
+            if (!table)
+                return;
+
+            auto entry = findWitnessTableEntry(table, key);
+            if (!entry)
+                return;
+
+            auto intVal = as<IRIntLit>(entry);
+            if (!intVal)
+                return;
+
+            mapping.add(getUniqueID(&builder, table), (UInt)intVal->getValue());
+        }
+
+        auto mappingFunc = createIntegerMappingFunc(module, mapping, 0);
+
+        builder.setInsertBefore(inst);
+        auto callResult = builder.emitCallInst(
+            builder.getUIntType(),
+            mappingFunc,
+            List<IRInst*>({witnessTableOp}));
+
+        // Cast from UInt to the actual value type.
+        auto castResult = builder.emitCast(resultType, callResult);
+
+        inst->replaceUsesWith(castResult);
+        inst->removeAndDeallocate();
+    }
+
     void processInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -569,6 +631,9 @@ struct TagOpsLoweringContext : public InstPassBase
             break;
         case kIROp_GetTagOfElementInSet:
             lowerGetTagOfElementInSet(as<IRGetTagOfElementInSet>(inst));
+            break;
+        case kIROp_LookupWitnessMethod:
+            lowerLookupWitnessForValue(as<IRLookupWitnessMethod>(inst));
             break;
         default:
             break;

@@ -1,10 +1,12 @@
-// Static const members in interfaces cannot currently be dispatched
-// dynamically. Accessing a static const through an interface-typed value
-// or a generic parameter with dynamic dispatch causes an internal compiler
-// error (ICE 99999) instead of producing a proper diagnostic.
+// This test was previously disabled while static const dispatch through
+// interfaces caused ICE 99999 (see #10150).
 //
-// These tests are disabled until the compiler either supports dynamic
-// dispatch of static const members or produces a clear error message.
+// The fix was implemented in #10150 and the functionality is now tested by
+// static-const-dispatch.slang in this directory.
+//
+// This file is kept as a marker for the former diagnostic test.
+// The DISABLE_TEST directives are left in place since the scenarios they
+// targeted are covered by the new compute test.
 
 // Scenario 1: static const accessed on interface-typed value
 //DISABLE_TEST:SIMPLE(filecheck=CHK1):-target hlsl -stage compute -entry scenario1
@@ -31,7 +33,6 @@ struct QuadOp : ILabeled
 
 int getLabel(ILabeled op)
 {
-    // CHK1: error
     return op.label;
 }
 
@@ -53,7 +54,6 @@ void scenario1()
 
 int getLabelGeneric<T : ILabeled>(T op)
 {
-    // CHK2: error
     return T.label;
 }
 
