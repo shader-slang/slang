@@ -573,12 +573,13 @@ struct TagOpsLoweringContext : public InstPassBase
         if (!witnessTableSet)
             return;
 
-        // Only handle value-type results (not functions, types, or witness tables
-        // which are handled by the typeflow specialization pass).
+        // Only handle value-type results (not functions, types, generics, or
+        // witness tables which are handled by the typeflow specialization pass).
         auto resultType = inst->getDataType();
         if (as<IRFuncType>(resultType) || as<IRWitnessTableType>(resultType))
             return;
-        if (resultType->getOp() == kIROp_TypeKind || resultType->getOp() == kIROp_TypeType)
+        if (resultType->getOp() == kIROp_GenericKind || resultType->getOp() == kIROp_TypeKind ||
+            resultType->getOp() == kIROp_TypeType)
             return;
 
         auto key = inst->getRequirementKey();
@@ -611,6 +612,9 @@ struct TagOpsLoweringContext : public InstPassBase
                 return;
             }
 
+            // The UInt cast preserves the bit pattern for 32-bit integer types
+            // (including negative values via two's complement). The emitCast below
+            // converts back to the original type.
             mapping.add(getUniqueID(&builder, table), (UInt)intVal->getValue());
         }
 
@@ -622,7 +626,6 @@ struct TagOpsLoweringContext : public InstPassBase
             mappingFunc,
             List<IRInst*>({witnessTableOp}));
 
-        // Cast from UInt to the actual value type.
         auto castResult = builder.emitCast(resultType, callResult);
 
         inst->replaceUsesWith(castResult);

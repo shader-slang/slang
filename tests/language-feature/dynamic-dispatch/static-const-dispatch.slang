@@ -29,6 +29,14 @@ struct QuadOp : ILabeled
     float compute(float x) { return x * x * scale; }
 }
 
+// Third conformance with a negative label to test signed dispatch
+struct NegOp : ILabeled
+{
+    float scale;
+    static const int label = -5;
+    float compute(float x) { return -x * scale; }
+}
+
 // Scenario 1: static const accessed on interface-typed value
 int getLabel(ILabeled op)
 {
@@ -41,7 +49,7 @@ int getLabelGeneric<T : ILabeled>(T op)
     return T.label;
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -73,9 +81,19 @@ void computeMain()
     outputBuffer[4] = int(op.compute(3.0));  // CHECK: 6
     outputBuffer[5] = int(op2.compute(2.0)); // CHECK: 20
 
-    // Verify negative values work (use LinOp.label - QuadOp.label = -10)
-    outputBuffer[6] = getLabel(op) - getLabel(op2);  // CHECK: -10
+    // --- NegOp path: test negative constant dispatch ---
+    ILabeled op3;
+    if (outputBuffer[6] == 999)
+        op3 = LinOp(1.0);
+    else
+        op3 = NegOp(3.0);
+
+    outputBuffer[6] = getLabel(op3);         // CHECK: -5
+    outputBuffer[7] = getLabelGeneric(op3);   // CHECK: -5
 
     // Verify both dispatch arms in a single getLabel call site
-    outputBuffer[7] = getLabel(op) + getLabel(op2);  // CHECK: 30
+    outputBuffer[8] = getLabel(op) + getLabel(op2);  // CHECK: 30
+
+    // Verify negative dispatched constant in arithmetic
+    outputBuffer[9] = getLabel(op) + getLabel(op3);  // CHECK: 5
 }
