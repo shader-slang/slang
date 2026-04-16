@@ -31,11 +31,18 @@ IValue makeValue(int kind)
     FloatImpl f; f.val = 1.0; return f;
 }
 
+// AnyValue unmarshalling reconstructs double via UInt64:
 // CHECK: uint64BitsToDouble
+
+// Explicit bit_cast exercises the Int64 -> Double path:
+// CHECK: int64BitsToDouble
 
 [numthreads(1, 1, 1)]
 void computeMain()
 {
     IValue v = makeValue(kindBuffer[0]);
     outputBuffer[0] = v.asFloat();
+
+    int64_t signedBits = int64_t(kindBuffer[0]);
+    outputBuffer[1] = float(bit_cast<double>(signedBits));
 }
