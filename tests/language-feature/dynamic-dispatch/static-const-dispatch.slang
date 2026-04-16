@@ -41,12 +41,13 @@ int getLabelGeneric<T : ILabeled>(T op)
     return T.label;
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain()
 {
+    // --- LinOp path (outputBuffer[0] starts at 0, so the 'if' branch is taken) ---
     // Flow two types into the same interface variable so the compiler
     // cannot statically resolve the dispatch.
     ILabeled op;
@@ -55,16 +56,26 @@ void computeMain()
     else
         op = QuadOp(3.0);
 
-    // LinOp path (outputBuffer[0] starts at 0):
     outputBuffer[0] = getLabel(op);         // CHECK: 10
     outputBuffer[1] = getLabelGeneric(op);   // CHECK: 10
 
-    // Reassign to QuadOp
-    ILabeled op2 = QuadOp(5.0);
+    // --- QuadOp path (force the else branch by using a non-zero selector) ---
+    ILabeled op2;
+    if (outputBuffer[2] == 999)
+        op2 = LinOp(4.0);
+    else
+        op2 = QuadOp(5.0);
+
     outputBuffer[2] = getLabel(op2);         // CHECK: 20
     outputBuffer[3] = getLabelGeneric(op2);   // CHECK: 20
 
     // Verify that instance methods still work alongside static const dispatch
     outputBuffer[4] = int(op.compute(3.0));  // CHECK: 6
     outputBuffer[5] = int(op2.compute(2.0)); // CHECK: 20
+
+    // Verify negative values work (use LinOp.label - QuadOp.label = -10)
+    outputBuffer[6] = getLabel(op) - getLabel(op2);  // CHECK: -10
+
+    // Verify both dispatch arms in a single getLabel call site
+    outputBuffer[7] = getLabel(op) + getLabel(op2);  // CHECK: 30
 }

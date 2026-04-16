@@ -448,8 +448,10 @@ struct TagOpsLoweringContext : public InstPassBase
     // take an integer in and return an integer out, based on the
     // input and output sets (and any other operands)
     //
-    TagOpsLoweringContext(IRModule* module)
-        : InstPassBase(module)
+    DiagnosticSink* sink;
+
+    TagOpsLoweringContext(IRModule* module, DiagnosticSink* sink)
+        : InstPassBase(module), sink(sink)
     {
     }
 
@@ -596,7 +598,18 @@ struct TagOpsLoweringContext : public InstPassBase
 
             auto intVal = as<IRIntLit>(entry);
             if (!intVal)
+            {
+                // Non-integer static const values (e.g. float) are not yet supported
+                // for dynamic dispatch. Emit a diagnostic rather than leaving the
+                // lookupWitness unresolved (which would cause ICE at emit time).
+                if (sink)
+                {
+                    sink->diagnose(Diagnostics::Unimplemented{
+                        .feature = "dynamic dispatch of non-integer static const interface members",
+                        .location = inst->sourceLoc});
+                }
                 return;
+            }
 
             mapping.add(getUniqueID(&builder, table), (UInt)intVal->getValue());
         }
@@ -1102,8 +1115,7 @@ void lowerSequentialIDTagCasts(IRModule* module, Linkage* linkage, DiagnosticSin
 
 void lowerTagInsts(IRModule* module, DiagnosticSink* sink)
 {
-    SLANG_UNUSED(sink);
-    TagOpsLoweringContext tagContext(module);
+    TagOpsLoweringContext tagContext(module, sink);
     tagContext.processModule();
 }
 
