@@ -2527,16 +2527,17 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
         specContext.shared->symbols.remove(mangledName);
         specContext.builder->setInsertBefore(existingInst);
 
-        // Remove existing inst from the module before cloning so our duplication-check
-        // (`checkIRDuplicate`) doesn't complain.
-        existingInst->removeFromParent();
+        // Strip the linkage decoration from existingInst so that checkIRDuplicate
+        // won't find a name conflict when the clone is created.
+        // We intentionally keep existingInst in the module tree so that its children
+        // (e.g. Specialize insts inside a Generic's body that reference the Generic
+        // itself) remain connected to the module during replaceUsesWith. Removing it
+        // from parent would orphan the entire subtree and crash the dedup/hoisting
+        // logic when it encounters those children as users with no module.
+        if (auto linkageDecor = existingInst->findDecoration<IRLinkageDecoration>())
+            linkageDecor->removeAndDeallocate();
 
         auto cloned = cloneValue(&specContext, originalInst);
-
-        // Replace uses and deallocate immediately rather than deferring to a second pass.
-        // Deferring causes crashes when existingInst A is a user of existingInst B: both
-        // get removed from parent in the first pass, then B's replaceUsesWith encounters
-        // orphaned A (no module) and crashes in the dedup/hoisting logic.
         existingInst->replaceUsesWith(cloned);
         existingInst->removeAndDeallocate();
     }

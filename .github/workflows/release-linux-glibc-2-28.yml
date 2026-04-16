@@ -37,7 +37,8 @@ jobs:
             bash -euo pipefail -c '
               yum install -y gcc-toolset-11-gcc gcc-toolset-11-gcc-c++
               source /opt/rh/gcc-toolset-11/enable
-              pip3 install cmake==3.25.0 ninja==1.11.1.4
+              /opt/python/cp310-cp310/bin/pip install cmake==3.25.0 ninja==1.11.1.4
+              export PATH=/opt/python/cp310-cp310/bin:$PATH
               cd /home/app
               git config --global --add safe.directory /home/app
               cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
