@@ -109,17 +109,22 @@ Expr* SemanticsVisitor::moveTemp(Expr* const& expr, F const& func)
 
 /// Execute `func` on a variable with the value of `expr`.
 ///
-/// If `expr` is just a reference to a variable then this will use the
-/// existing variable. Otherwise it will create a new variable to hold
-/// `expr`, using `moveTemp()`.
+/// If `expr` is just a reference to an immutable (or effectively immutable)
+/// variable then this will use the existing variable. Otherwise it will
+/// create a new variable to hold `expr`, using `moveTemp()`.
 ///
-/// Note: We accept any `VarDeclBase` (not just `LetDecl`) so that
-/// existential openings on the same variable always produce the same
-/// `ExtractExistentialType` instance. This ensures that associated types
-/// like `obj.Element` resolve consistently across multiple accesses to
-/// the same interface-typed variable, regardless of whether it was
-/// declared with `let`, `var`, or an explicit type annotation.
+/// For `LetDecl` (immutable binding), we always reuse directly.
+///
+/// For `VarDecl` (mutable binding), we reuse directly only if the variable
+/// has not been reassigned since its declaration (single-assignment `var`).
+/// This ensures that existential openings on the same variable always produce
+/// the same `ExtractExistentialType` instance, so that associated types like
+/// `obj.Element` resolve consistently across multiple accesses.
 /// See https://github.com/shader-slang/slang/issues/10004.
+///
+/// When we reuse a `VarDecl` directly, we mark it with
+/// `ExistentialOpenedOnVarModifier` so that a later reassignment can be
+/// diagnosed as an error (since it would invalidate the opened type identity).
 ///
 template<typename F>
 Expr* SemanticsVisitor::maybeMoveTemp(Expr* const& expr, F const& func)
@@ -127,8 +132,18 @@ Expr* SemanticsVisitor::maybeMoveTemp(Expr* const& expr, F const& func)
     if (auto varExpr = as<VarExpr>(expr))
     {
         auto declRef = varExpr->declRef;
-        if (auto varDeclRef = declRef.as<VarDeclBase>())
-            return func(varDeclRef);
+        if (auto letDeclRef = declRef.as<LetDecl>())
+            return func(letDeclRef);
+        if (auto varDeclRef = declRef.as<VarDecl>())
+        {
+            auto varDecl = varDeclRef.getDecl();
+            if (!varDecl->hasModifier<VarReassignedModifier>())
+            {
+                if (!varDecl->hasModifier<ExistentialOpenedOnVarModifier>())
+                    addModifier(varDecl, m_astBuilder->create<ExistentialOpenedOnVarModifier>());
+                return func(varDeclRef);
+            }
+        }
     }
 
     return moveTemp(expr, func);
@@ -3473,6 +3488,28 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     }
     auto right = maybeOpenRef(expr->right);
     expr->right = coerce(CoercionSite::Assignment, type, right, getSink());
+
+    // Track reassignment of `VarDecl`s for single-assignment detection.
+    // If a `var` had its existential type opened (ExistentialOpenedOnVarModifier),
+    // reassigning it would invalidate the opened type identity.
+    if (auto varExpr = as<VarExpr>(expr->left))
+    {
+        if (auto varDecl = as<VarDecl>(varExpr->declRef.getDecl()))
+        {
+            if (!as<LetDecl>(varDecl))
+            {
+                if (varDecl->hasModifier<ExistentialOpenedOnVarModifier>())
+                {
+                    getSink()->diagnose(
+                        Diagnostics::CannotReassignVarAfterExistentialOpened{
+                            .variable = varDecl->getName(),
+                            .location = expr->loc});
+                }
+                if (!varDecl->hasModifier<VarReassignedModifier>())
+                    addModifier(varDecl, m_astBuilder->create<VarReassignedModifier>());
+            }
+        }
+    }
 
     if (!expr->left->type.isLeftValue)
     {
