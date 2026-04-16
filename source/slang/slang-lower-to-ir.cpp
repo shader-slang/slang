@@ -2294,11 +2294,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
         SLANG_RELEASE_ASSERT(steps.getCount() >= 2);
 
-        // The first step produces the base witness table (e.g. a
-        // concrete witness table for Impl:>IC, or a StructKey for
-        // an interface requirement).
+        // The first step must produce a real witness table (e.g. a
+        // concrete witness table for Impl:>IC).  Interface-to-interface
+        // transitive chains are handled by resolveInterfaceWitnessChain
+        // in visitCastToSuperTypeExpr, so we should never see a StructKey
+        // here.
         IRInst* currentWT = lowerSimpleVal(context, steps[0]);
         SLANG_RELEASE_ASSERT(currentWT);
+        SLANG_ASSERT(currentWT->getOp() != kIROp_StructKey);
 
         // Each subsequent step looks up from the current witness table.
         for (Index i = 1; i < steps.getCount(); i++)
@@ -6804,6 +6807,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 {
                     // Traverse the source interface's inheritance requirements
                     // to find a path to the parent interface.
+                    IRInst* midWT = nullptr;
                     for (UInt i = 0; i < sourceIface->getOperandCount(); i++)
                     {
                         auto entry = sourceIface->getOperand(i);
@@ -6815,20 +6819,20 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                                 auto ifaceType = wtType->getConformanceType();
                                 if (ifaceType == parentIfaceType)
                                 {
-                                    // Found path: source -> parent
                                     auto inheritKey = entry->getOperand(0);
-                                    auto midWT = builder->emitLookupInterfaceMethodInst(
+                                    midWT = builder->emitLookupInterfaceMethodInst(
                                         wtType, sourceWT, inheritKey);
-                                    // Look up the target from the parent WT
-                                    auto supType = lowerType(context, witness->getSup());
-                                    return builder->emitLookupInterfaceMethodInst(
-                                        builder->getWitnessTableType(supType),
-                                        midWT,
-                                        key);
+                                    break;
                                 }
                             }
                         }
                     }
+                    SLANG_RELEASE_ASSERT(midWT);
+                    auto supType = lowerType(context, witness->getSup());
+                    return builder->emitLookupInterfaceMethodInst(
+                        builder->getWitnessTableType(supType),
+                        midWT,
+                        key);
                 }
             }
 
