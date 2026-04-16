@@ -4062,7 +4062,7 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericDecl(
                     .referenced = referencedDecl,
                     .expr = expr});
             }
-            else if (as<GenericTypeParamDecl>(decl) || as<GenericValueParamDecl>(decl))
+            else if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl))
             {
                 getSink()->diagnose(Diagnostics::ForwardReferenceInGenericDefaultInitializer{
                     .param = decl,
