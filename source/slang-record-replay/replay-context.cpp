@@ -123,10 +123,20 @@ DataMismatchException::DataMismatchException(size_t offset, size_t size)
 // ReplayContext construction and low-level helpers
 // =============================================================================
 
+static bool s_contextCreated = false;
+
 ReplayContext& ReplayContext::get()
 {
     static ReplayContext s_instance;
+    s_contextCreated = true;
     return s_instance;
+}
+
+ReplayContext* ReplayContext::tryGet()
+{
+    if (s_contextCreated)
+        return &get();
+    return nullptr;
 }
 
 ReplayContext::ReplayContext()
