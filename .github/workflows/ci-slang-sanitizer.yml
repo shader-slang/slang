@@ -273,7 +273,7 @@ jobs:
                 | grep -v '^LEAK:' > "$expected_patterns" || true
               grep -v '^\s*#' cmake/expected-sanitizer-findings.txt \
                 | grep -v '^\s*$' \
-                | sed -n 's/^LEAK:\s*//p' > "$expected_leak_patterns" || true
+                | sed -n 's/^LEAK:[[:space:]]*//p' > "$expected_leak_patterns" || true
             else
               : > "$expected_patterns"
               : > "$expected_leak_patterns"
