@@ -225,7 +225,8 @@ static bool isSpecArgExistentialDerived(IRInst* inst, int depth = 0)
         return as<IRInterfaceType>(inst->getOperand(0)) != nullptr;
     case kIROp_LookupWitnessMethod:
         return isSpecArgExistentialDerived(
-            as<IRLookupWitnessMethod>(inst)->getWitnessTable(), depth + 1);
+            as<IRLookupWitnessMethod>(inst)->getWitnessTable(),
+            depth + 1);
     case kIROp_BuiltinCast:
         return isSpecArgExistentialDerived(inst->getOperand(0), depth + 1);
     default:

@@ -29,9 +29,7 @@ static bool isExistentialDerived(IRInst* inst, int depth = 0)
     case kIROp_TypeEqualityWitness:
         return as<IRInterfaceType>(inst->getOperand(0)) != nullptr;
     case kIROp_LookupWitnessMethod:
-        return isExistentialDerived(
-            as<IRLookupWitnessMethod>(inst)->getWitnessTable(),
-            depth + 1);
+        return isExistentialDerived(as<IRLookupWitnessMethod>(inst)->getWitnessTable(), depth + 1);
     case kIROp_BuiltinCast:
         return isExistentialDerived(inst->getOperand(0), depth + 1);
     default:
