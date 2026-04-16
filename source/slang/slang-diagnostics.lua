@@ -891,6 +891,13 @@ err(
     span { loc = "location", message = "cannot use 'const' as a type modifier" }
 )
 
+err(
+    "volatile-not-allowed-on-type",
+    20019,
+    "invalid 'volatile' usage",
+    span { loc = "location", message = "cannot use 'volatile' as a type modifier" }
+)
+
 warning(
     "unintended-empty-statement",
     20101,
@@ -1156,6 +1163,13 @@ err(
     30029,
     "array index out of bounds",
     span { loc = "location", message = "array index '~index' is out of bounds for array of size '~size'." }
+)
+
+err(
+    "reference-type-as-struct-field",
+    30030,
+    "reference type cannot be used as struct field",
+    span { loc = "location", message = "'~type:Type' cannot be used as a struct field; reference types can only be used for function parameters and return values." }
 )
 
 err(
@@ -2547,7 +2561,7 @@ err(
     span { loc = "location", message = "interface '~decl:Decl' cannot be used as a constraint on a function type because it does not have the [__FunctionInterface] attribute." }
 )
 
--- 312xx - Modifiers and Deprecation
+-- 312xx - Modifiers and Deprecation (part 1)
 
 warning(
     "deprecated-usage",
@@ -2741,6 +2755,22 @@ err(
     31225,
     "missing initializer for static const",
     span { loc = "decl:Decl", message = "static const variable '~decl' must have an initializer" }
+)
+
+-- 3123x - Modifiers and Deprecation (part 2)
+
+err(
+    "removed-modifier-usage",
+    31230,
+    "use of removed modifier",
+    span { loc = "location", message = "modifier '~modifierName' has been removed from the language. ~message" }
+)
+
+warning(
+    "deprecated-modifier-usage",
+    31231,
+    "use of deprecated modifier",
+    span { loc = "location", message = "modifier '~modifierName' has been deprecated: ~message" }
 )
 
 -- Enums (320xx)
