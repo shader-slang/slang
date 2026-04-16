@@ -2662,6 +2662,40 @@ struct TypeFlowSpecializationContext
                         (IRType*)this->fieldInfo[structField],
                         as<IRPtrTypeBase>(fieldAddress->getDataType()));
                 }
+
+                // When accessing an interface-typed field and no fieldInfo has been
+                // propagated, fall back to enumerating global witness tables.
+                // See the analogous logic in analyzeLoad for direct interface
+                // loads from resource pointers.
+                if (auto interfaceType = as<IRInterfaceType>(structField->getFieldType()))
+                {
+                    if (!isComInterfaceType(interfaceType))
+                    {
+                        HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+                        collectExistentialTables(interfaceType, tables);
+                        if (tables.getCount() > 0)
+                        {
+                            auto valueInfo = makeTaggedUnionType(as<IRWitnessTableSet>(
+                                builder.getSet(kIROp_WitnessTableSet, tables)));
+                            module->getContainerPool().free(&tables);
+                            return builder.getPtrTypeWithAddressSpace(
+                                (IRType*)valueInfo,
+                                as<IRPtrTypeBase>(fieldAddress->getDataType()));
+                        }
+                        module->getContainerPool().free(&tables);
+                    }
+                }
+                else if (
+                    auto boundInterfaceType = as<IRBoundInterfaceType>(structField->getFieldType()))
+                {
+                    auto valueInfo =
+                        makeTaggedUnionType(cast<IRWitnessTableSet>(builder.getSingletonSet(
+                            kIROp_WitnessTableSet,
+                            boundInterfaceType->getWitnessTable())));
+                    return builder.getPtrTypeWithAddressSpace(
+                        (IRType*)valueInfo,
+                        as<IRPtrTypeBase>(fieldAddress->getDataType()));
+                }
             }
         }
 
@@ -2688,6 +2722,35 @@ struct TypeFlowSpecializationContext
             if (this->fieldInfo.containsKey(structField))
             {
                 return this->fieldInfo[structField];
+            }
+
+            // When extracting an interface-typed field from a struct and no fieldInfo
+            // has been propagated (e.g. the struct was loaded from a constant buffer
+            // rather than constructed via MakeStruct), fall back to enumerating all
+            // globally available witness tables for the interface. This mirrors the
+            // logic in analyzeLoad for direct interface loads from resource pointers.
+            if (auto interfaceType = as<IRInterfaceType>(structField->getFieldType()))
+            {
+                if (!isComInterfaceType(interfaceType))
+                {
+                    HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+                    collectExistentialTables(interfaceType, tables);
+                    if (tables.getCount() > 0)
+                    {
+                        auto result = makeTaggedUnionType(
+                            as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
+                        module->getContainerPool().free(&tables);
+                        return result;
+                    }
+                    module->getContainerPool().free(&tables);
+                }
+            }
+            else if (
+                auto boundInterfaceType = as<IRBoundInterfaceType>(structField->getFieldType()))
+            {
+                return makeTaggedUnionType(cast<IRWitnessTableSet>(builder.getSingletonSet(
+                    kIROp_WitnessTableSet,
+                    boundInterfaceType->getWitnessTable())));
             }
         }
         return none();
