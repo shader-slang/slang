@@ -2621,18 +2621,18 @@ struct TypeFlowSpecializationContext
 
                 // When accessing an interface-typed field and no fieldInfo has been
                 // propagated, fall back to enumerating global witness tables.
-                // See the analogous logic in analyzeFieldExtract.
+                // See the analogous logic in analyzeLoad for direct interface
+                // loads from resource pointers.
                 if (auto interfaceType = as<IRInterfaceType>(structField->getFieldType()))
                 {
                     if (!isComInterfaceType(interfaceType))
                     {
-                        HashSet<IRInst*>& tables =
-                            *module->getContainerPool().getHashSet<IRInst>();
+                        HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
                         collectExistentialTables(interfaceType, tables);
                         if (tables.getCount() > 0)
                         {
-                            auto valueInfo = makeTaggedUnionType(as<IRWitnessTableSet>(
-                                builder.getSet(kIROp_WitnessTableSet, tables)));
+                            auto valueInfo = makeTaggedUnionType(
+                                as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
                             module->getContainerPool().free(&tables);
                             return builder.getPtrTypeWithAddressSpace(
                                 (IRType*)valueInfo,
@@ -2678,13 +2678,12 @@ struct TypeFlowSpecializationContext
             {
                 if (!isComInterfaceType(interfaceType))
                 {
-                    HashSet<IRInst*>& tables =
-                        *module->getContainerPool().getHashSet<IRInst>();
+                    HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
                     collectExistentialTables(interfaceType, tables);
                     if (tables.getCount() > 0)
                     {
-                        auto result = makeTaggedUnionType(as<IRWitnessTableSet>(
-                            builder.getSet(kIROp_WitnessTableSet, tables)));
+                        auto result = makeTaggedUnionType(
+                            as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
                         module->getContainerPool().free(&tables);
                         return result;
                     }
