@@ -60,14 +60,16 @@ void IRDeduplicationContext::removeInstFromConstantMap(IRInst* inst)
 
 void IRDeduplicationContext::tryHoistInst(IRInst* inst)
 {
-    InstWorkList workList(inst->getModule());
+    auto module = inst->getModule();
+    SLANG_ASSERT(module);
+    InstWorkList workList(module);
 
     // Note: It is possible to see the same inst multiple times since it could
     // reference a hoistable inst through multiple paths. For now, we will essentially
     // re-hoist it each time, though we could be more efficient here.
     //
     workList.add(inst);
-    IRBuilder builder(inst->getModule());
+    IRBuilder builder(module);
 
     for (Index i = 0; i < workList.getCount(); i++)
     {
