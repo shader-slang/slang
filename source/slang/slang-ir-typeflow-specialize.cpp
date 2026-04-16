@@ -3224,6 +3224,15 @@ struct TypeFlowSpecializationContext
                 });
 
             auto setOp = getSetOpFromType(inst->getDataType());
+            if (setOp == kIROp_Invalid)
+            {
+                // The lookupWitness returns a plain value type (e.g. Int from
+                // `static const int`). The typeflow pass only handles function,
+                // type, generic, and witness-table results; value-type lookups
+                // are handled later by lowerTagInsts.
+                module->getContainerPool().free(&results);
+                return none();
+            }
             auto resultSetType = makeElementOfSetType(builder.getSet(setOp, results));
             module->getContainerPool().free(&results);
 
