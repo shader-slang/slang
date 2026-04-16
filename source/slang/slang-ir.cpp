@@ -4737,7 +4737,7 @@ IRInst* IRBuilder::emitMakeExistential(IRType* type, IRInst* value, IRInst* witn
     // looking up the target interface's witness table through the key.
     auto sourceIface = as<IRInterfaceType>(value->getDataType());
     auto targetIface = as<IRInterfaceType>(type);
-    if (sourceIface && targetIface && sourceIface != targetIface)
+    if (sourceIface && targetIface && sourceIface != targetIface && as<IRStructKey>(witnessTable))
     {
         auto extractedType = emitExtractExistentialType(value);
         auto extractedValue = emitExtractExistentialValue(extractedType, value);
