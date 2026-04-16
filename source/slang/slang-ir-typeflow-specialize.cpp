@@ -2403,8 +2403,21 @@ struct TypeFlowSpecializationContext
                 auto valueInfo = as<IRPtrTypeBase>(addrInfo)->getValueType();
                 return valueInfo;
             }
-            else
-                return none(); // No info for the address
+
+            // If there is no type flow info for the address but the loaded type
+            // is an interface, enumerate all conforming types globally.
+            // This handles groupshared global variables (and arrays thereof)
+            // with interface types, where the address traces back to a module-scope
+            // global variable that type flow analysis cannot track.
+            if (auto interfaceType = as<IRInterfaceType>(loadInst->getDataType()))
+            {
+                if (!isComInterfaceType(interfaceType))
+                {
+                    return findGlobalTables(interfaceType);
+                }
+            }
+
+            return none();
         }
         else if (as<IRRWStructuredBufferLoad>(inst) || as<IRStructuredBufferLoad>(inst))
         {
