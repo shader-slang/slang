@@ -59,6 +59,14 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     , m_cmdLineContext(new CommandLineContext())
     , m_stringSlicePool(StringSlicePool::Style::Default)
 {
+    // [TEST] Deliberate signed integer overflow to verify sanitizer CI catches it.
+    // UBSan will flag this; ASan will not. Remove after verification.
+    {
+        volatile int x = INT_MAX;
+        volatile int y = x + 1; // signed overflow — undefined behavior
+        (void)y;
+    }
+
     namePool = session->getNamePool();
 
     m_defaultSourceManager.initialize(session->getBuiltinSourceManager(), nullptr);
