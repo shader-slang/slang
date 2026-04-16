@@ -18,8 +18,14 @@ void invalidDefault<T : IFoo = NotIFoo>()
 }
 
 void badDefaultOrder<A=B,B=int>()
-//diag:                ^ undefined identifier
-//diag:                ^ undefined identifier 'B'.
+//diag:                ^ forward reference in generic default initializer
+//diag:                ^ generic default initializer for parameter 'A' references parameter 'B' before it is declared
+{
+}
+
+void badDefaultOrder2<int A=B,int B=10>()
+//diag:                     ^ forward reference in generic default initializer
+//diag:                     ^ generic default initializer for parameter 'A' references parameter 'B' before it is declared
 {
 }
 
