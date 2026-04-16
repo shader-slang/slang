@@ -13,9 +13,12 @@
 #       Bad:   null-pointer-use  (too broad, suppresses all null-pointer findings)
 #
 #   LEAK match (LEAK: prefix):
-#     Lines starting with "LEAK:" match a function name against the full
-#     log content (stack traces), but only for leak findings. This avoids
-#     relying on exact byte/allocation counts in leak SUMMARY lines.
+#     Lines starting with "LEAK:" match a function name against individual
+#     leak blocks (stack traces), not the whole log. A leak SUMMARY is
+#     expected only if every leak block contains at least one matching
+#     pattern. This avoids relying on exact byte/allocation counts in leak
+#     SUMMARY lines, while ensuring an expected leak does not mask
+#     unrelated new leaks in the same process.
 #       Good:  LEAK: _maybeBeginMacroInvocation
 #       Bad:   AddressSanitizer: 20064 byte(s) leaked  (fragile counts)
 #
