@@ -1113,6 +1113,36 @@ Modifier* SemanticsVisitor::validateAttribute(
 
         deprecatedAttr->message = message;
     }
+    else if (auto removedSinceAttr = as<RemovedSinceAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 2);
+
+        auto sinceVersion = checkConstantIntVal(attr->args[0]);
+        if (sinceVersion == nullptr)
+        {
+            return nullptr;
+        }
+
+        const int32_t kMinVersion = -1;
+        const int32_t kMaxVersion = 9999;
+        if ((sinceVersion->getValue() < kMinVersion) || (sinceVersion->getValue() > kMaxVersion))
+        {
+            getSink()->diagnose(Diagnostics::RemovedSinceBadVersion{
+                .minVersion = kMinVersion,
+                .maxVersion = kMaxVersion,
+                .location = removedSinceAttr->loc});
+            return nullptr;
+        }
+
+        String message;
+        if (!checkLiteralStringVal(attr->args[1], &message))
+        {
+            return nullptr;
+        }
+
+        removedSinceAttr->sinceVersion = int32_t(sinceVersion->getValue());
+        removedSinceAttr->message = message;
+    }
     else if (auto knownBuiltinAttr = as<KnownBuiltinAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
