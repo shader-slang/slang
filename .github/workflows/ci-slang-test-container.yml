@@ -61,57 +61,6 @@ jobs:
           fi
           echo "GPU: $output"
 
-      - name: Setup Vulkan ICD
-        run: |
-          # See job-level comment for why we override the Vulkan ICD.
-          # Write the modified ICD JSON to a writable temp path and point
-          # VK_ICD_FILENAMES at it — /etc/vulkan/icd.d/nvidia_icd.json may
-          # be mounted read-only by nvidia-container-toolkit 1.19+.
-          source_icd=""
-          for candidate in \
-            /etc/vulkan/icd.d/nvidia_icd.json \
-            /usr/share/vulkan/icd.d/nvidia_icd.json; do
-            if [ -f "$candidate" ]; then
-              source_icd="$candidate"
-              break
-            fi
-          done
-          icd_dir="${RUNNER_TEMP:-/tmp}/vulkan-icd"
-          icd_path="$icd_dir/nvidia_icd.json"
-          mkdir -p "$icd_dir"
-          if ! ICD_SOURCE="$source_icd" ICD_OUT="$icd_path" python3 - 2>"$icd_dir/py.err" <<'PY'
-          import json
-          import os
-          source = os.environ["ICD_SOURCE"]
-          out = os.environ["ICD_OUT"]
-          if source:
-              with open(source) as f:
-                  icd = json.load(f)
-              icd.setdefault("ICD", {})
-          else:
-              icd = {"file_format_version": "1.0.1", "ICD": {"api_version": "1.4.312"}}
-          icd["ICD"]["library_path"] = "libEGL_nvidia.so.0"
-          with open(out, "w") as f:
-              json.dump(icd, f, indent=4)
-              f.write("\n")
-          print(f"Vulkan ICD configured: libEGL_nvidia.so.0 (api_version={icd['ICD'].get('api_version', 'unknown')})")
-          PY
-          then
-            echo "::error::Failed to write Vulkan ICD override — default ICD risks libEGL_nvidia crash on driver 580.x"
-            echo "source_icd=$source_icd"
-            if [ -n "$source_icd" ]; then
-              echo "--- $source_icd ---"
-              cat "$source_icd" || true
-            fi
-            echo "--- python stderr ---"
-            cat "$icd_dir/py.err" 2>/dev/null || true
-            exit 1
-          fi
-          echo "VK_ICD_FILENAMES=$icd_path" >> "$GITHUB_ENV"
-          # Also remove the NVIDIA EGL vendor JSON if writable, to prevent
-          # libglvnd from loading libEGL_nvidia through the EGL path.
-          rm -f /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null || true
-
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
@@ -119,6 +68,9 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "1"
+
+      - name: Setup Vulkan ICD
+        uses: ./.github/actions/setup-vulkan-icd
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -255,52 +207,6 @@ jobs:
           fi
           echo "GPU: $output"
 
-      - name: Setup Vulkan ICD
-        run: |
-          # See test-slang job comment for why we override the Vulkan ICD.
-          source_icd=""
-          for candidate in \
-            /etc/vulkan/icd.d/nvidia_icd.json \
-            /usr/share/vulkan/icd.d/nvidia_icd.json; do
-            if [ -f "$candidate" ]; then
-              source_icd="$candidate"
-              break
-            fi
-          done
-          icd_dir="${RUNNER_TEMP:-/tmp}/vulkan-icd"
-          icd_path="$icd_dir/nvidia_icd.json"
-          mkdir -p "$icd_dir"
-          if ! ICD_SOURCE="$source_icd" ICD_OUT="$icd_path" python3 - 2>"$icd_dir/py.err" <<'PY'
-          import json
-          import os
-          source = os.environ["ICD_SOURCE"]
-          out = os.environ["ICD_OUT"]
-          if source:
-              with open(source) as f:
-                  icd = json.load(f)
-              icd.setdefault("ICD", {})
-          else:
-              icd = {"file_format_version": "1.0.1", "ICD": {"api_version": "1.4.312"}}
-          icd["ICD"]["library_path"] = "libEGL_nvidia.so.0"
-          with open(out, "w") as f:
-              json.dump(icd, f, indent=4)
-              f.write("\n")
-          print(f"Vulkan ICD configured: libEGL_nvidia.so.0 (api_version={icd['ICD'].get('api_version', 'unknown')})")
-          PY
-          then
-            echo "::error::Failed to write Vulkan ICD override — default ICD risks libEGL_nvidia crash on driver 580.x"
-            echo "source_icd=$source_icd"
-            if [ -n "$source_icd" ]; then
-              echo "--- $source_icd ---"
-              cat "$source_icd" || true
-            fi
-            echo "--- python stderr ---"
-            cat "$icd_dir/py.err" 2>/dev/null || true
-            exit 1
-          fi
-          echo "VK_ICD_FILENAMES=$icd_path" >> "$GITHUB_ENV"
-          rm -f /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null || true
-
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
@@ -308,6 +214,9 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "1"
+
+      - name: Setup Vulkan ICD
+        uses: ./.github/actions/setup-vulkan-icd
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
