@@ -55,7 +55,7 @@ One agent reads `plan.best.md`, implements the fix, and commits the result.
 
 ### Phase 4: Virtual Review and Amend
 
-A fresh agent reviews the commit as if it were a real code reviewer: checks correctness, style, edge cases, test coverage, and regressions. It also reviews all documentation changes (`CLAUDE.md`, `docs/user-guide/`, `docs/language-reference/`) and reverts additions that are not significant enough to justify a permanent change or are unrelated to the final implementation. All fixes are folded into the original commit via `git commit --amend`.
+A fresh agent reviews the commit as if it were a real code reviewer: checks correctness, style, edge cases, test coverage, and regressions. It also reviews all documentation changes and reverts additions that are not significant enough to justify a permanent change or are unrelated to the final implementation. All fixes are folded into the original commit via `git commit --amend`.
 
 ## Output
 

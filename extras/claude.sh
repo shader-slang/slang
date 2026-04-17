@@ -209,9 +209,10 @@ claude --dangerously-skip-permissions --print \
 1. Review git show to see the committed changeset.
 2. Walk through the issue scenario step by step and confirm the implementation resolves it.
 3. Identify all concerns a real code reviewer would raise: correctness, style, edge cases, test coverage, and potential regressions.
-4. Review all documentation changes (CLAUDE.md, docs/user-guide/, docs/language-reference/) and revert any additions that are not significant enough to justify a permanent change or are unrelated to the final implementation.
-5. Fix every concern you identified directly in the code.
-6. Run git commit --amend to incorporate all fixes into the original commit."
+4. Review all documentation changes and revert any additions that are not significant enough to justify a permanent change or are unrelated to the final implementation.
+5. Review new source code comments: ensure they match the implementation and are concise.
+6. Fix every concern you identified.
+7. Run git commit --amend to incorporate all fixes into the original commit."
 
 log "Done."
 echo ""
