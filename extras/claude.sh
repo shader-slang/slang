@@ -55,7 +55,11 @@ angles=(
   "Focus on the module/link stage (slang-ir-link.cpp, slang-serialize*.cpp, slang-module*.cpp): examine whether the issue surfaces during separate compilation, module serialization, or IR linking across translation units."
   "Focus on the legalization stage (slang-ir-legalize*.cpp, slang-ir-lower*.cpp): examine whether the issue is caused by a data representation transformation that Slang applies to meet target language requirements, such as struct splitting, array flattening, matrix layout conversion, or buffer element type lowering."
   "Focus on Slang language syntax (slang-parser.cpp, docs/user-guide/, external/spec/): examine whether the issue stems from incorrect user syntax, valid syntax that is not yet implemented, or a mismatch between what the spec allows and what the compiler accepts. Identify whether the fix belongs in the parser, the diagnostic messages, or the spec/docs."
+  "Focus on regression: examine git log and git blame to determine whether the issue was introduced by a recent change. Find the commit that broke the behavior, understand why it was made, and determine whether the fix should revert it, patch it, or take a different approach."
 )
+##############
+# When you add more angles, please update claude.md document as well.
+##############
 
 agentCount=${#angles[@]}
 

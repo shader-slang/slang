@@ -41,6 +41,7 @@ Run from the repository root. The script requires `claude` and `jq` in PATH.
 | Module/link stage | Separate compilation, module serialization, IR linking |
 | Legalization stage | `slang-ir-legalize*.cpp`, `slang-ir-lower*.cpp` — data representation transforms |
 | Language syntax | Parser, spec, docs — incorrect or unimplemented syntax |
+| Regression | `git log`/`git blame` — find the commit that introduced the issue |
 
 Each agent writes its proposal to `issue-<N>/plan.<i>.md`.
 
