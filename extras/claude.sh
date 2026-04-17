@@ -39,7 +39,21 @@ log() { echo "[$(date '+%H:%M:%S')] $*"; }
 # Use a per-issue subdirectory for plan files to avoid clobbering unrelated files in CWD
 planDir="issue-$githubIssue"
 mkdir -p "$planDir"
-rm -f "$planDir"/plan.*.md "$planDir"/plan.best.md
+rm -f "$planDir"/plan.*.md "$planDir"/plan.best.md "$planDir"/probe
+
+# Verify --dangerously-skip-permissions is effective before launching agents.
+# Ask Claude to write a known value to a file; if the file is not created,
+# the flag is blocked (e.g. by a managed policy) and we cannot proceed.
+log "Checking --dangerously-skip-permissions..."
+claude --dangerously-skip-permissions --print \
+  "Run this bash command: printf 'ok' > $planDir/probe" >/dev/null 2>&1 || true
+if [ ! -f "$planDir/probe" ] || [ "$(cat "$planDir/probe")" != "ok" ]; then
+  log "Error: --dangerously-skip-permissions is not effective on this system."
+  log "Check your Claude configuration or company policy. The script cannot continue."
+  exit 1
+fi
+rm -f "$planDir/probe"
+log "--dangerously-skip-permissions is working."
 
 # Each angle drives one independent planning agent — add or remove entries to tune coverage
 angles=(
@@ -156,8 +170,7 @@ claude_json() {
     echo "claude_json: missing -- before prompt" >&2
     return 2
   }
-  local tmp
-  tmp=$(mktemp -t claude.XXXXXX.json) || return 1
+  local tmp="$planDir/claude-output.json"
   claude --dangerously-skip-permissions --output-format json "${args[@]}" --print "$prompt" >"$tmp"
   jq -r '.result // empty' "$tmp" >&2
   jq -r '.session_id // empty' "$tmp"
