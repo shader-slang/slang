@@ -228,6 +228,8 @@ if(SLANG_ENABLE_GFX)
         VERBATIM
     )
     set_target_properties(copy-gfx-slang-modules PROPERTIES FOLDER generators)
+    # gfx owns this dependency (not slang-test) so the module files are
+    # copied even when SLANG_ENABLE_TESTS=OFF, e.g. in release builds.
     add_dependencies(gfx copy-gfx-slang-modules)
     install(
         FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang

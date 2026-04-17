@@ -35,7 +35,8 @@ runs:
       id: download
       shell: bash
       run: |
-        # Include targets in cache key so different target sets get separate cache entries
+        # Cache key includes targets so different target sets get separate entries.
+        # Keep in sync with the identical computation in the "Upload LLVM to GCS" step below.
         TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" | tr ';' '-')"
         LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${TARGETS_SLUG}-${{ inputs.llvm-hash }}"
         PUBLIC_URL="https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
@@ -97,6 +98,7 @@ runs:
       if: steps.download.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
       shell: bash
       run: |
+        # Keep in sync with the identical computation in the "Download LLVM from GCS" step above.
         TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" | tr ';' '-')"
         LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${TARGETS_SLUG}-${{ inputs.llvm-hash }}"
         GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
