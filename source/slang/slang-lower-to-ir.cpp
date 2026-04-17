@@ -6356,8 +6356,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
                 {
                     auto moduleDecl = context->getMainModuleDecl();
-                    if (!moduleDecl)
-                        moduleDecl = findModuleDecl(interfaceDeclRef.getDecl());
 
                     if (moduleDecl && moduleDecl->languageVersion >=
                                           SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2026)
@@ -6367,6 +6365,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     }
                     else
                     {
+                        // We should always have moduleDecl available. But let's diagnose
+                        // it just in case
                         if (!moduleDecl)
                             context->getSink()->diagnose(Diagnostics::Unexpected{
                                 .message = "Cannot determine source language version: context has "
