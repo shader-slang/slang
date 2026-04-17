@@ -82,7 +82,10 @@ Research angle: $angle
    - Step-by-step implementation plan
    - Test cases to add or modify
    - Potential risks and how to mitigate them
-5. If CLAUDE.md is missing information that would meaningfully improve LLM effectiveness on this repo, add it."
+5. Update documentation based on the nature of the information:
+   - CLAUDE.md: generic information that helps LLMs work effectively in this repo — build commands, debugging workflows, tool usage, architectural navigation. No Slang language details here.
+   - docs/user-guide/: user-facing information — how to use a language feature, what a construct means, usage examples, migration guidance.
+   - docs/language-reference/: technical or developer-facing details — compiler behavior, formal semantics, design decisions, internal architecture."
   ) &
   pids+=($!)
   log "  Agent $i launched (PID ${pids[-1]}): ${angle:0:70}..."
