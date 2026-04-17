@@ -70,12 +70,12 @@ angles=(
   "Focus on architectural impact: find similar issues that required cross-file or cross-subsystem changes. Consider all call sites and dependents."
   "Focus on failure modes: find issues closed as wontfix or duplicates to understand what approaches were rejected and why."
   "Focus on the IR stage (slang-ir*.cpp/h): examine how the issue manifests in the IR, which IR pass introduces the problem, and which IR instructions or types are involved. Read extras/split-ir-dump.md for the IR dump debugging workflow and follow it to locate the culprit pass."
-  "Focus on the emit stage (emit*.cpp/h): examine whether the issue surfaces during code generation to HLSL/GLSL/SPIRV/Metal, and whether the fix belongs in an emitter."
-  "Focus on the AST stage (slang-ast*.cpp/h, check*.cpp): examine whether the issue is rooted in type-checking, name resolution, or semantic analysis before IR lowering."
+  "Focus on the emit stage (slang-emit*.cpp/h): examine whether the issue surfaces during code generation to HLSL/GLSL/SPIRV/Metal, and whether the fix belongs in an emitter."
+  "Focus on the AST stage (slang-ast*.cpp/h, slang-check*.cpp): examine whether the issue is rooted in type-checking, name resolution, or semantic analysis before IR lowering."
   "Focus on the core-module (source/slang/*.meta.slang — core, hlsl, glsl, diff): examine whether the issue is rooted in built-in type definitions, intrinsics, or standard library functions defined in these modules."
   "Focus on the module/link stage (slang-ir-link.cpp, slang-serialize*.cpp, slang-module*.cpp): examine whether the issue surfaces during separate compilation, module serialization, or IR linking across translation units."
   "Focus on the legalization stage (slang-ir-legalize*.cpp, slang-ir-lower*.cpp): examine whether the issue is caused by a data representation transformation that Slang applies to meet target language requirements, such as struct splitting, array flattening, matrix layout conversion, or buffer element type lowering."
-  "Focus on Slang language syntax (slang-parser.cpp, docs/user-guide/, external/spec/): examine whether the issue stems from incorrect user syntax, valid syntax that is not yet implemented, or a mismatch between what the spec allows and what the compiler accepts. Identify whether the fix belongs in the parser, the diagnostic messages, or the spec/docs."
+  "Focus on Slang language syntax (slang-parser.cpp, docs/user-guide/): examine whether the issue stems from incorrect user syntax, valid syntax that is not yet implemented, or a mismatch between what the spec allows and what the compiler accepts. Identify whether the fix belongs in the parser, the diagnostic messages, or the docs."
   "Focus on regression: examine git log and git blame to determine whether the issue was introduced by a recent change. Find the commit that broke the behavior, understand why it was made, and determine whether the fix should revert it, patch it, or take a different approach."
 )
 ##############
