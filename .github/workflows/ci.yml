@@ -327,7 +327,7 @@ jobs:
   # Capped at 2 automatic retries via run_attempt check.
   retry-on-gpu-failure:
     needs: [check-ci]
-    if: failure() && fromJSON(github.run_attempt) < 3
+    if: failure() && github.event_name == 'merge_group' && fromJSON(github.run_attempt) < 3
     runs-on: ubuntu-latest
     permissions:
       actions: write

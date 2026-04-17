@@ -1246,6 +1246,8 @@ String getFileNameTokenValue(Token const& token)
 
     // Just trim off the first and last characters to remove the quotes
     // (whether they were `""` or `<>`.
+    if (content.getLength() < 2)
+        return String();
     return String(content.begin() + 1, content.end() - 1);
 }
 

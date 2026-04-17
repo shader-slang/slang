@@ -13,6 +13,7 @@ concurrency:
 permissions:
   id-token: write # Required for Workload Identity (GCS auth)
   contents: read # Read slang repo
+  packages: read # Pull container images from ghcr.io
   pull-requests: write # For PR comments (if needed)
 
 jobs:
@@ -24,6 +25,7 @@ jobs:
       platform: x86_64
       config: relwithdebinfo
       runs-on: '["ubuntu-22.04"]'
+      container: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
       build-llvm: true
       deploy-pages: false
       server-count: 1
@@ -44,6 +46,7 @@ jobs:
 
   merge-and-deploy:
     needs: [coverage-linux, coverage-macos]
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-22.04
     permissions:
       contents: write
