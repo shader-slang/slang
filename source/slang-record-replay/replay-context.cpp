@@ -9,6 +9,7 @@
 #include "../slang/slang-syntax.h"
 #include "proxy/proxy-component-type.h"
 
+#include <atomic>
 #include <chrono>
 #include <cinttypes>
 #include <cstdio>
@@ -123,18 +124,22 @@ DataMismatchException::DataMismatchException(size_t offset, size_t size)
 // ReplayContext construction and low-level helpers
 // =============================================================================
 
-static bool s_contextCreated = false;
+// Tracks whether the singleton in get() has been constructed. Atomic so that
+// tryGet() can safely observe construction on weakly-ordered architectures
+// (e.g. aarch64) without racing against a concurrent get() call, matching the
+// thread-safety contract documented on get().
+static std::atomic<bool> s_contextCreated{false};
 
 ReplayContext& ReplayContext::get()
 {
     static ReplayContext s_instance;
-    s_contextCreated = true;
+    s_contextCreated.store(true, std::memory_order_release);
     return s_instance;
 }
 
 ReplayContext* ReplayContext::tryGet()
 {
-    if (s_contextCreated)
+    if (s_contextCreated.load(std::memory_order_acquire))
         return &get();
     return nullptr;
 }

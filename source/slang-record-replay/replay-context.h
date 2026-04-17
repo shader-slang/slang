@@ -215,6 +215,8 @@ public:
     SLANG_API static ReplayContext& get();
 
     /// Return the singleton if it has already been constructed, or nullptr.
+    /// Thread-safe. Uses an atomic construction flag with acquire/release
+    /// ordering, matching the thread-safety contract of get().
     /// Use this in cleanup paths (e.g. slang_shutdown) to avoid constructing
     /// the singleton just to tear it down.
     SLANG_API static ReplayContext* tryGet();
