@@ -650,7 +650,7 @@ internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, Ta
             // Load and add ALL tiles at once
             if (subgroupId % (k<<1) == 0)
             {
-                if (subgroupId != (SubgroupCount - 1))
+                if (subgroupId + k < SubgroupCount)
                 {
                     [ForceUnroll]
                     for (int i = 0; i < ROW; i++)

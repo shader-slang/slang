@@ -342,7 +342,7 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
 
                 if (subgroupIndex % (s << 1) == 0)
                 {
-                    if (subgroupIndex != uint(SubgroupCount - 1))
+                    if (subgroupIndex + uint(s) < uint(SubgroupCount))
                     {
                         OPResult other;
                         other.loadRaw<ShMemSize>(base);

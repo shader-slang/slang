@@ -243,7 +243,7 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
 
                 if (subgroupIndex % uint(s << 1) == 0)
                 {
-                    if (subgroupIndex != uint(SubgroupCount - 1))
+                    if (subgroupIndex + uint(s) < uint(SubgroupCount))
                     {
                         OPResult other;
                         other.loadRaw<ShMemSize>(base);

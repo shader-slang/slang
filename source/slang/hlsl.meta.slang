@@ -27577,6 +27577,9 @@ struct CoopMat
         }
     }
 
+    /// Sets all elements of the cooperative matrix to zero.
+    /// On CUDA, uses integer zero-fill which enables CSE to a single register,
+    /// reducing register pressure when the zero matrix is used as an MMA accumulator.
     [ForceInline]
     [mutating]
     [require(cooperative_matrix)]
@@ -27591,6 +27594,12 @@ struct CoopMat
         }
     }
 
+    /// Writes a raw 32-bit value to a specific fragment register.
+    /// This provides direct access to the underlying hardware register layout
+    /// for building matrix tiles from per-thread data via warp shuffles.
+    ///
+    /// @param regIndex The fragment register index (0 to getPackedFragmentCount()-1).
+    /// @param value The 32-bit value to write (packs 1 float, 2 halves, or 4 int8s).
     [ForceInline]
     [mutating]
     [require(cooperative_matrix)]
@@ -27610,9 +27619,21 @@ struct CoopMat
                 this[base]     = bit_cast<T>(uint16_t(value & 0xFFFF));
                 this[base + 1] = bit_cast<T>(uint16_t(value >> 16));
             }
+            else if (sizeof(T) == 1)
+            {
+                this[base]     = bit_cast<T>(uint8_t(value & 0xFF));
+                this[base + 1] = bit_cast<T>(uint8_t((value >> 8) & 0xFF));
+                this[base + 2] = bit_cast<T>(uint8_t((value >> 16) & 0xFF));
+                this[base + 3] = bit_cast<T>(uint8_t((value >> 24) & 0xFF));
+            }
         }
     }
 
+    /// Reads a raw 32-bit value from a specific fragment register.
+    /// Inverse of fragmentWrite. Used to extract per-thread data from matrix tiles.
+    ///
+    /// @param regIndex The fragment register index (0 to getPackedFragmentCount()-1).
+    /// @return The raw 32-bit register value.
     [ForceInline]
     [__NoSideEffect]
     [require(cooperative_matrix)]
@@ -27632,6 +27653,14 @@ struct CoopMat
                 uint lo = uint(bit_cast<uint16_t>(this[base]));
                 uint hi = uint(bit_cast<uint16_t>(this[base + 1]));
                 return lo | (hi << 16);
+            }
+            else if (sizeof(T) == 1)
+            {
+                uint b0 = uint(bit_cast<uint8_t>(this[base]));
+                uint b1 = uint(bit_cast<uint8_t>(this[base + 1]));
+                uint b2 = uint(bit_cast<uint8_t>(this[base + 2]));
+                uint b3 = uint(bit_cast<uint8_t>(this[base + 3]));
+                return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
             }
             return 0;
         }
@@ -27802,6 +27831,10 @@ struct CoopMat
         }
     }
 
+    /// Returns the number of 32-bit fragment registers per thread for this matrix type.
+    /// Each register packs multiple elements: 1 for float, 2 for half, 4 for int8.
+    ///
+    /// @return The number of packed 32-bit registers per thread.
     [ForceInline]
     [require(cooperative_matrix)]
     [__NoSideEffect]
@@ -27839,9 +27872,10 @@ struct CoopMat
         return N;
     }
 
-    /// Changes the majorness of the cooperative matrix in-register.
-    /// Equivalent to transpose: converts row-major fragments to column-major and vice versa.
-    /// On CUDA, uses movmatrix PTX instruction for 16x16 f16 Matrix A.
+    /// Transposes each 8x8 sub-block of the cooperative matrix in-register.
+    /// This reinterprets a row-major loaded fragment as column-major (and vice versa)
+    /// without performing a full matrix transpose. On CUDA, uses movmatrix.sync.aligned
+    /// PTX instruction on each of the 4 registers for 16x16 f16 MatrixA/MatrixB.
     [require(cuda, cooperative_matrix)]
     [mutating]
     void ChangeMajor()

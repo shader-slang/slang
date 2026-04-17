@@ -1542,10 +1542,9 @@ static bool typeCheck(IROp op, uint32_t matrixUse)
     {
     case SLANG_COOPERATIVE_MATRIX_USE_A:
     case SLANG_COOPERATIVE_MATRIX_USE_B:
-        return op == kIROp_UInt8Type || op == kIROp_Int8Type || op == kIROp_HalfType ||
-               op == kIROp_BFloat16Type || op == kIROp_FloatE4M3Type || op == kIROp_FloatE5M2Type;
+        return op == kIROp_HalfType || op == kIROp_BFloat16Type;
     case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR:
-        return op == kIROp_IntType || op == kIROp_HalfType || op == kIROp_FloatType;
+        return op == kIROp_HalfType || op == kIROp_FloatType;
     }
     return false;
 }

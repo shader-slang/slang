@@ -176,9 +176,9 @@ DType[TransposeA ? InputSize : OutputSize]
         typealias MMA = TiledMMAHelper<DType, K, M, N, Target, ShMemSize, TransposeA, SubgroupCount>;
         typealias InputVec = WaveTangledVector<DType, ShMemSize, K, N, SubgroupCount>;
 
-        InputVec inputVec;
+        InputVec inputVec = InputVec(DType(0));
         for (int i = 0; i < InArraySize; i++)
-            inputVec.data[i] = inputData[i];
+            inputVec[i] = inputData[i];
 
         let resultVec = Bias
             ? MMA.forward<Address, true>(inputVec, address, Address(biasBuffer.value))

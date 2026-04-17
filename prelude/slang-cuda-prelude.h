@@ -7817,15 +7817,14 @@ struct WmmaFragment
     __device__ void FragmentWrite(int regIndex, unsigned value) { regs[regIndex] = value; }
     __device__ unsigned FragmentRead(int regIndex) const { return regs[regIndex]; }
 
-    // ====================================================================================
-    // MMA m16n8k16 ChangeMajor (in-register transpose) for Matrix A (16x16, f16)
+    // Uses movmatrix.sync.aligned.m8n8.trans.b16 to transpose each 8x8 sub-block
+    // independently. Does NOT swap off-diagonal blocks — this reinterprets
+    // row-major as column-major (and vice versa) without a full 16x16 transpose.
     //
-    // Uses movmatrix.sync.aligned.m8n8.trans.b16 to transpose each 8x8 quadrant,
-    // then swaps off-diagonal blocks for the 2x2 block-level transpose.
+    // Before:  reg0=A00, reg1=A10, reg2=A01, reg3=A11
+    // After:   reg0=A00^T, reg1=A10^T, reg2=A01^T, reg3=A11^T
     //
-    // Before:  reg0=A00, reg1=A10, reg2=A01, reg3=A11  (row-major fragments)
-    // After:   reg0=A00^T, reg1=A01^T, reg2=A10^T, reg3=A11^T  (column-major fragments)
-    // ====================================================================================
+    // For a full 16x16 transpose, combine with a reg1<->reg2 swap afterwards.
     __device__ void ChangeMajor()
     {
         if constexpr (RegsCount == 4 && (R == MatrixUse::MatrixA || R == MatrixUse::MatrixB))
