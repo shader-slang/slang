@@ -7,8 +7,12 @@ githubIssue=""
 while [[ $# -gt 0 ]]; do
   case $1 in
   --repo)
+    if [[ $# -lt 2 || -z "${2:-}" ]]; then
+      echo "Usage: $0 issue-number [--repo repo-name]" >&2
+      exit 1
+    fi
     githubRepo=$2
-    shift 2
+    shift
     ;;
   -*)
     echo "Usage: $0 issue-number [--repo repo-name]" >&2
@@ -16,9 +20,9 @@ while [[ $# -gt 0 ]]; do
     ;;
   *)
     githubIssue=$1
-    shift
     ;;
   esac
+  shift
 done
 
 if [ -z "$githubIssue" ]; then
@@ -111,10 +115,11 @@ Phase: Solution Synthesis
 if [ ! -f plan.best.md ]; then
   log "Warning: plan.best.md not produced. Falling back to first available plan."
   first_plan=$(find . -maxdepth 1 -name 'plan.[0-9]*.md' | sort | head -1)
-  [ -n "$first_plan" ] && cp "$first_plan" plan.best.md || {
+  if [ -z "$first_plan" ]; then
     log "Error: no plan available."
     exit 1
-  }
+  fi
+  cp "$first_plan" plan.best.md
 fi
 
 # Runs claude with --output-format json and emits:
