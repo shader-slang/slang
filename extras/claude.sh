@@ -187,7 +187,8 @@ claude --dangerously-skip-permissions --print \
 1. Review git diff to see the complete changeset.
 2. Walk through the issue scenario step by step and confirm the implementation resolves it.
 3. Identify all concerns a real code reviewer would raise: correctness, style, edge cases, test coverage, and potential regressions.
-4. Fix every concern you identified directly in the code. Do NOT commit."
+4. Review any changes to CLAUDE.md and revert additions that are not significant enough to justify a permanent change.
+5. Fix every concern you identified directly in the code. Do NOT commit."
 
 log "Phase 6: Committing the changes..."
 
