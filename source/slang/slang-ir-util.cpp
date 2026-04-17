@@ -1326,7 +1326,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
     return false;
 }
 
-IRInst* getUnitPoisonVal(IRBuilder builder, IRModule* module)
+IRInst* getUnitPoisonVal(IRBuilder* builder, IRModule* module)
 {
     IRInst* undefInst = nullptr;
 
@@ -1341,9 +1341,9 @@ IRInst* getUnitPoisonVal(IRBuilder builder, IRModule* module)
     }
     if (!undefInst)
     {
-        auto voidType = builder.getVoidType();
-        builder.setInsertAfter(voidType);
-        undefInst = builder.emitPoison(voidType);
+        auto voidType = builder->getVoidType();
+        builder->setInsertAfter(voidType);
+        undefInst = builder->emitPoison(voidType);
     }
     return undefInst;
 }
