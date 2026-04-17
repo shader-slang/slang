@@ -16951,9 +16951,7 @@ static void translateFwdDerivativeAttributeToAD2(
 
     fwdDiffExtension->parentDecl = funcDecl;
     fwdDiffExtension->loc = attr->loc;
-    visitor->addVisibilityModifier(
-        fwdDiffExtension,
-        synthesizedVisibility.extensionVisibility);
+    visitor->addVisibilityModifier(fwdDiffExtension, synthesizedVisibility.extensionVisibility);
 
     SubstitutionSet substSet;
     visitor->liftDeclFromGenericContainers(fwdDiffExtension, substSet);
