@@ -185,7 +185,7 @@ review_session=$(claude_json --resume "$impl_session" -- \
 4. Review any changes to CLAUDE.md and revert additions that are not significant enough to justify a permanent change.
 5. Fix every concern you identified directly in the code. Do NOT commit.")
 
-log "Phase 6: Committing the changes..."
+log "Phase 5: Committing the changes..."
 
 claude --dangerously-skip-permissions --resume "$review_session" --print \
   "Commit all changes for GitHub shader-slang/$githubRepo issue $githubIssue.

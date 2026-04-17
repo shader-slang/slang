@@ -113,7 +113,6 @@ vkd3d-proton.cache.write
 /.claude/settings.local.json
 /.claude/worktrees/
 /issue-*/plan.*.md
-/issue-*/
 CLAUDE.local.md
 
 # Other temporary files
