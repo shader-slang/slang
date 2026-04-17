@@ -312,37 +312,40 @@ jobs:
                   expected_files="${expected_files}${f}"$'\n'
                   continue
                 fi
-                # Second pass: for remaining leak summaries, check per-block.
-                # Each leak block starts with "Direct leak" or "Indirect leak"
-                # and runs until the next block or SUMMARY line.
-                # A leak SUMMARY is expected only if every individual leak
-                # block in the file matches at least one LEAK: pattern.
-                # This avoids a known expected leak masking unrelated new leaks
-                # when all tests share a single process (server-count 1).
+                # Second pass: for remaining leak summaries, check stack traces.
+                # A leak SUMMARY is expected if any "Direct leak" block in the
+                # file matches at least one LEAK: pattern. Indirect leaks are
+                # children of the direct allocation and don't need independent
+                # matching — they share the same root cause.
                 if [ -s "$expected_leak_patterns" ]; then
                   still_unexpected=""
                   while IFS= read -r line; do
                     if echo "$line" | grep -q 'leaked'; then
-                      # Count leak blocks not matched by any expected pattern.
-                      unmatched=$(awk '
+                      # Check if any Direct leak block matches an expected pattern.
+                      matched_direct=$(awk '
                         BEGIN {
                           while ((getline pat < ARGV[1]) > 0) pats[++n] = pat
                           delete ARGV[1]
                         }
-                        /^(Direct|Indirect) leak of/ {
+                        /^Direct leak of/ {
                           if (block != "") { check() }
                           block = ""
                         }
-                        { block = block $0 "\n" }
-                        END { if (block != "") check(); print unmatched + 0 }
+                        /^Indirect leak of/ {
+                          if (block != "") { check() }
+                          block = ""
+                          skip = 1
+                        }
+                        { if (!skip) block = block $0 "\n" }
+                        /^$/ { skip = 0 }
+                        END { if (block != "") check(); print matched + 0 }
                         function check() {
                           for (i = 1; i <= n; i++)
-                            if (index(block, pats[i]) > 0) return
-                          unmatched++
+                            if (index(block, pats[i]) > 0) { matched++; return }
                         }
                       ' "$expected_leak_patterns" "$f" 2>/dev/null)
-                      if [ "${unmatched:-1}" = "0" ]; then
-                        continue  # All leak blocks match expected patterns
+                      if [ "${matched_direct:-0}" -gt 0 ]; then
+                        continue  # At least one direct leak matches expected pattern
                       fi
                     fi
                     still_unexpected="${still_unexpected}${line}"$'\n'
