@@ -157,7 +157,7 @@ claude_json() {
   rm -f "$tmp"
 }
 
-log "Phase 3: Implementing the solution..."
+log "Phase 3: Implementing and committing..."
 
 impl_session=$(claude_json -- \
   "I want you to work on GitHub shader-slang/$githubRepo issue $githubIssue.
@@ -167,34 +167,26 @@ Phase: Implementation
 1. Read $planDir/plan.best.md carefully — this is your implementation blueprint.
 2. Re-read the issue and any linked PRs to confirm your understanding before touching code.
 3. Implement the solution exactly as specified in $planDir/plan.best.md.
-4. Do NOT commit changes yet.")
+4. Stage all modified files with git add and commit with a brief, descriptive message.")
 
 if [ -z "$impl_session" ]; then
   log "Error: Implementation phase did not return a session ID. Exiting."
   exit 1
 fi
 
-log "Phase 4: Virtual review..."
+log "Phase 4: Virtual review and amending..."
 
-review_session=$(claude_json --resume "$impl_session" -- \
+claude --dangerously-skip-permissions --resume "$impl_session" --print \
   "I want you to do a virtual code review of the implementation for GitHub shader-slang/$githubRepo issue $githubIssue.
 
-1. Review git diff to see the complete changeset.
+1. Review git show to see the committed changeset.
 2. Walk through the issue scenario step by step and confirm the implementation resolves it.
 3. Identify all concerns a real code reviewer would raise: correctness, style, edge cases, test coverage, and potential regressions.
 4. Review any changes to CLAUDE.md and revert additions that are not significant enough to justify a permanent change.
-5. Fix every concern you identified directly in the code. Do NOT commit.")
-
-log "Phase 5: Committing the changes..."
-
-claude --dangerously-skip-permissions --resume "$review_session" --print \
-  "Commit all changes for GitHub shader-slang/$githubRepo issue $githubIssue.
-
-1. Run git diff to review the full changeset one final time.
-2. Stage all modified files with git add.
-3. Commit with a brief, descriptive message that summarises what was fixed and why."
+5. Fix every concern you identified directly in the code.
+6. Run git commit --amend to incorporate all fixes into the original commit."
 
 log "Done."
 echo ""
 echo "To resume the implementation session interactively:"
-echo "  claude --dangerously-skip-permissions --resume $review_session"
+echo "  claude --dangerously-skip-permissions --resume $impl_session"
