@@ -36,6 +36,13 @@ fi
 
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
 
+for cmd in claude jq; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "Error: '$cmd' not found in PATH." >&2
+    exit 1
+  fi
+done
+
 # Use a per-issue subdirectory for plan files to avoid clobbering unrelated files in CWD
 planDir="issue-$githubIssue"
 mkdir -p "$planDir"
@@ -196,13 +203,13 @@ fi
 
 log "Phase 4: Virtual review and amending..."
 
-claude --dangerously-skip-permissions --resume "$impl_session" --print \
+claude --dangerously-skip-permissions --print \
   "I want you to do a virtual code review of the implementation for GitHub shader-slang/$githubRepo issue $githubIssue.
 
 1. Review git show to see the committed changeset.
 2. Walk through the issue scenario step by step and confirm the implementation resolves it.
 3. Identify all concerns a real code reviewer would raise: correctness, style, edge cases, test coverage, and potential regressions.
-4. Review any changes to CLAUDE.md and revert additions that are not significant enough to justify a permanent change.
+4. Review all documentation changes (CLAUDE.md, docs/user-guide/, docs/language-reference/) and revert any additions that are not significant enough to justify a permanent change or are unrelated to the final implementation.
 5. Fix every concern you identified directly in the code.
 6. Run git commit --amend to incorporate all fixes into the original commit."
 

@@ -15,8 +15,8 @@ extras/claude.sh <issue-number> [--repo <repo-name>]
 # Fix issue #1234 in shader-slang/slang
 extras/claude.sh 1234
 
-# Fix issue #42 in a different repo
-extras/claude.sh 42 --repo spec
+# Explicitly specify the repo
+extras/claude.sh 12345 --repo slang
 ```
 
 Run from the repository root. The script requires `claude` and `jq` in PATH.
@@ -25,7 +25,7 @@ Run from the repository root. The script requires `claude` and `jq` in PATH.
 
 ### Phase 1: Parallel Planning
 
-12 Claude agents run in parallel, each researching the issue from a different angle:
+Multiple Claude agents run in parallel, each researching the issue from a different angle:
 
 | Angle | Focus |
 |---|---|
@@ -34,7 +34,7 @@ Run from the repository root. The script requires `claude` and `jq` in PATH.
 | Minimal change | Smallest diff with no architectural side effects |
 | Architectural impact | Cross-file and cross-subsystem effects |
 | Failure modes | Past wontfix/duplicate issues to avoid repeating |
-| IR stage | `slang-ir*.cpp/h` — IR passes and instructions |
+| IR stage | Dump and bisect IR passes via `extras/split-ir-dump.md` to find which pass introduces the problem |
 | Emit stage | `emit*.cpp/h` — code generation to HLSL/GLSL/SPIRV/Metal |
 | AST stage | `slang-ast*.cpp/h`, `check*.cpp` — type-checking and name resolution |
 | Core-module | `*.meta.slang` — built-in types, intrinsics, standard library |
@@ -55,7 +55,7 @@ One agent reads `plan.best.md`, implements the fix, and commits the result.
 
 ### Phase 4: Virtual Review and Amend
 
-The same agent (session resumed) reviews the commit as if it were a real code reviewer: checks correctness, style, edge cases, test coverage, and regressions. It also reviews any changes to `CLAUDE.md` and reverts additions that are not significant enough to justify a permanent change. All fixes are folded into the original commit via `git commit --amend`.
+A fresh agent reviews the commit as if it were a real code reviewer: checks correctness, style, edge cases, test coverage, and regressions. It also reviews all documentation changes (`CLAUDE.md`, `docs/user-guide/`, `docs/language-reference/`) and reverts additions that are not significant enough to justify a permanent change or are unrelated to the final implementation. All fixes are folded into the original commit via `git commit --amend`.
 
 ## Output
 
