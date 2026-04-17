@@ -38,9 +38,13 @@ angles=(
   "Focus on minimal change: find the smallest diff that fixes the issue without architectural side effects. Prefer targeted fixes over refactors."
   "Focus on architectural impact: find similar issues that required cross-file or cross-subsystem changes. Consider all call sites and dependents."
   "Focus on failure modes: find issues closed as wontfix or duplicates to understand what approaches were rejected and why."
-  "Focus on the IR stage (slang-ir*.cpp/h): examine how the issue manifests in the IR, whether the fix belongs in an IR pass, and which IR instructions or types are involved."
+  "Focus on the IR stage (slang-ir*.cpp/h): examine how the issue manifests in the IR, which IR pass introduces the problem, and which IR instructions or types are involved. Read extras/split-ir-dump.md for the IR dump debugging workflow and follow it to locate the culprit pass."
   "Focus on the emit stage (emit*.cpp/h): examine whether the issue surfaces during code generation to HLSL/GLSL/SPIRV/Metal, and whether the fix belongs in an emitter."
   "Focus on the AST stage (slang-ast*.cpp/h, check*.cpp): examine whether the issue is rooted in type-checking, name resolution, or semantic analysis before IR lowering."
+  "Focus on the core-module (source/slang/*.meta.slang — core, hlsl, glsl, diff): examine whether the issue is rooted in built-in type definitions, intrinsics, or standard library functions defined in these modules."
+  "Focus on the module/link stage (slang-ir-link.cpp, slang-serialize*.cpp, slang-module*.cpp): examine whether the issue surfaces during separate compilation, module serialization, or IR linking across translation units."
+  "Focus on the legalization stage (slang-ir-legalize*.cpp, slang-ir-lower*.cpp): examine whether the issue is caused by a data representation transformation that Slang applies to meet target language requirements, such as struct splitting, array flattening, matrix layout conversion, or buffer element type lowering."
+  "Focus on Slang language syntax (slang-parser.cpp, docs/user-guide/, external/spec/): examine whether the issue stems from incorrect user syntax, valid syntax that is not yet implemented, or a mismatch between what the spec allows and what the compiler accepts. Identify whether the fix belongs in the parser, the diagnostic messages, or the spec/docs."
 )
 
 agentCount=${#angles[@]}
@@ -170,15 +174,15 @@ Phase: Refinement
 2. Check for: unhandled edge cases, missing error handling at boundaries, style inconsistencies with surrounding code, and any regression risks in modified code paths.
 3. Apply all improvements directly — do not just describe them." >/dev/null
 
-log "Phase 5: Final validation..."
+log "Phase 5: Virtual review..."
 
 claude --dangerously-skip-permissions --print \
-  "I want you to validate the implementation for GitHub shader-slang/$githubRepo issue $githubIssue.
+  "I want you to do a virtual code review of the implementation for GitHub shader-slang/$githubRepo issue $githubIssue.
 
 1. Review git diff to see the complete changeset.
 2. Walk through the issue scenario step by step and confirm the implementation resolves it.
-3. List any concerns a code reviewer would raise.
-4. Fix any remaining issues now. Do NOT commit."
+3. Identify all concerns a real code reviewer would raise: correctness, style, edge cases, test coverage, and potential regressions.
+4. Fix every concern you identified directly in the code. Do NOT commit."
 
 log "Phase 6: Committing the changes..."
 
