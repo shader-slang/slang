@@ -16,7 +16,7 @@ public struct HelperImpl1 : IHelper
     int getVal() { return storedVal; }
 }
 
-struct HelperImpl2 : IHelper
+public struct HelperImpl2 : IHelper
 {
     int storedVal;
 
