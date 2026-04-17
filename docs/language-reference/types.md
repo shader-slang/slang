@@ -5,6 +5,7 @@ Slang types:
 * [Vector and Matrix Types](types-vector-and-matrix.md)
 * [Structures](types-struct.md) and [Classes](types-class.md)
   * [Extensions](types-extension.md)
+* [Enumerations](types-enum.md)
 * [Array Types](types-array.md)
 * [Pointers](types-pointer.md)
 * [Interfaces](types-interface.md)
