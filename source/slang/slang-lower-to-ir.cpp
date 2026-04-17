@@ -2476,6 +2476,20 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitDifferentialPairType(DifferentialPairType* pairType)
     {
         IRType* primalType = lowerType(context, pairType->getPrimalType());
+        if (isDeclRefTypeOf<InterfaceDecl>(pairType->getPrimalType()))
+        {
+            // Existential differential pairs are handled specially later in autodiff lowering:
+            // their differential type is modeled as `IDifferentiable`, and the witness operand
+            // on `DifferentialPair<interface>` is not consulted.
+            //
+            // We intentionally lower a poison witness for any interface primal so we don't try to
+            // eagerly materialize front-end interface conformance through this operand.
+            //
+            // Use a sub-builder so that the insert point isn't affected.
+            IRBuilder subBuilder(context->irBuilder->getModule());
+            auto poisonWitness = getUnitPoisonVal(&subBuilder, context->irBuilder->getModule());
+            return getBuilder()->getDifferentialPairType(primalType, poisonWitness);
+        }
         if (as<IRAssociatedType>(primalType) || as<IRThisType>(primalType))
         {
             List<IRInst*> operands;
@@ -2491,8 +2505,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             auto undefined = getBuilder()->emitPoison(operands[1]->getFullType());
             return getBuilder()->getDifferentialPairType(primalType, undefined);
         }
-        else
-            return lowerSimpleIntrinsicType(pairType);
+
+        return lowerSimpleIntrinsicType(pairType);
     }
 
     IRFuncType* visitFuncType(FuncType* type)
@@ -15102,10 +15116,10 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     if (m_irModuleForLayout)
         return m_irModuleForLayout;
 
+    // `getOrCreateIRModuleForLayout()` is responsible for ensuring layout creation first.
+    SLANG_ASSERT(m_layout);
 
-    // Okay, now we need to fill it in.
-
-    auto programLayout = getOrCreateLayout(sink);
+    auto programLayout = m_layout;
     if (!programLayout)
         return nullptr;
 

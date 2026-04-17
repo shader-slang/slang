@@ -2620,6 +2620,20 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             getSink()->diagnose(Diagnostics::InvalidTypeVoid{.location = varDecl->loc});
         }
 
+        // Reject reference/parameter-passing-mode types as struct fields.
+        // These types (Ref<T>, RefParam<T>, BorrowInParam<T>, etc.) represent
+        // temporary borrows and cannot be stored in struct fields.
+        if (as<AggTypeDecl>(varDecl->parentDecl))
+        {
+            auto type = varDecl->type.type;
+            if (as<ExplicitRefType>(type) || as<ParamPassingModeType>(type))
+            {
+                getSink()->diagnose(Diagnostics::ReferenceTypeAsStructField{
+                    .type = type,
+                    .location = varDecl->loc});
+            }
+        }
+
         // If this is an unsized array variable, then we first want to give
         // it a chance to infer an array size from its initializer
         //
@@ -15379,98 +15393,30 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
     //
     _getCandidateExtensionList(typeDecl, m_mapDeclToCandidateExtensions).add(extDecl);
 
-    // Remove the cached inheritanceInfo about typeDecl, if `extDecl` inherits new types.
-    bool invalidateSubtypes = false;
-    if (as<InterfaceDecl>(typeDecl))
-    {
-        // If we are extending an interface, we are effectively extending all types
-        // that inherits the interface. So we need to remove all inheritance info
-        // that is related to the interface.
-        invalidateSubtypes = true;
-    }
-    bool hasInheritanceMember = false;
     bool hasImplicitCastMember = false;
     for (auto member : extDecl->getDirectMemberDecls())
     {
-        if (as<InheritanceDecl>(member))
-        {
-            hasInheritanceMember = true;
-        }
-        else if (auto ctorDecl = as<ConstructorDecl>(member))
+        if (auto ctorDecl = as<ConstructorDecl>(member))
         {
             if (ctorDecl->hasModifier<ImplicitConversionModifier>())
                 hasImplicitCastMember = true;
         }
     }
-    auto isTypeUpToDate = [this](Type* type)
-    {
-        if (auto declRefType = as<DeclRefType>(type))
-        {
-            return m_mapDeclRefToInheritanceInfo.containsKey(declRefType->getDeclRef());
-        }
-        return m_mapTypeToInheritanceInfo.containsKey(type);
-    };
-    auto isInheritanceInfoAffected = [typeDecl](InheritanceInfo& info)
-    {
-        for (auto f : info.facets)
-            if (f.getImpl()->getDeclRef().getDecl() == typeDecl)
-            {
-                return true;
-            }
-        return false;
-    };
-    if (invalidateSubtypes)
-    {
-        decltype(m_mapTypeToInheritanceInfo) newMapTypeToInheritanceInfo;
-        for (auto& kv : m_mapTypeToInheritanceInfo)
-        {
-            if (!isInheritanceInfoAffected(kv.second))
-            {
-                newMapTypeToInheritanceInfo.add(kv.first, kv.second);
-            }
-        }
-        m_mapTypeToInheritanceInfo = _Move(newMapTypeToInheritanceInfo);
-    }
 
-    ShortList<DeclRef<Decl>, 16> keysToRemove;
-    for (auto& kv : m_mapDeclRefToInheritanceInfo)
-    {
-        // We can confirm the type is affected by the new extension,
-        // if the declref type points to typeDecl.
-        if (kv.first.getDecl() == typeDecl)
-        {
-            keysToRemove.add(kv.first);
-            continue;
-        }
-
-        // If we are extending interface types (and in the future any struct type
-        // if we decide to have full inheritance support),
-        // we also need to account for conformant that implements the interface.
-        if (invalidateSubtypes && isInheritanceInfoAffected(kv.second))
-        {
-            keysToRemove.add(kv.first);
-        }
-    }
-    for (auto& key : keysToRemove)
-    {
-        m_mapDeclRefToInheritanceInfo.remove(key);
-    }
-
-    if (hasInheritanceMember || invalidateSubtypes)
-    {
-        ShortList<TypePair, 16> typePairsToRemove;
-        for (auto& kv : m_mapTypePairToSubtypeWitness)
-        {
-            if (!isTypeUpToDate(kv.first.type0) || !isTypeUpToDate(kv.first.type1))
-            {
-                typePairsToRemove.add(kv.first);
-            }
-        }
-        for (auto& key : typePairsToRemove)
-        {
-            m_mapTypePairToSubtypeWitness.remove(key);
-        }
-    }
+    // A new extension can affect not only `typeDecl` itself, but also any cached
+    // type whose linearized facets reference `typeDecl` transitively. Historically
+    // we handled that by scanning the entire inheritance/subtype cache and removing
+    // every potentially-affected entry. That is correct, but it turns extension
+    // registration into a global cache invalidation point and makes synthesized
+    // function extensions especially expensive.
+    //
+    // Instead we bump a per-declaration extension epoch here. Each cached
+    // inheritance result snapshots the epochs of the declarations that contributed
+    // facets to it, and subtype cache entries snapshot the inheritance-cache
+    // generations of their endpoints. Old entries therefore get discarded lazily
+    // when they are queried again, without forcing us to iterate the giant global
+    // dictionaries up front.
+    bumpDeclExtensionEpoch(typeDecl);
 
     if (hasImplicitCastMember)
     {

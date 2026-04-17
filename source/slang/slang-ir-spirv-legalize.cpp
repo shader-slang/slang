@@ -1780,6 +1780,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         bool isLegalGlobalInstForTarget(IRInst* inst) override
         {
+            // Spec-const-rate instructions must stay at their current scope
+            // (module level or inside a generic) because SPIR-V requires
+            // OpSpecConstantOp results to appear outside function bodies.
+            // Only ops validated by canOperationBeSpecConst (via
+            // shouldHaveSpecConstRate in _createInst) acquire this rate.
+            if (isSpecConstRateType(inst->getFullType()))
+                return true;
             switch (inst->getOp())
             {
             case kIROp_MakeStruct:
