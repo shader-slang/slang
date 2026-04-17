@@ -64,10 +64,9 @@ jobs:
       - name: Setup Vulkan ICD
         run: |
           # See job-level comment for why we override the Vulkan ICD.
-          # Read the existing NVIDIA ICD JSON (injected by the container toolkit
-          # read-only in 1.19+) and swap only the library_path, preserving
-          # api_version. Write to a writable temp path and point
-          # VK_ICD_FILENAMES at it via $GITHUB_ENV.
+          # Write the modified ICD JSON to a writable temp path and point
+          # VK_ICD_FILENAMES at it — /etc/vulkan/icd.d/nvidia_icd.json may
+          # be mounted read-only by nvidia-container-toolkit 1.19+.
           source_icd=""
           for candidate in \
             /etc/vulkan/icd.d/nvidia_icd.json \
@@ -77,24 +76,26 @@ jobs:
               break
             fi
           done
-          if [ -z "$source_icd" ]; then
-            echo "::warning::No existing NVIDIA ICD JSON found, using defaults"
-          fi
           mkdir -p /tmp/vulkan-icd
-          python3 -c "
+          if ! python3 - "$source_icd" <<'PY'
           import json
-          source = '$source_icd'
+          import sys
+          source = sys.argv[1]
           if source:
               with open(source) as f:
                   icd = json.load(f)
           else:
-              icd = {'file_format_version': '1.0.1', 'ICD': {'api_version': '1.4.312'}}
-          icd['ICD']['library_path'] = 'libEGL_nvidia.so.0'
-          with open('/tmp/vulkan-icd/nvidia_icd.json', 'w') as f:
+              icd = {"file_format_version": "1.0.1", "ICD": {"api_version": "1.4.312"}}
+          icd["ICD"]["library_path"] = "libEGL_nvidia.so.0"
+          with open("/tmp/vulkan-icd/nvidia_icd.json", "w") as f:
               json.dump(icd, f, indent=4)
-              f.write('\n')
-          print(f\"Vulkan ICD configured: libEGL_nvidia.so.0 (api_version={icd['ICD'].get('api_version', 'unknown')})\")
-          "
+              f.write("\n")
+          print(f"Vulkan ICD configured: libEGL_nvidia.so.0 (api_version={icd['ICD'].get('api_version', 'unknown')})")
+          PY
+          then
+            echo "::warning::Failed to write Vulkan ICD override; keeping default"
+            exit 0
+          fi
           echo "VK_ICD_FILENAMES=/tmp/vulkan-icd/nvidia_icd.json" >> "$GITHUB_ENV"
           # Also remove the NVIDIA EGL vendor JSON if writable, to prevent
           # libglvnd from loading libEGL_nvidia through the EGL path.
@@ -255,24 +256,27 @@ jobs:
               break
             fi
           done
-          if [ -z "$source_icd" ]; then
-            echo "::warning::No existing NVIDIA ICD JSON found, using defaults"
-            source_icd=""
-          fi
-          mkdir -p /etc/vulkan/icd.d
-          python3 -c "
-          import json, sys
-          if '$source_icd':
-              with open('$source_icd') as f:
+          mkdir -p /tmp/vulkan-icd
+          if ! python3 - "$source_icd" <<'PY'
+          import json
+          import sys
+          source = sys.argv[1]
+          if source:
+              with open(source) as f:
                   icd = json.load(f)
           else:
-              icd = {'file_format_version': '1.0.1', 'ICD': {'api_version': '1.4.312'}}
-          icd['ICD']['library_path'] = 'libEGL_nvidia.so.0'
-          with open('/etc/vulkan/icd.d/nvidia_icd.json', 'w') as f:
+              icd = {"file_format_version": "1.0.1", "ICD": {"api_version": "1.4.312"}}
+          icd["ICD"]["library_path"] = "libEGL_nvidia.so.0"
+          with open("/tmp/vulkan-icd/nvidia_icd.json", "w") as f:
               json.dump(icd, f, indent=4)
-              f.write('\n')
-          print(f\"Vulkan ICD configured: libEGL_nvidia.so.0 (api_version={icd['ICD'].get('api_version', 'unknown')})\")
-          "
+              f.write("\n")
+          print(f"Vulkan ICD configured: libEGL_nvidia.so.0 (api_version={icd['ICD'].get('api_version', 'unknown')})")
+          PY
+          then
+            echo "::warning::Failed to write Vulkan ICD override; keeping default"
+            exit 0
+          fi
+          echo "VK_ICD_FILENAMES=/tmp/vulkan-icd/nvidia_icd.json" >> "$GITHUB_ENV"
           rm -f /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null || true
 
       - name: Configure Git safe directory
