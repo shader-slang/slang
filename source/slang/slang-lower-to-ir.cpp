@@ -6357,7 +6357,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 {
                     auto moduleDecl = context->getMainModuleDecl();
                     if (!moduleDecl)
-                        findModuleDecl(interfaceDeclRef.getDecl());
+                        moduleDecl = findModuleDecl(interfaceDeclRef.getDecl());
 
                     if (moduleDecl && moduleDecl->languageVersion >=
                                           SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2026)
