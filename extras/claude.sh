@@ -19,6 +19,10 @@ while [[ $# -gt 0 ]]; do
     exit 1
     ;;
   *)
+    if [ -n "$githubIssue" ] || ! [[ $1 =~ ^[0-9]+$ ]]; then
+      echo "Usage: $0 issue-number [--repo repo-name]" >&2
+      exit 1
+    fi
     githubIssue=$1
     ;;
   esac
@@ -32,8 +36,10 @@ fi
 
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
 
-# Clean up plan files from any previous run in this directory
-rm -f plan.*.md plan.best.md
+# Use a per-issue subdirectory for plan files to avoid clobbering unrelated files in CWD
+planDir="issue-$githubIssue"
+mkdir -p "$planDir"
+rm -f "$planDir"/plan.*.md "$planDir"/plan.best.md
 
 # Each angle drives one independent planning agent — add or remove entries to tune coverage
 angles=(
@@ -66,7 +72,7 @@ Research angle: $angle
 1. Review the issue description, all comments, and every linked PR in detail.
 2. Search for five similar issues and PRs on the same repo and study them thoroughly.
 3. Apply your research angle to propose a concrete, actionable solution.
-4. Write your full proposal to plan.$i.md. Include:
+4. Write your full proposal to $planDir/plan.$i.md. Include:
    - Root cause analysis
    - Exact files and functions to change
    - Step-by-step implementation plan
@@ -87,7 +93,7 @@ for i in "${!pids[@]}"; do
   fi
 done
 
-plan_count=$(find . -maxdepth 1 -name 'plan.[0-9]*.md' | wc -l)
+plan_count=$(find "$planDir" -maxdepth 1 -name 'plan.[0-9]*.md' | wc -l)
 log "Phase 1 complete: $plan_count / $agentCount plans produced ($failed failed)"
 
 if [ "$plan_count" -eq 0 ]; then
@@ -102,9 +108,9 @@ claude --dangerously-skip-permissions --print \
 
 Phase: Solution Synthesis
 
-1. Read every plan.*.md file in the current directory. Each was written by an independent agent with a different research angle.
+1. Read every $planDir/plan.*.md file in the current directory. Each was written by an independent agent with a different research angle.
 2. Compare proposals: identify where they agree (high-confidence areas), where they diverge (areas requiring judgment), and which plan has the strongest root cause analysis.
-3. Produce plan.best.md — a synthesized plan that takes the strongest elements from each. It must include:
+3. Produce $planDir/plan.best.md — a synthesized plan that takes the strongest elements from each. It must include:
    - Final root cause analysis
    - Ordered list of files and functions to change
    - Concrete implementation steps
@@ -112,14 +118,14 @@ Phase: Solution Synthesis
    - Known risks and mitigations
 4. Do NOT write any code yet."
 
-if [ ! -f plan.best.md ]; then
+if [ ! -f "$planDir/plan.best.md" ]; then
   log "Warning: plan.best.md not produced. Falling back to first available plan."
-  first_plan=$(find . -maxdepth 1 -name 'plan.[0-9]*.md' | sort | head -1)
+  first_plan=$(find "$planDir" -maxdepth 1 -name 'plan.[0-9]*.md' | sort | head -1)
   if [ -z "$first_plan" ]; then
     log "Error: no plan available."
     exit 1
   fi
-  cp "$first_plan" plan.best.md
+  cp "$first_plan" "$planDir/plan.best.md"
 fi
 
 # Runs claude with --output-format json and emits:
@@ -158,41 +164,30 @@ impl_session=$(claude_json -- \
 
 Phase: Implementation
 
-1. Read plan.best.md carefully — this is your implementation blueprint.
+1. Read $planDir/plan.best.md carefully — this is your implementation blueprint.
 2. Re-read the issue and any linked PRs to confirm your understanding before touching code.
-3. Implement the solution exactly as specified in plan.best.md.
-4. Do NOT commit changes yet." | tail -1)
+3. Implement the solution exactly as specified in $planDir/plan.best.md.
+4. Do NOT commit changes yet.")
 
 if [ -z "$impl_session" ]; then
   log "Error: Implementation phase did not return a session ID. Exiting."
   exit 1
 fi
 
-log "Phase 4: Refining the implementation..."
+log "Phase 4: Virtual review..."
 
-claude_json --resume "$impl_session" -- \
-  "Continue working on GitHub shader-slang/$githubRepo issue $githubIssue.
-
-Phase: Refinement
-
-1. Run git diff to review all changes made so far.
-2. Check for: unhandled edge cases, missing error handling at boundaries, style inconsistencies with surrounding code, and any regression risks in modified code paths.
-3. Apply all improvements directly — do not just describe them." >/dev/null
-
-log "Phase 5: Virtual review..."
-
-claude --dangerously-skip-permissions --print \
+review_session=$(claude_json --resume "$impl_session" -- \
   "I want you to do a virtual code review of the implementation for GitHub shader-slang/$githubRepo issue $githubIssue.
 
 1. Review git diff to see the complete changeset.
 2. Walk through the issue scenario step by step and confirm the implementation resolves it.
 3. Identify all concerns a real code reviewer would raise: correctness, style, edge cases, test coverage, and potential regressions.
 4. Review any changes to CLAUDE.md and revert additions that are not significant enough to justify a permanent change.
-5. Fix every concern you identified directly in the code. Do NOT commit."
+5. Fix every concern you identified directly in the code. Do NOT commit.")
 
 log "Phase 6: Committing the changes..."
 
-claude --dangerously-skip-permissions --resume "$impl_session" --print \
+claude --dangerously-skip-permissions --resume "$review_session" --print \
   "Commit all changes for GitHub shader-slang/$githubRepo issue $githubIssue.
 
 1. Run git diff to review the full changeset one final time.
@@ -202,4 +197,4 @@ claude --dangerously-skip-permissions --resume "$impl_session" --print \
 log "Done."
 echo ""
 echo "To resume the implementation session interactively:"
-echo "  claude --dangerously-skip-permissions --resume $impl_session"
+echo "  claude --dangerously-skip-permissions --resume $review_session"
