@@ -32,5 +32,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID, uint idx : SV_GroupIndex)
     // CHECK: OpMemoryBarrier
     GroupMemoryBarrier();
 
-    output[idx] = val;
+    // Access shared memory after barrier to prevent dead-code elimination
+    output[idx] = val + sharedArray[idx];
 }

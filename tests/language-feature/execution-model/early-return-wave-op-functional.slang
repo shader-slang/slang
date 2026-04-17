@@ -1,9 +1,6 @@
 // Corner case: early return removes threads, then remaining threads do wave ops.
 // Thread 0 returns early. Threads {1,2,3} continue and do WaveActiveMin.
 // WaveActiveMin({1,2,3}) should be 1 (thread 0 is inactive).
-//
-// Then thread 1 also returns. Threads {2,3} do WaveActiveSum.
-// WaveActiveSum({2,3}) should be 5.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type
