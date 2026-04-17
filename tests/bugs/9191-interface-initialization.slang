@@ -36,13 +36,17 @@ struct HelperImpl3 : IHelper
 struct StructWithIfaceField
 {
 #if EXPECT_ERROR
+
     IHelper ifaceField = { };
 //CHECKERR:              ^ cannot initialize an interface variable with defaults
 //CHECKERR:              ^ initializing an interface variable with defaults is not supported. Please provide a compatible initializer or leave the variable uninitialized
+
 #else
+
     IHelper ifaceField = { };
 //CHECK:                 ^ initializing an interface variable with defaults is deprecated and may cause unexpected behavior
 //CHECK:                 ^ initializing an interface variable with defaults is deprecated and may cause unexpected behavior. Please provide a compatible initializer or leave the variable uninitialized
+
 #endif
 }
 
@@ -132,6 +136,30 @@ StructWithIfaceField test3(int val)
         ret.ifaceField = HelperImpl2(val);
     }
     return ret;
+}
+
+void test4()
+{
+    // note: this variant would print an error in an earlier compilation phase
+    // (not enough arguments to call (got 0, expected 1)
+    // StructWithIfaceField2 tmp1 = { };
+    //
+    // Tested separately in 9191-interface-initialization-2.slang
+
+
+#if EXPECT_ERROR
+
+    StructWithIfaceField2 tmp2 = { { } };
+//CHECKERR:                        ^ cannot initialize an interface variable with defaults
+//CHECKERR:                        ^ initializing an interface variable with defaults is not supported. Please provide a compatible initializer or leave the variable uninitialized
+
+#else
+
+    StructWithIfaceField2 tmp2 = { { } };
+//CHECK:                           ^ initializing an interface variable with defaults is deprecated and may cause unexpected behavior
+//CHECK:                           ^ initializing an interface variable with defaults is deprecated and may cause unexpected behavior. Please provide a compatible initializer or leave the variable uninitialized
+
+#endif
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=gOutputBuffer
