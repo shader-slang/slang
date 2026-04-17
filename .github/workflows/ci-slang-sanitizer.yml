@@ -322,23 +322,24 @@ jobs:
                   while IFS= read -r line; do
                     if echo "$line" | grep -q 'leaked'; then
                       # Check if any Direct leak block matches an expected pattern.
+                      # Preamble lines before the first leak block are skipped.
+                      # Indirect leak blocks are skipped (child allocations).
                       matched_direct=$(awk '
                         BEGIN {
                           while ((getline pat < ARGV[1]) > 0) pats[++n] = pat
                           delete ARGV[1]
                         }
                         /^Direct leak of/ {
-                          if (block != "") { check() }
-                          block = ""
+                          if (in_leak && block != "") check()
+                          in_leak = 1; block = $0 "\n"; next
                         }
                         /^Indirect leak of/ {
-                          if (block != "") { check() }
-                          block = ""
-                          skip = 1
+                          if (in_leak && block != "") check()
+                          in_leak = 1; block = ""; skip = 1; next
                         }
-                        { if (!skip) block = block $0 "\n" }
+                        in_leak && !skip { block = block $0 "\n" }
                         /^$/ { skip = 0 }
-                        END { if (block != "") check(); print matched + 0 }
+                        END { if (in_leak && block != "") check(); print matched + 0 }
                         function check() {
                           for (i = 1; i <= n; i++)
                             if (index(block, pats[i]) > 0) { matched++; return }
