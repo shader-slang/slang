@@ -319,6 +319,12 @@ struct ASTIterator
             dispatchIfNotNull(expr->value);
             dispatchIfNotNull(expr->typeExpr);
         }
+        void visitCastOptionalExpr(CastOptionalExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->valueArg);
+            dispatchIfNotNull(expr->innerCoercedExpr);
+        }
         void visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr* expr)
         {
             dispatchIfNotNull(expr->originalExpr);

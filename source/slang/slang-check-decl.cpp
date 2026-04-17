@@ -1158,6 +1158,12 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->value);
         dispatchIfNotNull(expr->typeExpr);
     }
+    void visitCastOptionalExpr(CastOptionalExpr* expr)
+    {
+        dispatchIfNotNull(expr->valueArg);
+        // innerVarDecl is synthetic; innerCoercedExpr references it
+        dispatchIfNotNull(expr->innerCoercedExpr);
+    }
     void visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr*) { return; }
     void visitSPIRVAsmExpr(SPIRVAsmExpr*) { return; }
     void visitModifiedTypeExpr(ModifiedTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }

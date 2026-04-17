@@ -685,6 +685,12 @@ void ASTPrinter::addExpr(Expr* expr)
         }
         sb << ")";
     }
+    else if (const auto castOptionalExpr = as<CastOptionalExpr>(expr))
+    {
+        sb << "CastOptional(";
+        addExpr(castOptionalExpr->valueArg);
+        sb << ")";
+    }
     else if (const auto makeOptionalExpr = as<MakeOptionalExpr>(expr))
     {
         if (makeOptionalExpr->value)
