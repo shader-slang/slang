@@ -839,5 +839,9 @@ return {
 	["ImageTexelPointer"] = 862,
 	["Type.MetalPackedVec"] = 863,
 	["Decoration.glslFragDepthGreater"] = 865,
-	["Decoration.glslFragDepthLess"] = 866
+	["Decoration.glslFragDepthLess"] = 866,
+	["Decoration.nodeLaunch"] = 867,
+	["Decoration.nodeMaxDispatchGrid"] = 868,
+	["Decoration.nodeDispatchGrid"] = 869,
+	["Decoration.maxRecords"] = 870
 }
