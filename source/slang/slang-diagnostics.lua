@@ -2311,6 +2311,13 @@ err(
     span { loc = "attr:Modifier", message = "expected a power of 2 between 4 and 128, inclusive, in 'WaveSize' attribute, got '~value:Int'" }
 )
 
+err(
+    "invalid-node-launch-mode",
+    31150,
+    "invalid 'NodeLaunch' mode",
+    span { loc = "attr:Modifier", message = "invalid NodeLaunch mode '~mode:String'; expected 'broadcasting', 'thread', or 'coalescing'" }
+)
+
 warning(
     "explicit-uniform-location",
     31104,

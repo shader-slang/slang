@@ -1190,6 +1190,12 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
     if (type->findDecoration<IRTargetIntrinsicDecoration>())
         return LegalType::simple(type);
 
+    // Work-graph record types (DispatchNodeInputRecord<T>, NodeOutput<T>, etc.) are
+    // opaque ABI objects. They must survive type legalization as-is even though they
+    // have no IR fields — eliminating them breaks entry-point parameter handling.
+    if (isWorkGraphRecordType(type))
+        return LegalType::simple(type);
+
     if (context->isSimpleType(type))
         return LegalType::simple(type);
 

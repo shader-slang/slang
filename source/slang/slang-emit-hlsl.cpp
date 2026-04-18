@@ -425,7 +425,7 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
 
     if (profile.getFamily() == ProfileFamily::DX)
     {
-        if (profile.getVersion() >= ProfileVersion::DX_6_1)
+        if (profile.getVersion() >= ProfileVersion::DX_6_1 || stage == Stage::Node)
         {
             char const* stageName = getStageName(stage);
             if (stageName)
@@ -569,6 +569,39 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
     case Stage::Amplification:
         {
             emitNumThreadsAttribute();
+            break;
+        }
+    case Stage::Node:
+        {
+            auto launchDecor = irFunc->findDecoration<IRNodeLaunchDecoration>();
+            if (launchDecor)
+            {
+                m_writer->emit("[NodeLaunch(\"");
+                m_writer->emit(launchDecor->getMode()->getStringSlice());
+                m_writer->emit("\")]\n");
+            }
+            if (auto decor = irFunc->findDecoration<IRNodeMaxDispatchGridDecoration>())
+            {
+                m_writer->emit("[NodeMaxDispatchGrid(");
+                m_writer->emit(getIntVal(as<IRIntLit>(decor->getOperand(0))));
+                m_writer->emit(", ");
+                m_writer->emit(getIntVal(as<IRIntLit>(decor->getOperand(1))));
+                m_writer->emit(", ");
+                m_writer->emit(getIntVal(as<IRIntLit>(decor->getOperand(2))));
+                m_writer->emit(")]\n");
+            }
+            if (auto decor = irFunc->findDecoration<IRNodeDispatchGridDecoration>())
+            {
+                m_writer->emit("[NodeDispatchGrid(");
+                m_writer->emit(getIntVal(as<IRIntLit>(decor->getOperand(0))));
+                m_writer->emit(", ");
+                m_writer->emit(getIntVal(as<IRIntLit>(decor->getOperand(1))));
+                m_writer->emit(", ");
+                m_writer->emit(getIntVal(as<IRIntLit>(decor->getOperand(2))));
+                m_writer->emit(")]\n");
+            }
+            if (!launchDecor || launchDecor->getMode()->getStringSlice() != toSlice("thread"))
+                emitNumThreadsAttribute();
             break;
         }
     // TODO: There are other stages that will need this kind of handling.
@@ -2212,6 +2245,14 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     // invalid "groupshared" keyword.
     if (!param->findDecoration<IRHLSLMeshPayloadDecoration>())
         emitRateQualifiersAndAddressSpace(param);
+
+    // [MaxRecords(n)] on work-graph node output parameters
+    if (auto decor = param->findDecoration<IRMaxRecordsDecoration>())
+    {
+        m_writer->emit("[MaxRecords(");
+        m_writer->emit(getIntVal(decor->getCount()));
+        m_writer->emit(")] ");
+    }
 
     if (auto decor = param->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {

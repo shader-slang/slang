@@ -3010,6 +3010,13 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
             if (op != kIROp_Invalid)
                 builder->addDecoration(inst, op);
         }
+        else if (auto maxRecAttr = as<MaxRecordsAttribute>(mod))
+        {
+            IRInst* val = builder->getIntValue(
+                builder->getIntType(),
+                as<ConstantIntVal>(maxRecAttr->value)->getValue());
+            builder->addDecoration(inst, kIROp_MaxRecordsDecoration, val);
+        }
         // TODO: what are other modifiers we need to propagate through?
     }
     if (auto t = composeGetters<IRMeshOutputType>(
@@ -13377,6 +13384,30 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addWaveSizeDecoration(
                     irFunc,
                     getSimpleVal(subContext, lowerVal(subContext, waveSizeAttr->numLanes)));
+            }
+            else if (auto nodeLaunchAttr = as<NodeLaunchAttribute>(modifier))
+            {
+                IRStringLit* lit =
+                    getBuilder()->getStringValue(nodeLaunchAttr->mode.getUnownedSlice());
+                getBuilder()->addDecoration(irFunc, kIROp_NodeLaunchDecoration, lit);
+            }
+            else if (auto gridAttr = as<NodeMaxDispatchGridAttribute>(modifier))
+            {
+                IRInst* ops[3] = {
+                    getSimpleVal(subContext, lowerVal(subContext, gridAttr->x)),
+                    getSimpleVal(subContext, lowerVal(subContext, gridAttr->y)),
+                    getSimpleVal(subContext, lowerVal(subContext, gridAttr->z)),
+                };
+                getBuilder()->addDecoration(irFunc, kIROp_NodeMaxDispatchGridDecoration, ops, 3);
+            }
+            else if (auto fixedGridAttr = as<NodeDispatchGridAttribute>(modifier))
+            {
+                IRInst* ops[3] = {
+                    getSimpleVal(subContext, lowerVal(subContext, fixedGridAttr->x)),
+                    getSimpleVal(subContext, lowerVal(subContext, fixedGridAttr->y)),
+                    getSimpleVal(subContext, lowerVal(subContext, fixedGridAttr->z)),
+                };
+                getBuilder()->addDecoration(irFunc, kIROp_NodeDispatchGridDecoration, ops, 3);
             }
             else if (as<ReadNoneAttribute>(modifier))
             {

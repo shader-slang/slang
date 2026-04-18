@@ -126,6 +126,9 @@ SlangResult GLSLSourceEmitter::init()
             _requireSPIRVVersion(SemanticVersion(1, 4));
             break;
         }
+    case Stage::Node:
+        SLANG_UNEXPECTED("Node stage is not supported for GLSL output");
+        break;
     default:
         break;
     }
@@ -1532,6 +1535,10 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
     case Stage::Mesh:
     case Stage::Amplification:
         emitLocalSizeLayout();
+        break;
+    case Stage::Node:
+        // Node stage is not supported on GLSL; handled above.
+        break;
     default:
         break;
     }

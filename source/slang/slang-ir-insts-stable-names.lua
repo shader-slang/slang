@@ -827,5 +827,10 @@ return {
 	["makeConditionalValue"] = 851,
 	["SpecializeExistentialsInType"] = 852,
 	["assumeAddress"] = 853,
-	["DebugCompilationUnit"] = 854
+	["DebugCompilationUnit"] = 854,
+        ["SpecializeExistentialsInType"] = 855,
+        ["Decoration.nodeLaunch"] = 856,
+        ["Decoration.nodeMaxDispatchGrid"] = 857,
+        ["Decoration.nodeDispatchGrid"] = 858,
+        ["Decoration.maxRecords"] = 859
 }

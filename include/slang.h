@@ -851,6 +851,7 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_MESH = 13,
         SLANG_STAGE_AMPLIFICATION = 14,
         SLANG_STAGE_DISPATCH = 15,
+        SLANG_STAGE_NODE = 16,
         //
         SLANG_STAGE_COUNT,
 

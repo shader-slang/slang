@@ -4426,6 +4426,27 @@ attribute_syntax [NumThreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttr
 __attributeTarget(FuncDecl)
 attribute_syntax [WaveSize(numLanes: int)]   : WaveSizeAttribute;
 
+// Work Graph Node Shader attributes
+
+/// Specifies the launch mode for a work-graph node shader.
+/// @param mode One of "broadcasting", "thread", or "coalescing".
+__attributeTarget(FuncDecl)
+attribute_syntax [NodeLaunch(mode: String)] : NodeLaunchAttribute;
+
+/// Specifies the maximum dispatch grid for a broadcasting node.
+__attributeTarget(FuncDecl)
+attribute_syntax [NodeMaxDispatchGrid(x: int, y: int, z: int)] : NodeMaxDispatchGridAttribute;
+
+/// Specifies a fixed dispatch grid for a broadcasting node.
+__attributeTarget(FuncDecl)
+attribute_syntax [NodeDispatchGrid(x: int, y: int, z: int)] : NodeDispatchGridAttribute;
+
+/// Maximum number of output records for a node output parameter, or maximum input records
+/// for a coalescing node input parameter.
+__attributeTarget(FuncDecl)
+__attributeTarget(ParamDecl)
+attribute_syntax [MaxRecords(count: int)] : MaxRecordsAttribute;
+
 //@hidden:
 __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanRayPayload(location : int = -1)] : VulkanRayPayloadAttribute;

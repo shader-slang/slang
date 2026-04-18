@@ -3327,4 +3327,20 @@ IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> eleme
     return builder.emitMakeValuePack(resultType, elements.getCount(), elements.getBuffer());
 }
 
+bool isWorkGraphRecordType(IRType* type)
+{
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return false;
+    auto nameHint = structType->findDecoration<IRNameHintDecoration>();
+    if (!nameHint)
+        return false;
+    UnownedStringSlice name = nameHint->getName();
+    return name == "DispatchNodeInputRecord" || name == "ThreadNodeInputRecord" ||
+           name == "GroupNodeInputRecords" || name == "NodeOutput" ||
+           name == "NodeOutputArray" || name == "GroupNodeOutputRecords" ||
+           name == "ThreadNodeOutputRecords" || name == "EmptyNodeInput" ||
+           name == "EmptyNodeOutput" || name == "EmptyNodeOutputArray";
+}
+
 } // namespace Slang

@@ -6599,6 +6599,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             CASE(Miss, MissKHR);
             CASE(Intersection, IntersectionKHR);
             CASE(RayGeneration, RayGenerationKHR);
+            CASE(Node, GLCompute); // Work-graph node shaders use GLCompute model + ShaderEnqueueAMDX
             // TODO: Extended execution models for ray tracing, etc.
 
 #undef CASE

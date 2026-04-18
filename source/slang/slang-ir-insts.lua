@@ -1814,6 +1814,30 @@ local insts = {
 				},
 			},
 			{
+				nodeLaunch = {
+					struct_name = "NodeLaunchDecoration",
+					operands = { { "mode", "IRStringLit" } },
+				},
+			},
+			{
+				nodeMaxDispatchGrid = {
+					struct_name = "NodeMaxDispatchGridDecoration",
+					min_operands = 3,
+				},
+			},
+			{
+				nodeDispatchGrid = {
+					struct_name = "NodeDispatchGridDecoration",
+					min_operands = 3,
+				},
+			},
+			{
+				maxRecords = {
+					struct_name = "MaxRecordsDecoration",
+					operands = { { "count", "IRIntLit" } },
+				},
+			},
+			{
 				availableInDownstreamIR = { struct_name = "AvailableInDownstreamIRDecoration", min_operands = 1 },
 			},
 			{
