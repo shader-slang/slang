@@ -6457,6 +6457,83 @@ Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
         }
     }
 
+    // Handle associated types accessed through an extern struct, e.g. `Object.VertexOutput`
+    // where `extern struct Object : IObject = MyObject`. AssocTypeDecl itself is not marked
+    // extern, so the existing check above doesn't apply.
+    else if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
+    {
+        if (auto lookupSourceDeclRefType = as<DeclRefType>(lookupDeclRef->getLookupSource()))
+        {
+            auto resolvedSource = lookupExternDeclRefType(lookupSourceDeclRefType);
+            if (resolvedSource != lookupSourceDeclRefType)
+            {
+                // Primary path: witnessTable is null on aliased extern structs; use witnessVal.
+                auto tryViaWitnessVal = [&]() -> Type*
+                {
+                    auto witness = lookupDeclRef->getWitness();
+                    if (!witness)
+                        return nullptr;
+                    auto declaredWitness = as<DeclaredSubtypeWitness>(witness);
+                    if (!declaredWitness)
+                        return nullptr;
+                    auto inheritanceDeclRef = declaredWitness->getDeclRef().as<InheritanceDecl>();
+                    if (!inheritanceDeclRef)
+                        return nullptr;
+                    auto concreteWitness =
+                        as<SubtypeWitness>(inheritanceDeclRef.getDecl()->witnessVal);
+                    if (!concreteWitness)
+                        return nullptr;
+                    RequirementWitness reqWitness =
+                        tryLookUpRequirementWitness(astBuilder, concreteWitness, decl);
+                    if (reqWitness.getFlavor() == RequirementWitness::Flavor::declRef)
+                        return DeclRefType::create(astBuilder, reqWitness.getDeclRef());
+                    if (reqWitness.getFlavor() == RequirementWitness::Flavor::val)
+                    {
+                        if (auto t = as<Type>(reqWitness.getVal()))
+                            return t;
+                    }
+                    return nullptr;
+                };
+
+                if (auto resolved = tryViaWitnessVal())
+                    return resolved;
+
+                // Fallback: iterate the concrete type's InheritanceDecls directly.
+                if (auto resolvedDeclRefType = as<DeclRefType>(resolvedSource))
+                {
+                    if (auto resolvedAggDeclRef =
+                            resolvedDeclRefType->getDeclRef().as<AggTypeDecl>())
+                    {
+                        auto supDecl =
+                            lookupDeclRef->getWitness() ? lookupDeclRef->getSupDecl() : nullptr;
+                        auto interfaceDecl = as<InterfaceDecl>(supDecl);
+                        for (auto inheritanceDeclRef :
+                             getMembersOfType<InheritanceDecl>(astBuilder, resolvedAggDeclRef))
+                        {
+                            auto supType = getSup(astBuilder, inheritanceDeclRef);
+                            auto supInterfaceRef = isDeclRefTypeOf<InterfaceDecl>(supType);
+                            if (!supInterfaceRef)
+                                continue;
+                            if (interfaceDecl && supInterfaceRef.getDecl() != interfaceDecl)
+                                continue;
+                            auto concreteWitness = astBuilder->getDeclaredSubtypeWitness(
+                                resolvedSource, supType, inheritanceDeclRef);
+                            RequirementWitness reqWitness =
+                                tryLookUpRequirementWitness(astBuilder, concreteWitness, decl);
+                            if (reqWitness.getFlavor() == RequirementWitness::Flavor::declRef)
+                                return DeclRefType::create(astBuilder, reqWitness.getDeclRef());
+                            if (reqWitness.getFlavor() == RequirementWitness::Flavor::val)
+                            {
+                                if (auto t = as<Type>(reqWitness.getVal()))
+                                    return t;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // If the type is an alias of another type, then we should create the type layout
     // from the aliased type instead.
     if (auto aggTypeDeclRef = isDeclRefTypeOf<AggTypeDecl>(resultType))
