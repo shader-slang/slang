@@ -835,5 +835,9 @@ return {
 	["IncrementBranchCoverageCounter"] = 859,
 	["Decoration.BuiltinRequirementDecoration"] = 860,
 	["builtinRequirementKey"] = 861,
-	["ImageTexelPointer"] = 862
+	["ImageTexelPointer"] = 862,
+	["Decoration.nodeLaunch"] = 863,
+	["Decoration.nodeMaxDispatchGrid"] = 864,
+	["Decoration.nodeDispatchGrid"] = 865,
+	["Decoration.maxRecords"] = 866
 }

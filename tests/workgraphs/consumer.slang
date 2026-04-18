@@ -4,6 +4,8 @@ struct RecordData
     int myData;
 };
 
+RWStructuredBuffer<int> output;
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main(uint3 dispatchThreadId : SV_GroupThreadID)
@@ -17,7 +19,7 @@ void main(uint3 dispatchThreadId : SV_GroupThreadID)
     DispatchNodeInputRecord<RecordData> inputData;
 
     let recordData = inputData.Get();
-    int myData = recordData.myData;
+    output[0] = recordData.myData;
 }
 
 //CHK: ; Types, variables and constants
@@ -28,5 +30,5 @@ void main(uint3 dispatchThreadId : SV_GroupThreadID)
 
 //CHK: ; Function
 //CHK: [[VarName:%[a-zA-Z_0-9]+]] = OpVariable [[PtrType]] NodePayloadAMDX
-//CHK: = OpAccessChain [[PtrType]] [[VarName]]
-
+//CHK: OpAccessChain
+//CHK: OpLoad
