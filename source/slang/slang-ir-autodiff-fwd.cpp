@@ -694,6 +694,23 @@ struct ForwardDiffTranslationContext
                 }
             }
 
+            // If all diff operands are VoidType (non-differentiable), the
+            // differential of the construct is also void — don't create a
+            // construct with mismatched types.
+            bool allVoid = true;
+            for (auto op : diffOperands)
+            {
+                if (op->getOp() != kIROp_VoidLit)
+                {
+                    allVoid = false;
+                    break;
+                }
+            }
+            if (allVoid)
+            {
+                return InstPair(primalConstruct, nullptr);
+            }
+
             return InstPair(
                 primalConstruct,
                 builder->emitIntrinsicInst(
