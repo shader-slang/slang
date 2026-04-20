@@ -74,10 +74,16 @@ jobs:
           # choco is preinstalled on GitHub-hosted windows-latest runners.
           # Pin the version so failures are obvious (not an upstream regression).
           choco install opencppcoverage --version 0.9.9.0 -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "choco install exited $LASTEXITCODE" }
           # Add to PATH for the rest of the job.
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\OpenCppCoverage"
-          # Verify.
-          & "C:\Program Files\OpenCppCoverage\OpenCppCoverage.exe" --help | Select-Object -First 1
+          # Verify by filesystem presence. Avoid invoking the tool here -- a
+          # piped `--help | Select-Object -First 1` closes the pipe early,
+          # and the resulting broken-pipe exit code trips the pwsh step
+          # failure check.
+          $exe = "C:\Program Files\OpenCppCoverage\OpenCppCoverage.exe"
+          if (-not (Test-Path $exe)) { throw "OpenCppCoverage.exe missing at $exe" }
+          Write-Host "OpenCppCoverage installed: $exe"
 
       - name: Install Clang 18 and LLVM Tools
         if: inputs.compiler == 'clang-18' && inputs.os == 'linux' && inputs.container == ''
