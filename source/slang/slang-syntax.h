@@ -396,9 +396,9 @@ inline Type* getResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef
 {
     if (hasDirectFuncType(declRef))
     {
-        return as<FuncType>(
-                   declRef.substitute(astBuilder, declRef.getDecl()->funcType.type)->resolve())
-            ->getResultType();
+        auto substituted = declRef.substitute(astBuilder, declRef.getDecl()->funcType.type);
+        if (auto funcType = as<FuncType>(substituted->resolve()))
+            return funcType->getResultType();
     }
 
     return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);

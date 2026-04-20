@@ -225,7 +225,18 @@ struct ShaderInputLayoutParser
                     negate = true;
                 }
 
-                if (parser.NextToken().Type == Misc::TokenType::HalfLiteral)
+                if (!negate && parser.NextToken().Type == Misc::TokenType::Identifier)
+                {
+                    // Buffer name reference: resolve to device address at bind time.
+                    // Reserves 2 uint32 slots (8 bytes) for a 64-bit device address.
+                    ShaderInputLayout::BufferAddressRef ref;
+                    ref.dataOffset = val->bufferData.getCount();
+                    ref.bufferName = parser.ReadWord();
+                    val->addressRefs.add(ref);
+                    val->bufferData.add(0);
+                    val->bufferData.add(0);
+                }
+                else if (parser.NextToken().Type == Misc::TokenType::HalfLiteral)
                 {
                     // Half float literal (e.g. 1.0h): store one half per uint32_t slot.
                     // Packing into the final buffer layout is handled by assignBuffer()
