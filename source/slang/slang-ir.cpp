@@ -3373,6 +3373,12 @@ IRInst* IRBuilder::emitDebugLine(
         getIntValue(getUIntType(), colEnd)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugLine, 5, args);
 }
+IRInst* IRBuilder::emitIncrementCoverageCounter(IRIntegerValue uid)
+{
+    IRInst* arg = getIntValue(getUIntType(), uid);
+    return emitIntrinsicInst(getVoidType(), kIROp_IncrementCoverageCounter, 1, &arg);
+}
+
 IRInst* IRBuilder::emitDebugVar(
     IRType* type,
     IRInst* source,

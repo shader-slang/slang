@@ -1139,6 +1139,8 @@ typedef uint32_t SlangSizeT;
 
         DiagnosticColor, // intValue0: SlangDiagnosticColor (always, never, auto)
 
+        TraceCoverage, // bool: insert per-statement execution counters
+
         CountOf,
     };
 

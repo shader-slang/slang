@@ -3499,6 +3499,10 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* col,
         IRInst* argIndex = nullptr);
     IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue);
+    // Emit an IncrementCoverageCounter(uid) placeholder. The coverage
+    // instrumentation IR pass later rewrites each occurrence into an
+    // atomic add on a synthesized counter buffer indexed by `uid`.
+    IRInst* emitIncrementCoverageCounter(IRIntegerValue uid);
     IRInst* emitDebugInlinedAt(
         IRInst* line,
         IRInst* col,

@@ -1352,6 +1352,23 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(");\n");
             return true;
         }
+    case kIROp_AtomicAdd:
+        {
+            // Lower AtomicAdd on a pointer-to-uint/int slot to a call
+            // through the CPU prelude helpers. Matches HLSL/GLSL
+            // semantics: returns the prior value as the inst result.
+            auto dataType = inst->getDataType();
+            bool isSigned = dataType->getOp() == kIROp_IntType;
+            char const* helper = isSigned ? "_slang_atomic_add_i32" : "_slang_atomic_add_u32";
+            emitInstResultDecl(inst);
+            m_writer->emit(helper);
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
     default:
         return false;
     }

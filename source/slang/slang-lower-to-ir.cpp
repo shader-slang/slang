@@ -614,6 +614,13 @@ struct IRGenContext
 
     DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
 
+    // Prototype shader-coverage instrumentation. When true, each
+    // lowered statement is preceded by an IncrementCoverageCounter
+    // placeholder whose uid increments from 0. A later IR pass rewrites
+    // the placeholders into counter writes on a synthesized buffer.
+    bool traceCoverage = false;
+    IRIntegerValue nextCoverageUID = 0;
+
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
 
@@ -8964,6 +8971,22 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
         ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
 }
 
+// Unconditional variant used by the coverage instrumentation path:
+// attaches an IRDebugLocationDecoration even when `-g` is off, because
+// coverage needs the source mapping regardless of user debug settings.
+void addCoverageLocationDecoration(IRGenContext* context, IRInst* inst)
+{
+    IRInst* debugSourceInst = getOrEmitDebugSource(context, inst->sourceLoc);
+    if (!debugSourceInst)
+        return;
+
+    auto sourceManager = context->getLinkage()->getSourceManager();
+    auto humaneLoc = sourceManager->getHumaneLoc(inst->sourceLoc, SourceLocType::Emit);
+
+    context->irBuilder
+        ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
+}
+
 void lowerStmt(IRGenContext* context, Stmt* stmt)
 {
     IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, stmt->loc);
@@ -8974,6 +8997,21 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
     try
     {
         maybeEmitDebugLine(context, &visitor, stmt, stmt->loc);
+
+        // Emit a coverage-counter placeholder tagged with this
+        // statement's source location, before lowering the statement
+        // itself. The pass in slang-ir-coverage-instrument.cpp later
+        // rewrites these into counter writes. EmptyStmt, blocks, and
+        // other purely structural statements also receive a counter
+        // because they all occupy real source positions — the LCOV
+        // converter aggregates multiple counters per line as needed.
+        if (context->traceCoverage && stmt->loc.isValid() && !as<EmptyStmt>(stmt))
+        {
+            auto counterInst =
+                context->irBuilder->emitIncrementCoverageCounter(context->nextCoverageUID++);
+            addCoverageLocationDecoration(context, counterInst);
+        }
+
         visitor.dispatch(stmt);
     }
     // Don't emit any context message for an explicit `AbortCompilationException`
@@ -14199,6 +14237,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     context->irBuilder = builder;
     context->debugInfoLevel = compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel();
+    context->traceCoverage =
+        compileRequest->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage);
 
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {

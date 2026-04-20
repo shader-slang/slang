@@ -1096,6 +1096,14 @@ local insts = {
 			{ atomicDec = { operands = { { "ptr" } } } },
 		},
 	},
+	-- Placeholder emitted at AST lowering when `-trace-coverage` is on.
+	-- A single integer `uid` identifies the statement the placeholder
+	-- was produced for. The coverage-instrument IR pass later rewrites
+	-- each occurrence into an atomic add on a synthesized counter
+	-- buffer, indexed by uid, and harvests the uid -> SourceLoc mapping
+	-- for the compile manifest. Inherent side-effect semantics keep the
+	-- optimizer from deleting or hoisting the placeholder.
+	{ IncrementCoverageCounter = { operands = { { "uid" } } } },
 	-- Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 	-- currently accumulated derivative to pass to some dOut argument in a nested call.
 	{ LoadReverseGradient = { operands = { { "value" } } } },

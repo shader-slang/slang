@@ -321,6 +321,34 @@ public:                                                                         
 #include "slang-cpp-scalar-intrinsics.h"
 #include "slang-cpp-types.h"
 
+// Atomic helpers for the CPU target. Needed so kIROp_AtomicAdd and
+// friends can lower to native atomic operations on the host — matching
+// the semantics of HLSL `InterlockedAdd`, SPIR-V `OpAtomicIAdd`, etc.
+// Uses compiler builtins so no <atomic> header is required.
+#if defined(_MSC_VER)
+#include <intrin.h>
+static inline uint32_t _slang_atomic_add_u32(uint32_t* ptr, uint32_t val)
+{
+    // Returns the PRIOR value, matching HLSL InterlockedAdd and GLSL atomicAdd.
+    return static_cast<uint32_t>(
+        _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(ptr), static_cast<long>(val)));
+}
+static inline int32_t _slang_atomic_add_i32(int32_t* ptr, int32_t val)
+{
+    return static_cast<int32_t>(
+        _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(ptr), static_cast<long>(val)));
+}
+#else
+static inline uint32_t _slang_atomic_add_u32(uint32_t* ptr, uint32_t val)
+{
+    return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
+}
+static inline int32_t _slang_atomic_add_i32(int32_t* ptr, int32_t val)
+{
+    return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
+}
+#endif
+
 // TODO(JS): Hack! Output C++ code from slang can copy uninitialized variables.
 #if defined(_MSC_VER)
 #pragma warning(disable : 4700)
