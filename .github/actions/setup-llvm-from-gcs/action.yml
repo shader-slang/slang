@@ -67,9 +67,12 @@ runs:
         echo "📊 LLVM installation size:"
         du -sh build/llvm-project-install
 
-        # Set environment variables for CMake
-        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        # Set environment variables for CMake. LLVM_DIR/Clang_DIR must point to
+        # the directories containing LLVMConfig.cmake and ClangConfig.cmake
+        # respectively (CMake does not search subdirectories of <pkg>_DIR).
+        LLVM_INSTALL="${{ github.workspace }}/build/llvm-project-install"
+        echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> $GITHUB_ENV
+        echo "Clang_DIR=${LLVM_INSTALL}/lib/cmake/clang" >> $GITHUB_ENV
 
     - name: Build LLVM from source
       if: steps.download.outputs.cache-hit != 'true' && inputs.build-if-missing == 'true'
@@ -90,9 +93,11 @@ runs:
 
         echo "✅ LLVM build complete"
 
-        # Set environment variables for CMake
-        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        # Set environment variables for CMake. See matching comment in the
+        # download step above.
+        LLVM_INSTALL="${{ github.workspace }}/build/llvm-project-install"
+        echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> $GITHUB_ENV
+        echo "Clang_DIR=${LLVM_INSTALL}/lib/cmake/clang" >> $GITHUB_ENV
 
     - name: Upload LLVM to GCS
       if: steps.download.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
