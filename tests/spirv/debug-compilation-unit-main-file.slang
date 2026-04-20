@@ -34,4 +34,6 @@ float4 main(VertexOutput input) : SV_Target
 // Verify that DebugCompilationUnit references this main shader file
 // CHECK: [[MAIN_FILE:%[0-9]+]] = OpString "{{.*}}debug-compilation-unit-main-file.slang"
 // CHECK: [[SOURCE_ID:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugSource [[MAIN_FILE]] %{{[0-9]+}}
-// CHECK: OpExtInst %void %{{[0-9]+}} DebugCompilationUnit %uint_{{[0-9]+}} %uint_{{[0-9]+}} [[SOURCE_ID]] %uint_{{[0-9]+}}
+// CHECK: [[CU:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugCompilationUnit %uint_{{[0-9]+}} %uint_{{[0-9]+}} [[SOURCE_ID]] %uint_{{[0-9]+}}
+// Verify scope propagation: the main entry point's DebugFunction must reference this CU as its parent scope.
+// CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugFunction {{.*}} [[CU]]
