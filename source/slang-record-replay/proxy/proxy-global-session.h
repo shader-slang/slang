@@ -202,9 +202,7 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(sourceLanguage);
-        ISlangBlob* preludePtr;
-        if (!outPrelude)
-            outPrelude = &preludePtr;
+        PREPARE_POINTER_OUTPUT(outPrelude);
         getActual<IGlobalSession>()->getLanguagePrelude(sourceLanguage, outPrelude);
         RECORD_COM_OUTPUT(outPrelude);
     }
