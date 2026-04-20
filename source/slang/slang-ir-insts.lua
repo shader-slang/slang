@@ -1097,12 +1097,14 @@ local insts = {
 		},
 	},
 	-- Placeholder emitted at AST lowering when `-trace-coverage` is on.
-	-- A single integer `uid` identifies the statement the placeholder
-	-- was produced for. The coverage-instrument IR pass later rewrites
-	-- each occurrence into an atomic add on a synthesized counter
-	-- buffer, indexed by uid, and harvests the uid -> SourceLoc mapping
-	-- for the compile manifest. Inherent side-effect semantics keep the
-	-- optimizer from deleting or hoisting the placeholder.
+	-- The integer `uid` identifies the statement the placeholder was
+	-- produced for, and the instruction carries an
+	-- IRDebugLocationDecoration with its (file, line). The
+	-- coverage-instrument IR pass later rewrites each occurrence into
+	-- an atomic add on a synthesized counter buffer; the counter index
+	-- is assigned by deduplicating (file, line) keys, so multiple UIDs
+	-- on the same line share a slot. Inherent side-effect semantics
+	-- keep the optimizer from deleting or hoisting the placeholder.
 	{ IncrementCoverageCounter = { operands = { { "uid" } } } },
 	-- Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 	-- currently accumulated derivative to pass to some dOut argument in a nested call.

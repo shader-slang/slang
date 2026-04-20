@@ -9001,12 +9001,21 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
         // Emit a coverage-counter placeholder tagged with this
         // statement's source location, before lowering the statement
         // itself. The pass in slang-ir-coverage-instrument.cpp later
-        // rewrites these into counter writes. EmptyStmt, blocks, and
-        // other purely structural statements also receive a counter
-        // because they all occupy real source positions — the LCOV
-        // converter aggregates multiple counters per line as needed.
+        // rewrites these into counter writes.
+        //
+        // Empty statements are skipped because they have no
+        // observable execution; the LCOV converter deduplicates
+        // counters back to `(file, line)` at the IR-pass stage.
+        //
+        // `startBlockIfNeeded` is required because `maybeEmitDebugLine`
+        // may have returned early (e.g. under `-g0`) without opening a
+        // fresh block after a terminator. Without it, a statement that
+        // follows a `break` / `return` could get its coverage counter
+        // inserted into the already-terminated predecessor block,
+        // corrupting the IR.
         if (context->traceCoverage && stmt->loc.isValid() && !as<EmptyStmt>(stmt))
         {
+            visitor.startBlockIfNeeded(stmt);
             auto counterInst =
                 context->irBuilder->emitIncrementCoverageCounter(context->nextCoverageUID++);
             addCoverageLocationDecoration(context, counterInst);

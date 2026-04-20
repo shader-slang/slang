@@ -1357,9 +1357,17 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             // Lower AtomicAdd on a pointer-to-uint/int slot to a call
             // through the CPU prelude helpers. Matches HLSL/GLSL
             // semantics: returns the prior value as the inst result.
+            //
+            // Only 32-bit integer widths are supported by the prelude
+            // helpers today; wider/narrower types fall through to the
+            // default unhandled-opcode diagnostic so the build fails
+            // loudly instead of producing bogus code.
             auto dataType = inst->getDataType();
-            bool isSigned = dataType->getOp() == kIROp_IntType;
-            char const* helper = isSigned ? "_slang_atomic_add_i32" : "_slang_atomic_add_u32";
+            bool isSignedInt = dataType->getOp() == kIROp_IntType;
+            bool isUnsignedInt = dataType->getOp() == kIROp_UIntType;
+            if (!isSignedInt && !isUnsignedInt)
+                return false;
+            char const* helper = isSignedInt ? "_slang_atomic_add_i32" : "_slang_atomic_add_u32";
             emitInstResultDecl(inst);
             m_writer->emit(helper);
             m_writer->emit("(");

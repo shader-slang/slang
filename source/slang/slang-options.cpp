@@ -3690,6 +3690,21 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         }
 
+        // `-trace-coverage` instruments at the Slang IR level and has
+        // no meaning when the user asks for pass-through codegen
+        // (where the downstream compiler sees the original source
+        // directly). Reject the combination rather than silently
+        // producing an uninstrumented shader.
+        if (m_requestImpl->m_passThrough != PassThroughMode::None &&
+            linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage))
+        {
+            m_sink->diagnoseRaw(
+                Severity::Error,
+                UnownedStringSlice("-trace-coverage cannot be combined with -pass-through; "
+                                   "pass-through bypasses the Slang IR pipeline and cannot "
+                                   "emit coverage instrumentation."));
+        }
+
         // If the user is requesting code generation via pass-through,
         // then any entry points they specify need to have a stage set,
         // because fxc/dxc/glslang don't have a facility for taking
