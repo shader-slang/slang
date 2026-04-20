@@ -694,21 +694,23 @@ struct ForwardDiffTranslationContext
                 }
             }
 
-            // If all diff operands are VoidType (non-differentiable), the
-            // differential of the construct is also void — don't create a
-            // construct with mismatched types.
-            bool allVoid = true;
-            for (auto op : diffOperands)
+            // If all diff operands are VoidLit (all operands are non-differentiable),
+            // the differential of the entire construct is also non-differentiable.
+            // Return nullptr instead of creating a construct with VoidLit operands
+            // that would have mismatched types (e.g. MakeVectorFromScalar(void_constant)
+            // with a float3 result type).
             {
-                if (op->getOp() != kIROp_VoidLit)
+                bool allVoid = true;
+                for (auto op : diffOperands)
                 {
-                    allVoid = false;
-                    break;
+                    if (op->getOp() != kIROp_VoidLit)
+                    {
+                        allVoid = false;
+                        break;
+                    }
                 }
-            }
-            if (allVoid)
-            {
-                return InstPair(primalConstruct, nullptr);
+                if (allVoid)
+                    return InstPair(primalConstruct, nullptr);
             }
 
             return InstPair(
