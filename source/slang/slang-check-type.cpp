@@ -469,7 +469,6 @@ static bool validateMatrixType(
             sink->diagnose(Diagnostics::MatrixDimensionOutOfRange{
                 .dimName = "column count",
                 .dimValue = String(colCount),
-                .maxValue = "4",
                 .location = loc});
             valid = false;
         }
@@ -483,7 +482,6 @@ static bool validateMatrixType(
             sink->diagnose(Diagnostics::MatrixDimensionOutOfRange{
                 .dimName = "row count",
                 .dimValue = String(rowCount),
-                .maxValue = "4",
                 .location = loc});
             valid = false;
         }
