@@ -3967,14 +3967,7 @@ err(
     "matrix-dimension-out-of-range",
     38206,
     "matrix dimension out of valid range",
-    span { loc = "location", message = "matrix type has ~dimName ~dimValue which exceeds the maximum of ~maxValue" }
-)
-
-err(
-    "matrix-invalid-element-type",
-    38207,
-    "matrix element type not supported",
-    span { loc = "location", message = "matrix with element type '~elementType:Type' is not supported; matrix elements must be float, half, double, int, or uint" }
+    span { loc = "location", message = "matrix type has ~dimName ~dimValue; matrix row and column counts must be between 1 and 4 inclusive" }
 )
 
 
