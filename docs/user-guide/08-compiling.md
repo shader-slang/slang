@@ -1028,6 +1028,24 @@ meanings of their `CompilerOptionValue` encodings.
 | GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entry point. `intValue0` specifies a bool value for the setting. |
 | UseUpToDateBinaryModule | When set will only load precompiled modules if it is up-to-date with its source. `intValue0` specifies a bool value for the setting. |
 | ValidateUniformity | When set will perform [uniformity analysis](a1-05-uniformity.md).|
+| SPIRVResourceHeapStride | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
+| SPIRVSamplerHeapStride | Specifies the byte stride for the sampler descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
+| ForceDXLayout | When set forces the compiler to use DirectX-compatible (HLSL register packing) rules when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
+| ForceCLayout | When set forces the compiler to use C struct layout rules (natural alignment, no HLSL/GLSL padding) when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
+| DenormalModeFp16 | Specifies how 16-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
+| DenormalModeFp32 | Specifies how 32-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
+| DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
+| UseMSVCStyleBitfieldPacking | When set uses MSVC-compatible bitfield packing rules instead of the default GLSL/Vulkan rules. `intValue0` specifies a bool value for the setting. |
+
+### Compiler Option ABI Stability
+
+Each `CompilerOptionName` enumerator has an explicit integer value in `include/slang.h`. You
+can safely pass option names through the `CompilerOptionEntry` API and rely on them remaining
+consistent across Slang releases.
+
+New options are assigned explicit integer values above the current `CountOf` sentinel; existing
+values are never changed. Deprecated options are retained as numbered placeholders to prevent
+renumbering of subsequent members.
 
 ## Debugging
 
