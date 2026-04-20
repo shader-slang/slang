@@ -109,8 +109,7 @@ The following are rejected:
 |-------|------|-------------|
 | 38050 | `invalid-entry-point-varying-type` | Type cannot be used as entry-point varying parameter or return type |
 | 38051 | `invalid-entry-point-varying-type-for-target` | Type cannot be used as entry-point varying for a specific target |
-| 38206 | `matrix-dimension-out-of-range` | Matrix row or column count exceeds 4 |
-| 38207 | `matrix-invalid-element-type` | Matrix element type is not supported |
+| 38206 | `matrix-dimension-out-of-range` | Matrix row or column count is outside 1..4 |
 
 ## Extending the System
 
