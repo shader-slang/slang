@@ -4389,13 +4389,10 @@ struct ISession : public ISlangUnknown
         also given the opportunity to specify the dispatch ID of the implementation type. If
         `conformanceIdOverride` is -1, there will be no override behavior and Slang will
         automatically assign IDs to implementation types. The automatically assigned IDs can be
-
         queried via `ISession::getTypeConformanceWitnessSequentialID`.
 
-        If an
-       application mixes explicit ID reservations with implicitly allocated IDs, explicit
-
-       reservations should be established first before any implicit IDs are queried.
+        If an application mixes explicit ID reservations with implicitly allocated IDs, explicit
+        reservations should be established first before any implicit IDs are queried.
 
  Returns
        SLANG_OK if succeeds, or SLANG_FAIL if `type` does not conform to `interfaceType`.
