@@ -71,10 +71,11 @@ static void maybeAddTypeAnnotationsForHigherOrderDiff(
                                                           origType,
                                                           AnnotationKind::DifferentialPairType))
                                ->getWitness();
-        if (as<IRStructKey>(diffWitness))
+        if (as<IRStructKey>(diffWitness) || as<IRPoison>(diffWitness))
         {
-            // For now, we'll ignore this case (happens for existential types)
-            // Existential types cannot be higher-order differentiated at the moment.
+            // Existential/interface differential pairs may carry a placeholder witness
+            // instead of a usable IDifferentiable witness table. Higher-order autodiff
+            // doesn't support synthesizing annotations from that representation yet.
             return;
         }
 
