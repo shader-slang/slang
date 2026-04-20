@@ -321,11 +321,45 @@ struct CoverageInstrumenter
         {
             auto const& key = orderedKeys[i];
             fprintf(f, "%s\n    {\"index\": %lld, \"file\": \"", i == 0 ? "" : ",", (long long)i);
+            // JSON requires escaping backslash, double-quote, and all
+            // control characters (U+0000..U+001F). Source file paths can
+            // come from user `#line` directives or synthetic locations
+            // and may legally contain tabs, newlines, etc. — emit
+            // specific escape sequences where defined and `\uXXXX`
+            // elsewhere to keep the manifest parseable.
             for (auto c : key.file)
             {
-                if (c == '\\' || c == '"')
-                    fputc('\\', f);
-                fputc(c, f);
+                unsigned char uc = (unsigned char)c;
+                switch (uc)
+                {
+                case '\\':
+                    fputs("\\\\", f);
+                    break;
+                case '"':
+                    fputs("\\\"", f);
+                    break;
+                case '\b':
+                    fputs("\\b", f);
+                    break;
+                case '\f':
+                    fputs("\\f", f);
+                    break;
+                case '\n':
+                    fputs("\\n", f);
+                    break;
+                case '\r':
+                    fputs("\\r", f);
+                    break;
+                case '\t':
+                    fputs("\\t", f);
+                    break;
+                default:
+                    if (uc < 0x20)
+                        fprintf(f, "\\u%04x", (unsigned)uc);
+                    else
+                        fputc((int)uc, f);
+                    break;
+                }
             }
             fprintf(f, "\", \"line\": %lld}", (long long)key.line);
         }

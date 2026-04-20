@@ -25,9 +25,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // Synthesized coverage buffer should appear in the emitted C++.
 //CHECK: RWStructuredBuffer{{.*}}_slang_coverage
 
-// Each basic block's counter increment materializes as a pointer
-// fetch followed by a non-atomic load-add-store on that slot. At
-// least three distinct counter indices should show up.
-//CHECK: _slang_coverage{{.*int\(0\)}}
-//CHECK: _slang_coverage{{.*int\(1\)}}
-//CHECK: _slang_coverage{{.*int\(2\)}}
+// At least three distinct counter indices should be written to via
+// the CPU-prelude atomic helper. This assertion matches both the
+// slot reference AND the real atomic emission so the test would fail
+// if codegen regressed to a non-atomic load-add-store.
+//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(0\)}}
+//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(1\)}}
+//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(2\)}}
