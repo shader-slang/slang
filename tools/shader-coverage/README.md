@@ -151,9 +151,12 @@ Plain JSON, version 1:
   D3D12).
 - `buffer.synthesized` — `true` when Slang created the buffer,
   `false` when the user declared it in the shader.
-- `entries` — one per counter, in index order. Multiple entries may
-  share the same `(file, line)` when several statements live on one
-  source line; their hits are summed at the LCOV conversion step.
+- `entries` — one per deduplicated `(file, line)` counter, in index
+  order. Multiple source statements on one line share a single
+  counter slot, so each `(file, line)` appears at most once. The hit
+  count for a line is the sum of all statements on that line that
+  actually executed, multiplied by the number of invocations that
+  reached each.
 
 ## Counter buffer format
 

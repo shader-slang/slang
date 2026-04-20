@@ -4,7 +4,7 @@ Convert a Slang coverage counter buffer + manifest to LCOV .info format.
 
 Pipeline:
     1. Compile a shader with:
-           slangc shader.slang -fcoverage ...
+           slangc shader.slang -trace-coverage ...
        with SLANG_COVERAGE_MANIFEST_PATH=shader.slangcov set in the
        environment.  This produces an instrumented shader plus a JSON
        sidecar describing each counter's (file, line).

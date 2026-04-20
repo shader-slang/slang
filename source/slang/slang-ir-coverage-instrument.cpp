@@ -1,5 +1,6 @@
 #include "slang-ir-coverage-instrument.h"
 
+#include "compiler-core/slang-diagnostic-sink.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 
@@ -43,10 +44,13 @@ struct CoverageKeyHasher
     }
 };
 
-// Locate the module-scope RWStructuredBuffer<uint> named
-// `__slang_coverage`, if any. Returns nullptr when the user has not
-// declared the buffer themselves.
-static IRGlobalParam* findCoverageBuffer(IRModule* module)
+// Locate the module-scope `RWStructuredBuffer<uint> __slang_coverage`
+// declared by the user, if any. Returns nullptr when no such buffer
+// exists. If a buffer with the reserved name is present but has the
+// wrong type (not a `RWStructuredBuffer<uint>`), that is a user error:
+// diagnose via `sink` and treat it as absent so the pass is a no-op
+// rather than generating invalid IR.
+static IRGlobalParam* findCoverageBuffer(IRModule* module, DiagnosticSink* sink)
 {
     for (auto inst : module->getGlobalInsts())
     {
@@ -58,11 +62,62 @@ static IRGlobalParam* findCoverageBuffer(IRModule* module)
             continue;
         if (nameHint->getName() != UnownedStringSlice(kCoverageBufferName))
             continue;
-        if (!as<IRHLSLRWStructuredBufferType>(param->getDataType()))
-            continue;
+        auto bufferType = as<IRHLSLRWStructuredBufferType>(param->getDataType());
+        if (!bufferType)
+        {
+            if (sink)
+                sink->diagnoseRaw(
+                    Severity::Warning,
+                    UnownedStringSlice("'__slang_coverage' is reserved for -trace-coverage; "
+                                       "declaration must be 'RWStructuredBuffer<uint>'. "
+                                       "Ignoring and synthesizing the coverage buffer."));
+            return nullptr;
+        }
+        // Validate the element type is specifically `uint`. Anything
+        // else (float, int, struct) would produce bad IR once we emit
+        // atomic-add on the slot pointer.
+        auto elementType = as<IRBasicType>(bufferType->getElementType());
+        if (!elementType || elementType->getBaseType() != BaseType::UInt)
+        {
+            if (sink)
+                sink->diagnoseRaw(
+                    Severity::Warning,
+                    UnownedStringSlice("'__slang_coverage' element type must be 'uint' for "
+                                       "-trace-coverage. Ignoring and synthesizing the "
+                                       "coverage buffer."));
+            return nullptr;
+        }
         return param;
     }
     return nullptr;
+}
+
+// Return true if any existing module-scope global parameter already
+// occupies the reserved `(space, binding)` we would assign to the
+// synthesized coverage buffer. Used to diagnose before synthesis
+// rather than aliasing a user resource silently.
+static bool hasResourceAtReservedBinding(IRModule* module)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto param = as<IRGlobalParam>(inst);
+        if (!param)
+            continue;
+        auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
+        if (!layoutDecor)
+            continue;
+        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+        if (!varLayout)
+            continue;
+        auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace);
+        auto bindingAttr = varLayout->findOffsetAttr(LayoutResourceKind::DescriptorTableSlot);
+        if (!spaceAttr || !bindingAttr)
+            continue;
+        if ((UInt)spaceAttr->getOffset() == kCoverageReservedSpace &&
+            (UInt)bindingAttr->getOffset() == kCoverageReservedBinding)
+            return true;
+    }
+    return false;
 }
 
 // Collect every IncrementCoverageCounter placeholder in the module
@@ -287,8 +342,21 @@ struct CoverageInstrumenter
 // global parameter with a reserved layout. Follows the pattern in
 // `lowerDynamicResourceHeap` — we manually build an IRTypeLayout /
 // IRVarLayout so the buffer survives later uniform-collection passes.
-static IRGlobalParam* synthesizeCoverageBuffer(IRModule* module)
+// Emits a warning if any existing user resource already occupies the
+// reserved binding; synthesis proceeds anyway but aliasing risk is
+// documented to the user.
+static IRGlobalParam* synthesizeCoverageBuffer(IRModule* module, DiagnosticSink* sink)
 {
+    if (hasResourceAtReservedBinding(module) && sink)
+    {
+        sink->diagnoseRaw(
+            Severity::Warning,
+            UnownedStringSlice("-trace-coverage: an existing resource occupies the reserved "
+                               "binding (space=31, binding=0); coverage buffer may alias it. "
+                               "Declare `RWStructuredBuffer<uint> __slang_coverage` explicitly "
+                               "at a conflict-free binding to avoid this."));
+    }
+
     IRBuilder builder(module);
     builder.setInsertInto(module->getModuleInst());
 
@@ -327,24 +395,25 @@ static void stripPlaceholders(IRModule* module)
 
 } // anonymous namespace
 
-void instrumentCoverage(IRModule* module, DiagnosticSink* /*sink*/, bool enabled)
+void instrumentCoverage(IRModule* module, DiagnosticSink* sink, bool enabled)
 {
-    auto buffer = findCoverageBuffer(module);
-    bool synthesized = false;
-
-    // With the flag off and no user buffer: any placeholders that got
-    // emitted (shouldn't normally happen) are dropped and we return.
-    if (!enabled && !buffer)
+    // With the flag off: guarantee a true no-op. Any placeholders that
+    // might have made it in via a stale cached module are dropped so
+    // the backend emitter never sees them, but we do not print any
+    // info messages or write a manifest.
+    if (!enabled)
     {
         stripPlaceholders(module);
         return;
     }
 
-    // With the flag on, synthesize the buffer when the user didn't
-    // supply one themselves.
-    if (enabled && !buffer)
+    // Flag is on. Reuse a user-declared buffer if present and well-
+    // typed; otherwise synthesize one.
+    auto buffer = findCoverageBuffer(module, sink);
+    bool synthesized = false;
+    if (!buffer)
     {
-        buffer = synthesizeCoverageBuffer(module);
+        buffer = synthesizeCoverageBuffer(module, sink);
         synthesized = true;
     }
 
