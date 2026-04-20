@@ -255,11 +255,9 @@ struct CoverageInstrumenter
             if (layout.binding >= 0)
                 fprintf(f, ",\n    \"binding\": %lld", (long long)layout.binding);
             if (layout.descriptorSet >= 0)
-                fprintf(f, ",\n    \"descriptor_set\": %lld",
-                        (long long)layout.descriptorSet);
+                fprintf(f, ",\n    \"descriptor_set\": %lld", (long long)layout.descriptorSet);
             if (layout.uavRegister >= 0)
-                fprintf(f, ",\n    \"uav_register\": %lld",
-                        (long long)layout.uavRegister);
+                fprintf(f, ",\n    \"uav_register\": %lld", (long long)layout.uavRegister);
         }
         fprintf(f, "\n  },\n");
 
@@ -267,9 +265,7 @@ struct CoverageInstrumenter
         for (Index i = 0; i < orderedKeys.getCount(); ++i)
         {
             auto const& key = orderedKeys[i];
-            fprintf(f, "%s\n    {\"index\": %lld, \"file\": \"",
-                    i == 0 ? "" : ",",
-                    (long long)i);
+            fprintf(f, "%s\n    {\"index\": %lld, \"file\": \"", i == 0 ? "" : ",", (long long)i);
             for (auto c : key.file)
             {
                 if (c == '\\' || c == '"')
@@ -298,16 +294,13 @@ static IRGlobalParam* synthesizeCoverageBuffer(IRModule* module)
 
     auto uintType = builder.getUIntType();
     IRInst* elemOperand = uintType;
-    auto bufferType = (IRType*)
-        builder.getType(kIROp_HLSLRWStructuredBufferType, 1, &elemOperand);
+    auto bufferType = (IRType*)builder.getType(kIROp_HLSLRWStructuredBufferType, 1, &elemOperand);
 
     auto param = builder.createGlobalParam(bufferType);
     builder.addNameHintDecoration(param, UnownedStringSlice(kCoverageBufferName));
 
     IRTypeLayout::Builder typeLayoutBuilder(&builder);
-    typeLayoutBuilder.addResourceUsage(
-        LayoutResourceKind::DescriptorTableSlot,
-        LayoutSize(1));
+    typeLayoutBuilder.addResourceUsage(LayoutResourceKind::DescriptorTableSlot, LayoutSize(1));
     auto typeLayout = typeLayoutBuilder.build();
 
     IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
@@ -360,19 +353,13 @@ void instrumentCoverage(IRModule* module, DiagnosticSink* /*sink*/, bool enabled
 
     // Always announce the counter count on stderr — the host needs
     // this to allocate the counter buffer at the right size.
-    fprintf(
-        stderr,
-        "slang-coverage-info: counters=%lld\n",
-        (long long)instrumenter.counterCount());
+    fprintf(stderr, "slang-coverage-info: counters=%lld\n", (long long)instrumenter.counterCount());
 
     if (auto path = getenv("SLANG_COVERAGE_MANIFEST_PATH"))
     {
         if (!instrumenter.writeJsonManifest(path))
         {
-            fprintf(
-                stderr,
-                "slang-coverage-info: failed to write manifest to '%s'\n",
-                path);
+            fprintf(stderr, "slang-coverage-info: failed to write manifest to '%s'\n", path);
         }
         else
         {
