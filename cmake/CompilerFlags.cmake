@@ -281,12 +281,18 @@ function(set_default_compile_options target)
             # distinct in the binary, giving a truthful hit/miss verdict
             # for every source line. Runtime is ~2-3x slower -- acceptable
             # for a nightly coverage job where accuracy is the target.
+            # (MSVC emits D9025 "overriding '/Ob1' with '/Ob0'" -- harmless
+            # noise; /wd9025 can't suppress driver warnings, so we just live
+            # with it.)
             target_compile_options(${target} PRIVATE /Ob0)
-            # Suppress MSVC warning D9025 ("overriding '/Ob1' with '/Ob0'")
-            # that fires when CMake's RelWithDebInfo flags already contain
-            # /Ob1. The /Ob0 later on the command line wins; the warning
-            # is expected and harmless.
-            target_compile_options(${target} PRIVATE /wd9025)
+            # Force /INCREMENTAL:NO at the target level. Windows +
+            # Ninja-Multi-Config + RelWithDebInfo otherwise leaves
+            # /INCREMENTAL on the link line (CMake's default for the
+            # configuration), racing with slang-proxy's explicit
+            # /INCREMENTAL:NO and producing LNK1104 on slang.ilk. Disabling
+            # incremental linking globally for coverage targets avoids the
+            # .ilk file entirely. No runtime cost.
+            target_link_options(${target} PRIVATE /INCREMENTAL:NO)
         endif()
     endif()
 
