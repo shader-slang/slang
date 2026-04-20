@@ -791,6 +791,75 @@ void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, Di
     validateAtomicOperations(skipFuncParamValidation, sink, module->getModuleInst());
 }
 
+static void collectAssumeAddressInsts(IRInst* inst, List<IRInst*>& out)
+{
+    if (inst->getOp() == kIROp_AssumeAddress)
+        out.add(inst);
+    for (auto child : inst->getModifiableChildren())
+        collectAssumeAddressInsts(child, out);
+}
+
+void validateAndRemoveAssumeAddress(IRModule* module, bool validate, DiagnosticSink* sink)
+{
+    List<IRInst*> assumeAddrs;
+    collectAssumeAddressInsts(module->getModuleInst(), assumeAddrs);
+
+    if (validate)
+    {
+        for (auto inst : assumeAddrs)
+        {
+            auto addr = inst->getOperand(0);
+            auto root = getRootAddr(addr);
+            bool shouldDiagnose = false;
+            if (root->getOp() == kIROp_Var)
+            {
+                // Don't diagnose vars that hold resource/buffer handles. Those
+                // always refer to device memory regardless of where the handle
+                // itself is stored (e.g. a ConstantBuffer parameter copied to a
+                // local var still points into device memory).
+                IRType* valueType = nullptr;
+                if (auto ptrType = as<IRPtrTypeBase>(root->getDataType()))
+                    valueType = ptrType->getValueType();
+                shouldDiagnose = !valueType || (!as<IRPointerLikeType>(valueType) &&
+                                                !as<IRHLSLStructuredBufferTypeBase>(valueType) &&
+                                                !as<IRByteAddressBufferTypeBase>(valueType));
+            }
+            else if (auto param = as<IRParam>(root))
+            {
+                // Also diagnose function parameters that are not of
+                // pointer/pointer-like type. Those represent function-local
+                // storage that cannot be addressed on GPU targets.
+                // (By-value params go through a kIROp_Var copy above; this
+                // catches inout/ref params where the IRParam itself is the root.)
+                auto parentBlock = as<IRBlock>(param->getParent());
+                IRGlobalValueWithCode* parentFunc = nullptr;
+                if (parentBlock)
+                    parentFunc = as<IRGlobalValueWithCode>(parentBlock->getParent());
+
+                if (parentFunc && parentBlock == parentFunc->getFirstBlock())
+                {
+                    auto type = root->getDataType();
+                    shouldDiagnose = !as<IRPtrTypeBase>(type) && !as<IRPointerLikeType>(type) &&
+                                     !as<IRHLSLStructuredBufferTypeBase>(type) &&
+                                     !as<IRByteAddressBufferTypeBase>(type);
+                }
+            }
+            if (!shouldDiagnose)
+                continue;
+            sink->diagnose(Diagnostics::InvalidAddressOf{
+                .location = inst->sourceLoc,
+            });
+        }
+    }
+
+    for (auto inst : assumeAddrs)
+    {
+        inst->replaceUsesWith(inst->getOperand(0));
+        inst->removeAndDeallocate();
+    }
+}
+
+
 //
 // Cooperative matrix/vector validation.
 //
