@@ -88,6 +88,8 @@ def main():
         sys.exit(f"error: unsupported manifest version {version}")
 
     total = int(manifest["counters"])
+    if total < 0:
+        sys.exit(f"error: manifest 'counters' must be non-negative, got {total}")
     if args.counters:
         counters = load_counters_binary(args.counters, total)
     else:
@@ -99,8 +101,8 @@ def main():
     hits_by_line = collections.defaultdict(lambda: collections.defaultdict(int))
     for entry in manifest["entries"]:
         idx = entry["index"]
-        if idx >= len(counters):
-            sys.exit(f"error: entry index {idx} exceeds counter buffer size")
+        if idx < 0 or idx >= len(counters):
+            sys.exit(f"error: entry index {idx} out of range [0, {len(counters)})")
         hits_by_line[entry["file"]][int(entry["line"])] += counters[idx]
 
     out = sys.stdout if args.output == "-" else open(args.output, "w")
