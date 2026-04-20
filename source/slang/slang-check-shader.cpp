@@ -697,8 +697,9 @@ bool isBuiltinParameterType(Type* type)
 }
 
 // Returns true if `type` is the CoopMat<T,S,M,N,R> type.
-// CoopMat is declared with __intrinsic_type(kIROp_CoopMatrixType) and has no
-// dedicated AST type class, so we detect it by checking the inner struct name.
+// CoopMat has no dedicated AST type class; it is declared with
+// __intrinsic_type(kIROp_CoopMatrixType) in the core module, so we detect it
+// by looking for that modifier on the type's decl.
 static bool isCoopMatrixType(Type* type)
 {
     auto declRefType = as<DeclRefType>(type);
@@ -708,15 +709,10 @@ static bool isCoopMatrixType(Type* type)
     if (!decl)
         return false;
 
-    // Walk up to the inner decl if this is a GenericAppDeclRef
-    Decl* innerDecl = decl;
-    if (auto genericDecl = as<GenericDecl>(innerDecl))
-        innerDecl = genericDecl->inner;
-
-    auto name = innerDecl->getName();
-    if (!name)
+    auto modifier = decl->findModifier<IntrinsicTypeModifier>();
+    if (!modifier)
         return false;
-    return name->text == toSlice("CoopMat");
+    return IROp(modifier->irOp) == kIROp_CoopMatrixType;
 }
 
 // Describes a rule for types that are invalid as entry-point varying parameters/return types.
@@ -803,6 +799,7 @@ static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
 
 struct VaryingTypeValidationContext
 {
+    ASTBuilder* astBuilder;
     DiagnosticSink* sink;
     Name* entryPointName;
     SourceLoc loc;
@@ -873,17 +870,25 @@ static bool validateVaryingType(VaryingTypeValidationContext& ctx, Type* type)
     // Recurse into struct fields
     if (auto declRefType = as<DeclRefType>(type))
     {
-        auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl());
-        if (structDecl)
+        auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
+        if (structDeclRef)
         {
             if (ctx.seenTypes.contains(type))
                 return false;
             ctx.seenTypes.add(type);
 
             bool foundError = false;
-            for (auto field : structDecl->getFields())
+            // Iterate the struct's fields through the DeclRef so that generic
+            // type parameter substitutions are applied to each field's type.
+            // Without this, `struct Wrapper<T> { T x; }` used as
+            // `Wrapper<DifferentialPair<float>>` would not be caught.
+            for (auto fieldDeclRef : getMembersOfType<VarDecl>(
+                     ctx.astBuilder,
+                     structDeclRef,
+                     MemberFilterStyle::Instance))
             {
-                if (validateVaryingType(ctx, field->getType()))
+                auto fieldType = getType(ctx.astBuilder, fieldDeclRef);
+                if (validateVaryingType(ctx, fieldType))
                     foundError = true;
             }
             return foundError;
@@ -1002,10 +1007,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         for (auto target : linkage->targets)
             targets.add(target->getTarget());
 
+        auto astBuilder = linkage->getASTBuilder();
+
         // Validate return type as varying output
         if (returnType)
         {
             VaryingTypeValidationContext ctx;
+            ctx.astBuilder = astBuilder;
             ctx.sink = sink;
             ctx.entryPointName = entryPointName;
             ctx.loc = entryPointFuncDecl->loc;
@@ -1024,6 +1032,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 continue;
 
             VaryingTypeValidationContext ctx;
+            ctx.astBuilder = astBuilder;
             ctx.sink = sink;
             ctx.entryPointName = entryPointName;
             ctx.loc = param->loc;
@@ -1033,7 +1042,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                                                                   : "input";
 
             StringBuilder contextSb;
-            contextSb << "parameter '" << param->getName()->text << "'";
+            auto paramName = param->getName();
+            if (paramName)
+                contextSb << "parameter '" << paramName->text << "'";
+            else
+                contextSb << "parameter";
             String contextStr = contextSb.produceString();
             ctx.context = contextStr.getBuffer();
             ctx.targets = targets.getArrayView();
