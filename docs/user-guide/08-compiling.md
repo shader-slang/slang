@@ -591,6 +591,56 @@ When building Slang from source, the DXC headers are automatically copied to
 `build/dxc/include/` during the build, so you can use `-Xdxc -Ibuild/dxc/include`
 for local development and testing.
 
+#### Querying Cooperative Type Combinations Used by a Shader
+
+Before dispatching a shader that uses cooperative vector or matrix operations, applications
+must verify that the driver supports the specific type combinations the shader uses.
+APIs such as `vkGetPhysicalDeviceCooperativeVectorPropertiesNV` and
+`vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR` return which combinations are supported,
+but the application also needs to know which combinations the shader requires.
+
+Slang exposes this via the `slang::ICooperativeTypesMetadata` interface, obtained from the
+`slang::IMetadata` pointer returned by `getTargetMetadata()` or `getEntryPointMetadata()`.
+The interface lists every distinct cooperative type and type combination that survived in the
+final output — targets that lower cooperative types to ordinary arrays (CPU, non-OptiX CUDA,
+etc.) report empty lists.
+
+```c++
+slang::IComponentType* program = ...;
+slang::IMetadata* metadata = nullptr;
+program->getTargetMetadata(targetIndex, &metadata);
+
+auto* coopMeta = static_cast<slang::ICooperativeTypesMetadata*>(
+    metadata ? metadata->castAs(slang::ICooperativeTypesMetadata::getTypeGuid()) : nullptr);
+
+if (coopMeta)
+{
+    // Query cooperative vector combinations (for Vulkan NV_cooperative_vector)
+    SlangUInt vecCombCount = coopMeta->getCooperativeVectorCombinationCount();
+    for (SlangUInt i = 0; i < vecCombCount; ++i)
+    {
+        slang::CooperativeVectorCombination comb = {};
+        coopMeta->getCooperativeVectorCombinationByIndex(i, &comb);
+        // comb.inputType, comb.inputInterpretation, comb.matrixInterpretation,
+        // comb.biasInterpretation (NONE if no bias), comb.resultType, comb.transpose
+        // -- check these against VkCooperativeVectorPropertiesNV entries
+    }
+
+    // Query cooperative matrix combinations (for Vulkan KHR_cooperative_matrix)
+    SlangUInt matCombCount = coopMeta->getCooperativeMatrixCombinationCount();
+    for (SlangUInt i = 0; i < matCombCount; ++i)
+    {
+        slang::CooperativeMatrixCombination comb = {};
+        coopMeta->getCooperativeMatrixCombinationByIndex(i, &comb);
+        // comb.m, comb.n, comb.k, comb.componentTypeA/B/C/Result, comb.scope, comb.saturate
+        // -- check these against VkCooperativeMatrixPropertiesKHR entries
+    }
+}
+```
+
+The `SlangScalarType` values in these structs map directly to the element type fields in the
+Vulkan property structs (e.g. `SLANG_SCALAR_TYPE_FLOAT16` → `VK_COMPONENT_TYPE_FLOAT16_KHR`).
+
 ## Using the Compilation API
 
 The C++ API provided by Slang is meant to provide more complete control over compilation for applications that need it.

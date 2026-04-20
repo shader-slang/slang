@@ -857,14 +857,34 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
-    typedef SlangUInt32 SlangScopeIntegral;
-    enum SlangScope : SlangScopeIntegral
+    // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
+    typedef SlangInt32 SlangMemoryScopeIntegral;
+    enum SlangMemoryScope : SlangMemoryScopeIntegral
     {
-        SLANG_SCOPE_NONE,
-        SLANG_SCOPE_THREAD,
-        SLANG_SCOPE_WAVE,
-        SLANG_SCOPE_THREAD_GROUP,
+        SLANG_MEMORY_SCOPE_CROSS_DEVICE = 0,
+        SLANG_MEMORY_SCOPE_DEVICE = 1,
+        SLANG_MEMORY_SCOPE_WORKGROUP = 2,
+        SLANG_MEMORY_SCOPE_SUBGROUP = 3,
+        SLANG_MEMORY_SCOPE_INVOCATION = 4,
+        SLANG_MEMORY_SCOPE_QUEUE_FAMILY = 5,
+        SLANG_MEMORY_SCOPE_SHADER_CALL = 6,
     };
+
+#ifdef __cplusplus
+    namespace slang
+    {
+    enum MemoryScope : SlangMemoryScopeIntegral
+    {
+        CrossDevice = SLANG_MEMORY_SCOPE_CROSS_DEVICE,
+        Device = SLANG_MEMORY_SCOPE_DEVICE,
+        Workgroup = SLANG_MEMORY_SCOPE_WORKGROUP,
+        Subgroup = SLANG_MEMORY_SCOPE_SUBGROUP,
+        Invocation = SLANG_MEMORY_SCOPE_INVOCATION,
+        QueueFamily = SLANG_MEMORY_SCOPE_QUEUE_FAMILY,
+        ShaderCall = SLANG_MEMORY_SCOPE_SHADER_CALL,
+    };
+    } // namespace slang
+#endif
 
     typedef SlangUInt32 SlangCooperativeMatrixUseIntegral;
     enum SlangCooperativeMatrixUse : SlangCooperativeMatrixUseIntegral
@@ -4501,7 +4521,7 @@ struct CooperativeMatrixType
 {
     // Component type `NONE` means this type is not valid.
     SlangScalarType componentType = SLANG_SCALAR_TYPE_NONE;
-    SlangScope scope = SLANG_SCOPE_NONE;
+    MemoryScope scope = MemoryScope::CrossDevice;
 
     uint32_t rowCount = 0;
     uint32_t columnCount = 0;
@@ -4530,7 +4550,7 @@ struct CooperativeMatrixCombination
     SlangScalarType componentTypeResult = SLANG_SCALAR_TYPE_NONE;
 
     SlangBool saturate = false;
-    SlangScope scope = SLANG_SCOPE_NONE;
+    MemoryScope scope = MemoryScope::CrossDevice;
 
     bool operator==(const CooperativeMatrixCombination& other) const
     {
@@ -4555,6 +4575,12 @@ struct CooperativeVectorType
     // vector training operations such as outer-product accumulation and reduce-sum
     // accumulation.
     SlangBool usedForTrainingOp = false;
+
+    bool operator==(const CooperativeVectorType& other) const
+    {
+        return componentType == other.componentType && maxSize == other.maxSize &&
+               usedForTrainingOp == other.usedForTrainingOp;
+    }
 };
 
 struct CooperativeVectorCombination
@@ -4568,6 +4594,8 @@ struct CooperativeVectorCombination
     // `NONE` means the operation has no bias operand/matrix.
     SlangScalarType biasInterpretation = SLANG_SCALAR_TYPE_NONE;
     SlangScalarType resultType = SLANG_SCALAR_TYPE_NONE;
+    SlangCooperativeVectorMatrixLayout memoryLayout =
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR;
     SlangBool transpose = false;
 
     bool operator==(const CooperativeVectorCombination& other) const
@@ -4576,7 +4604,7 @@ struct CooperativeVectorCombination
                inputPackingFactor == other.inputPackingFactor &&
                matrixInterpretation == other.matrixInterpretation &&
                biasInterpretation == other.biasInterpretation && resultType == other.resultType &&
-               transpose == other.transpose;
+               memoryLayout == other.memoryLayout && transpose == other.transpose;
     }
 };
 

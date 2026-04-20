@@ -116,18 +116,9 @@ enum class AddressSpace : uint64_t
     UserPointer = 0x100000001ULL,
 };
 
-// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
-// must be 32 bit to match SPIR-V
-enum class MemoryScope : int32_t
-{
-    CrossDevice = 0,
-    Device = 1,
-    Workgroup = 2,
-    Subgroup = 3,
-    Invocation = 4,
-    QueueFamily = 5,
-    ShaderCall = 6,
-};
+// MemoryScope is defined in namespace slang (slang.h) so it can be part of the public API.
+// Bring it into the Slang namespace for internal use.
+using MemoryScope = slang::MemoryScope;
 
 // Represents the access qualifier of a pointer type.
 enum class AccessQualifier : uint64_t
