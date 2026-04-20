@@ -9,7 +9,7 @@
 void computeMain1(float3 tid : SV_DispatchThreadID)
 /*CHECK:
                          ^^^ invalid SV_DispatchThreadID type
-                         ^^^ parameter with SV_DispatchThreadID must be either scalar or vector (1 to 3) of uint/int
+                         ^^^ parameter with SV_DispatchThreadID must be either scalar or vector (1 to 3) of uint/int but is vector<float,3>
 */
 {
 }
@@ -18,7 +18,7 @@ void computeMain1(float3 tid : SV_DispatchThreadID)
 void computeMain2(uint4 tid : SV_DispatchThreadID)
 /*CHECK2:
                         ^^^ invalid SV_DispatchThreadID type
-                        ^^^ parameter with SV_DispatchThreadID must be either scalar or vector (1 to 3) of uint/int
+                        ^^^ parameter with SV_DispatchThreadID must be either scalar or vector (1 to 3) of uint/int but is vector<uint,4>
 */
 {
 }

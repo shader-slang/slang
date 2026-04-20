@@ -8,7 +8,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -entry fragmentMain -stage fragment
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -entry fragmentMain -stage fragment
-//TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -entry fragmentMain -stage fragment -profile spirv_1_6
+//TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv-asm -entry fragmentMain -stage fragment -emit-spirv-directly -profile spirv_1_6
 
 uniform float threshold;
 
