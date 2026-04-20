@@ -12,6 +12,8 @@ StructuredBuffer<uint> constant_uint_buffer;
 void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
     float* mutablePtr1 = &mutable_float_buffer[threadId.x];
+//diag:                  ^ address-of operator not supported
+//diag:                  ^ the '&' operator for taking addresses is no longer supported in Slang
 
     float* mutablePtr2 = __getAddress(mutable_float_buffer[threadId.x]);
 //diag:                  ^^^^^^^^^^^^ invalid __getAddress usage
@@ -21,6 +23,8 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
     // Constant pointers arent a thing in slang
     float* ptr1 = &constant_float_buffer[threadId.x];
+//diag:           ^ address-of operator not supported
+//diag:           ^ the '&' operator for taking addresses is no longer supported in Slang
 //diag:                                 ^ cannot take address of immutable object
 //diag:                                 ^ Not allowed to take the address of an immutable object
 //diag:                                 ^ argument must be l-value
