@@ -2620,6 +2620,20 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             getSink()->diagnose(Diagnostics::InvalidTypeVoid{.location = varDecl->loc});
         }
 
+        // Reject reference/parameter-passing-mode types as struct fields.
+        // These types (Ref<T>, RefParam<T>, BorrowInParam<T>, etc.) represent
+        // temporary borrows and cannot be stored in struct fields.
+        if (as<AggTypeDecl>(varDecl->parentDecl))
+        {
+            auto type = varDecl->type.type;
+            if (as<ExplicitRefType>(type) || as<ParamPassingModeType>(type))
+            {
+                getSink()->diagnose(Diagnostics::ReferenceTypeAsStructField{
+                    .type = type,
+                    .location = varDecl->loc});
+            }
+        }
+
         // If this is an unsized array variable, then we first want to give
         // it a chance to infer an array size from its initializer
         //
