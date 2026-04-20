@@ -269,6 +269,24 @@ function(set_default_compile_options target)
                 BEFORE
                 PUBLIC -fprofile-instr-generate
             )
+        elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+            # MSVC has no native source-level coverage tool; Windows coverage
+            # is collected externally by OpenCppCoverage via PDBs. The only
+            # build-time tuning that matters is keeping more of the source
+            # visible in the PDB. CMake's default RelWithDebInfo flags are
+            # `/O2 /Ob1`, which already downgrades inlining from /Ob2 but
+            # still inlines any function marked `inline` or `__inline`
+            # (covering most header-defined methods in Slang). /Ob0
+            # disables inlining entirely so every function body remains
+            # distinct in the binary, giving a truthful hit/miss verdict
+            # for every source line. Runtime is ~2-3x slower -- acceptable
+            # for a nightly coverage job where accuracy is the target.
+            target_compile_options(${target} PRIVATE /Ob0)
+            # Suppress MSVC warning D9025 ("overriding '/Ob1' with '/Ob0'")
+            # that fires when CMake's RelWithDebInfo flags already contain
+            # /Ob1. The /Ob0 later on the command line wins; the warning
+            # is expected and harmless.
+            target_compile_options(${target} PRIVATE /wd9025)
         endif()
     endif()
 

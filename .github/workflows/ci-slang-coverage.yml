@@ -67,6 +67,18 @@ jobs:
         with:
           min-disk-gb: "10"
 
+      - name: Install OpenCppCoverage (Windows)
+        if: inputs.os == 'windows'
+        shell: pwsh
+        run: |
+          # choco is preinstalled on GitHub-hosted windows-latest runners.
+          # Pin the version so failures are obvious (not an upstream regression).
+          choco install opencppcoverage --version 0.9.9.0 -y --no-progress
+          # Add to PATH for the rest of the job.
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\OpenCppCoverage"
+          # Verify.
+          & "C:\Program Files\OpenCppCoverage\OpenCppCoverage.exe" --help | Select-Object -First 1
+
       - name: Install Clang 18 and LLVM Tools
         if: inputs.compiler == 'clang-18' && inputs.os == 'linux' && inputs.container == ''
         shell: bash
@@ -180,7 +192,8 @@ jobs:
             ccache --show-stats || true
           fi
 
-      - name: Run Tests with Coverage
+      - name: Run Tests with Coverage (Linux/macOS)
+        if: inputs.os != 'windows'
         run: |
           # Generate both HTML and LCOV formats
           export COVERAGE_HTML=1
@@ -222,8 +235,50 @@ jobs:
             ./tools/coverage/run-coverage.sh --with-synthesis "${test_args[@]}"
           fi
 
-      - name: Generate Coverage Summary
+      - name: Run Tests with Coverage (Windows)
+        if: inputs.os == 'windows'
+        shell: pwsh
+        env:
+          COVERAGE_LCOV: "1"
+          COVERAGE_HTML: "1"
+          # Use repo-root paths so the artifact upload step (OS-agnostic) finds
+          # the expected layout.
+          COVERAGE_LCOV_FILE: "coverage.lcov"
+          COVERAGE_HTML_DIR: "coverage-html"
+          # Match regular CI's SPIRV validation settings.
+          SLANG_RUN_SPIRV_VALIDATION: "1"
+          SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN: "1"
+          CONFIG: "RelWithDebInfo"
+          # Ninja preset writes to build\; override the script's default
+          # vs2022-dev probe.
+          BUILD_DIR: "build"
+        run: |
+          $testArgs = @(
+            '-expected-failure-list', 'tests/expected-failure-github.txt'
+            '-expected-failure-list', 'tests/expected-failure-no-gpu.txt'
+            '-skip-reference-image-generation'
+            '-show-adapter-info'
+            '-enable-debug-layers', 'true'
+          )
+          if ([int]'${{ inputs.server-count }}' -gt 1) {
+            $testArgs += @('-use-test-server', '-server-count', '${{ inputs.server-count }}')
+          }
+
+          # Retry once on intermittent failure. OpenCppCoverage itself
+          # tolerates the child's non-zero exit (expected failures without
+          # GPU drivers), but a script-level failure (missing dependency,
+          # malformed args) still propagates.
+          $script = 'tools/coverage/run-coverage-windows.ps1'
+          try {
+            & $script -WithSynthesis @testArgs
+          } catch {
+            Write-Host "::warning::First coverage run failed ($_). Retrying..."
+            & $script -WithSynthesis @testArgs
+          }
+
+      - name: Generate Coverage Summary (Linux/macOS)
         id: coverage-summary
+        if: inputs.os != 'windows'
         run: |
           # Ensure git works in container (ownership check)
           git config --global --add safe.directory "$PWD"
@@ -343,17 +398,95 @@ jobs:
             fi
           fi
 
+      - name: Generate Coverage Summary (Windows)
+        id: coverage-summary-windows
+        if: inputs.os == 'windows'
+        shell: pwsh
+        run: |
+          # OpenCppCoverage has already produced the Cobertura XML via
+          # run-coverage-windows.ps1. Parse it for the JSON summary used by
+          # coverage-nightly.yml's merge step. Only line-level metrics are
+          # available from Cobertura (no region/function/branch -- those are
+          # llvm-cov-only), so those fields are omitted on Windows.
+          $covDir = "build\coverage-data"
+          $xmlPath = Join-Path $covDir 'full.cobertura.xml'
+          $slangcLcov = 'coverage-slangc.lcov'
+          if (-not (Test-Path $xmlPath)) {
+              throw "Missing $xmlPath -- Pass 1 must have failed to produce coverage."
+          }
+
+          [xml]$cob = Get-Content -LiteralPath $xmlPath
+          $c = $cob.coverage
+          $line_pct = [math]::Round([double]$c.'line-rate' * 100, 2)
+          $lines_hit = [int]$c.'lines-covered'
+          $lines_total = [int]$c.'lines-valid'
+
+          # Slangc-only totals: sum LF/LH from the filtered LCOV.
+          $slangc_hit = 0
+          $slangc_total = 0
+          if (Test-Path $slangcLcov) {
+              foreach ($line in Get-Content $slangcLcov) {
+                  if ($line.StartsWith('LF:')) { $slangc_total += [int]$line.Substring(3) }
+                  elseif ($line.StartsWith('LH:')) { $slangc_hit += [int]$line.Substring(3) }
+              }
+          }
+          $slangc_pct = if ($slangc_total -gt 0) { [math]::Round($slangc_hit / $slangc_total * 100, 2) } else { 0 }
+
+          "coverage=$line_pct" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding ascii
+
+          # Step summary. Built line-by-line to avoid here-string indentation
+          # leaking into markdown (leading spaces render as code blocks).
+          $summary = @(
+              "# Coverage Report (Windows)"
+              ""
+              "## Full Library"
+              "- **Line Coverage:** $line_pct% ($lines_hit / $lines_total)"
+              ""
+              "## slangc Compiler Pipeline"
+              "- **Line Coverage:** $slangc_pct% ($slangc_hit / $slangc_total)"
+              ""
+              "> Note: region/function/branch coverage is not available on Windows"
+              "> (OpenCppCoverage produces line-level data only)."
+          ) -join "`n"
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+          # coverage-summary.json for historical tracking. Schema mirrors the
+          # Linux/macOS output but omits region/function/branch fields.
+          $commitShort = (git rev-parse --short HEAD).Trim()
+          $reportDate = (Get-Date -AsUTC).ToString('yyyy-MM-dd')
+          $json = [ordered]@{
+              date = $reportDate
+              commit = $commitShort
+              platform = 'windows'
+              platform_detail = "windows-${{ inputs.platform }}"
+              line_coverage = "$line_pct"
+              lines_hit = $lines_hit
+              lines_found = $lines_total
+              slangc_line_coverage = "$slangc_pct"
+              slangc_lines_hit = $slangc_hit
+              slangc_lines_found = $slangc_total
+              _version = 2
+          }
+          $json | ConvertTo-Json -Depth 2 | Set-Content -LiteralPath 'coverage-summary.json' -Encoding ascii
+          Write-Host "Saved coverage-summary.json:"
+          Get-Content 'coverage-summary.json' | Write-Host
+
       - name: Upload Coverage Artifacts for Merging
         if: ${{ !inputs.deploy-pages }}
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ inputs.os }}-${{ inputs.platform }}
+          # coverage-html-slangc/ and libslang.* are Linux/macOS-only; the
+          # Cobertura XML and slangc LCOV are Windows-only. upload-artifact
+          # silently skips missing paths, so one path list works for all OSes.
           path: |
             coverage-summary.json
             coverage-html/
             coverage-html-slangc/
+            coverage-slangc.lcov
             build/${{ inputs.config }}/coverage-data/slang-test.profdata
             build/${{ inputs.config }}/lib/libslang.*
+            build/coverage-data/full.cobertura.xml
           retention-days: 7
 
       - name: Checkout Coverage Reports Repository

@@ -4,9 +4,12 @@ This directory contains tools for generating and analyzing code coverage reports
 
 ## Prerequisites
 
-- LLVM coverage tools (`llvm-profdata`, `llvm-cov`) installed
+- **Linux / macOS**: LLVM coverage tools (`llvm-profdata`, `llvm-cov`) installed
+- **Windows**: [OpenCppCoverage](https://github.com/OpenCppCoverage/OpenCppCoverage/releases) installed (the `ci-slang-coverage.yml` workflow installs it via `choco install opencppcoverage --version 0.9.9.0`; for local dev either install the `.exe` from GitHub releases or `winget install --id OpenCppCoverage.OpenCppCoverage`)
 
 ## Quick Start (HTML report)
+
+### Linux / macOS
 
 ```bash
 cmake --preset coverage
@@ -23,6 +26,30 @@ Wrapper script handles the full workflow on local workspace:
 ```
 
 Run `./tools/coverage/run-coverage-local.sh --help` for options.
+
+### Windows
+
+```powershell
+# Configure + build slang-test in RelWithDebInfo with SLANG_ENABLE_COVERAGE=ON
+# (enables /Ob0 for truthful PDB line mappings), run the test suite wrapped in
+# OpenCppCoverage, and generate HTML + LCOV reports.
+powershell -File tools\coverage\run-coverage-local.ps1
+
+# Re-export reports from an existing run without re-testing:
+powershell -File tools\coverage\run-coverage-local.ps1 -SkipBuild -SkipTest
+
+# Outputs:
+#   coverage-html\index.html              -- full library HTML report
+#   coverage.lcov                         -- full library LCOV
+#   coverage-slangc.lcov                  -- slangc compiler-only LCOV
+#   build\coverage-data\full.cobertura.xml
+```
+
+Notes for Windows:
+- Coverage targets `slang-compiler.dll` (the real compiler lib; `slang.dll` is a thin proxy on Windows).
+- OpenCppCoverage emits Cobertura XML, which the script converts to LCOV internally for format parity with Linux/macOS.
+- No `coverage-html-slangc/` directory on Windows — the slangc-only filter runs post-hoc on the LCOV; generating an HTML view would require a second test pass (deferred).
+- Add `-WithSynthesis` to run the `-only-synthesized` pass. On runners without GPU drivers this provides a large backend-emit coverage boost; on machines with drivers it's a near no-op because Pass 1 already exercises the same paths.
 
 ## Command-Line Options and Environment Variables
 
