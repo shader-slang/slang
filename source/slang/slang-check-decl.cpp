@@ -8554,12 +8554,11 @@ static SynthesizedExtensionVisibility getSynthesizedExtensionVisibility(
         result.memberVisibility = DeclVisibility::Default;
         break;
     case DeclVisibility::Private:
-        result.extensionVisibility = DeclVisibility::Public;
+        result.extensionVisibility = DeclVisibility::Internal;
         result.memberVisibility = DeclVisibility::Private;
         break;
     default:
-        result.extensionVisibility = targetVisibility;
-        result.memberVisibility = targetVisibility;
+        SLANG_UNEXPECTED("unexpected visibility type");
         break;
     }
     return result;
