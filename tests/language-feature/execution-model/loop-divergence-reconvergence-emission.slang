@@ -7,6 +7,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly
 
 RWStructuredBuffer<int> output;
 
@@ -28,10 +29,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // Wave operation should include all threads in the wave.
     // CHECK_HLSL: WaveActiveSum
     // CHECK_GLSL: subgroupAdd
+    // CHECK_SPIRV: OpGroupNonUniformIAdd
     int waveTotal = WaveActiveSum(acc);
 
     // CHECK_HLSL: WaveActiveMax
     // CHECK_GLSL: subgroupMax
+    // CHECK_SPIRV: OpGroupNonUniformSMax
     int waveMax = WaveActiveMax(acc);
 
     output[idx] = waveTotal + waveMax;

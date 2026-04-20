@@ -1,62 +1,68 @@
-// Comprehensive test for all compute shader system values.
-// Verifies SV_DispatchThreadID, SV_GroupThreadID, SV_GroupID, and SV_GroupIndex
-// all produce correct values for a 3D thread group configuration.
-//
-// From the docs: "An individual invocation is executed by an individual thread for
-// every grid and thread group point combination."
-//
-// Thread group is (2,2,1). We dispatch one group, so:
-//   SV_GroupID = (0,0,0) for all threads
-//   SV_GroupThreadID = SV_DispatchThreadID (since single group)
-//   SV_GroupIndex = threadId.x + threadId.y * groupDim.x
+// Test compute shader system values within a single dispatch group.
+// Uses [numthreads(2,2,2)] — 8 threads spanning full 3D groupThreadId coordinates.
+// Dispatch is single-group, so SV_GroupID is always (0,0,0) and
+// SV_DispatchThreadID == SV_GroupThreadID. SV_GroupIndex follows the
+// linearization x + y*Nx + z*Nx*Ny = x + y*2 + z*4.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 
 RWStructuredBuffer<int> outputBuffer;
 
-[numthreads(2, 2, 1)]
+[numthreads(2, 2, 2)]
 void computeMain(
     uint3 dispatchId : SV_DispatchThreadID,
     uint3 groupThreadId : SV_GroupThreadID,
     uint3 groupId : SV_GroupID,
     uint groupIndex : SV_GroupIndex)
 {
-    // Pack all system values into output for verification
-    // Layout: 4 ints per thread, threads ordered by SV_GroupIndex
     int base = int(groupIndex) * 4;
 
-    // SV_DispatchThreadID should equal SV_GroupThreadID for single-group dispatch
-    outputBuffer[base + 0] = int(dispatchId.x * 10 + dispatchId.y);
-
-    // SV_GroupThreadID
-    outputBuffer[base + 1] = int(groupThreadId.x * 10 + groupThreadId.y);
-
-    // SV_GroupID should be (0,0,0) for single-group dispatch
+    // Pack 3D coordinates into a single scalar as x*100 + y*10 + z.
+    outputBuffer[base + 0] = int(dispatchId.x * 100 + dispatchId.y * 10 + dispatchId.z);
+    outputBuffer[base + 1] = int(groupThreadId.x * 100 + groupThreadId.y * 10 + groupThreadId.z);
     outputBuffer[base + 2] = int(groupId.x + groupId.y + groupId.z);
-
-    // SV_GroupIndex = flatten(groupThreadId, groupDim)
     outputBuffer[base + 3] = int(groupIndex);
 }
 
-// Thread (0,0): groupIndex=0, dispatchId=(0,0), groupThreadId=(0,0), groupId=(0,0,0)
+// Thread (0,0,0): groupIndex=0
 // CHECK: 0
-// CHECK: 0
-// CHECK: 0
-// CHECK: 0
-// Thread (1,0): groupIndex=1, dispatchId=(1,0), groupThreadId=(1,0), groupId=(0,0,0)
-// CHECK: 10
-// CHECK: 10
-// CHECK: 0
-// CHECK: 1
-// Thread (0,1): groupIndex=2, dispatchId=(0,1), groupThreadId=(0,1), groupId=(0,0,0)
-// CHECK: 1
-// CHECK: 1
-// CHECK: 0
-// CHECK: 2
-// Thread (1,1): groupIndex=3, dispatchId=(1,1), groupThreadId=(1,1), groupId=(0,0,0)
-// CHECK: 11
-// CHECK: 11
-// CHECK: 0
-// CHECK: 3
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+// Thread (1,0,0): groupIndex=1
+// CHECK-NEXT: 100
+// CHECK-NEXT: 100
+// CHECK-NEXT: 0
+// CHECK-NEXT: 1
+// Thread (0,1,0): groupIndex=2
+// CHECK-NEXT: 10
+// CHECK-NEXT: 10
+// CHECK-NEXT: 0
+// CHECK-NEXT: 2
+// Thread (1,1,0): groupIndex=3
+// CHECK-NEXT: 110
+// CHECK-NEXT: 110
+// CHECK-NEXT: 0
+// CHECK-NEXT: 3
+// Thread (0,0,1): groupIndex=4
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 0
+// CHECK-NEXT: 4
+// Thread (1,0,1): groupIndex=5
+// CHECK-NEXT: 101
+// CHECK-NEXT: 101
+// CHECK-NEXT: 0
+// CHECK-NEXT: 5
+// Thread (0,1,1): groupIndex=6
+// CHECK-NEXT: 11
+// CHECK-NEXT: 11
+// CHECK-NEXT: 0
+// CHECK-NEXT: 6
+// Thread (1,1,1): groupIndex=7
+// CHECK-NEXT: 111
+// CHECK-NEXT: 111
+// CHECK-NEXT: 0
+// CHECK-NEXT: 7

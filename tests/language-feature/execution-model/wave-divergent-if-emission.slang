@@ -9,6 +9,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly
 
 RWStructuredBuffer<int> output;
 
@@ -24,6 +25,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // Divergent branch based on thread index
     // CHECK_HLSL: WaveActiveMin
     // CHECK_GLSL: subgroupMin
+    // CHECK_SPIRV: OpGroupNonUniformSMin
     if ((idx & 1) == 0)
     {
         // Even threads: WaveActiveMin over even indices only
@@ -34,12 +36,14 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         // Odd threads: WaveActiveMin over odd indices only
         // CHECK_HLSL: WaveActiveMin
         // CHECK_GLSL: subgroupMin
+        // CHECK_SPIRV: OpGroupNonUniformSMin
         result = WaveActiveMin(idx * 2);
     }
 
     // After reconvergence: all threads participate
     // CHECK_HLSL: WaveActiveSum
     // CHECK_GLSL: subgroupAdd
+    // CHECK_SPIRV: OpGroupNonUniformIAdd
     int total = WaveActiveSum(result);
 
     output[idx] = total;

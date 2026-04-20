@@ -19,6 +19,7 @@ struct VsOut
     float brightness : BRIGHTNESS;
 };
 
+// CHECK_VERT: brighten
 // CHECK_VERT: SV_Position
 // CHECK_VERT: BRIGHTNESS
 [shader("vertex")]
@@ -31,6 +32,7 @@ VsOut vertMain(float3 position : POSITION, float lum : LUMINANCE)
 }
 
 // --- Fragment entry point ---
+// CHECK_FRAG: brighten
 // CHECK_FRAG: SV_TARGET
 [shader("fragment")]
 float4 fragMain(float brightness : BRIGHTNESS) : SV_Target
@@ -42,6 +44,7 @@ float4 fragMain(float brightness : BRIGHTNESS) : SV_Target
 // --- Compute entry point ---
 RWStructuredBuffer<float> outputBuf;
 
+// CHECK_COMP: brighten
 // CHECK_COMP: numthreads(64, 1, 1)
 [shader("compute")]
 [numthreads(64, 1, 1)]
