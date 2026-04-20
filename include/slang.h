@@ -1155,6 +1155,8 @@ typedef uint32_t SlangSizeT;
 
         // Add new options HERE, immediately before CountOf.
 
+        TraceCoverage, // bool: insert per-statement execution counters
+
         CountOf,
     };
 

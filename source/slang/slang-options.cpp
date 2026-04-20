@@ -539,6 +539,14 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Reports information about checkpoint contexts used for reverse-mode automatic "
          "differentiation."},
+        {OptionKind::TraceCoverage,
+         "-trace-coverage",
+         nullptr,
+         "Prototype: instrument the shader with per-statement execution counters. "
+         "Emits IncrementCoverageCounter placeholders at AST lowering that a later IR "
+         "pass rewrites into counter writes on a synthesized `RWStructuredBuffer<uint> "
+         "__slang_coverage` buffer bound at a reserved space/binding. A sidecar manifest "
+         "(set SLANG_COVERAGE_MANIFEST_PATH) maps counters back to source positions."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -2382,6 +2390,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ReportPerfBenchmark:
         case OptionKind::ReportCheckpointIntermediates:
         case OptionKind::ReportDynamicDispatchSites:
+        case OptionKind::TraceCoverage:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:

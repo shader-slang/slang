@@ -177,6 +177,7 @@ public:
     bool shouldDumpIR();
     bool shouldReportCheckpointIntermediates();
     bool shouldReportDynamicDispatchSites();
+    bool shouldTraceCoverage();
 
     bool shouldTrackLiveness();
 
