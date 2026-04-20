@@ -9989,7 +9989,8 @@ bool SemanticsVisitor::checkConformanceToType(
                     .type = subType,
                     .interface = superInterfaceDeclRef.getDecl(),
                     .inheritance = inheritanceDecl});
-                return false;
+                // Fall through — let conformance checking proceed so the witness table
+                // is populated. The warning already informed the user.
             }
 
             // The type is stating that it conforms to an interface.
