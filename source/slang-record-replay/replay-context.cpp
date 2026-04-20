@@ -9,10 +9,10 @@
 #include "../slang/slang-syntax.h"
 #include "proxy/proxy-component-type.h"
 
-#include <atomic>
 #include <chrono>
 #include <cinttypes>
 #include <cstdio>
+#include <mutex>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -124,24 +124,27 @@ DataMismatchException::DataMismatchException(size_t offset, size_t size)
 // ReplayContext construction and low-level helpers
 // =============================================================================
 
-// Tracks whether the singleton in get() has been constructed. Atomic so that
-// tryGet() can safely observe construction on weakly-ordered architectures
-// (e.g. aarch64) without racing against a concurrent get() call, matching the
-// thread-safety contract documented on get().
-static std::atomic<bool> s_contextCreated{false};
+// Tracks the singleton in get() once it has been constructed, so that tryGet()
+// can observe construction from other threads without racing against a
+// concurrent get() call. Guarded by s_contextMutex to match the thread-safety
+// contract documented on get().
+static std::mutex s_contextMutex;
+static ReplayContext* s_contextInstance = nullptr;
 
 ReplayContext& ReplayContext::get()
 {
     static ReplayContext s_instance;
-    s_contextCreated.store(true, std::memory_order_release);
+    {
+        std::lock_guard<std::mutex> lock(s_contextMutex);
+        s_contextInstance = &s_instance;
+    }
     return s_instance;
 }
 
 ReplayContext* ReplayContext::tryGet()
 {
-    if (s_contextCreated.load(std::memory_order_acquire))
-        return &get();
-    return nullptr;
+    std::lock_guard<std::mutex> lock(s_contextMutex);
+    return s_contextInstance;
 }
 
 ReplayContext::ReplayContext()
