@@ -11,6 +11,9 @@
 
 RWStructuredBuffer<int> output;
 
+// CHECK_HLSL: [numthreads(128, 1, 1)]
+// CHECK_GLSL: layout(local_size_x = 128
+
 [numthreads(128, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
