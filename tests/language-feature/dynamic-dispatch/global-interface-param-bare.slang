@@ -1,10 +1,10 @@
 // Bare `uniform IFoo` at global scope with conformances should support
 // dynamic dispatch, just like ConstantBuffer<IFoo> (global-interface-param.slang).
 //
-// The `slangc` CLI path works with the SCCP-style global typeflow refactor,
-// but the Slang API / test-server path still crashes. Kept disabled until the
-// API-path crash is root-caused; tracked as follow-up work separate from this
-// PR.
+// Currently crashes because `collect-global-uniforms` wraps the bare interface
+// param into a `ConstantBuffer<struct { ... }>` but does not rewrite the
+// module-scope hoisted `extractExistentialWitnessTable` / `lookupWitnessMethod`
+// operands, leaving the IR in an inconsistent state. Tracked in #10892.
 
 //DISABLED_TEST:SIMPLE(filecheck=SINGLE): -target spirv-asm -stage compute -entry computeMain -conformance "ImplA:IFoo=0"
 //DISABLED_TEST:SIMPLE(filecheck=SINGLE): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0"

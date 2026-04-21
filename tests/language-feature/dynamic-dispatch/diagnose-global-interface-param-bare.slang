@@ -1,9 +1,9 @@
 // A bare `uniform IFoo` at global scope (without ConstantBuffer wrapper)
 // should produce error 50100 when no conformances are registered.
 //
-// The `slangc` CLI path emits the diagnostic cleanly, but the Slang API /
-// test-server path still crashes. Kept disabled until the API-path crash is
-// root-caused; tracked as follow-up work separate from this PR.
+// The diagnostic fires, but the compiler crashes immediately afterward in the
+// same `collect-global-uniforms` / hoisted-insts path as
+// global-interface-param-bare.slang. Tracked in #10892.
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
 
