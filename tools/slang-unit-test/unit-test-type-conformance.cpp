@@ -214,6 +214,8 @@ SLANG_UNIT_TEST(typeConformance)
     SLANG_CHECK(code != nullptr);
 }
 
+// Verifies that implicit sequential-ID allocation starts at the lowest free slot after an
+// explicit override reserves a higher ID.
 SLANG_UNIT_TEST(typeConformanceSequentialIDAllocatesFirstFreeSlot)
 {
     ComPtr<slang::IGlobalSession> globalSession;
@@ -277,6 +279,168 @@ SLANG_UNIT_TEST(typeConformanceSequentialIDAllocatesFirstFreeSlot)
     SLANG_CHECK(curvesID == 1);
 }
 
+// Verifies that implicit sequential-ID allocation fills multiple sparse gaps in ascending order
+// when explicit overrides reserve non-contiguous IDs.
+SLANG_UNIT_TEST(typeConformanceSequentialIDAllocatesAcrossSparseGaps)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    const char* sparseGapSource = R"(
+        interface IHitInfo
+        {
+            uint getGeoNameHash();
+        }
+
+        struct ReservedHitInfo0 : IHitInfo
+        {
+            int dummy;
+            uint getGeoNameHash() { return 100u; }
+        }
+
+        struct ReservedHitInfo2 : IHitInfo
+        {
+            int dummy;
+            uint getGeoNameHash() { return 200u; }
+        }
+
+        struct ReservedHitInfo5 : IHitInfo
+        {
+            int dummy;
+            uint getGeoNameHash() { return 500u; }
+        }
+
+        struct ImplicitHitInfoA : IHitInfo
+        {
+            int dummy;
+            uint getGeoNameHash() { return 444u; }
+        }
+
+        struct ImplicitHitInfoB : IHitInfo
+        {
+            int dummy;
+            uint getGeoNameHash() { return 555u; }
+        }
+
+        struct ImplicitHitInfoC : IHitInfo
+        {
+            int dummy;
+            uint getGeoNameHash() { return 666u; }
+        }
+
+        struct ImplicitHitInfoD : IHitInfo
+        {
+            int dummy;
+            uint getGeoNameHash() { return 777u; }
+        }
+    )";
+
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromSourceString(
+        "hitInfoConformanceSparseGaps",
+        "hitInfoConformanceSparseGaps.slang",
+        sparseGapSource,
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto layout = module->getLayout();
+    SLANG_CHECK_ABORT(layout != nullptr);
+
+    auto hitInfo = layout->findTypeByName("IHitInfo");
+    auto reservedHitInfo0 = layout->findTypeByName("ReservedHitInfo0");
+    auto reservedHitInfo2 = layout->findTypeByName("ReservedHitInfo2");
+    auto reservedHitInfo5 = layout->findTypeByName("ReservedHitInfo5");
+    auto implicitHitInfoA = layout->findTypeByName("ImplicitHitInfoA");
+    auto implicitHitInfoB = layout->findTypeByName("ImplicitHitInfoB");
+    auto implicitHitInfoC = layout->findTypeByName("ImplicitHitInfoC");
+    auto implicitHitInfoD = layout->findTypeByName("ImplicitHitInfoD");
+    SLANG_CHECK_ABORT(hitInfo != nullptr);
+    SLANG_CHECK_ABORT(reservedHitInfo0 != nullptr);
+    SLANG_CHECK_ABORT(reservedHitInfo2 != nullptr);
+    SLANG_CHECK_ABORT(reservedHitInfo5 != nullptr);
+    SLANG_CHECK_ABORT(implicitHitInfoA != nullptr);
+    SLANG_CHECK_ABORT(implicitHitInfoB != nullptr);
+    SLANG_CHECK_ABORT(implicitHitInfoC != nullptr);
+    SLANG_CHECK_ABORT(implicitHitInfoD != nullptr);
+
+    ComPtr<slang::ITypeConformance> reservedConformance0;
+    ComPtr<slang::ITypeConformance> reservedConformance2;
+    ComPtr<slang::ITypeConformance> reservedConformance5;
+    SLANG_CHECK_ABORT(
+        session->createTypeConformanceComponentType(
+            reservedHitInfo0,
+            hitInfo,
+            reservedConformance0.writeRef(),
+            0,
+            diagnostics.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        session->createTypeConformanceComponentType(
+            reservedHitInfo2,
+            hitInfo,
+            reservedConformance2.writeRef(),
+            2,
+            diagnostics.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        session->createTypeConformanceComponentType(
+            reservedHitInfo5,
+            hitInfo,
+            reservedConformance5.writeRef(),
+            5,
+            diagnostics.writeRef()) == SLANG_OK);
+
+    uint32_t reservedID0 = 0;
+    uint32_t reservedID2 = 0;
+    uint32_t reservedID5 = 0;
+    SLANG_CHECK_ABORT(
+        session->getTypeConformanceWitnessSequentialID(reservedHitInfo0, hitInfo, &reservedID0) ==
+        SLANG_OK);
+    SLANG_CHECK_ABORT(
+        session->getTypeConformanceWitnessSequentialID(reservedHitInfo2, hitInfo, &reservedID2) ==
+        SLANG_OK);
+    SLANG_CHECK_ABORT(
+        session->getTypeConformanceWitnessSequentialID(reservedHitInfo5, hitInfo, &reservedID5) ==
+        SLANG_OK);
+
+    SLANG_CHECK(reservedID0 == 0);
+    SLANG_CHECK(reservedID2 == 2);
+    SLANG_CHECK(reservedID5 == 5);
+
+    uint32_t implicitIDA = 0;
+    uint32_t implicitIDB = 0;
+    uint32_t implicitIDC = 0;
+    uint32_t implicitIDD = 0;
+    SLANG_CHECK_ABORT(
+        session->getTypeConformanceWitnessSequentialID(implicitHitInfoA, hitInfo, &implicitIDA) ==
+        SLANG_OK);
+    SLANG_CHECK_ABORT(
+        session->getTypeConformanceWitnessSequentialID(implicitHitInfoB, hitInfo, &implicitIDB) ==
+        SLANG_OK);
+    SLANG_CHECK_ABORT(
+        session->getTypeConformanceWitnessSequentialID(implicitHitInfoC, hitInfo, &implicitIDC) ==
+        SLANG_OK);
+    SLANG_CHECK_ABORT(
+        session->getTypeConformanceWitnessSequentialID(implicitHitInfoD, hitInfo, &implicitIDD) ==
+        SLANG_OK);
+
+    SLANG_CHECK(implicitIDA == 1);
+    SLANG_CHECK(implicitIDB == 3);
+    SLANG_CHECK(implicitIDC == 4);
+    SLANG_CHECK(implicitIDD == 6);
+}
+
+// Verifies that duplicate explicit sequential-ID overrides are diagnosed once codegen needs an
+// unambiguous sequential-ID-to-tag mapping.
 SLANG_UNIT_TEST(typeConformanceDuplicateExplicitSequentialIDDiagnostic)
 {
     ComPtr<slang::IGlobalSession> globalSession;
@@ -365,6 +529,8 @@ SLANG_UNIT_TEST(typeConformanceDuplicateExplicitSequentialIDDiagnostic)
     SLANG_CHECK(diagnosticText.indexOf(toSlice("Sequential ID '0'")) != -1);
 }
 
+// Verifies that an implicit query followed by a conflicting explicit override is still diagnosed
+// once tag lowering encounters the duplicate sequential ID.
 SLANG_UNIT_TEST(typeConformanceImplicitThenExplicitSequentialIDDiagnostic)
 {
     ComPtr<slang::IGlobalSession> globalSession;

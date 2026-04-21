@@ -4394,8 +4394,7 @@ struct ISession : public ISlangUnknown
         If an application mixes explicit ID reservations with implicitly allocated IDs, explicit
         reservations should be established first before any implicit IDs are queried.
 
- Returns
-       SLANG_OK if succeeds, or SLANG_FAIL if `type` does not conform to `interfaceType`.
+        Returns SLANG_OK if succeeds, or SLANG_FAIL if `type` does not conform to `interfaceType`.
     */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createTypeConformanceComponentType(
         slang::TypeReflection* type,
