@@ -155,26 +155,11 @@ int runCompile(const Options& opt)
         std::fprintf(stderr, "%s", (const char*)diagnostics->getBufferPointer());
 
     // Force codegen so the coverage pass runs and the manifest is
-    // written. This triggers the full IR pipeline for the selected
-    // target. In the current prototype, the synthesized coverage
-    // buffer surfaces as an extra parameter that the CPU/LLVM
-    // downstream compiler cannot yet call — the manifest is written
-    // during the IR pipeline *before* that final codegen step, so we
-    // swallow the downstream compile error and continue. A follow-up
-    // that makes the synthesized buffer reflection-visible removes
-    // this workaround.
-    try
-    {
-        ComPtr<slang::IBlob> codeBlob;
-        linked->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnostics.writeRef());
-    }
-    catch (...)
-    {
-        std::fprintf(
-            stderr,
-            "(downstream compile failed — expected in current prototype; "
-            "manifest was still produced)\n");
-    }
+    // written.  This triggers the full IR pipeline for the selected
+    // target; the coverage pass writes the `.slangcov` sidecar during
+    // that pipeline.
+    ComPtr<slang::IBlob> codeBlob;
+    linked->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnostics.writeRef());
     if (diagnostics)
         std::fprintf(stderr, "%s", (const char*)diagnostics->getBufferPointer());
 
