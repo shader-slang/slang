@@ -2332,6 +2332,13 @@ err(
     span { loc = "decl:Decl", message = "'[NodeDispatchGrid]' and '[NodeMaxDispatchGrid]' are only valid on broadcasting-launch node shaders" }
 )
 
+err(
+    "invalid-barrier-semantic-flags-value",
+    31404,
+    "invalid 'BarrierSemanticFlags' value",
+    span { loc = "location", message = "unrecognized BarrierSemanticFlags value '~value:String'; expected a combination of GroupSync (0x1), GroupScope (0x2), DeviceScope (0x4), or Reorder (0x0)" }
+)
+
 warning(
     "explicit-uniform-location",
     31104,

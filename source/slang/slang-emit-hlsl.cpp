@@ -583,21 +583,21 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
             if (auto decor = irFunc->findDecoration<IRNodeMaxDispatchGridDecoration>())
             {
                 m_writer->emit("[NodeMaxDispatchGrid(");
-                m_writer->emit(getIntVal(as<IRIntLit>(decor->getOperand(0))));
+                m_writer->emit(getIntVal(decor->getX()));
                 m_writer->emit(", ");
-                m_writer->emit(getIntVal(as<IRIntLit>(decor->getOperand(1))));
+                m_writer->emit(getIntVal(decor->getY()));
                 m_writer->emit(", ");
-                m_writer->emit(getIntVal(as<IRIntLit>(decor->getOperand(2))));
+                m_writer->emit(getIntVal(decor->getZ()));
                 m_writer->emit(")]\n");
             }
             if (auto decor = irFunc->findDecoration<IRNodeDispatchGridDecoration>())
             {
                 m_writer->emit("[NodeDispatchGrid(");
-                m_writer->emit(getIntVal(as<IRIntLit>(decor->getOperand(0))));
+                m_writer->emit(getIntVal(decor->getX()));
                 m_writer->emit(", ");
-                m_writer->emit(getIntVal(as<IRIntLit>(decor->getOperand(1))));
+                m_writer->emit(getIntVal(decor->getY()));
                 m_writer->emit(", ");
-                m_writer->emit(getIntVal(as<IRIntLit>(decor->getOperand(2))));
+                m_writer->emit(getIntVal(decor->getZ()));
                 m_writer->emit(")]\n");
             }
             if (!launchDecor || launchDecor->getMode()->getStringSlice() != toSlice("thread"))
@@ -1173,6 +1173,15 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 emitFlag("GROUP_SYNC", BarrierSemanticFlags::GroupSync);
                 emitFlag("GROUP_SCOPE", BarrierSemanticFlags::GroupScope);
                 emitFlag("DEVICE_SCOPE", BarrierSemanticFlags::DeviceScope);
+                if (first)
+                {
+                    StringBuilder sb;
+                    sb << "0x" << String(flagVal, 16);
+                    getSink()->diagnose(Diagnostics::InvalidBarrierSemanticFlagsValue{
+                        .value = sb.produceString(),
+                        .location = inst->sourceLoc});
+                    m_writer->emit("0");
+                }
             }
             m_writer->emit(")");
             return true;
