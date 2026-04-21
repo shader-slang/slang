@@ -5317,6 +5317,7 @@ struct TypeFlowSpecializationContext
         List<IRInst*> globalParams;
         List<IRInst*> extractInsts;
         List<IRInst*> lookupInsts;
+        List<IRInst*> otherInsts;
 
         for (auto inst : module->getGlobalInsts())
         {
@@ -5331,6 +5332,8 @@ struct TypeFlowSpecializationContext
                 extractInsts.add(inst);
             else if (inst->getOp() == kIROp_LookupWitnessMethod)
                 lookupInsts.add(inst);
+            else
+                otherInsts.add(inst);
         }
 
         for (auto inst : globalParams)
@@ -5338,6 +5341,12 @@ struct TypeFlowSpecializationContext
         for (auto inst : extractInsts)
             hasChanges |= specializeInst(moduleInst, inst, globalsWorkList);
         for (auto inst : lookupInsts)
+            hasChanges |= specializeInst(moduleInst, inst, globalsWorkList);
+        // Any other module-scope insts that received typeflow info run last,
+        // after the known dependency-ordered ones. Today Phase 0 only seeds
+        // params / extracts / lookups, but this keeps the pass forward-compatible
+        // so future additions to Phase 0 don't get silently dropped here.
+        for (auto inst : otherInsts)
             hasChanges |= specializeInst(moduleInst, inst, globalsWorkList);
 
         return hasChanges;
