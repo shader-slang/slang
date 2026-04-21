@@ -1,21 +1,37 @@
 # Expected sanitizer findings for Slang.
 #
 # Known sanitizer findings that should not block PRs or nightly runs.
-# Each non-comment, non-empty line is a fixed substring matched against
-# sanitizer SUMMARY lines. A finding is "expected" when its SUMMARY line
-# contains any pattern listed here.
+# Each non-comment, non-empty line is matched against sanitizer log output.
 #
-# Use the error type + function name for stable matching -- file paths
-# and line numbers shift between builds and should not be used.
+# Two matching modes:
 #
-#   Good:  null-pointer-use in slang::IRBlock::SuccessorList::reverse
-#   Bad:   slang-ir.h:456    (fragile, breaks on any edit)
-#   Bad:   null-pointer-use  (too broad, suppresses all null-pointer findings)
+#   SUMMARY match (default):
+#     A plain line is a fixed substring matched against SUMMARY lines.
+#     Use the error type + function name for stable matching.
+#       Good:  null-pointer-use in slang::IRBlock::SuccessorList::reverse
+#       Bad:   slang-ir.h:456    (fragile, breaks on any edit)
+#       Bad:   null-pointer-use  (too broad, suppresses all null-pointer findings)
+#
+#   LEAK match (LEAK: prefix):
+#     Lines starting with "LEAK:" match a function name against Direct
+#     leak blocks (root allocations) in the log. A leak SUMMARY is
+#     expected if any Direct leak block matches at least one pattern.
+#     Indirect leaks (child allocations) are skipped since they share
+#     the same root cause. This avoids relying on exact byte/allocation
+#     counts in SUMMARY lines.
+#       Good:  LEAK: _maybeBeginMacroInvocation
+#       Bad:   AddressSanitizer: 20064 byte(s) leaked  (fragile counts)
 #
 # Track each entry with a bug/issue number so entries can be removed
-# when the underlying issue is fixed.
+# when the underlying issue is fixed. Stale entries that match nothing
+# will produce CI warnings as a reminder to clean up.
 #
 # See also:
 #   cmake/lsan-suppressions.txt        -- suppresses leak reports at LSan level
 #   cmake/sanitizer-ignorelist.txt     -- suppresses UBSan checks at compile level
 #   This file                          -- accepts real findings as known issues
+
+# #10828: Preprocessor ExpansionInputStream leak during slangc-test
+# Leak from _maybeBeginMacroInvocation() and type layout objects
+# created during compilation.
+LEAK: _maybeBeginMacroInvocation

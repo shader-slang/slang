@@ -5,6 +5,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-legalize-types.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -654,7 +655,6 @@ struct AnyValueMarshallingContext
             {
                 // Bindless targets (CUDA, CPU, Metal): DescriptorHandle is a native type
                 // Marshal as raw bytes based on actual size (8 or 16 bytes)
-                // Use uint2 instead of uint64 to avoid Int64 capability requirement
                 SLANG_UNUSED(dataType);
 
                 auto srcVal = builder->emitLoad(concreteVar);
@@ -666,18 +666,53 @@ struct AnyValueMarshallingContext
                 if (fieldOffset + numFieldsNeeded <=
                     static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
-                    auto uintVectorType =
-                        builder->getVectorType(builder->getUIntType(), numFieldsNeeded);
-                    auto uintVectorVal = builder->emitBitCast(uintVectorType, srcVal);
-
-                    for (IRIntegerValue i = 0; i < numFieldsNeeded; i++)
+                    if (isMetalTarget(targetRequest) && sizeInBytes == 8)
                     {
-                        auto bits = builder->emitElementExtract(uintVectorVal, i);
-                        auto dstAddr = builder->emitFieldAddress(
+                        // Metal: DescriptorHandle is a pointer; as_type<> can't cast
+                        // between pointer and non-pointer types. Convert through uint64
+                        // using CastDescriptorHandleToUInt64 which emits a C-style cast.
+                        auto uint64Val = builder->emitIntrinsicInst(
+                            builder->getUInt64Type(),
+                            kIROp_CastDescriptorHandleToUInt64,
+                            1,
+                            &srcVal);
+                        auto lowBits = builder->emitCast(builder->getUIntType(), uint64Val);
+                        auto highBits = builder->emitShr(
+                            builder->getUInt64Type(),
+                            uint64Val,
+                            builder->getIntValue(builder->getIntType(), 32));
+                        highBits = builder->emitCast(builder->getUIntType(), highBits);
+
+                        auto dstAddr0 = builder->emitFieldAddress(
                             uintPtrType,
                             anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset + i]);
-                        builder->emitStore(dstAddr, bits);
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        builder->emitStore(dstAddr0, lowBits);
+                        auto dstAddr1 = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset + 1]);
+                        builder->emitStore(dstAddr1, highBits);
+                    }
+                    else
+                    {
+                        // Metal pointers are always 8 bytes; bitcast is invalid for
+                        // pointers on Metal so this path must not be reached.
+                        SLANG_ASSERT(!isMetalTarget(targetRequest));
+                        // CUDA/CPU: bitcast works for non-pointer native handles
+                        auto uintVectorType =
+                            builder->getVectorType(builder->getUIntType(), numFieldsNeeded);
+                        auto uintVectorVal = builder->emitBitCast(uintVectorType, srcVal);
+
+                        for (IRIntegerValue i = 0; i < numFieldsNeeded; i++)
+                        {
+                            auto bits = builder->emitElementExtract(uintVectorVal, i);
+                            auto dstAddr = builder->emitFieldAddress(
+                                uintPtrType,
+                                anyValueVar,
+                                anyValInfo->fieldKeys[fieldOffset + i]);
+                            builder->emitStore(dstAddr, bits);
+                        }
                     }
                 }
                 advanceOffset((uint32_t)sizeInBytes);
@@ -1033,7 +1068,6 @@ struct AnyValueMarshallingContext
             {
                 // Bindless targets (CUDA, CPU, Metal): DescriptorHandle is a native type
                 // Unmarshal from raw bytes based on actual size (8 or 16 bytes)
-                // Use uint2 instead of uint64 to avoid Int64 capability requirement
 
                 // sizeInBytes should be either 8 or 16
                 const IRIntegerValue numFieldsNeeded = (sizeInBytes + 3) / 4;
@@ -1042,23 +1076,63 @@ struct AnyValueMarshallingContext
                 if (fieldOffset + numFieldsNeeded <=
                     static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
-                    auto uintVectorType =
-                        builder->getVectorType(builder->getUIntType(), numFieldsNeeded);
-                    IRInst* components[4]; // max 4 uints needed
-
-                    for (IRIntegerValue i = 0; i < numFieldsNeeded; i++)
+                    if (isMetalTarget(targetRequest) && sizeInBytes == 8)
                     {
-                        auto srcAddr = builder->emitFieldAddress(
+                        // Metal: DescriptorHandle is a pointer; as_type<> can't cast
+                        // between pointer and non-pointer types. Reconstruct through
+                        // uint64 using CastUInt64ToDescriptorHandle.
+                        auto srcAddr0 = builder->emitFieldAddress(
                             uintPtrType,
                             anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset + i]);
-                        components[i] = builder->emitLoad(srcAddr);
-                    }
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        auto lowBits = builder->emitLoad(srcAddr0);
 
-                    auto uintVecVal =
-                        builder->emitMakeVector(uintVectorType, numFieldsNeeded, components);
-                    auto result = builder->emitBitCast(dataType, uintVecVal);
-                    builder->emitStore(concreteVar, result);
+                        auto srcAddr1 = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset + 1]);
+                        auto highBits = builder->emitLoad(srcAddr1);
+
+                        auto lowBits64 = builder->emitCast(builder->getUInt64Type(), lowBits);
+                        auto highBits64 = builder->emitCast(builder->getUInt64Type(), highBits);
+                        auto shiftedHigh = builder->emitShl(
+                            builder->getUInt64Type(),
+                            highBits64,
+                            builder->getIntValue(builder->getIntType(), 32));
+                        auto combined =
+                            builder->emitBitOr(builder->getUInt64Type(), lowBits64, shiftedHigh);
+
+                        auto result = builder->emitIntrinsicInst(
+                            dataType,
+                            kIROp_CastUInt64ToDescriptorHandle,
+                            1,
+                            &combined);
+                        builder->emitStore(concreteVar, result);
+                    }
+                    else
+                    {
+                        // Metal pointers are always 8 bytes; bitcast is invalid for
+                        // pointers on Metal so this path must not be reached.
+                        SLANG_ASSERT(!isMetalTarget(targetRequest));
+                        // CUDA/CPU: bitcast works for non-pointer native handles
+                        auto uintVectorType =
+                            builder->getVectorType(builder->getUIntType(), numFieldsNeeded);
+                        IRInst* components[4]; // max 4 uints needed
+
+                        for (IRIntegerValue i = 0; i < numFieldsNeeded; i++)
+                        {
+                            auto srcAddr = builder->emitFieldAddress(
+                                uintPtrType,
+                                anyValueVar,
+                                anyValInfo->fieldKeys[fieldOffset + i]);
+                            components[i] = builder->emitLoad(srcAddr);
+                        }
+
+                        auto uintVecVal =
+                            builder->emitMakeVector(uintVectorType, numFieldsNeeded, components);
+                        auto result = builder->emitBitCast(dataType, uintVecVal);
+                        builder->emitStore(concreteVar, result);
+                    }
                 }
                 advanceOffset((uint32_t)sizeInBytes);
             }
