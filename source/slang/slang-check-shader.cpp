@@ -696,11 +696,10 @@ bool isBuiltinParameterType(Type* type)
     return true;
 }
 
-// Returns true if `type` is the CoopMat<T,S,M,N,R> type.
-// CoopMat has no dedicated AST type class; it is declared with
-// __intrinsic_type(kIROp_CoopMatrixType) in the core module, so we detect it
-// by looking for that modifier on the type's decl.
-static bool isCoopMatrixType(Type* type)
+// Returns true if `type` is declared with `__intrinsic_type(op)` for the given
+// IR opcode. Used to detect intrinsic types such as `CoopMat` and `CoopVec`
+// which have no dedicated AST type class but carry an `IntrinsicTypeModifier`.
+static bool isIntrinsicTypeWithOp(Type* type, IROp op)
 {
     auto declRefType = as<DeclRefType>(type);
     if (!declRefType)
@@ -712,7 +711,7 @@ static bool isCoopMatrixType(Type* type)
     auto modifier = decl->findModifier<IntrinsicTypeModifier>();
     if (!modifier)
         return false;
-    return IROp(modifier->irOp) == kIROp_CoopMatrixType;
+    return IROp(modifier->irOp) == op;
 }
 
 // Describes a rule for types that are invalid as entry-point varying parameters/return types.
@@ -741,12 +740,15 @@ static bool _matchAtomicType(Type* type)
 
 static bool _matchCoopVectorType(Type* type)
 {
-    return as<CoopVectorExpressionType>(type) != nullptr;
+    // `CoopVec` is declared as an intrinsic type with kIROp_CoopVectorType.
+    // Also match the older `CoopVectorExpressionType` AST class for safety.
+    return as<CoopVectorExpressionType>(type) != nullptr ||
+           isIntrinsicTypeWithOp(type, kIROp_CoopVectorType);
 }
 
 static bool _matchCoopMatrixType(Type* type)
 {
-    return isCoopMatrixType(type);
+    return isIntrinsicTypeWithOp(type, kIROp_CoopMatrixType);
 }
 
 static bool _matchVectorBoolType(Type* type)
