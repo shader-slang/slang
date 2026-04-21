@@ -278,12 +278,23 @@ jobs:
           # tolerates the child's non-zero exit (expected failures without
           # GPU drivers), but a script-level failure (missing dependency,
           # malformed args) still propagates.
+          #
+          # Synthesis pass (-WithSynthesis) is intentionally omitted on
+          # Windows CI for Phase 1. Measured: Pass 3 (-only-synthesized)
+          # takes ~2h on windows-latest with OCC + /Ob0, pushing the total
+          # job past the 4h GitHub Actions timeout. As a result, Windows
+          # coverage will be meaningfully lower than Linux/macOS because
+          # -only-synthesized is how backend emit paths get covered on
+          # runners without GPU drivers (see tmp/windows-coverage/plan.md
+          # "finding 9"). Phase 2 (self-hosted Windows runner with GPU)
+          # eliminates the need for synthesis entirely since Pass 1 would
+          # then exercise the backend paths directly.
           $script = 'tools/coverage/run-coverage-windows.ps1'
           try {
-            & $script -WithSynthesis @testArgs
+            & $script @testArgs
           } catch {
             Write-Host "::warning::First coverage run failed ($_). Retrying..."
-            & $script -WithSynthesis @testArgs
+            & $script @testArgs
           }
 
       - name: Generate Coverage Summary (Linux/macOS)
