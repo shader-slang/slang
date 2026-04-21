@@ -32,3 +32,24 @@ SLANG_UNIT_TEST(replayResetHandlersClearsDictionary)
     SLANG_CHECK(restoredCount > 0);
     SLANG_CHECK(restoredCount <= initialCount);
 }
+
+// Verify that tryGet() returns the singleton when it has already been
+// constructed, so slang_shutdown() can safely skip construction when
+// the singleton was never needed (e.g. slang-bootstrap with static linking).
+//
+// The nullptr path (singleton never constructed) is not reachable from
+// slang-test: ReplayContext::get() is a function-local static with no
+// reset, and REPLAY_TEST / earlier tests construct it before any test
+// body runs.
+//
+// Regression test for https://github.com/shader-slang/slang/issues/10791
+SLANG_UNIT_TEST(replayTryGetSkipsConstruction)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    // The singleton already exists in this process, so tryGet() must return it.
+    auto* ptr = ReplayContext::tryGet();
+    SLANG_CHECK(ptr != nullptr);
+    SLANG_CHECK(ptr == &ReplayContext::get());
+}
