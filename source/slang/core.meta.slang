@@ -5096,16 +5096,19 @@ semantic sv_dispatchthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -5117,16 +5120,19 @@ semantic sv_groupid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -5135,6 +5141,7 @@ semantic sv_groupindex
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 }
 
@@ -5146,16 +5153,19 @@ semantic sv_groupthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 

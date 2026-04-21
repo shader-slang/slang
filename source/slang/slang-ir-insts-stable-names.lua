@@ -843,5 +843,6 @@ return {
 	["Decoration.nodeLaunch"] = 867,
 	["Decoration.nodeMaxDispatchGrid"] = 868,
 	["Decoration.nodeDispatchGrid"] = 869,
-	["Decoration.maxRecords"] = 870
+	["Decoration.maxRecords"] = 870,
+	["nodeOutputRecordGetElementPtr"] = 871
 }

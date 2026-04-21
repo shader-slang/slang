@@ -2680,6 +2680,16 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
 
+    case kIROp_NodeOutputRecordGetElementPtr:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, outerPrec);
+            m_writer->emit(".Get(");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit(")");
+        }
+        break;
+
     case kIROp_GetEquivalentStructuredBuffer:
         {
             auto base = inst->getOperand(0);
