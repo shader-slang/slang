@@ -8,7 +8,7 @@ import linalg;
 float4 main(
     linalg::CoopMat<float, MemoryScope::CrossDevice, 1, 1, linalg::CoopMatMatrixUse::MatrixA> m : A)
     : SV_Position
-//CHECK: error 38050
+//CHECK: CoopMat is not a valid varying type
 {
     return float4(0);
 }

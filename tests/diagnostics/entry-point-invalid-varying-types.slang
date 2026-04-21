@@ -8,7 +8,7 @@
 // DifferentialPair<T> as a varying parameter
 [shader("vertex")]
 float4 diffPairParam(DifferentialPair<float> dp : A) : SV_Position
-//CHECK: error 38050
+//CHECK: DifferentialPair is not a valid varying type
 {
     return float4(0);
 }
@@ -16,7 +16,7 @@ float4 diffPairParam(DifferentialPair<float> dp : A) : SV_Position
 // Atomic<T> as a varying parameter
 [shader("vertex")]
 float4 atomicParam(Atomic<int> a : A) : SV_Position
-//ATOMIC: error 38050
+//ATOMIC: Atomic is not a valid varying type
 {
     return float4(0);
 }
@@ -24,7 +24,7 @@ float4 atomicParam(Atomic<int> a : A) : SV_Position
 // CoopVec<T, N> as a varying parameter
 [shader("vertex")]
 float4 coopVecParam(CoopVec<float, 4> v : A) : SV_Position
-//COOPVEC: error 38050
+//COOPVEC: CoopVec is not a valid varying type
 {
     return float4(0);
 }
@@ -32,7 +32,7 @@ float4 coopVecParam(CoopVec<float, 4> v : A) : SV_Position
 // matrix with non-standard element type as a SPIR-V varying parameter
 [shader("vertex")]
 float4 matrixParam(matrix<uint64_t, 2, 2> m : A) : SV_Position
-//MATRIX: error 38051
+//MATRIX: matrix with this element type is not valid as a SPIR-V varying type
 {
     return float4(0);
 }

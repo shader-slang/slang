@@ -4,7 +4,7 @@
 
 [shader("vertex")]
 float4 main(vector<bool, 4> b : A) : SV_Position
-//CHECK: error 38051
+//CHECK: vector<bool> is not valid as a SPIR-V varying type
 {
     return float4(0);
 }
