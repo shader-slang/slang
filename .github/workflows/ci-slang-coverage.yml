@@ -282,28 +282,21 @@ jobs:
             $testArgs += @('-use-test-server', '-server-count', '${{ inputs.server-count }}')
           }
 
-          # Retry once on intermittent failure. OpenCppCoverage itself
-          # tolerates the child's non-zero exit (expected failures without
-          # GPU drivers), but a script-level failure (missing dependency,
-          # malformed args) still propagates.
+          # The script tolerates slang-test failures internally (expected
+          # when GPU/CUDA drivers are absent) and returns exit 0 when
+          # coverage data + exports succeed. We do not retry on failure
+          # here -- a single ~90-min Windows pass is the budget; a second
+          # attempt would blow the 4h job timeout (see tmp/windows-
+          # coverage/plan.md). If the script genuinely fails, the job
+          # fails fast and we iterate on the issue.
           #
           # Synthesis pass (-WithSynthesis) is intentionally omitted on
           # Windows CI for Phase 1. Measured: Pass 3 (-only-synthesized)
           # takes ~2h on windows-latest with OCC + /Ob0, pushing the total
-          # job past the 4h GitHub Actions timeout. As a result, Windows
-          # coverage will be meaningfully lower than Linux/macOS because
-          # -only-synthesized is how backend emit paths get covered on
-          # runners without GPU drivers (see tmp/windows-coverage/plan.md
-          # "finding 9"). Phase 2 (self-hosted Windows runner with GPU)
-          # eliminates the need for synthesis entirely since Pass 1 would
-          # then exercise the backend paths directly.
-          $script = 'tools/coverage/run-coverage-windows.ps1'
-          try {
-            & $script @testArgs
-          } catch {
-            Write-Host "::warning::First coverage run failed ($_). Retrying..."
-            & $script @testArgs
-          }
+          # job past the 4h GitHub Actions timeout. Phase 2 (self-hosted
+          # Windows runner with GPU drivers) would exercise the backend
+          # emit paths via Pass 1 directly and make synthesis unneeded.
+          & 'tools/coverage/run-coverage-windows.ps1' @testArgs
 
       - name: Generate Coverage Summary (Linux/macOS)
         id: coverage-summary

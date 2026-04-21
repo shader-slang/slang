@@ -398,3 +398,11 @@ if ($wantHtml) {
     Write-Host "  HTML (full):      $HtmlDir\index.html"
     Write-Host "  (slangc-only HTML is not produced on Windows -- see script comment)"
 }
+
+# Explicitly signal success. Without this, the script's implicit exit code is
+# whatever $LASTEXITCODE the last native command left behind -- and Pass 1
+# routinely leaves $LASTEXITCODE != 0 when slang-test has expected GPU-less
+# failures (tolerated by Invoke-OCC but still visible in $LASTEXITCODE). A
+# non-zero script exit triggers the caller's retry logic and doubles the
+# runtime for no new data.
+exit 0
