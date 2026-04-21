@@ -3779,6 +3779,13 @@ err(
     span { loc = "param:Decl", message = "parameter '~param' direction '~actualDirection:ParamPassingMode' does not match interface requirement '~expectedDirection:ParamPassingMode'." }
 )
 
+warning(
+    "non-copyable-type-cannot-conform-to-interface",
+    38109,
+    "non-copyable interface conformance is not fully supported",
+    span { loc = "inheritance:Decl", message = "conforming non-copyable type '~type:Type' to interface '~interface:Decl' is not properly supported and may lead to compiler crashes." }
+)
+
 --
 -- 381xx: this/init/return_val
 --
