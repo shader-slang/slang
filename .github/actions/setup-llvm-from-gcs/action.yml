@@ -87,16 +87,23 @@ runs:
           REPO_URL="https://${{ inputs.github-token }}@github.com/llvm/llvm-project"
         fi
 
+        # Use $PWD so the install prefix is an absolute path that is valid
+        # inside the current shell (container or host).
+        LLVM_INSTALL="$PWD/build/llvm-project-install"
+
         ./external/build-llvm.sh \
-          --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
+          --install-prefix "${LLVM_INSTALL}" \
           --repo "${REPO_URL}" \
           --targets "${{ inputs.llvm-targets }}"
 
         echo "✅ LLVM build complete"
 
+        # Verify the install actually landed where we expect.
+        echo "📊 LLVM installation contents:"
+        ls -la "${LLVM_INSTALL}/lib/cmake/clang/" || echo "⚠️  lib/cmake/clang/ missing!"
+
         # Set environment variables for CMake. See matching comment in the
         # download step above.
-        LLVM_INSTALL="${{ github.workspace }}/build/llvm-project-install"
         echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}" >> $GITHUB_ENV
         echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> $GITHUB_ENV
         echo "Clang_DIR=${LLVM_INSTALL}/lib/cmake/clang" >> $GITHUB_ENV
