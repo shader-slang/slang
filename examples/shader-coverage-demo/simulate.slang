@@ -1,20 +1,19 @@
-// simulate.slang — particle physics step, with branching on particle
-// type. The demo runs this kernel multiple times with different inputs
-// so that coverage percentages differ between scenarios.
+// simulate.slang — particle physics compute kernel entry point.
+//
+// The per-type physics helpers (`applyGravity`, `stepFluid`,
+// `stepGas`, `stepSolid`) and the `Particle` struct live in
+// `physics.slang` as a separate module. When `-trace-coverage` is
+// on, counters are attributed to whichever file each statement
+// came from, so the resulting LCOV report spans BOTH files — one
+// `SF:` record per file, each with its own per-line hit counts.
 
-// Particle type discriminants. Matches the `PARTICLE_TYPE_*` enum on
-// the host side.
+import physics;
+
+// Particle type discriminants. Matches the `PARTICLE_TYPE_*` enum
+// on the host side.
 static const uint PARTICLE_TYPE_FLUID = 0;
 static const uint PARTICLE_TYPE_GAS   = 1;
 static const uint PARTICLE_TYPE_SOLID = 2;
-
-struct Particle
-{
-    float3 position;
-    float3 velocity;
-    uint   type;
-    uint   flags;
-};
 
 //TEST_INPUT: set particles = out ubuffer(data=[], stride=32)
 RWStructuredBuffer<Particle> particles;
@@ -24,41 +23,6 @@ cbuffer Params
 {
     uint  particleCount;
     float dt;
-}
-
-float3 applyGravity(float3 velocity, float dt)
-{
-    return velocity + float3(0.0, -9.8, 0.0) * dt;
-}
-
-void stepFluid(inout Particle p, float dt)
-{
-    p.velocity = applyGravity(p.velocity, dt);
-    // Viscous drag proportional to speed.
-    float speed = length(p.velocity);
-    if (speed > 0.01)
-        p.velocity -= normalize(p.velocity) * 0.5 * dt;
-    p.position += p.velocity * dt;
-}
-
-void stepGas(inout Particle p, float dt)
-{
-    // Gas rises buoyantly; no gravity pull, only ambient drag.
-    p.velocity += float3(0.0, 2.5, 0.0) * dt;
-    p.velocity *= 0.98;
-    p.position += p.velocity * dt;
-}
-
-void stepSolid(inout Particle p, float dt)
-{
-    // Solids fall under gravity; bounce on the floor.
-    p.velocity = applyGravity(p.velocity, dt);
-    p.position += p.velocity * dt;
-    if (p.position.y < 0.0)
-    {
-        p.position.y = 0.0;
-        p.velocity.y = -p.velocity.y * 0.6;  // inelastic bounce
-    }
 }
 
 [numthreads(64, 1, 1)]
