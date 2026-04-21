@@ -1,9 +1,9 @@
 // Test that invalid types inside struct fields are detected recursively,
 // including when the struct is a generic instantiation.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry structParam -stage vertex
-//DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC):-target spirv -entry genericStructParam -stage vertex
-//DIAGNOSTIC_TEST:SIMPLE(diag=ARRAY):-target spirv -entry arrayParam -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -entry structParam -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC,non-exhaustive):-target spirv -entry genericStructParam -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=ARRAY,non-exhaustive):-target spirv -entry arrayParam -stage vertex
 
 struct BadFields
 {
