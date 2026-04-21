@@ -3138,6 +3138,13 @@ err(
     span { loc = "initList:Expr", message = "cannot use initializer list for CoopVector of statically unknown size '~elementCount'" }
 )
 
+standalone_note(
+    "initializer-list-member-visibility-mismatch",
+    30515,
+    "member '~member:Decl' is ~memberVis:DeclVisibility, but '~type:Type' is ~structVis:DeclVisibility; all members must be ~structVis:DeclVisibility to use an initializer list",
+    span { loc = "member:Decl" }
+)
+
 warning(
     "interface-default-initializer",
     30506,
