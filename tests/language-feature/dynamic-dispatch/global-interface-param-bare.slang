@@ -1,9 +1,10 @@
 // Bare `uniform IFoo` at global scope with conformances should support
 // dynamic dispatch, just like ConstantBuffer<IFoo> (global-interface-param.slang).
 //
-// Bare `uniform IFoo` with conformances crashes due to a pre-existing
-// bug in the typeflow pass (separate from the ConstantBuffer/ParameterBlock
-// fix). Disabled until the bare interface path is fixed.
+// The `slangc` CLI path works with the SCCP-style global typeflow refactor,
+// but the Slang API / test-server path still crashes. Kept disabled until the
+// API-path crash is root-caused; tracked as follow-up work separate from this
+// PR.
 
 //DISABLED_TEST:SIMPLE(filecheck=SINGLE): -target spirv-asm -stage compute -entry computeMain -conformance "ImplA:IFoo=0"
 //DISABLED_TEST:SIMPLE(filecheck=SINGLE): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0"

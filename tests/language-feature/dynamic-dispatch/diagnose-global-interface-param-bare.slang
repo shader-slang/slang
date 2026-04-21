@@ -1,9 +1,9 @@
 // A bare `uniform IFoo` at global scope (without ConstantBuffer wrapper)
 // should produce error 50100 when no conformances are registered.
 //
-// The diagnostic fires correctly but the compiler still crashes after emitting
-// it (pre-existing crash in the typeflow pass). Disabled until the follow-up
-// crash is fixed.
+// The `slangc` CLI path emits the diagnostic cleanly, but the Slang API /
+// test-server path still crashes. Kept disabled until the API-path crash is
+// root-caused; tracked as follow-up work separate from this PR.
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
 
