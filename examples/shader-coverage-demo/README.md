@@ -91,7 +91,7 @@ type" branch and are exactly what a regression-watch would flag.
 | Backend | `--mode=compile` | `--mode=dispatch` |
 |---|---|---|
 | `cpu` | ✅ Works | ✅ **Fully working** — produces correct counter values and a complete LCOV report |
-| `metal` | ✅ Works | ⚠️ Pipeline builds; dispatch runs; counters *directly in the entry point* are correct; counters inside helper functions are not written. Localized to the generated MSL pattern that stores the coverage buffer's `device*` inside a thread-local `KernelContext` struct — the helper functions read the struct field but the atomic writes don't reach the bound buffer. Reflection is correct; this is an MSL address-space / slang-rhi codegen issue, not a coverage-feature issue. Diagnosed by initializing the counter buffer with `0xDEADBEEF` and observing that only the computeMain-direct counters change. |
+| `metal` | ✅ Works | ⚠️ Pipeline builds; dispatch runs; only counters *before the `if (i >= particleCount) return;` guard* are written. Diagnosed by seeding the counter buffer with `0xDEADBEEF`: counter 16 (inside the guard body) shows 512 writes while counters for the rest of `computeMain` remain at the sentinel. That means every Metal thread takes the early-return branch — i.e. `particleCount` is being read as 0. Root cause is that `cursor["Params"]["particleCount"].setData(...)` on Metal doesn't deliver the constant-buffer value to the shader. **Not a coverage-feature issue** — belongs against slang-rhi's Metal backend. Force-inlining the helpers was tried and didn't help (verifying the bug isn't helper-specific). |
 | `vulkan` | Untested on this branch | Untested |
 | `d3d12` | Untested | Untested |
 
