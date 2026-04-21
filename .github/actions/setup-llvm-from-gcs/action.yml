@@ -67,10 +67,11 @@ runs:
         echo "📊 LLVM installation size:"
         du -sh build/llvm-project-install
 
-        # Set environment variables for CMake. LLVM_DIR/Clang_DIR must point to
-        # the directories containing LLVMConfig.cmake and ClangConfig.cmake
-        # respectively (CMake does not search subdirectories of <pkg>_DIR).
+        # Set environment variables for CMake. We set CMAKE_PREFIX_PATH to the
+        # LLVM install prefix so find_package(Clang CONFIG) can locate
+        # ClangConfig.cmake via CMake's standard subdirectory search.
         LLVM_INSTALL="${{ github.workspace }}/build/llvm-project-install"
+        echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}" >> $GITHUB_ENV
         echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> $GITHUB_ENV
         echo "Clang_DIR=${LLVM_INSTALL}/lib/cmake/clang" >> $GITHUB_ENV
 
@@ -96,6 +97,7 @@ runs:
         # Set environment variables for CMake. See matching comment in the
         # download step above.
         LLVM_INSTALL="${{ github.workspace }}/build/llvm-project-install"
+        echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}" >> $GITHUB_ENV
         echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> $GITHUB_ENV
         echo "Clang_DIR=${LLVM_INSTALL}/lib/cmake/clang" >> $GITHUB_ENV
 
