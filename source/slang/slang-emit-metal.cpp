@@ -58,6 +58,7 @@ matrix<T,A,B> _slang_matrixFmod(matrix<T,A,B> m1, matrix<T,A,B> m2)
 }
 )";
 
+
 static const char* kMetalBuiltinPreludeSimdgroupMatrixOps = R"(
 template<typename Matrix, typename T>
 Matrix _slang_simdgroup_load(const device T* src, ulong elements_per_row) {
@@ -84,7 +85,6 @@ Matrix _slang_simdgroup_load_transpose(const threadgroup T* src, ulong elements_
     return result;
 }
 )";
-
 
 void MetalSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,

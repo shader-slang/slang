@@ -26,10 +26,6 @@ alwaysApply: false
 - **fill**: `case metal: this = __makeFromScalar(t);`
 - **Load** (StructuredBuffer, pointer, groupshared T[V], Ptr<T>): `case metal:` using `_slang_simdgroup_load<$TR>(...)`
 - **Store** (StructuredBuffer, pointer, groupshared T[V], Ptr<T>): `case metal:` using `simdgroup_store(...)`
-- **copyFrom**: added `case metal:` (shares hlsl/spirv cast path)
-- **GetLength**: added `default: return uint(M * N / 32);`
-- **subscript get/set**: added `default:` cases using `__indexRead`/`__indexRef`
-- **operator * (scalar)**: added `case metal:` sharing CUDA's `__intrinsic_asm "$0 * $1"`
 - Updated `[require(cuda_spirv, ...)]` → `[require(cuda_spirv_metal, ...)]` on all Load/Store overloads
 
 ## Build Status

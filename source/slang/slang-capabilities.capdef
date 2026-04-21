@@ -1385,7 +1385,7 @@ alias cooperative_matrix_spirv = spvCooperativeMatrixKHR;
 alias cooperative_matrix_reduction = spvCooperativeMatrixReductionsNV;
 /// Capabilities needed to convert cooperative matrices, all the conversions can be supported by cuda
 /// [Compound]
-alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV | cuda | _sm_6_10 | metal;
+alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV | cuda | _sm_6_10;
 /// Capabilities needed to use MapElement operation with cooperative matrix
 /// [Compound]
 alias cooperative_matrix_map_element = spvCooperativeMatrixPerElementOperationsNV;

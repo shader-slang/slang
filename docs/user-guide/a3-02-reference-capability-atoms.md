@@ -1174,6 +1174,9 @@ Compound Capabilities
 `cuda_spirv`
 > CUDA and SPIRV code-gen targets
 
+`cuda_spirv_metal`
+> CUDA, SPIRV and Metal code-gen targets
+
 `descriptor_handle`
 > Targets that support DescriptorHandle types for bindless descriptor access.
 

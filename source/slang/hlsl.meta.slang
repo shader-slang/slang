@@ -27619,7 +27619,6 @@ struct CoopMat
         {
         case hlsl:
         case spirv:
-        case metal:
             if (__isCoopFloat<T>() && __isInt<U>())
                 this = __int_to_float_cast<T, R>(other);
             else if (__isInt<T>() && __isCoopFloat<U>())
@@ -27656,7 +27655,7 @@ struct CoopMat
     ///
     /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_hlsl_spirv, cooperative_matrix)]
     [__NoSideEffect]
     int getCount()
     {
@@ -27678,6 +27677,7 @@ struct CoopMat
     /// belong to the current thread, but the locations of those elements on the matrix is
     /// unspecified. It indicates that user can only use this operator to perform uniform
     /// operations.
+    [require(cuda_hlsl_spirv, cooperative_matrix)]
     __subscript(int index) -> T
     {
         [__NoSideEffect]
@@ -27692,8 +27692,6 @@ struct CoopMat
                 __intrinsic_asm "($0).get($1)";
             case hlsl:
                 __intrinsic_asm "($0).Get($1)";
-            default:
-                return __indexRead(index);
             }
         }
 
@@ -27708,8 +27706,6 @@ struct CoopMat
                 __intrinsic_asm "($0)->set($1, $2)";
             case hlsl:
                 __intrinsic_asm "($0).Set($1, $2)";
-            default:
-                __indexRef(index) = newValue;
             }
         }
     }
@@ -27725,7 +27721,7 @@ struct CoopMat
     ///
     /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_hlsl_spirv, cooperative_matrix)]
     static uint GetLength()
     {
         __target_switch
@@ -27739,8 +27735,6 @@ struct CoopMat
             {
                 result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
             };
-        default:
-            return uint(M * N / 32);
         }
     }
 
@@ -27945,9 +27939,9 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
         case metal:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "simdgroup_store($0, $1 + $2, (ulong)$3)";
+                __intrinsic_asm "simdgroup_store($0, (device $[0]*)($1) + $2, (ulong)$3)", T;
             else
-                __intrinsic_asm "simdgroup_store($0, $1 + $2, (ulong)$3, ulong2(0), true)";
+                __intrinsic_asm "simdgroup_store($0, (device $[0]*)($1) + $2, (ulong)$3, ulong2(0), true)", T;
         }
     }
 
@@ -28036,9 +28030,9 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, $2, $3)";
         case metal:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "simdgroup_store($0, ($1)->m_data + $2, (ulong)$3)";
+                __intrinsic_asm "simdgroup_store($0, &((*($1))[0]) + $2, (ulong)$3)";
             else
-                __intrinsic_asm "simdgroup_store($0, ($1)->m_data + $2, (ulong)$3, ulong2(0), true)";
+                __intrinsic_asm "simdgroup_store($0, &((*($1))[0]) + $2, (ulong)$3, ulong2(0), true)";
         }
     }
 
@@ -28101,9 +28095,9 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data + $2, $3)";
         case metal:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "simdgroup_store($0, ($1)->m_data + $2, (ulong)$3)";
+                __intrinsic_asm "simdgroup_store($0, &((*($1))[0]) + $2, (ulong)$3)";
             else
-                __intrinsic_asm "simdgroup_store($0, ($1)->m_data + $2, (ulong)$3, ulong2(0), true)";
+                __intrinsic_asm "simdgroup_store($0, &((*($1))[0]) + $2, (ulong)$3, ulong2(0), true)";
         }
     }
 
@@ -28220,9 +28214,9 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
         case metal:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "_slang_simdgroup_load<$TR>($0 + $1, (ulong)$2)";
+                __intrinsic_asm "_slang_simdgroup_load<$TR>((const device $[0]*)($0) + $1, (ulong)$2)", T;
             else
-                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>($0 + $1, (ulong)$2)";
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>((const device $[0]*)($0) + $1, (ulong)$2)", T;
         }
     }
 
@@ -28322,9 +28316,9 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data, $1, $2)";
         case metal:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "_slang_simdgroup_load<$TR>(($0)->m_data + $1, (ulong)$2)";
+                __intrinsic_asm "_slang_simdgroup_load<$TR>(&((*($0))[0]) + $1, (ulong)$2)";
             else
-                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>(($0)->m_data + $1, (ulong)$2)";
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>(&((*($0))[0]) + $1, (ulong)$2)";
         }
     }
 
@@ -28388,9 +28382,9 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data + $1, $2)";
         case metal:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "_slang_simdgroup_load<$TR>(($0)->m_data + $1, (ulong)$2)";
+                __intrinsic_asm "_slang_simdgroup_load<$TR>(&((*($0))[0]) + $1, (ulong)$2)";
             else
-                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>(($0)->m_data + $1, (ulong)$2)";
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>(&((*($0))[0]) + $1, (ulong)$2)";
         }
     }
 
@@ -29464,7 +29458,7 @@ extension<
 /// @param lhs The cooperative matrix to multiply.
 /// @param rhs The scalar value to multiply each element by.
 /// @return A new cooperative matrix with all elements multiplied by the scalar.
-[require(cooperative_matrix)]
+[require(cuda_hlsl_spirv, cooperative_matrix)]
 linalg.CoopMat<T, S, M, N, R> operator *<
     T : ICoopElement,
     let S : MemoryScope,
@@ -29481,7 +29475,6 @@ linalg.CoopMat<T, S, M, N, R> operator *<
             result:$$linalg.CoopMat<T, S, M, N, R> = OpMatrixTimesScalar $lhs $rhs;
         };
     case cuda:
-    case metal:
         __intrinsic_asm "$0 * $1";
     case hlsl:
         linalg.__requirePrelude_hlsl_cm_scale();
@@ -29499,7 +29492,7 @@ linalg.CoopMat<T, S, M, N, R> operator *<
 /// @param lhs The scalar value to multiply each element by.
 /// @param rhs The cooperative matrix to multiply.
 /// @return A new cooperative matrix with all elements multiplied by the scalar.
-[require(cooperative_matrix)]
+[require(cuda_hlsl_spirv, cooperative_matrix)]
 linalg.CoopMat<T, S, M, N, R> operator *<
     T : ICoopElement,
     let S : MemoryScope,

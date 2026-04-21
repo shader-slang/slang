@@ -1,6 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BAB):-vk -emit-spirv-directly -Xslang -DBAB
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_CUDA):-cuda -output-using-type
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK_METAL):-metal -compute -output-using-type -xslang -DMETAL
 
 //DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include -DBAB
 //DXIL: result code = 0
@@ -8,6 +9,9 @@
 // CHECK: type: float
 // CHECK-COUNT-256: 241.0
 // CHECK_BAB-COUNT-256: 43710000
+
+// CHECK_METAL: type: float
+// CHECK_METAL-COUNT-64: 121.0
 
 // CHECK: type: int32_t
 // CHECK-COUNT-256: 481
@@ -79,6 +83,14 @@ using namespace linalg;
 [numthreads(32, 1, 1)]
 void computeMain()
 {
+#ifdef METAL
+    // ( 3.0 * 5.0 ) * 8 + 1.0 = 121.0
+    coopMatMulAdd<float, false>(
+            CoopMat<half, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse::MatrixA>(3.0),
+            CoopMat<half, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse::MatrixB>(5.0),
+            CoopMat<float, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse::MatrixAccumulator>(1.0)
+    ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer1, 0, 8);
+#else
     // ( 3.0 * 5.0 ) * 16 + 1.0 = 241.0
     coopMatMulAdd<float, false>(
             CoopMat<half, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>(3.0),
@@ -89,8 +101,6 @@ void computeMain()
     __target_switch
     {
     case hlsl:
-        // int8_t is not a native scalar type in DXC HLSL.
-        // The float/half MulAdd test above already covers HLSL MulAdd support.
         break;
     case spirv:
         // ( 3.0 * 5.0 ) * 32 + 1.0 = 481
@@ -176,4 +186,5 @@ void computeMain()
                 CoopMat<int32_t, MemoryScope.Subgroup, 8, 32, CoopMatMatrixUse::MatrixAccumulator>(0x7FFFFFFF)
         ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer7, 0, 32);
     }
+#endif
 }
