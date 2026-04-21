@@ -12,14 +12,13 @@ namespace Slang
 namespace
 {
 
+// The coverage buffer is synthesized as a global-scope `VarDecl` at
+// AST-check time by `maybeSynthesizeCoverageBufferDecl` (see
+// slang-check-synthesize-coverage.cpp). By the time this IR pass
+// runs, the buffer is a normal `IRGlobalParam` indistinguishable
+// from a user-declared one; this pass only locates it by name and
+// rewrites `IncrementCoverageCounter` placeholders against it.
 static const char kCoverageBufferName[] = "__slang_coverage";
-
-// Reserved register space + binding for the synthesized coverage
-// buffer. Chosen to sit high enough that it is unlikely to collide
-// with user resources. Will become configurable once the feature
-// moves out of prototype status.
-static const UInt kCoverageReservedSpace = 31;
-static const UInt kCoverageReservedBinding = 0;
 
 // Key that identifies a counter slot in the host-facing manifest:
 // one slot per (file, line) pair. Multiple placeholder UIDs that
@@ -92,34 +91,6 @@ static IRGlobalParam* findCoverageBuffer(IRModule* module, DiagnosticSink* sink)
     return nullptr;
 }
 
-// Return true if any existing module-scope global parameter already
-// occupies the reserved `(space, binding)` we would assign to the
-// synthesized coverage buffer. Used to diagnose before synthesis
-// rather than aliasing a user resource silently.
-static bool hasResourceAtReservedBinding(IRModule* module)
-{
-    for (auto inst : module->getGlobalInsts())
-    {
-        auto param = as<IRGlobalParam>(inst);
-        if (!param)
-            continue;
-        auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
-        if (!layoutDecor)
-            continue;
-        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
-        if (!varLayout)
-            continue;
-        auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace);
-        auto bindingAttr = varLayout->findOffsetAttr(LayoutResourceKind::DescriptorTableSlot);
-        if (!spaceAttr || !bindingAttr)
-            continue;
-        if ((UInt)spaceAttr->getOffset() == kCoverageReservedSpace &&
-            (UInt)bindingAttr->getOffset() == kCoverageReservedBinding)
-            return true;
-    }
-    return false;
-}
-
 // Collect every IncrementCoverageCounter placeholder in the module
 // across all functions. The pass is designed to be a simple, O(n)
 // linear sweep — placeholders are opaque to the optimizer so if any
@@ -153,13 +124,12 @@ struct CoverageInstrumenter
     IRType* uintType;
     IRType* uintPtrType;
     IRType* intType;
-    bool isSynthesized;
 
     Dictionary<CoverageKey, UInt, CoverageKeyHasher> keyToIndex;
     List<CoverageKey> orderedKeys;
 
-    CoverageInstrumenter(IRModule* m, IRGlobalParam* buf, bool synthesized)
-        : module(m), coverageBuffer(buf), isSynthesized(synthesized)
+    CoverageInstrumenter(IRModule* m, IRGlobalParam* buf)
+        : module(m), coverageBuffer(buf)
     {
         IRBuilder tmpBuilder(module);
         uintType = tmpBuilder.getUIntType();
@@ -297,12 +267,16 @@ struct CoverageInstrumenter
         fprintf(f, "  \"version\": 1,\n");
         fprintf(f, "  \"counters\": %lld,\n", (long long)orderedKeys.getCount());
 
+        // The coverage buffer is always reflection-visible:
+        // AST-synthesized when `-trace-coverage` is on, or user-
+        // declared by the shader itself. The binding reported below
+        // is whatever the parameter-binding pass assigned; hosts
+        // use this to bind the counter UAV at runtime.
         auto layout = readLayout();
         fprintf(f, "  \"buffer\": {\n");
         fprintf(f, "    \"name\": \"%s\",\n", kCoverageBufferName);
         fprintf(f, "    \"element_type\": \"uint32\",\n");
-        fprintf(f, "    \"element_stride\": 4,\n");
-        fprintf(f, "    \"synthesized\": %s", isSynthesized ? "true" : "false");
+        fprintf(f, "    \"element_stride\": 4");
         if (layout.hasLayout)
         {
             if (layout.space >= 0)
@@ -372,50 +346,6 @@ struct CoverageInstrumenter
     Index counterCount() const { return orderedKeys.getCount(); }
 };
 
-// Synthesize an implicit `RWStructuredBuffer<uint> __slang_coverage`
-// global parameter with a reserved layout. Follows the pattern in
-// `lowerDynamicResourceHeap` — we manually build an IRTypeLayout /
-// IRVarLayout so the buffer survives later uniform-collection passes.
-// Emits a warning if any existing user resource already occupies the
-// reserved binding; synthesis proceeds anyway but aliasing risk is
-// documented to the user.
-static IRGlobalParam* synthesizeCoverageBuffer(IRModule* module, DiagnosticSink* sink)
-{
-    if (hasResourceAtReservedBinding(module) && sink)
-    {
-        sink->diagnoseRaw(
-            Severity::Warning,
-            UnownedStringSlice("-trace-coverage: an existing resource occupies the reserved "
-                               "binding (space=31, binding=0); coverage buffer may alias it. "
-                               "Declare `RWStructuredBuffer<uint> __slang_coverage` explicitly "
-                               "at a conflict-free binding to avoid this."));
-    }
-
-    IRBuilder builder(module);
-    builder.setInsertInto(module->getModuleInst());
-
-    auto uintType = builder.getUIntType();
-    IRInst* elemOperand = uintType;
-    auto bufferType = (IRType*)builder.getType(kIROp_HLSLRWStructuredBufferType, 1, &elemOperand);
-
-    auto param = builder.createGlobalParam(bufferType);
-    builder.addNameHintDecoration(param, UnownedStringSlice(kCoverageBufferName));
-
-    IRTypeLayout::Builder typeLayoutBuilder(&builder);
-    typeLayoutBuilder.addResourceUsage(LayoutResourceKind::DescriptorTableSlot, LayoutSize(1));
-    auto typeLayout = typeLayoutBuilder.build();
-
-    IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
-    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->offset =
-        kCoverageReservedSpace;
-    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot)->offset =
-        kCoverageReservedBinding;
-    auto varLayout = varLayoutBuilder.build();
-    builder.addLayoutDecoration(param, varLayout);
-
-    return param;
-}
-
 // Strip any leftover IncrementCoverageCounter placeholders from the
 // module. Called when the pass is a no-op (neither flag nor user
 // buffer) so the backend emitter never sees the opaque op.
@@ -441,17 +371,19 @@ void instrumentCoverage(IRModule* module, DiagnosticSink* sink, bool enabled)
         return;
     }
 
-    // Flag is on. Reuse a user-declared buffer if present and well-
-    // typed; otherwise synthesize one.
+    // Flag is on. The AST synthesizer (see
+    // slang-check-synthesize-coverage.cpp) has already injected the
+    // `__slang_coverage` decl unless the user declared it themselves,
+    // so `findCoverageBuffer` always returns a valid buffer at this
+    // point. If it doesn't, some earlier phase has failed; bail.
     auto buffer = findCoverageBuffer(module, sink);
-    bool synthesized = false;
     if (!buffer)
     {
-        buffer = synthesizeCoverageBuffer(module, sink);
-        synthesized = true;
+        stripPlaceholders(module);
+        return;
     }
 
-    CoverageInstrumenter instrumenter(module, buffer, synthesized);
+    CoverageInstrumenter instrumenter(module, buffer);
     instrumenter.run();
 
     // Always announce the counter count on stderr — the host needs

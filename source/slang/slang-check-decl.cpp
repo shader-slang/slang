@@ -2,6 +2,7 @@
 #include "slang-ast-modifier.h"
 #include "slang-ast-support-types.h"
 #include "slang-check-impl.h"
+#include "slang-check-synthesize-coverage.h"
 
 // This file constaints the semantic checking logic and
 // related queries for declarations.
@@ -4800,6 +4801,15 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
         if (auto fileDecl = as<FileDecl>(moduleDecl->getDirectMemberDecl(i)))
             visitIncludeDecls(fileDecl);
     }
+
+    // When `-trace-coverage` is on, inject the synthetic
+    // `RWStructuredBuffer<uint> __slang_coverage` global that the
+    // coverage IR pass will later wire counter increments into.
+    // Done here — after imports/includes, before the main decl-
+    // state iteration — so the synthetic decl participates in the
+    // same name-lookup, parameter-binding, and reflection passes as
+    // a user-declared global.
+    maybeSynthesizeCoverageBufferDecl(this, moduleDecl);
 
     // The entire goal of semantic checking is to get all of the
     // declarations in the module up to `DeclCheckState::DefinitionChecked`.
