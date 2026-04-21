@@ -269,6 +269,14 @@ jobs:
             '-skip-reference-image-generation'
             '-show-adapter-info'
             '-enable-debug-layers', 'true'
+            # RecordReplayApiTypeOperations.internal crashes with
+            # EXCEPTION_ILLEGAL_INSTRUCTION on windows-latest runners
+            # under OpenCppCoverage instrumentation. The crash leaves a
+            # dead child process that slang-test / OCC wait on, hanging
+            # the whole job until the GHA 6-hour limit kills it. Skip
+            # the test entirely until we understand the root cause.
+            # Tracked in tmp/windows-coverage/plan.md.
+            '-exclude-prefix', 'slang-unit-test-tool/RecordReplayApiTypeOperations'
           )
           if ([int]'${{ inputs.server-count }}' -gt 1) {
             $testArgs += @('-use-test-server', '-server-count', '${{ inputs.server-count }}')

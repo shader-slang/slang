@@ -227,9 +227,24 @@ if (-not $ReportOnly) {
         Push-Location $RepoRoot
         try {
             # Tolerate failures -- the main goal is coverage accumulation.
+            # Forward -exclude-prefix / -exclude entries from the caller's
+            # TestArgs so CI-level exclusions (e.g. tests that crash under
+            # OCC instrumentation) apply here too. Other TestArgs are
+            # dropped to keep the record-replay pass scoped to the
+            # RecordReplayApi prefix.
+            $recordArgs = @('slang-unit-test-tool/RecordReplayApi')
+            for ($i = 0; $i -lt $TestArgs.Count; $i++) {
+                if ($TestArgs[$i] -in @('-exclude', '-exclude-prefix')) {
+                    $recordArgs += $TestArgs[$i]
+                    if ($i + 1 -lt $TestArgs.Count) {
+                        $recordArgs += $TestArgs[$i + 1]
+                        $i++
+                    }
+                }
+            }
             try {
                 Run-WithCoverage -OutputCov $recordCov -InputCov $mainCov `
-                    -ChildArgs @('slang-unit-test-tool/RecordReplayApi')
+                    -ChildArgs $recordArgs
             } catch {
                 Write-Warning "Record-replay pass failed: $_  (coverage from main pass retained)"
                 Copy-Item -Force $mainCov $recordCov
