@@ -27566,7 +27566,7 @@ struct CoopMat
         case cuda:
             __intrinsic_asm "($0)->fill($1)";
         case metal:
-            this = __makeFromScalar(t);
+            __intrinsic_asm "_slang_simdgroup_fill($0, $1)";
         case hlsl:
             __intrinsic_asm ".Splat";
         }

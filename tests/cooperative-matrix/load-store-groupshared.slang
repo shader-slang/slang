@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK_FLOAT):-metal -compute -output-using-type -xslang -DMETAL
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK_METAL):-metal -compute -output-using-type -xslang -DMETAL
 
 // CHECK: 1
 // CHECK-NEXT: 2
@@ -29,14 +29,14 @@
 // CHECK-NEXT: 7.0
 // CHECK-NEXT: 8.0
 
-// CHECK_FLOAT: 1.0
-// CHECK_FLOAT-NEXT: 2.0
-// CHECK_FLOAT-NEXT: 3.0
-// CHECK_FLOAT-NEXT: 4.0
-// CHECK_FLOAT-NEXT: 5.0
-// CHECK_FLOAT-NEXT: 6.0
-// CHECK_FLOAT-NEXT: 7.0
-// CHECK_FLOAT-NEXT: 8.0
+// CHECK_METAL: 1.0
+// CHECK_METAL-NEXT: 2.0
+// CHECK_METAL-NEXT: 3.0
+// CHECK_METAL-NEXT: 4.0
+// CHECK_METAL-NEXT: 5.0
+// CHECK_METAL-NEXT: 6.0
+// CHECK_METAL-NEXT: 7.0
+// CHECK_METAL-NEXT: 8.0
 
 #pragma warning(disable:41017)
 

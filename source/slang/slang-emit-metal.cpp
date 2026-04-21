@@ -60,6 +60,10 @@ matrix<T,A,B> _slang_matrixFmod(matrix<T,A,B> m1, matrix<T,A,B> m2)
 
 
 static const char* kMetalBuiltinPreludeSimdgroupMatrixOps = R"(
+template<typename T, int Cols, int Rows, typename V>
+void _slang_simdgroup_fill(thread simdgroup_matrix<T, Cols, Rows>* dest, V val) {
+    *dest = make_filled_simdgroup_matrix<T, Cols, Rows>(T(val));
+}
 template<typename Matrix, typename T>
 Matrix _slang_simdgroup_load(const device T* src, ulong elements_per_row) {
     Matrix result;
@@ -783,20 +787,6 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
                 return true;
             }
             break;
-        }
-    case kIROp_MakeCoopMatrixFromScalar:
-        {
-            m_writer->emit("make_filled_simdgroup_matrix<");
-            auto coopType = as<IRCoopMatrixType>(inst->getDataType());
-            emitType(coopType->getElementType());
-            m_writer->emit(", ");
-            emitVal(coopType->getColumnCount(), getInfo(EmitOp::General));
-            m_writer->emit(", ");
-            emitVal(coopType->getRowCount(), getInfo(EmitOp::General));
-            m_writer->emit(">(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(")");
-            return true;
         }
     case kIROp_MatrixReshape:
         {
