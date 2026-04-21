@@ -805,8 +805,7 @@ Val* BwdDiffFuncType::_resolveImplOverride()
             splitParameterTypeAndDirection(astBuilder, thisParamType);
         if (auto thisTypeDiffWitness = diffTypeWitness->getThisTypeDiffWitness())
         {
-            auto thisPairType =
-                getEffectiveDiffPairType(thisParamValueType, thisTypeDiffWitness);
+            auto thisPairType = getEffectiveDiffPairType(thisParamValueType, thisTypeDiffWitness);
             switch (thisParamDirection)
             {
             case ParamPassingMode::In:
@@ -836,8 +835,7 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                 newParamTypes.add(noDiffThisType);
                 break;
             case ParamPassingMode::BorrowInOut:
-                newParamTypes.add(
-                    astBuilder->getBorrowInOutParamType(noDiffThisType));
+                newParamTypes.add(astBuilder->getBorrowInOutParamType(noDiffThisType));
                 break;
             default:
                 SLANG_UNEXPECTED("Unhandled `this` param passing mode");
