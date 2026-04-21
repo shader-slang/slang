@@ -1823,13 +1823,13 @@ local insts = {
 			{
 				nodeMaxDispatchGrid = {
 					struct_name = "NodeMaxDispatchGridDecoration",
-					min_operands = 3,
+					operands = { { "x", "IRIntLit" }, { "y", "IRIntLit" }, { "z", "IRIntLit" } },
 				},
 			},
 			{
 				nodeDispatchGrid = {
 					struct_name = "NodeDispatchGridDecoration",
-					min_operands = 3,
+					operands = { { "x", "IRIntLit" }, { "y", "IRIntLit" }, { "z", "IRIntLit" } },
 				},
 			},
 			{
@@ -3191,8 +3191,8 @@ local insts = {
 	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } },
 	-- Work-graph Barrier flag intrinsics: convert a compile-time BarrierMemoryTypeFlags/BarrierSemanticFlags
 	-- integer value to the corresponding target named-constant expression (e.g. "(UAV_MEMORY)").
-	{ getEnumBarrierMemoryTypeFlags = { operands = { { "flags" } } } },
-	{ getEnumBarrierSemanticFlags = { operands = { { "flags" } } } }
+	{ getEnumBarrierMemoryTypeFlags = { operands = { { "flags" } }, hoistable = true } },
+	{ getEnumBarrierSemanticFlags = { operands = { { "flags" } }, hoistable = true } }
 }
 
 -- A function to calculate some useful properties and put it in the table,

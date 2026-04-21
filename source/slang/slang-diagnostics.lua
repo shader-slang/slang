@@ -2313,9 +2313,23 @@ err(
 
 err(
     "invalid-node-launch-mode",
-    31150,
+    31401,
     "invalid 'NodeLaunch' mode",
     span { loc = "attr:Modifier", message = "invalid NodeLaunch mode '~mode:String'; expected 'broadcasting', 'thread', or 'coalescing'" }
+)
+
+err(
+    "conflicting-node-grid-attributes",
+    31402,
+    "conflicting node grid attributes",
+    span { loc = "decl:Decl", message = "'[NodeDispatchGrid]' and '[NodeMaxDispatchGrid]' cannot both appear on the same node shader" }
+)
+
+err(
+    "node-grid-attribute-requires-broadcasting",
+    31403,
+    "node grid attribute requires broadcasting launch mode",
+    span { loc = "decl:Decl", message = "'[NodeDispatchGrid]' and '[NodeMaxDispatchGrid]' are only valid on broadcasting-launch node shaders" }
 )
 
 warning(

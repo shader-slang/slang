@@ -3012,9 +3012,7 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         }
         else if (auto maxRecAttr = as<MaxRecordsAttribute>(mod))
         {
-            IRInst* val = builder->getIntValue(
-                builder->getIntType(),
-                as<ConstantIntVal>(maxRecAttr->value)->getValue());
+            IRInst* val = getSimpleVal(context, lowerVal(context, maxRecAttr->value));
             builder->addDecoration(inst, kIROp_MaxRecordsDecoration, val);
         }
         // TODO: what are other modifiers we need to propagate through?

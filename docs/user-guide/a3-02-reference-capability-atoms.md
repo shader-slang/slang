@@ -1638,6 +1638,7 @@ Other
 > User should not use this capability
 
 `node`
+> Work-graph node shader stage (D3D12 Work Graphs, SM 6.8)
 
 `optix_coopvec`
 > Represents capabilities required for optix cooperative vector support.
