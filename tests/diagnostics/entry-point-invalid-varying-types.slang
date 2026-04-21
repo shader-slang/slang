@@ -1,9 +1,9 @@
 // Test that invalid types are rejected as entry-point varying parameters.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry diffPairParam -stage vertex
-//DIAGNOSTIC_TEST:SIMPLE(diag=ATOMIC):-target spirv -entry atomicParam -stage vertex
-//DIAGNOSTIC_TEST:SIMPLE(diag=COOPVEC):-target spirv -entry coopVecParam -stage vertex
-//DIAGNOSTIC_TEST:SIMPLE(diag=MATRIX):-target spirv -entry matrixParam -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -entry diffPairParam -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=ATOMIC,non-exhaustive):-target spirv -entry atomicParam -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=COOPVEC,non-exhaustive):-target spirv -entry coopVecParam -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=MATRIX,non-exhaustive):-target spirv -entry matrixParam -stage vertex
 
 // DifferentialPair<T> as a varying parameter
 [shader("vertex")]
