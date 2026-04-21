@@ -39,6 +39,13 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# PowerShell 7.4+ enables $PSNativeCommandUseErrorActionPreference by default,
+# which makes native commands (OpenCppCoverage.exe, slang-test.exe, ...) throw
+# a NativeCommandExitException on non-zero exit. That fires *before* our
+# -TolerateChildFailure check in Invoke-OCC, so intentional tolerance of
+# slang-test failures (expected with no-GPU / crashing tests) never applies.
+# Explicitly disable so we can inspect $LASTEXITCODE ourselves.
+$PSNativeCommandUseErrorActionPreference = $false
 
 function Resolve-RepoPath([string]$Relative) {
     return (Join-Path $RepoRoot $Relative)
