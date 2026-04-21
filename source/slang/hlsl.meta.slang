@@ -32700,25 +32700,60 @@ struct EmptyNodeOutputArray
     }
 };
 
-// Barrier flag constants for work-graph node shaders (SM 6.8)
-// MemoryTypeFlags (first argument):
-static const uint UAV_MEMORY          = 0x01;
-static const uint GROUP_SHARED_MEMORY = 0x02;
-static const uint NODE_INPUT_MEMORY   = 0x04;
-static const uint OUTPUT_MEMORY       = 0x08;
-// SemanticFlags (second argument):
-static const uint GROUP_SYNC          = 0x01;
-static const uint GROUP_SCOPE         = 0x02;
-static const uint DEVICE_SCOPE        = 0x04;
+/// Memory type flags for the work-graph Barrier() intrinsic (SM 6.8, first argument).
+/// Values are defined as Slang::BarrierMemoryTypeFlags in slang-type-system-shared.h.
+enum BarrierMemoryTypeFlags : uint
+{
+    UAV_MEMORY          = $(BarrierMemoryTypeFlags::UavMemory),
+    GROUP_SHARED_MEMORY = $(BarrierMemoryTypeFlags::GroupSharedMemory),
+    NODE_INPUT_MEMORY   = $(BarrierMemoryTypeFlags::NodeInputMemory),
+    OUTPUT_MEMORY       = $(BarrierMemoryTypeFlags::OutputMemory),
+    ALL_MEMORY          = $(BarrierMemoryTypeFlags::AllMemory),
+}
 
-/// Work-graph Barrier intrinsic (SM 6.8).
+/// Semantic flags for the work-graph Barrier() intrinsic (SM 6.8, second argument).
+/// Values are defined as Slang::BarrierSemanticFlags in slang-type-system-shared.h.
+enum BarrierSemanticFlags : uint
+{
+    REORDER      = $(BarrierSemanticFlags::Reorder),
+    GROUP_SYNC   = $(BarrierSemanticFlags::GroupSync),
+    GROUP_SCOPE  = $(BarrierSemanticFlags::GroupScope),
+    DEVICE_SCOPE = $(BarrierSemanticFlags::DeviceScope),
+}
+
+/// Maps a compile-time BarrierMemoryTypeFlags value to its target named-constant expression
+/// (e.g. "(UAV_MEMORY)" or "(UAV_MEMORY | NODE_INPUT_MEMORY)"). Handled by the
+/// HLSL emitter via kIROp_GetEnumBarrierMemoryTypeFlags; must only be called for HLSL.
+__intrinsic_op(getEnumBarrierMemoryTypeFlags)
+int GetEnumBarrierMemoryTypeFlags(BarrierMemoryTypeFlags f);
+
+/// Maps a compile-time BarrierSemanticFlags value to its target named-constant expression
+/// (e.g. "(GROUP_SYNC)" or "(DEVICE_SCOPE | GROUP_SCOPE)"). Handled by the
+/// HLSL emitter via kIROp_GetEnumBarrierSemanticFlags; must only be called for HLSL.
+__intrinsic_op(getEnumBarrierSemanticFlags)
+int GetEnumBarrierSemanticFlags(BarrierSemanticFlags f);
+
 [require(hlsl, sm_6_8)]
-void Barrier(uint memoryTypeFlags, uint semanticFlags)
+void __Barrier_hlsl(int memoryTypeFlags, int semanticFlags)
 {
     __target_switch
     {
     case hlsl:
         __intrinsic_asm "Barrier";
+    }
+}
+
+/// Work-graph Barrier intrinsic (SM 6.8).
+[ForceInline]
+[require(hlsl, sm_6_8)]
+void Barrier(BarrierMemoryTypeFlags memoryTypeFlags, BarrierSemanticFlags semanticFlags)
+{
+    __target_switch
+    {
+    case hlsl:
+        __Barrier_hlsl(
+            GetEnumBarrierMemoryTypeFlags(memoryTypeFlags),
+            GetEnumBarrierSemanticFlags(semanticFlags));
     }
 }
 

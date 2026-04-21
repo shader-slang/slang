@@ -1113,6 +1113,70 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit("GroupMemoryBatrierWithGroupSync();\n");
             return true;
         }
+
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+        {
+            SLANG_UNUSED(inOuterPrec);
+            auto flagVal = (uint32_t)getIntVal(inst->getOperand(0));
+            m_writer->emit("(");
+            // ALL_MEMORY has its own named constant; otherwise decompose into individual flags.
+            if (flagVal == BarrierMemoryTypeFlags::AllMemory)
+            {
+                m_writer->emit("ALL_MEMORY");
+            }
+            else
+            {
+                bool first = true;
+                auto emitFlag = [&](const char* name, uint32_t bit)
+                {
+                    if (flagVal & bit)
+                    {
+                        if (!first)
+                            m_writer->emit(" | ");
+                        m_writer->emit(name);
+                        first = false;
+                    }
+                };
+                emitFlag("UAV_MEMORY", BarrierMemoryTypeFlags::UavMemory);
+                emitFlag("GROUP_SHARED_MEMORY", BarrierMemoryTypeFlags::GroupSharedMemory);
+                emitFlag("NODE_INPUT_MEMORY", BarrierMemoryTypeFlags::NodeInputMemory);
+                emitFlag("OUTPUT_MEMORY", BarrierMemoryTypeFlags::OutputMemory);
+                if (first)
+                    m_writer->emit("0"); // no bits set — fallback
+            }
+            m_writer->emit(")");
+            return true;
+        }
+
+    case kIROp_GetEnumBarrierSemanticFlags:
+        {
+            SLANG_UNUSED(inOuterPrec);
+            auto flagVal = (uint32_t)getIntVal(inst->getOperand(0));
+            m_writer->emit("(");
+            if (flagVal == BarrierSemanticFlags::Reorder)
+            {
+                m_writer->emit("REORDER");
+            }
+            else
+            {
+                bool first = true;
+                auto emitFlag = [&](const char* name, uint32_t bit)
+                {
+                    if (flagVal & bit)
+                    {
+                        if (!first)
+                            m_writer->emit(" | ");
+                        m_writer->emit(name);
+                        first = false;
+                    }
+                };
+                emitFlag("GROUP_SYNC", BarrierSemanticFlags::GroupSync);
+                emitFlag("GROUP_SCOPE", BarrierSemanticFlags::GroupScope);
+                emitFlag("DEVICE_SCOPE", BarrierSemanticFlags::DeviceScope);
+            }
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_MakeCoopVector:
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:

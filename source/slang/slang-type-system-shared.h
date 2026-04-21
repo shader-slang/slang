@@ -5,6 +5,27 @@
 
 namespace Slang
 {
+
+// Memory type flags for the work-graph Barrier() intrinsic (SM 6.8, first argument).
+// Values are referenced by hlsl.meta.slang via $() splices and by the HLSL emitter.
+enum BarrierMemoryTypeFlags : uint32_t
+{
+    UavMemory          = 0x01u,
+    GroupSharedMemory  = 0x02u,
+    NodeInputMemory    = 0x04u,
+    OutputMemory       = 0x08u,
+    AllMemory          = 0x0fu,
+};
+
+// Semantic flags for the work-graph Barrier() intrinsic (SM 6.8, second argument).
+// Values are referenced by hlsl.meta.slang via $() splices and by the HLSL emitter.
+enum BarrierSemanticFlags : uint32_t
+{
+    Reorder      = 0x00u,
+    GroupSync    = 0x01u,
+    GroupScope   = 0x02u,
+    DeviceScope  = 0x04u,
+};
 #define FOREACH_BASE_TYPE(X) \
     X(Void)                  \
     X(Bool)                  \

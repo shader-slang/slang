@@ -350,6 +350,28 @@ Examples of this pattern already in the codebase:
 - `NodeLaunchDecoration` stores the mode as `IRStringLit("broadcasting")` and the emitter re-emits the string verbatim.
 - Work-graph output record `Get()` returns `Ref<T>` backed by `__intrinsic_asm ".Get"` so the emitted HLSL says `.Get(i)` (an l-value in HLSL) rather than an integer offset.
 
+#### Pattern: emitting enum values as target named constants
+
+Use this when a Slang enum must be emitted as named constants rather than integers (e.g. `UAV_MEMORY` instead of `1`).
+
+1. **Define the C++ enum in `slang-type-system-shared.h`** (inside `namespace Slang`, plain `enum` not `enum class` so values implicitly convert to `int`). This header is transitively included by both the core-module source and the emitters.
+
+2. **Mirror it as a Slang enum in the appropriate `*.meta.slang` file**, pulling the actual values from C++ via `$(...)` splices so the two definitions stay in sync:
+   ```slang
+   enum MyFlags : uint { FlagA = $(MyFlags::FlagA), FlagB = $(MyFlags::FlagB) }
+   ```
+
+3. **Declare a `__intrinsic_op` converter in the `.meta.slang` file** to represent the enum-to-string conversion in the IR:
+   ```slang
+   __intrinsic_op(getEnumMyFlags)
+   int GetEnumMyFlags(MyFlags f);
+   ```
+   The mnemonic passed to `__intrinsic_op(...)` must exactly match the Lua key in the next step.
+
+4. **Register the new IR op in `slang-ir-insts.lua`** and add a stable ID in `slang-ir-insts-stable-names.lua`.
+
+5. **Emit the named-constant string in the target emitter** (e.g. `tryEmitInstExprImpl` in `slang-emit-hlsl.cpp`): read the compile-time integer operand via `getIntVal(inst->getOperand(0))`, then map each bit or value to its HLSL named-constant string and write it out with `m_writer->emit(...)`.
+
 ### Git commit message
 
 - Don't mention Claude on the commit message
