@@ -3042,6 +3042,14 @@ standalone_note(
     "use 'let each' to declare a variadic generic value parameter: 'let each ~paramName:Name : ~type:Type'"
 )
 
+warning(
+    "generic-param-shadows-outer-generic",
+    30515,
+    "generic parameter '~param:Decl' shadows a generic parameter from an enclosing scope",
+    span { loc = "param:Decl", message = "generic parameter '~param' shadows an outer generic parameter with the same name" },
+    span { loc = "outerParam:Decl", message = "outer generic parameter '~outerParam' declared here" }
+)
+
 err(
     "pack-param-must-be-last",
     30500,
