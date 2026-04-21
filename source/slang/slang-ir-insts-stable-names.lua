@@ -842,5 +842,6 @@ return {
 	["Decoration.maxRecords"] = 866,
 	["nodeOutputRecordGetElementPtr"] = 867,
 	["getEnumBarrierMemoryTypeFlags"] = 868,
-	["getEnumBarrierSemanticFlags"] = 869
+	["getEnumBarrierSemanticFlags"] = 869,
+	["Decoration.workGraphRecordType"] = 870
 }
