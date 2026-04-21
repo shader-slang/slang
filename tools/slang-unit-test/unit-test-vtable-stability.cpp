@@ -1646,7 +1646,8 @@ struct IByteCodeRunnerProbe : IByteCodeRunner
         lastSlot = 5;
         return -1;
     }
-    SLANG_NO_THROW SlangResult SLANG_MCALL getFunctionInfo(uint32_t, ByteCodeFuncInfo*) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL getFunctionInfo(uint32_t, ByteCodeFuncInfo*)
+        SLANG_OVERRIDE
     {
         lastSlot = 6;
         return SLANG_OK;
@@ -1671,7 +1672,8 @@ struct IByteCodeRunnerProbe : IByteCodeRunner
     {
         lastSlot = 11;
     }
-    SLANG_NO_THROW SlangResult SLANG_MCALL registerExtCall(const char*, VMExtFunction) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL registerExtCall(const char*, VMExtFunction)
+        SLANG_OVERRIDE
     {
         lastSlot = 12;
         return SLANG_OK;
