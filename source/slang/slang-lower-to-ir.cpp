@@ -11603,6 +11603,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subBuilder->addDecoration(irAggType, kIROp_RayPayloadDecoration);
         }
 
+        if (decl->findModifier<WorkGraphRecordTypeAttribute>())
+        {
+            subBuilder->addDecoration(irAggType, kIROp_WorkGraphRecordTypeDecoration);
+        }
+
         subBuilder->setInsertInto(irAggType);
 
         // A `struct` that inherits from another `struct` must start

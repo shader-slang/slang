@@ -6599,7 +6599,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             CASE(Miss, MissKHR);
             CASE(Intersection, IntersectionKHR);
             CASE(RayGeneration, RayGenerationKHR);
-            CASE(Node, GLCompute); // Work-graph node shaders use GLCompute model + ShaderEnqueueAMDX
+            // TODO: Full SPIRV work-graph support requires declaring the SPV_AMDX_shader_enqueue
+            // extension and ShaderEnqueueAMDX capability. Currently maps to GLCompute as a
+            // placeholder; proper AMDX execution-mode and capability declarations are deferred.
+            CASE(Node, GLCompute);
             // TODO: Extended execution models for ray tracing, etc.
 
 #undef CASE

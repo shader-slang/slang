@@ -4448,6 +4448,10 @@ __attributeTarget(ParamDecl)
 attribute_syntax [MaxRecords(count: int)] : MaxRecordsAttribute;
 
 //@hidden:
+__attributeTarget(StructDecl)
+attribute_syntax [__workGraphRecordType] : WorkGraphRecordTypeAttribute;
+
+//@hidden:
 __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanRayPayload(location : int = -1)] : VulkanRayPayloadAttribute;
 

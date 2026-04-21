@@ -127,7 +127,7 @@ SlangResult GLSLSourceEmitter::init()
             break;
         }
     case Stage::Node:
-        SLANG_UNEXPECTED("Node stage is not supported for GLSL output");
+        SLANG_UNIMPLEMENTED_X("Node stage for GLSL output");
         break;
     default:
         break;

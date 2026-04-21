@@ -504,25 +504,25 @@ Modifier* SemanticsVisitor::validateAttribute(
     else if (auto gridAttr = as<NodeMaxDispatchGridAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
-        gridAttr->x = checkLinkTimeConstantIntVal(attr->args[0]);
-        gridAttr->y = checkLinkTimeConstantIntVal(attr->args[1]);
-        gridAttr->z = checkLinkTimeConstantIntVal(attr->args[2]);
+        gridAttr->x = checkConstantIntVal(attr->args[0]);
+        gridAttr->y = checkConstantIntVal(attr->args[1]);
+        gridAttr->z = checkConstantIntVal(attr->args[2]);
         if (!gridAttr->x || !gridAttr->y || !gridAttr->z)
             return nullptr;
     }
     else if (auto fixedGridAttr = as<NodeDispatchGridAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
-        fixedGridAttr->x = checkLinkTimeConstantIntVal(attr->args[0]);
-        fixedGridAttr->y = checkLinkTimeConstantIntVal(attr->args[1]);
-        fixedGridAttr->z = checkLinkTimeConstantIntVal(attr->args[2]);
+        fixedGridAttr->x = checkConstantIntVal(attr->args[0]);
+        fixedGridAttr->y = checkConstantIntVal(attr->args[1]);
+        fixedGridAttr->z = checkConstantIntVal(attr->args[2]);
         if (!fixedGridAttr->x || !fixedGridAttr->y || !fixedGridAttr->z)
             return nullptr;
     }
     else if (auto maxRecAttr = as<MaxRecordsAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
-        maxRecAttr->value = checkLinkTimeConstantIntVal(attr->args[0]);
+        maxRecAttr->value = checkConstantIntVal(attr->args[0]);
         if (!maxRecAttr->value)
             return nullptr;
     }
