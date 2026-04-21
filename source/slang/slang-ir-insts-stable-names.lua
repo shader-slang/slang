@@ -840,5 +840,7 @@ return {
 	["Decoration.nodeMaxDispatchGrid"] = 864,
 	["Decoration.nodeDispatchGrid"] = 865,
 	["Decoration.maxRecords"] = 866,
-	["nodeOutputRecordGetElementPtr"] = 867
+	["nodeOutputRecordGetElementPtr"] = 867,
+	["getEnumBarrierMemoryTypeFlags"] = 868,
+	["getEnumBarrierSemanticFlags"] = 869
 }
