@@ -1479,6 +1479,12 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_CapabilityDisjunction:
         return true;
 
+    // Work-graph Barrier flag helpers: must be inlined into the call site so the HLSL
+    // emitter can emit named constants directly rather than through a temporary int.
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+    case kIROp_GetEnumBarrierSemanticFlags:
+        return true;
+
     // Always fold these in, because their results
     // cannot be represented in the type system of
     // our current targets.
