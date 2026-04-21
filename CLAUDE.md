@@ -323,6 +323,33 @@ Use the `/repro-remix` skill or see `extras/repro-remix.md`.
 - The enum values starting with `kIROp_` are defined in a generated file, `build/source/slang/fiddle/slang-ir-insts-enum.h.fiddle`
 - `FIDDLE()` and `FIDDLE(...)` statements in AST node declarations indicate that additional source is generated and included from `build/source/slang/fiddle`, providing static type system and reflection metadata, visitor support, and serialization support.
 
+### Rebuilding after `hlsl.meta.slang` / `core.meta.slang` changes
+
+The core module source (`hlsl.meta.slang`, `core.meta.slang`, etc.) is embedded into the `slang-bootstrap` binary at compile time. After modifying these files you **must** `touch` the file before building to guarantee CMake detects the change, run the bootstrap generator, then rebuild `slangc`:
+
+```bash
+touch source/slang/hlsl.meta.slang   # (or whichever meta file changed)
+cmake --build --preset debug --target slang-bootstrap
+./build/generators/Debug/bin/slang-bootstrap
+cmake --build --preset debug --target slangc
+```
+
+If you skip the `touch` step the cached bootstrap binary may silently embed the OLD source, and diagnostic line numbers from `./build/generators/Debug/bin/slang-bootstrap` will not match the current source file — a sure sign the binary is stale.
+
+### HLSL named-constant emission rule
+
+**Never emit HLSL enum / named-constant values as hard-coded integers.** DXC maps named constants (attribute strings, flag identifiers, etc.) at parse time; if we bake in a numeric value and DXC later changes the internal mapping the generated HLSL will silently break.
+
+The correct pattern:
+
+1. **Define a Slang enum** (or a set of named intrinsic-backed constants) for each group of conceptual values (e.g. `NodeLaunch` mode, Barrier flag sets).
+2. **Store the name, not the integer, in the IR.** Use `IRStringLit` operands (as `NodeLaunchDecoration` does) or a `Ref<T>` / intrinsic-based accessor that preserves the identifier through to emission.
+3. **Provide a mapping function** in the HLSL emitter (`slang-emit-hlsl.cpp` or `slang-emit-c-like.cpp`) that converts the stored enum/string value back to the HLSL source name so that emitted code reads e.g. `[NodeLaunch("broadcasting")]` not `[NodeLaunch(0)]`.
+
+Examples of this pattern already in the codebase:
+- `NodeLaunchDecoration` stores the mode as `IRStringLit("broadcasting")` and the emitter re-emits the string verbatim.
+- Work-graph output record `Get()` returns `Ref<T>` backed by `__intrinsic_asm ".Get"` so the emitted HLSL says `.Get(i)` (an l-value in HLSL) rather than an integer offset.
+
 ### Git commit message
 
 - Don't mention Claude on the commit message
