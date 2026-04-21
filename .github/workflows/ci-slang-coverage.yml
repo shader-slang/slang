@@ -42,7 +42,11 @@ on:
 jobs:
   coverage:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 120
+    # Windows coverage is the long pole: OpenCppCoverage ~2x, /Ob0 build
+    # another ~1.2x, synthesis pass (needed without GPU drivers to pick up
+    # backend emit coverage) adds another ~50 min. Budget accordingly.
+    # Linux and macOS finish well under this; longer timeout is harmless.
+    timeout-minutes: 240
     container: ${{ inputs.container != '' && fromJSON(format('{{"image":"{0}","options":"--user root","credentials":{{"username":"{1}","password":"{2}"}}}}', inputs.container, github.actor, github.token)) || null }}
     permissions:
       id-token: write # Required for Workload Identity (GCS auth)
