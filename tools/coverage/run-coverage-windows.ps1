@@ -39,13 +39,6 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-# PowerShell 7.4+ enables $PSNativeCommandUseErrorActionPreference by default,
-# which makes native commands (OpenCppCoverage.exe, slang-test.exe, ...) throw
-# a NativeCommandExitException on non-zero exit. That fires *before* our
-# -TolerateChildFailure check in Invoke-OCC, so intentional tolerance of
-# slang-test failures (expected with no-GPU / crashing tests) never applies.
-# Explicitly disable so we can inspect $LASTEXITCODE ourselves.
-$PSNativeCommandUseErrorActionPreference = $false
 
 function Resolve-RepoPath([string]$Relative) {
     return (Join-Path $RepoRoot $Relative)
@@ -155,12 +148,25 @@ function Invoke-OCC {
         $full += $ChildCommand
     }
     Write-Host "+ $OCC $($full -join ' ')"
-    & $OCC @full
+    # Run OCC with ErrorActionPreference temporarily relaxed so a non-zero
+    # native exit sets $LASTEXITCODE rather than throwing a
+    # NativeCommandExitException. Setting $PSNativeCommandUseErrorActionPreference
+    # globally at script scope does NOT reliably propagate in pwsh 7 when the
+    # script is invoked via `& $path` from another pwsh step -- the outer
+    # scope's $true wins. Scoping the override to this function is robust.
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $OCC @full
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
     # OpenCppCoverage returns the child's exit code. For test runs we want to
-    # tolerate non-zero (expected failures from missing GPU/CUDA drivers) as
-    # long as coverage data was written. Callers that are strictly checking
-    # OCC itself (e.g. re-export from --input_coverage) should leave the
-    # switch off.
+    # tolerate non-zero (expected failures from missing GPU/CUDA drivers,
+    # occasional illegal-instruction crashes on GitHub runners, etc.) as long
+    # as coverage data was written. Callers that are strictly checking OCC
+    # itself (e.g. re-export from --input_coverage) should leave the switch
+    # off.
     if ($LASTEXITCODE -ne 0 -and -not $TolerateChildFailure) {
         throw "OpenCppCoverage exited with code $LASTEXITCODE"
     }
