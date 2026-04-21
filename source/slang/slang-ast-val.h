@@ -93,6 +93,38 @@ private:
     Val* tryResolve(SubtypeWitness* newWitness, Type* newLookupSource);
 };
 
+// A DeclRef that encodes that there is some `placeholderDecl` that was looked-up from
+// a synthetic facet, defined on some variation of a explicit member constraint (ex: type-coercion
+// constraint). This `placeholderDecl` can be resolved into a "real" declaration via the original
+// constraint it comes from subsituting.
+FIDDLE()
+class MemberConstraintDeclRef : public DeclRefBase
+{
+    FIDDLE(...)
+public:
+    MemberConstraintDeclRef(Decl* placeholderDecl, TypeCoercionConstraintDecl* constraintDecl)
+    {
+        setOperands(placeholderDecl, constraintDecl);
+    }
+
+    // The constraint that we resolve our declref with.
+    TypeCoercionConstraintDecl* getConstraintDecl()
+    {
+        return as<TypeCoercionConstraintDecl>(getDeclOperand(1));
+    }
+
+    DeclRefBase* _substituteImplOverride(
+        ASTBuilder* astBuilder,
+        SubstitutionSet subst,
+        int* ioDiff);
+
+    void _toTextOverride(StringBuilder& out);
+
+    Val* _resolveImplOverride();
+
+    DeclRefBase* _getBaseOverride();
+};
+
 // Represents a specialization of a generic decl.
 FIDDLE()
 class GenericAppDeclRef : public DeclRefBase

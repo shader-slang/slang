@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK_FAIL): -target spirv -entry computeMain -stage compute -DFAIL
-//TEST:SIMPLE(filecheck=CHECK_PASS): -target spirv -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -slang -compute -shaderobj -output-using-type
+// TEST:SIMPLE(filecheck=CHECK_FAIL): -target spirv -entry computeMain -stage compute -DFAIL
+// TEST:SIMPLE(filecheck=CHECK_PASS): -target spirv -entry computeMain -stage compute
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -slang -compute -shaderobj -output-using-type -xslang -Wno-30856
 
 interface ITwoParamGeneric<A, B>
 {
@@ -21,12 +21,19 @@ struct NotPrimitiveCastable
     double data;
 }
 
-extension<A, B> Foo<A,B> 
-    where int(A)
+extension<A, B, C,
 #ifdef FAIL
-    where NotPrimitiveCastable(B)
+    D,
+#endif
+    E> Foo<A,B> 
+    where C == int
+    where C(A)
+#ifdef FAIL
+    where D == NotPrimitiveCastable
+    where D(B)
 #else
-    where float(B)
+    where E == float
+    where E(B)
 #endif
 {
     [mutating]

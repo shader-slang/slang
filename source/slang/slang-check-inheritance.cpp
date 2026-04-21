@@ -560,6 +560,37 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         return result;
     };
 
+
+    auto tryToAddTypeCoercionConstraintFacet =
+        [&](DeclRef<TypeCoercionConstraintDecl> typeCoercionConstraintDeclRef)
+    {
+        auto typeCoercionConstraintDecl = typeCoercionConstraintDeclRef.getDecl();
+        ensureDecl(&visitor, typeCoercionConstraintDecl, DeclCheckState::CanSpecializeGeneric);
+
+        // Only add synthetic facets if the `selfType` is equal to the `toType`. Otherwise
+        // we will be adding $init's that are nonsensical. Expected form: `ToType
+        // __init(FromType);`.
+        auto toType = getToType(astBuilder, typeCoercionConstraintDeclRef);
+        if (!selfType->equals(toType))
+            return;
+
+        auto syntheticFacetDeclRef = typeCoercionConstraintDecl->syntheticFacetDeclRef;
+        auto syntheticAsAType = DeclRefType::create(astBuilder, syntheticFacetDeclRef);
+        auto syntheticAsAWitness = astBuilder->getTypeEqualityWitness(syntheticAsAType);
+
+        // Add a synthetic facet so that the frontend can pretend they have access to a
+        // valid `__init` function. This facet is `self` since the definition must come
+        // directly from `toType` for it to be an `__init`.
+        Facet typeCoercionFacet = new (arena) Facet::Impl(
+            astBuilder,
+            selfFacetKind,
+            Facet::Directness::Self,
+            syntheticFacetDeclRef,
+            syntheticAsAType,
+            syntheticAsAWitness);
+        allFacets.add(typeCoercionFacet);
+    };
+
     // We now look at the structure of the declaration itself
     // to help us enumerate the direct bases.
     //
@@ -573,83 +604,93 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             // In the case where we have an aggregate type or `extension`
             // declaration, we can use the explicit list of direct bases.
             //
-            for (auto typeConstraintDeclRef :
-                 getMembersOfType<TypeConstraintDecl>(_getASTBuilder(), containerDeclRef))
+            for (auto constraintDeclRef : getMembers(_getASTBuilder(), containerDeclRef))
             {
-                // Note: In certain cases something takes the *syntactic* form of an inheritance
-                // clause, but it is not actually something that should be treated as implying
-                // a subtype relationship. For example, an `enum` declaration can use what looks
-                // like an inheritance clause to indicate its underlying "tag type."
-                //
-                // We skip such pseudo-inheritance relationships for the purposes of determining
-                // the linearized list of bases.
-                //
-                if (typeConstraintDeclRef.getDecl()->hasModifier<IgnoreForLookupModifier>())
-                    continue;
-
-                Type* subTypeForWitness = selfType;
-                if (auto interfaceDeclRef = containerDeclRef.as<InterfaceDecl>())
+                if (auto typeConstraintDeclRef = constraintDeclRef.as<TypeConstraintDecl>())
                 {
-                    // If we're dealing with an interface decl, we'll need to
-                    // represent the constraint as a lookup on the 'this' type of the
-                    // interface.
+                    // Note: In certain cases something takes the *syntactic* form of an inheritance
+                    // clause, but it is not actually something that should be treated as implying
+                    // a subtype relationship. For example, an `enum` declaration can use what looks
+                    // like an inheritance clause to indicate its underlying "tag type."
                     //
+                    // We skip such pseudo-inheritance relationships for the purposes of determining
+                    // the linearized list of bases.
+                    //
+                    if (typeConstraintDeclRef.getDecl()->hasModifier<IgnoreForLookupModifier>())
+                        continue;
 
-                    typeConstraintDeclRef = substituteDeclRef(
-                                                SubstitutionSet(declRef),
-                                                astBuilder,
-                                                visitor.getRequirementAsLookedUpDecl(
+                    Type* subTypeForWitness = selfType;
+                    if (auto interfaceDeclRef = containerDeclRef.as<InterfaceDecl>())
+                    {
+                        // If we're dealing with an interface decl, we'll need to
+                        // represent the constraint as a lookup on the 'this' type of the
+                        // interface.
+                        //
+
+                        typeConstraintDeclRef = substituteDeclRef(
+                                                    SubstitutionSet(declRef),
                                                     astBuilder,
-                                                    typeConstraintDeclRef.getDecl()))
-                                                .as<TypeConstraintDecl>();
-                    subTypeForWitness = substituteType(
-                        SubstitutionSet(declRef),
-                        astBuilder,
-                        visitor.calcThisType(interfaceDeclRef));
-                }
+                                                    visitor.getRequirementAsLookedUpDecl(
+                                                        astBuilder,
+                                                        typeConstraintDeclRef.getDecl()))
+                                                    .as<TypeConstraintDecl>();
+                        subTypeForWitness = substituteType(
+                            SubstitutionSet(declRef),
+                            astBuilder,
+                            visitor.calcThisType(interfaceDeclRef));
+                    }
 
-                // The only case we will ever see a GenericTypeConstraintDecl inside a AggTypeDecl
-                // is when AggTypeDecl is a associatedtype decl. In this case, we will only lookup
-                // the type constraint if the constraint is on the associated type itself.
-                //
-                auto genericTypeConstraintDeclRef =
-                    typeConstraintDeclRef.as<GenericTypeConstraintDecl>();
-                if (genericTypeConstraintDeclRef)
-                {
-                    // If the base expr on the constraint isn't even a `VarExpr`, then it can't be
-                    // referencing the associated type itself and we can skip this constraint.
-                    if (!genericTypeConstraintDeclRef.getDecl()->sub.type &&
-                        !as<VarExpr>(genericTypeConstraintDeclRef.getDecl()->sub.exp))
+                    // The only case we will ever see a GenericTypeConstraintDecl inside a
+                    // AggTypeDecl is when AggTypeDecl is a associatedtype decl. In this case, we
+                    // will only lookup the type constraint if the constraint is on the associated
+                    // type itself.
+                    //
+                    auto genericTypeConstraintDeclRef =
+                        typeConstraintDeclRef.as<GenericTypeConstraintDecl>();
+                    if (genericTypeConstraintDeclRef)
+                    {
+                        // If the base expr on the constraint isn't even a `VarExpr`, then it can't
+                        // be referencing the associated type itself and we can skip this
+                        // constraint.
+                        if (!genericTypeConstraintDeclRef.getDecl()->sub.type &&
+                            !as<VarExpr>(genericTypeConstraintDeclRef.getDecl()->sub.exp))
+                            continue;
+                    }
+
+                    visitor.ensureDecl(
+                        typeConstraintDeclRef,
+                        DeclCheckState::CanUseBaseOfInheritanceDecl);
+
+                    // For generic type constraint decls, always make sure it is about the type
+                    // being checked.
+                    //
+                    if (genericTypeConstraintDeclRef)
+                    {
+                        auto subType = getSub(astBuilder, genericTypeConstraintDeclRef);
+                        if (subType != selfType)
+                            continue;
+                    }
+                    else if (currentDeclRef != declRef)
+                    {
                         continue;
+                    }
+                    // The base type and subtype witness can easily be determined
+                    // using the `InheritanceDecl`.
+                    //
+                    auto baseType = getSup(astBuilder, typeConstraintDeclRef);
+                    auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
+                        subTypeForWitness,
+                        baseType,
+                        typeConstraintDeclRef);
+
+                    addDirectBaseType(baseType, satisfyingWitness);
                 }
-
-                visitor.ensureDecl(
-                    typeConstraintDeclRef,
-                    DeclCheckState::CanUseBaseOfInheritanceDecl);
-
-                // For generic type constraint decls, always make sure it is about the type being
-                // checked.
-                //
-                if (genericTypeConstraintDeclRef)
+                else if (
+                    auto typeCoercionConstraintDeclRef =
+                        constraintDeclRef.as<TypeCoercionConstraintDecl>())
                 {
-                    auto subType = getSub(astBuilder, genericTypeConstraintDeclRef);
-                    if (subType != selfType)
-                        continue;
+                    tryToAddTypeCoercionConstraintFacet(typeCoercionConstraintDeclRef);
                 }
-                else if (currentDeclRef != declRef)
-                {
-                    continue;
-                }
-                // The base type and subtype witness can easily be determined
-                // using the `InheritanceDecl`.
-                //
-                auto baseType = getSup(astBuilder, typeConstraintDeclRef);
-                auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
-                    subTypeForWitness,
-                    baseType,
-                    typeConstraintDeclRef);
-
-                addDirectBaseType(baseType, satisfyingWitness);
             }
         }
 
@@ -704,64 +745,77 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         bool selfIsGenericParamType =
             isDeclRefTypeOf<GenericTypeParamDeclBase>(selfType) != nullptr;
 
-        for (auto constraintDeclRef :
-             getMembersOfType<GenericTypeConstraintDecl>(astBuilder, genericDeclRef))
+        for (auto genericDeclRefMember : getMembers(astBuilder, genericDeclRef))
         {
-            if (constraintDeclRef.getDecl()->checkState.isBeingChecked())
-                continue;
-
-            ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::ScopesWired);
-
-            // Check only the sub-type.
-            visitor.CheckConstraintSubType(constraintDeclRef.getDecl()->sub);
-            auto sub = constraintDeclRef.getDecl()->sub;
-
-            // If the sub-type part of the generic constraint is a member expression, it can't
-            // possibly be defining a constraint for a generic type parameter, so we skip it
-            // to avoid circular checking on the generic param type.
-            if (selfIsGenericParamType && as<MemberExpr>(sub.exp))
-                continue;
-
-            if (!sub.type)
-                sub = visitor.TranslateTypeNodeForced(sub);
-
-            // Canonicalize the constraint declRef to make sure we have a full reference to it.
-            constraintDeclRef =
-                createDefaultSubstitutionsIfNeeded(astBuilder, &visitor, constraintDeclRef)
-                    .as<GenericTypeConstraintDecl>();
-
-            auto subType = constraintDeclRef.substitute(astBuilder, sub.type);
-
-            // We only consider constraints where the type represented
-            // by `declRef` is the subtype, since those
-            // constraints are the ones that give us information about
-            // the declared supertypes.
-            //
-            auto subDeclRefType = as<DeclRefType>(subType);
-            if (!subDeclRefType)
+            if (auto constraintDeclRef = as<GenericTypeConstraintDecl>(genericDeclRefMember))
             {
-                if (auto subEachType = as<EachType>(subType))
-                {
-                    subDeclRefType = subEachType->getElementDeclRefType();
-                }
-                if (!subDeclRefType)
+                if (constraintDeclRef.getDecl()->checkState.isBeingChecked())
                     continue;
+
+                ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::ScopesWired);
+
+                // Check only the sub-type.
+                visitor.CheckConstraintSubType(constraintDeclRef.getDecl()->sub);
+                auto sub = constraintDeclRef.getDecl()->sub;
+
+                // If the sub-type part of the generic constraint is a member expression, it can't
+                // possibly be defining a constraint for a generic type parameter, so we skip it
+                // to avoid circular checking on the generic param type.
+                if (selfIsGenericParamType && as<MemberExpr>(sub.exp))
+                    continue;
+
+                if (!sub.type)
+                    sub = visitor.TranslateTypeNodeForced(sub);
+
+                // Canonicalize the constraint declRef to make sure we have a full reference to it.
+                constraintDeclRef =
+                    createDefaultSubstitutionsIfNeeded(astBuilder, &visitor, constraintDeclRef)
+                        .as<GenericTypeConstraintDecl>();
+
+                auto subType = constraintDeclRef.substitute(astBuilder, sub.type);
+
+                // We only consider constraints where the type represented
+                // by `declRef` is the subtype, since those
+                // constraints are the ones that give us information about
+                // the declared supertypes.
+                //
+                auto subDeclRefType = as<DeclRefType>(subType);
+                if (!subDeclRefType)
+                {
+                    if (auto subEachType = as<EachType>(subType))
+                    {
+                        subDeclRefType = subEachType->getElementDeclRefType();
+                    }
+                    if (!subDeclRefType)
+                        continue;
+                }
+                if (subDeclRefType->getDeclRef() != declRef)
+                    continue;
+
+                // Further check the constraint, since we now need the sup-type.
+                ensureDecl(
+                    &visitor,
+                    constraintDeclRef.getDecl(),
+                    DeclCheckState::CanSpecializeGeneric);
+
+                auto superType = getSup(astBuilder, constraintDeclRef);
+
+                // Because the constraint is a declared inheritance relationship,
+                // adding the base to our list of direct bases is as straightforward
+                // as in all the preceding cases.
+                //
+                auto satisfyingWitness = _getASTBuilder()->getDeclaredSubtypeWitness(
+                    selfType,
+                    superType,
+                    constraintDeclRef);
+                addDirectBaseType(superType, satisfyingWitness);
             }
-            if (subDeclRefType->getDeclRef() != declRef)
-                continue;
-
-            // Further check the constraint, since we now need the sup-type.
-            ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::CanSpecializeGeneric);
-
-            auto superType = getSup(astBuilder, constraintDeclRef);
-
-            // Because the constraint is a declared inheritance relationship,
-            // adding the base to our list of direct bases is as straightforward
-            // as in all the preceding cases.
-            //
-            auto satisfyingWitness =
-                _getASTBuilder()->getDeclaredSubtypeWitness(selfType, superType, constraintDeclRef);
-            addDirectBaseType(superType, satisfyingWitness);
+            else if (
+                auto typeCoercionConstraintDeclRef =
+                    genericDeclRefMember.as<TypeCoercionConstraintDecl>())
+            {
+                tryToAddTypeCoercionConstraintFacet(typeCoercionConstraintDeclRef);
+            }
         }
     }
 

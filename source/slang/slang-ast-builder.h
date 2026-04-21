@@ -384,6 +384,11 @@ public:
                 break;
             }
         }
+        else if (auto knownMethodDecl = as<KnownMethodDecl>(parent.getDecl()))
+        {
+            return getMemberConstraintDeclRef(knownMethodDecl->constraintDecl, memberDecl)
+                .template as<T>();
+        }
         else if (auto directDeclRef = as<DirectDeclRef>(parent.declRefBase))
         {
             return makeDeclRef(memberDecl);
@@ -449,6 +454,13 @@ public:
     {
         auto result = getOrCreate<LookupDeclRef>(declToLookup, base, subtypeWitness);
         return result;
+    }
+
+    DeclRef<Decl> getMemberConstraintDeclRef(
+        TypeCoercionConstraintDecl* constraintDecl,
+        Decl* declToLookup)
+    {
+        return getOrCreate<MemberConstraintDeclRef>(declToLookup, constraintDecl);
     }
 
     DeclRef<Decl> getLookupDeclRef(SubtypeWitness* subtypeWitness, Decl* declToLookup)

@@ -427,6 +427,33 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
     return innerDeclRefType;
 }
 
+DeclRefBase* MemberConstraintDeclRef::_substituteImplOverride(ASTBuilder*, SubstitutionSet, int*)
+{
+    return this;
+}
+
+void MemberConstraintDeclRef::_toTextOverride(StringBuilder& out)
+{
+    out << "MemberConstraintDeclRef<";
+    out << ">(";
+    if (getDecl()->getName() && getDecl()->getName()->text.getLength() != 0)
+    {
+        out << getDecl()->getName()->text;
+    }
+    out << getConstraintDecl();
+    out << ")";
+}
+
+Val* MemberConstraintDeclRef::_resolveImplOverride()
+{
+    return this;
+}
+
+DeclRefBase* MemberConstraintDeclRef::_getBaseOverride()
+{
+    return nullptr;
+}
+
 DeclRefBase* GenericAppDeclRef::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,

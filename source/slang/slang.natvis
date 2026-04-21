@@ -349,6 +349,8 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::EmptyDecl">(Slang::EmptyDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SyntaxDecl">(Slang::SyntaxDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DeclGroup">(Slang::DeclGroup*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TypeCoercionConstraintDecl">(Slang::TypeCoercionConstraintDecl*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::KnownMethodDecl">(Slang::KnownMethodDecl*)&amp;astNodeType</ExpandedItem>
             <Item Name="Decl">(Slang::DeclBase*)this,!</Item>
         </Expand>
     </Type>
@@ -395,6 +397,8 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::EmptyDecl">(Slang::EmptyDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SyntaxDecl">(Slang::SyntaxDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DeclGroup">(Slang::DeclGroup*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TypeCoercionConstraintDecl">(Slang::TypeCoercionConstraintDecl*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::KnownMethodDecl">(Slang::KnownMethodDecl*)&amp;astNodeType</ExpandedItem>
             <Item Name="Decl">(Slang::Decl*)this,!</Item>
         </Expand>
     </Type>

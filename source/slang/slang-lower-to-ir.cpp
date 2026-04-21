@@ -9873,7 +9873,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl)
     {
-        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
+        if (auto assocTypeDecl = as<AssocTypeDecl>(decl->parentDecl))
+        {
+            if (const auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->parentDecl))
+            {
+                return LoweredValInfo::simple(getInterfaceRequirementKey(decl));
+            }
+        }
+        else if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
         {
             SLANG_UNUSED(globalGenericParamDecl);
             auto builder = getBuilder();
@@ -11896,11 +11903,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         TypeCoercionConstraintDecl* constraintDecl)
     {
         auto subBuilder = subContext->irBuilder;
-        auto fromType = lowerType(subContext, constraintDecl->fromType.Ptr());
-        auto toType = lowerType(subContext, constraintDecl->toType);
-        auto funcType = subBuilder->getFuncType(1, &fromType, toType);
+        auto subFromType = getFromType(subContext->astBuilder, constraintDecl);
+        auto irFromType = lowerType(subContext, subFromType);
+        auto subToType = getToType(subContext->astBuilder, constraintDecl);
+        auto irToType = lowerType(subContext, subToType);
+        auto funcType = subBuilder->getFuncType(1, &irFromType, irToType);
         auto param = subBuilder->emitParam(funcType);
-        addNameHint(context, param, constraintDecl);
+        addNameHint(context, param, "$init");
         subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
     }
 
@@ -13816,6 +13825,15 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
     const auto initialSubst = subst;
     SLANG_UNUSED(initialSubst);
 
+    if (auto memberConstraintDeclRef = as<MemberConstraintDeclRef>(subst))
+    {
+        auto constraintDecl = memberConstraintDeclRef->getConstraintDecl();
+        // `TypeCoercionWitness` should map to a `Param` already in an outer scope generic.
+        // This `Param` is subsituted out during specialization to resolve our method.
+        auto loweredDeclInfo = context->findLoweredDecl(constraintDecl);
+        SLANG_ASSERT(loweredDeclInfo);
+        return *loweredDeclInfo;
+    }
 
     if (as<ThisTypeDecl>(decl))
     {

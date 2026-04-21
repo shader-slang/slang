@@ -3648,6 +3648,19 @@ bool addTypeCoercionWitnessToArgs(
     ShortList<Val*>& args,
     bool shouldEmitError);
 
+// Returns `false` if coerce fails, `true` if success, `outTypeCoercionWitness` maybe filled on
+// success.
+bool checkTypeCoercionWitnessValidity(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    TypeCoercionConstraintDecl* constraintDecl,
+    Type* fromType,
+    Type* toType,
+    DeclRef<GenericDecl>* maybeGenericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    bool shouldEmitError,
+    TypeCoercionWitness** outTypeCoercionWitness);
+
 bool addHasDiffTypeInfoWitnessToArgs(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,

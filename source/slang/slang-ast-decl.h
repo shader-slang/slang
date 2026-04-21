@@ -536,6 +536,18 @@ class InheritanceDecl : public TypeConstraintDecl
 
 // TODO: may eventually need sub-classes for explicit/direct vs. implicit/indirect inheritance
 
+// A container that contains a method we know that exists via a constraint.
+// This container is used as a 'synthetic facet' for member-lookup.
+// This container is currently only designed around containing one synthetic method.
+FIDDLE()
+class KnownMethodDecl : public AggTypeDeclBase
+{
+    FIDDLE(...)
+    // The original type this synthetic facet is a facet for.
+    FIDDLE() Type* thisType;
+    FIDDLE() TypeCoercionConstraintDecl* constraintDecl;
+    Type* getThisType() const { return thisType; }
+};
 
 // A declaration that represents a simple (non-aggregate) type
 //
@@ -992,6 +1004,7 @@ class TypeCoercionConstraintDecl : public Decl
     SourceLoc whereTokenLoc = SourceLoc();
     FIDDLE() TypeExp fromType;
     FIDDLE() TypeExp toType;
+    FIDDLE() DeclRef<KnownMethodDecl> syntheticFacetDeclRef;
 };
 
 FIDDLE()

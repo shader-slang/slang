@@ -4073,6 +4073,73 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
         decl->fromType = TranslateTypeNodeForced(decl->fromType);
     if (!decl->toType.type)
         decl->toType = TranslateTypeNodeForced(decl->toType);
+
+    auto astBuilder = getASTBuilder();
+
+    // Pre-generate a container (`KnownMethodDecl`) that will function as a synthetic-facet
+    // during member lookup. Put inside it a synthetic-method that signifies
+    // that a particular type contains some method of the form `ToType __init(FromType)`.
+    auto paramDecl = astBuilder->create<ParamDecl>();
+    paramDecl->type = decl->fromType;
+    paramDecl->nameAndLoc.name = getName("value");
+    paramDecl->nameAndLoc.loc = decl->loc;
+
+    auto syntheticFunctionDecl = astBuilder->create<ConstructorDecl>();
+    syntheticFunctionDecl->returnType = decl->toType;
+    syntheticFunctionDecl->nameAndLoc.name = getName("$init");
+    syntheticFunctionDecl->nameAndLoc.loc = decl->loc;
+    syntheticFunctionDecl->addMember(paramDecl);
+
+    // `syntheticFunctionDecl` should be an implicit conversion if the constraint is `implicit`
+    if (auto implicitConversionModifier = decl->findModifier<ImplicitConversionModifier>())
+        addModifier(syntheticFunctionDecl, implicitConversionModifier);
+
+    auto parentDecl = getModuleDecl(decl->parentDecl);
+    DeclRef<KnownMethodDecl> syntheticFacetDeclRef = astBuilder->create<KnownMethodDecl>();
+    KnownMethodDecl* syntheticFacetDecl = syntheticFacetDeclRef.getDecl();
+    syntheticFacetDecl->constraintDecl = decl;
+    syntheticFacetDecl->ownedScope = astBuilder->create<Scope>();
+    syntheticFacetDecl->ownedScope->parent = getScope(parentDecl);
+    syntheticFacetDecl->ownedScope->containerDecl = syntheticFacetDecl;
+    syntheticFacetDecl->parentDecl = parentDecl;
+    syntheticFacetDecl->nameAndLoc.loc = decl->loc;
+    syntheticFacetDecl->addMember(syntheticFunctionDecl);
+    syntheticFacetDecl->thisType = getToType(astBuilder, decl);
+
+    decl->syntheticFacetDeclRef = syntheticFacetDeclRef;
+
+    // To resolve calling a method constrained via a `TypeCoercionWitness` we must
+    // add a synthetic facet to our `ToType` and resolve the methods existence via
+    // specialization. As a result, if a user specifies a `ToType` not defined in the
+    // current scopes generic parameter list, we have a problem: we cannot retroactively add methods
+    // to an already baked `InheritanceInfo` (so the method constrained will not be accessible).
+    //
+    // If a user intends to constrain a type declared outside the current scope they need to use
+    // type equality constraints.
+    //
+    auto toTypeDeclRefType = as<DeclRefType>(decl->toType);
+    if (toTypeDeclRefType)
+    {
+        if (as<GenericDecl>(decl->parentDecl))
+        {
+            auto toTypeDecl = toTypeDeclRefType->getDeclRef().getDecl();
+            for (auto genericTypeParamDecl :
+                 decl->parentDecl->getMembersOfType<GenericTypeParamDeclBase>())
+            {
+                if (genericTypeParamDecl == toTypeDecl)
+                    return;
+            }
+        }
+        else if (
+            isAssociatedTypeDecl(decl->parentDecl) &&
+            toTypeDeclRefType->getDeclRef().getDecl() == decl->parentDecl)
+            return;
+    }
+    getSink()->diagnose(
+        Diagnostics::TypeCoerceConstraintToTypeMustBeDefinedInTheCurrentScopesGeneric{
+            .toType = decl->toType,
+            .locationOfGenericParameterList = decl->parentDecl,
+            .location = decl->loc});
 }
 
 void SemanticsDeclHeaderVisitor::visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl)
@@ -5915,49 +5982,72 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
 {
     SLANG_UNUSED(satisfyingType);
 
-    // We will enumerate the type constraints placed on the
+    // We will enumerate the constraints placed on the
     // associated type and see if they can be satisfied.
     //
     bool conformance = true;
     Val* witness = nullptr;
-    for (auto requiredConstraintDeclRef :
-         getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, requirementDeclRef))
+    for (auto requiredConstraintDeclRef : getMembers(m_astBuilder, requirementDeclRef))
     {
-        // Grab the type we expect to conform to from the constraint.
-        auto requiredSuperType = getSup(m_astBuilder, requiredConstraintDeclRef);
+        if (auto genericTypeConstraintDecl =
+                requiredConstraintDeclRef.as<GenericTypeConstraintDecl>())
+        {
+            // Grab the type we expect to conform to from the constraint.
+            auto requiredSuperType = getSup(m_astBuilder, genericTypeConstraintDecl);
 
-        auto subType = getSub(m_astBuilder, requiredConstraintDeclRef);
-        witness = tryGetSubtypeWitness(subType, requiredSuperType);
+            auto subType = getSub(m_astBuilder, genericTypeConstraintDecl);
+            witness = tryGetSubtypeWitness(subType, requiredSuperType);
 
-        if (witness)
-        {
-            auto genConstraint = as<GenericTypeConstraintDecl>(requiredConstraintDeclRef.getDecl());
-            if (genConstraint && genConstraint->isEqualityConstraint &&
-                !isTypeEqualityWitness(witness))
-                witness = nullptr;
-        }
-        if (witness)
-        {
-            // If a subtype witness was found, then the conformance
-            // appears to hold, and we can satisfy that requirement.
-            witnessTable->add(requiredConstraintDeclRef.getDecl(), RequirementWitness(witness));
-        }
-        else
-        {
-            // Is our constraint optional? If so, then our conformance is still fine.
-            // We'll just use a NoneWitness.
-            //
-            if (requiredConstraintDeclRef.getDecl()->findModifier<OptionalConstraintModifier>())
+            if (witness)
             {
-                witnessTable->add(
-                    requiredConstraintDeclRef.getDecl(),
-                    m_astBuilder->getOrCreate<NoneWitness>());
-                continue;
+                auto genConstraint =
+                    as<GenericTypeConstraintDecl>(genericTypeConstraintDecl.getDecl());
+                if (genConstraint && genConstraint->isEqualityConstraint &&
+                    !isTypeEqualityWitness(witness))
+                    witness = nullptr;
             }
+            if (witness)
+            {
+                // If a subtype witness was found, then the conformance
+                // appears to hold, and we can satisfy that requirement.
+                witnessTable->add(genericTypeConstraintDecl.getDecl(), RequirementWitness(witness));
+            }
+            else
+            {
+                // Is our constraint optional? If so, then our conformance is still fine.
+                // We'll just use a NoneWitness.
+                //
+                if (genericTypeConstraintDecl.getDecl()->findModifier<OptionalConstraintModifier>())
+                {
+                    witnessTable->add(
+                        genericTypeConstraintDecl.getDecl(),
+                        m_astBuilder->getOrCreate<NoneWitness>());
+                    continue;
+                }
 
-            // If a witness couldn't be found, then the conformance
-            // seems like it will fail.
-            conformance = false;
+                // If a witness couldn't be found, then the conformance
+                // seems like it will fail.
+                conformance = false;
+            }
+        }
+        else if (
+            auto typeCoercionConstraintDeclRef =
+                requiredConstraintDeclRef.as<TypeCoercionConstraintDecl>())
+        {
+            auto astBuilder = getASTBuilder();
+            auto fromType = getFromType(astBuilder, typeCoercionConstraintDeclRef);
+            auto toType = getToType(astBuilder, typeCoercionConstraintDeclRef);
+            if (!checkTypeCoercionWitnessValidity(
+                    astBuilder,
+                    this,
+                    typeCoercionConstraintDeclRef.getDecl(),
+                    fromType,
+                    toType,
+                    nullptr,
+                    nullptr,
+                    false,
+                    nullptr))
+                conformance = false;
         }
     }
     return conformance;
@@ -14175,13 +14265,25 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
 
         HashSet<Decl*> genericParamsReferencedByConstraints;
 
-        // Also collect declarations referenced by generic constraints
-        for (auto constraint :
-             getMembersOfType<GenericTypeConstraintDecl>(getASTBuilder(), genericDecl))
+        // Also collect declarations referenced by generic & type-coercion constraints
+        for (auto constraintDeclRef : getMembers(getASTBuilder(), genericDecl))
         {
-            collectReferencedDecls(
-                constraint.getDecl()->sup.type,
-                genericParamsReferencedByConstraints);
+            if (auto genericTypeConstraintDeclRef =
+                    constraintDeclRef.as<GenericTypeConstraintDecl>())
+                collectReferencedDecls(
+                    genericTypeConstraintDeclRef.getDecl()->sup.type,
+                    genericParamsReferencedByConstraints);
+            else if (
+                auto typeCoercionConstraintDeclRef =
+                    constraintDeclRef.as<TypeCoercionConstraintDecl>())
+            {
+                collectReferencedDecls(
+                    typeCoercionConstraintDeclRef.getDecl()->toType.type,
+                    genericParamsReferencedByConstraints);
+                collectReferencedDecls(
+                    typeCoercionConstraintDeclRef.getDecl()->fromType.type,
+                    genericParamsReferencedByConstraints);
+            }
         }
 
         // Note: We intentionally do NOT check inheritance declarations in the extension.
@@ -14345,6 +14447,10 @@ Type* SemanticsVisitor::calcThisType(DeclRef<Decl> declRef)
         ensureDecl(extDeclRef, DeclCheckState::CanUseExtensionTargetType);
         auto targetType = getTargetType(m_astBuilder, extDeclRef);
         return calcThisType(targetType);
+    }
+    else if (auto knownMethodDecl = declRef.as<KnownMethodDecl>())
+    {
+        return calcThisType(knownMethodDecl.getDecl()->getThisType());
     }
     else
     {

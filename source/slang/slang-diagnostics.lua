@@ -3935,6 +3935,13 @@ err(
     span { loc = "location", message = "'~fromType:Type' is not convertible to '~toType:Type', not satisfying the type coerce constraint '~toType:Type(~fromType:Type)'" }
 )
 
+err(
+    "type-coerce-constraint-to-type-must-be-defined-in-the-current-scopes-generic",
+    38044,
+    "type coerce constraint ToType must be defined in the current scope's generic parameter list",
+    span { loc = "location", message = "the ToType of a type coerce constraint ('~toType:Type') must be defined in the current scope's generic parameter list. Consider adding to '~locationOfGenericParameterList:Decl' the generic parameter 'ToType' with constraint 'where ToType == ~toType:Type'" }
+)
+
 --
 -- 382xx: module imports
 --
