@@ -37,7 +37,8 @@ Each rule specifies:
 ```
 Rule                    Type Predicate                          Target
 ----                    --------------                          ------
-DifferentialPair<T>     as<DifferentialPairType>                all
+DifferentialPair<T>     as<DifferentialPairType> or             all
+DifferentialPtrPair<T>  as<DifferentialPtrPairType>
 Atomic<T>               as<AtomicType>                          all
 CoopVec<T, N>           IntrinsicTypeModifier with              all
                         irOp == kIROp_CoopVectorType
@@ -46,6 +47,9 @@ CoopMat<T,S,M,N,R>      IntrinsicTypeModifier with              all
                         irOp == kIROp_CoopMatrixType
 vector<bool>            VectorExpressionType with               SPIR-V only
                         Bool element type
+matrix<T, R, C>         MatrixExpressionType with element       SPIR-V only
+(bad element type)      type other than float/half/double/
+                        int/uint
 ```
 
 New rules are added by appending entries to the static array. No other code
@@ -84,33 +88,25 @@ in `linkage->targets`. If any target matches the predicate, the error is emitted
 This handles the case where a user compiles for both SPIR-V and HLSL -- the
 SPIR-V restriction still applies.
 
-### Site 2: Matrix Type Validation
+### Site 2: Matrix Dimension Validation
 
 **Location**: `CoerceToUsableType()` in `source/slang/slang-check-type.cpp`
 
-Matrix types are validated at type-construction time (not just at entry points)
-because invalid matrix dimensions and element types produce broken output
-regardless of where they appear.
-
-#### Dimension Validation
+Matrix **dimensions** are validated at type-construction time (not just at
+entry points) because matrix dimensions outside 1..4 produce broken output
+regardless of where the type appears.
 
 Row count and column count are checked when they are compile-time constants
-(`ConstantIntVal`). Values > 4 are rejected. Non-constant dimensions (generic
-parameters) are not validated here -- they will be checked when the generic is
-instantiated with concrete values.
+(`ConstantIntVal`). Values outside `1..4` are rejected. Non-constant dimensions
+(generic parameters) are not validated here -- they will be checked when the
+generic is instantiated with concrete values.
 
-#### Element Type Validation
-
-The following element types are supported for matrices:
-
-- `float`, `half`, `double`
-- `int` (32-bit), `uint` (32-bit)
-
-The following are rejected:
-
-- `int8_t`, `int16_t`, `int64_t`
-- `uint8_t`, `uint16_t`, `uint64_t`
-- `bool`
+**Note:** Matrix *element-type* validation is handled by Site 1 (the varying
+rule table), because the restriction on element types is specific to SPIR-V
+entry-point varyings rather than a universal type-system restriction. Matrices
+with `uint64_t` elements (for example) are fine inside a uniform buffer or
+internal computation; they only fail when used as an entry-point varying for
+SPIR-V.
 
 ## Diagnostics
 

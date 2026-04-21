@@ -506,7 +506,9 @@ TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
         }
     }
 
-    // Validate matrix dimensions and element types
+    // Validate matrix dimensions. Element-type restrictions are handled by
+    // the entry-point varying rules (see validateEntryPoint) rather than here,
+    // since they are target-specific (SPIR-V) and only apply to varyings.
     if (auto matType = as<MatrixExpressionType>(type))
     {
         SourceLoc loc = result.exp ? result.exp->loc : SourceLoc();

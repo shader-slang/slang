@@ -8,7 +8,7 @@
 // DifferentialPair<T> as a varying parameter
 [shader("vertex")]
 float4 diffPairParam(DifferentialPair<float> dp : A) : SV_Position
-//CHECK: DifferentialPair is not a valid varying type
+//CHECK: DifferentialPair/DifferentialPtrPair is not a valid varying type
 {
     return float4(0);
 }

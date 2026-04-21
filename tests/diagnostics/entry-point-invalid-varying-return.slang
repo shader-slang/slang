@@ -14,7 +14,7 @@ Atomic<int> atomicReturn()
 // DifferentialPair<T> as a return type
 [shader("vertex")]
 DifferentialPair<float> diffPairReturn()
-//DIFFPAIR: DifferentialPair is not a valid varying type
+//DIFFPAIR: DifferentialPair/DifferentialPtrPair is not a valid varying type
 {
     return {};
 }

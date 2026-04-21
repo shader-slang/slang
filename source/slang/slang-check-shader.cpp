@@ -729,7 +729,11 @@ struct EntryPointVaryingTypeRule
 
 static bool _matchDifferentialPairType(Type* type)
 {
-    return as<DifferentialPairType>(type) != nullptr;
+    // Match both `DifferentialPair<T>` and `DifferentialPtrPair<T>` (the
+    // backward-mode autodiff ptr-pair type). They are represented by
+    // distinct AST classes but share the same varying-type restriction.
+    return as<DifferentialPairType>(type) != nullptr ||
+           as<DifferentialPtrPairType>(type) != nullptr;
 }
 
 static bool _matchAtomicType(Type* type)
@@ -788,7 +792,9 @@ static bool _isSpirvTarget(CodeGenTarget target)
 }
 
 static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
-    {_matchDifferentialPairType, "DifferentialPair is not a valid varying type", nullptr},
+    {_matchDifferentialPairType,
+     "DifferentialPair/DifferentialPtrPair is not a valid varying type",
+     nullptr},
     {_matchAtomicType, "Atomic is not a valid varying type", nullptr},
     {_matchCoopVectorType, "CoopVec is not a valid varying type", nullptr},
     {_matchCoopMatrixType, "CoopMat is not a valid varying type", nullptr},
@@ -808,6 +814,8 @@ struct VaryingTypeValidationContext
     const char* context;
     ArrayView<CodeGenTarget> targets;
     HashSet<Type*> seenTypes;
+    UInt recursionDepth = 0;
+    bool reportedNestingLimit = false;
 };
 
 // Recursively walks a type and checks it against the varying type rules.
@@ -819,6 +827,33 @@ static bool validateVaryingType(VaryingTypeValidationContext& ctx, Type* type)
 
     if (as<ErrorType>(type))
         return false;
+
+    // Guard against deeply / infinitely nested generic struct types. The
+    // `seenTypes` set catches self-referential types that reuse the same
+    // `Type*` pointer, but generic instantiations such as
+    // `struct LoopField<each T> { LoopField<T, int> next; }` produce a fresh
+    // `Type*` at every level and would otherwise recurse unboundedly.
+    if (ctx.recursionDepth >= kMaxTypeNestingDepth)
+    {
+        if (!ctx.reportedNestingLimit)
+        {
+            ctx.reportedNestingLimit = true;
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location = ctx.loc;
+            ctx.sink->diagnose(diag);
+        }
+        return true;
+    }
+    struct DepthGuard
+    {
+        UInt& depth;
+        DepthGuard(UInt& d)
+            : depth(d)
+        {
+            ++depth;
+        }
+        ~DepthGuard() { --depth; }
+    } depthGuard(ctx.recursionDepth);
 
     // Unwrap ModifiedType
     if (auto modType = as<ModifiedType>(type))
@@ -902,6 +937,11 @@ static bool validateVaryingType(VaryingTypeValidationContext& ctx, Type* type)
             return foundError;
         }
     }
+
+    // We deliberately do not recurse into vector/matrix element types: the
+    // type system requires those element types to be scalar, and any scalar
+    // element restriction (e.g. `vector<bool>`, `matrix<uint64_t, ...>`) is
+    // expressed as a whole-type rule in `kEntryPointVaryingTypeRules` above.
 
     return false;
 }
@@ -1040,10 +1080,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             ctx.sink = sink;
             ctx.entryPointName = entryPointName;
             ctx.loc = param->loc;
-            ctx.direction = param->hasModifier<OutModifier>()     ? "output"
-                            : param->hasModifier<InOutModifier>() ? "input/output"
-                            : param->hasModifier<RefModifier>()   ? "input/output"
-                                                                  : "input";
+            // Note: `InOutModifier` inherits from `OutModifier`, so it must be
+            // checked first to avoid mislabeling `inout` parameters as "output".
+            ctx.direction = param->hasModifier<InOutModifier>() ? "input/output"
+                            : param->hasModifier<OutModifier>() ? "output"
+                            : param->hasModifier<RefModifier>() ? "input/output"
+                                                                : "input";
 
             StringBuilder contextSb;
             auto paramName = param->getName();

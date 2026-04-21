@@ -14,7 +14,7 @@ struct BadFields
 // Invalid type as a field of a varying struct parameter
 [shader("vertex")]
 float4 structParam(BadFields b : A) : SV_Position
-//CHECK: DifferentialPair is not a valid varying type
+//CHECK: DifferentialPair/DifferentialPtrPair is not a valid varying type
 {
     return float4(0);
 }
@@ -29,7 +29,7 @@ struct Wrapper<T>
 // declaration without applying substitutions.
 [shader("vertex")]
 float4 genericStructParam(Wrapper<DifferentialPair<float>> w : A) : SV_Position
-//GENERIC: DifferentialPair is not a valid varying type
+//GENERIC: DifferentialPair/DifferentialPtrPair is not a valid varying type
 {
     return float4(0);
 }
@@ -37,7 +37,7 @@ float4 genericStructParam(Wrapper<DifferentialPair<float>> w : A) : SV_Position
 // Invalid type as the element of an array parameter.
 [shader("vertex")]
 float4 arrayParam(DifferentialPair<float> arr[4] : A) : SV_Position
-//ARRAY: DifferentialPair is not a valid varying type
+//ARRAY: DifferentialPair/DifferentialPtrPair is not a valid varying type
 {
     return float4(0);
 }
