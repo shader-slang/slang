@@ -5,8 +5,8 @@
 void test()
 {
     matrix<float, 4, 5> m1;
-//CHECK: error 38206
+//CHECK: matrix row and column counts must be between 1 and 4
 
     matrix<float, 5, 4> m2;
-//CHECK: error 38206
+//CHECK: matrix row and column counts must be between 1 and 4
 }
