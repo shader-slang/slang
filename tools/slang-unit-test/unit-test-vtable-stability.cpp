@@ -9,15 +9,23 @@
 // indices of all subsequent methods shift by one, causing a different probe
 // method to fire and the corresponding SLANG_CHECK to fail.
 //
-// Calling convention note: on all platforms Slang targets, virtual dispatch
-// passes `this` in the first register and further args in subsequent registers.
-// The probe overrides never read their arguments, so calling with no args
-// (beyond `this`) is safe regardless of the declared parameter list.
+// Calling convention note: callSlot() casts every vtable entry to
+// void(SLANG_MCALL*)(void*) and calls it with only `this`. The actual methods
+// have varying signatures; calling through a mismatched pointer is undefined
+// behavior per [expr.call]. On all 64-bit ABIs Slang targets (x86_64, ARM64)
+// this is benign: `this` lands in the first integer register, remaining
+// argument registers hold garbage that the probe overrides never read, and the
+// caller handles stack cleanup (no __stdcall callee-cleanup mismatch). On
+// 32-bit x86 with __stdcall the callee would clean the stack for its declared
+// parameters, corrupting the stack when called with fewer arguments, so the
+// entire test is guarded by SLANG_PTR_IS_64.
 
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace slang;
+
+#if SLANG_PTR_IS_64
 
 // ---------------------------------------------------------------------------
 // Helper: call vtable slot `slot` on `obj`, passing only `this`.
@@ -1601,3 +1609,93 @@ SLANG_UNIT_TEST(vtableIModule)
     callSlot(&p, 29);
     SLANG_CHECK(p.lastSlot == 29); // disassemble
 }
+
+// ---------------------------------------------------------------------------
+// IByteCodeRunner : ISlangUnknown  (own slots 3-13)
+// ---------------------------------------------------------------------------
+struct IByteCodeRunnerProbe : IByteCodeRunner
+{
+    int lastSlot = -1;
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const&, void**) SLANG_OVERRIDE
+    {
+        lastSlot = 0;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        lastSlot = 1;
+        return 1;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        lastSlot = 2;
+        return 1;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL loadModule(IBlob*) SLANG_OVERRIDE
+    {
+        lastSlot = 3;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL selectFunctionByIndex(uint32_t) SLANG_OVERRIDE
+    {
+        lastSlot = 4;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW int SLANG_MCALL findFunctionByName(const char*) SLANG_OVERRIDE
+    {
+        lastSlot = 5;
+        return -1;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL getFunctionInfo(uint32_t, ByteCodeFuncInfo*) SLANG_OVERRIDE
+    {
+        lastSlot = 6;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW void* SLANG_MCALL getCurrentWorkingSet() SLANG_OVERRIDE
+    {
+        lastSlot = 7;
+        return nullptr;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL execute(void*, size_t) SLANG_OVERRIDE
+    {
+        lastSlot = 8;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW void SLANG_MCALL getErrorString(IBlob**) SLANG_OVERRIDE { lastSlot = 9; }
+    SLANG_NO_THROW void* SLANG_MCALL getReturnValue(size_t*) SLANG_OVERRIDE
+    {
+        lastSlot = 10;
+        return nullptr;
+    }
+    SLANG_NO_THROW void SLANG_MCALL setExtInstHandlerUserData(void*) SLANG_OVERRIDE
+    {
+        lastSlot = 11;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL registerExtCall(const char*, VMExtFunction) SLANG_OVERRIDE
+    {
+        lastSlot = 12;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL setPrintCallback(VMPrintFunc, void*) SLANG_OVERRIDE
+    {
+        lastSlot = 13;
+        return SLANG_OK;
+    }
+};
+
+SLANG_UNIT_TEST(vtableIByteCodeRunner)
+{
+    IByteCodeRunnerProbe p;
+    callSlot(&p, 3);
+    SLANG_CHECK(p.lastSlot == 3); // loadModule
+    callSlot(&p, 5);
+    SLANG_CHECK(p.lastSlot == 5); // findFunctionByName
+    callSlot(&p, 7);
+    SLANG_CHECK(p.lastSlot == 7); // getCurrentWorkingSet
+    callSlot(&p, 10);
+    SLANG_CHECK(p.lastSlot == 10); // getReturnValue
+    callSlot(&p, 13);
+    SLANG_CHECK(p.lastSlot == 13); // setPrintCallback
+}
+
+#endif // SLANG_PTR_IS_64
