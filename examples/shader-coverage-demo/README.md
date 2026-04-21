@@ -13,11 +13,15 @@ host-side helper library `slang-coverage-rt`. Runs in two modes:
   consumable by `genhtml`, Codecov, VS Code Coverage Gutters, etc.
   Exercises the library/report half of the pipeline.
 
-A `--mode=dispatch` flag is reserved for the full
-compile→dispatch→readback→LCOV pipeline, but is currently not
-implemented: the synthesized coverage buffer is not yet visible to
-slang-rhi's reflection-driven pipeline builder. See the *Known
-limitations* section.
+- **`--mode=dispatch`** — Full compile → bind → dispatch → readback →
+  LCOV pipeline via slang-rhi. Works end-to-end on Metal
+  (architecture empirically validated). The shader executes with
+  its instrumentation, but because the synthesized coverage buffer
+  is not yet reflection-visible, the `__slang_coverage` `ShaderCursor`
+  comes back invalid and the counter buffer is never bound to the
+  shader — so the resulting LCOV shows unreliable/zero hit counts.
+  The dispatch mode is kept in the demo precisely to **expose that
+  reflection gap concretely** — see *Known limitations*.
 
 ## Usage
 
@@ -55,19 +59,18 @@ gcov does for CPU programs.
 
 ## Known limitations (follow-ups)
 
-**Dispatch-through-slang-rhi is not yet functional.** The coverage IR
+**Dispatch-through-slang-rhi binds no counters.** The coverage IR
 pass synthesizes an implicit `RWStructuredBuffer<uint> __slang_coverage`
 *after* slang-rhi has built its reflection view of the module, which
 means neither `ShaderCursor` nor the pipeline-layout builder is aware
-of the extra parameter. Empirically, the CPU backend's LLVM downstream
-compiler reports:
+of the extra parameter.
+
+The demo detects this at runtime — `cursor["__slang_coverage"]`
+returns an invalid cursor under current slang-rhi — and prints:
 ```
-error : no matching function for call to '_computeMain'
-note : candidate function not viable: requires 4 arguments, but 3 were provided
+[dispatch] NOTE: `__slang_coverage` not found in reflection;
+[dispatch] the shader will still run but counters will stay 0.
 ```
-because the backend emits a function signature with the synthesized
-coverage-buffer parameter but the host code calls the original
-3-parameter signature.
 
 The fix is to make the coverage synthesis *reflection-visible* — the
 pass should register the buffer in the same layout structures that
@@ -75,13 +78,24 @@ pass should register the buffer in the same layout structures that
 bindings pick it up. That's a small patch to the main compiler; it
 lives in the follow-up work log on shader-slang/slang#10794.
 
-Until that fix lands:
+### Backend-specific status matrix
 
-- **`--mode=compile`** works and produces a valid manifest.
+| Backend | `--mode=compile` | `--mode=dispatch` |
+|---|---|---|
+| `cpu` | Works (manifest produced). LLVM codegen then reports a 3-vs-4 function-argument mismatch for the same reflection reason; the demo catches the shutdown abort. | Fails with the LLVM mismatch at pipeline build. |
+| `metal` | Works. Generates valid `atomic_fetch_add_explicit` on the synthesized `_slang_coverage_0` buffer. | Pipeline builds; shader dispatches; counters not bound (reflection gap) → LCOV shows zeros / stale memory. |
+| `vulkan` | Untested on this branch. | Untested. |
+| `d3d12` | Untested. | Untested. |
+
+### Mode behaviour summary
+
+- **`--mode=compile`** works on all tested backends and produces a
+  valid manifest.
 - **`--mode=report`** works with any external counter buffer (hand-
   generated, captured from `slang-test`, or future integrations).
-- **`--mode=dispatch`** is stubbed and prints a note pointing to this
-  README.
+- **`--mode=dispatch`** runs architecturally on Metal (pipeline →
+  dispatch → readback → LCOV all complete), but counter values are
+  unreliable until the reflection gap is fixed.
 
 ## Scenarios (future expansion)
 

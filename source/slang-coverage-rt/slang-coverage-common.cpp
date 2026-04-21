@@ -32,9 +32,9 @@ struct CounterEntry
 struct SlangCoverageContext
 {
     std::vector<CounterEntry> entries;
-    std::vector<uint64_t>     accumulator;
-    SlangCoverageBindingInfo  binding{};
-    std::string               bufferNameStorage;
+    std::vector<uint64_t> accumulator;
+    SlangCoverageBindingInfo binding{};
+    std::string bufferNameStorage;
 };
 
 //
@@ -93,51 +93,72 @@ bool parseString(const char*& p, const char* end, std::string& out)
         char esc = *p++;
         switch (esc)
         {
-        case '"':  out.push_back('"'); break;
-        case '\\': out.push_back('\\'); break;
-        case '/':  out.push_back('/'); break;
-        case 'b':  out.push_back('\b'); break;
-        case 'f':  out.push_back('\f'); break;
-        case 'n':  out.push_back('\n'); break;
-        case 'r':  out.push_back('\r'); break;
-        case 't':  out.push_back('\t'); break;
-        case 'u':
-        {
-            if (p + 4 > end)
-                return false;
-            unsigned cp = 0;
-            for (int i = 0; i < 4; ++i)
-            {
-                char h = p[i];
-                unsigned v = 0;
-                if (h >= '0' && h <= '9') v = unsigned(h - '0');
-                else if (h >= 'a' && h <= 'f') v = unsigned(h - 'a' + 10);
-                else if (h >= 'A' && h <= 'F') v = unsigned(h - 'A' + 10);
-                else return false;
-                cp = (cp << 4) | v;
-            }
-            p += 4;
-            // Emit as UTF-8. Surrogate pairs and non-BMP escapes are
-            // not expected in our manifest contents (file paths), so
-            // treat high code points conservatively.
-            if (cp < 0x80)
-            {
-                out.push_back(char(cp));
-            }
-            else if (cp < 0x800)
-            {
-                out.push_back(char(0xC0 | (cp >> 6)));
-                out.push_back(char(0x80 | (cp & 0x3F)));
-            }
-            else
-            {
-                out.push_back(char(0xE0 | (cp >> 12)));
-                out.push_back(char(0x80 | ((cp >> 6) & 0x3F)));
-                out.push_back(char(0x80 | (cp & 0x3F)));
-            }
+        case '"':
+            out.push_back('"');
             break;
-        }
-        default: return false;
+        case '\\':
+            out.push_back('\\');
+            break;
+        case '/':
+            out.push_back('/');
+            break;
+        case 'b':
+            out.push_back('\b');
+            break;
+        case 'f':
+            out.push_back('\f');
+            break;
+        case 'n':
+            out.push_back('\n');
+            break;
+        case 'r':
+            out.push_back('\r');
+            break;
+        case 't':
+            out.push_back('\t');
+            break;
+        case 'u':
+            {
+                if (p + 4 > end)
+                    return false;
+                unsigned cp = 0;
+                for (int i = 0; i < 4; ++i)
+                {
+                    char h = p[i];
+                    unsigned v = 0;
+                    if (h >= '0' && h <= '9')
+                        v = unsigned(h - '0');
+                    else if (h >= 'a' && h <= 'f')
+                        v = unsigned(h - 'a' + 10);
+                    else if (h >= 'A' && h <= 'F')
+                        v = unsigned(h - 'A' + 10);
+                    else
+                        return false;
+                    cp = (cp << 4) | v;
+                }
+                p += 4;
+                // Emit as UTF-8. Surrogate pairs and non-BMP escapes are
+                // not expected in our manifest contents (file paths), so
+                // treat high code points conservatively.
+                if (cp < 0x80)
+                {
+                    out.push_back(char(cp));
+                }
+                else if (cp < 0x800)
+                {
+                    out.push_back(char(0xC0 | (cp >> 6)));
+                    out.push_back(char(0x80 | (cp & 0x3F)));
+                }
+                else
+                {
+                    out.push_back(char(0xE0 | (cp >> 12)));
+                    out.push_back(char(0x80 | ((cp >> 6) & 0x3F)));
+                    out.push_back(char(0x80 | (cp & 0x3F)));
+                }
+                break;
+            }
+        default:
+            return false;
         }
     }
     return false;
@@ -221,8 +242,7 @@ bool skipValue(const char*& p, const char* end)
     while (p < end)
     {
         char x = *p;
-        if (x == ',' || x == '}' || x == ']' || x == ' ' || x == '\t' ||
-            x == '\r' || x == '\n')
+        if (x == ',' || x == '}' || x == ']' || x == ' ' || x == '\t' || x == '\r' || x == '\n')
             break;
         ++p;
     }
@@ -245,7 +265,11 @@ bool parseBuffer(const char*& p, const char* end, SlangCoverageContext* ctx)
     while (true)
     {
         p = skipWs(p, end);
-        if (p < end && *p == '}') { ++p; return true; }
+        if (p < end && *p == '}')
+        {
+            ++p;
+            return true;
+        }
         if (!first && !expect(p, end, ','))
             return false;
         first = false;
@@ -263,7 +287,8 @@ bool parseBuffer(const char*& p, const char* end, SlangCoverageContext* ctx)
         p = skipWs(p, end);
         if (key == "name")
         {
-            if (p >= end || *p != '"') return false;
+            if (p >= end || *p != '"')
+                return false;
             ++p;
             if (!parseString(p, end, ctx->bufferNameStorage))
                 return false;
@@ -272,18 +297,24 @@ bool parseBuffer(const char*& p, const char* end, SlangCoverageContext* ctx)
         else if (key == "element_stride")
         {
             int64_t v = 0;
-            if (!parseNumber(p, end, v)) return false;
+            if (!parseNumber(p, end, v))
+                return false;
             ctx->binding.elementStrideBytes = int32_t(v);
         }
-        else if (key == "space" || key == "binding" ||
-                 key == "descriptor_set" || key == "uav_register")
+        else if (
+            key == "space" || key == "binding" || key == "descriptor_set" || key == "uav_register")
         {
             int64_t v = 0;
-            if (!parseNumber(p, end, v)) return false;
-            if (key == "space") ctx->binding.space = int32_t(v);
-            else if (key == "binding") ctx->binding.binding = int32_t(v);
-            else if (key == "descriptor_set") ctx->binding.descriptorSet = int32_t(v);
-            else ctx->binding.uavRegister = int32_t(v);
+            if (!parseNumber(p, end, v))
+                return false;
+            if (key == "space")
+                ctx->binding.space = int32_t(v);
+            else if (key == "binding")
+                ctx->binding.binding = int32_t(v);
+            else if (key == "descriptor_set")
+                ctx->binding.descriptorSet = int32_t(v);
+            else
+                ctx->binding.uavRegister = int32_t(v);
         }
         else if (key == "synthesized")
         {
@@ -303,7 +334,8 @@ bool parseBuffer(const char*& p, const char* end, SlangCoverageContext* ctx)
         }
         else
         {
-            if (!skipValue(p, end)) return false;
+            if (!skipValue(p, end))
+                return false;
         }
     }
 }
@@ -313,7 +345,11 @@ bool parseEntries(const char*& p, const char* end, SlangCoverageContext* ctx)
     if (!expect(p, end, '['))
         return false;
     p = skipWs(p, end);
-    if (p < end && *p == ']') { ++p; return true; }
+    if (p < end && *p == ']')
+    {
+        ++p;
+        return true;
+    }
     while (true)
     {
         if (!expect(p, end, '{'))
@@ -323,13 +359,18 @@ bool parseEntries(const char*& p, const char* end, SlangCoverageContext* ctx)
         while (true)
         {
             p = skipWs(p, end);
-            if (p < end && *p == '}') { ++p; break; }
+            if (p < end && *p == '}')
+            {
+                ++p;
+                break;
+            }
             if (!first && !expect(p, end, ','))
                 return false;
             first = false;
 
             p = skipWs(p, end);
-            if (p >= end || *p != '"') return false;
+            if (p >= end || *p != '"')
+                return false;
             ++p;
             std::string key;
             if (!parseString(p, end, key))
@@ -340,7 +381,8 @@ bool parseEntries(const char*& p, const char* end, SlangCoverageContext* ctx)
 
             if (key == "file")
             {
-                if (p >= end || *p != '"') return false;
+                if (p >= end || *p != '"')
+                    return false;
                 ++p;
                 if (!parseString(p, end, entry.file))
                     return false;
@@ -348,17 +390,23 @@ bool parseEntries(const char*& p, const char* end, SlangCoverageContext* ctx)
             else if (key == "line")
             {
                 int64_t v = 0;
-                if (!parseNumber(p, end, v)) return false;
+                if (!parseNumber(p, end, v))
+                    return false;
                 entry.line = int32_t(v);
             }
             else
             {
-                if (!skipValue(p, end)) return false;
+                if (!skipValue(p, end))
+                    return false;
             }
         }
         ctx->entries.push_back(std::move(entry));
         p = skipWs(p, end);
-        if (p < end && *p == ',') { ++p; continue; }
+        if (p < end && *p == ',')
+        {
+            ++p;
+            continue;
+        }
         if (!expect(p, end, ']'))
             return false;
         return true;
@@ -379,13 +427,18 @@ bool parseManifest(const std::string& text, SlangCoverageContext* ctx)
     while (true)
     {
         p = skipWs(p, end);
-        if (p < end && *p == '}') { ++p; break; }
+        if (p < end && *p == '}')
+        {
+            ++p;
+            break;
+        }
         if (!first && !expect(p, end, ','))
             return false;
         first = false;
 
         p = skipWs(p, end);
-        if (p >= end || *p != '"') return false;
+        if (p >= end || *p != '"')
+            return false;
         ++p;
         std::string key;
         if (!parseString(p, end, key))
@@ -395,30 +448,34 @@ bool parseManifest(const std::string& text, SlangCoverageContext* ctx)
 
         if (key == "version")
         {
-            if (!parseNumber(p, end, version)) return false;
+            if (!parseNumber(p, end, version))
+                return false;
         }
         else if (key == "counters")
         {
-            if (!parseNumber(p, end, counterCount)) return false;
+            if (!parseNumber(p, end, counterCount))
+                return false;
         }
         else if (key == "buffer")
         {
-            if (!parseBuffer(p, end, ctx)) return false;
+            if (!parseBuffer(p, end, ctx))
+                return false;
         }
         else if (key == "entries")
         {
-            if (!parseEntries(p, end, ctx)) return false;
+            if (!parseEntries(p, end, ctx))
+                return false;
         }
         else
         {
-            if (!skipValue(p, end)) return false;
+            if (!skipValue(p, end))
+                return false;
         }
     }
 
     if (version != 1)
         return false;
-    if (counterCount < 0 ||
-        size_t(counterCount) < ctx->entries.size())
+    if (counterCount < 0 || size_t(counterCount) < ctx->entries.size())
     {
         // Accept counters >= entries.size (trailing slots may exist
         // if the compiler reserved them for future use), but reject
@@ -480,8 +537,7 @@ extern "C" uint32_t slang_coverage_counter_count(const SlangCoverageContext* ctx
     return ctx ? uint32_t(ctx->accumulator.size()) : 0;
 }
 
-extern "C" const SlangCoverageBindingInfo* slang_coverage_binding(
-    const SlangCoverageContext* ctx)
+extern "C" const SlangCoverageBindingInfo* slang_coverage_binding(const SlangCoverageContext* ctx)
 {
     return ctx ? &ctx->binding : nullptr;
 }
@@ -507,9 +563,7 @@ extern "C" void slang_coverage_reset_accumulator(SlangCoverageContext* ctx)
     std::fill(ctx->accumulator.begin(), ctx->accumulator.end(), uint64_t(0));
 }
 
-extern "C" uint64_t slang_coverage_get_hits(
-    const SlangCoverageContext* ctx,
-    uint32_t index)
+extern "C" uint64_t slang_coverage_get_hits(const SlangCoverageContext* ctx, uint32_t index)
 {
     if (!ctx || index >= ctx->accumulator.size())
         return 0;
@@ -548,11 +602,7 @@ extern "C" SlangCoverageResult slang_coverage_save_lcov(
         std::fprintf(f, "SF:%s\n", filePair.first.c_str());
         for (const auto& lineHits : filePair.second)
         {
-            std::fprintf(
-                f,
-                "DA:%d,%llu\n",
-                lineHits.first,
-                (unsigned long long)lineHits.second);
+            std::fprintf(f, "DA:%d,%llu\n", lineHits.first, (unsigned long long)lineHits.second);
         }
         std::fprintf(f, "end_of_record\n");
     }
