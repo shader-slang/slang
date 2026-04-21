@@ -27565,6 +27565,8 @@ struct CoopMat
             };
         case cuda:
             __intrinsic_asm "($0)->fill($1)";
+        case metal:
+            this = __makeFromScalar(t);
         case hlsl:
             __intrinsic_asm ".Splat";
         }
@@ -27617,6 +27619,7 @@ struct CoopMat
         {
         case hlsl:
         case spirv:
+        case metal:
             if (__isCoopFloat<T>() && __isInt<U>())
                 this = __int_to_float_cast<T, R>(other);
             else if (__isInt<T>() && __isCoopFloat<U>())
@@ -27629,6 +27632,9 @@ struct CoopMat
             __intrinsic_asm "($0)->copyFrom<$T1::ElementType>($1)";
         }
     }
+
+    __intrinsic_op($(kIROp_MakeCoopMatrixFromScalar))
+    internal static This __makeFromScalar(T value);
 
     //
     // Subscript
@@ -27686,6 +27692,8 @@ struct CoopMat
                 __intrinsic_asm "($0).get($1)";
             case hlsl:
                 __intrinsic_asm "($0).Get($1)";
+            default:
+                return __indexRead(index);
             }
         }
 
@@ -27700,6 +27708,8 @@ struct CoopMat
                 __intrinsic_asm "($0)->set($1, $2)";
             case hlsl:
                 __intrinsic_asm "($0).Set($1, $2)";
+            default:
+                __indexRef(index) = newValue;
             }
         }
     }
@@ -27729,6 +27739,8 @@ struct CoopMat
             {
                 result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
             };
+        default:
+            return uint(M * N / 32);
         }
     }
 
@@ -27902,7 +27914,7 @@ struct CoopMat
     /// @param stride The stride in elements between consecutive rows (for row major layout) or
     ///        columns (for column major layout) and must be a multiple of 8 for __half element type
     ///        or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
-    [require(cuda_spirv, cooperative_matrix)]
+    [require(cuda_spirv_metal, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(RWStructuredBuffer<T> buffer, uint element, uint stride)
@@ -27910,7 +27922,7 @@ struct CoopMat
         __store<matrixLayout>(buffer, element, stride);
     }
 
-    [require(cuda_spirv, cooperative_matrix)]
+    [require(cuda_spirv_metal, cooperative_matrix)]
     internal void __store<
         let matrixLayout : CoopMatMatrixLayout
     >(RWStructuredBuffer<T> buffer, uint element, uint stride)
@@ -27931,6 +27943,11 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
             else
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "simdgroup_store($0, $1 + $2, (ulong)$3)";
+            else
+                __intrinsic_asm "simdgroup_store($0, $1 + $2, (ulong)$3, ulong2(0), true)";
         }
     }
 
@@ -27939,7 +27956,7 @@ struct CoopMat
     /// @param buffer The pointer to the buffer to store the matrix into.
     /// @param element The starting element index in the buffer.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
-    [require(cuda_spirv, cooperative_matrix)]
+    [require(cuda_spirv_metal, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
@@ -27958,6 +27975,11 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
             else
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "simdgroup_store($0, $1 + $2, (ulong)$3)";
+            else
+                __intrinsic_asm "simdgroup_store($0, $1 + $2, (ulong)$3, ulong2(0), true)";
         }
     }
 
@@ -27991,7 +28013,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cuda_spirv, cooperative_matrix)]
+    [require(cuda_spirv_metal, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
@@ -28012,11 +28034,16 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, $2, $3)";
             else
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, $2, $3)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "simdgroup_store($0, ($1)->m_data + $2, (ulong)$3)";
+            else
+                __intrinsic_asm "simdgroup_store($0, ($1)->m_data + $2, (ulong)$3, ulong2(0), true)";
         }
     }
 
     [ForceInline]
-    [require(cuda_spirv, cooperative_matrix)]
+    [require(cuda_spirv_metal, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
     >(Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
@@ -28034,6 +28061,11 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, 0, $2)";
             else
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, 0, $2)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "simdgroup_store($0, ($1), (ulong)$2)";
+            else
+                __intrinsic_asm "simdgroup_store($0, ($1), (ulong)$2, ulong2(0), true)";
         }
     }
 
@@ -28045,7 +28077,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cuda_spirv, cooperative_matrix)]
+    [require(cuda_spirv_metal, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -28067,11 +28099,16 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data + $2, $3)";
             else
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data + $2, $3)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "simdgroup_store($0, ($1)->m_data + $2, (ulong)$3)";
+            else
+                __intrinsic_asm "simdgroup_store($0, ($1)->m_data + $2, (ulong)$3, ulong2(0), true)";
         }
     }
 
     [ForceInline]
-    [require(cuda_spirv, cooperative_matrix)]
+    [require(cuda_spirv_metal, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -28090,6 +28127,11 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1), $2)";
             else
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1), $2)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "simdgroup_store($0, ($1), (ulong)$2)";
+            else
+                __intrinsic_asm "simdgroup_store($0, ($1), (ulong)$2, ulong2(0), true)";
         }
     }
 
@@ -28152,7 +28194,7 @@ $}
     }
 
     [__NoSideEffect]
-    [require(cuda_spirv, cooperative_matrix)]
+    [require(cuda_spirv_metal, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(
@@ -28176,6 +28218,11 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
             else
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "_slang_simdgroup_load<$TR>($0 + $1, (ulong)$2)";
+            else
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>($0 + $1, (ulong)$2)";
         }
     }
 
@@ -28191,7 +28238,7 @@ $}
     /// @return A cooperative matrix loaded from the buffer.
     [ForceInline]
     [__NoSideEffect]
-    [require(cuda_spirv, cooperative_matrix)]
+    [require(cuda_spirv_metal, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
@@ -28210,6 +28257,11 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
             else
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "_slang_simdgroup_load<$TR>($0 + $1, (ulong)$2)";
+            else
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>($0 + $1, (ulong)$2)";
         }
     }
 
@@ -28247,7 +28299,7 @@ $}
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cuda_spirv, cooperative_matrix)]
+    [require(cuda_spirv_metal, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
@@ -28268,11 +28320,16 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>(($0)->m_data, $1, $2)";
             else
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data, $1, $2)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "_slang_simdgroup_load<$TR>(($0)->m_data + $1, (ulong)$2)";
+            else
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>(($0)->m_data + $1, (ulong)$2)";
         }
     }
 
     [ForceInline]
-    [require(cuda_spirv, cooperative_matrix)]
+    [require(cuda_spirv_metal, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
     >(Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
@@ -28290,6 +28347,11 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, 0, $1)";
             else
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, 0, $1)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "_slang_simdgroup_load<$TR>($0, (ulong)$1)";
+            else
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>($0, (ulong)$1)";
         }
     }
 
@@ -28302,7 +28364,7 @@ $}
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cuda_spirv, cooperative_matrix)]
+    [require(cuda_spirv_metal, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -28324,11 +28386,16 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>(($0)->m_data + $1, $2)";
             else
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data + $1, $2)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "_slang_simdgroup_load<$TR>(($0)->m_data + $1, (ulong)$2)";
+            else
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>(($0)->m_data + $1, (ulong)$2)";
         }
     }
 
     [ForceInline]
-    [require(cuda_spirv, cooperative_matrix)]
+    [require(cuda_spirv_metal, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -28347,6 +28414,11 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1)";
             else
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "_slang_simdgroup_load<$TR>($0, (ulong)$1)";
+            else
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>($0, (ulong)$1)";
         }
     }
 
@@ -28990,7 +29062,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cuda_spirv, cooperative_matrix)]
+[require(cuda_spirv_metal, cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : ICoopElement,
     let S : MemoryScope,
@@ -29019,7 +29091,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cuda_spirv, cooperative_matrix)]
+[require(cuda_spirv_metal, cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : ICoopElement,
     let S : MemoryScope,
@@ -29048,7 +29120,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cuda_spirv, cooperative_matrix)]
+[require(cuda_spirv_metal, cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : ICoopElement,
     let S : MemoryScope,
@@ -29110,7 +29182,7 @@ CoopMat<T, S, M, N, R> coopMatLoadCoherent<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the groupshared array.
 [ForceInline]
-[require(cuda_spirv, cooperative_matrix)]
+[require(cuda_spirv_metal, cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : ICoopElement,
     let S : MemoryScope,
@@ -29409,6 +29481,7 @@ linalg.CoopMat<T, S, M, N, R> operator *<
             result:$$linalg.CoopMat<T, S, M, N, R> = OpMatrixTimesScalar $lhs $rhs;
         };
     case cuda:
+    case metal:
         __intrinsic_asm "$0 * $1";
     case hlsl:
         linalg.__requirePrelude_hlsl_cm_scale();

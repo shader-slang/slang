@@ -58,6 +58,33 @@ matrix<T,A,B> _slang_matrixFmod(matrix<T,A,B> m1, matrix<T,A,B> m2)
 }
 )";
 
+static const char* kMetalBuiltinPreludeSimdgroupMatrixOps = R"(
+template<typename Matrix, typename T>
+Matrix _slang_simdgroup_load(const device T* src, ulong elements_per_row) {
+    Matrix result;
+    simdgroup_load(result, src, elements_per_row);
+    return result;
+}
+template<typename Matrix, typename T>
+Matrix _slang_simdgroup_load_transpose(const device T* src, ulong elements_per_row) {
+    Matrix result;
+    simdgroup_load(result, src, elements_per_row, ulong2(0), true);
+    return result;
+}
+template<typename Matrix, typename T>
+Matrix _slang_simdgroup_load(const threadgroup T* src, ulong elements_per_row) {
+    Matrix result;
+    simdgroup_load(result, src, elements_per_row);
+    return result;
+}
+template<typename Matrix, typename T>
+Matrix _slang_simdgroup_load_transpose(const threadgroup T* src, ulong elements_per_row) {
+    Matrix result;
+    simdgroup_load(result, src, elements_per_row, ulong2(0), true);
+    return result;
+}
+)";
+
 
 void MetalSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,
@@ -711,6 +738,23 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit("}\n");
             return true;
         }
+    case kIROp_CoopMatMulAdd:
+        {
+            auto coopMatMulAdd = cast<IRCoopMatMulAdd>(inst);
+            emitInstResultDecl(inst);
+            emitOperand(coopMatMulAdd->getMatC(), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+            m_writer->emit("simdgroup_multiply_accumulate(");
+            m_writer->emit(getName(inst));
+            m_writer->emit(", ");
+            emitOperand(coopMatMulAdd->getMatA(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopMatMulAdd->getMatB(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            m_writer->emit(getName(inst));
+            m_writer->emit(");\n");
+            return true;
+        }
     }
     return false;
 }
@@ -739,6 +783,20 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
                 return true;
             }
             break;
+        }
+    case kIROp_MakeCoopMatrixFromScalar:
+        {
+            m_writer->emit("make_filled_simdgroup_matrix<");
+            auto coopType = as<IRCoopMatrixType>(inst->getDataType());
+            emitType(coopType->getElementType());
+            m_writer->emit(", ");
+            emitVal(coopType->getColumnCount(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitVal(coopType->getRowCount(), getInfo(EmitOp::General));
+            m_writer->emit(">(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
         }
     case kIROp_MatrixReshape:
         {
@@ -1326,6 +1384,19 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(">");
             return;
         }
+    case kIROp_CoopMatrixType:
+        {
+            auto coopType = as<IRCoopMatrixType>(type);
+            m_writer->emit("simdgroup_matrix<");
+            emitType(coopType->getElementType());
+            m_writer->emit(", ");
+            emitVal(coopType->getColumnCount(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitVal(coopType->getRowCount(), getInfo(EmitOp::General));
+            m_writer->emit(">");
+            ensurePrelude(kMetalBuiltinPreludeSimdgroupMatrixOps);
+            return;
+        }
     default:
         break;
     }
@@ -1722,6 +1793,7 @@ void MetalSourceEmitter::emitFrontMatterImpl(TargetRequest*)
     m_writer->emit("#include <metal_stdlib>\n");
     m_writer->emit("#include <metal_math>\n");
     m_writer->emit("#include <metal_texture>\n");
+    m_writer->emit("#include <metal_simdgroup_matrix>\n");
     m_writer->emit("using namespace metal;\n");
 }
 
