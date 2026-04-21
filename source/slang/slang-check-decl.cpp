@@ -4445,10 +4445,9 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
                     continue;
                 if (outerMember->getName() == paramName)
                 {
-                    getSink()->diagnose(
-                        Diagnostics::GenericParamShadowsOuterGeneric{
-                            .param = m,
-                            .outerParam = outerMember});
+                    getSink()->diagnose(Diagnostics::GenericParamShadowsOuterGeneric{
+                        .param = m,
+                        .outerParam = outerMember});
                     found = true;
                     break;
                 }
