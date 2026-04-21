@@ -1,0 +1,9 @@
+if(SLANG_ENABLE_SHADER_COVERAGE_RT)
+    slang_add_target(
+        .
+        STATIC
+        USE_EXTRA_WARNINGS
+        INCLUDE_DIRECTORIES_PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+endif()
