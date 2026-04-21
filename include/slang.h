@@ -4635,21 +4635,21 @@ struct ICooperativeTypesMetadata : public ISlangCastable
         0x49c3,
         {0x9f, 0xde, 0x3f, 0x0f, 0x9c, 0x6f, 0x01, 0x31})
 
-    virtual SlangUInt SLANG_MCALL getCooperativeMatrixTypeCount() = 0;
-    virtual SlangResult SLANG_MCALL
+    virtual SLANG_NO_THROW SlangUInt SLANG_MCALL getCooperativeMatrixTypeCount() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getCooperativeMatrixTypeByIndex(SlangUInt index, CooperativeMatrixType* outType) = 0;
 
-    virtual SlangUInt SLANG_MCALL getCooperativeMatrixCombinationCount() = 0;
-    virtual SlangResult SLANG_MCALL getCooperativeMatrixCombinationByIndex(
+    virtual SLANG_NO_THROW SlangUInt SLANG_MCALL getCooperativeMatrixCombinationCount() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCooperativeMatrixCombinationByIndex(
         SlangUInt index,
         CooperativeMatrixCombination* outCombination) = 0;
 
-    virtual SlangUInt SLANG_MCALL getCooperativeVectorTypeCount() = 0;
-    virtual SlangResult SLANG_MCALL
+    virtual SLANG_NO_THROW SlangUInt SLANG_MCALL getCooperativeVectorTypeCount() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getCooperativeVectorTypeByIndex(SlangUInt index, CooperativeVectorType* outType) = 0;
 
-    virtual SlangUInt SLANG_MCALL getCooperativeVectorCombinationCount() = 0;
-    virtual SlangResult SLANG_MCALL getCooperativeVectorCombinationByIndex(
+    virtual SLANG_NO_THROW SlangUInt SLANG_MCALL getCooperativeVectorCombinationCount() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCooperativeVectorCombinationByIndex(
         SlangUInt index,
         CooperativeVectorCombination* outCombination) = 0;
 };
