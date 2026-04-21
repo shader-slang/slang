@@ -8,7 +8,7 @@
 // DifferentialPair<T> as a varying parameter
 [shader("vertex")]
 float4 diffPairParam(DifferentialPair<float> dp : A) : SV_Position
-//CHECK: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type cannot be used as entry-point varying parameter or return type
+//CHECK: error 38050
 {
     return float4(0);
 }
@@ -16,7 +16,7 @@ float4 diffPairParam(DifferentialPair<float> dp : A) : SV_Position
 // Atomic<T> as a varying parameter
 [shader("vertex")]
 float4 atomicParam(Atomic<int> a : A) : SV_Position
-//ATOMIC: ^^^^^^^^^^^^^^^^^^^^^^^ type cannot be used as entry-point varying parameter or return type
+//ATOMIC: error 38050
 {
     return float4(0);
 }
@@ -24,7 +24,7 @@ float4 atomicParam(Atomic<int> a : A) : SV_Position
 // CoopVec<T, N> as a varying parameter
 [shader("vertex")]
 float4 coopVecParam(CoopVec<float, 4> v : A) : SV_Position
-//COOPVEC: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type cannot be used as entry-point varying parameter or return type
+//COOPVEC: error 38050
 {
     return float4(0);
 }
@@ -32,7 +32,7 @@ float4 coopVecParam(CoopVec<float, 4> v : A) : SV_Position
 // matrix with non-standard element type as a SPIR-V varying parameter
 [shader("vertex")]
 float4 matrixParam(matrix<uint64_t, 2, 2> m : A) : SV_Position
-//MATRIX: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type cannot be used as entry-point varying for this target
+//MATRIX: error 38051
 {
     return float4(0);
 }
