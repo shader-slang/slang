@@ -247,6 +247,8 @@ works for any given binary.
 | `SLANG_EMBED_CORE_MODULE`         | `TRUE`                     | Build slang with an embedded version of the core module                                      |
 | `SLANG_EMBED_CORE_MODULE_SOURCE`  | `TRUE`                     | Embed the core module source in the binary                                                   |
 | `SLANG_ENABLE_DXIL`               | `TRUE`                     | Enable generating DXIL using DXC                                                             |
+| `SLANG_DXC_BINARY_URL`            | Platform dependent         | URL of the prebuilt DXC binary archive to download; overrides the default release URL        |
+| `SLANG_DXC_BUILD_FROM_SOURCE`     | Auto-detected              | `ON`: always build DXC from source; `OFF`: skip auto-detection and use prebuilt; unset: build from source automatically on Linux when the system GLIBC is older than the minimum required by the prebuilt binaries |
 | `SLANG_ENABLE_ASAN`               | `FALSE`                    | Enable ASAN (address sanitizer)                                                              |
 | `SLANG_ENABLE_COVERAGE`           | `FALSE`                    | Enable code coverage instrumentation                                                         |
 | `SLANG_ENABLE_FULL_IR_VALIDATION` | `FALSE`                    | Enable full IR validation (SLOW!)                                                            |
