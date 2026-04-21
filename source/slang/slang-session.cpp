@@ -739,15 +739,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessMangled
     return SLANG_OK;
 }
 
-static String _getTypeConformanceSequentialIDKey(
-    String const& interfaceMangledName,
-    uint32_t sequentialID)
-{
-    StringBuilder builder;
-    builder << interfaceMangledName << "#" << sequentialID;
-    return builder.produceString();
-}
-
 uint32_t Linkage::getFirstFreeTypeConformanceWitnessSequentialID(String const& interfaceMangledName)
 {
     auto idAllocator =
@@ -760,7 +751,7 @@ uint32_t Linkage::getFirstFreeTypeConformanceWitnessSequentialID(String const& i
     }
 
     while (usedTypeConformanceWitnessSequentialIDKeys.contains(
-        _getTypeConformanceSequentialIDKey(interfaceMangledName, *idAllocator)))
+        TypeConformanceSequentialIDKey{interfaceMangledName, *idAllocator}))
     {
         ++(*idAllocator);
     }
@@ -776,11 +767,7 @@ void Linkage::registerTypeConformanceWitnessSequentialID(
     // Caller holds `m_sequentialIDMapMutex`.
     mapMangledNameToRTTIObjectIndex[witnessTableMangledName] = sequentialID;
     usedTypeConformanceWitnessSequentialIDKeys.add(
-        _getTypeConformanceSequentialIDKey(interfaceMangledName, sequentialID));
-
-    // Advance the per-interface counter past any IDs that are now occupied,
-    // so the next allocation starts from a free slot.
-    getFirstFreeTypeConformanceWitnessSequentialID(interfaceMangledName);
+        TypeConformanceSequentialIDKey{interfaceMangledName, sequentialID});
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequentialID(

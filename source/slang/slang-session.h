@@ -87,6 +87,27 @@ struct ContainerTypeKey
     }
 };
 
+struct TypeConformanceSequentialIDKey
+{
+    typedef TypeConformanceSequentialIDKey ThisType;
+
+    String interfaceMangledName;
+    uint32_t sequentialID;
+
+    bool operator==(const ThisType& other) const
+    {
+        return interfaceMangledName == other.interfaceMangledName &&
+               sequentialID == other.sequentialID;
+    }
+
+    HashCode getHashCode() const
+    {
+        return combineHash(
+            Slang::getHashCode(interfaceMangledName),
+            Slang::getHashCode(sequentialID));
+    }
+};
+
 /// A context for loading and re-using code modules.
 class Linkage : public RefObject, public slang::ISession
 {
@@ -269,7 +290,7 @@ public:
     Dictionary<String, uint32_t> mapMangledNameToRTTIObjectIndex;
 
     // Tracks which interface/sequential-ID pairs are already occupied.
-    HashSet<String> usedTypeConformanceWitnessSequentialIDKeys;
+    HashSet<TypeConformanceSequentialIDKey> usedTypeConformanceWitnessSequentialIDKeys;
 
     // Counters for allocating sequential IDs to witness tables conforming to each interface type.
     Dictionary<String, uint32_t> mapInterfaceMangledNameToSequentialIDCounters;
