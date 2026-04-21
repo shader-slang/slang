@@ -40,14 +40,17 @@ IRFunc* getFuncDefinitionForContext(IRInst* context)
 // This unit has two components: an 'inst' and a 'context' under which we
 // are recording propagation info.
 //
-// The 'inst' must be inside a block (with either generic or func parent), since
-// we assume everything in the global scope is concrete.
-//
-// The 'context' can be one of two cases:
+// The 'context' can be one of these cases:
 // 1. an IRFunc ONLY if it is not generic (func is in the global scope). 'inst' must
 //    be inside the func.
 // 2. an IRSpecialize(generic, ...). 'inst' must be inside the generic. the
 //    specialization args must all be global values (either concrete types/values, or collections).
+// 3. an IRSpecializeExistentialsInFunc wrapping an IRFunc. 'inst' must be inside the underlying
+//    func.
+// 4. an IRModuleInst. 'inst' must be a direct child of the module (a module-scope global inst).
+//    Used to track propagation info for global interface parameters and their derived hoistable
+//    instructions, following the SCCP pattern of processing global scope first and sharing info
+//    with function-scope analysis.
 //
 // All other possibilites for 'context' are illegal.
 // `InstWithContext::validateInstWithContext` enforces these rules.
@@ -120,29 +123,17 @@ struct InstWithContext
 
                 break;
             }
+        case kIROp_ModuleInst:
+            {
+                // Module-scope global inst. 'inst' must be a direct child of the module.
+                SLANG_ASSERT(inst->getParent() == context);
+                break;
+            }
         default:
             {
                 SLANG_UNEXPECTED("Invalid context for InstWithContext");
             }
         }
-    }
-
-    // If a context is not specified, we assume it is not in a generic, and
-    // simply use the parent func.
-    //
-    InstWithContext(IRInst* inst)
-        : inst(inst)
-    {
-        auto block = cast<IRBlock>(inst->getParent());
-        auto func = cast<IRFunc>(block->getParent());
-
-        // If parent func is not a global, then it is not a direct
-        // reference. An explicit IRSpecialize instruction must be provided as
-        // context.
-        //
-        SLANG_ASSERT(func->getParent()->getOp() == kIROp_ModuleInst);
-
-        context = func;
     }
 
     bool operator==(const InstWithContext& other) const
@@ -1077,16 +1068,12 @@ struct TypeFlowSpecializationContext
         if (!inst->getParent())
             return none();
 
-        // For module-scope instructions, check pre-computed global info.
-        // This is populated by preProcessGlobalScope() before the main
-        // propagation loop, similar to how SCCP processes global scope first.
-        if (as<IRModuleInst>(inst->getParent()))
-        {
-            IRInst* globalInfo = nullptr;
-            if (globalInstInfo.tryGetValue(inst, globalInfo))
-                return globalInfo;
-            return none();
-        }
+        // For module-scope instructions, look up info using the module as context.
+        // This is populated during the initial seeding phase of performInformationPropagation
+        // and refined by the worklist, following the SCCP pattern of processing global scope
+        // first and sharing info with function-scope analysis.
+        if (auto moduleInst = as<IRModuleInst>(inst->getParent()))
+            return _tryGetInfo(InstWithContext(moduleInst, inst));
 
         return _tryGetInfo(InstWithContext(context, inst));
     }
@@ -1427,9 +1414,18 @@ struct TypeFlowSpecializationContext
             if (isFuncParam(param))
                 addContextUsersToWorkQueue(context, workQueue);
 
+        bool moduleScopeProducer = as<IRModuleInst>(context) != nullptr;
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
+
+            // For module-scope producers, only enqueue users that are also module-scope.
+            // Function-scope users will pick up the seeded global info via tryGetInfo()
+            // during Phase 1 of performInformationPropagation; enqueueing them here with
+            // module context would violate InstWithContext validation.
+            //
+            if (moduleScopeProducer && !as<IRModuleInst>(user->getParent()))
+                continue;
 
             // If user is in a different block (or the inst is a param), add that block to work
             // queue.
@@ -1529,20 +1525,20 @@ struct TypeFlowSpecializationContext
         return false;
     }
 
-    // Pre-process global-scope instructions to compute typeflow info for
-    // module-scope interface params and their derived hoistable instructions.
-    // This follows the SCCP pattern: global scope is processed first, and
-    // the computed info is shared with function-scope analysis via tryGetInfo().
+    // Seed propagation info for module-scope interface parameters. Their derived
+    // hoistable instructions (ExtractExistential*, LookupWitnessMethod at module
+    // scope) are handled by the normal worklist: updateInfo enqueues module-scope
+    // users, and processInstForPropagation runs the same analyze* functions it
+    // uses for function-scope insts.
     //
-    void preProcessGlobalScope()
+    // Only handles bare `uniform IFoo` params where the global param itself has
+    // interface type. ConstantBuffer<IFoo> / ParameterBlock<IFoo> wrappers are
+    // handled by the function-scope analyzeLoad + specializeLoad path, which
+    // already enumerates conformances for resource pointer loads.
+    //
+    void seedGlobalScope(WorkQueue<WorkItem>& workQueue)
     {
-        // Sub-phase A: Seed global params with TaggedUnionType info.
-        //
-        // Only handles bare `uniform IFoo` params where the global param
-        // itself has interface type. ConstantBuffer<IFoo> / ParameterBlock<IFoo>
-        // wrappers are handled by the function-scope analyzeLoad + specializeLoad
-        // path, which already enumerates conformances for resource pointer loads.
-        //
+        auto moduleInst = module->getModuleInst();
         for (auto inst : module->getGlobalInsts())
         {
             auto globalParam = as<IRGlobalParam>(inst);
@@ -1561,7 +1557,7 @@ struct TypeFlowSpecializationContext
             {
                 auto taggedUnion = makeTaggedUnionType(
                     as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
-                globalInstInfo[globalParam] = taggedUnion;
+                updateInfo(moduleInst, globalParam, taggedUnion, workQueue);
             }
             else
             {
@@ -1574,109 +1570,6 @@ struct TypeFlowSpecializationContext
                     .location = globalParam->sourceLoc});
             }
             module->getContainerPool().free(&tables);
-        }
-
-        // Sub-phase B: Propagate info to derived hoistable instructions.
-        // Use a fixed-point loop since lookupWitnessMethod depends on
-        // extractExistentialWitnessTable which depends on the global param.
-        //
-        bool changed = true;
-        while (changed)
-        {
-            changed = false;
-            for (auto inst : module->getGlobalInsts())
-            {
-                // Skip instructions that already have info.
-                if (globalInstInfo.containsKey(inst))
-                    continue;
-
-                switch (inst->getOp())
-                {
-                case kIROp_ExtractExistentialWitnessTable:
-                    {
-                        auto operand = inst->getOperand(0);
-                        IRInst* operandInfo = nullptr;
-                        globalInstInfo.tryGetValue(operand, operandInfo);
-                        if (!operandInfo)
-                            break;
-                        if (auto taggedUnion = as<IRTaggedUnionType>(operandInfo))
-                        {
-                            globalInstInfo[inst] =
-                                makeElementOfSetType(taggedUnion->getWitnessTableSet());
-                            changed = true;
-                        }
-                        break;
-                    }
-                case kIROp_ExtractExistentialType:
-                    {
-                        auto operand = inst->getOperand(0);
-                        IRInst* operandInfo = nullptr;
-                        globalInstInfo.tryGetValue(operand, operandInfo);
-                        if (!operandInfo)
-                            break;
-                        if (auto taggedUnion = as<IRTaggedUnionType>(operandInfo))
-                        {
-                            globalInstInfo[inst] = makeElementOfSetType(taggedUnion->getTypeSet());
-                            changed = true;
-                        }
-                        break;
-                    }
-                case kIROp_LookupWitnessMethod:
-                    {
-                        auto lookupInst = as<IRLookupWitnessMethod>(inst);
-                        auto witnessTable = lookupInst->getWitnessTable();
-                        IRInst* wtInfo = nullptr;
-                        globalInstInfo.tryGetValue(witnessTable, wtInfo);
-                        if (!wtInfo)
-                            break;
-                        auto elementOfSetType = as<IRElementOfSetType>(wtInfo);
-                        if (!elementOfSetType)
-                            break;
-
-                        auto key = lookupInst->getRequirementKey();
-                        IRBuilder builder(module);
-                        HashSet<IRInst*>& results =
-                            *module->getContainerPool().getHashSet<IRInst>();
-
-                        forEachInSet(
-                            module,
-                            cast<IRWitnessTableSet>(elementOfSetType->getSet()),
-                            [&](IRInst* table)
-                            {
-                                if (as<IRUnboundedWitnessTableElement>(table))
-                                {
-                                    if (inst->getDataType()->getOp() == kIROp_FuncType)
-                                        results.add(builder.getUnboundedFuncElement());
-                                    else if (inst->getDataType()->getOp() == kIROp_WitnessTableType)
-                                        results.add(builder.getUnboundedWitnessTableElement(
-                                            as<IRWitnessTableType>(inst->getDataType())
-                                                ->getConformanceType()));
-                                    return;
-                                }
-
-                                auto resolvedTable = translationContext.resolveInst(table);
-                                auto witnessTab = as<IRWitnessTable>(resolvedTable);
-                                if (as<IRNoneWitnessTableElement>(table) || as<IRVoidLit>(table) ||
-                                    !witnessTab ||
-                                    (witnessTab->getConformanceType()->getOp() == kIROp_VoidType))
-                                {
-                                    results.add(builder.getVoidValue());
-                                    return;
-                                }
-
-                                results.add(findWitnessTableEntry(witnessTab, key));
-                            });
-
-                        auto setOp = getSetOpFromType(lookupInst->getDataType());
-                        globalInstInfo[inst] = makeElementOfSetType(builder.getSet(setOp, results));
-                        module->getContainerPool().free(&results);
-                        changed = true;
-                        break;
-                    }
-                default:
-                    break;
-                }
-            }
         }
     }
 
@@ -1705,17 +1598,38 @@ struct TypeFlowSpecializationContext
         // Global worklist for interprocedural analysis.
         WorkQueue<WorkItem> workQueue;
 
-        // Add all global functions to worklist. Functions that are invalid existential
-        // specializations are skipped here; the diagnostic for them is emitted when
-        // discoverContext encounters the corresponding IRSpecialize context or when
-        // propagateToCallSite/specializeCall resolves the callee.
+        // Phase 0: Global scope.
+        //
+        // Seed module-scope interface parameters with their TaggedUnionType info
+        // and drain the worklist. Propagation within module scope flows to derived
+        // hoistable instructions (ExtractExistential*, LookupWitnessMethod at
+        // module scope) via the normal processInstForPropagation dispatch.
+        //
+        // This must complete before function-scope analysis so that function-scope
+        // uses of globals pick up the seeded info via tryGetInfo() on first pass.
+        //
+        seedGlobalScope(workQueue);
+        drainWorkQueue(workQueue);
+        if (sink->getErrorCount() > 0)
+            return;
+
+        // Phase 1: Function scope.
+        //
+        // Add all entry points to the worklist. Functions that are invalid
+        // existential specializations are skipped here; the diagnostic for them is
+        // emitted when discoverContext encounters the corresponding IRSpecialize
+        // context or when propagateToCallSite/specializeCall resolves the callee.
         //
         for (auto inst : module->getGlobalInsts())
             if (auto func = as<IRFunc>(inst))
                 if (isEntryPoint(func) && !isInvalidExistentialSpecialization(func))
                     discoverContext(func, workQueue);
 
-        // Process until fixed point.
+        drainWorkQueue(workQueue);
+    }
+
+    void drainWorkQueue(WorkQueue<WorkItem>& workQueue)
+    {
         while (workQueue.hasItems())
         {
             auto item = workQueue.dequeue();
@@ -5271,26 +5185,29 @@ struct TypeFlowSpecializationContext
         return clonedFunc;
     }
 
-    // Specialize module-scope instructions that have pre-computed global info.
-    // This mirrors the function-scope specializeInst() but operates on global
-    // instructions, using globalInstInfo for type lookup.
+    // Specialize module-scope instructions whose typeflow info was computed
+    // during Phase 0 of performInformationPropagation.
     //
-    bool specializeGlobalInsts()
+    // Uses the same specializeInst() dispatch as function-scope lowering, with
+    // the module inst as context so that tryGetInfo() routes to the module-scope
+    // entries in propagationMap.
+    //
+    // Dependency order: global params (type change to TaggedUnionType) →
+    // ExtractExistential* (depend on param type) → LookupWitnessMethod (depends
+    // on witness table type).
+    //
+    bool specializeGlobalInsts(WorkQueue<IRInst*>& globalsWorkList)
     {
+        auto moduleInst = module->getModuleInst();
         bool hasChanges = false;
 
-        // Collect module-scope instructions to specialize, ordered by dependency:
-        // 1. Global params (type change to TaggedUnionType)
-        // 2. ExtractExistentialWitnessTable, ExtractExistentialType (depend on param type)
-        // 3. LookupWitnessMethod (depends on witness table type)
-        //
         List<IRInst*> globalParams;
         List<IRInst*> extractInsts;
         List<IRInst*> lookupInsts;
 
         for (auto inst : module->getGlobalInsts())
         {
-            if (!globalInstInfo.containsKey(inst))
+            if (!propagationMap.containsKey(InstWithContext(moduleInst, inst)))
                 continue;
 
             if (as<IRGlobalParam>(inst))
@@ -5303,57 +5220,12 @@ struct TypeFlowSpecializationContext
                 lookupInsts.add(inst);
         }
 
-        // Phase 1: Replace global param types.
-        // Only for bare interface params (not ConstantBuffer/ParameterBlock wrappers).
-        // Change to TaggedUnionType so that extract instructions can operate on them.
-        //
         for (auto inst : globalParams)
-        {
-            auto info = globalInstInfo[inst];
-            if (auto specializedType = as<IRType>(getLoweredType(info)))
-            {
-                if (specializedType != inst->getDataType())
-                {
-                    inst->setFullType(specializedType);
-                    hasChanges = true;
-                }
-            }
-        }
-
-        // Phase 2: Specialize extract instructions.
-        // These use the existing specialize* functions. Since tryGetInfo()
-        // checks globalInstInfo for module-scope instructions regardless
-        // of context, we can use any entry point function as a dummy context.
-        // However, the specialize functions only use the context for tryGetInfo
-        // lookups, and for globals, the context is ignored. We pass nullptr
-        // and handle it gracefully below.
-        //
+            hasChanges |= specializeInst(moduleInst, inst, globalsWorkList);
         for (auto inst : extractInsts)
-        {
-            switch (inst->getOp())
-            {
-            case kIROp_ExtractExistentialWitnessTable:
-                hasChanges |= specializeExtractExistentialWitnessTable(
-                    nullptr,
-                    as<IRExtractExistentialWitnessTable>(inst));
-                break;
-            case kIROp_ExtractExistentialType:
-                hasChanges |=
-                    specializeExtractExistentialType(nullptr, as<IRExtractExistentialType>(inst));
-                break;
-            default:
-                break;
-            }
-        }
-
-        // Phase 3: Specialize lookup instructions.
-        // After extract instructions are lowered to SetTagType, lookups
-        // can be lowered to GetTagForMappedSet.
-        //
+            hasChanges |= specializeInst(moduleInst, inst, globalsWorkList);
         for (auto inst : lookupInsts)
-        {
-            hasChanges |= specializeLookupWitnessMethod(nullptr, as<IRLookupWitnessMethod>(inst));
-        }
+            hasChanges |= specializeInst(moduleInst, inst, globalsWorkList);
 
         return hasChanges;
     }
@@ -5381,14 +5253,12 @@ struct TypeFlowSpecializationContext
         for (auto structType : structsToProcess)
             hasChanges |= specializeStructType(structType);
 
-        // Specialize module-scope instructions that have pre-computed global info.
-        // This must run before function-scope specialization so that functions
-        // see the lowered types (SetTagType, TaggedUnionType) on their global operands.
+        // Specialize module-scope instructions that had typeflow info seeded
+        // by Phase 0 of performInformationPropagation. Must run before
+        // function-scope specialization so that functions see the lowered
+        // types (SetTagType, TaggedUnionType) on their global operands.
         //
-        // Ordering: global params first (type change), then extract instructions,
-        // then lookup instructions.
-        //
-        hasChanges |= specializeGlobalInsts();
+        hasChanges |= specializeGlobalInsts(globalWorkList);
 
         HashSet<IRInst*> processedSet;
         while (globalWorkList.hasItems())
@@ -7983,20 +7853,12 @@ struct TypeFlowSpecializationContext
     {
         bool hasChanges = false;
 
-        // Part 0: Pre-process global scope
-        //    Compute typeflow info for module-scope instructions (global
-        //    interface params and their derived hoistable instructions).
-        //    This must run before performInformationPropagation() so that
-        //    function-scope analysis can access global info via tryGetInfo().
-        //
-        preProcessGlobalScope();
-
-        if (sink->getErrorCount() > 0)
-            return false;
-
         // Part 1: Information Propagation
         //    This phase propagates type information through the module
         //    and records them into different maps in the current context.
+        //    Internally it processes global scope first (seeding module-scope
+        //    interface parameters and propagating to derived hoistable
+        //    instructions), then function scope.
         //
         performInformationPropagation();
 
@@ -8075,12 +7937,10 @@ struct TypeFlowSpecializationContext
         return true;
     }
 
-    // Mapping from module-scope inst --> propagated typeflow info.
-    // Populated by preProcessGlobalScope() before performInformationPropagation().
-    // Analogous to SCCP's mapInstToLatticeVal shared from global context.
-    Dictionary<IRInst*, IRInst*> globalInstInfo;
-
-    // Mapping from (context, inst) --> propagated info
+    // Mapping from (context, inst) --> propagated info.
+    // Module-scope insts are keyed with the IRModuleInst as context, analogous
+    // to SCCP's global-scope lattice entries. Function and generic scopes use
+    // IRFunc / IRSpecialize / IRSpecializeExistentialsInFunc as context.
     Dictionary<InstWithContext, IRWeakUse*> propagationMap;
 
     // Mapping from context --> return value info
