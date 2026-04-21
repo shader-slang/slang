@@ -6,13 +6,12 @@
 // enumerating specialization parameters, and validating
 // attempts to specialize shader code.
 
+#include "../core/slang-type-text-util.h"
 #include "slang-lookup.h"
 #include "slang-parameter-binding.h"
 #include "slang-profile.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-target.h"
-
-#include "../core/slang-type-text-util.h"
 
 namespace Slang
 {
@@ -869,6 +868,13 @@ static bool validateVaryingType(VaryingTypeValidationContext& ctx, Type* type)
         return true;
     }
 
+    // Recurse into array element type.
+    // Note: `ArrayExpressionType` inherits from `DeclRefType` (its decl is the
+    // builtin `Array` struct), so this check must come before the struct-field
+    // recursion below to avoid iterating the internal fields of `Array`.
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return validateVaryingType(ctx, arrayType->getElementType());
+
     // Recurse into struct fields
     if (auto declRefType = as<DeclRefType>(type))
     {
@@ -896,10 +902,6 @@ static bool validateVaryingType(VaryingTypeValidationContext& ctx, Type* type)
             return foundError;
         }
     }
-
-    // Recurse into array element type
-    if (auto arrayType = as<ArrayExpressionType>(type))
-        return validateVaryingType(ctx, arrayType->getElementType());
 
     return false;
 }
