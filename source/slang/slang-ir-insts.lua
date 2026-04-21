@@ -2054,6 +2054,9 @@ local insts = {
 			{
 				AnyValueSize = { struct_name = "AnyValueSizeDecoration", operands = { { "sizeOperand", "IRIntLit" } } },
 			},
+			{
+				AlignmentDecoration = { operands= { { "alignmentOperand", "IRIntLit" } } },
+			},
 			{ SpecializeDecoration = {} },
 			{ SpecializationDepthDecoration = { operands = { { "specializationDepthOperand", "IRIntLit" } } } },
 			{ SequentialIDDecoration = { operands = { { "sequentialIdOperand", "IRIntLit" } } } },

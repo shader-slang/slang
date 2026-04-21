@@ -705,7 +705,7 @@ return {
 	["Type.MetalParameterBlockLayout"] = 729,
 	["Type.CUDALayout"] = 730,
 	["Type.LLVMLayout"] = 731,
-  	["makeCombinedTextureSampler"] = 732,
+	["makeCombinedTextureSampler"] = 732,
 	["SPIRVResourceHeap"] = 733,
 	["SPIRVSamplerHeap"] = 734,
 	["SPIRVLoadDescriptorFromHeap"] = 735,
@@ -825,5 +825,6 @@ return {
 	["Type.Conditional"] = 849,
 	["getConditionalValue"] = 850,
 	["makeConditionalValue"] = 851,
-  ["SpecializeExistentialsInType"] = 852
+	["SpecializeExistentialsInType"] = 852,
+	["Decoration.AlignmentDecoration"] = 853,
 }
