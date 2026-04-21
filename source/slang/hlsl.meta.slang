@@ -33791,6 +33791,7 @@ int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 /// Read-only input to a broadcasting-launch node shader.
 __generic<T>
 [require(hlsl_spirv)]
+[__workGraphRecordType]
 struct DispatchNodeInputRecord
 {
     /// Returns the input record value.
@@ -33818,6 +33819,7 @@ struct DispatchNodeInputRecord
 /// Read-only input to a thread-launch node shader.
 __generic<T>
 [require(hlsl)]
+[__workGraphRecordType]
 struct ThreadNodeInputRecord
 {
     T Get()
@@ -33833,6 +33835,7 @@ struct ThreadNodeInputRecord
 /// Read-only input array for a coalescing-launch node shader.
 __generic<T>
 [require(hlsl)]
+[__workGraphRecordType]
 struct GroupNodeInputRecords
 {
     uint Count()
@@ -33857,6 +33860,8 @@ struct GroupNodeInputRecords
     }
 };
 
+[require(hlsl)]
+[__workGraphRecordType]
 struct EmptyNodeInput
 {
     uint Count() { __intrinsic_asm ".Count"; }
@@ -33865,6 +33870,7 @@ struct EmptyNodeInput
 /// Per-thread output records for node shader output; call OutputComplete() when done writing.
 __generic<T>
 [require(hlsl)]
+[__workGraphRecordType]
 struct ThreadNodeOutputRecords
 {
     Ref<T> Get(uint index = 0)
@@ -33894,6 +33900,7 @@ struct ThreadNodeOutputRecords
 /// Per-group (shared) output records for node shader output; call OutputComplete() when done writing.
 __generic<T>
 [require(hlsl)]
+[__workGraphRecordType]
 struct GroupNodeOutputRecords
 {
     Ref<T> Get(uint index = 0)
@@ -33924,6 +33931,7 @@ struct GroupNodeOutputRecords
 /// Output node handle; use to obtain output record objects for the named output node.
 __generic<T>
 [require(hlsl)]
+[__workGraphRecordType]
 struct NodeOutput
 {
     bool IsValid()
@@ -33955,6 +33963,7 @@ struct NodeOutput
 /// Array of output node handles indexed by node array index.
 __generic<T>
 [require(hlsl)]
+[__workGraphRecordType]
 struct NodeOutputArray
 {
     NodeOutput<T> Get(uint index)
@@ -33971,6 +33980,8 @@ struct NodeOutputArray
     }
 };
 
+[require(hlsl)]
+[__workGraphRecordType]
 struct EmptyNodeOutput
 {
     bool IsValid() { __intrinsic_asm ".IsValid"; }
@@ -33985,6 +33996,8 @@ struct EmptyNodeOutput
     void OutputComplete() { __intrinsic_asm ".OutputComplete"; }
 };
 
+[require(hlsl)]
+[__workGraphRecordType]
 struct EmptyNodeOutputArray
 {
     EmptyNodeOutput Get(uint index) { __intrinsic_asm ".operator[]"; }
