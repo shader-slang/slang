@@ -216,6 +216,30 @@ int foo = undefined;
 - **Adding a built-in function**: Add to appropriate module in `prelude/`
 - **Adding a new target**: Implement new emitter in `source/slang/slang-emit-*.cpp`
 
+### Capability Atoms Documentation
+
+**`docs/user-guide/a3-02-reference-capability-atoms.md` is auto-generated — never edit it directly.**
+
+It is produced by `slang-capability-generator` from `source/slang/slang-capabilities.capdef`. To add or update a capability atom's description:
+
+1. Add or update the `///` doc comment immediately before the `def` or `alias` in `slang-capabilities.capdef`:
+   ```
+   /// My description here.
+   alias myatom = ...;
+   ```
+2. Regenerate the doc:
+   ```bash
+   cmake --build --preset debug --target slang-capability-generator
+   mkdir -p build/capgen-out
+   ./build/generators/Debug/bin/slang-capability-generator \
+       source/slang/slang-capabilities.capdef \
+       --target-directory build/capgen-out \
+       --doc docs/user-guide/a3-02-reference-capability-atoms.md
+   ```
+3. Commit the updated `slang-capabilities.capdef` and the regenerated `.md` together.
+
+Note: the `///` comment must be on the **public alias** (e.g. `alias node = _node;`), not on the internal `def _node : stage;` atom, for the description to appear under the public name.
+
 ### Modifying Public Headers (`include/`)
 
 All files under `include/` are public API. Changes must preserve binary (ABI) and source

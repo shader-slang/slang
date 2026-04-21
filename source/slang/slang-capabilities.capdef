@@ -506,10 +506,9 @@ def geometry : stage;
 /// [Stage]
 def dispatch : stage;
 
+/// Work-graph node stage
 /// [Stage]
-def _node : stage;
-/// Work-graph node shader stage (D3D12 Work Graphs, SM 6.8)
-alias node = _node;
+def node : stage;
 
 def _raygen : stage;
 alias _raygeneration = _raygen;
