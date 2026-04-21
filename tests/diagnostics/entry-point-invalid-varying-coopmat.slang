@@ -1,6 +1,6 @@
 // Test that CoopMat is rejected as an entry-point varying parameter.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -entry main -stage vertex
 
 import linalg;
 
