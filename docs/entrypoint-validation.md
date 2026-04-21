@@ -39,8 +39,10 @@ Rule                    Type Predicate                          Target
 ----                    --------------                          ------
 DifferentialPair<T>     as<DifferentialPairType>                all
 Atomic<T>               as<AtomicType>                          all
-CoopVec<T, N>           as<CoopVectorExpressionType>            all
-CoopMat<T,S,M,N,R>     IntrinsicTypeModifier with              all
+CoopVec<T, N>           IntrinsicTypeModifier with              all
+                        irOp == kIROp_CoopVectorType
+                        (or as<CoopVectorExpressionType>)
+CoopMat<T,S,M,N,R>      IntrinsicTypeModifier with              all
                         irOp == kIROp_CoopMatrixType
 vector<bool>            VectorExpressionType with               SPIR-V only
                         Bool element type
@@ -53,10 +55,17 @@ changes are needed to add a new "type X is never valid as a varying" rule.
 
 The type walker recursively descends into:
 
+- **Array element types**: `DifferentialPair<float>[4]` is also caught. This
+  check is performed *before* the struct-field recursion because
+  `ArrayExpressionType` inherits from `DeclRefType` and its decl is the builtin
+  `Array` struct; without ordering array first we would walk the internal
+  fields of `Array` instead of the element type.
 - **Struct fields**: If a struct is used as a varying parameter, each field's
   type is checked against the rules. This catches cases like
-  `struct Foo { DifferentialPair<float> x; }` used as a parameter.
-- **Array element types**: `DifferentialPair<float>[4]` is also caught.
+  `struct Foo { DifferentialPair<float> x; }` used as a parameter. Fields are
+  iterated through the struct's `DeclRef` so that generic type-parameter
+  substitutions are applied; `Wrapper<DifferentialPair<float>>` with
+  `struct Wrapper<T> { T x; }` is also caught.
 - **ModifiedType wrappers**: Unwrapped transparently.
 
 Cycle detection prevents infinite recursion on recursive struct types.
