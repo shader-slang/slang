@@ -448,10 +448,8 @@ struct TagOpsLoweringContext : public InstPassBase
     // take an integer in and return an integer out, based on the
     // input and output sets (and any other operands)
     //
-    DiagnosticSink* sink;
-
-    TagOpsLoweringContext(IRModule* module, DiagnosticSink* sink)
-        : InstPassBase(module), sink(sink)
+    TagOpsLoweringContext(IRModule* module)
+        : InstPassBase(module)
     {
     }
 
@@ -556,12 +554,14 @@ struct TagOpsLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
-    // Lower a `lookupWitness` whose result is a plain value type (e.g. Int from
-    // `static const int`). The typeflow specialization pass only handles function,
-    // type, and witness-table results; value-type lookups survive unresolved.
-    // At this point in the pipeline the witness-table operand still carries
-    // SetTagType(WitnessTableSet), so we can map each table's entry to a
-    // concrete value via an integer mapping function.
+    // Lower a `lookupWitness` whose result is a plain value type (e.g. `Int`
+    // from `static const int`, `float` from `static const float`). The
+    // typeflow specialization pass handles function/type/generic/witness-table
+    // results; value-type lookups reach this pass still carrying the
+    // `SetTagType(WitnessTableSet)` on their operand, so we emit a dispatch
+    // function that returns the correct witness-table entry for the runtime
+    // tag. Since every entry is already a constant IR value, we can return it
+    // directly — no restriction on the entry kind.
     void lowerLookupWitnessForValue(IRLookupWitnessMethod* inst)
     {
         auto witnessTableOp = inst->getWitnessTable();
@@ -573,8 +573,8 @@ struct TagOpsLoweringContext : public InstPassBase
         if (!witnessTableSet)
             return;
 
-        // Only handle value-type results (not functions, types, generics, or
-        // witness tables which are handled by the typeflow specialization pass).
+        // Only handle value-type results; func/type/generic/witness-table
+        // results are handled by the typeflow specialization pass.
         auto resultType = inst->getDataType();
         if (as<IRFuncType>(resultType) || as<IRWitnessTableType>(resultType))
             return;
@@ -584,51 +584,87 @@ struct TagOpsLoweringContext : public InstPassBase
 
         auto key = inst->getRequirementKey();
 
-        IRBuilder builder(module);
-        Dictionary<UInt, UInt> mapping;
-
-        for (UInt i = 0; i < witnessTableSet->getCount(); i++)
+        // Collect (tagID, entry) pairs from every witness table in the set.
+        List<UInt> caseTags;
+        List<IRInst*> caseEntries;
         {
-            auto table = as<IRWitnessTable>(witnessTableSet->getElement(i));
-            if (!table)
-                return;
-
-            auto entry = findWitnessTableEntry(table, key);
-            if (!entry)
-                return;
-
-            auto intVal = as<IRIntLit>(entry);
-            if (!intVal)
+            IRBuilder tagBuilder(module);
+            for (UInt i = 0; i < witnessTableSet->getCount(); i++)
             {
-                // Non-integer static const values (e.g. float) are not yet supported
-                // for dynamic dispatch. Emit a diagnostic rather than leaving the
-                // lookupWitness unresolved (which would cause ICE at emit time).
-                if (sink)
-                {
-                    sink->diagnose(Diagnostics::Unimplemented{
-                        .feature = "dynamic dispatch of non-integer static const interface members",
-                        .location = inst->sourceLoc});
-                }
-                return;
-            }
+                auto table = as<IRWitnessTable>(witnessTableSet->getElement(i));
+                if (!table)
+                    return;
 
-            // The UInt cast preserves the bit pattern for 32-bit integer types
-            // (including negative values via two's complement). The emitCast below
-            // converts back to the original type.
-            mapping.add(getUniqueID(&builder, table), (UInt)intVal->getValue());
+                auto entry = findWitnessTableEntry(table, key);
+                if (!entry)
+                    return;
+
+                caseTags.add(getUniqueID(&tagBuilder, table));
+                caseEntries.add(entry);
+            }
         }
 
-        auto mappingFunc = createIntegerMappingFunc(module, mapping, 0);
+        if (caseEntries.getCount() == 0)
+            return;
 
+        // Build a dispatch function `(UInt tag) -> resultType` that returns
+        // the witness-table entry for `tag`.
+        IRBuilder funcBuilder(module);
+        auto funcType =
+            funcBuilder.getFuncType(List<IRType*>({funcBuilder.getUIntType()}), resultType);
+        auto dispatchFunc = funcBuilder.createFunc();
+        funcBuilder.setInsertInto(dispatchFunc);
+        dispatchFunc->setFullType(funcType);
+
+        auto entryBlock = funcBuilder.emitBlock();
+        funcBuilder.setInsertInto(entryBlock);
+        auto tagParam = funcBuilder.emitParam(funcBuilder.getUIntType());
+
+        // Default block: in a correctly-tagged program the default is never
+        // taken, but the IR requires a value return. Using the first case's
+        // entry is arbitrary-but-valid.
+        auto defaultBlock = funcBuilder.emitBlock();
+        funcBuilder.setInsertInto(defaultBlock);
+        funcBuilder.emitReturn(caseEntries[0]);
+
+        List<IRInst*> caseValues;
+        List<IRBlock*> caseBlocks;
+        for (Index i = 0; i < caseEntries.getCount(); i++)
+        {
+            auto caseBlock = funcBuilder.emitBlock();
+            funcBuilder.setInsertInto(caseBlock);
+            funcBuilder.emitReturn(caseEntries[i]);
+
+            caseValues.add(funcBuilder.getIntValue(funcBuilder.getUIntType(), caseTags[i]));
+            caseBlocks.add(caseBlock);
+        }
+
+        List<IRInst*> flattenedCaseArgs;
+        for (Index i = 0; i < caseValues.getCount(); i++)
+        {
+            flattenedCaseArgs.add(caseValues[i]);
+            flattenedCaseArgs.add(caseBlocks[i]);
+        }
+
+        auto unreachableBlock = funcBuilder.emitBlock();
+        funcBuilder.setInsertInto(unreachableBlock);
+        funcBuilder.emitUnreachable();
+
+        funcBuilder.setInsertInto(entryBlock);
+        funcBuilder.emitSwitch(
+            tagParam,
+            unreachableBlock,
+            defaultBlock,
+            flattenedCaseArgs.getCount(),
+            flattenedCaseArgs.getBuffer());
+
+        // Emit the call at the original site.
+        IRBuilder builder(module);
         builder.setInsertBefore(inst);
-        auto callResult = builder.emitCallInst(
-            builder.getUIntType(),
-            mappingFunc,
-            List<IRInst*>({witnessTableOp}));
+        auto callResult =
+            builder.emitCallInst(resultType, dispatchFunc, List<IRInst*>({witnessTableOp}));
 
-        auto castResult = builder.emitCast(resultType, callResult);
-
-        inst->replaceUsesWith(castResult);
+        inst->replaceUsesWith(callResult);
         inst->removeAndDeallocate();
     }
 
@@ -1118,7 +1154,8 @@ void lowerSequentialIDTagCasts(IRModule* module, Linkage* linkage, DiagnosticSin
 
 void lowerTagInsts(IRModule* module, DiagnosticSink* sink)
 {
-    TagOpsLoweringContext tagContext(module, sink);
+    SLANG_UNUSED(sink);
+    TagOpsLoweringContext tagContext(module);
     tagContext.processModule();
 }
 
