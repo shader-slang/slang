@@ -745,8 +745,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_CoopMatMulAdd:
         {
             auto coopMatMulAdd = cast<IRCoopMatMulAdd>(inst);
-            emitInstResultDecl(inst);
-            emitOperand(coopMatMulAdd->getMatC(), getInfo(EmitOp::General));
+            emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n");
             m_writer->emit("simdgroup_multiply_accumulate(");
             m_writer->emit(getName(inst));
@@ -755,7 +754,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", ");
             emitOperand(coopMatMulAdd->getMatB(), getInfo(EmitOp::General));
             m_writer->emit(", ");
-            m_writer->emit(getName(inst));
+            emitOperand(coopMatMulAdd->getMatC(), getInfo(EmitOp::General));
             m_writer->emit(");\n");
             return true;
         }
