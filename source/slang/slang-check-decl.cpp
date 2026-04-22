@@ -8564,6 +8564,69 @@ static SynthesizedExtensionVisibility getSynthesizedExtensionVisibility(
     return result;
 }
 
+static bool isModuleReachableViaExportedImports(
+    ModuleDecl* sourceModule,
+    ModuleDecl* targetModule,
+    HashSet<ModuleDecl*>& visitedModules)
+{
+    if (!sourceModule || !targetModule)
+        return false;
+    if (sourceModule == targetModule)
+        return true;
+    if (!visitedModules.add(sourceModule))
+        return false;
+
+    for (auto importDecl : sourceModule->getMembersOfType<ImportDecl>())
+    {
+        if (!importDecl->hasModifier<ExportedModifier>())
+            continue;
+
+        if (isModuleReachableViaExportedImports(
+                importDecl->importedModuleDecl,
+                targetModule,
+                visitedModules))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+template<typename TDerivativeAttr>
+static bool checkPublicCustomDerivativeUsesExportedImport(
+    SemanticsVisitor* visitor,
+    FunctionDeclBase* primalFuncDecl,
+    TDerivativeAttr* attr)
+{
+    auto derivativeDeclRefExpr = as<DeclRefExpr>(attr->funcExpr);
+    if (!derivativeDeclRefExpr)
+        return true;
+
+    auto derivativeDecl = as<CallableDecl>(derivativeDeclRefExpr->declRef.getDecl());
+    if (!derivativeDecl)
+        return true;
+
+    auto visibility =
+        Math::Min(getDeclVisibility(primalFuncDecl), getDeclVisibility(derivativeDecl));
+    if (visibility != DeclVisibility::Public)
+        return true;
+
+    auto primalModule = getModuleDecl(primalFuncDecl);
+    auto derivativeModule = getModuleDecl(derivativeDecl);
+    if (!primalModule || !derivativeModule || primalModule == derivativeModule)
+        return true;
+
+    HashSet<ModuleDecl*> visitedModules;
+    if (isModuleReachableViaExportedImports(primalModule, derivativeModule, visitedModules))
+        return true;
+
+    visitor->getSink()->diagnose(Diagnostics::PublicCustomDerivativeUsesNonExportedImport{
+        .derivative = derivativeDecl,
+        .attr = attr->loc});
+    return false;
+}
+
 bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
     ConformanceCheckingContext* context,
     DeclRef<Decl> requirementDeclRef,
@@ -16946,7 +17009,10 @@ static void translateFwdDerivativeAttributeToAD2(
     auto funcDeclRef = funcDecl->getDefaultDeclRef();
     funcDeclRef = createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), visitor, funcDeclRef);
     auto funcAsType = DeclRefType::create(astBuilder, funcDeclRef);
-    auto synthesizedVisibility = getSynthesizedExtensionVisibility(getDeclVisibility(funcDecl));
+    auto userDefinedFwdDiffFunc = as<DeclRefExpr>(attr->funcExpr)->declRef.as<CallableDecl>();
+    auto visibility =
+        Math::Min(getDeclVisibility(funcDecl), getDeclVisibility(userDefinedFwdDiffFunc.getDecl()));
+    auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
 
     fwdDiffExtension->parentDecl = funcDecl;
     fwdDiffExtension->loc = attr->loc;
@@ -16963,8 +17029,7 @@ static void translateFwdDerivativeAttributeToAD2(
     auto fwdDiffInheritanceDecl = astBuilder->create<InheritanceDecl>();
     fwdDiffInheritanceDecl->base.type = visitor->getForwardDiffFuncInterfaceType(funcAsType);
     fwdDiffExtension->addMember(fwdDiffInheritanceDecl);
-
-    auto userDefinedFwdDiffFunc =
+    userDefinedFwdDiffFunc =
         substituteDeclRef(substSet, astBuilder, as<DeclRefExpr>(attr->funcExpr)->declRef)
             .as<CallableDecl>();
 
@@ -17005,7 +17070,8 @@ static void translateBwdDerivativeAttributeToAD2(
     SubstitutionSet substSet;
     DeclRef<Decl> bwdDiffFunc = as<DeclRefExpr>(attr->funcExpr)->declRef;
 
-    auto visibility = getDeclVisibility(targetFuncDecl);
+    auto visibility =
+        Math::Min(getDeclVisibility(targetFuncDecl), getDeclVisibility(bwdDiffFunc.getDecl()));
     auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
     auto bwdDiffExtension = extendContainerDecl(
         visitor,
@@ -17113,6 +17179,9 @@ static void checkDerivativeAttribute(
         return;
     }
 
+    if (!checkPublicCustomDerivativeUsesExportedImport(visitor, funcDecl, attr))
+        return;
+
     translateFwdDerivativeAttributeToAD2(visitor, funcDecl, attr);
 
     if (getCurrentASTBuilder()->m_substituteMap.containsKey(funcDecl))
@@ -17146,6 +17215,9 @@ static void checkDerivativeAttribute(
         // If the funcExpr did not resolve to a declRefExpr, we can't do anything.
         return;
     }
+
+    if (!checkPublicCustomDerivativeUsesExportedImport(visitor, funcDecl, attr))
+        return;
 
     translateBwdDerivativeAttributeToAD2(
         visitor,

@@ -66,49 +66,49 @@ public struct VisibilityCase
 
     public static float callPublicFwd(float x)
     {
-        return VisibilityCase.publicSquare.fwd_diff(diffPair(x, 1.0)).d;
+        return fwd_diff(VisibilityCase.publicSquare)(diffPair(x, 1.0)).d;
     }
 
     public static float callInternalFwd(float x)
     {
-        return VisibilityCase.internalCube.fwd_diff(diffPair(x, 1.0)).d;
+        return fwd_diff(VisibilityCase.internalCube)(diffPair(x, 1.0)).d;
     }
 
     public static float callPrivateFwd(float x)
     {
-        return VisibilityCase.privatePow4.fwd_diff(diffPair(x, 1.0)).d;
+        return fwd_diff(VisibilityCase.privatePow4)(diffPair(x, 1.0)).d;
     }
 
     public static float callPrivateCustomFwd(float x)
     {
-        return VisibilityCase.privateCustomSquare.fwd_diff(diffPair(x, 1.0)).d;
+        return fwd_diff(VisibilityCase.privateCustomSquare)(diffPair(x, 1.0)).d;
     }
 
     public static float callPublicBwd(float x)
     {
         var dx = diffPair(x);
-        VisibilityCase.publicCube.bwd_diff(dx, 1.0);
+        bwd_diff(VisibilityCase.publicCube)(dx, 1.0);
         return dx.d;
     }
 
     public static float callInternalBwd(float x)
     {
         var dx = diffPair(x);
-        VisibilityCase.internalPow4.bwd_diff(dx, 1.0);
+        bwd_diff(VisibilityCase.internalPow4)(dx, 1.0);
         return dx.d;
     }
 
     public static float callPrivateBwd(float x)
     {
         var dx = diffPair(x);
-        VisibilityCase.privatePow5.bwd_diff(dx, 1.0);
+        bwd_diff(VisibilityCase.privatePow5)(dx, 1.0);
         return dx.d;
     }
 
     public static float callPrivateCustomBwd(float x)
     {
         var dx = diffPair(x);
-        VisibilityCase.privateCustomCube.bwd_diff(dx, 1.0);
+        bwd_diff(VisibilityCase.privateCustomCube)(dx, 1.0);
         return dx.d;
     }
 }

@@ -389,6 +389,7 @@ float sin(float x)
     // Calc sin(X) using Taylor series..
 }
 ```
+Note that visibility of the derivative attribute is the same as the referenced derivative function, so if `sin_bwd` was `internal`, then `sin` is considered differentiable only within the module.
 
 > Note that the signature of the provided forward or backward derivative function must match the expected signature from invoking `fwd_diff(fn)`/`bwd_diff(fn)`.
 > For a full list of signature rules, see the reference section for the [auto-diff operators](#fwd_difff--slang_function---slang_function).
@@ -398,7 +399,7 @@ Sometimes, the original function's definition might be inaccessible, so it can b
 
 For such cases, Slang provides the `[ForwardDerivativeOf(primal_fn)]` and `[BackwardDerivativeOf(primal_fn)]` attributes that can be used
 on the derivative function and contain a reference to the function for which they are providing a derivative implementation.
-As long as the derivative function is in scope, the primal function will be considered differentiable.
+The primal function will be considered differentiable wherever the derivative function is visible according to the standard visibility rules (`private/public/internal`).
 
 Example:
 ```csharp

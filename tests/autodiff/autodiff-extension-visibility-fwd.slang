@@ -9,7 +9,7 @@ import "autodiff-extension-visibility-lib";
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    outputBuffer[0] = VisibilityCase.publicSquare.fwd_diff(diffPair(3.0, 1.0)).d;
+    outputBuffer[0] = fwd_diff(VisibilityCase.publicSquare)(diffPair(3.0, 1.0)).d;
     outputBuffer[1] = VisibilityCase.callPublicFwd(3.0);
     outputBuffer[2] = VisibilityCase.callInternalFwd(2.0);
     outputBuffer[3] = VisibilityCase.callPrivateFwd(2.0);
