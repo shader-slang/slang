@@ -3140,7 +3140,7 @@ err(
 
 standalone_note(
     "initializer-list-member-visibility-mismatch",
-    30515,
+    30516,
     "member '~member:Decl' is ~memberVis:DeclVisibility, but '~type:Type' is ~structVis:DeclVisibility; all members must be ~structVis:DeclVisibility to use an initializer list",
     span { loc = "member:Decl" }
 )
