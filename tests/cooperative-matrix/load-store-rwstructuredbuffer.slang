@@ -4,7 +4,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -Xslang -DRWSB
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -Xslang -DBAB
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK_METAL):-metal -compute -output-using-type -xslang -DMETAL
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK_METAL):-metal -compute -output-using-type -Xslang -DMETAL
 
 //DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include -DBAB
 //DXIL: result code = 0
@@ -27,7 +27,7 @@
 // CHECK_METAL-NEXT: 7.0
 // CHECK_METAL-NEXT: 8.0
 
-//TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8], stride=4, count=256),name=inputBufferInt
+//TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8], stride=4, count=256):name=inputBufferInt
 #if defined(RWSB)
 RWStructuredBuffer<int32_t> inputBufferInt;
 #elif defined(BAB)
@@ -43,7 +43,7 @@ RWByteAddressBuffer outputBufferInt;
 RWStructuredBuffer<int32_t> outputBufferInt;
 #endif
 
-//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0], stride=4, count=256),name=inputBufferFloat
+//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0], stride=4, count=256):name=inputBufferFloat
 #if defined(RWSB)
 RWStructuredBuffer<float> inputBufferFloat;
 #elif defined(BAB)

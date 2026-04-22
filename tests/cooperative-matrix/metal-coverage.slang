@@ -1,4 +1,4 @@
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type -xslang -DMETAL
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type -Xslang -DMETAL
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outStructuredBuffer
 RWStructuredBuffer<float> outStructuredBuffer;
@@ -23,6 +23,9 @@ RWStructuredBuffer<float> outPtrCross;
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outMMA
 RWStructuredBuffer<float> outMMA;
+
+//TEST_INPUT:ubuffer(stride=4, count=256):out,name=outColMajor
+RWStructuredBuffer<float> outColMajor;
 
 //TEST_INPUT:ubuffer(data=[5.0 5.0 5.0 5.0 5.0 5.0 5.0 5.0], stride=4, count=256):name=inputBAB
 ByteAddressBuffer inputBAB;
@@ -96,4 +99,13 @@ void computeMain()
     ).Store<CoopMatMatrixLayout.RowMajor>(outMMA, 0u, kStride);
     // CHECK: type: float
     // CHECK-COUNT-8: 49.000000
+
+    // --- 9. Store/Load with ColMajor layout via groupshared ---
+    var matCol : CMat;
+    matCol.fill(5.0);
+    matCol.Store<CoopMatMatrixLayout.ColumnMajor>(gsFloat, 0u, kStride);
+    let matColLoaded = CMat.Load<CoopMatMatrixLayout.ColumnMajor>(gsFloat, 0u, kStride);
+    matColLoaded.Store<CoopMatMatrixLayout.RowMajor>(outColMajor, 0u, kStride);
+    // CHECK: type: float
+    // CHECK-COUNT-8: 5.000000
 }

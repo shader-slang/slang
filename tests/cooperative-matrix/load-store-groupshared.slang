@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK_METAL):-metal -compute -output-using-type -xslang -DMETAL
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK_METAL):-metal -compute -output-using-type -Xslang -DMETAL
 
 // CHECK: 1
 // CHECK-NEXT: 2
@@ -43,7 +43,7 @@
 //TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8], stride=4, count=256):name=inputInt
 ByteAddressBuffer inputInt;
 
-// TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBufferInt
+//TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBufferInt
 RWStructuredBuffer<int32_t> outputBufferInt;
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBufferInt1

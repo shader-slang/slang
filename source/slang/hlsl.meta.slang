@@ -27479,6 +27479,13 @@ Workgroup-scope cooperative matrices requires a specific workgroup size setting 
 `[numthreads]`). Use the Vulkan API to query the supported combinations of element type, matrix
 shape and workgroup size settings.
 
+Metal backend (simdgroup_matrix):
+- Only 8x8 matrix dimensions
+- Only half and float element types
+- Supported operations: fill, Load, Store, coopMatMulAdd
+- No per-element access (subscript, GetLength, getCount)
+- No scalar multiply, copyFrom, transpose, reduce, or MapElement
+
 @category matrix_types
 */
 __intrinsic_type($(kIROp_CoopMatrixType))
