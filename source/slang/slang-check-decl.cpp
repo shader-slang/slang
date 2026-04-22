@@ -4423,6 +4423,38 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
         }
     }
 
+    // Check for generic type parameters that shadow outer generic parameters.
+    for (Index i = 0; i < genericDecl->getDirectMemberDeclCount(); ++i)
+    {
+        Decl* m = genericDecl->getDirectMemberDecl(i);
+        if (!as<GenericTypeParamDeclBase>(m))
+            continue;
+        auto paramName = m->getName();
+        if (!paramName)
+            continue;
+        bool found = false;
+        for (auto ancestor = genericDecl->parentDecl; ancestor && !found;
+             ancestor = ancestor->parentDecl)
+        {
+            auto outerGeneric = as<GenericDecl>(ancestor);
+            if (!outerGeneric)
+                continue;
+            for (auto outerMember : outerGeneric->getMembers())
+            {
+                if (!as<GenericTypeParamDeclBase>(outerMember))
+                    continue;
+                if (outerMember->getName() == paramName)
+                {
+                    getSink()->diagnose(Diagnostics::GenericParamShadowsOuterGeneric{
+                        .param = m,
+                        .outerParam = outerMember});
+                    found = true;
+                    break;
+                }
+            }
+        }
+    }
+
     // Validate that pack parameters only appear at the end of the parameter list.
     bool seenPack = false;
     for (Index i = 0; i < genericDecl->getDirectMemberDeclCount(); ++i)
