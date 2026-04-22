@@ -7541,7 +7541,12 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             synDeclRef.getParent().as<GenericDecl>(),
             requiredMemberDeclRef.getParent().as<GenericDecl>(),
             witnessTable);
-        SLANG_ASSERT(doesSignatureMatch);
+        if (!doesSignatureMatch)
+        {
+            if (outFailureDetails)
+                outFailureDetails->reason = WitnessSynthesisFailureReason::GenericSignatureMismatch;
+            return false;
+        }
     }
     else
     {
@@ -7550,7 +7555,10 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             synDeclRef.as<FuncDecl>(),
             requiredMemberDeclRef,
             witnessTable);
-        SLANG_ASSERT(doesSignatureMatch);
+        if (!doesSignatureMatch)
+        {
+            return false;
+        }
     }
 
     return true;
@@ -9129,9 +9137,11 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     //
     this->ensureDecl(witnessDecl, DeclCheckState::ReadyForLookup);
 
+    auto synthesizedCallableDeclRef = synthesizedWitnessDeclRef.as<CallableDecl>();
+
     // Test signature and register in witness table.
     bool doesSignatureMatch = doesSignatureMatchRequirement(
-        synthesizedWitnessDeclRef.as<CallableDecl>(),
+        synthesizedCallableDeclRef,
         requirementDeclRef.as<CallableDecl>(),
         witnessTable);
 
@@ -9973,6 +9983,16 @@ bool SemanticsVisitor::checkConformanceToType(
         auto superTypeDeclRef = supereclRefType->getDeclRef();
         if (auto superInterfaceDeclRef = superTypeDeclRef.as<InterfaceDecl>())
         {
+            if (isNonCopyableType(subType))
+            {
+                getSink()->diagnose(Diagnostics::NonCopyableTypeCannotConformToInterface{
+                    .type = subType,
+                    .interface = superInterfaceDeclRef.getDecl(),
+                    .inheritance = inheritanceDecl});
+                // Fall through — let conformance checking proceed so the witness table
+                // is populated. The warning already informed the user.
+            }
+
             // The type is stating that it conforms to an interface.
             // We need to check that it provides all of the members
             // required by that interface.
