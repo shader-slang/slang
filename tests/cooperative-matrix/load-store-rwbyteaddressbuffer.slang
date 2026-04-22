@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DRWBAB
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -Xslang -DRWBAB
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK_METAL):-metal -compute -output-using-type -Xslang -DMETAL
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK_METAL):-metal -compute -output-using-type -Xslang -DMETAL -Xslang -preserve-params
 
 //DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include
 //DXIL: result code = 0
@@ -36,7 +36,7 @@ ByteAddressBuffer inputBufferInt;
 RWByteAddressBuffer outputBufferInt;
 
 //TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0], stride=4, count=256):name=inputBufferFloat
-StructuredBuffer<float> inputBufferFloat;
+ByteAddressBuffer inputBufferFloat;
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBufferFloat
 RWStructuredBuffer<float> outputBufferFloat;

@@ -1377,6 +1377,16 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_CoopMatrixType:
         {
             auto coopType = as<IRCoopMatrixType>(type);
+            auto rows = getIntVal(coopType->getRowCount());
+            auto cols = getIntVal(coopType->getColumnCount());
+            if (rows != 8 || cols != 8)
+            {
+                getSink()->diagnose(
+                    type->sourceLoc,
+                    Diagnostics::unimplemented,
+                    "Metal cooperative matrices (simdgroup_matrix) only support 8x8 dimensions");
+            }
+            // Metal's simdgroup_matrix<T, Cols, Rows> uses Cols, Rows order
             m_writer->emit("simdgroup_matrix<");
             emitType(coopType->getElementType());
             m_writer->emit(", ");
