@@ -3236,6 +3236,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // then we simply need to check that expression and coerce
         // it to the type of the variable.
         //
+        // Capture the error count before checking the initializer so that errors from
+        // CheckTerm or coerce (e.g. undefined identifier) suppress downstream diagnostics.
+        auto errorCountBeforeInitCheck = getSink()->getErrorCount();
         initExpr = subVisitor.CheckTerm(initExpr);
 
         if (initExpr->type.isWriteOnly)
@@ -3254,6 +3257,17 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         if (!varDecl->val)
         {
             varDecl->val = _validateCircularVarDefinition(varDecl);
+            // If this is a global `static const` variable with scalar integer type and we still
+            // couldn't constant-fold its initializer (and no new error was emitted anywhere
+            // during init checking, e.g. for an undefined identifier, a circular definition, or
+            // a type error), the initializer references a non-constant expression. Diagnose this
+            // now rather than crashing in IR code generation.
+            if (isStaticConst && isGlobalDecl(varDecl) && isScalarIntegerType(varDecl->type) &&
+                !varDecl->val && getSink()->getErrorCount() == errorCountBeforeInitCheck)
+            {
+                getSink()->diagnose(
+                    Diagnostics::StaticConstGlobalNonConstantInit{.decl = varDecl});
+            }
         }
     }
     else
