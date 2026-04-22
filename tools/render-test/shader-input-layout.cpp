@@ -3,6 +3,7 @@
 
 #include "shader-input-layout.h"
 
+#include "core/slang-math.h"
 #include "core/slang-token-reader.h"
 #include "core/slang-type-text-util.h"
 
@@ -224,7 +225,18 @@ struct ShaderInputLayoutParser
                     negate = true;
                 }
 
-                if (parser.NextToken().Type == Misc::TokenType::HalfLiteral)
+                if (!negate && parser.NextToken().Type == Misc::TokenType::Identifier)
+                {
+                    // Buffer name reference: resolve to device address at bind time.
+                    // Reserves 2 uint32 slots (8 bytes) for a 64-bit device address.
+                    ShaderInputLayout::BufferAddressRef ref;
+                    ref.dataOffset = val->bufferData.getCount();
+                    ref.bufferName = parser.ReadWord();
+                    val->addressRefs.add(ref);
+                    val->bufferData.add(0);
+                    val->bufferData.add(0);
+                }
+                else if (parser.NextToken().Type == Misc::TokenType::HalfLiteral)
                 {
                     // Half float literal (e.g. 1.0h): store one half per uint32_t slot.
                     // Packing into the final buffer layout is handled by assignBuffer()
@@ -1147,6 +1159,39 @@ void ShaderInputLayout::parse(RandomGenerator* rand, const char* source)
             }
             break;
         }
+    case ScalarType::BFloat16:
+        {
+            auto ptr = (const uint16_t*)data;
+            const size_t size = sizeInBytes / sizeof(ptr[0]);
+            for (size_t i = 0; i < size; ++i)
+            {
+                const float v = BFloat16ToFloat(ptr[i]);
+                writer.print("%f\n", v);
+            }
+            break;
+        }
+    case ScalarType::FloatE4M3:
+        {
+            auto ptr = (const uint8_t*)data;
+            const size_t size = sizeInBytes / sizeof(ptr[0]);
+            for (size_t i = 0; i < size; ++i)
+            {
+                const float v = FloatE4M3ToFloat(ptr[i]);
+                writer.print("%f\n", v);
+            }
+            break;
+        }
+    case ScalarType::FloatE5M2:
+        {
+            auto ptr = (const uint8_t*)data;
+            const size_t size = sizeInBytes / sizeof(ptr[0]);
+            for (size_t i = 0; i < size; ++i)
+            {
+                const float v = FloatE5M2ToFloat(ptr[i]);
+                writer.print("%f\n", v);
+            }
+            break;
+        }
 #define CASE(SLANG_TYPE, C_TYPE, FORMAT)                      \
     case ScalarType::SLANG_TYPE:                              \
         {                                                     \
@@ -1167,6 +1212,8 @@ void ShaderInputLayout::parse(RandomGenerator* rand, const char* source)
         CASE(Int32, int32_t, PRId32);
         CASE(UInt64, uint64_t, PRIu64);
         CASE(Int64, int64_t, PRId64);
+        CASE(UIntPtr, uintptr_t, PRIuPTR);
+        CASE(IntPtr, intptr_t, PRIdPTR);
         CASE(Float32, float, "f");
         CASE(Float64, double, "f");
 #undef CASE
@@ -1452,6 +1499,9 @@ void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputD
     case SLANG_SCALAR_TYPE_FLOAT64:
     case SLANG_SCALAR_TYPE_FLOAT32:
     case SLANG_SCALAR_TYPE_FLOAT16:
+    case SLANG_SCALAR_TYPE_BFLOAT16:
+    case SLANG_SCALAR_TYPE_FLOAT_E4M3:
+    case SLANG_SCALAR_TYPE_FLOAT_E5M2:
         type = SimpleScalarType::kFloat;
         break;
     default:

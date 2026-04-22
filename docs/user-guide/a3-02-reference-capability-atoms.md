@@ -224,6 +224,9 @@ Versions
 `metallib_3_1`
 > Represents MetalLib 3.1.
 
+`metallib_4_0`
+> Represents MetalLib 4.0.
+
 `metallib_latest`
 > Represents the latest MetalLib version.
 
@@ -270,6 +273,14 @@ Versions
 `sm_6_1`
 > HLSL shader model 6.1 and related capabilities of other targets.
 > Includes related GLSL/SPIRV extensions.
+
+`sm_6_10`
+> HLSL shader model 6.10 and related capabilities of other targets.
+> Includes related GLSL/SPIRV extensions.
+
+`sm_6_10_version`
+> HLSL shader model 6.10 and related capabilities of other targets.
+> Does not include related GLSL/SPIRV extensions.
 
 `sm_6_1_version`
 > HLSL shader model 6.1 and related capabilities of other targets.
@@ -775,11 +786,17 @@ Extensions
 `spvFragmentShaderPixelInterlockEXT`
 > Represents the SPIR-V capability for using SPV_EXT_fragment_shader_interlock.
 
+`spvGroupNonUniform`
+> Represents the SPIR-V GroupNonUniform capability (basic subgroup operations).
+
 `spvGroupNonUniformArithmetic`
 > Represents the SPIR-V capability for group non-uniform arithmetic operations.
 
 `spvGroupNonUniformBallot`
 > Represents the SPIR-V capability for group non-uniform ballot operations.
+
+`spvGroupNonUniformClustered`
+> Represents the SPIR-V capability for group non-uniform clustered operations.
 
 `spvGroupNonUniformPartitionedNV`
 > Represents the SPIR-V capability for group non-uniform partitioned operations.
@@ -792,6 +809,9 @@ Extensions
 
 `spvGroupNonUniformShuffle`
 > Represents the SPIR-V capability for group non-uniform shuffle operations.
+
+`spvGroupNonUniformShuffleRelative`
+> Represents the SPIR-V capability for group non-uniform shuffle relative operations.
 
 `spvGroupNonUniformVote`
 > Represents the SPIR-V capability for group non-uniform vote operations.
@@ -1228,6 +1248,9 @@ Compound Capabilities
 > `SPV_KHR_compute_shader_derivatives` (SPIR-V), or profile `cs_6_6` (HLSL).
 > 
 
+`mem_model`
+> Capabilities needed to use memory model
+
 `memorybarrier`
 > Capabilities required to use sm_5_0 style memory barriers
 
@@ -1527,6 +1550,9 @@ Other
 `DX_6_1`
 > Use `sm_6_1` instead
 
+`DX_6_10`
+> Use `sm_6_10` instead
+
 `DX_6_2`
 > Use `sm_6_2` instead
 
@@ -1574,6 +1600,9 @@ Other
 
 `METAL_3_1`
 > Use `metallib_3_1` instead
+
+`METAL_4_0`
+> Use `metallib_4_0` instead
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead

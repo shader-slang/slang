@@ -95,6 +95,28 @@ if [ ! -e /dev/nvidia-modeset ]; then
   nvidia-modprobe -m 2>/dev/null || modprobe nvidia-modeset 2>/dev/null || true
 fi
 
+# Enable GPU persistence mode to prevent NVML state corruption in containers.
+# Without this, NVML can lose track of GPU processes when they exit inside Docker,
+# causing "Failed to initialize NVML: Unknown Error".
+log "  Enabling GPU persistence mode..."
+if pm_out="$(nvidia-smi -pm 1 2>&1)"; then
+  log "  GPU persistence mode enabled."
+else
+  log "WARNING: Failed to enable GPU persistence mode: ${pm_out}"
+fi
+
+# Create /dev/char symlinks for all NVIDIA device nodes. Recent runc versions
+# with cgroup v2 require these symlinks to properly inject devices into
+# containers. Without them, containers can intermittently lose GPU access
+# with "Failed to initialize NVML: Unknown Error".
+# See: https://github.com/NVIDIA/nvidia-docker/issues/1730
+log "  Creating /dev/char symlinks..."
+if ctk_out="$(nvidia-ctk system create-dev-char-symlinks --create-all 2>&1)"; then
+  log "  /dev/char symlinks created."
+else
+  log "WARNING: Failed to create /dev/char symlinks: ${ctk_out}"
+fi
+
 # Verify GPU devices
 log "  GPU devices:"
 ls -la /dev/nvidia* 2>&1 | while read -r line; do log "    $line"; done || true

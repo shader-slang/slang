@@ -214,6 +214,12 @@ public:
     /// Thread-safe. The singleton starts in Idle or Record mode based on env var.
     SLANG_API static ReplayContext& get();
 
+    /// Return the singleton if it has already been constructed, or nullptr.
+    /// Thread-safe - uses a mutex to synchronize with get().
+    /// Use this in cleanup paths (e.g. slang_shutdown) to avoid constructing
+    /// the singleton just to tear it down.
+    SLANG_API static ReplayContext* tryGet();
+
     /// Create an idle context.
     /// Will switch to Record mode if SLANG_RECORD_LAYER=1 is set.
     SLANG_API ReplayContext();
@@ -603,6 +609,19 @@ public:
     /// Register a playback handler for a function signature.
     /// The signature should match what __FUNCSIG__ or __PRETTY_FUNCTION__ produces.
     SLANG_API void registerHandler(const char* signature, PlaybackHandler handler);
+
+    /// Return the number of registered playback handlers.
+    SLANG_API size_t getHandlerCount() const;
+
+    /// Clear the handler dictionary and deallocate its backing storage.
+    /// Called from slang_shutdown() to free heap-allocated handler strings
+    /// before _CrtDumpMemoryLeaks() runs.
+    SLANG_API void resetHandlers();
+
+    /// Re-register the default set of playback handlers.
+    /// Call after resetHandlers() to restore replay functionality.
+    /// Normal initialization happens automatically via static HandlerRegistrar.
+    SLANG_API void registerDefaultHandlers();
 
     /// Execute the next recorded call from the stream.
     /// Reads the function signature, looks up the handler, and calls it.

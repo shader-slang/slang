@@ -180,6 +180,8 @@ FIDDLE()
 class SynthesizedModifier : public Modifier
 {
     FIDDLE(...)
+    FIDDLE() uint32_t op = kIROp_Nop;
+    FIDDLE() List<Val*> operands;
 };
 
 // Marks that the definition of a func decl is synthesized static invoke func for
@@ -1586,26 +1588,57 @@ class SpecializeAttribute : public Attribute
     FIDDLE(...)
 };
 
+
+// Attribute intended only for interface requirements, to indicate an optional conformance
+// to IForwardDifferentiable<Self> and IBackwardDifferentiable<Self>.
+//
+FIDDLE()
+class MaybeDifferentiableAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 /// An attribute that marks a type, function or variable as differentiable.
 FIDDLE()
 class DifferentiableAttribute : public Attribute
 {
     FIDDLE(...)
-    // TODO(tfoley): Why is there this duplication here?
-    List<KeyValuePair<Type*, SubtypeWitness*>> m_typeToIDifferentiableWitnessMappings;
+    OrderedDictionary<Val*, OrderedDictionary<SlangInt, Val*>> m_associatedValMapping;
 
-    void addType(Type* declRef, SubtypeWitness* witness)
+    bool hasAssociatedVals(Val* targetVal) const
     {
-        getMapTypeToIDifferentiableWitness();
-        if (m_mapToIDifferentiableWitness.addIfNotExists(declRef, witness))
-        {
-            m_typeToIDifferentiableWitnessMappings.add(
-                KeyValuePair<Type*, SubtypeWitness*>(declRef, witness));
-        }
+        return m_associatedValMapping.containsKey(targetVal);
     }
 
-    /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
-    const OrderedDictionary<Type*, SubtypeWitness*>& getMapTypeToIDifferentiableWitness();
+    auto begin(Val* targetVal) const
+    {
+        SLANG_ASSERT(hasAssociatedVals(targetVal));
+        return m_associatedValMapping.tryGetValue(targetVal)->begin();
+    }
+
+    auto end(Val* targetVal) const { return m_associatedValMapping.tryGetValue(targetVal)->end(); }
+
+    void resolveDictionaryKeys()
+    {
+        // Go over m_associatedValMapping & call ->resolve() on all
+        // the dictionary keys (and re-insert them, if they are different)
+        //
+        OrderedDictionary<Val*, OrderedDictionary<SlangInt, Val*>> newMapping;
+        for (auto& pair : m_associatedValMapping)
+        {
+            auto& assocVals = pair.value;
+            auto newKey = pair.key->resolve();
+            newMapping[newKey] = assocVals;
+        }
+        m_associatedValMapping = newMapping;
+    }
+
+    void addAssocVal(Val* targetVal, SlangInt id, Val* assocVal)
+    {
+        if (!hasAssociatedVals(targetVal))
+            m_associatedValMapping[targetVal] = OrderedDictionary<SlangInt, Val*>();
+        m_associatedValMapping.tryGetValue(targetVal)->addIfNotExists(id, assocVal);
+    }
 
     ValSet m_typeRegistrationWorkingSet;
     UInt m_typeRegistrationRecursionDepth = 0;
@@ -1659,6 +1692,8 @@ FIDDLE()
 class AutoPyBindCudaAttribute : public Attribute
 {
     FIDDLE(...)
+    FIDDLE() DeclRefExpr* fwdDiffFuncDeclRef = nullptr;
+    FIDDLE() DeclRefExpr* bwdDiffFuncDeclRef = nullptr;
 };
 
 FIDDLE()
@@ -1734,6 +1769,14 @@ class AlwaysFoldIntoUseSiteAttribute : public Attribute
 //
 FIDDLE()
 class TreatAsDifferentiableAttribute : public DifferentiableAttribute
+{
+    FIDDLE(...)
+};
+
+/// The `[HasTrivialForwardDerivative]` attribute indicates that a function has a trivial forward
+/// derivative.
+FIDDLE()
+class HasTrivialForwardDerivativeAttribute : public DifferentiableAttribute
 {
     FIDDLE(...)
 };
@@ -1945,6 +1988,17 @@ class DeprecatedAttribute : public Attribute
     FIDDLE() String message;
 };
 
+/// A `[RemovedSince(languageVersion, "message")]` attribute indicates that the
+/// target has been removed starting from the specified language version.
+///
+FIDDLE()
+class RemovedSinceAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() int32_t sinceVersion;
+    FIDDLE() String message;
+};
+
 FIDDLE()
 class NonCopyableTypeAttribute : public Attribute
 {
@@ -2121,6 +2175,12 @@ public:
 
 FIDDLE()
 class ExperimentalModuleAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class FunctionInterfaceAttribute : public Attribute
 {
     FIDDLE(...)
 };

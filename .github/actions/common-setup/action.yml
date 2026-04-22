@@ -16,6 +16,10 @@ inputs:
   use-cached-llvm:
     default: true
     required: false
+  min-disk-gb:
+    description: "Minimum required free disk space in GB"
+    default: "3"
+    required: false
 runs:
   using: composite
   steps:
@@ -25,6 +29,11 @@ runs:
       run: |
         Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
         Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+
+    - name: Check disk space
+      uses: ./.github/actions/check-disk-space
+      with:
+        min-disk-gb: ${{ inputs.min-disk-gb }}
 
     - name: Set up MSVC dev tools on Windows
       uses: ilammy/msvc-dev-cmd@v1
@@ -112,16 +121,6 @@ runs:
           echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
           echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
         fi
-
-    # Put spirv-tools in path
-    - shell: bash
-      run: |
-        win_platform="${{ inputs.platform }}"
-        win_platform="${win_platform//x86_64/x64}"
-        case "${{inputs.os}}" in
-          windows*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/windows-$win_platform/bin" >> "$GITHUB_PATH";;
-          linux*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/$(uname -m)-linux/bin" >> "$GITHUB_PATH";;
-        esac
 
       # Note: ccache for Windows self-hosted has been replaced by sccache
       # sccache is set up in ci-slang-build.yml for all platforms

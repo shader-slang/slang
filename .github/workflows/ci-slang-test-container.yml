@@ -17,7 +17,14 @@ on:
 
 jobs:
   # Run GPU tests in container with Vulkan and CUDA support.
-  # Requires mounting host NVIDIA Vulkan ICD and EGL vendor config for Vulkan to work.
+  #
+  # Vulkan ICD: We use libEGL_nvidia.so.0 as the Vulkan ICD instead of the
+  # default libGLX_nvidia.so.0 to avoid an intermittent crash in the EGL
+  # initialization path of driver 580.x. Both libraries export vk_icd* symbols.
+  # The default ICD causes the driver to load libEGL_nvidia.so via libglvnd's
+  # EGL vendor dispatch, which has a null-deref bug that crashes test-server
+  # processes. Using libEGL_nvidia directly as the ICD skips the EGL vendor
+  # dispatch entirely, so the buggy code path is never reached.
   test-slang:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 60
@@ -27,7 +34,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -38,10 +45,7 @@ jobs:
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
-        -e VK_LOADER_LAYERS_DISABLE=VK_LAYER_MESA_device_select
-        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
-        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
 
     defaults:
       run:
@@ -64,6 +68,9 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "1"
+
+      - name: Setup Vulkan ICD
+        uses: ./.github/actions/setup-vulkan-icd
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -101,7 +108,6 @@ jobs:
             "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
-            "-ignore-abort-msg"
           )
 
           if [ "${{ inputs.server-count }}" -gt 1 ]; then
@@ -130,7 +136,6 @@ jobs:
             -server-count ${{ inputs.server-count }} \
             -category full \
             -emit-spirv-via-glsl \
-            -ignore-abort-msg \
             -api vk \
             -expected-failure-list tests/expected-failure-via-glsl.txt \
             -expected-failure-list tests/expected-failure-github.txt \
@@ -140,17 +145,31 @@ jobs:
       - name: GPU post-test diagnostics
         if: failure()
         run: |
+          gpu_crashed=0
           echo "=== GPU State ==="
-          nvidia-smi 2>&1 || echo "nvidia-smi FAILED (GPU may have crashed)"
+          if ! nvidia-smi 2>&1; then
+            echo "nvidia-smi FAILED (GPU may have crashed)"
+            echo "::error::GPU crashed during tests — retrying may help."
+            gpu_crashed=1
+          fi
           echo ""
           echo "=== GPU Memory & ECC ==="
           nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
             --format=csv,noheader 2>&1 || true
           echo ""
+          echo "=== XID Errors ==="
+          nvidia-smi -q -d XID_ERRORS 2>&1 || true
+          echo ""
+          echo "=== GPU Process State ==="
+          nvidia-smi pmon -c 1 2>&1 || true
+          echo ""
           echo "=== Kernel GPU Messages ==="
           dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
           sudo dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
           echo "(dmesg not available in container)"
+          if [[ "$gpu_crashed" -eq 1 ]]; then
+            exit 1
+          fi
 
   test-slang-rhi:
     runs-on: ["Linux", "self-hosted", "GPU"]
@@ -161,7 +180,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -172,10 +191,7 @@ jobs:
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
-        -e VK_LOADER_LAYERS_DISABLE=VK_LAYER_MESA_device_select
-        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
-        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
 
     defaults:
       run:
@@ -198,6 +214,9 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "1"
+
+      - name: Setup Vulkan ICD
+        uses: ./.github/actions/setup-vulkan-icd
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -239,14 +258,28 @@ jobs:
       - name: GPU post-test diagnostics
         if: failure()
         run: |
+          gpu_crashed=0
           echo "=== GPU State ==="
-          nvidia-smi 2>&1 || echo "nvidia-smi FAILED (GPU may have crashed)"
+          if ! nvidia-smi 2>&1; then
+            echo "nvidia-smi FAILED (GPU may have crashed)"
+            echo "::error::GPU crashed during tests — retrying may help."
+            gpu_crashed=1
+          fi
           echo ""
           echo "=== GPU Memory & ECC ==="
           nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
             --format=csv,noheader 2>&1 || true
           echo ""
+          echo "=== XID Errors ==="
+          nvidia-smi -q -d XID_ERRORS 2>&1 || true
+          echo ""
+          echo "=== GPU Process State ==="
+          nvidia-smi pmon -c 1 2>&1 || true
+          echo ""
           echo "=== Kernel GPU Messages ==="
           dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
           sudo dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
           echo "(dmesg not available in container)"
+          if [[ "$gpu_crashed" -eq 1 ]]; then
+            exit 1
+          fi
