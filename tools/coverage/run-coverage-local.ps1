@@ -109,8 +109,10 @@ Write-Host "`n========================================" -ForegroundColor Blue
 Write-Host "Coverage run completed." -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Blue
 Write-Host "  HTML (full):    $htmlIndex"
-Write-Host "  HTML (slangc):  $(Join-Path $RepoRoot 'coverage-html-slangc\index.html')"
 Write-Host "  LCOV (full):    $(Join-Path $RepoRoot 'coverage.lcov')"
+Write-Host "  LCOV (slangc):  $(Join-Path $RepoRoot 'coverage-slangc.lcov')"
+Write-Host "  (slangc-only HTML is not produced on Windows -- OCC would"
+Write-Host "   need a second collection pass; see tools/coverage/README.md.)"
 
 if (Test-Path $htmlIndex) {
     Start-Process $htmlIndex

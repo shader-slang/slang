@@ -182,18 +182,21 @@ function Run-WithCoverage {
         [string]$InputCov = $null,
         [switch]$QuietRun
     )
-    $args = @(
+    # Not named $args: that's a PowerShell automatic variable for unbound
+    # positional arguments, and PSScriptAnalyzer's
+    # PSAvoidAssignmentToAutomaticVariable flags assignment to it.
+    $occArgs = @(
         '--sources', $RepoRoot
         '--modules', $SlangDll
         '--working_dir', $RepoRoot
         '--cover_children'
         '--export_type', "binary:$OutputCov"
     )
-    if ($QuietRun) { $args += '--quiet' }
-    if ($InputCov) { $args += @('--input_coverage', $InputCov) }
+    if ($QuietRun) { $occArgs += '--quiet' }
+    if ($InputCov) { $occArgs += @('--input_coverage', $InputCov) }
     # Test failures in the child are expected in environments missing GPU
     # drivers, CUDA, etc. Coverage is still written -- proceed with the run.
-    Invoke-OCC -OccArgs $args -ChildCommand (@($SlangTest) + $ChildArgs) -TolerateChildFailure
+    Invoke-OCC -OccArgs $occArgs -ChildCommand (@($SlangTest) + $ChildArgs) -TolerateChildFailure
 }
 
 if (-not $ReportOnly) {
@@ -300,7 +303,6 @@ if (-not [System.IO.Path]::IsPathRooted($HtmlDir))  { $HtmlDir  = Join-Path $Rep
 $LcovDir   = Split-Path -Parent $LcovFile
 $LcovStem  = [IO.Path]::GetFileNameWithoutExtension($LcovFile)
 $SlangcLcov = Join-Path $LcovDir ("{0}-slangc.lcov" -f $LcovStem)
-$SlangcHtml   = "$HtmlDir-slangc"
 
 # Cobertura is always emitted -- it's the source for both the summary parser
 # and the LCOV conversion. LCOV and HTML are opt-in via env vars (matches
