@@ -2046,6 +2046,16 @@ bool SemanticsVisitor::_coerce(
     //
     if (auto witness = tryGetSubtypeWitness(fromType, toType))
     {
+        // Interface-to-interface upcast may receive a compressed witness
+        // whose internal `DeclRef` is rooted in an intermediate interface
+        // rather than `fromType`.  Expand it into a transitive chain so
+        // IR lowering can walk the inheritance path mechanically without
+        // inspecting the inheritance graph itself.
+        if (isInterfaceType(fromType) && isInterfaceType(toType))
+        {
+            witness = normalizeSubtypeWitnessForInterfaceUpcast(fromType, witness);
+        }
+
         if (outToExpr)
         {
             *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
@@ -2904,6 +2914,54 @@ Expr* SemanticsVisitor::createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, 
     expr->valueArg = fromExpr;
     expr->witnessArg = witness;
     return expr;
+}
+
+SubtypeWitness* SemanticsVisitor::normalizeSubtypeWitnessForInterfaceUpcast(
+    Type* subType,
+    SubtypeWitness* witness)
+{
+    if (!witness)
+        return witness;
+
+    if (auto transitive = as<TransitiveSubtypeWitness>(witness))
+    {
+        auto subToMid =
+            normalizeSubtypeWitnessForInterfaceUpcast(subType, transitive->getSubToMid());
+        auto midType = subToMid->getSup();
+        auto midToSup =
+            normalizeSubtypeWitnessForInterfaceUpcast(midType, transitive->getMidToSup());
+        if (subToMid == transitive->getSubToMid() && midToSup == transitive->getMidToSup())
+            return witness;
+        return m_astBuilder->getTransitiveSubtypeWitness(subToMid, midToSup);
+    }
+
+    if (auto declared = as<DeclaredSubtypeWitness>(witness))
+    {
+        auto parentDecl = declared->getDeclRef().getDecl()->parentDecl;
+        auto parentInterface = as<InterfaceDecl>(parentDecl);
+        if (!parentInterface)
+            return witness;
+
+        auto parentInterfaceType =
+            DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(parentInterface));
+        if (parentInterfaceType->equals(subType))
+            return witness;
+
+        // The declRef belongs to a different interface than `subType`.
+        // Split into (subType : parentInterfaceType) ∘ (parentInterfaceType : sup).
+        auto subToParent = tryGetSubtypeWitness(subType, parentInterfaceType);
+        SLANG_ASSERT(subToParent);
+        subToParent = normalizeSubtypeWitnessForInterfaceUpcast(subType, subToParent);
+
+        auto parentToSup = m_astBuilder->getDeclaredSubtypeWitness(
+            parentInterfaceType,
+            declared->getSup(),
+            declared->getDeclRef());
+
+        return m_astBuilder->getTransitiveSubtypeWitness(subToParent, parentToSup);
+    }
+
+    return witness;
 }
 
 Expr* SemanticsVisitor::createModifierCastExpr(Type* toType, Expr* fromExpr)

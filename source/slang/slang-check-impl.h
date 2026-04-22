@@ -2764,6 +2764,26 @@ public:
 
     Expr* createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, Val* witness);
 
+    /// Expand a compressed interface-to-interface subtype witness into a
+    /// transitive chain rooted at `subType`.
+    ///
+    /// The facet merger (see `_specializeInterfaceInheritanceWitness`) may
+    /// produce a `DeclaredSubtypeWitness(sub, sup, declRef)` where
+    /// `declRef.parent` is an interface *different* from `sub` — i.e. the
+    /// witness is conceptually a composition of (sub : declRef.parent) and
+    /// (declRef.parent : sup) but stored as a single node.  That shape is
+    /// fine for facet-based lookup but malformed for IR lowering, because
+    /// `declRef`'s inheritance key only resolves against the witness table
+    /// of its declaring interface.
+    ///
+    /// This helper walks the witness tree and splits any such compressed
+    /// step back into a `TransitiveSubtypeWitness`, so downstream lowering
+    /// can mechanically chain `lookupWitnessMethod` calls without doing
+    /// any inheritance-graph discovery itself.
+    SubtypeWitness* normalizeSubtypeWitnessForInterfaceUpcast(
+        Type* subType,
+        SubtypeWitness* witness);
+
     // Handles special modifier cases. In general case, calls createModifierCastExpr.
     Expr* createModifierCast(Type* toType, Type* fromType, Expr* fromExpr);
     Expr* createModifierCastExpr(Type* toType, Expr* fromExpr); // General modifier cast expr.
