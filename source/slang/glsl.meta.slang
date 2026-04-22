@@ -6900,15 +6900,14 @@ public void hitObjectGetIntersectionTriangleVertexPositionsEXT(hitObjectEXT hitO
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetIntersectionTriangleVertexPositionsEXT($0, $1)";
     case spvShaderInvocationReorderEXT:
-        spirv_asm
+        typedef vec3[3] vec3Arr3;
+        positions = spirv_asm
         {
             OpExtension "SPV_KHR_ray_tracing_position_fetch";
             OpCapability RayTracingPositionFetchKHR;
             OpExtension "SPV_EXT_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderEXT;
-            OpHitObjectGetIntersectionTriangleVertexPositionsEXT
-                &hitObject
-                &positions;
+            result: $$vec3Arr3 = OpHitObjectGetIntersectionTriangleVertexPositionsEXT &hitObject;
         };
     }
 }
