@@ -41,7 +41,7 @@ void staticAlignTest() throws MemoryAllocationError
         SystemHeapAllocator.free(uptr);
 
         float4* f4ptr = try SystemHeapAllocator.allocate<float4, DefaultDataLayout>();
-        cases[4] = cases[4] && isAligned(u64ptr, 16);
+        cases[4] = cases[4] && isAligned(f4ptr, 16);
         SystemHeapAllocator.free(u64ptr);
         SystemHeapAllocator.free(f4ptr);
     }

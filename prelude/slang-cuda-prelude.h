@@ -2548,6 +2548,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void* __slang_cuda_realloc(void* oldPtr, size
 {
     void* newPtr = malloc(newBytes);
     memcpy(newPtr, oldPtr, oldBytes < newBytes ? oldBytes : newBytes);
+    free(oldPtr);
     return newPtr;
 }
 
