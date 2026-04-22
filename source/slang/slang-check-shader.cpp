@@ -857,6 +857,30 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             attr->patchConstantFuncDecl = patchConstantFuncDeclRef.getDecl();
         }
     }
+    else if (stage == Stage::Geometry)
+    {
+        bool hasOutputStream = false;
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            if (as<HLSLStreamOutputType>(param->getType()))
+            {
+                hasOutputStream = true;
+                break;
+            }
+        }
+        if (!hasOutputStream)
+        {
+            sink->diagnose(Diagnostics::GeometryShaderMissingOutputStream{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+        if (!entryPointFuncDecl->findModifier<MaxVertexCountAttribute>())
+        {
+            sink->diagnose(Diagnostics::GeometryShaderMissingMaxVertexCount{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+    }
     else if (stage == Stage::Compute)
     {
         for (const auto& param : entryPointFuncDecl->getParameters())
