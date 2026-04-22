@@ -27,6 +27,9 @@ jobs:
       - name: Checkout Slang repository
         uses: actions/checkout@v4
 
+      - name: Check disk space
+        uses: ./.github/actions/check-disk-space
+
       - name: Add bash to PATH
         shell: pwsh
         run: |

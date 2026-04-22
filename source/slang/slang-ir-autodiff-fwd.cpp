@@ -71,10 +71,11 @@ static void maybeAddTypeAnnotationsForHigherOrderDiff(
                                                           origType,
                                                           AnnotationKind::DifferentialPairType))
                                ->getWitness();
-        if (as<IRStructKey>(diffWitness))
+        if (as<IRStructKey>(diffWitness) || as<IRPoison>(diffWitness))
         {
-            // For now, we'll ignore this case (happens for existential types)
-            // Existential types cannot be higher-order differentiated at the moment.
+            // Existential/interface differential pairs may carry a placeholder witness
+            // instead of a usable IDifferentiable witness table. Higher-order autodiff
+            // doesn't support synthesizing annotations from that representation yet.
             return;
         }
 
@@ -691,6 +692,25 @@ struct ForwardDiffTranslationContext
                         diffOperands.add(builder->getVoidValue());
                     }
                 }
+            }
+
+            // If all diff operands are VoidLit (all operands are non-differentiable),
+            // the differential of the entire construct is also non-differentiable.
+            // Return nullptr instead of creating a construct with VoidLit operands
+            // that would have mismatched types (e.g. MakeVectorFromScalar(void_constant)
+            // with a float3 result type).
+            {
+                bool allVoid = true;
+                for (auto op : diffOperands)
+                {
+                    if (op->getOp() != kIROp_VoidLit)
+                    {
+                        allVoid = false;
+                        break;
+                    }
+                }
+                if (allVoid)
+                    return InstPair(primalConstruct, nullptr);
             }
 
             return InstPair(

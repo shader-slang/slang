@@ -628,6 +628,39 @@ struct InheritanceInfo
     FacetList facets;
 };
 
+/// Records the extension epoch observed for one declaration dependency.
+///
+/// Inheritance and subtype cache entries can depend on many declarations via
+/// transitive facets. We snapshot the epoch for each contributing declaration so
+/// we can validate lazily instead of eagerly scanning and invalidating large
+/// global cache dictionaries when a new extension is registered.
+struct DeclExtensionEpochStamp
+{
+    Decl* decl = nullptr;
+    UInt epoch = 0;
+};
+
+/// Cached inheritance info plus the declaration epochs it depends on.
+///
+/// The `generation` value changes whenever the entry is recomputed. Subtype
+/// cache entries record the generations they were built against so they can
+/// cheaply detect when either endpoint's inheritance info has changed.
+struct InheritanceInfoCacheEntry
+{
+    InheritanceInfo info;
+    List<DeclExtensionEpochStamp> dependencyEpochs;
+    UInt generation = 0;
+    bool isComputing = false;
+};
+
+/// Cached subtype query plus the inheritance cache generations it depended on.
+struct SubtypeWitnessCacheEntry
+{
+    SubtypeWitness* witness = nullptr;
+    UInt subTypeGeneration = 0;
+    UInt superTypeGeneration = 0;
+};
+
 /// Cached information about how to convert between two types.
 struct ImplicitCastMethod
 {
@@ -815,16 +848,8 @@ public:
         InheritanceCircularityInfo* circularityInfo);
 
     /// Try get subtype witness from cache, returns true if cache contains a result for the query.
-    bool tryGetSubtypeWitnessFromCache(Type* sub, Type* sup, SubtypeWitness*& outWitness)
-    {
-        auto pair = TypePair{sub, sup};
-        return m_mapTypePairToSubtypeWitness.tryGetValue(pair, outWitness);
-    }
-    void cacheSubtypeWitness(Type* sub, Type* sup, SubtypeWitness*& outWitness)
-    {
-        auto pair = TypePair{sub, sup};
-        m_mapTypePairToSubtypeWitness[pair] = outWitness;
-    }
+    bool tryGetSubtypeWitnessFromCache(Type* sub, Type* sup, SubtypeWitness*& outWitness);
+    void cacheSubtypeWitness(Type* sub, Type* sup, SubtypeWitness*& outWitness);
     ImplicitCastMethod* tryGetImplicitCastMethod(ImplicitCastMethodKey key)
     {
         return m_mapTypePairToImplicitCastMethod.tryGetValue(key);
@@ -882,6 +907,20 @@ private:
         DeclRef<Decl> declRef,
         Type* selfType,
         InheritanceCircularityInfo* circularityInfo);
+
+    UInt getDeclExtensionEpoch(Decl* decl) const;
+    void bumpDeclExtensionEpoch(Decl* decl);
+
+    bool _isInheritanceInfoCacheEntryUpToDate(InheritanceInfoCacheEntry const& entry) const;
+
+    void _collectInheritanceInfoDependencyEpochs(
+        Decl* subjectDecl,
+        InheritanceInfo const& info,
+        List<DeclExtensionEpochStamp>& outDependencyEpochs) const;
+
+    UInt _getInheritanceInfoCacheGeneration(
+        Type* type,
+        InheritanceCircularityInfo* circularityInfo = nullptr);
 
     void getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef);
 
@@ -985,11 +1024,13 @@ private:
         SubtypeWitness* selfIsSubtypeOfBase,
         SubtypeWitness* baseIsSubtypeOfFacet);
 
-    Dictionary<Type*, InheritanceInfo> m_mapTypeToInheritanceInfo;
-    Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
-    Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
+    Dictionary<Type*, InheritanceInfoCacheEntry> m_mapTypeToInheritanceInfo;
+    Dictionary<DeclRef<Decl>, InheritanceInfoCacheEntry> m_mapDeclRefToInheritanceInfo;
+    Dictionary<TypePair, SubtypeWitnessCacheEntry> m_mapTypePairToSubtypeWitness;
     Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
     Dictionary<Type*, bool> m_isCStyleTypeCache;
+    Dictionary<Decl*, UInt> m_mapDeclToExtensionEpoch;
+    UInt m_nextInheritanceInfoCacheGeneration = 1;
 };
 
 /// Local/scoped state of the semantic-checking system
@@ -1477,7 +1518,10 @@ public:
 
     Scope* getScope(SyntaxNode* node);
 
-    void diagnoseDeprecatedDeclRefUsage(DeclRef<Decl> declRef, SourceLoc loc, Expr* originalExpr);
+    void diagnoseDeprecatedAndRemovedDeclRefUsage(
+        DeclRef<Decl> declRef,
+        SourceLoc loc,
+        Expr* originalExpr);
 
     DeclRef<Decl> getDefaultDeclRef(Decl* decl)
     {
@@ -2568,9 +2612,7 @@ public:
 
     FuncType* getCalculatedDiffFuncType(const char* magicCalcName, Type* baseFuncAsType)
     {
-        Val* args[] = {
-            baseFuncAsType,
-            tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+        Val* args[] = {baseFuncAsType, getDiffTypeInfoWitness(baseFuncAsType)};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2580,10 +2622,7 @@ public:
         Type* baseFuncAsType,
         Type* operand1)
     {
-        Val* args[] = {
-            baseFuncAsType,
-            operand1,
-            tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+        Val* args[] = {baseFuncAsType, operand1, getDiffTypeInfoWitness(baseFuncAsType)};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2594,11 +2633,7 @@ public:
         Type* operand1,
         Type* operand2)
     {
-        Val* args[] = {
-            baseFuncAsType,
-            operand1,
-            operand2,
-            tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+        Val* args[] = {baseFuncAsType, operand1, operand2, getDiffTypeInfoWitness(baseFuncAsType)};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2697,7 +2732,8 @@ public:
         Type* superType,
         IsSubTypeOptions isSubTypeOptions);
 
-    SubtypeWitness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
+    Witness* getDiffTypeInfoWitness(Type* type);
+    Witness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
 
     bool isValidGenericConstraintType(Type* type);
 
@@ -3606,6 +3642,16 @@ bool addTypeCoercionWitnessToArgs(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
     TypeCoercionConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    HashSet<Decl*>* maybeConstrainedGenericParams,
+    ShortList<Val*>& args,
+    bool shouldEmitError);
+
+bool addHasDiffTypeInfoWitnessToArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    HasDiffTypeInfoConstraintDecl* constraintDecl,
     DeclRef<GenericDecl> genericDeclRef,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     HashSet<Decl*>* maybeConstrainedGenericParams,
