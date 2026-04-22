@@ -150,18 +150,32 @@ mkdir -p "$build_dir"
 cmake \
   -S "$source_dir/llvm" -B "$build_dir" \
   -G "Ninja Multi-Config" \
+  "-DCMAKE_INSTALL_PREFIX=$install_prefix" \
   "${cmake_arguments_for_slang[@]}" \
   "${extra_arguments[@]}"
 
 msg "##########################################################"
-msg "# Building LLVM in $build_dir"
+msg "# Building and installing LLVM into $install_prefix"
 msg "##########################################################"
-cmake --build "$build_dir" -j --config "$config"
-
-msg "##########################################################"
-msg "# Installing LLVM to $install_prefix"
-msg "##########################################################"
-cmake --install "$build_dir" --prefix "$install_prefix" --config "$config"
+# Build and install only the targets Slang needs, not `ninja all`.
+# CLANG_ENABLE_STATIC_ANALYZER=0 does NOT prevent the Static Analyzer from
+# being compiled under `ninja all` — see
+# https://github.com/llvm/llvm-project/issues/117705. By using LLVM's
+# component-based install targets we build only the clang/LLVM libraries and
+# headers that slang-llvm links against (see cmake/LLVM.cmake), skipping
+# ~180 Static Analyzer sources, LLVM tools, tests, examples, etc.
+#
+# Each install-<component> target builds the sources it needs and installs
+# them to CMAKE_INSTALL_PREFIX (baked in at configure time above).
+cmake_install_targets=(
+  install-cmake-exports
+  install-clang-cmake-exports
+  install-clang-headers
+  install-clang-libraries
+  install-llvm-headers
+  install-llvm-libraries
+)
+cmake --build "$build_dir" -j --config "$config" --target "${cmake_install_targets[@]}"
 
 msg "##########################################################"
 msg "LLVM installed in $install_prefix"
