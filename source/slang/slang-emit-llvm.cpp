@@ -1207,10 +1207,22 @@ struct LLVMEmitter
     LLVMInst* emitArrayGetElementPtr(
         LLVMInst* llvmPtr,
         LLVMInst* indexInst,
+        bool signedIndex,
         IRType* elemType,
         IRTypeLayoutRules* rules)
     {
         IRSizeAndAlignment sizeAndAlignment = types->getSizeAndAlignment(elemType, rules);
+        if (!signedIndex)
+        {
+            // If we have an unsigned index with less bits than a pointer, LLVM
+            // will sign-extend it while we need zero-extension. So we have to
+            // cast manually to avoid that. Note that emitCast just passes
+            // through if the type is already correct.
+            int pointerBits = builder->getPointerSizeInBits();
+            LLVMType* extendedType = builder->getIntType(pointerBits);
+            indexInst = builder->emitCast(indexInst, extendedType, false, false);
+        }
+
         return builder->emitGetElementPtr(llvmPtr, sizeAndAlignment.getStride(), indexInst);
     }
 
@@ -1257,11 +1269,13 @@ struct LLVMEmitter
                     auto dstElemPtr = emitArrayGetElementPtr(
                         dstPtr,
                         builder->getConstantInt(builder->getIntType(32), elem),
+                        false,
                         elemType,
                         dstLayout);
                     auto srcElemPtr = emitArrayGetElementPtr(
                         srcPtr,
                         builder->getConstantInt(builder->getIntType(32), elem),
+                        false,
                         elemType,
                         srcLayout);
                     last = crossLayoutMemCpy(
@@ -1766,6 +1780,7 @@ struct LLVMEmitter
                 LLVMInst* ptr = emitArrayGetElementPtr(
                     llvmInst,
                     builder->getConstantInt(int32Type, aa),
+                    false,
                     op->getDataType(),
                     defaultPointerRules);
                 emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
@@ -1798,6 +1813,7 @@ struct LLVMEmitter
                     LLVMInst* ptr = emitArrayGetElementPtr(
                         llvmInst,
                         builder->getConstantInt(int32Type, i),
+                        false,
                         element->getDataType(),
                         defaultPointerRules);
                     emitStore(ptr, llvmElement, element->getDataType(), defaultPointerRules);
@@ -1930,6 +1946,7 @@ struct LLVMEmitter
                     auto llvmDstElement = emitArrayGetElementPtr(
                         llvmDst,
                         maybeEmitConstant(irElementIndex),
+                        isSigned(irElementIndex),
                         elementType,
                         rules);
                     auto llvmSrcElement =
@@ -2042,6 +2059,7 @@ struct LLVMEmitter
                 llvmInst = emitArrayGetElementPtr(
                     findValue(baseInst),
                     findValue(indexInst),
+                    isSigned(indexInst),
                     baseType,
                     getBufferLayoutRules(baseInst->getDataType()));
             }
@@ -2078,6 +2096,7 @@ struct LLVMEmitter
                 llvmInst = emitArrayGetElementPtr(
                     findValue(baseInst),
                     findValue(indexInst),
+                    isSigned(indexInst),
                     elemType,
                     getBufferLayoutRules(baseInst->getDataType()));
             }
@@ -2110,6 +2129,7 @@ struct LLVMEmitter
                     LLVMInst* ptr = emitArrayGetElementPtr(
                         llvmVal,
                         findValue(indexInst),
+                        isSigned(indexInst),
                         elemType,
                         defaultPointerRules);
                     llvmInst = emitLoad(ptr, elemType, defaultPointerRules);
@@ -2218,13 +2238,18 @@ struct LLVMEmitter
                 auto baseType =
                     cast<IRHLSLRWStructuredBufferType>(gepInst->getBase()->getDataType());
                 auto llvmBase = findValue(gepInst->getBase());
-                auto llvmIndex = findValue(gepInst->getIndex());
+                auto index = gepInst->getIndex();
+                auto llvmIndex = findValue(index);
 
                 auto llvmPtr = builder->emitGetBufferPtr(llvmBase);
 
                 IRTypeLayoutRules* rules = getBufferLayoutRules(baseType);
-                llvmInst =
-                    emitArrayGetElementPtr(llvmPtr, llvmIndex, baseType->getElementType(), rules);
+                llvmInst = emitArrayGetElementPtr(
+                    llvmPtr,
+                    llvmIndex,
+                    isSigned(index),
+                    baseType->getElementType(),
+                    rules);
             }
             break;
 
@@ -2233,7 +2258,8 @@ struct LLVMEmitter
             {
                 auto base = inst->getOperand(0);
                 auto llvmBase = findValue(base);
-                auto llvmIndex = findValue(inst->getOperand(1));
+                auto index = inst->getOperand(1);
+                auto llvmIndex = findValue(index);
 
                 auto baseType = cast<IRHLSLStructuredBufferTypeBase>(base->getDataType());
 
@@ -2243,6 +2269,7 @@ struct LLVMEmitter
                 auto llvmPtr = emitArrayGetElementPtr(
                     llvmBasePtr,
                     llvmIndex,
+                    isSigned(index),
                     baseType->getElementType(),
                     rules);
                 llvmInst = emitLoad(llvmPtr, inst->getDataType(), rules);
@@ -2253,7 +2280,8 @@ struct LLVMEmitter
             {
                 auto base = inst->getOperand(0);
                 auto llvmBase = findValue(base);
-                auto llvmIndex = findValue(inst->getOperand(1));
+                auto index = inst->getOperand(1);
+                auto llvmIndex = findValue(index);
                 auto val = inst->getOperand(2);
 
                 auto baseType = cast<IRHLSLStructuredBufferTypeBase>(base->getDataType());
@@ -2264,6 +2292,7 @@ struct LLVMEmitter
                 auto llvmPtr = emitArrayGetElementPtr(
                     llvmBasePtr,
                     llvmIndex,
+                    isSigned(index),
                     baseType->getElementType(),
                     rules);
                 llvmInst = emitStore(llvmPtr, findValue(val), val->getDataType(), rules);
