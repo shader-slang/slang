@@ -84,7 +84,7 @@ struct DeadCodeEliminationContext
                 builder.setInsertBefore(firstChild);
             else
                 builder.setInsertInto(module->getModuleInst());
-            undefInst = Slang::getUnitPoisonVal(builder, module);
+            undefInst = Slang::getUnitPoisonVal(&builder, module);
         }
         return undefInst;
     }
@@ -663,6 +663,7 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
     case kIROp_CompilerDictionaryEntry:
         if (operandIndex != 1)
             return true;
+        break;
     default:
         break;
     }

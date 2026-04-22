@@ -692,7 +692,7 @@ interface IForwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
     [MaybeDifferentiable]
-    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff
+    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff 
 };
 
 // Core library interfaces:
@@ -4690,8 +4690,35 @@ attribute_syntax [noinline] : NoInlineAttribute;
 
 /// Mark a declaration as deprecated.
 /// @param message The diagnostic message to show when the declaration is used.
+///
+/// @see `[RemovedSince]`.
 __attributeTarget(DeclBase)
 attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;
+
+/// Mark a declaration as removed starting from the specified language version.
+///
+/// @param languageVersion  The first version from which the declaration is considered removed.
+/// @param message The diagnostic message to show when the declaration is used.
+///
+/// This attribute is used for a scheduled removal of a declaration.
+///
+/// An error is triggered when a declaration tagged with
+/// `[RemovedSince]` is referenced by a module that is compiled with
+/// language version `languageVersion` or higher.
+/// When an error is triggered due to removal, a possible
+/// `[deprecated]` attribute decoration for the same declaration is ignored.
+///
+/// It is not required that `languageVersion` match a version
+/// that is supported by `slangc`. This allows removal
+/// of declarations from future language versions. Value `-1`
+/// marks the declaration as removed from all language versions.
+///
+/// When a declaration is slated for removal, it is recommended to
+/// also tag it with the `[deprecated]` attribute.
+///
+/// @see `[deprecated]`.
+__attributeTarget(DeclBase)
+attribute_syntax [RemovedSince(languageVersion: int, message: String)] : RemovedSinceAttribute;
 
 /// Controls the behavior of the compiler when a differentiable function is detected to have side-effects.
 /// @category misc_types

@@ -68,6 +68,11 @@ jobs:
           submodules: "recursive"
           fetch-depth: "2"
 
+      - name: Check disk space
+        uses: ./.github/actions/check-disk-space
+        with:
+          min-disk-gb: "5"
+
       # Restore sccache local cache from master
       - name: Restore sccache cache
         uses: actions/cache/restore@v4

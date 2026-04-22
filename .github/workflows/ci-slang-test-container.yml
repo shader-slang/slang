@@ -17,7 +17,14 @@ on:
 
 jobs:
   # Run GPU tests in container with Vulkan and CUDA support.
-  # Requires mounting host NVIDIA Vulkan ICD and EGL vendor config for Vulkan to work.
+  #
+  # Vulkan ICD: We use libEGL_nvidia.so.0 as the Vulkan ICD instead of the
+  # default libGLX_nvidia.so.0 to avoid an intermittent crash in the EGL
+  # initialization path of driver 580.x. Both libraries export vk_icd* symbols.
+  # The default ICD causes the driver to load libEGL_nvidia.so via libglvnd's
+  # EGL vendor dispatch, which has a null-deref bug that crashes test-server
+  # processes. Using libEGL_nvidia directly as the ICD skips the EGL vendor
+  # dispatch entirely, so the buggy code path is never reached.
   test-slang:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 60
@@ -38,9 +45,7 @@ jobs:
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
-        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
-        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
 
     defaults:
       run:
@@ -63,6 +68,9 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "1"
+
+      - name: Setup Vulkan ICD
+        uses: ./.github/actions/setup-vulkan-icd
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -183,9 +191,7 @@ jobs:
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
-        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
-        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
 
     defaults:
       run:
@@ -208,6 +214,9 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "1"
+
+      - name: Setup Vulkan ICD
+        uses: ./.github/actions/setup-vulkan-icd
 
       - name: Download artifacts
         uses: actions/download-artifact@v4

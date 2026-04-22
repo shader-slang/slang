@@ -2411,6 +2411,20 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     break;
                 }
                 break;
+            case BaseType::Double:
+                switch (fromType)
+                {
+                case BaseType::UInt64:
+                    m_writer->emit("uint64BitsToDouble");
+                    break;
+                case BaseType::Int64:
+                    m_writer->emit("int64BitsToDouble");
+                    break;
+                default:
+                    emitType(inst->getDataType());
+                    break;
+                }
+                break;
             case BaseType::Bool:
                 m_writer->emit("bool");
                 break;

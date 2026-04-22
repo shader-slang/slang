@@ -9750,6 +9750,26 @@ static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
 
 static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
 {
+    if ((!parser->options.allowGLSLInput) &&
+        (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026))
+    {
+        parser->sink->diagnose(Diagnostics::RemovedModifierUsage{
+            .modifierName = "volatile",
+            .message = "Suggested replacement: Atomic<T>",
+            .location = parser->tokenReader.peekLoc()});
+    }
+    else if (
+        (!parser->options.allowGLSLInput) &&
+        (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025))
+    {
+        parser->sink->diagnose(Diagnostics::DeprecatedModifierUsage{
+            .modifierName = "volatile",
+            .message = "to be removed in Slang 2026. Suggested replacement: Atomic<T>",
+            .location = parser->tokenReader.peekLoc()});
+    }
+
+    // note: no diagnostics before Slang version 2025
+
     ModifierListBuilder listBuilder;
 
     auto hlslMod = parser->astBuilder->create<HLSLVolatileModifier>();

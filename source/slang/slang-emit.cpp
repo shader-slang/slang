@@ -141,7 +141,6 @@
 #include "slang-vm-bytecode.h"
 
 #include <assert.h>
-
 Slang::String get_slang_cpp_host_prelude();
 Slang::String get_slang_torch_prelude();
 
@@ -870,6 +869,20 @@ void lowerSumVectorMatrixInsts(IRModule* module)
     pass.processModule();
 }
 
+void removeWeakUseInsts(IRModule* module)
+{
+    List<IRInst*> weakUseInsts;
+    for (auto inst : module->getModuleInst()->getGlobalInsts())
+    {
+        if (inst->getOp() == kIROp_WeakUse)
+            weakUseInsts.add(inst);
+    }
+
+    for (auto weakUse : weakUseInsts)
+    {
+        weakUse->removeAndDeallocate();
+    }
+}
 
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
@@ -1088,12 +1101,6 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.enumType)
         SLANG_PASS(lowerEnumType, sink);
 
-    // Lower enum types early since enums and enum casts may appear in
-    // specialization & not resolving them here would block specialization.
-    //
-    if (requiredLoweringPassSet.enumType)
-        lowerEnumType(irModule, sink);
-
     IRSimplificationOptions defaultIRSimplificationOptions =
         IRSimplificationOptions::getDefault(targetProgram);
     IRSimplificationOptions fastIRSimplificationOptions =
@@ -1155,6 +1162,15 @@ Result linkAndOptimizeIR(
     // the relevant specialization transformations are handled in a
     // single pass that looks for all simplification opportunities.
     //
+
+    // Diagnose circular interface conformances before specialization.
+    // Circular conformance IR (e.g. a struct implementing IFoo that contains
+    // an IFoo field) produces IR that the translation/specialization passes
+    // cannot handle. Detecting and reporting this early avoids crashes in
+    // downstream passes.
+    SLANG_PASS(diagnoseCircularConformances, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     if (!codeGenContext->isSpecializationDisabled())
     {
@@ -1282,6 +1298,9 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(inferAnyValueSizeWhereNecessary, targetProgram, sink);
 
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     // If we have any witness tables that are marked as `KeepAlive`,
     // but are not used for dynamic dispatch, unpin them so we don't
     // do unnecessary work to lower them.
@@ -1316,21 +1335,8 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(lowerExistentials, targetProgram, sink);
 
-    // get rid of weak-use insts and any dictionaries in the
-    // module inst.
-    //
-    // -- put into a pass --
-    List<IRInst*> weakUseInsts;
-    for (auto insts : irModule->getModuleInst()->getGlobalInsts())
-    {
-        if (insts->getOp() == kIROp_WeakUse)
-            weakUseInsts.add(insts);
-    }
-
-    for (auto weakUse : weakUseInsts)
-    {
-        weakUse->removeAndDeallocate();
-    }
+    // Get rid of weak-use insts and any dictionaries in the module inst.
+    SLANG_PASS(removeWeakUseInsts);
 
     clearTranslationDictionary(irModule);
 

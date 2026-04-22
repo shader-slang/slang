@@ -1408,6 +1408,28 @@ bool SemanticsVisitor::_failedCoercion(
                     .expectedType = toType,
                     .actualType = fromExpr->type,
                     .expr = fromExpr});
+
+                // When calling an interface method on an existential, the
+                // 'This' type in the parameter becomes an
+                // ExtractExistentialType. If the argument is also an opened
+                // existential (a different ExtractExistentialType), both
+                // print as "This" in the error, making the message confusing.
+                // Add a note explaining the type-erasure issue.
+                if (auto toExtType = as<ExtractExistentialType>(toType))
+                {
+                    if (auto fromExtType = as<ExtractExistentialType>(fromType))
+                    {
+                        Type* toInterfaceType = toExtType->getOriginalInterfaceType();
+                        Type* fromInterfaceType = fromExtType->getOriginalInterfaceType();
+                        if (toInterfaceType && fromInterfaceType &&
+                            toInterfaceType->equals(fromInterfaceType))
+                        {
+                            sink->diagnose(Diagnostics::ThisTypeMismatchAfterErasure{
+                                .interfaceType = toInterfaceType,
+                                .location = fromExpr->loc});
+                        }
+                    }
+                }
             }
         }
     }
@@ -2522,6 +2544,23 @@ bool SemanticsVisitor::_coerce(
                         .fromType = fromType.type,
                         .toType = toType,
                         .location = fromExpr->loc});
+
+                    if (auto fromPtrType = as<PtrType>(fromType.type))
+                    {
+                        if (auto toPtrType = as<PtrType>(toType))
+                        {
+                            auto fromVal = fromPtrType->getValueType();
+                            auto toVal = toPtrType->getValueType();
+                            if (!isInterfaceType(fromVal) && isInterfaceType(toVal) &&
+                                tryGetSubtypeWitness(fromVal, toVal))
+                            {
+                                sink->diagnose(Diagnostics::NoteConcreteToInterfacePtrUnsafe{
+                                    .from = fromVal,
+                                    .to = toVal,
+                                    .location = fromExpr->loc});
+                            }
+                        }
+                    }
                 }
             }
             // For general implicit conversions with high cost, emit a warning
@@ -2613,23 +2652,7 @@ bool SemanticsVisitor::_coerce(
             castExpr->arguments.clear();
             castExpr->arguments.add(args[0]);
 
-            // TODO: Make this a common utility.
-            //
-            // TODO: Making this false for now, because we aren't accounting for
-            // `TypeCoercionConstraint` when generating auto-diff extensions.
-            //
-            if (m_parentDifferentiableAttr && false)
-            {
-                if (auto checkedInvokeExpr = as<InvokeExpr>(castExpr))
-                {
-                    // Register types for final resolved invoke arguments again.
-                    for (auto& arg : checkedInvokeExpr->arguments)
-                        maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
-
-                    if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
-                        registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
-                }
-            }
+            // TODO: Register associated differentiable methods & types here as well.
         }
         if (!cachedMethod)
         {
