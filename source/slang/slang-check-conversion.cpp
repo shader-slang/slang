@@ -2544,6 +2544,23 @@ bool SemanticsVisitor::_coerce(
                         .fromType = fromType.type,
                         .toType = toType,
                         .location = fromExpr->loc});
+
+                    if (auto fromPtrType = as<PtrType>(fromType.type))
+                    {
+                        if (auto toPtrType = as<PtrType>(toType))
+                        {
+                            auto fromVal = fromPtrType->getValueType();
+                            auto toVal = toPtrType->getValueType();
+                            if (!isInterfaceType(fromVal) && isInterfaceType(toVal) &&
+                                tryGetSubtypeWitness(fromVal, toVal))
+                            {
+                                sink->diagnose(Diagnostics::NoteConcreteToInterfacePtrUnsafe{
+                                    .from = fromVal,
+                                    .to = toVal,
+                                    .location = fromExpr->loc});
+                            }
+                        }
+                    }
                 }
             }
             // For general implicit conversions with high cost, emit a warning

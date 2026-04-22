@@ -5205,6 +5205,13 @@ standalone_note(
     span { loc = "location" }
 )
 
+standalone_note(
+    "note-concrete-to-interface-ptr-unsafe",
+    -1,
+    "implicit conversion from '~from:Type*' to '~to:Type*' is not allowed because the pointed-to data layouts are not bit equivalent",
+    span { loc = "location" }
+)
+
 -- IR-specific variants for use in IR linking and lowering passes
 -- These take IRInst* instead of Decl*
 
