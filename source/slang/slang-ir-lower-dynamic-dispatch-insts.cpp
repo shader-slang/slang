@@ -555,13 +555,16 @@ struct TagOpsLoweringContext : public InstPassBase
     }
 
     // Lower a `lookupWitness` whose result is a plain value type (e.g. `Int`
-    // from `static const int`, `float` from `static const float`). The
+    // from `static const int`, `bool` from `static const bool`). The
     // typeflow specialization pass handles function/type/generic/witness-table
     // results; value-type lookups reach this pass still carrying the
     // `SetTagType(WitnessTableSet)` on their operand, so we emit a dispatch
     // function that returns the correct witness-table entry for the runtime
     // tag. Since every entry is already a constant IR value, we can return it
-    // directly — no restriction on the entry kind.
+    // directly — no restriction on the entry kind. The language front-end
+    // currently only permits `int` and `bool` for static const requirements
+    // (error 30302), but this lowering is agnostic and handles any value-typed
+    // entry the front-end ever allows.
     void lowerLookupWitnessForValue(IRLookupWitnessMethod* inst)
     {
         auto witnessTableOp = inst->getWitnessTable();
@@ -585,6 +588,11 @@ struct TagOpsLoweringContext : public InstPassBase
         auto key = inst->getRequirementKey();
 
         // Collect (tagID, entry) pairs from every witness table in the set.
+        // By the time lowerTagInsts runs, a WitnessTableSet always holds
+        // IRWitnessTables and each table carries an entry for every requirement
+        // key of its interface. A null table or missing entry here would
+        // indicate a compiler-internal bug in an earlier pass, not malformed
+        // user code — fail loud so regressions are caught close to the source.
         List<UInt> caseTags;
         List<IRInst*> caseEntries;
         {
@@ -592,12 +600,10 @@ struct TagOpsLoweringContext : public InstPassBase
             for (UInt i = 0; i < witnessTableSet->getCount(); i++)
             {
                 auto table = as<IRWitnessTable>(witnessTableSet->getElement(i));
-                if (!table)
-                    return;
+                SLANG_ASSERT(table);
 
                 auto entry = findWitnessTableEntry(table, key);
-                if (!entry)
-                    return;
+                SLANG_ASSERT(entry);
 
                 caseTags.add(getUniqueID(&tagBuilder, table));
                 caseEntries.add(entry);

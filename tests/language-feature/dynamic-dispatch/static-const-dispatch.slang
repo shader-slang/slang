@@ -1,9 +1,11 @@
 // Static const members in interfaces can be dispatched dynamically when the
 // concrete type is not known at compile time. This test exercises accessing
 // static const values through interface-typed parameters and generic
-// parameters with dynamic dispatch. It covers both signed-int entries
-// (including negative values) and bool entries to verify the lowering is
-// not restricted to `IRIntLit`.
+// parameters with dynamic dispatch. It covers signed-int entries (including
+// negative values) and bool entries — the two types the language currently
+// permits for `static const` interface requirements (see error 30302). The
+// `bool` case exercises `IRBoolLit`, proving the lowering is not restricted
+// to `IRIntLit`.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
