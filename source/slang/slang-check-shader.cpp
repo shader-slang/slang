@@ -282,6 +282,68 @@ static void validateSystemValueSemanticForType(
     }
 }
 
+// Check if a system value semantic name is per-primitive in mesh shaders.
+// These semantics must only appear in OutputPrimitives (or 'out primitives') parameters.
+static bool isPerPrimitiveMeshSemantic(UnownedStringSlice semanticName)
+{
+    return semanticName.caseInsensitiveEquals(toSlice("sv_cullprimitive")) ||
+           semanticName.caseInsensitiveEquals(toSlice("sv_primitiveid")) ||
+           semanticName.caseInsensitiveEquals(toSlice("sv_rendertargetarrayindex")) ||
+           semanticName.caseInsensitiveEquals(toSlice("sv_viewportarrayindex")) ||
+           semanticName.caseInsensitiveEquals(toSlice("sv_shadingrate"));
+}
+
+// Recursively check struct fields for per-primitive mesh shader semantics.
+// Emits a diagnostic if any per-primitive semantic is found in a vertex/index output.
+static void validateNoPerPrimitiveSemanticsInType(
+    DiagnosticSink* sink,
+    Type* type,
+    ASTBuilder* astBuilder,
+    HashSet<Type*>& seenTypes)
+{
+    if (!type)
+        return;
+    if (seenTypes.contains(type))
+        return;
+    seenTypes.add(type);
+
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return;
+
+    auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
+    if (!structDeclRef)
+        return;
+
+    for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+    {
+        auto fieldDecl = fieldDeclRef.getDecl();
+
+        // Recurse into nested struct types, unwrapping conditional and array wrappers first
+        if (auto fieldVarDecl = as<VarDeclBase>(fieldDecl))
+        {
+            Type* fieldType = unwrapConditionalType(fieldVarDecl->getType());
+            while (auto arrayType = as<ArrayExpressionType>(fieldType))
+                fieldType = unwrapConditionalType(arrayType->getElementType());
+            validateNoPerPrimitiveSemanticsInType(sink, fieldType, astBuilder, seenTypes);
+        }
+
+        // Check if this field has a per-primitive system value semantic
+        auto semantic = fieldDecl->findModifier<HLSLSimpleSemantic>();
+        if (!semantic)
+            continue;
+
+        auto name = semantic->name.getContent();
+        if (isPerPrimitiveMeshSemantic(name))
+        {
+            sink->diagnose(Diagnostics::PerPrimitiveSemanticInVertexOutput{
+                .semantic = String(name),
+                .location = fieldDecl->loc});
+        }
+    }
+}
+
+
 // Validate system value semantics on a declaration recursively.
 // and validates any SV_ semantic against the SemanticDecl definitions in core module.
 static void validateSystemValueSemantic(
@@ -331,6 +393,27 @@ static void validateSystemValueSemantic(
     if (auto meshOutputType = as<MeshOutputType>(type))
     {
         auto elementType = meshOutputType->getElementType();
+        // If this is a vertex or index output, validate that no per-primitive semantics are used.
+        // Per-primitive semantics must only appear in OutputPrimitives / 'out primitives'.
+        if (stage == Stage::Mesh && !as<PrimitivesType>(meshOutputType))
+        {
+            if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
+            {
+                if (isPerPrimitiveMeshSemantic(semantic->name.getContent()))
+                {
+                    sink->diagnose(Diagnostics::PerPrimitiveSemanticInVertexOutput{
+                        .semantic = String(semantic->name.getContent()),
+                        .location = decl->loc});
+                }
+            }
+
+            HashSet<Type*> seenTypes;
+            validateNoPerPrimitiveSemanticsInType(
+                sink,
+                unwrapConditionalType(elementType),
+                visitor->getASTBuilder(),
+                seenTypes);
+        }
         type = unwrapConditionalType(elementType);
         direction = SemanticDirection::Output;
     }

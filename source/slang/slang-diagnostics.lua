@@ -3207,8 +3207,15 @@ err(
 )
 
 err(
-    "parameter-without-default-after-parameter-with-default",
+    "per-primitive-semantic-in-vertex-output",
     30703,
+    "per-primitive system value semantic '~semantic' must be placed in an 'OutputPrimitives' (or 'out primitives') parameter, not in a vertex or index output",
+    span { loc = "location" }
+)
+
+err(
+    "parameter-without-default-after-parameter-with-default",
+    30704,
     "parameter '~param:Decl' does not have a default value, but follows a parameter that does",
     span { loc = "param:Decl" }
 )
