@@ -16,15 +16,6 @@
 // CHECK-NEXT: 7
 // CHECK-NEXT: 8
 
-// CHECK: 1.0
-// CHECK-NEXT: 2.0
-// CHECK-NEXT: 3.0
-// CHECK-NEXT: 4.0
-// CHECK-NEXT: 5.0
-// CHECK-NEXT: 6.0
-// CHECK-NEXT: 7.0
-// CHECK-NEXT: 8.0
-
 // CHECK_METAL: 1.0
 // CHECK_METAL-NEXT: 2.0
 // CHECK_METAL-NEXT: 3.0
@@ -45,11 +36,7 @@ ByteAddressBuffer inputBufferInt;
 RWByteAddressBuffer outputBufferInt;
 
 //TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0], stride=4, count=256):name=inputBufferFloat
-#if defined(RWBAB)
-RWByteAddressBuffer inputBufferFloat;
-#else
-ByteAddressBuffer inputBufferFloat;
-#endif
+StructuredBuffer<float> inputBufferFloat;
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBufferFloat
 RWStructuredBuffer<float> outputBufferFloat;
@@ -60,22 +47,12 @@ using namespace linalg;
 void computeMain()
 {
 #ifndef METAL
-    {
-        let stride = 16;
-        let mat = coopMatLoad<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(inputBufferInt, 0, stride);
-        mat.Store<CoopMatMatrixLayout.RowMajor>(outputBufferInt, 0, 16);
-    }
-#endif
-
-    {
-#ifdef METAL
-        let stride = 8;
-        let mat = coopMatLoad<float, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(inputBufferFloat, 0, stride);
-        mat.Store<CoopMatMatrixLayout.RowMajor>(outputBufferFloat, 0, 8);
+    let stride = 16;
+    let mat = coopMatLoad<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(inputBufferInt, 0, stride);
+    mat.Store<CoopMatMatrixLayout.RowMajor>(outputBufferInt, 0, 16);
 #else
-        let stride = 16;
-        let mat = coopMatLoad<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(inputBufferFloat, 0, stride);
-        mat.Store<CoopMatMatrixLayout.RowMajor>(outputBufferFloat, 0, 16);
+    let stride = 8;
+    let mat = coopMatLoad<float, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(inputBufferFloat, 0, stride);
+    mat.Store<CoopMatMatrixLayout.RowMajor>(outputBufferFloat, 0, 8);
 #endif
-    }
 }

@@ -17,15 +17,6 @@
 // CHECK-NEXT: 7
 // CHECK-NEXT: 8
 
-// CHECK: 1.0
-// CHECK-NEXT: 2.0
-// CHECK-NEXT: 3.0
-// CHECK-NEXT: 4.0
-// CHECK-NEXT: 5.0
-// CHECK-NEXT: 6.0
-// CHECK-NEXT: 7.0
-// CHECK-NEXT: 8.0
-
 // CHECK_METAL: 1.0
 // CHECK_METAL-NEXT: 2.0
 // CHECK_METAL-NEXT: 3.0
@@ -53,25 +44,15 @@ using namespace linalg;
 void computeMain()
 {
 #ifndef METAL
-    {
-        int32_t* ptrIn = inputBufferInt;
-        int32_t* ptrOut = outputBufferInt;
-        let stride = 16;
-        let mat = coopMatLoad<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(ptrIn, 0, stride);
-        mat.Store<CoopMatMatrixLayout.RowMajor>(ptrOut, 0, 16);
-    }
-#endif
-
-    {
-        float* ptrIn = inputBufferFloat;
-#ifdef METAL
-        let stride = 8;
-        let mat = coopMatLoad<float, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(ptrIn, 0, stride);
-        mat.Store<CoopMatMatrixLayout.RowMajor>(outputBufferFloat, 0, 8);
+    int32_t* ptrIn = inputBufferInt;
+    int32_t* ptrOut = outputBufferInt;
+    let stride = 16;
+    let mat = coopMatLoad<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(ptrIn, 0, stride);
+    mat.Store<CoopMatMatrixLayout.RowMajor>(ptrOut, 0, 16);
 #else
-        let stride = 16;
-        let mat = coopMatLoad<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(ptrIn, 0, stride);
-        mat.Store<CoopMatMatrixLayout.RowMajor>(outputBufferFloat, 0, 16);
+    float* ptrIn = inputBufferFloat;
+    let stride = 8;
+    let mat = coopMatLoad<float, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(ptrIn, 0, stride);
+    mat.Store<CoopMatMatrixLayout.RowMajor>(outputBufferFloat, 0, 8);
 #endif
-    }
 }

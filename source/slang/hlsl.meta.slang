@@ -28095,9 +28095,9 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data + $2, $3)";
         case metal:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "simdgroup_store($0, &((*($1))[0]) + $2, (ulong)$3)";
+                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)(&((*($1))[0])) + $2, (ulong)$3)", T;
             else
-                __intrinsic_asm "simdgroup_store($0, &((*($1))[0]) + $2, (ulong)$3, ulong2(0), true)";
+                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)(&((*($1))[0])) + $2, (ulong)$3, ulong2(0), true)", T;
         }
     }
 
@@ -28123,9 +28123,9 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1), $2)";
         case metal:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "simdgroup_store($0, ($1), (ulong)$2)";
+                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)($1), (ulong)$2)", T;
             else
-                __intrinsic_asm "simdgroup_store($0, ($1), (ulong)$2, ulong2(0), true)";
+                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)($1), (ulong)$2, ulong2(0), true)", T;
         }
     }
 
@@ -28382,9 +28382,9 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data + $1, $2)";
         case metal:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "_slang_simdgroup_load<$TR>(&((*($0))[0]) + $1, (ulong)$2)";
+                __intrinsic_asm "_slang_simdgroup_load<$TR>((const threadgroup $[0]*)(&((*($0))[0])) + $1, (ulong)$2)", T;
             else
-                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>(&((*($0))[0]) + $1, (ulong)$2)";
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>((const threadgroup $[0]*)(&((*($0))[0])) + $1, (ulong)$2)", T;
         }
     }
 
@@ -28410,9 +28410,9 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1)";
         case metal:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "_slang_simdgroup_load<$TR>($0, (ulong)$1)";
+                __intrinsic_asm "_slang_simdgroup_load<$TR>((const threadgroup $[0]*)($0), (ulong)$1)", T;
             else
-                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>($0, (ulong)$1)";
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>((const threadgroup $[0]*)($0), (ulong)$1)", T;
         }
     }
 
