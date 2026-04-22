@@ -1635,7 +1635,9 @@ public enum MemoryAllocationError
 /// As an implementor of a memory allocator, the minimum you need to implement
 /// is `allocate`, everything else has a technically valid default
 /// implementation. It's also good to implement `free` or `close` to allow
-/// the user some way of deallocating memory.
+/// the user some way of deallocating memory. The default implementations assume
+/// that `nullptr` is a valid pointer, which may or may not be true depending on
+/// your address space and allocator.
 ///
 /// @param addrSpace The address space of pointers which the allocator operates with
 interface IAllocator<AddressSpace addrSpace>
