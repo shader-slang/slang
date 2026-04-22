@@ -436,7 +436,10 @@ static uint64_t __stdcall _aulldiv(uint64_t a, uint64_t b)
     x(memcpy, memcpy, void*, (void*, const void*, size_t)) \
     x(memmove, memmove, void*, (void*, const void*, size_t)) \
     x(memcmp, memcmp, int, (const void*, const void*, size_t)) \
-    x(memset, memset, void*, (void*, int, size_t)) 
+    x(memset, memset, void*, (void*, int, size_t)) \
+    x(malloc, malloc, void*, (size_t)) \
+    x(free, free, void, (void*)) \
+    x(realloc, realloc, void*, (void*, size_t))
 
 #if SLANG_OSX
 #   define SLANG_PLATFORM_FUNCS(x) \

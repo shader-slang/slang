@@ -1820,15 +1820,16 @@ Ptr<void> __cpu_malloc(size_t bytes)
 
 [ForceInline]
 [require(cpp_cuda_llvm)]
-Ptr<void> __cpu_realloc(Ptr<void> oldPtr, size_t bytes)
+Ptr<void> __cpu_realloc(Ptr<void> oldPtr, size_t oldBytes, size_t bytes)
 {
     __target_switch
     {
     case cpp:
+        __intrinsic_asm "realloc($0, $2)";
     case cuda:
-        __intrinsic_asm "realloc($0, $1)";
+        __intrinsic_asm "__slang_cuda_realloc($0, $1, $2)";
     case llvm:
-        __intrinsic_asm "%result = call ptr @realloc($0, $1)";
+        __intrinsic_asm "%result = call ptr @realloc($0, $2)";
     }
 }
 
@@ -1900,7 +1901,7 @@ public struct SystemHeapAllocator: IAllocator<AddressSpace.Device>
         }
         else
         {
-            let newPtr = __cpu_realloc(Ptr<void>(oldPtr), __arraySizeOf<T, L>(newCount));
+            let newPtr = __cpu_realloc(Ptr<void>(oldPtr), __arraySizeOf<T, L>(oldCount), __arraySizeOf<T, L>(newCount));
             if (newPtr == nullptr)
                 throw MemoryAllocationError.OutOfMemory;
             return reinterpret<LayoutPtr<T, L>>(newPtr);
@@ -1942,6 +1943,24 @@ public struct StackFrameAllocator: IAllocator<AddressSpace.Device>
     [ForceInline]
     __intrinsic_op($(kIROp_Alloca))
     static LayoutPtr<T, L> allocate<T, L:IBufferDataLayout = DefaultDataLayout>(size_t count = 1);
+
+    [ForceInline]
+    static override LayoutPtr<T, L> reallocate<T, L:IBufferDataLayout = DefaultDataLayout>(
+        LayoutPtr<T, L> oldPtr,
+        size_t oldCount,
+        size_t newCount
+    ){
+        // No shrinking supported ever anyway, so we may as well return the old
+        // pointer.
+        if (newCount <= oldCount)
+            return oldPtr;
+
+        let newPtr = allocate<T, L>(newCount);
+        size_t copyCount = min(oldCount, newCount);
+        for (size_t i = 0; i < copyCount; ++i)
+            newPtr[i] = oldPtr[i];
+        return newPtr;
+    }
 
     static override Ptr<void> alignedAllocate(size_t bytes, uint alignment) throws MemoryAllocationError
     {

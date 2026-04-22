@@ -22,6 +22,8 @@ extern "C" void assertFailure(const char* msg);
 #endif // SLANG_PRELUDE_ENABLE_ASSERT
 #endif
 
+#define alloca(size) __builtin_alloca(size)
+
 /*
 Taken from stddef.h
 */
