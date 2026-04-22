@@ -3373,10 +3373,9 @@ IRInst* IRBuilder::emitDebugLine(
         getIntValue(getUIntType(), colEnd)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugLine, 5, args);
 }
-IRInst* IRBuilder::emitIncrementCoverageCounter(IRIntegerValue uid)
+IRInst* IRBuilder::emitIncrementCoverageCounter()
 {
-    IRInst* arg = getIntValue(getUIntType(), uid);
-    return emitIntrinsicInst(getVoidType(), kIROp_IncrementCoverageCounter, 1, &arg);
+    return emitIntrinsicInst(getVoidType(), kIROp_IncrementCoverageCounter, 0, nullptr);
 }
 
 IRInst* IRBuilder::emitDebugVar(

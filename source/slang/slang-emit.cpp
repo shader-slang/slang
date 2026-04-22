@@ -961,11 +961,8 @@ Result linkAndOptimizeIR(
 
     // Debug info is added by the front-end. If the target cannot express debug info, or if the user
     // specifies -g0, we need to stripped them out now to allow more optimization and cleanups.
-    // Exception: when `-trace-coverage` is on, coverage placeholders reference the debug source
-    // entries; stripping now would leave dangling operands. Strip after the coverage pass has run.
     if (requiredLoweringPassSet.debugInfo &&
-        (targetCompilerOptions.getDebugInfoLevel() == DebugInfoLevel::None) &&
-        !codeGenContext->shouldTraceCoverage())
+        (targetCompilerOptions.getDebugInfoLevel() == DebugInfoLevel::None))
         SLANG_PASS(stripDebugInfo);
 
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
@@ -1017,22 +1014,12 @@ Result linkAndOptimizeIR(
     // passed using constant buffers.
     //
     // Shader coverage instrumentation. Runs before the user's module-
-    // scope globals are packed into a uniform struct, so that a
-    // `RWStructuredBuffer<uint> __slang_coverage` declaration (or one
-    // synthesized by this pass) is still visible as a top-level
-    // IRGlobalParam. When `-trace-coverage` is off the pass is a no-op
-    // unless the user has declared the buffer themselves.
+    // scope globals are packed into a uniform struct, so that the
+    // synthesized `__slang_coverage` buffer is still visible as a
+    // top-level IRGlobalParam. Counter ops carry source position on
+    // their built-in `sourceLoc`, so this pass is independent of
+    // debug-info state.
     SLANG_PASS(instrumentCoverage, sink, codeGenContext->shouldTraceCoverage());
-
-    // If the user requested -trace-coverage but not -g, we deferred the
-    // debug-info strip so the coverage pass could read source positions
-    // off the placeholders. Now that the placeholders are gone, strip
-    // the debug instructions as originally intended.
-    if (codeGenContext->shouldTraceCoverage() && requiredLoweringPassSet.debugInfo &&
-        targetCompilerOptions.getDebugInfoLevel() == DebugInfoLevel::None)
-    {
-        SLANG_PASS(stripDebugInfo);
-    }
 
     SLANG_PASS(collectGlobalUniformParameters, outLinkedIR.globalScopeVarLayout, target);
     validateIRModuleIfEnabled(codeGenContext, irModule);

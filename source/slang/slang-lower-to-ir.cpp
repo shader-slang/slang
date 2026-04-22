@@ -614,12 +614,11 @@ struct IRGenContext
 
     DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
 
-    // Prototype shader-coverage instrumentation. When true, each
-    // lowered statement is preceded by an IncrementCoverageCounter
-    // placeholder whose uid increments from 0. A later IR pass rewrites
-    // the placeholders into counter writes on a synthesized buffer.
+    // Shader-coverage instrumentation. When true, each lowered
+    // statement is preceded by an IncrementCoverageCounter op, which a
+    // later IR pass rewrites into an atomic counter write on a
+    // synthesized buffer.
     bool traceCoverage = false;
-    IRIntegerValue nextCoverageUID = 0;
 
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
@@ -8987,22 +8986,6 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
         ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
 }
 
-// Unconditional variant used by the coverage instrumentation path:
-// attaches an IRDebugLocationDecoration even when `-g` is off, because
-// coverage needs the source mapping regardless of user debug settings.
-void addCoverageLocationDecoration(IRGenContext* context, IRInst* inst)
-{
-    IRInst* debugSourceInst = getOrEmitDebugSource(context, inst->sourceLoc);
-    if (!debugSourceInst)
-        return;
-
-    auto sourceManager = context->getLinkage()->getSourceManager();
-    auto humaneLoc = sourceManager->getHumaneLoc(inst->sourceLoc, SourceLocType::Emit);
-
-    context->irBuilder
-        ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
-}
-
 void lowerStmt(IRGenContext* context, Stmt* stmt)
 {
     IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, stmt->loc);
@@ -9014,14 +8997,16 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
     {
         maybeEmitDebugLine(context, &visitor, stmt, stmt->loc);
 
-        // Emit a coverage-counter placeholder tagged with this
-        // statement's source location, before lowering the statement
-        // itself. The pass in slang-ir-coverage-instrument.cpp later
-        // rewrites these into counter writes.
+        // Emit a coverage-counter op before lowering the statement.
+        // The IRBuilderSourceLocRAII above sets the builder's current
+        // source location to `stmt->loc`, so the emitted instruction
+        // inherits that as its `sourceLoc` — no separate decoration
+        // needed. The pass in slang-ir-coverage-instrument.cpp later
+        // rewrites these ops into counter writes and deduplicates by
+        // `(file, line)` when assigning slot indices.
         //
-        // Empty statements are skipped because they have no
-        // observable execution; the LCOV converter deduplicates
-        // counters back to `(file, line)` at the IR-pass stage.
+        // Empty statements are skipped because they have no observable
+        // execution.
         //
         // `startBlockIfNeeded` is required because `maybeEmitDebugLine`
         // may have returned early (e.g. under `-g0`) without opening a
@@ -9032,9 +9017,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
         if (context->traceCoverage && stmt->loc.isValid() && !as<EmptyStmt>(stmt))
         {
             visitor.startBlockIfNeeded(stmt);
-            auto counterInst =
-                context->irBuilder->emitIncrementCoverageCounter(context->nextCoverageUID++);
-            addCoverageLocationDecoration(context, counterInst);
+            context->irBuilder->emitIncrementCoverageCounter();
         }
 
         visitor.dispatch(stmt);

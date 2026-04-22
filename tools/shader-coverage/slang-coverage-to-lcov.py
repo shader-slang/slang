@@ -5,15 +5,18 @@ Convert a Slang coverage counter buffer + manifest to LCOV .info format.
 Pipeline:
     1. Compile a shader with:
            slangc shader.slang -trace-coverage ...
-       with SLANG_COVERAGE_MANIFEST_PATH=shader.slangcov set in the
-       environment.  This produces an instrumented shader plus a JSON
-       sidecar describing each counter's (file, line).
-    2. Dispatch the shader on your runtime of choice, bound to the
-       buffer whose location is recorded in the manifest's `buffer`
-       block (register/space or binding/descriptor_set).
-    3. Read the UAV back to a binary file of little-endian uint32's,
+       This instruments the shader with a synthesized
+       `RWStructuredBuffer<uint> __slang_coverage`. The slot ordering
+       is (file, line) sorted lexicographically.
+    2. Produce a `.slangcov` manifest describing each counter's
+       (file, line). Until the compiler exposes this via a
+       post-emit-metadata API, the host must construct it from its
+       own knowledge of the shader source.
+    3. Dispatch the shader, bound to the coverage buffer at the
+       reserved binding (space 31, binding 0 — prototype default).
+    4. Read the UAV back to a binary file of little-endian uint32's,
        one per counter.
-    4. Run this script:
+    5. Run this script:
            slang-coverage-to-lcov.py \\
                --manifest shader.slangcov \\
                --counters shader.buffer.bin \\

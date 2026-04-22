@@ -1096,16 +1096,17 @@ local insts = {
 			{ atomicDec = { operands = { { "ptr" } } } },
 		},
 	},
-	-- Placeholder emitted at AST lowering when `-trace-coverage` is on.
-	-- The integer `uid` identifies the statement the placeholder was
-	-- produced for, and the instruction carries an
-	-- IRDebugLocationDecoration with its (file, line). The
-	-- coverage-instrument IR pass later rewrites each occurrence into
-	-- an atomic add on a synthesized counter buffer; the counter index
-	-- is assigned by deduplicating (file, line) keys, so multiple UIDs
-	-- on the same line share a slot. Inherent side-effect semantics
-	-- keep the optimizer from deleting or hoisting the placeholder.
-	{ IncrementCoverageCounter = { operands = { { "uid" } } } },
+	-- Emitted at AST lowering when `-trace-coverage` is on. The
+	-- instruction has no operands; its source position is carried on
+	-- the standard per-instruction `sourceLoc` field, which is always
+	-- preserved and never stripped by `stripDebugInfo`. The coverage-
+	-- instrument IR pass later rewrites each occurrence into an atomic
+	-- add on a synthesized counter buffer; counter slots are assigned
+	-- by deduplicating (file, line) keys sorted lexicographically, so
+	-- slot assignment is stable across unrelated source edits.
+	-- Inherent side-effect semantics keep the optimizer from deleting
+	-- or hoisting this op.
+	{ IncrementCoverageCounter = {} },
 	-- Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 	-- currently accumulated derivative to pass to some dOut argument in a nested call.
 	{ LoadReverseGradient = { operands = { { "value" } } } },
