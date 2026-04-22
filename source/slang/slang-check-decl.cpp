@@ -8644,9 +8644,7 @@ static Decl* getDeclFromCallableOperand(Val* operand)
     return nullptr;
 }
 
-static bool validatePublicCallableOperandVisibility(
-    SemanticsVisitor* visitor,
-    CallableDecl* decl)
+static bool validatePublicCallableOperandVisibility(SemanticsVisitor* visitor, CallableDecl* decl)
 {
     if (!decl || getDeclVisibility(decl) != DeclVisibility::Public)
         return true;
