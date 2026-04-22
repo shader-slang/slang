@@ -28,27 +28,48 @@ void checkForOperatorShiftOverflowRecursive(IRInst* inst, DiagnosticSink* sink)
                     {
                         SLANG_ASSERT(opInst->getOperandCount() == 2);
 
-                        IRInst* rhs = opInst->getOperand(1);
-                        auto rhsLit = as<IRIntLit>(rhs);
-                        if (!rhsLit)
-                            continue;
-
                         IRInst* lhs = opInst->getOperand(0);
                         IRType* lhsType = lhs->getDataType();
 
-                        IRSizeAndAlignment sizeAlignment;
+                        IRSizeAndAlignment lhsSizeAlignment;
                         if (SLANG_FAILED(
-                                getNaturalSizeAndAlignment(nullptr, lhsType, &sizeAlignment)))
-                            continue;
+                                getNaturalSizeAndAlignment(nullptr, lhsType, &lhsSizeAlignment)))
+                            break;
 
-                        IRIntegerValue shiftAmount = rhsLit->getValue();
-                        if (sizeAlignment.size * 8 <= shiftAmount)
+                        IRInst* rhs = opInst->getOperand(1);
+                        auto rhsLit = as<IRIntLit>(rhs);
+                        if (rhsLit)
                         {
-                            sink->diagnose(Diagnostics::OperatorShiftLeftOverflow{
-                                .lhsType = lhsType,
-                                .shiftAmount = shiftAmount,
-                                .location = opInst->sourceLoc,
-                            });
+                            // For literal shift amounts, warn if the shift overflows the LHS type.
+                            IRIntegerValue shiftAmount = rhsLit->getValue();
+                            if (lhsSizeAlignment.size * 8 <= shiftAmount)
+                            {
+                                sink->diagnose(Diagnostics::OperatorShiftLeftOverflow{
+                                    .lhsType = lhsType,
+                                    .shiftAmount = shiftAmount,
+                                    .location = opInst->sourceLoc,
+                                });
+                            }
+                        }
+                        else if (lhsSizeAlignment.size < 4)
+                        {
+                            // For non-literal shift amounts on a narrow LHS type (< 32 bits),
+                            // warn only when the shift amount type is wider than the LHS. This
+                            // targets the C/C++ integer-promotion surprise: `uint8_t x; x << n`
+                            // keeps the result as uint8_t in Slang, not widened to int as in C.
+                            IRType* rhsType = rhs->getDataType();
+                            IRSizeAndAlignment rhsSizeAlignment;
+                            if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(
+                                    nullptr,
+                                    rhsType,
+                                    &rhsSizeAlignment)) &&
+                                rhsSizeAlignment.size > lhsSizeAlignment.size)
+                            {
+                                sink->diagnose(Diagnostics::OperatorShiftOnNarrowType{
+                                    .lhsType = lhsType,
+                                    .location = opInst->sourceLoc,
+                                });
+                            }
                         }
                         break;
                     }
