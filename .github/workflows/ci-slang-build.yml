@@ -39,9 +39,7 @@ on:
 jobs:
   build:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    # 180-minute timeout accommodates the one-time LLVM rebuild when the GCS
-    # cache key format changes. Cached runs normally take well under 60m.
-    timeout-minutes: 180
+    timeout-minutes: 120
     permissions:
       id-token: write # Required for Workload Identity
       contents: read
