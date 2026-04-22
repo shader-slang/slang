@@ -472,6 +472,16 @@ static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
         case AddressSpace::StorageBuffer:
         case AddressSpace::UserPointer:
             return true;
+        case AddressSpace::Uniform:
+            // SPIRV 1.3 represents SSBOs as Uniform storage class with BufferBlock decoration,
+            // rather than StorageBuffer storage class used in SPIRV 1.4+. Accept uniform pointers
+            // to BufferBlock-decorated structs as valid atomic targets.
+            if (auto structType = as<IRStructType>(ptrType->getValueType()))
+            {
+                if (structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+                    return true;
+            }
+            break;
         default:
             break;
         }
