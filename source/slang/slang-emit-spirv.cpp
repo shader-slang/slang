@@ -4433,8 +4433,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto varType = tryGetPointedToType(&builder, globalInst->getDataType());
         auto debugType = emitDebugType(varType, false);
 
-        // Use default debug source and line info similar to struct debug type emission
         auto loc = globalInst->findDecoration<IRDebugLocationDecoration>();
+        if (!loc)
+        {
+            if (auto nameHint = globalInst->findDecoration<IRNameHintDecoration>())
+            {
+                if (nameHint->getName().indexOf('.') != Index(-1))
+                    return;
+            }
+        }
         IRInst* source = loc ? loc->getSource() : m_defaultDebugSource;
         IRInst* line = loc ? loc->getLine() : builder.getIntValue(builder.getUIntType(), 0);
         IRInst* col = loc ? loc->getCol() : line;
