@@ -1,8 +1,11 @@
 // The stack frame allocator is only available on the CPU and CUDA targets.
-// The LLVM results are checked separately, as it is the only target here that
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -cuda -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -cpu -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -llvm -compute
+
+// Unfortunately, there is no way to directly test the data layout
+// functionality - it only changes the size of the allocation in bytes, which
+// the allocators do not actually communicate.
 
 //TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
@@ -102,8 +105,4 @@ void computeMain()
     {
         outputBuffer[10] = err == MemoryAllocationError.AlignmentIsTooLarge ? 1 : 2;
     }
-
-    // Unfortunately, there is no way to test the data layout functionality - it
-    // only changes the size of the allocation in bytes, which the allocators do
-    // not actually communicate.
 }

@@ -1785,14 +1785,16 @@ size_t __alignedAllocPtrLength<AddressSpace addrSpace>(size_t bytes, uint alignm
     return (allocSize + ptrSize - 1) / ptrSize;
 }
 
+// Used as part of the default implementation of alignedAllocate.
 Ptr<void, Access.ReadWrite, addrSpace> __finalizeAlignedAlloc<AddressSpace addrSpace>(
     Ptr<void, Access.ReadWrite, addrSpace> unalignedPtr,
     uint alignment)
 {
+    size_t ptrSize = sizeof(Ptr<void, Access.ReadWrite, addrSpace>);
     size_t ptrAlign = alignof(Ptr<void, Access.ReadWrite, addrSpace>);
 
     // Leave room to store original address in [-1].
-    uintptr_t alignedPtr = reinterpret<uintptr_t>(unalignedPtr+1);
+    uintptr_t alignedPtr = reinterpret<uintptr_t>(unalignedPtr)+ptrSize;
 
     // If we need special alignment, do that!
     if (alignment > ptrAlign)
@@ -1870,7 +1872,7 @@ public struct SystemHeapAllocator: IAllocator<AddressSpace.Device>
         else
         {
             allocation = __cpu_malloc(__arraySizeOf<T, L>(count));
-            if (allocation == nullptr)
+            if (allocation == nullptr && count != 0)
                 throw MemoryAllocationError.OutOfMemory;
         }
         return reinterpret<LayoutPtr<T, L>>(allocation);
@@ -1880,7 +1882,7 @@ public struct SystemHeapAllocator: IAllocator<AddressSpace.Device>
     {
         size_t allocCount = __alignedAllocPtrLength<AddressSpace.Device>(bytes, alignment);
         Ptr<void> allocation = __cpu_malloc(allocCount * sizeof(Ptr<void>));
-        if (allocation == nullptr)
+        if (allocation == nullptr && allocCount != 0)
             throw MemoryAllocationError.OutOfMemory;
         return __finalizeAlignedAlloc(allocation, alignment);
     }
@@ -1890,6 +1892,9 @@ public struct SystemHeapAllocator: IAllocator<AddressSpace.Device>
         size_t oldCount,
         size_t newCount
     ) throws MemoryAllocationError {
+        if (oldPtr == nullptr)
+            return try allocate<T, L>(newCount);
+
         if (alignof(T, L) > alignof(Ptr<void>))
         {
             let newPtr = try allocate<T, L>(newCount);
@@ -1902,7 +1907,7 @@ public struct SystemHeapAllocator: IAllocator<AddressSpace.Device>
         else
         {
             let newPtr = __cpu_realloc(Ptr<void>(oldPtr), __arraySizeOf<T, L>(oldCount), __arraySizeOf<T, L>(newCount));
-            if (newPtr == nullptr)
+            if (newPtr == nullptr && newCount != 0)
                 throw MemoryAllocationError.OutOfMemory;
             return reinterpret<LayoutPtr<T, L>>(newPtr);
         }
@@ -1918,7 +1923,8 @@ public struct SystemHeapAllocator: IAllocator<AddressSpace.Device>
 
     static override void alignedFree(Ptr<void> data)
     {
-        __cpu_free(reinterpret<Ptr<Ptr<void>>>(data)[-1]);
+        if (data != nullptr)
+            __cpu_free(reinterpret<Ptr<Ptr<void>>>(data)[-1]);
     }
 }
 
