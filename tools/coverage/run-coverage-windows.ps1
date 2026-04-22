@@ -291,6 +291,12 @@ if (-not $ReportOnly) {
 
 $LcovFile     = if ($env:COVERAGE_LCOV_FILE) { $env:COVERAGE_LCOV_FILE } else { Join-Path $RepoRoot 'coverage.lcov' }
 $HtmlDir      = if ($env:COVERAGE_HTML_DIR)  { $env:COVERAGE_HTML_DIR }  else { Join-Path $RepoRoot 'coverage-html' }
+# Resolve relative paths against $RepoRoot. CI passes bare filenames like
+# "coverage.lcov", and Split-Path -Parent on a bare filename returns "",
+# which makes the Join-Path calls below throw "Cannot bind argument to
+# parameter 'Path' because it is an empty string."
+if (-not [System.IO.Path]::IsPathRooted($LcovFile)) { $LcovFile = Join-Path $RepoRoot $LcovFile }
+if (-not [System.IO.Path]::IsPathRooted($HtmlDir))  { $HtmlDir  = Join-Path $RepoRoot $HtmlDir }
 $LcovDir   = Split-Path -Parent $LcovFile
 $LcovStem  = [IO.Path]::GetFileNameWithoutExtension($LcovFile)
 $SlangcLcov = Join-Path $LcovDir ("{0}-slangc.lcov" -f $LcovStem)
