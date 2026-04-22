@@ -2882,6 +2882,26 @@ static NodeBase* parseBackwardDifferentiate(Parser* parser, void* /* unused */)
     return parseBackwardDifferentiate(parser);
 }
 
+/// Parse an expression of the form __apply(fn) where fn is an
+/// identifier pointing to a function.
+static Expr* parseApplyForBwd(Parser* parser)
+{
+    ApplyForBwdExpr* applyExpr = parser->astBuilder->create<ApplyForBwdExpr>();
+
+    parser->ReadToken(TokenType::LParent);
+
+    applyExpr->baseFunction = parser->ParseExpression();
+
+    parser->ReadToken(TokenType::RParent);
+
+    return applyExpr;
+}
+
+static NodeBase* parseApplyForBwd(Parser* parser, void* /* unused */)
+{
+    return parseApplyForBwd(parser);
+}
+
 static Expr* parseFuncAsTypeExpr(Parser* parser)
 {
     // Parse an expr of the form `__func_as_type(fn)`
@@ -3920,6 +3940,59 @@ static NodeBase* parseExtensionDecl(Parser* parser, void* /*userData*/)
             parseOptionalInheritanceClause(parser, decl);
             maybeParseGenericConstraints(parser, genericParent);
             parseDeclBody(parser, decl);
+            return decl;
+        });
+}
+
+static NodeBase* parseFuncExtensionDecl(Parser* parser, void* /*userData*/)
+{
+    return parseOptGenericDecl(
+        parser,
+        [&](GenericDecl* genericParent)
+        {
+            FuncExtensionDecl* decl = parser->astBuilder->create<FuncExtensionDecl>();
+            parser->FillPosition(decl);
+
+            // Parse the target as a higher-order expression via keyword dispatch.
+            // e.g. "fwd_diff(foo<T>)" dispatches to parseForwardDifferentiate,
+            // "bwd_diff(foo)" dispatches to parseBackwardDifferentiate, etc.
+            // We use syntax-decl lookup to avoid hard-coding operator names.
+            Expr* targetExpr = nullptr;
+            if (!tryParseUsingSyntaxDecl(parser, &targetExpr))
+            {
+                parser->diagnose(Diagnostics::UnexpectedToken{
+                    .tokenType = TokenTypeToString(peekTokenType(parser)),
+                    .location = peekToken(parser).getLoc()});
+                return decl;
+            }
+            decl->targetExpr = targetExpr;
+
+            // Parse function signature: (params) -> ReturnType { body }
+            FuncDecl* innerFunc = parser->astBuilder->create<FuncDecl>();
+            parser->FillPosition(innerFunc);
+
+            parser->PushScope(innerFunc);
+            parseModernParamList(parser, innerFunc);
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
+
+            if (AdvanceIf(parser, "throws"))
+            {
+                innerFunc->errorType = parser->ParseTypeExp();
+            }
+            if (AdvanceIf(parser, TokenType::RightArrow))
+            {
+                innerFunc->returnType = parser->ParseTypeExp();
+            }
+            maybeParseGenericConstraints(parser, genericParent);
+
+            parser->PushScope(funcScope);
+            innerFunc->body = parseOptBody(parser);
+            if (auto blockStmt = as<BlockStmt>(innerFunc->body))
+                innerFunc->closingSourceLoc = blockStmt->closingSourceLoc;
+            parser->PopScope();
+
+            decl->innerFunc = innerFunc;
             return decl;
         });
 }
@@ -10179,6 +10252,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("__generic", parseGenericDecl),
     _makeParseDecl("__extension", parseExtensionDecl),
     _makeParseDecl("extension", parseExtensionDecl),
+    _makeParseDecl("__func_extension", parseFuncExtensionDecl),
     _makeParseDecl("__init", parseConstructorDecl),
     _makeParseDecl("__subscript", parseSubscriptDecl),
     _makeParseDecl("property", parsePropertyDecl),
@@ -10316,6 +10390,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("__func_as_type", parseFuncAsTypeExpr),
     _makeParseExpr("fwd_diff", parseForwardDifferentiate),
     _makeParseExpr("bwd_diff", parseBackwardDifferentiate),
+    _makeParseExpr("__apply", parseApplyForBwd),
     _makeParseExpr("__dispatch_kernel", parseDispatchKernel),
     _makeParseExpr("sizeof", parseSizeOfExpr),
     _makeParseExpr("alignof", parseAlignOfExpr),

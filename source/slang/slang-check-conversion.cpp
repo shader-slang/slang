@@ -2089,6 +2089,11 @@ bool SemanticsVisitor::_coerce(
             if (outToExpr)
             {
                 *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, fromIsToWitness);
+                // Type-equality casts preserve l-value status since the
+                // types are structurally equivalent (e.g., T.Differential == T
+                // via a where clause).
+                if (fromExpr)
+                    (*outToExpr)->type.isLeftValue = fromExpr->type.isLeftValue;
             }
             if (outCost)
                 *outCost = 0;

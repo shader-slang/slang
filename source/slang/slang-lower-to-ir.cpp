@@ -5552,6 +5552,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         SLANG_UNEXPECTED("BackwardDifferentiateExpr present during IR lowered");
     }
 
+    LoweredValInfo visitApplyForBwdExpr(ApplyForBwdExpr* expr)
+    {
+        SLANG_UNUSED(expr);
+        SLANG_UNEXPECTED("ApplyForBwdExpr present during IR lowering");
+    }
+
     LoweredValInfo visitDispatchKernelExpr(DispatchKernelExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->baseFunction);
@@ -6761,21 +6767,25 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
     {
         auto superType = lowerType(context, expr->type);
-        auto value = lowerRValueExpr(context, expr->valueArg);
 
         // First, we check if the witness is a type equality witness.
-        // If so, we can simply emit a bit cast to the target type that should eventually
-        // fold out to a no-op.
-        // Note: if we are going to equivalent but not identical types in the future,
-        // then the cast between equivalent types shouldn't be as simple as a bit cast
-        // and will require actual coercion logic between the two types.
-        // For now, we don't support type equivalence witness so this is safe for
-        // equal types.
+        // If so, the types are structurally equal (e.g. T.Differential == T via
+        // a where clause), and the cast is a no-op.
         if (isTypeEqualityWitness(expr->witnessArg))
         {
+            // For l-value type-equality casts, lower as an l-value so that
+            // out/inout parameters work correctly through the cast.
+            if (expr->type.isLeftValue)
+            {
+                auto lval = lowerLValueExpr(context, expr->valueArg);
+                return lval;
+            }
+            auto value = lowerRValueExpr(context, expr->valueArg);
             return LoweredValInfo::simple(
                 getBuilder()->emitBitCast(superType, getSimpleVal(context, value)));
         }
+
+        auto value = lowerRValueExpr(context, expr->valueArg);
 
         // The actual operation that we need to perform here
         // depends on the kind of subtype relationship we
@@ -9656,6 +9666,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     IGNORED_CASE(FileDecl)
     IGNORED_CASE(RequireCapabilityDecl)
     IGNORED_CASE(SemanticDecl)
+    IGNORED_CASE(FuncExtensionDecl)
 
 #undef IGNORED_CASE
 

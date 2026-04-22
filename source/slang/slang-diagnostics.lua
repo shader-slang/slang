@@ -1121,6 +1121,13 @@ err(
 )
 
 standalone_note(
+    "note-synthesizing-differential-method",
+    30022,
+    "some of the above errors may have been produced while synthesizing '~methodName:Name' for 'IDifferentiable' conformance of '~typeName:Name'",
+    span { loc = "location" }
+)
+
+standalone_note(
     "this-type-mismatch-after-erasure",
     30021,
     "the concrete 'This' type identity is lost after type erasure into interface type '~interfaceType:Type'; consider using a generic function with a type constraint instead",
@@ -1839,6 +1846,13 @@ err(
     30102,
     "missing field in differential type",
     span { loc = "location", message = "differentiable member '~member:Name' should have a corresponding field in '~diffType:Type'. Use [DerivativeMember(...)] or mark as no_diff" }
+)
+
+err(
+    "synthesized-differential-method-missing-field",
+    30119,
+    "synthesized IDifferentiable method will not include differentiable field",
+    span { loc = "field:Decl", message = "field '~field' of type '~fieldType:Type' is differentiable but will not be included in the synthesized 'dzero'/'dadd' methods because the 'IDifferentiable' conformance is provided via extension. Provide explicit 'dzero()' and 'dadd()' implementations, or mark the field 'no_diff'." }
 )
 
 -- type pack diagnostics

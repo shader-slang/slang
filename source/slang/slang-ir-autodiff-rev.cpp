@@ -882,9 +882,8 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
 
     if (isContextTypeInTuple)
     {
-        // If the apply func returns a tuple, we need to extract the context value from it and pass
-        // it to the remat func.
-        //
+        // The apply func returns a tuple — extract the context value and insert
+        // at position 0 (MinimalContext is always the first remat parameter).
         auto contextVal = builder.emitElementExtract(applyResult, builder.getIntValue(1));
         rematFuncArgs.insert(0, contextVal);
     }

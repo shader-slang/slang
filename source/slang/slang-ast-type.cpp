@@ -698,8 +698,17 @@ Val* RematFuncType::_resolveImplOverride()
         auto funcType =
             getFuncType(astBuilder, as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
 
-        // First parameter is the MinimalCtxType.
+        // First parameter is always the MinimalCtxType.
         newParamTypes.add(resolvedMinimalCtxType);
+
+        // For member methods, include the this-type as an explicit parameter.
+        // Since remat is static, there is no implicit `this` from the extension,
+        // so the this-type must be explicitly present in the parameter list.
+        auto thisParamType = diffTypeWitness->getThisParamType();
+        if (thisParamType)
+        {
+            newParamTypes.add(thisParamType);
+        }
 
         // Get references to the differentiable interfaces to determine witness type.
         auto differentiableRefInterface = astBuilder->getDifferentiableRefInterfaceType();
@@ -787,6 +796,52 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         // The backward diff return type is void.
         auto resultType = astBuilder->getVoidType();
         auto errorType = funcType->getErrorType();
+
+        // For non-static member methods, include the this-type as an explicit parameter
+        // (bwd_diff is static in the interface, so non-static `this` becomes a parameter).
+        // Static functions should have null thisParamType in the witness.
+        auto thisParamType = diffTypeWitness->getThisParamType();
+        auto [thisParamValueType, thisParamDirection] =
+            splitParameterTypeAndDirection(astBuilder, thisParamType);
+        if (auto thisTypeDiffWitness = diffTypeWitness->getThisTypeDiffWitness())
+        {
+            auto thisPairType = getEffectiveDiffPairType(thisParamValueType, thisTypeDiffWitness);
+            switch (thisParamDirection)
+            {
+            case ParamPassingMode::In:
+                // In parameters become inout differential pairs in backward diff.
+                if (as<DifferentialPairType>(thisPairType))
+                    newParamTypes.add(astBuilder->getBorrowInOutParamType(thisPairType));
+                else if (as<DifferentialPtrPairType>(thisPairType))
+                    newParamTypes.add(thisPairType);
+                break;
+            case ParamPassingMode::BorrowInOut:
+                newParamTypes.add(astBuilder->getBorrowInOutParamType(thisPairType));
+                break;
+            default:
+                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
+                break;
+            }
+        }
+        else if (thisParamType)
+        {
+            // Non-differentiable this type gets no_diff modifier.
+            auto noDiffThisType = astBuilder->getModifiedType(
+                thisParamValueType,
+                {astBuilder->getNoDiffModifierVal()});
+            switch (thisParamDirection)
+            {
+            case ParamPassingMode::In:
+                newParamTypes.add(noDiffThisType);
+                break;
+            case ParamPassingMode::BorrowInOut:
+                newParamTypes.add(astBuilder->getBorrowInOutParamType(noDiffThisType));
+                break;
+            default:
+                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
+                break;
+            }
+        }
 
         // Process each parameter according to backward diff rules.
         for (Index i = 0; i < funcType->getParamCount(); ++i)
