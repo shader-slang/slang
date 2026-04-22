@@ -1,17 +1,10 @@
-// bit_cast between interface-typed values and their raw memory representation.
+// `bit_cast` from an interface-typed existential into a raw struct is
+// rejected.  The existential memory layout (witness tables, any-value
+// payload) is a compiler-managed detail that must not leak through
+// `bit_cast`.  Use `serializeDynamicObject` for the existential -> raw
+// direction; see serialize-dynamic-object.slang.
 //
-// Currently, the compiler lowers interface-typed existentials to a compact
-// tagged-union representation when the concrete type set is known, rather than
-// the full existential tuple (RTTI + WitnessTableID + AnyValue).  Because the
-// tagged-union size depends on the conforming types, bit_cast round-tripping
-// through an interface-typed existential is not currently supported.
-//
-// Two sub-issues block this feature:
-//   #10221 — bit_cast extracts concrete payload instead of full existential
-//   #10222 — specialization lowers existential to compact tagged-union
-//
-// Once resolved, bit_cast<RawType>(interfaceValue) and
-// bit_cast<IFoo>(rawValue) should produce correct round-trip results.
+// See #10221 / #10222 for context; parent feature tracker is #9920.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
 
@@ -33,22 +26,18 @@ struct FooB : IFoo
     float eval() { return x * 2.0; }
 }
 
-// Raw representation sized for the full existential tuple:
-// RTTI [uint2 = 8B] + WitnessTableID [uint2 = 8B] + AnyValue [16B] = 32B = 8 uints
-static const int kRawUints = 8;
-
 struct RawExistential
 {
-    uint data[kRawUints];
+    uint data[8];
 }
 
-float testRoundTrip(int typeId, float val)
+float testForward(int typeId, float val)
 {
     IFoo foo = createDynamicObject<IFoo>(typeId, val);
     RawExistential raw = bit_cast<RawExistential>(foo);
-    IFoo foo2 = bit_cast<IFoo>(raw);
-//CHECK:                      ^ cannot bit-cast to existential (non-concrete) type
-    return foo2.eval();
+//CHECK:                                          ^^^ bit_cast involving interface type is not supported
+//CHECK:                                          ^^^ 'IFoo' involves an interface type
+    return float(raw.data[0]);
 }
 
 RWStructuredBuffer<float> outputBuffer;
@@ -56,5 +45,5 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
-    outputBuffer[0] = testRoundTrip(id, 3.0);
+    outputBuffer[0] = testForward(id, 3.0);
 }

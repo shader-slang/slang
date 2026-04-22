@@ -298,6 +298,11 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
         // For specializing generic structs
         return Store;
 
+    case kIROp_ExtractDynamicObject:
+        // Operand 0 is the interface-typed object being read; operands 1 and 2
+        // are `out` pointers that this instruction writes to.
+        return (inst == user->getOperand(0)) ? Load : Store;
+
     // Miscellaenous cases
     case kIROp_ManagedPtrAttach:
     case kIROp_Unmodified:

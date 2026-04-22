@@ -4554,6 +4554,13 @@ err(
 )
 
 err(
+    "bit-cast-involving-interface-type",
+    41205,
+    "bit_cast involving interface type is not supported",
+    span { loc = "location", message = "'~type:Type' involves an interface type; use `createDynamicObject` / `serializeDynamicObject` for existential<->raw conversion instead of `bit_cast`" }
+)
+
+err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",

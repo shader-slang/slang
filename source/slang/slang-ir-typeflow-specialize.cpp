@@ -1686,6 +1686,12 @@ struct TypeFlowSpecializationContext
         case kIROp_BitCast:
             diagnoseUnsupportedBitCast(inst);
             return;
+        case kIROp_ExtractDynamicObject:
+            // ExtractDynamicObject has no meaningful result info of its own:
+            // it writes outputs via its pointer operands.  Let operand info
+            // propagate through the normal Store/Load paths after
+            // specializeExtractDynamicObject rewrites this inst.
+            return;
         case kIROp_Load:
         case kIROp_RWStructuredBufferLoad:
         case kIROp_StructuredBufferLoad:
@@ -5471,6 +5477,8 @@ struct TypeFlowSpecializationContext
             return specializeMakeTuple(context, inst);
         case kIROp_CreateExistentialObject:
             return specializeCreateExistentialObject(context, as<IRCreateExistentialObject>(inst));
+        case kIROp_ExtractDynamicObject:
+            return specializeExtractDynamicObject(context, as<IRExtractDynamicObject>(inst));
         case kIROp_RWStructuredBufferLoad:
         case kIROp_StructuredBufferLoad:
             return specializeStructuredBufferLoad(context, inst);
@@ -6979,6 +6987,66 @@ struct TypeFlowSpecializationContext
         }
 
         return false;
+    }
+
+    // Inverse of `specializeCreateExistentialObject`.  Rewrites
+    //   extractDynamicObject obj, typeIDOutPtr, valueOutPtr
+    // into an extraction of the witness-table tag (converted to the sequential
+    // ID the caller supplied to `createDynamicObject`) and the packed any-value
+    // payload reinterpreted as the user's storage type `U`, storing each into
+    // its respective out parameter pointer.
+    bool specializeExtractDynamicObject(IRInst* context, IRExtractDynamicObject* inst)
+    {
+        SLANG_UNUSED(context);
+
+        auto obj = inst->getOperand(0);
+        auto typeIDOutPtr = inst->getOperand(1);
+        auto valueOutPtr = inst->getOperand(2);
+
+        auto taggedUnionType = as<IRTaggedUnionType>(obj->getDataType());
+        if (!taggedUnionType)
+        {
+            // Operand has not been specialized yet; wait for the next round.
+            return false;
+        }
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+
+        // Pull the witness-table tag out of the tagged union and convert it to
+        // the globally consistent sequential ID expected by the caller.
+        auto tag = builder.emitGetTagFromTaggedUnion(obj);
+        auto tagType = cast<IRSetTagType>(tag->getDataType());
+        auto firstTable = tagType->getSet()->getElement(0);
+        auto interfaceType =
+            as<IRInterfaceType>(as<IRWitnessTable>(firstTable)->getConformanceType());
+        IRInst* seqIDArgs[] = {interfaceType, tag};
+        auto seqID = builder.emitIntrinsicInst(
+            builder.getUIntType(),
+            kIROp_GetSequentialIDFromTag,
+            2,
+            seqIDArgs);
+        builder.emitStore(typeIDOutPtr, seqID);
+
+        // Extract the packed payload and reinterpret it as the user-chosen
+        // storage type behind `valueOutPtr`.
+        auto packedValue = builder.emitGetValueFromTaggedUnion(obj);
+        auto valuePtrType = cast<IRPtrTypeBase>(valueOutPtr->getDataType());
+        auto valueType = valuePtrType->getValueType();
+
+        IRInst* unpackedValue = nullptr;
+        if (as<IRUntaggedUnionType>(packedValue->getDataType()))
+        {
+            unpackedValue = builder.emitUnpackAnyValue(valueType, packedValue);
+        }
+        else
+        {
+            unpackedValue = builder.emitReinterpret(valueType, packedValue);
+        }
+        builder.emitStore(valueOutPtr, unpackedValue);
+
+        inst->removeAndDeallocate();
+        return true;
     }
 
     bool specializeCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)

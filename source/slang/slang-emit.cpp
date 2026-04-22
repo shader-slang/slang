@@ -472,6 +472,7 @@ void calcRequiredLoweringPassSet(
         result.meshOutput = true;
         break;
     case kIROp_CreateExistentialObject:
+    case kIROp_ExtractDynamicObject:
     case kIROp_MakeExistential:
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialValue:

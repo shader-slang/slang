@@ -3321,6 +3321,22 @@ __generic<T, U>
 __intrinsic_op($(kIROp_CreateExistentialObject))
 T createDynamicObject(uint typeId, U value);
 
+/// Inverse of `createDynamicObject`.  Unpacks an existential value of interface
+/// type `T` into its sequential witness-table ID and its concrete payload
+/// reinterpreted as storage type `U`.  `U` must be the same size as the
+/// interface's any-value payload.
+///
+/// Use together with `createDynamicObject` to serialize and reconstruct
+/// interface-typed values through raw buffers.  Note: plain `bit_cast`
+/// between interface types and raw memory is intentionally not supported;
+/// use this builtin for the serialize direction and `createDynamicObject`
+/// for the deserialize direction.
+/// @category dynamic_dispatch
+__generic<T, U>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_ExtractDynamicObject))
+void serializeDynamicObject(T obj, out uint typeId, out U value);
+
 /// Reinterpret type `U` as type `T`. `T` and `U`
 /// can be any scalar, vector, matrix, struct or array types.
 /// @category conversion

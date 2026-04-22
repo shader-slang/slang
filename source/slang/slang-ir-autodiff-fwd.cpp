@@ -2633,6 +2633,7 @@ struct ForwardDiffTranslationContext
             // existential object but with a dzero() for it's value.
             //
         case kIROp_CreateExistentialObject:
+        case kIROp_ExtractDynamicObject:
             return translateNonDiffInst(builder, origInst);
 
         case kIROp_StructKey:

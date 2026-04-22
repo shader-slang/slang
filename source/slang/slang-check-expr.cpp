@@ -6737,6 +6737,44 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     return checkedResultExpr;
 }
 
+// Recursively detect whether `type` is or contains an interface type, so bit_cast
+// can be rejected for values whose memory representation would include a
+// compiler-managed existential header that the user is not supposed to see.
+static bool typeInvolvesInterfaceImpl(Type* type, HashSet<Decl*>& visiting)
+{
+    if (!type)
+        return false;
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        auto declRef = declRefType->getDeclRef();
+        if (declRef.as<InterfaceDecl>())
+            return true;
+        if (auto structDecl = as<StructDecl>(declRef.getDecl()))
+        {
+            if (!visiting.add(structDecl))
+                return false;
+            for (auto field : structDecl->getMembersOfType<VarDecl>())
+            {
+                if (typeInvolvesInterfaceImpl(field->getType(), visiting))
+                    return true;
+            }
+        }
+    }
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return typeInvolvesInterfaceImpl(arrayType->getElementType(), visiting);
+    if (auto vectorType = as<VectorExpressionType>(type))
+        return typeInvolvesInterfaceImpl(vectorType->getElementType(), visiting);
+    if (auto matrixType = as<MatrixExpressionType>(type))
+        return typeInvolvesInterfaceImpl(matrixType->getElementType(), visiting);
+    return false;
+}
+
+bool typeInvolvesInterface(Type* type)
+{
+    HashSet<Decl*> visiting;
+    return typeInvolvesInterfaceImpl(type, visiting);
+}
+
 void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
 {
     auto checkedInvokeExpr = as<InvokeExpr>(invokeExpr);
