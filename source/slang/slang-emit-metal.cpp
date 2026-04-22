@@ -746,6 +746,11 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_CoopMatMulAdd:
         {
             auto coopMatMulAdd = cast<IRCoopMatMulAdd>(inst);
+            auto saturatingAccumulation =
+                cast<IRBoolLit>(coopMatMulAdd->getSaturatingAccumulation())->getValue();
+            SLANG_RELEASE_ASSERT(
+                !saturatingAccumulation &&
+                "Saturating accumulation is not supported for Metal cooperative matrix.");
             emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n");
             m_writer->emit("simdgroup_multiply_accumulate(");
