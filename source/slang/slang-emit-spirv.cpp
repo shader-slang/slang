@@ -6666,6 +6666,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         if (!irInst)
             return false;
+        if (irInst->getOp() == kIROp_SPIRVAsmOperandBuiltinVar)
+        {
+            if (isIntegralScalarOrCompositeType(irInst->getDataType()))
+            {
+                if (isInstUsedInStage(irInst, Stage::Fragment))
+                    return true;
+            }
+            return false;
+        }
         if (irInst->getOp() != kIROp_GlobalVar && irInst->getOp() != kIROp_GlobalParam)
             return false;
         auto ptrType = as<IRPtrTypeBase>(irInst->getDataType());
