@@ -356,6 +356,26 @@ void WGSLSourceEmitter::emit(const AddressSpace addressSpace)
     }
 }
 
+static ImageFormat getImageFormat(IRTextureType* texType)
+{
+    return texType->hasFormat() ? (ImageFormat)getIntVal(texType->getFormat())
+                                : ImageFormat::unknown;
+}
+
+static bool wgslFormatSupportsReadWrite(ImageFormat fmt)
+{
+    // Per https://www.w3.org/TR/WGSL/#storage-texel-formats, rgba16float only
+    // supports read and write access modes, not read_write.
+    // All other formats supported by the WGSL backend allow read_write.
+    switch (fmt)
+    {
+    case ImageFormat::rgba16f:
+        return false;
+    default:
+        return true;
+    }
+}
+
 const char* WGSLSourceEmitter::getWgslImageFormat(IRTextureTypeBase* type)
 {
     // You can find the supported WGSL texel format from the URL:
@@ -650,8 +670,19 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 switch (texType->getAccess())
                 {
                 case SLANG_RESOURCE_ACCESS_READ_WRITE:
-                    m_writer->emit(getWgslImageFormat(texType));
-                    m_writer->emit(", read_write");
+                    {
+                        ImageFormat fmt = getImageFormat(texType);
+                        const char* fmtStr = getWgslImageFormat(texType);
+                        if (!wgslFormatSupportsReadWrite(fmt))
+                        {
+                            getSink()->diagnose(
+                                Diagnostics::StorageTextureAccessModeNotSupportedInWgsl{
+                                    .format = fmtStr,
+                                    .accessMode = "read_write"});
+                        }
+                        m_writer->emit(fmtStr);
+                        m_writer->emit(", read_write");
+                    }
                     break;
                 case SLANG_RESOURCE_ACCESS_WRITE:
                     m_writer->emit(getWgslImageFormat(texType));
