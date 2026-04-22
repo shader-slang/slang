@@ -152,9 +152,13 @@ cmake_arguments_for_slang=(
 )
 build_dir=$source_dir/build
 mkdir -p "$build_dir"
+# Use the single-config Ninja generator rather than Ninja Multi-Config because
+# LLVM_DISTRIBUTION_COMPONENTS (used below) is not compatible with
+# multi-configuration generators.
 cmake \
   -S "$source_dir/llvm" -B "$build_dir" \
-  -G "Ninja Multi-Config" \
+  -G "Ninja" \
+  "-DCMAKE_BUILD_TYPE=$config" \
   "-DCMAKE_INSTALL_PREFIX=$install_prefix" \
   "${cmake_arguments_for_slang[@]}" \
   "${extra_arguments[@]}"
@@ -169,7 +173,7 @@ msg "##########################################################"
 # which would otherwise compile the Clang Static Analyzer and other unused
 # pieces despite CLANG_ENABLE_STATIC_ANALYZER=0
 # (llvm/llvm-project#117705).
-cmake --build "$build_dir" -j --config "$config" --target install-distribution
+cmake --build "$build_dir" -j --target install-distribution
 
 msg "##########################################################"
 msg "LLVM installed in $install_prefix"
