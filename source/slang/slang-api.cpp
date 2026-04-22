@@ -283,7 +283,8 @@ SLANG_API void slang_shutdown()
     Slang::SPIRVCoreGrammarInfo::freeEmbeddedGrammerInfo();
     Slang::RttiInfo::deallocateAll();
     Slang::freeCapabilityDefs();
-    SlangRecord::ReplayContext::get().resetHandlers();
+    if (auto replayContext = SlangRecord::ReplayContext::tryGet())
+        replayContext->resetHandlers();
 }
 
 SLANG_API void slang_enableRecordLayer(bool enable)
