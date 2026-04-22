@@ -3052,7 +3052,7 @@ warning(
 
 err(
     "pack-param-must-be-last",
-    30515,
+    30522,
     "generic parameter after a variadic pack parameter is not allowed",
     span { loc = "param:Decl", message = "generic parameter '~param' cannot appear after a variadic pack parameter" }
 )
@@ -3105,7 +3105,7 @@ warning(
 
 err(
     "too-many-initializers",
-    30516,
+    30523,
     "too many initializers in initializer list",
     span { loc = "initList:Expr", message = "too many initializers (expected ~expected:int, got ~got:int)" }
 )
