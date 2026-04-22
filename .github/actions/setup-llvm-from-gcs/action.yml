@@ -69,8 +69,10 @@ runs:
 
         # Set environment variables for CMake. We set CMAKE_PREFIX_PATH to the
         # LLVM install prefix so find_package(Clang CONFIG) can locate
-        # ClangConfig.cmake via CMake's standard subdirectory search.
-        LLVM_INSTALL="${{ github.workspace }}/build/llvm-project-install"
+        # ClangConfig.cmake via CMake's standard subdirectory search. Use $PWD
+        # so the path resolves inside the current shell (container or host),
+        # matching the build-from-source step below.
+        LLVM_INSTALL="$PWD/build/llvm-project-install"
         echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}" >> $GITHUB_ENV
         echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> $GITHUB_ENV
         echo "Clang_DIR=${LLVM_INSTALL}/lib/cmake/clang" >> $GITHUB_ENV
@@ -116,7 +118,7 @@ runs:
         TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" | tr ';' '-')"
         LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${TARGETS_SLUG}-${{ inputs.llvm-hash }}"
         GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
-        LLVM_DIR="${{ github.workspace }}/build/llvm-project-install"
+        LLVM_DIR="$PWD/build/llvm-project-install"
 
         if [ ! -d "${LLVM_DIR}" ]; then
           echo "ERROR: LLVM directory not found at ${LLVM_DIR}"
