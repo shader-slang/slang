@@ -6707,6 +6707,10 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
     // This will create a substitution of the synthesized parameters for the
     // original parameters.
     //
+    // We'll also need to invalidate cached default substitution args, because
+    // we've changed the generic decl after the last time
+    // getDefaultSubstitutionArgs was called.
+    synGenericDecl->_cachedArgsForDefaultSubstitution.clear();
     auto defaultArgs = getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
     DeclRef<CallableDecl> requiredFuncDeclRef =
         m_astBuilder->getGenericAppDeclRef(requiredMemberDeclRef, defaultArgs.getArrayView())
