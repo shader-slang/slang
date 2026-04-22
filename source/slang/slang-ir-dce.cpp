@@ -84,7 +84,7 @@ struct DeadCodeEliminationContext
                 builder.setInsertBefore(firstChild);
             else
                 builder.setInsertInto(module->getModuleInst());
-            undefInst = Slang::getUnitPoisonVal(builder, module);
+            undefInst = Slang::getUnitPoisonVal(&builder, module);
         }
         return undefInst;
     }

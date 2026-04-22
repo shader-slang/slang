@@ -273,7 +273,6 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             slangd
             test-server
             test-process
-            slang-neural-module
         OPTIONAL_REQUIRES
             slang-rt
             slang-glslang
@@ -285,6 +284,14 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
+    # Only depend on slang-neural-module when SLANG_EMBED_CORE_MODULE=ON.
+    # With SLANG_EMBED_CORE_MODULE=OFF, building the neural module crashes
+    # (slang-bootstrap exits 0xC0000005 when processing neural.slang), so we
+    # exclude the dependency to keep development builds with EMBED=OFF working.
+    if(SLANG_EMBED_CORE_MODULE)
+        add_dependencies(slang-test slang-neural-module)
+    endif()
+
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
         PROPERTY VS_STARTUP_PROJECT slang-test
