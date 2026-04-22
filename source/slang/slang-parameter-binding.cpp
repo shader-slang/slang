@@ -2356,6 +2356,21 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             ptrTypeLayout->valueTypeLayout = valueTypeLayout;
             return ptrTypeLayout;
         }
+        else if (auto conditionalType = as<ConditionalType>(type))
+        {
+            auto hasValueVal = conditionalType->getHasValue();
+            auto folded =
+                hasValueVal ? context->getTargetProgram()->getProgram()->tryFoldIntVal(hasValueVal)
+                            : nullptr;
+            if (folded && getIntVal(folded) != 0)
+                return processParamOfTypeFunc(
+                    _Move(processParamOfTypeFunc),
+                    conditionalType->getValueType());
+            RefPtr<TypeLayout> typeLayout = new TypeLayout();
+            typeLayout->type = type;
+            typeLayout->rules = context->layoutContext.rules;
+            return typeLayout;
+        }
         else if (auto optionalType = as<OptionalType>(type))
         {
             Array<Type*, 2> types =
@@ -2471,6 +2486,14 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                         getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
                             .paramName = field.getName(),
                             .decl = field.getDecl()});
+
+                        // Keep the aggregate layout structurally well-formed so later
+                        // validation and cleanup code doesn't trip over a null field layout
+                        // after we've already diagnosed the invalid varying field.
+                        fieldTypeLayout = new TypeLayout();
+                        fieldTypeLayout->type = getType(context->getASTBuilder(), field);
+                        fieldTypeLayout->rules = context->layoutContext.rules;
+                        fieldVarLayout->typeLayout = fieldTypeLayout;
                         continue;
                     }
                     fieldVarLayout->typeLayout = fieldTypeLayout;
@@ -4372,16 +4395,24 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
 
 ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 {
+    // Layout construction still walks shared linkage-owned front-end state, so serialize it with
+    // other component-type front-end operations.
+    std::lock_guard<std::recursive_mutex> lock(
+        m_program->getLinkage()->getComponentTypeOperationMutex());
+
+    m_targetReq->getTargetCaps();
+    m_targetReq->getHLSLToVulkanLayoutOptions();
+
     if (!m_layout)
     {
         m_layout = generateParameterBindings(this, sink);
         if (sink->getErrorCount() != 0)
             return nullptr;
+    }
 
-        if (m_layout)
-        {
-            m_irModuleForLayout = createIRModuleForLayout(sink);
-        }
+    if (m_layout && !m_irModuleForLayout)
+    {
+        m_irModuleForLayout = createIRModuleForLayout(sink);
     }
     return m_layout;
 }

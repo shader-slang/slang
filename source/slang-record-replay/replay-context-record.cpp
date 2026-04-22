@@ -548,10 +548,7 @@ void ReplayContext::record(RecordFlag flags, slang::SessionDesc& value)
     record(flags, value.enableEffectAnnotations);
     record(flags, value.allowGLSLSyntax);
 
-    const slang::CompilerOptionEntry* entries = value.compilerOptionEntries;
-    recordArray(flags, entries, value.compilerOptionEntryCount);
-    if (isReading())
-        value.compilerOptionEntries = const_cast<slang::CompilerOptionEntry*>(entries);
+    recordArray(flags, value.compilerOptionEntries, value.compilerOptionEntryCount);
 
     record(flags, value.skipSPIRVValidation);
 }

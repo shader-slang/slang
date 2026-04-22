@@ -17,6 +17,7 @@
 #include "slang-compiler-fwd.h"
 #include "slang-compiler-options.h"
 
+#include <mutex>
 #include <slang-com-helper.h>
 #include <slang.h>
 
@@ -168,7 +169,7 @@ public:
     SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
         slang::IComponentType** outLinkedComponentType,
         uint32_t count,
-        slang::CompilerOptionEntry* entries,
+        slang::CompilerOptionEntry const* entries,
         ISlangBlob** outDiagnostics) override;
 
     //
@@ -413,6 +414,8 @@ protected:
 
 protected:
     Linkage* m_linkage;
+    // Parallel backend emission shares these lazily populated target caches.
+    mutable std::mutex m_cacheMutex;
 
     CompilerOptionSet m_optionSet;
 

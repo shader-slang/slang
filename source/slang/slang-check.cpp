@@ -80,6 +80,9 @@ void Session::_setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
 
 void Session::resetDownstreamCompiler(PassThroughMode type)
 {
+    // The downstream compiler table is shared session state and may be reset concurrently.
+    std::lock_guard<std::recursive_mutex> lock(m_downstreamCompilerMutex);
+
     // Mark as initialized
     m_downstreamCompilerInitialized &= ~(1 << int(type));
     m_downstreamCompilers[int(type)].setNull();
@@ -89,6 +92,10 @@ IDownstreamCompiler* Session::getOrLoadDownstreamCompiler(
     PassThroughMode type,
     DiagnosticSink* sink)
 {
+    // Lazy downstream compiler loading mutates shared state, and GenericCCpp can re-enter
+    // this routine while probing specific C/C++ compilers.
+    std::lock_guard<std::recursive_mutex> lock(m_downstreamCompilerMutex);
+
     if (m_downstreamCompilerInitialized & (1 << int(type)))
     {
         return m_downstreamCompilers[int(type)];
@@ -192,7 +199,7 @@ void checkTranslationUnit(
 
     visitor.checkModule(translationUnit->getModuleDecl());
 
-    translationUnit->getModule()->_collectShaderParams();
+    translationUnit->getModule()->_collectShaderParams(translationUnit->compileRequest->getSink());
 }
 
 void SemanticsVisitor::dispatchStmt(Stmt* stmt, SemanticsContext const& context)

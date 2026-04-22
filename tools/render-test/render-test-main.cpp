@@ -282,6 +282,7 @@ struct AssignValsFromLayoutContext
     ShaderOutputPlan& outputPlan;
     TestResourceContext& resourceContext;
     IAccelerationStructure* accelerationStructure;
+    Dictionary<String, ComPtr<IBuffer>> namedBuffers;
 
     AssignValsFromLayoutContext(
         IDevice* device,
@@ -316,6 +317,14 @@ struct AssignValsFromLayoutContext
 
     SlangResult assignData(ShaderCursor const& dstCursor, ShaderInputLayout::DataVal* srcVal)
     {
+        if (srcVal->addressRefs.getCount() > 0)
+        {
+            StdWriters::getError().print(
+                "error: data=[bufferName] address references are only supported in buffer"
+                " (ubuffer) inputs, not uniform data\n");
+            return SLANG_FAIL;
+        }
+
         const size_t bufferSize = srcVal->bufferData.getCount() * sizeof(uint32_t);
 
         ShaderCursor dataCursor = dstCursor;
@@ -408,10 +417,61 @@ struct AssignValsFromLayoutContext
         }
     }
 
-    SlangResult assignBuffer(ShaderCursor const& dstCursor, ShaderInputLayout::BufferVal* srcVal)
+    SlangResult assignBuffer(
+        ShaderCursor const& dstCursor,
+        ShaderInputLayout::BufferVal* srcVal,
+        String const& fieldName = String())
     {
         const InputBufferDesc& srcBuffer = srcVal->bufferDesc;
         auto& bufferData = srcVal->bufferData;
+
+        // Resolve buffer address references: replace placeholders with actual device addresses
+        // of previously created named buffers.
+        if (srcVal->addressRefs.getCount() > 0 && srcBuffer.stride > 0 && srcBuffer.stride < 4)
+        {
+            StdWriters::getError().print(
+                "error: data=[bufferName] requires stride >= 4 (got %d);"
+                " device addresses occupy 8 bytes and would be mangled by sub-word packing\n",
+                srcBuffer.stride);
+            return SLANG_FAIL;
+        }
+        for (auto& ref : srcVal->addressRefs)
+        {
+            ComPtr<IBuffer> refBuffer;
+            if (namedBuffers.tryGetValue(ref.bufferName, refBuffer))
+            {
+                uint64_t addr = refBuffer->getDeviceAddress();
+                bufferData[ref.dataOffset] = (uint32_t)(addr & 0xFFFFFFFF);
+                bufferData[ref.dataOffset + 1] = (uint32_t)(addr >> 32);
+            }
+            else
+            {
+                StdWriters::getError().print(
+                    "error: buffer '%s' referenced in data=[] not found"
+                    " (ensure it is declared before this buffer)\n",
+                    ref.bufferName.begin());
+                return SLANG_FAIL;
+            }
+        }
+
+        // When stride=1 or stride=2, each value in data=[] should occupy only `stride` bytes.
+        // Pack values per uint32, little-endian (first value in LSB).
+        if (srcBuffer.stride == 1 || srcBuffer.stride == 2)
+        {
+            const int strideBits = srcBuffer.stride * 8;
+            const uint32_t mask = (1u << strideBits) - 1u;
+            const int valsPerWord = (int)sizeof(uint32_t) / srcBuffer.stride;
+            List<uint32_t> packed;
+            for (Index i = 0; i < bufferData.getCount(); i += valsPerWord)
+            {
+                uint32_t word = 0;
+                for (int j = 0; j < valsPerWord && (i + j) < bufferData.getCount(); j++)
+                    word |= (bufferData[i + j] & mask) << (j * strideBits);
+                packed.add(word);
+            }
+            bufferData = packed;
+        }
+
         const size_t bufferSize = Math::Max(
             (size_t)bufferData.getCount() * sizeof(uint32_t),
             (size_t)(srcBuffer.elementCount * srcBuffer.stride));
@@ -430,6 +490,10 @@ struct AssignValsFromLayoutContext
 
         // Keep buffer alive in resource context
         resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
+
+        // Register named buffer for cross-referencing by other buffers' data=[]
+        if (fieldName.getLength() > 0)
+            namedBuffers[fieldName] = bufferResource;
 
         // Check for device address/pointer FIRST (before descriptor handles)
         // This ensures plain uint64/pointer types use device addresses, not descriptor handles
@@ -676,7 +740,7 @@ struct AssignValsFromLayoutContext
                         (int)fieldIndex);
                     return SLANG_E_INVALID_ARG;
                 }
-                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val));
+                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val, field.name));
             }
             else
             {
@@ -688,7 +752,7 @@ struct AssignValsFromLayoutContext
                         field.name.begin());
                     return SLANG_E_INVALID_ARG;
                 }
-                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val));
+                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val, field.name));
             }
         }
         return SLANG_OK;
@@ -783,7 +847,10 @@ struct AssignValsFromLayoutContext
         return SLANG_OK;
     }
 
-    SlangResult assign(ShaderCursor const& dstCursor, ShaderInputLayout::ValPtr const& srcVal)
+    SlangResult assign(
+        ShaderCursor const& dstCursor,
+        ShaderInputLayout::ValPtr const& srcVal,
+        String const& fieldName = String())
     {
         auto& entryCursor = dstCursor;
         switch (srcVal->kind)
@@ -792,7 +859,7 @@ struct AssignValsFromLayoutContext
             return assignData(dstCursor, (ShaderInputLayout::DataVal*)srcVal.Ptr());
 
         case ShaderInputType::Buffer:
-            return assignBuffer(dstCursor, (ShaderInputLayout::BufferVal*)srcVal.Ptr());
+            return assignBuffer(dstCursor, (ShaderInputLayout::BufferVal*)srcVal.Ptr(), fieldName);
 
         case ShaderInputType::CombinedTextureSampler:
             return assignCombinedTextureSampler(
@@ -1995,6 +2062,12 @@ SLANG_TEST_TOOL_API SlangResult innerMain(
 int main(int argc, char** argv)
 {
     using namespace Slang;
+
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+
     SlangSession* session = spCreateSession(nullptr);
 
     TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);

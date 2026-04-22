@@ -60,11 +60,16 @@ void IRDeduplicationContext::removeInstFromConstantMap(IRInst* inst)
 
 void IRDeduplicationContext::tryHoistInst(IRInst* inst)
 {
-    InstWorkList workList(inst->getModule());
-    InstHashSet workListSet(inst->getModule());
+    auto module = inst->getModule();
+    SLANG_ASSERT(module);
+    InstWorkList workList(module);
+
+    // Note: It is possible to see the same inst multiple times since it could
+    // reference a hoistable inst through multiple paths. For now, we will essentially
+    // re-hoist it each time, though we could be more efficient here.
+    //
     workList.add(inst);
-    workListSet.add(inst);
-    IRBuilder builder(inst->getModule());
+    IRBuilder builder(module);
 
     for (Index i = 0; i < workList.getCount(); i++)
     {
@@ -72,13 +77,21 @@ void IRDeduplicationContext::tryHoistInst(IRInst* inst)
 
         // Does inst no longer depend on anything defined locally?
         // If so we should hoist it.
-        bool shouldHoist = false;
+        bool shouldHoist = (item->getOperandCount() > 0);
+
+        if (item->getFullType())
+        {
+            auto typeParent = item->getFullType()->getParent();
+            if (typeParent == item->getParent())
+                shouldHoist = false;
+        }
+
         for (UInt a = 0; a < item->getOperandCount(); a++)
         {
             auto opParent = item->getOperand(a)->getParent();
-            if (opParent != item->getParent())
+            if (opParent == item->getParent())
             {
-                shouldHoist = true;
+                shouldHoist = false;
                 break;
             }
         }
@@ -94,8 +107,7 @@ void IRDeduplicationContext::tryHoistInst(IRInst* inst)
             {
                 if (getIROpInfo(use->getUser()->getOp()).isHoistable())
                 {
-                    if (workListSet.add(use->getUser()))
-                        workList.add(use->getUser());
+                    workList.add(use->getUser());
                 }
             }
         }

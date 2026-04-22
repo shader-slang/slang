@@ -6,6 +6,13 @@
 // either from having a finite packed size.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK): -target glsl
+//TEST:SIMPLE(filecheck=CHECK): -target cpp
+//TEST:SIMPLE(filecheck=CHECK): -target metal
+//TEST:SIMPLE(filecheck=CHECK): -target wgsl
+//TEST:SIMPLE(filecheck=NEG): -target spirv
+//TEST:SIMPLE(filecheck=NEG): -target hlsl
 
 [anyValueSize(32)]
 interface IFoo
@@ -16,20 +23,39 @@ interface IFoo
 [anyValueSize(32)]
 interface IBar
 {
-    void process();
+    float process();
 }
 
+// CHECK-DAG: error[E41003]
+// CHECK-DAG: BarImpl
+// CHECK-DAG: circular reference through interface
+// CHECK-DAG: IBar
 struct BarImpl : IBar
 {
-    IFoo foo;  // Contains IFoo
-    void process() {}
+    IFoo foo;
+    float process() { return foo.getValue(); }
 }
 
-// CHECK: error[E{{[0-9]+}}]
+// CHECK-DAG: error[E41003]
+// CHECK-DAG: FooImpl
+// CHECK-DAG: circular reference through interface
+// CHECK-DAG: IFoo
 struct FooImpl : IFoo
 {
-    IBar bar;  // Cycle: FooImpl -> IBar -> BarImpl -> IFoo -> FooImpl
-    float getValue() { return 0; }
+    IBar bar;
+    float getValue() { return bar.process(); }
+}
+
+IFoo createFoo()
+{
+    FooImpl f;
+    return f;
+}
+
+IBar createBar()
+{
+    BarImpl b;
+    return b;
 }
 
 RWStructuredBuffer<float> outputBuffer;
@@ -37,6 +63,8 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    IFoo f = createDynamicObject<IFoo>(0, 5);
-    outputBuffer[0] = f.getValue();
+    IFoo f = createFoo();
+    IBar b = createBar();
+    // NEG-NOT: error[E41011]
+    outputBuffer[0] = f.getValue() + b.process();
 }

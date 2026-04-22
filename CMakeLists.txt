@@ -56,6 +56,7 @@ include(SlangTarget)
 include(AutoOption)
 include(GitHubRelease)
 include(FetchedSharedLibrary)
+include(CheckSecureCRT)
 
 #
 # Options
@@ -133,9 +134,7 @@ option(
     OFF
 )
 if(SLANG_IGNORE_ABORT_MSG)
-    set(slang_ignore_abort_msg_arg -ignore-abort-msg)
-else()
-    set(slang_ignore_abort_msg_arg)
+    add_compile_definitions(SLANG_IGNORE_ABORT_MSG=1)
 endif()
 option(
     SLANG_ENABLE_ASAN
@@ -154,7 +153,6 @@ option(
     ON
 )
 
-option(SLANG_ENABLE_PREBUILT_BINARIES "Enable using prebuilt binaries" ON)
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
 option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
 option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
@@ -392,26 +390,30 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
 endif()
 
 if(NOT SLANG_EXCLUDE_DAWN)
-    set(webgpu_dawn_release_tag "webgpu_dawn-0")
-    if(
-        CMAKE_SYSTEM_NAME MATCHES "Windows"
-        AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
-    )
-        set(SLANG_WEBGPU_DAWN_BINARY_URL
-            "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
+    if(NOT DEFINED SLANG_WEBGPU_DAWN_BINARY_URL)
+        set(webgpu_dawn_release_tag "webgpu_dawn-0")
+        if(
+            CMAKE_SYSTEM_NAME MATCHES "Windows"
+            AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
         )
+            set(SLANG_WEBGPU_DAWN_BINARY_URL
+                "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
+            )
+        endif()
     endif()
 endif()
 
 if(NOT SLANG_EXCLUDE_TINT)
-    set(slang_tint_release_tag "slang-tint-0")
-    if(
-        CMAKE_SYSTEM_NAME MATCHES "Windows"
-        AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
-    )
-        set(SLANG_SLANG_TINT_BINARY_URL
-            "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
+    if(NOT DEFINED SLANG_SLANG_TINT_BINARY_URL)
+        set(slang_tint_release_tag "slang-tint-0")
+        if(
+            CMAKE_SYSTEM_NAME MATCHES "Windows"
+            AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
         )
+            set(SLANG_SLANG_TINT_BINARY_URL
+                "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
+            )
+        endif()
     endif()
 endif()
 
@@ -539,6 +541,10 @@ if(${SLANG_USE_SYSTEM_GLSLANG})
     endif()
 endif()
 
+if(SLANG_ENABLE_DXIL)
+    include(FetchDXC)
+endif()
+
 add_subdirectory(external)
 
 # webgpu_dawn is only available as a fetched shared library, since Dawn's nested source
@@ -583,6 +589,7 @@ add_subdirectory(source/slang-core-module)
 add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
+add_subdirectory(source/slang-dispatcher)
 add_subdirectory(source/standard-modules)
 add_subdirectory(examples)
 
@@ -644,6 +651,21 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
             NAMESPACE ${PROJECT_NAME}::
             DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
         )
+
+        if(UNIX)
+            configure_file(
+                "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
+                "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+                @ONLY
+            )
+
+            # TODO: When build system is changed to respect CMAKE_INSTALL_LIBDIR,
+            # update this destination.
+            install(
+                FILES "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+                DESTINATION "lib/pkgconfig"
+            )
+        endif()
     endif()
 endif()
 

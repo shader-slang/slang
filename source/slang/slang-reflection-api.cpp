@@ -144,6 +144,14 @@ static inline ProgramLayout* convert(SlangReflection* program)
     return (SlangReflection*)program;
 }
 
+static bool isScalarType(Type* type)
+{
+    if (as<BasicExpressionType>(type))
+        return true;
+
+    return as<BFloat16Type>(type) || as<FloatE4M3Type>(type) || as<FloatE5M2Type>(type);
+}
+
 // user attribute
 
 static unsigned int getUserAttributeCount(Decl* decl)
@@ -402,7 +410,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
 
     // TODO(tfoley): Don't emit the same type more than once...
 
-    if (const auto basicType = as<BasicExpressionType>(type))
+    if (isScalarType(type))
     {
         return SLANG_TYPE_KIND_SCALAR;
     }
@@ -686,7 +694,7 @@ SLANG_API unsigned int spReflectionType_GetRowCount(SlangReflectionType* inType)
     {
         return 1;
     }
-    else if (const auto basicType = as<BasicExpressionType>(type))
+    else if (isScalarType(type))
     {
         return 1;
     }
@@ -708,7 +716,7 @@ SLANG_API unsigned int spReflectionType_GetColumnCount(SlangReflectionType* inTy
     {
         return (unsigned int)getIntVal(vectorType->getElementCount());
     }
-    else if (const auto basicType = as<BasicExpressionType>(type))
+    else if (isScalarType(type))
     {
         return 1;
     }
@@ -752,15 +760,23 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
             CASE(Half, FLOAT16);
             CASE(Float, FLOAT32);
             CASE(Double, FLOAT64);
+            CASE(IntPtr, INTPTR);
+            CASE(UIntPtr, UINTPTR);
 
 #undef CASE
 
         default:
             SLANG_REFLECTION_UNEXPECTED();
             return SLANG_SCALAR_TYPE_NONE;
-            break;
         }
     }
+
+    if (as<BFloat16Type>(type))
+        return SLANG_SCALAR_TYPE_BFLOAT16;
+    if (as<FloatE4M3Type>(type))
+        return SLANG_SCALAR_TYPE_FLOAT_E4M3;
+    if (as<FloatE5M2Type>(type))
+        return SLANG_SCALAR_TYPE_FLOAT_E5M2;
 
     return SLANG_SCALAR_TYPE_NONE;
 }

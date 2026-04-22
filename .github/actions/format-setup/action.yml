@@ -14,9 +14,15 @@ runs:
       shell: bash
       run: |
         tmpdir=$(mktemp -d)
-        curl -L -H "Authorization: token ${{github.token}}" \
+        curl -fL --retry 3 --retry-delay 5 -H "Authorization: token ${{github.token}}" \
           -o "$tmpdir/clang-format" \
           https://github.com/shader-slang/slang-binaries/raw/306d22efc0f5f72c7230b0b6b7c99f03c46995bd/clang-format/x86_64-linux/bin/clang-format
+        if file "$tmpdir/clang-format" | grep -qi "HTML\|text"; then
+          echo "Error: downloaded clang-format is not a valid binary"
+          file "$tmpdir/clang-format"
+          head -5 "$tmpdir/clang-format"
+          exit 1
+        fi
         chmod +x "$tmpdir/clang-format"
         echo "$tmpdir" >> $GITHUB_PATH
 
@@ -30,8 +36,14 @@ runs:
       shell: bash
       run: |
         tmpdir=$(mktemp -d)
-        curl -L -H "Authorization: token ${{github.token}}" \
+        curl -fL --retry 3 --retry-delay 5 -H "Authorization: token ${{github.token}}" \
           -o "$tmpdir/shfmt" \
           https://github.com/mvdan/sh/releases/download/v3.10.0/shfmt_v3.10.0_linux_amd64
+        if file "$tmpdir/shfmt" | grep -qi "HTML\|text"; then
+          echo "Error: downloaded shfmt is not a valid binary"
+          file "$tmpdir/shfmt"
+          head -5 "$tmpdir/shfmt"
+          exit 1
+        fi
         chmod +x "$tmpdir/shfmt"
         echo "$tmpdir" >> $GITHUB_PATH

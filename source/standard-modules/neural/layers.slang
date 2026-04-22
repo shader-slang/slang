@@ -73,7 +73,7 @@ public struct FFLayer<
     [ForceInline]
     public OutputVector eval<A>(InputVector input, A parameterAddr)
         where A : IPointerLikeAddress<T>
-        where A.Differential : IPointerLikeAddress<T.Differential>
+        where A.Differential : IPointerLikeAddress<T>
     {
         OutputVector y;
         if(HasBias)

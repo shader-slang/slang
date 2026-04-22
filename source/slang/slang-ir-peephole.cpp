@@ -139,12 +139,28 @@ struct PeepholeContext : InstPassBase
             case kIROp_ExpandTypeOrVal:
             case kIROp_TrimFirstOfPack:
             case kIROp_TrimLastOfPack:
+            case kIROp_ShapeConcat:
+            case kIROp_ShapePermute:
+            case kIROp_ShapeSwap:
+            case kIROp_ShapeReduce:
                 return true;
             default:
                 break;
             }
         }
         return false;
+    }
+
+    bool isConcreteShapePack(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_MakeValuePack:
+        case kIROp_MakeTuple:
+            return !hasNestedFlattenablePackOperand(inst);
+        default:
+            return false;
+        }
     }
 
     bool tryOptimizeArithmeticInst(IRInst* inst)
@@ -561,6 +577,196 @@ struct PeepholeContext : InstPassBase
                     inst->replaceUsesWith(replacement);
                     maybeRemoveOldInst(inst);
                     changed = true;
+                }
+            }
+            break;
+        case kIROp_ShapeConcat:
+            {
+                auto leftPack = inst->getOperand(0);
+                auto rightPack = inst->getOperand(1);
+                auto axis = inst->getOperand(2);
+
+                if (isConcreteShapePack(leftPack) && isConcreteShapePack(rightPack) &&
+                    leftPack->getOperandCount() == rightPack->getOperandCount())
+                {
+                    Int64 axisValue = 0;
+                    if (tryGetConstantIntLit(axis, axisValue) && axisValue >= 0 &&
+                        (UInt)axisValue < leftPack->getOperandCount())
+                    {
+                        IRBuilder builder(module);
+                        IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                        builder.setInsertBefore(inst);
+
+                        ShortList<IRInst*> resultElements;
+                        bool canFold = true;
+                        for (UInt i = 0; i < leftPack->getOperandCount(); ++i)
+                        {
+                            auto leftElement = leftPack->getOperand(i);
+                            auto rightElement = rightPack->getOperand(i);
+                            if (i == (UInt)axisValue)
+                            {
+                                resultElements.add(builder.emitAdd(
+                                    as<IRType>(leftElement->getDataType()),
+                                    leftElement,
+                                    rightElement));
+                            }
+                            else if (areKnownEqualShapeElements(leftElement, rightElement))
+                            {
+                                resultElements.add(leftElement);
+                            }
+                            else
+                            {
+                                canFold = false;
+                                break;
+                            }
+                        }
+
+                        if (canFold)
+                        {
+                            if (auto replacement = emitPackLike(
+                                    module,
+                                    inst,
+                                    resultElements.getArrayView().arrayView))
+                            {
+                                inst->replaceUsesWith(replacement);
+                                maybeRemoveOldInst(inst);
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+            break;
+        case kIROp_ShapePermute:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto orderPack = inst->getOperand(1);
+                if (isConcreteShapePack(valuePack) && isConcreteShapePack(orderPack) &&
+                    valuePack->getOperandCount() == orderPack->getOperandCount())
+                {
+                    List<bool> seen;
+                    seen.setCount(valuePack->getOperandCount());
+                    for (Index i = 0; i < seen.getCount(); ++i)
+                        seen[i] = false;
+
+                    ShortList<IRInst*> resultElements;
+                    bool canFold = true;
+                    for (UInt i = 0; i < orderPack->getOperandCount(); ++i)
+                    {
+                        Int64 orderIndex = 0;
+                        if (!tryGetConstantIntLit(orderPack->getOperand(i), orderIndex) ||
+                            orderIndex < 0 || (UInt)orderIndex >= valuePack->getOperandCount() ||
+                            seen[(Index)orderIndex])
+                        {
+                            canFold = false;
+                            break;
+                        }
+
+                        seen[(Index)orderIndex] = true;
+                        resultElements.add(valuePack->getOperand((UInt)orderIndex));
+                    }
+
+                    if (canFold)
+                    {
+                        if (auto replacement =
+                                emitPackLike(module, inst, resultElements.getArrayView().arrayView))
+                        {
+                            inst->replaceUsesWith(replacement);
+                            maybeRemoveOldInst(inst);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            break;
+        case kIROp_ShapeSwap:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto dim0 = inst->getOperand(1);
+                auto dim1 = inst->getOperand(2);
+
+                if (isConcreteShapePack(valuePack))
+                {
+                    Int64 dim0Value = 0;
+                    Int64 dim1Value = 0;
+                    if (tryGetConstantIntLit(dim0, dim0Value) &&
+                        tryGetConstantIntLit(dim1, dim1Value))
+                    {
+                        if (dim0Value == dim1Value)
+                        {
+                            inst->replaceUsesWith(valuePack);
+                            maybeRemoveOldInst(inst);
+                            changed = true;
+                            break;
+                        }
+
+                        if (dim0Value >= 0 && dim1Value >= 0 &&
+                            (UInt)dim0Value < valuePack->getOperandCount() &&
+                            (UInt)dim1Value < valuePack->getOperandCount())
+                        {
+                            ShortList<IRInst*> resultElements;
+                            for (UInt i = 0; i < valuePack->getOperandCount(); ++i)
+                            {
+                                if (i == (UInt)dim0Value)
+                                    resultElements.add(valuePack->getOperand((UInt)dim1Value));
+                                else if (i == (UInt)dim1Value)
+                                    resultElements.add(valuePack->getOperand((UInt)dim0Value));
+                                else
+                                    resultElements.add(valuePack->getOperand(i));
+                            }
+
+                            if (auto replacement = emitPackLike(
+                                    module,
+                                    inst,
+                                    resultElements.getArrayView().arrayView))
+                            {
+                                inst->replaceUsesWith(replacement);
+                                maybeRemoveOldInst(inst);
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+            break;
+        case kIROp_ShapeReduce:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto axis = inst->getOperand(1);
+
+                if (isConcreteShapePack(valuePack))
+                {
+                    Int64 axisValue = 0;
+                    if (tryGetConstantIntLit(axis, axisValue) && axisValue >= 0 &&
+                        (UInt)axisValue < valuePack->getOperandCount())
+                    {
+                        IRBuilder builder(module);
+                        IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                        builder.setInsertBefore(inst);
+
+                        ShortList<IRInst*> resultElements;
+                        for (UInt i = 0; i < valuePack->getOperandCount(); ++i)
+                        {
+                            if (i == (UInt)axisValue)
+                            {
+                                resultElements.add(builder.getIntValue(
+                                    as<IRType>(valuePack->getOperand(i)->getDataType()),
+                                    1));
+                            }
+                            else
+                            {
+                                resultElements.add(valuePack->getOperand(i));
+                            }
+                        }
+
+                        if (auto replacement =
+                                emitPackLike(module, inst, resultElements.getArrayView().arrayView))
+                        {
+                            inst->replaceUsesWith(replacement);
+                            maybeRemoveOldInst(inst);
+                            changed = true;
+                        }
+                    }
                 }
             }
             break;
@@ -1039,6 +1245,16 @@ struct PeepholeContext : InstPassBase
                 if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalValue)
                 {
                     inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_GetConditionalValue:
+            {
+                if (auto makeConditional = as<IRMakeConditionalValue>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(makeConditional->getValue());
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }

@@ -857,6 +857,30 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             attr->patchConstantFuncDecl = patchConstantFuncDeclRef.getDecl();
         }
     }
+    else if (stage == Stage::Geometry)
+    {
+        bool hasOutputStream = false;
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            if (as<HLSLStreamOutputType>(param->getType()))
+            {
+                hasOutputStream = true;
+                break;
+            }
+        }
+        if (!hasOutputStream)
+        {
+            sink->diagnose(Diagnostics::GeometryShaderMissingOutputStream{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+        if (!entryPointFuncDecl->findModifier<MaxVertexCountAttribute>())
+        {
+            sink->diagnose(Diagnostics::GeometryShaderMissingMaxVertexCount{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+    }
     else if (stage == Stage::Compute)
     {
         for (const auto& param : entryPointFuncDecl->getParameters())
@@ -1389,7 +1413,7 @@ Type* getParamTypeWithModeWrapper(
     }
 }
 
-void Module::_collectShaderParams()
+void Module::_collectShaderParams(DiagnosticSink* sink)
 {
     // We are going to walk the global declarations in the body of the
     // module, and use those to build up our lists of:
@@ -1454,7 +1478,7 @@ void Module::_collectShaderParams()
                         shaderParamInfo,
                         m_specializationParams,
                         makeDeclRef(globalVar),
-                        nullptr))
+                        sink))
                 {
                     return;
                 }
@@ -1670,10 +1694,10 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
                 Diagnostics::InvalidTypeConformanceOptionString{.option = stringValue});
             continue;
         }
-        auto concreteType = globalComponentType->getTypeFromString(
-            String(typeName).getBuffer(),
-            compileRequest->getSink());
-        if (!concreteType)
+        DiagnosticSink typeLookupSink(linkage->getSourceManager(), nullptr);
+        auto concreteType =
+            globalComponentType->getTypeFromString(String(typeName).getBuffer(), &typeLookupSink);
+        if (!concreteType || as<ErrorType>(concreteType))
         {
             compileRequest->getSink()->diagnose(Diagnostics::InvalidTypeConformanceOptionNoType{
                 .option = stringValue,
@@ -1682,8 +1706,8 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
         }
         auto interfaceType = globalComponentType->getTypeFromString(
             String(interfaceName).getBuffer(),
-            compileRequest->getSink());
-        if (!interfaceType)
+            &typeLookupSink);
+        if (!interfaceType || as<ErrorType>(interfaceType))
         {
             compileRequest->getSink()->diagnose(Diagnostics::InvalidTypeConformanceOptionNoType{
                 .option = stringValue,
