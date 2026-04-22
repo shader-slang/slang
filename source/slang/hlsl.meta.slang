@@ -27632,9 +27632,6 @@ struct CoopMat
         }
     }
 
-    __intrinsic_op($(kIROp_MakeCoopMatrixFromScalar))
-    internal static This __makeFromScalar(T value);
-
     //
     // Subscript
     //
