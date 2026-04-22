@@ -1612,6 +1612,7 @@ class DifferentiableAttribute : public Attribute
 
     auto begin(Val* targetVal) const
     {
+        SLANG_ASSERT(hasAssociatedVals(targetVal));
         return m_associatedValMapping.tryGetValue(targetVal)->begin();
     }
 
@@ -1984,6 +1985,17 @@ FIDDLE()
 class DeprecatedAttribute : public Attribute
 {
     FIDDLE(...)
+    FIDDLE() String message;
+};
+
+/// A `[RemovedSince(languageVersion, "message")]` attribute indicates that the
+/// target has been removed starting from the specified language version.
+///
+FIDDLE()
+class RemovedSinceAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() int32_t sinceVersion;
     FIDDLE() String message;
 };
 

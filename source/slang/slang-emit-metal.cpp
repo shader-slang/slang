@@ -834,6 +834,24 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             return true;
         }
+    case kIROp_CastDescriptorHandleToUInt64:
+        {
+            // Metal: DescriptorHandle is a pointer; emit C-style cast to ulong.
+            m_writer->emit("(ulong)(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+    case kIROp_CastUInt64ToDescriptorHandle:
+        {
+            // Metal: cast integer back to pointer type.
+            m_writer->emit("(");
+            emitType(inst->getDataType());
+            m_writer->emit(")(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_BitCast:
         {
             auto toType = inst->getDataType();

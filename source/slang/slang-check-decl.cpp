@@ -695,6 +695,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl);
 
+    void visitHasDiffTypeInfoConstraintDecl(HasDiffTypeInfoConstraintDecl* decl);
+
     bool validateGenericConstraintSubType(
         GenericTypeConstraintDecl* decl,
         TypeExp type,
@@ -846,6 +848,11 @@ struct SemanticsDeclTypeResolutionVisitor : public SemanticsDeclVisitorBase,
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
         visitTypeExp(inheritanceDecl->base);
+        validateDynInterfaceUseWithInheritanceDecl(
+            this,
+            getSink(),
+            getOptionSet(),
+            inheritanceDecl);
     }
 
     void visitCallableDecl(CallableDecl* decl)
@@ -2613,6 +2620,20 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             getSink()->diagnose(Diagnostics::InvalidTypeVoid{.location = varDecl->loc});
         }
 
+        // Reject reference/parameter-passing-mode types as struct fields.
+        // These types (Ref<T>, RefParam<T>, BorrowInParam<T>, etc.) represent
+        // temporary borrows and cannot be stored in struct fields.
+        if (as<AggTypeDecl>(varDecl->parentDecl))
+        {
+            auto type = varDecl->type.type;
+            if (as<ExplicitRefType>(type) || as<ParamPassingModeType>(type))
+            {
+                getSink()->diagnose(Diagnostics::ReferenceTypeAsStructField{
+                    .type = type,
+                    .location = varDecl->loc});
+            }
+        }
+
         // If this is an unsized array variable, then we first want to give
         // it a chance to infer an array size from its initializer
         //
@@ -4090,6 +4111,15 @@ void SemanticsDeclHeaderVisitor::visitNonEmptyPackConstraintDecl(NonEmptyPackCon
     getSink()->diagnose(Diagnostics::InvalidNonEmptyPackConstraintTarget{.expr = packExpr});
 }
 
+void SemanticsDeclHeaderVisitor::visitHasDiffTypeInfoConstraintDecl(
+    HasDiffTypeInfoConstraintDecl* decl)
+{
+    CheckConstraintSubType(decl->type);
+
+    if (!decl->type.type)
+        decl->type = TranslateTypeNodeForced(decl->type);
+}
+
 static void maybeFlattenConjunctionType(Type* type, List<Type*>& outTypes)
 {
     if (auto andType = as<AndType>(type))
@@ -4387,7 +4417,7 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
         }
         else if (
             as<GenericTypeConstraintDecl>(m) || as<TypeCoercionConstraintDecl>(m) ||
-            as<NonEmptyPackConstraintDecl>(m))
+            as<NonEmptyPackConstraintDecl>(m) || as<HasDiffTypeInfoConstraintDecl>(m))
         {
             ensureDecl(m, DeclCheckState::ReadyForReference);
         }
@@ -4527,7 +4557,7 @@ struct SemanticsDeclConformancesVisitor : public SemanticsDeclVisitorBase,
     }
 };
 
-// Check that types used as `Differential` type use themselves as their own `Differential` type.
+// Check that function extensions only conform to `[__FunctionInterface]` interfaces.
 struct SemanticsDeclFunctionConformancesVisitor
     : public SemanticsDeclVisitorBase,
       public DeclVisitor<SemanticsDeclFunctionConformancesVisitor>
@@ -4568,28 +4598,6 @@ struct SemanticsDeclFunctionConformancesVisitor
                 checkExtensionConformance(extensionDecl);
             }
         }
-    }
-};
-
-// Check that types used as `Differential` type use themselves as their own `Differential` type.
-struct SemanticsDeclDifferentialConformanceVisitor
-    : public SemanticsDeclVisitorBase,
-      public DeclVisitor<SemanticsDeclDifferentialConformanceVisitor>
-{
-    SemanticsDeclDifferentialConformanceVisitor(SemanticsContext const& outer)
-        : SemanticsDeclVisitorBase(outer)
-    {
-    }
-    void visitDecl(Decl*) {}
-    void visitDeclGroup(DeclGroup*) {}
-
-    void visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
-    {
-        validateDynInterfaceUseWithInheritanceDecl(
-            this,
-            getSink(),
-            getOptionSet(),
-            inheritanceDecl);
     }
 };
 
@@ -5413,6 +5421,8 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             return true;
         if (as<NonEmptyPackConstraintDecl>(declRef))
             return true;
+        if (as<HasDiffTypeInfoConstraintDecl>(declRef))
+            return true;
         return false;
     };
 
@@ -5552,6 +5562,19 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             else
                 return false;
         }
+        else if (
+            auto requiredHasDiffTypeInfoConstraintDeclRef =
+                requiredMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>())
+        {
+            if (auto satisfyingConstraintDeclRef =
+                    satisfyingMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>())
+            {
+                // The actual constrained type comparison depends on the specialized
+                // substitution environment and is validated below.
+            }
+            else
+                return false;
+        }
         else
             return false;
     }
@@ -5672,6 +5695,16 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             if (!satisfyingPackVal)
                 satisfyingPackVal = m_astBuilder->getErrorType();
             requiredSubstArgs.add(m_astBuilder->getNonEmptyPackWitness(satisfyingPackVal));
+        }
+        else if (
+            auto requiredHasDiffTypeInfoConstraintDeclRef =
+                requiredMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>())
+        {
+            auto satisfyingConstraintDeclRef =
+                satisfyingMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>();
+            SLANG_ASSERT(satisfyingConstraintDeclRef);
+            requiredSubstArgs.add(
+                m_astBuilder->getHasDiffTypeInfoWitness(satisfyingConstraintDeclRef));
         }
     }
 
@@ -5819,6 +5852,29 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             {
                 return false;
             }
+        }
+        else if (
+            auto requiredHasDiffTypeInfoConstraintDeclRef =
+                requiredMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>())
+        {
+            auto satisfyingConstraintDeclRef =
+                satisfyingMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>();
+            SLANG_ASSERT(satisfyingConstraintDeclRef);
+
+            auto specializedRequiredConstraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        requiredGenericDeclRef,
+                        requiredSubstArgs.getArrayView(),
+                        requiredHasDiffTypeInfoConstraintDeclRef.getDecl())
+                    .as<HasDiffTypeInfoConstraintDecl>();
+            if (!specializedRequiredConstraintDeclRef)
+                return false;
+
+            auto requiredType = getBaseType(m_astBuilder, specializedRequiredConstraintDeclRef);
+            auto satisfyingType = getBaseType(m_astBuilder, satisfyingConstraintDeclRef);
+            if (!requiredType || !satisfyingType || !satisfyingType->equals(requiredType))
+                return false;
         }
     }
 
@@ -6321,6 +6377,31 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
                     getCurrentASTBuilder(),
                     SubstitutionSet(_partiallySpecializedRequiredGenericDeclRef)));
             }
+            else if (auto hasDiffTypeInfoDecl = as<HasDiffTypeInfoConstraintDecl>(member))
+            {
+                auto synConstraintDecl = m_astBuilder->create<HasDiffTypeInfoConstraintDecl>();
+                synConstraintDecl->nameAndLoc = hasDiffTypeInfoDecl->getNameAndLoc();
+                synConstraintDecl->parentDecl = synGenericDecl;
+                synConstraintDecl->whereTokenLoc = hasDiffTypeInfoDecl->whereTokenLoc;
+
+                synConstraintDecl->type = TypeExp((Type*)hasDiffTypeInfoDecl->type.type->substitute(
+                    m_astBuilder,
+                    SubstitutionSet(currentDeclRef)));
+                synGenericDecl->addDirectMemberDecl(synConstraintDecl);
+                mapSynToOrigTypeParams.add(synConstraintDecl, hasDiffTypeInfoDecl);
+
+                m_astBuilder->m_cachedGenericDefaultArgs.remove(synGenericDecl);
+                synGenericDecl->_cachedArgsForDefaultSubstitution.clear();
+                auto _partialDefaultArgs =
+                    getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
+                DeclRef<Decl> _partiallySpecializedRequiredGenericDeclRef =
+                    m_astBuilder->getGenericAppDeclRef(
+                        genericDecl,
+                        _partialDefaultArgs.getArrayView());
+                currentDeclRef = as<DeclRefBase>(currentDeclRef->substitute(
+                    getCurrentASTBuilder(),
+                    SubstitutionSet(_partiallySpecializedRequiredGenericDeclRef)));
+            }
         }
 
         // Override generic pointer to point to the original generic container.
@@ -6582,6 +6663,20 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
 
             synGenericDecl->addDirectMemberDecl(synConstraintDecl);
         }
+        else if (
+            auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+        {
+            auto synConstraintDecl = m_astBuilder->create<HasDiffTypeInfoConstraintDecl>();
+            synConstraintDecl->nameAndLoc = hasDiffTypeInfoConstraintDecl->getNameAndLoc();
+            synConstraintDecl->parentDecl = synGenericDecl;
+            synConstraintDecl->whereTokenLoc = hasDiffTypeInfoConstraintDecl->whereTokenLoc;
+            synConstraintDecl->type =
+                TypeExp((Type*)hasDiffTypeInfoConstraintDecl->type.type->substitute(
+                    m_astBuilder,
+                    SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+
+            synGenericDecl->addDirectMemberDecl(synConstraintDecl);
+        }
         else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
         {
             auto synConstraintDecl = m_astBuilder->create<NonEmptyPackConstraintDecl>();
@@ -6606,28 +6701,6 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
 
             synGenericDecl->addDirectMemberDecl(synConstraintDecl);
         }
-    }
-
-    for (auto coercionDecl :
-         requiredMemberDeclRef.getDecl()->getDirectMemberDeclsOfType<TypeCoercionConstraintDecl>())
-    {
-        auto synCoercionDecl = m_astBuilder->create<TypeCoercionConstraintDecl>();
-        synCoercionDecl->nameAndLoc = coercionDecl->getNameAndLoc();
-        synCoercionDecl->parentDecl = synGenericDecl;
-        synCoercionDecl->whereTokenLoc = coercionDecl->whereTokenLoc;
-        if (coercionDecl->findModifier<ImplicitConversionModifier>())
-        {
-            addModifier(synCoercionDecl, m_astBuilder->create<ImplicitConversionModifier>());
-        }
-
-        synCoercionDecl->fromType = TypeExp((Type*)coercionDecl->fromType.type->substitute(
-            m_astBuilder,
-            SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
-        synCoercionDecl->toType = TypeExp((Type*)coercionDecl->toType.type->substitute(
-            m_astBuilder,
-            SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
-
-        synGenericDecl->addDirectMemberDecl(synCoercionDecl);
     }
 
     // Override generic pointer to point to the original generic container.
@@ -7468,7 +7541,12 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             synDeclRef.getParent().as<GenericDecl>(),
             requiredMemberDeclRef.getParent().as<GenericDecl>(),
             witnessTable);
-        SLANG_ASSERT(doesSignatureMatch);
+        if (!doesSignatureMatch)
+        {
+            if (outFailureDetails)
+                outFailureDetails->reason = WitnessSynthesisFailureReason::GenericSignatureMismatch;
+            return false;
+        }
     }
     else
     {
@@ -7477,7 +7555,10 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             synDeclRef.as<FuncDecl>(),
             requiredMemberDeclRef,
             witnessTable);
-        SLANG_ASSERT(doesSignatureMatch);
+        if (!doesSignatureMatch)
+        {
+            return false;
+        }
     }
 
     return true;
@@ -9056,9 +9137,11 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     //
     this->ensureDecl(witnessDecl, DeclCheckState::ReadyForLookup);
 
+    auto synthesizedCallableDeclRef = synthesizedWitnessDeclRef.as<CallableDecl>();
+
     // Test signature and register in witness table.
     bool doesSignatureMatch = doesSignatureMatchRequirement(
-        synthesizedWitnessDeclRef.as<CallableDecl>(),
+        synthesizedCallableDeclRef,
         requirementDeclRef.as<CallableDecl>(),
         witnessTable);
 
@@ -9180,22 +9263,19 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
 
 Type* SemanticsVisitor::getForwardDiffFuncInterfaceType(Type* baseType)
 {
-    auto diffTypeInfoWitness =
-        tryGetSubtypeWitness(baseType, m_astBuilder->getDiffTypeInfoInterfaceType());
+    auto diffTypeInfoWitness = getDiffTypeInfoWitness(baseType);
     return m_astBuilder->getForwardDiffFuncInterfaceType(baseType, diffTypeInfoWitness);
 }
 
 Type* SemanticsVisitor::getBackwardDiffFuncInterfaceType(Type* baseType)
 {
-    auto diffTypeInfoWitness =
-        tryGetSubtypeWitness(baseType, m_astBuilder->getDiffTypeInfoInterfaceType());
+    auto diffTypeInfoWitness = getDiffTypeInfoWitness(baseType);
     return m_astBuilder->getBackwardDiffFuncInterfaceType(baseType, diffTypeInfoWitness);
 }
 
 Type* SemanticsVisitor::getBwdCallableBaseType(Type* baseType)
 {
-    auto diffTypeInfoWitness =
-        tryGetSubtypeWitness(baseType, m_astBuilder->getDiffTypeInfoInterfaceType());
+    auto diffTypeInfoWitness = getDiffTypeInfoWitness(baseType);
     return m_astBuilder->getBwdCallableBaseType(baseType, diffTypeInfoWitness);
 }
 
@@ -9903,6 +9983,16 @@ bool SemanticsVisitor::checkConformanceToType(
         auto superTypeDeclRef = supereclRefType->getDeclRef();
         if (auto superInterfaceDeclRef = superTypeDeclRef.as<InterfaceDecl>())
         {
+            if (isNonCopyableType(subType))
+            {
+                getSink()->diagnose(Diagnostics::NonCopyableTypeCannotConformToInterface{
+                    .type = subType,
+                    .interface = superInterfaceDeclRef.getDecl(),
+                    .inheritance = inheritanceDecl});
+                // Fall through — let conformance checking proceed so the witness table
+                // is populated. The warning already informed the user.
+            }
+
             // The type is stating that it conforms to an interface.
             // We need to check that it provides all of the members
             // required by that interface.
@@ -11393,6 +11483,8 @@ void SemanticsVisitor::getGenericParams(
             outConstraints.add(typeCoercionConstraintDecl);
         else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(dd))
             outConstraints.add(nonEmptyConstraintDecl);
+        else if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(dd))
+            outConstraints.add(hasDiffTypeInfoConstraintDecl);
     }
 }
 
@@ -11678,6 +11770,25 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
                 return false;
             }
         }
+        else if (
+            auto leftHasDiffTypeInfoConstraint =
+                as<HasDiffTypeInfoConstraintDecl>(leftConstraints[cc]))
+        {
+            auto unspecializedRightConstraintDeclRef = createDefaultSubstitutionsIfNeeded(
+                m_astBuilder,
+                this,
+                makeDeclRef(rightConstraints[cc]));
+            auto rightConstraint =
+                substInnerRightToLeft.substitute(m_astBuilder, unspecializedRightConstraintDeclRef)
+                    .as<HasDiffTypeInfoConstraintDecl>();
+            if (!rightConstraint)
+                return false;
+
+            auto leftType = leftHasDiffTypeInfoConstraint->type.type;
+            auto rightType = getBaseType(m_astBuilder, rightConstraint);
+            if (!leftType || !rightType || !leftType->equals(rightType))
+                return false;
+        }
         else
         {
             return false;
@@ -11829,6 +11940,12 @@ List<Val*> getDefaultSubstitutionArgs(
             {
                 semantics->ensureDecl(nonEmptyConstraintDecl, DeclCheckState::ReadyForReference);
             }
+            else if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(member))
+            {
+                semantics->ensureDecl(
+                    hasDiffTypeInfoConstraintDecl,
+                    DeclCheckState::ReadyForReference);
+            }
         }
     }
 
@@ -11901,6 +12018,19 @@ List<Val*> getDefaultSubstitutionArgs(
                 continue;
             }
             args.add(astBuilder->getNonEmptyPackWitness(packVal));
+        }
+        else if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(decl))
+        {
+            if (semantics)
+                semantics->ensureDecl(
+                    hasDiffTypeInfoConstraintDecl,
+                    DeclCheckState::ReadyForReference);
+            auto constraintDeclRef = createDefaultSubstitutionsIfNeeded(
+                                         astBuilder,
+                                         semantics,
+                                         hasDiffTypeInfoConstraintDecl->getDefaultDeclRef())
+                                         .as<HasDiffTypeInfoConstraintDecl>();
+            args.add(astBuilder->getHasDiffTypeInfoWitness(constraintDeclRef));
         }
     }
 
@@ -13747,6 +13877,21 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
     }
 
+    // Check that no parameter without a default value follows a parameter with one.
+    bool seenDefaultParam = false;
+    for (auto paramDecl : decl->getParameters())
+    {
+        if (paramDecl->initExpr)
+        {
+            seenDefaultParam = true;
+        }
+        else if (seenDefaultParam)
+        {
+            getSink()->diagnose(
+                Diagnostics::ParameterWithoutDefaultAfterParameterWithDefault{.param = paramDecl});
+        }
+    }
+
     auto errorType = decl->errorType;
     if (errorType.type || errorType.exp)
     {
@@ -15268,98 +15413,30 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
     //
     _getCandidateExtensionList(typeDecl, m_mapDeclToCandidateExtensions).add(extDecl);
 
-    // Remove the cached inheritanceInfo about typeDecl, if `extDecl` inherits new types.
-    bool invalidateSubtypes = false;
-    if (as<InterfaceDecl>(typeDecl))
-    {
-        // If we are extending an interface, we are effectively extending all types
-        // that inherits the interface. So we need to remove all inheritance info
-        // that is related to the interface.
-        invalidateSubtypes = true;
-    }
-    bool hasInheritanceMember = false;
     bool hasImplicitCastMember = false;
     for (auto member : extDecl->getDirectMemberDecls())
     {
-        if (as<InheritanceDecl>(member))
-        {
-            hasInheritanceMember = true;
-        }
-        else if (auto ctorDecl = as<ConstructorDecl>(member))
+        if (auto ctorDecl = as<ConstructorDecl>(member))
         {
             if (ctorDecl->hasModifier<ImplicitConversionModifier>())
                 hasImplicitCastMember = true;
         }
     }
-    auto isTypeUpToDate = [this](Type* type)
-    {
-        if (auto declRefType = as<DeclRefType>(type))
-        {
-            return m_mapDeclRefToInheritanceInfo.containsKey(declRefType->getDeclRef());
-        }
-        return m_mapTypeToInheritanceInfo.containsKey(type);
-    };
-    auto isInheritanceInfoAffected = [typeDecl](InheritanceInfo& info)
-    {
-        for (auto f : info.facets)
-            if (f.getImpl()->getDeclRef().getDecl() == typeDecl)
-            {
-                return true;
-            }
-        return false;
-    };
-    if (invalidateSubtypes)
-    {
-        decltype(m_mapTypeToInheritanceInfo) newMapTypeToInheritanceInfo;
-        for (auto& kv : m_mapTypeToInheritanceInfo)
-        {
-            if (!isInheritanceInfoAffected(kv.second))
-            {
-                newMapTypeToInheritanceInfo.add(kv.first, kv.second);
-            }
-        }
-        m_mapTypeToInheritanceInfo = _Move(newMapTypeToInheritanceInfo);
-    }
 
-    ShortList<DeclRef<Decl>, 16> keysToRemove;
-    for (auto& kv : m_mapDeclRefToInheritanceInfo)
-    {
-        // We can confirm the type is affected by the new extension,
-        // if the declref type points to typeDecl.
-        if (kv.first.getDecl() == typeDecl)
-        {
-            keysToRemove.add(kv.first);
-            continue;
-        }
-
-        // If we are extending interface types (and in the future any struct type
-        // if we decide to have full inheritance support),
-        // we also need to account for conformant that implements the interface.
-        if (invalidateSubtypes && isInheritanceInfoAffected(kv.second))
-        {
-            keysToRemove.add(kv.first);
-        }
-    }
-    for (auto& key : keysToRemove)
-    {
-        m_mapDeclRefToInheritanceInfo.remove(key);
-    }
-
-    if (hasInheritanceMember || invalidateSubtypes)
-    {
-        ShortList<TypePair, 16> typePairsToRemove;
-        for (auto& kv : m_mapTypePairToSubtypeWitness)
-        {
-            if (!isTypeUpToDate(kv.first.type0) || !isTypeUpToDate(kv.first.type1))
-            {
-                typePairsToRemove.add(kv.first);
-            }
-        }
-        for (auto& key : typePairsToRemove)
-        {
-            m_mapTypePairToSubtypeWitness.remove(key);
-        }
-    }
+    // A new extension can affect not only `typeDecl` itself, but also any cached
+    // type whose linearized facets reference `typeDecl` transitively. Historically
+    // we handled that by scanning the entire inheritance/subtype cache and removing
+    // every potentially-affected entry. That is correct, but it turns extension
+    // registration into a global cache invalidation point and makes synthesized
+    // function extensions especially expensive.
+    //
+    // Instead we bump a per-declaration extension epoch here. Each cached
+    // inheritance result snapshots the epochs of the declarations that contributed
+    // facets to it, and subtype cache entries snapshot the inheritance-cache
+    // generations of their endpoints. Old entries therefore get discarded lazily
+    // when they are queried again, without forcing us to iterate the giant global
+    // dictionaries up front.
+    bumpDeclExtensionEpoch(typeDecl);
 
     if (hasImplicitCastMember)
     {
@@ -15638,7 +15715,6 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
 
     case DeclCheckState::TypesFullyResolved:
         SemanticsDeclTypeResolutionVisitor(shared).dispatch(decl);
-        SemanticsDeclDifferentialConformanceVisitor(shared).dispatch(decl);
         SemanticsDeclFunctionConformancesVisitor(shared).dispatch(decl);
         break;
 
