@@ -108,9 +108,15 @@ runs:
 
         echo "✅ LLVM build complete"
 
-        # Verify the install actually landed where we expect.
+        # Verify the install actually landed where we expect. Fail hard
+        # rather than letting the subsequent Slang configure fail with an
+        # opaque find_package(Clang) error.
+        if [ ! -d "${LLVM_INSTALL}/lib/cmake/clang" ]; then
+          echo "::error::LLVM install is missing ${LLVM_INSTALL}/lib/cmake/clang/ — the component install targets in external/build-llvm.sh did not produce ClangConfig.cmake."
+          exit 1
+        fi
         echo "📊 LLVM installation contents:"
-        ls -la "${LLVM_INSTALL}/lib/cmake/clang/" || echo "⚠️  lib/cmake/clang/ missing!"
+        ls -la "${LLVM_INSTALL}/lib/cmake/clang/"
 
         # Set environment variables for CMake. See matching comment in the
         # download step above.
