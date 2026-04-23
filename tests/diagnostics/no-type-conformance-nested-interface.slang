@@ -33,8 +33,19 @@ struct ArrayWrapped
     IBar bar;
 }
 
+// Third struct referencing the same `IFoo` as `Wrapped` — used below to
+// exercise the `diagnosedNoTypeConformancesInterfaces` cross-site dedup:
+// only one E50100 should fire for `IFoo` across `wrappedBuffer` and
+// `anotherFooBuffer` even though both loads produce unresolved
+// `lookupWitnessMethod` insts on `IFoo`.
+struct AlsoWrapped
+{
+    IFoo anotherFoo;
+}
+
 StructuredBuffer<Wrapped> wrappedBuffer;
 StructuredBuffer<ArrayWrapped[4]> arrayBuffer;
+StructuredBuffer<AlsoWrapped> anotherFooBuffer;
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -46,4 +57,10 @@ void computeMain()
     outputBuffer[1] = arrayBuffer[0][2].bar.getValue();
 //CHECK:                                            ^ no type conformances found
 //CHECK:                                            ^ No type conformances are found for interface 'IBar'. Code generation for current target requires at least one implementation type present in the linkage.
+    // Second access on the same `IFoo` interface — the dedup set must
+    // suppress it so we don't re-emit.  The exhaustive-CHECK mode
+    // implicitly verifies this: if a duplicate E50100 for IFoo fired
+    // here, the test would fail with "unannotated diagnostic" on this
+    // line.
+    outputBuffer[2] = anotherFooBuffer[0].anotherFoo.getValue();
 }
