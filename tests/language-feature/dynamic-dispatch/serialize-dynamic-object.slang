@@ -2,7 +2,9 @@
 // `createDynamicObject` (raw -> existential) to round-trip an
 // interface-typed value through a raw uint buffer.  These are the
 // supported replacements for `bit_cast` on interface types; see
-// bit-cast-interface-roundtrip.slang for the rejected `bit_cast` case.
+// bit-cast-interface-roundtrip.slang (forward direction rejection) and
+// bit-cast-interface-serialize.slang (reverse direction rejection) for
+// the rejected `bit_cast` cases.
 //
 // Covers #10221 / #10222; parent tracker #9920.
 

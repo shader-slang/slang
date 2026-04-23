@@ -7017,9 +7017,25 @@ struct TypeFlowSpecializationContext
         // the globally consistent sequential ID expected by the caller.
         auto tag = builder.emitGetTagFromTaggedUnion(obj);
         auto tagType = cast<IRSetTagType>(tag->getDataType());
-        auto firstTable = tagType->getSet()->getElement(0);
-        auto interfaceType =
-            as<IRInterfaceType>(as<IRWitnessTable>(firstTable)->getConformanceType());
+        auto set = tagType->getSet();
+        if (set->getCount() == 0)
+        {
+            // No concrete conformances known; bail out rather than dereferencing
+            // a non-existent element.  The existential value itself is unusable
+            // in this state.
+            return false;
+        }
+        auto firstTable = as<IRWitnessTable>(set->getElement(0));
+        if (!firstTable)
+        {
+            // Set entry was not a concrete witness table (e.g. unbounded or an
+            // unresolved placeholder); keep the inst intact so later passes can
+            // retry once specialization has progressed further.
+            return false;
+        }
+        auto interfaceType = as<IRInterfaceType>(firstTable->getConformanceType());
+        if (!interfaceType)
+            return false;
         IRInst* seqIDArgs[] = {interfaceType, tag};
         auto seqID = builder.emitIntrinsicInst(
             builder.getUIntType(),

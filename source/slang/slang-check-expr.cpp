@@ -6740,39 +6740,62 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
 // Recursively detect whether `type` is or contains an interface type, so bit_cast
 // can be rejected for values whose memory representation would include a
 // compiler-managed existential header that the user is not supposed to see.
-static bool typeInvolvesInterfaceImpl(Type* type, HashSet<Decl*>& visiting)
+// Generic struct fields are substituted through the enclosing DeclRef so that
+// e.g. `Box<IFoo>` is correctly identified as containing an interface.
+static bool typeInvolvesInterfaceImpl(ASTBuilder* astBuilder, Type* type, HashSet<Type*>& visiting)
 {
     if (!type)
         return false;
+    if (!visiting.add(type))
+        return false;
+
+    if (auto modifiedType = as<ModifiedType>(type))
+        return typeInvolvesInterfaceImpl(astBuilder, modifiedType->getBase(), visiting);
+    if (auto optionalType = as<OptionalType>(type))
+        return typeInvolvesInterfaceImpl(astBuilder, optionalType->getValueType(), visiting);
+    if (auto tupleType = as<TupleType>(type))
+    {
+        for (Index i = 0; i < tupleType->getMemberCount(); i++)
+        {
+            if (typeInvolvesInterfaceImpl(astBuilder, tupleType->getMember(i), visiting))
+                return true;
+        }
+        return false;
+    }
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return typeInvolvesInterfaceImpl(astBuilder, arrayType->getElementType(), visiting);
+    if (auto vectorType = as<VectorExpressionType>(type))
+        return typeInvolvesInterfaceImpl(astBuilder, vectorType->getElementType(), visiting);
+    if (auto matrixType = as<MatrixExpressionType>(type))
+        return typeInvolvesInterfaceImpl(astBuilder, matrixType->getElementType(), visiting);
     if (auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->getDeclRef();
         if (declRef.as<InterfaceDecl>())
             return true;
-        if (auto structDecl = as<StructDecl>(declRef.getDecl()))
+        if (auto structDeclRef = declRef.as<StructDecl>())
         {
-            if (!visiting.add(structDecl))
-                return false;
-            for (auto field : structDecl->getMembersOfType<VarDecl>())
+            // Substitute field types through `structDeclRef` so generic parameters are
+            // resolved to their instantiated types (otherwise `struct Box<T> { T value; }`
+            // instantiated as `Box<IFoo>` would see `T` and miss the interface).
+            for (auto fieldDeclRef :
+                 getMembersOfType<VarDecl>(astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
-                if (typeInvolvesInterfaceImpl(field->getType(), visiting))
+                if (typeInvolvesInterfaceImpl(
+                        astBuilder,
+                        getType(astBuilder, fieldDeclRef),
+                        visiting))
                     return true;
             }
         }
     }
-    if (auto arrayType = as<ArrayExpressionType>(type))
-        return typeInvolvesInterfaceImpl(arrayType->getElementType(), visiting);
-    if (auto vectorType = as<VectorExpressionType>(type))
-        return typeInvolvesInterfaceImpl(vectorType->getElementType(), visiting);
-    if (auto matrixType = as<MatrixExpressionType>(type))
-        return typeInvolvesInterfaceImpl(matrixType->getElementType(), visiting);
     return false;
 }
 
-bool typeInvolvesInterface(Type* type)
+bool typeInvolvesInterface(ASTBuilder* astBuilder, Type* type)
 {
-    HashSet<Decl*> visiting;
-    return typeInvolvesInterfaceImpl(type, visiting);
+    HashSet<Type*> visiting;
+    return typeInvolvesInterfaceImpl(astBuilder, type, visiting);
 }
 
 void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)

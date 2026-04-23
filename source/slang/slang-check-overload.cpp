@@ -3097,7 +3097,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         if (auto funcType = as<FuncType>(funcExpr->type.type))
         {
             auto resultType = funcType->getResultType();
-            if (typeInvolvesInterface(resultType))
+            if (typeInvolvesInterface(m_astBuilder, resultType))
             {
                 getSink()->diagnose(Diagnostics::BitCastInvolvingInterfaceType{
                     .type = resultType,
@@ -3107,7 +3107,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         }
         for (auto& arg : expr->arguments)
         {
-            if (arg && typeInvolvesInterface(arg->type.type))
+            if (arg && typeInvolvesInterface(m_astBuilder, arg->type.type))
             {
                 getSink()->diagnose(Diagnostics::BitCastInvolvingInterfaceType{
                     .type = arg->type.type,
