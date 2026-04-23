@@ -1542,7 +1542,7 @@ static bool typeCheck(IROp op, uint32_t matrixUse)
     {
     case SLANG_COOPERATIVE_MATRIX_USE_A:
     case SLANG_COOPERATIVE_MATRIX_USE_B:
-        return op == kIROp_HalfType || op == kIROp_BFloat16Type;
+        return op == kIROp_HalfType;
     case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR:
         return op == kIROp_HalfType || op == kIROp_FloatType;
     }
@@ -1572,24 +1572,11 @@ static UnownedStringSlice getMatrixUseName(uint32_t matrixUse)
  * Supported shapes:
  *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16)
  */
-inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col)
+inline FragmentShape computeShapeCombination(uint32_t /*matrixUse*/, uint32_t row, uint32_t col)
 {
-    switch (matrixUse)
-    {
-    case SLANG_COOPERATIVE_MATRIX_USE_A: // Matrix A: row=m, col=k
-        if (row == 16 && col == 16)
-            return {16, 16, 16};
-        return {0, 0, 0};
-    case SLANG_COOPERATIVE_MATRIX_USE_B: // Matrix B: row=k, col=n
-        if (row == 16 && col == 16)
-            return {16, 16, 16};
-        return {0, 0, 0};
-    case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR: // Matrix C/D: row=m, col=n
-    default:
-        if (row == 16 && col == 16)
-            return {16, 16, 16};
-        return {0, 0, 0};
-    }
+    if (row == 16 && col == 16)
+        return {16, 16, 16};
+    return {0, 0, 0};
 }
 
 SlangResult CUDASourceEmitter::emitWMMAFragmentType(

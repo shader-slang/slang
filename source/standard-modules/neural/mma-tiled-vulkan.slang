@@ -4,6 +4,9 @@
 // shmem or global memory — no changeMajor or transposeSubMatrix needed.
 // Uses fromVectorViaShMem, loadWeightTiled, matMul, toVectorViaShMem.
 //
+// InputSize and OutputSize must be tile-aligned (multiples of 16).
+// Callers with arbitrary sizes should pad via PadToTile before instantiation.
+//
 // Called by TiledMMAHelper.backward() on Vulkan/SPIR-V targets.
 implementing neural;
 
@@ -48,7 +51,14 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
         Optional<Address> biasAddress)
         where Address : IPointerLikeAddress<T>
     {
-        uint shBase = 0u;
+        // Per-warp shmem offset to avoid cross-warp races on shared memory.
+        // fromVectorViaShMem packs input as half (TileWidth = 16/8 = 2 uint4/lane),
+        // toVectorViaShMem stores as T (TileWidth = 16/(16/sizeof(T)) uint4/lane).
+        // Use the larger of the two to avoid overlap.
+        static const int TileWidthIn = 16 / (sizeof(uint4) / sizeof(half));
+        static const int TileWidthOut = 16 / (sizeof(uint4) / sizeof(T));
+        static const int ShmemPerWarp = N * (TileWidthIn > TileWidthOut ? TileWidthIn : TileWidthOut);
+        uint perWarpBase = uint(getWaveId()) * uint(ShmemPerWarp);
 
         // Weight: MatA(M, K) from global (row-major tiled layout)
         MatrixA<M, K> wA;
@@ -57,7 +67,7 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
         // Input: MatB(K, N) — each lane's K-element input as a row
         typealias InputVec = WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount>;
         MatrixB<K, N> inputB;
-        inputB.fromVectorViaShMem<ShMemSize, T, InputVec.Uint4AlignedInputSize, false>(input.data, shBase);
+        inputB.fromVectorViaShMem<ShMemSize, T, InputVec.Uint4AlignedInputSize, false>(input.data, perWarpBase);
 
         // MMA: result(M, N) = W(M, K) × input(K, N)
         MatrixC<T, M, N> resultMat = matMul<T, M, K, N>(wA, inputB);
@@ -65,7 +75,7 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
         // Extract output vector
         typealias OutputVec = WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>;
         OutputVec output;
-        resultMat.toVectorViaShMem<ShMemSize, OutputVec.Uint4AlignedInputSize, false>(output.data, shBase);
+        resultMat.toVectorViaShMem<ShMemSize, OutputVec.Uint4AlignedInputSize, false>(output.data, perWarpBase);
 
         if (Bias)
         {

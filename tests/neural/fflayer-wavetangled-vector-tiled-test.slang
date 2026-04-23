@@ -2,9 +2,9 @@
 // This verifies that FFLayer works with tiled weight layout for CooperativeMatrix acceleration.
 //
 // OptimalLayout (tiled) — single-warp:
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0 -emit-spirv-directly
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=1 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -emit-spirv-directly
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature -xslang -DTEST_POINTER=1 -xslang -DWARP_COUNT=1
 
 #pragma warning(disable: 41017)
 import slang.neural;
@@ -16,10 +16,6 @@ import common;
 
 #ifndef TEST_POINTER
 #define TEST_POINTER 0
-#endif
-
-#ifndef TEST_TENSORVIEW
-#define TEST_TENSORVIEW 0
 #endif
 
 typealias ElementType = float;
@@ -37,11 +33,7 @@ typealias Layout = OptimalLayout;
 //TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
 
-#if TEST_TENSORVIEW
-    uniform TensorView<ElementType> parameters;
-    uniform TensorView<ElementType> dParameters;
-    typealias Address = TorchTensorViewAddress<ElementType>;
-#elif TEST_POINTER
+#if TEST_POINTER
     uniform ElementType* parameters;
     uniform ElementType* dParameters;
     typealias Address = PointerAddress<ElementType>;

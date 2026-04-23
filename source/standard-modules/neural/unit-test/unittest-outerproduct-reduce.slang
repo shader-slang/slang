@@ -68,6 +68,9 @@ public void testOuterProductAccumulate<
 // Routes to TiledMMACuda.outerProduct (CUDA) and
 // TiledMMAVulkan.outerProductAccumulate (Vulkan) which produce
 // row-major tiled output layout.
+//
+// InputSize and OutputSize must be tile-aligned (multiples of 16).
+// Callers with arbitrary sizes should pad via PadToTile before calling.
 // ---------------------------------------------------------------------------
 
 public void testOuterProductAccumulateTiled<

@@ -370,3 +370,81 @@ public void fillTransposeWeightTiled<T, int Rows, int Cols, int WorkgroupSize, b
     }
     }
 }
+
+// Fill weight matrix with a constant value in tiled layout for forward MMA tests.
+// InputSize = K, OutputSize = M.
+// CUDA: stores as B(K, M) then converts to native fragment layout.
+// VK:   stores as A(M, K) in row-major tiled layout (what loadWeightTiled expects).
+public void fillForwardWeightTiled<T, int InputSize, int OutputSize, int WorkgroupSize>(
+    uint tid, RWStructuredBuffer<T>.Handle buffer, T fillValue)
+    where T : __BuiltinFloatingPointType
+{
+    static const int TileSize = 16;
+    static const int PaddedK = PadToTile<InputSize>.Value;
+    static const int PaddedM = PadToTile<OutputSize>.Value;
+
+    __target_switch
+    {
+    case cuda:
+    {
+        static const int TotalElements = PaddedM * PaddedK;
+        static const int NumClearIters = (TotalElements + WorkgroupSize - 1) / WorkgroupSize;
+        for (int iter = 0; iter < NumClearIters; iter++)
+        {
+            int idx = iter * WorkgroupSize + tid;
+            if (idx < TotalElements)
+                buffer[idx] = T(0);
+        }
+        AllMemoryBarrierWithGroupSync();
+
+        static const int NTileCols = PaddedM / TileSize;
+        static const int NumRowIters = (InputSize + WorkgroupSize - 1) / WorkgroupSize;
+        for (int iter = 0; iter < NumRowIters; iter++)
+        {
+            int row = iter * WorkgroupSize + tid;
+            if (row >= InputSize) break;
+            int tileRow = row / TileSize;
+            int localRow = row % TileSize;
+            for (int col = 0; col < OutputSize; col++)
+            {
+                int tileCol = col / TileSize;
+                int localCol = col % TileSize;
+                int offset = (tileRow * NTileCols + tileCol) * (TileSize * TileSize) + localRow * TileSize + localCol;
+                buffer[offset] = fillValue;
+            }
+        }
+        AllMemoryBarrierWithGroupSync();
+        convertTiledToNativeB<T, PaddedK, PaddedM, WorkgroupSize>(tid, buffer);
+    }
+    default:
+    {
+        static const int TotalElements = PaddedK * PaddedM;
+        static const int NumClearIters = (TotalElements + WorkgroupSize - 1) / WorkgroupSize;
+        for (int iter = 0; iter < NumClearIters; iter++)
+        {
+            int idx = iter * WorkgroupSize + tid;
+            if (idx < TotalElements)
+                buffer[idx] = T(0);
+        }
+        AllMemoryBarrierWithGroupSync();
+
+        static const int NTileCols = PaddedK / TileSize;
+        static const int NumRowIters = (OutputSize + WorkgroupSize - 1) / WorkgroupSize;
+        for (int iter = 0; iter < NumRowIters; iter++)
+        {
+            int row = iter * WorkgroupSize + tid;
+            if (row >= OutputSize) break;
+            int tileRow = row / TileSize;
+            int localRow = row % TileSize;
+            for (int col = 0; col < InputSize; col++)
+            {
+                int tileCol = col / TileSize;
+                int localCol = col % TileSize;
+                int offset = (tileRow * NTileCols + tileCol) * (TileSize * TileSize) + localRow * TileSize + localCol;
+                buffer[offset] = fillValue;
+            }
+        }
+        AllMemoryBarrierWithGroupSync();
+    }
+    }
+}

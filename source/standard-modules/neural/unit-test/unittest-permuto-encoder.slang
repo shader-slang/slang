@@ -4,6 +4,9 @@ implementing neural;
 namespace neural_unittest
 {
 
+// Address type is hardcoded to BindlessAddress<T> because this function is
+// [Differentiable] and the autodiff system requires Addr.Differential to also
+// conform to IPointerLikeAddress<T>, which can't be expressed as a generic constraint.
 [Differentiable]
 public void testEncodePerLevel<
         T : __BuiltinFloatingPointType,

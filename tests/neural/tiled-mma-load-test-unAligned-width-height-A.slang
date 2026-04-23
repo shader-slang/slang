@@ -170,7 +170,7 @@ void Test<int M, int K>(uint tid, uint tileIndex, int resIndex)
 
     // fill the shared memory with invalid values.
     invalidateSharedMemoryA(tid);
-    neural_unittest.testLoadShA<K, M, TestShMemSize, false, 1>(OffsetA, tileIndex, inputBuffer);
+    neural_unittest.testLoadShA<K, M, SubgroupSize, TestShMemSize, false, 1>(OffsetA, tileIndex, inputBuffer);
 
     bool res = verifiedOutput<M, K>(tid, OffsetA, tileIndex);
     res = WaveActiveAllTrue(res);

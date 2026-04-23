@@ -62,7 +62,7 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
     {
         [ForceUnroll]
         for (int i = 0; i < TileCount; i++)
-            tiles[i].ChangeMajor();
+            tiles[i].__ChangeMajor();
     }
 
     // =========================================================================
@@ -81,10 +81,10 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
         [ForceUnroll]
         for (int idx = 0; idx < TileCount; idx++)
         {
-            uint r1 = tiles[idx].fragmentRead(1);
-            uint r2 = tiles[idx].fragmentRead(2);
-            tiles[idx].fragmentWrite(1, r2);
-            tiles[idx].fragmentWrite(2, r1);
+            uint r1 = tiles[idx].__fragmentRead(1);
+            uint r2 = tiles[idx].__fragmentRead(2);
+            tiles[idx].__fragmentWrite(1, r2);
+            tiles[idx].__fragmentWrite(2, r1);
         }
     }
 
@@ -112,18 +112,18 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
                 int srcIdx = tileIdx(c, r);
                 int dstIdx = result.tileIdx(r, c);
 
-                uint r0 = tiles[srcIdx].fragmentRead(0);
-                uint r1 = tiles[srcIdx].fragmentRead(1);
-                uint r2 = tiles[srcIdx].fragmentRead(2);
-                uint r3 = tiles[srcIdx].fragmentRead(3);
+                uint r0 = tiles[srcIdx].__fragmentRead(0);
+                uint r1 = tiles[srcIdx].__fragmentRead(1);
+                uint r2 = tiles[srcIdx].__fragmentRead(2);
+                uint r3 = tiles[srcIdx].__fragmentRead(3);
 
                 // Sub-tile transpose: swap reg[1] and reg[2]
-                result.tiles[dstIdx].fragmentWrite(0, r0);
-                result.tiles[dstIdx].fragmentWrite(1, r2);
-                result.tiles[dstIdx].fragmentWrite(2, r1);
-                result.tiles[dstIdx].fragmentWrite(3, r3);
+                result.tiles[dstIdx].__fragmentWrite(0, r0);
+                result.tiles[dstIdx].__fragmentWrite(1, r2);
+                result.tiles[dstIdx].__fragmentWrite(2, r1);
+                result.tiles[dstIdx].__fragmentWrite(3, r3);
 
-                result.tiles[dstIdx].ChangeMajor();
+                result.tiles[dstIdx].__ChangeMajor();
             }
         }
         return result;
@@ -215,7 +215,7 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
                         value = regsi[j];
                 }
 
-                tiles[frag_idx].fragmentWrite(reg_idx, value);
+                tiles[frag_idx].__fragmentWrite(reg_idx, value);
             }
         }
     }
@@ -267,7 +267,7 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
             {
                 int base_reg_idx = int((r_col / ColsPerRowPerSubTile) * RegsPerSubTile + (r_col % ColsPerRowPerSubTile));
                 int base_frag_idx = int(mma_col * MMARows);
-                regsi[i] = tiles[base_frag_idx].fragmentRead(base_reg_idx);
+                regsi[i] = tiles[base_frag_idx].__fragmentRead(base_reg_idx);
 
                 [ForceUnroll]
                 for (uint j = 1; j < RegColsPacked; j++)
@@ -279,7 +279,7 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
                     int frag_idx = int(mma_col * MMARows + mma_row);
 
                     if (laneid % RegColsPacked == (i + j) % RegColsPacked)
-                        regsi[i] = tiles[frag_idx].fragmentRead(reg_idx);
+                        regsi[i] = tiles[frag_idx].__fragmentRead(reg_idx);
                 }
             }
 
@@ -347,23 +347,23 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
             if (RegsPerLane <= 4)
             {
                 let vec = *bit_cast<uint4*>(src);
-                tiles[tileIndex].fragmentWrite(0, vec.x);
-                tiles[tileIndex].fragmentWrite(1, vec.y);
-                tiles[tileIndex].fragmentWrite(2, vec.z);
-                tiles[tileIndex].fragmentWrite(3, vec.w);
+                tiles[tileIndex].__fragmentWrite(0, vec.x);
+                tiles[tileIndex].__fragmentWrite(1, vec.y);
+                tiles[tileIndex].__fragmentWrite(2, vec.z);
+                tiles[tileIndex].__fragmentWrite(3, vec.w);
             }
             else
             {
                 let vec0 = *bit_cast<uint4*>(src);
                 let vec1 = *bit_cast<uint4*>(src + 4);
-                tiles[tileIndex].fragmentWrite(0, vec0.x);
-                tiles[tileIndex].fragmentWrite(1, vec0.y);
-                tiles[tileIndex].fragmentWrite(2, vec0.z);
-                tiles[tileIndex].fragmentWrite(3, vec0.w);
-                tiles[tileIndex].fragmentWrite(4, vec1.x);
-                tiles[tileIndex].fragmentWrite(5, vec1.y);
-                tiles[tileIndex].fragmentWrite(6, vec1.z);
-                tiles[tileIndex].fragmentWrite(7, vec1.w);
+                tiles[tileIndex].__fragmentWrite(0, vec0.x);
+                tiles[tileIndex].__fragmentWrite(1, vec0.y);
+                tiles[tileIndex].__fragmentWrite(2, vec0.z);
+                tiles[tileIndex].__fragmentWrite(3, vec0.w);
+                tiles[tileIndex].__fragmentWrite(4, vec1.x);
+                tiles[tileIndex].__fragmentWrite(5, vec1.y);
+                tiles[tileIndex].__fragmentWrite(6, vec1.z);
+                tiles[tileIndex].__fragmentWrite(7, vec1.w);
             }
         }
         else if (sizeof(U) > sizeof(T))
@@ -378,10 +378,10 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
             let tvec0 = (vector<T, 4>)fvec0;
             let tvec1 = (vector<T, 4>)fvec1;
 
-            tiles[tileIndex].fragmentWrite(0, bit_cast<uint>(tvec0.xy));
-            tiles[tileIndex].fragmentWrite(1, bit_cast<uint>(tvec0.zw));
-            tiles[tileIndex].fragmentWrite(2, bit_cast<uint>(tvec1.xy));
-            tiles[tileIndex].fragmentWrite(3, bit_cast<uint>(tvec1.zw));
+            tiles[tileIndex].__fragmentWrite(0, bit_cast<uint>(tvec0.xy));
+            tiles[tileIndex].__fragmentWrite(1, bit_cast<uint>(tvec0.zw));
+            tiles[tileIndex].__fragmentWrite(2, bit_cast<uint>(tvec1.xy));
+            tiles[tileIndex].__fragmentWrite(3, bit_cast<uint>(tvec1.zw));
         }
     }
 
@@ -441,16 +441,16 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
             uint offset = baseOffset + uint(i) * uint(TileStride);
             if (RegsPerLane <= 4)
             {
-                uint4 v = uint4(tiles[i].fragmentRead(0), tiles[i].fragmentRead(1),
-                                tiles[i].fragmentRead(2), tiles[i].fragmentRead(3));
+                uint4 v = uint4(tiles[i].__fragmentRead(0), tiles[i].__fragmentRead(1),
+                                tiles[i].__fragmentRead(2), tiles[i].__fragmentRead(3));
                 ShMemPool.smemStore<uint4, ShmemAddressMode.Shared>(offset, int(laneId), v);
             }
             else
             {
-                uint4 v0 = uint4(tiles[i].fragmentRead(0), tiles[i].fragmentRead(1),
-                                 tiles[i].fragmentRead(2), tiles[i].fragmentRead(3));
-                uint4 v1 = uint4(tiles[i].fragmentRead(4), tiles[i].fragmentRead(5),
-                                 tiles[i].fragmentRead(6), tiles[i].fragmentRead(7));
+                uint4 v0 = uint4(tiles[i].__fragmentRead(0), tiles[i].__fragmentRead(1),
+                                 tiles[i].__fragmentRead(2), tiles[i].__fragmentRead(3));
+                uint4 v1 = uint4(tiles[i].__fragmentRead(4), tiles[i].__fragmentRead(5),
+                                 tiles[i].__fragmentRead(6), tiles[i].__fragmentRead(7));
                 ShMemPool.smemStore<uint4, ShmemAddressMode.Shared>(offset, int(laneId * 2), v0);
                 ShMemPool.smemStore<uint4, ShmemAddressMode.Shared>(offset, int(laneId * 2 + 1), v1);
             }
@@ -471,23 +471,23 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
             if (RegsPerLane <= 4)
             {
                 uint4 v = ShMemPool.smemLoad<uint4, ShmemAddressMode.Shared>(offset, int(laneId));
-                tiles[i].fragmentWrite(0, v.x);
-                tiles[i].fragmentWrite(1, v.y);
-                tiles[i].fragmentWrite(2, v.z);
-                tiles[i].fragmentWrite(3, v.w);
+                tiles[i].__fragmentWrite(0, v.x);
+                tiles[i].__fragmentWrite(1, v.y);
+                tiles[i].__fragmentWrite(2, v.z);
+                tiles[i].__fragmentWrite(3, v.w);
             }
             else
             {
                 uint4 v0 = ShMemPool.smemLoad<uint4, ShmemAddressMode.Shared>(offset, int(laneId * 2));
                 uint4 v1 = ShMemPool.smemLoad<uint4, ShmemAddressMode.Shared>(offset, int(laneId * 2 + 1));
-                tiles[i].fragmentWrite(0, v0.x);
-                tiles[i].fragmentWrite(1, v0.y);
-                tiles[i].fragmentWrite(2, v0.z);
-                tiles[i].fragmentWrite(3, v0.w);
-                tiles[i].fragmentWrite(4, v1.x);
-                tiles[i].fragmentWrite(5, v1.y);
-                tiles[i].fragmentWrite(6, v1.z);
-                tiles[i].fragmentWrite(7, v1.w);
+                tiles[i].__fragmentWrite(0, v0.x);
+                tiles[i].__fragmentWrite(1, v0.y);
+                tiles[i].__fragmentWrite(2, v0.z);
+                tiles[i].__fragmentWrite(3, v0.w);
+                tiles[i].__fragmentWrite(4, v1.x);
+                tiles[i].__fragmentWrite(5, v1.y);
+                tiles[i].__fragmentWrite(6, v1.z);
+                tiles[i].__fragmentWrite(7, v1.w);
             }
         }
     }
@@ -764,7 +764,7 @@ toMatrixB<int Rows, int Cols>(
             int srcIdx = c * TileRows + r;
             int dstIdx = r * TileCols + c;
             result.tiles[dstIdx].copyFrom(input.tiles[srcIdx]);
-            result.tiles[dstIdx].ChangeMajor();
+            result.tiles[dstIdx].__ChangeMajor();
         }
     }
     return result;

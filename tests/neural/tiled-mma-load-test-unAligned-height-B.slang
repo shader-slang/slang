@@ -130,7 +130,7 @@ void Test<int K>(uint tid, uint tileIndex, int resIndex)
     for (int i = 0; i < K; i++)
         inputVector[i] = half(tid * 32 + i);
 
-    neural_unittest.testLoadShB<K, OutputSize, TestShMemSize, 1>(OffsetB, tileIndex, 0, inputVector);
+    neural_unittest.testLoadShB<K, OutputSize, SubgroupSize, TestShMemSize, 1>(OffsetB, tileIndex, 0, inputVector);
 
     bool res = verifiedOutput<K>(tid, OffsetB, tileIndex);
     res = WaveActiveAllTrue(res);

@@ -1,12 +1,12 @@
-// DISABLED-TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
-// DISABLED-TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
-// DISABLED-TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
-// DISABLED-TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
 
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
 
 #pragma warning(disable: 41017)
 
@@ -37,57 +37,9 @@ public struct TestShMemSize : ISharedMemorySize {
 static const uint OffsetA = 0;
 static const uint OffsetB = 256;
 
-// Clear the weight buffer region used by a PaddedM x PaddedK tiled matrix.
-void clearWeightBuffer<int PaddedM, int PaddedK>(uint tid)
-{
-    static const int TotalElements = PaddedM * PaddedK;
-    static const int NumIters = (TotalElements + BatchSize - 1) / BatchSize;
-
-    for (int iter = 0; iter < NumIters; iter++)
-    {
-        int index = iter * BatchSize + tid;
-        if (index < TotalElements)
-            weightBuffer[index] = DType(0);
-    }
-}
-
-// Compute the tiled layout offset for element (row, col) in a PaddedM x PaddedK matrix.
-int tiledOffset<int PaddedK>(int row, int col)
-{
-    static const int TileSize = 16;
-    static const int NTileCols = PaddedK / TileSize;
-    int tileRow = row / TileSize;
-    int tileCol = col / TileSize;
-    int localRow = row % TileSize;
-    int localCol = col % TileSize;
-    int tileIndex = tileRow * NTileCols + tileCol;
-    return tileIndex * TileSize * TileSize + localRow * TileSize + localCol;
-}
-
-// Fill weight matrix with 0.5 in tiled MatB(K, M) layout.
-// MatB has K=InputSize rows × M=OutputSize columns, padded to PaddedK × PaddedM.
 void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedK, int PaddedM>(uint tid)
 {
-    clearWeightBuffer<PaddedM, PaddedK>(tid);
-    AllMemoryBarrierWithGroupSync();
-
-    static const int NumRowIters = (InputSize + BatchSize - 1) / BatchSize;
-
-    for (int iter = 0; iter < NumRowIters; iter++)
-    {
-        int row = iter * BatchSize + tid;
-        if (row >= InputSize)
-            break;
-
-        for (int col = 0; col < OutputSize; col++)
-        {
-            int offset = tiledOffset<PaddedM>(row, col);
-            weightBuffer[offset] = DType(0.5);
-        }
-    }
-
-    AllMemoryBarrierWithGroupSync();
-    convertTiledToNativeB<DType, PaddedK, PaddedM, BatchSize>(tid, weightBuffer);
+    fillForwardWeightTiled<DType, InputSize, OutputSize, BatchSize>(tid, weightBuffer, DType(0.5));
 }
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)

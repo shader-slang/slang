@@ -27598,12 +27598,12 @@ struct CoopMat
     /// This provides direct access to the underlying hardware register layout
     /// for building matrix tiles from per-thread data via warp shuffles.
     ///
-    /// @param regIndex The fragment register index (0 to getPackedFragmentCount()-1).
+    /// @param regIndex The fragment register index (0 to __getPackedFragmentCount()-1).
     /// @param value The 32-bit value to write (packs 1 float, 2 halves, or 4 int8s).
     [ForceInline]
     [mutating]
     [require(cooperative_matrix)]
-    void fragmentWrite(int regIndex, uint value)
+    void __fragmentWrite(int regIndex, uint value)
     {
         __target_switch
         {
@@ -27630,14 +27630,14 @@ struct CoopMat
     }
 
     /// Reads a raw 32-bit value from a specific fragment register.
-    /// Inverse of fragmentWrite. Used to extract per-thread data from matrix tiles.
+    /// Inverse of __fragmentWrite. Used to extract per-thread data from matrix tiles.
     ///
-    /// @param regIndex The fragment register index (0 to getPackedFragmentCount()-1).
+    /// @param regIndex The fragment register index (0 to __getPackedFragmentCount()-1).
     /// @return The raw 32-bit register value.
     [ForceInline]
     [__NoSideEffect]
     [require(cooperative_matrix)]
-    uint fragmentRead(int regIndex)
+    uint __fragmentRead(int regIndex)
     {
         __target_switch
         {
@@ -27836,9 +27836,9 @@ struct CoopMat
     ///
     /// @return The number of packed 32-bit registers per thread.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda, cooperative_matrix)]
     [__NoSideEffect]
-    static int getPackedFragmentCount()
+    static int __getPackedFragmentCount()
     {
         __target_switch
         {
@@ -27878,7 +27878,7 @@ struct CoopMat
     /// PTX instruction on each of the 4 registers for 16x16 f16 MatrixA/MatrixB.
     [require(cuda, cooperative_matrix)]
     [mutating]
-    void ChangeMajor()
+    void __ChangeMajor()
     {
         __target_switch
         {

@@ -4,8 +4,8 @@
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1
 
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
 
 #pragma warning(disable: 41017)
 import slang.neural;
@@ -75,40 +75,30 @@ void computeMain(uint tid : SV_DispatchThreadID)
         fillWeightMatrixTiled<3, 5, 16, 16, false>(tid);
         AllMemoryBarrierWithGroupSync();
         test<3, 5>(tid, 0);
-        fillWeightMatrixTiled<3, 5, 16, 16, true>(tid);
-        AllMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrixTiled<11, 18, 16, 32, false>(tid);
         AllMemoryBarrierWithGroupSync();
         test<11, 18>(tid, 1);
-        fillWeightMatrixTiled<11, 18, 16, 32, true>(tid);
-        AllMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrixTiled<23, 9, 32, 16, false>(tid);
         AllMemoryBarrierWithGroupSync();
         test<23, 9>(tid, 2);
-        fillWeightMatrixTiled<23, 9, 32, 16, true>(tid);
-        AllMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrixTiled<35, 3, 48, 16, false>(tid);
         AllMemoryBarrierWithGroupSync();
         test<35, 3>(tid, 3);
-        fillWeightMatrixTiled<35, 3, 48, 16, true>(tid);
-        AllMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrixTiled<17, 64, 32, 64, false>(tid);
         AllMemoryBarrierWithGroupSync();
         test<17, 64>(tid, 4);
-        fillWeightMatrixTiled<17, 64, 32, 64, true>(tid);
-        AllMemoryBarrierWithGroupSync();
     }
 
     // BUFFER: 1

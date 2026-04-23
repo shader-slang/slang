@@ -399,7 +399,6 @@ internal extension<T> Ptr<T, Access.ReadWrite, AddressSpace.Device> : IPointerLi
     }
 
     [ForceInline]
-    [ForceInline]
     internal void atomicAdd(uint index, T value)
     {
         __target_switch

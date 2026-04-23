@@ -175,7 +175,7 @@ bool verifiedOutput<int M>(uint tid, uint size, uint sharedMemOffset, uint tileI
 void Test<int M>(uint tid, int tileIndex, int resIndex)
 {
     invalidateSharedMemory(tid, OffsetA);
-    neural_unittest.testLoadShA<InputSize, M, TestShMemSize, true, 1>(OffsetA, tileIndex, inputBuffer);
+    neural_unittest.testLoadShA<InputSize, M, SubgroupSize, TestShMemSize, true, 1>(OffsetA, tileIndex, inputBuffer);
 
     bool res = verifiedOutput<M>(tid, M, OffsetA, tileIndex);
     res = WaveActiveAllTrue(res);

@@ -113,7 +113,7 @@ void test(uint tid, uint tileIndex, uint resIndex)
     if (tid >= SubgroupSize)
         return;
 
-    neural_unittest.testLoadShA<InputSize, OutputSize, TestShMemSize, true, 1>(OffsetA, tileIndex, inputBuffer);
+    neural_unittest.testLoadShA<InputSize, OutputSize, SubgroupSize, TestShMemSize, true, 1>(OffsetA, tileIndex, inputBuffer);
 
     bool res = verifiedOutput(tid, OutputSize, OffsetA, tileIndex);
     res = WaveActiveAllTrue(res);

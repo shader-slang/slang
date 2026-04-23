@@ -54,7 +54,7 @@ void test1(uint tid)
     if (tid >= SubgroupSize)
         return;
 
-    neural_unittest.testLoadShA<InputSize, OutputSize, TestShMemSize, false, 1>(OffsetA, 0, inputBuffer);
+    neural_unittest.testLoadShA<InputSize, OutputSize, SubgroupSize, TestShMemSize, false, 1>(OffsetA, 0, inputBuffer);
 
     bool res = verifiedOutput(tid, OutputSize, OffsetA, 0);
     res = WaveActiveAllTrue(res);
@@ -65,7 +65,7 @@ void test1(uint tid)
     half inputVector[InputSize];
     for (int i = 0; i < InputSize; i++)
         inputVector[i] = half(tid * InputSize + i);
-    neural_unittest.testLoadShB<InputSize, OutputSize, TestShMemSize, 1>(OffsetB, 0, 0, inputVector);
+    neural_unittest.testLoadShB<InputSize, OutputSize, SubgroupSize, TestShMemSize, 1>(OffsetB, 0, 0, inputVector);
 
     bool res1 = verifiedOutput(tid, InputSize, OffsetB, 0);
     res1 = WaveActiveAllTrue(res1);
@@ -79,7 +79,7 @@ void test2(uint tid)
     if (tid >= SubgroupSize)
         return;
 
-    neural_unittest.testLoadShA<InputSize, OutputSize, TestShMemSize, false, 1>(OffsetA, 1, inputBuffer);
+    neural_unittest.testLoadShA<InputSize, OutputSize, SubgroupSize, TestShMemSize, false, 1>(OffsetA, 1, inputBuffer);
 
     bool res = verifiedOutput(tid, OutputSize, OffsetA, 1);
     res = WaveActiveAllTrue(res);
@@ -90,7 +90,7 @@ void test2(uint tid)
     half inputVector[InputSize];
     for (int i = 0; i < InputSize; i++)
         inputVector[i] = half(tid * InputSize + i);
-    neural_unittest.testLoadShB<InputSize, OutputSize, TestShMemSize, 1>(OffsetB, 1, 0, inputVector);
+    neural_unittest.testLoadShB<InputSize, OutputSize, SubgroupSize, TestShMemSize, 1>(OffsetB, 1, 0, inputVector);
 
     bool res1 = verifiedOutput(tid, InputSize, OffsetB, 1);
     res1 = WaveActiveAllTrue(res1);

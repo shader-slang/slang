@@ -11,6 +11,7 @@ namespace neural_unittest
 void testLoadShAImpl<
         int InputSize,
         int OutputSize,
+        int SubgroupSize,
         ShMemSize : ISharedMemorySize,
         TargetEnum Target,
         bool TransposeA,
@@ -21,13 +22,14 @@ void testLoadShAImpl<
 {
     typealias Address = BindlessAddress<half>;
     Address address = Address(weightBuffer);
-    MMAHelper<half, InputSize, OutputSize, 32, Target, ShMemSize, TransposeA, SubgroupCount>.loadShA<half, Address>(sharedMemOffset, tileIndex, address);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, TransposeA, SubgroupCount>.loadShA<half, Address>(sharedMemOffset, tileIndex, address);
     GroupMemoryBarrierWithWaveSync();
 }
 
 public void testLoadShA<
         int InputSize,
         int OutputSize,
+        int SubgroupSize,
         ShMemSize : ISharedMemorySize,
         bool TransposeA,
         int SubgroupCount>
@@ -38,9 +40,9 @@ public void testLoadShA<
     __target_switch
     {
     case cuda:
-        testLoadShAImpl<InputSize, OutputSize, ShMemSize, TargetEnum.CUDA, TransposeA, SubgroupCount>(sharedMemOffset, tileIndex, weightBuffer);
+        testLoadShAImpl<InputSize, OutputSize, SubgroupSize, ShMemSize, TargetEnum.CUDA, TransposeA, SubgroupCount>(sharedMemOffset, tileIndex, weightBuffer);
     case spirv:
-        testLoadShAImpl<InputSize, OutputSize, ShMemSize, TargetEnum.SPIR_V, TransposeA, SubgroupCount>(sharedMemOffset, tileIndex, weightBuffer);
+        testLoadShAImpl<InputSize, OutputSize, SubgroupSize, ShMemSize, TargetEnum.SPIR_V, TransposeA, SubgroupCount>(sharedMemOffset, tileIndex, weightBuffer);
     }
 }
 
@@ -51,6 +53,7 @@ public void testLoadShA<
 void testLoadShBImpl<
         int InputSize,
         int OutputSize,
+        int SubgroupSize,
         ShMemSize : ISharedMemorySize,
         TargetEnum Target,
         int SubgroupCount>
@@ -64,13 +67,14 @@ void testLoadShBImpl<
     for (int i = 0; i < InputSize; i++)
         aligned[i] = inputVector[i];
 
-    MMAHelper<half, InputSize, OutputSize, 32, Target, ShMemSize, false, SubgroupCount>.loadVectorToShB<half, half[AlignedSize]>(sharedMemOffset, tileIndex, subgroupIndex, aligned);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, false, SubgroupCount>.loadVectorToShB<half, half[AlignedSize]>(sharedMemOffset, tileIndex, subgroupIndex, aligned);
     GroupMemoryBarrierWithWaveSync();
 }
 
 public void testLoadShB<
         int InputSize,
         int OutputSize,
+        int SubgroupSize,
         ShMemSize : ISharedMemorySize,
         int SubgroupCount>
     (uint sharedMemOffset,
@@ -81,9 +85,9 @@ public void testLoadShB<
     __target_switch
     {
     case cuda:
-        testLoadShBImpl<InputSize, OutputSize, ShMemSize, TargetEnum.CUDA, SubgroupCount>(sharedMemOffset, tileIndex, subgroupIndex, inputVector);
+        testLoadShBImpl<InputSize, OutputSize, SubgroupSize, ShMemSize, TargetEnum.CUDA, SubgroupCount>(sharedMemOffset, tileIndex, subgroupIndex, inputVector);
     case spirv:
-        testLoadShBImpl<InputSize, OutputSize, ShMemSize, TargetEnum.SPIR_V, SubgroupCount>(sharedMemOffset, tileIndex, subgroupIndex, inputVector);
+        testLoadShBImpl<InputSize, OutputSize, SubgroupSize, ShMemSize, TargetEnum.SPIR_V, SubgroupCount>(sharedMemOffset, tileIndex, subgroupIndex, inputVector);
     }
 }
 

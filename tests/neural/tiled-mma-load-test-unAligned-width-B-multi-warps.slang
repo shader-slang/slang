@@ -193,7 +193,7 @@ void Test(uint tid, uint tileIndex, int resIndex)
         inputVector[i] = half(value + i);
 
     uint subgroupIndex = tid / 32;
-    neural_unittest.testLoadShB<InputSize, OutputSize, TestShMemSize, SUBGROUP_COUNT>(OffsetB, tileIndex, subgroupIndex, inputVector);
+    neural_unittest.testLoadShB<InputSize, OutputSize, SubgroupSize, TestShMemSize, SUBGROUP_COUNT>(OffsetB, tileIndex, subgroupIndex, inputVector);
 
     int laneId = WaveGetLaneIndex();
     uint offset = subgroupIndex * (TILE_SIZE * N_TILES_PER_SUBGROUP);

@@ -3,6 +3,9 @@
 // Routes forward and backward to backend-specific implementations:
 //   CUDA:   TiledMMACuda / MMAHelperNew (WaveMatrix register ops)
 //   Vulkan: TiledMMAVulkan (WaveMatrix + shmem, CoopMat.Load)
+//
+// InputSize and OutputSize must be tile-aligned (multiples of 16).
+// Callers with arbitrary sizes should pad via PadToTile before instantiation.
 implementing neural;
 
 

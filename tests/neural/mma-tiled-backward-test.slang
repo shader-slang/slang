@@ -1,4 +1,9 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0
+// VK half disabled: backward pass uses half atomics for bias/weight gradient accumulation,
+// which requires VK_EXT_shader_atomic_float16 not available on our test GPUs.
+// DISABLED-TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature -xslang -DTEST_HALF=0
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature -xslang -DTEST_HALF=1
 
 #pragma warning(disable: 41017)
 import slang.neural;
@@ -11,7 +16,8 @@ typealias DType = float;
 #endif
 
 // Weight matrix in tiled layout (read by transpose MMA)
-// TEST_INPUT: set weightBuffer = ubuffer(stride=4, count=4096)
+// 2x size needed: convertTiledToNativeB uses the second half as scratch space.
+// TEST_INPUT: set weightBuffer = ubuffer(stride=4, count=8192)
 uniform RWStructuredBuffer<DType>.Handle weightBuffer;
 
 // Weight gradient (written by outer product)
@@ -69,6 +75,7 @@ void clearGradBuffers<int PaddedSize>(uint tid)
 }
 
 // Write identity matrix in tiled layout.
+// On CUDA, also converts from row-major tiled to native fragment layout.
 void identityWeightTiled<int Size, int PaddedSize>(uint tid)
 {
     static const int TileSize = 16;
@@ -92,6 +99,9 @@ void identityWeightTiled<int Size, int PaddedSize>(uint tid)
         int offset = tileIndex * TileSize * TileSize + localRow * TileSize + localCol;
         weightBuffer[offset] = DType(1);
     }
+    AllMemoryBarrierWithGroupSync();
+
+    convertTiledToNativeB<DType, PaddedSize, PaddedSize, BatchSize>(tid, weightBuffer);
     AllMemoryBarrierWithGroupSync();
 }
 

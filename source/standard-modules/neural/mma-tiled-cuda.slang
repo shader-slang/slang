@@ -7,6 +7,9 @@ implementing neural;
 // and register-level transforms (changeMajor, transposeSubMatrix) for
 // zero-shmem vector↔CoopMat and weight transpose operations.
 //
+// InputSize and OutputSize must be tile-aligned (multiples of 16).
+// Callers with arbitrary sizes should pad via PadToTile before instantiation.
+//
 // Called by TiledMMAHelper.backward() on CUDA targets.
 
 [require(cuda)]
@@ -442,17 +445,17 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
                 [ForceUnroll]
                 for (int r = 0; r < 4; r++)
                 {
-                    uint v0 = localTiles.tiles[tc * NRowGroups].fragmentRead(r);
-                    uint v1 = localTiles.tiles[tc * NRowGroups + g].fragmentRead(r);
-                    localTiles.tiles[tc * NRowGroups].fragmentWrite(r, bit_cast<uint>(bit_cast<half2>(v0) + bit_cast<half2>(v1)));
+                    uint v0 = localTiles.tiles[tc * NRowGroups].__fragmentRead(r);
+                    uint v1 = localTiles.tiles[tc * NRowGroups + g].__fragmentRead(r);
+                    localTiles.tiles[tc * NRowGroups].__fragmentWrite(r, bit_cast<uint>(bit_cast<half2>(v0) + bit_cast<half2>(v1)));
                 }
             }
 
             {
-                uint r0 = localTiles.tiles[tc * NRowGroups].fragmentRead(0);
-                uint r1 = localTiles.tiles[tc * NRowGroups].fragmentRead(1);
-                uint r2 = localTiles.tiles[tc * NRowGroups].fragmentRead(2);
-                uint r3 = localTiles.tiles[tc * NRowGroups].fragmentRead(3);
+                uint r0 = localTiles.tiles[tc * NRowGroups].__fragmentRead(0);
+                uint r1 = localTiles.tiles[tc * NRowGroups].__fragmentRead(1);
+                uint r2 = localTiles.tiles[tc * NRowGroups].__fragmentRead(2);
+                uint r3 = localTiles.tiles[tc * NRowGroups].__fragmentRead(3);
 
                 half2 sum_lo = bit_cast<half2>(r0) + bit_cast<half2>(r1);
                 half2 sum_hi = bit_cast<half2>(r2) + bit_cast<half2>(r3);
@@ -499,6 +502,8 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
 
                 if (sizeof(U) == 2)
                 {
+                    // M is always tile-aligned (multiple of 16), so elemIdx1 < M
+                    // is sufficient — no odd-M tail handling needed.
                     if (elemIdx1 < M)
                     {
                         let addr = biasAddress.getOffset(elemIdx0);
