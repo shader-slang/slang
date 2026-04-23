@@ -73,6 +73,11 @@ if (-not $SkipTest) {
         '-skip-reference-image-generation'
         '-show-adapter-info'
         '-enable-debug-layers', 'true'
+        # Match ci-slang-coverage.yml: RecordReplayApiTypeOperations.internal
+        # crashes with EXCEPTION_ILLEGAL_INSTRUCTION under OpenCppCoverage and
+        # leaves a dead child that slang-test waits on. Without this exclusion
+        # a local run can hang indefinitely with no visible error.
+        '-exclude-prefix', 'slang-unit-test-tool/RecordReplayApiTypeOperations'
     )
     if ($ServerCount -gt 1) {
         $testArgs += @('-use-test-server', '-server-count', "$ServerCount")

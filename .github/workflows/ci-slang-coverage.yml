@@ -92,7 +92,12 @@ jobs:
           # OCC's own HTML is line-level only and markedly less polished than
           # llvm-cov's HTML on Linux/macOS; ReportGenerator's output is close
           # to parity.
-          dotnet tool install -g dotnet-reportgenerator-globaltool
+          #
+          # Pin the version to match local testing (parallel to the OCC pin
+          # above). Without --version, `dotnet tool install` grabs the latest
+          # NuGet release at workflow execution time, so a breaking change in
+          # ReportGenerator could fail the nightly with no diff in this repo.
+          dotnet tool install -g dotnet-reportgenerator-globaltool --version 5.5.6
           if ($LASTEXITCODE -ne 0) { throw "dotnet tool install reportgenerator exited $LASTEXITCODE" }
           $toolsDir = Join-Path $env:USERPROFILE '.dotnet\tools'
           Add-Content -Path $env:GITHUB_PATH -Value $toolsDir
