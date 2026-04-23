@@ -6826,7 +6826,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // a requirement key, not a witness table).  Instead: decompose
                 // the source existential, walk the witness to compute a new
                 // witness table via `lookupWitnessMethod`, then recompose.
-                if (as<IRInterfaceType>(concreteValue->getDataType()))
+                // Check the AST type (robust to generic instantiations whose
+                // IR form is `Specialize(Generic(...),...)` rather than a
+                // plain `IRInterfaceType`).
+                auto isInterfaceAstType = [](Type* t) -> bool
+                {
+                    if (auto drt = as<DeclRefType>(t))
+                        return drt->getDeclRef().as<InterfaceDecl>();
+                    return false;
+                };
+                if (expr->valueArg && isInterfaceAstType(expr->valueArg->type))
                 {
                     auto extractedType = builder->emitExtractExistentialType(concreteValue);
                     auto extractedValue =

@@ -1322,8 +1322,20 @@ struct PeepholeContext : InstPassBase
                     auto sourceExistential = inst->getOperand(0)->getOperand(0);
                     auto resultType = inst->getDataType();
                     auto sourceType = sourceExistential->getDataType();
-                    bool isInterfaceUpcast = as<IRInterfaceType>(resultType) &&
-                                             as<IRInterfaceType>(sourceType) &&
+                    // Detect interface-to-interface upcast, including when the
+                    // interface types are generic specializations whose IR form
+                    // is `Specialize(Generic(IInterface), ...)` rather than a
+                    // plain `IRInterfaceType`.
+                    auto rootInterface = [](IRType* t) -> IRInterfaceType*
+                    {
+                        while (auto spec = as<IRSpecialize>(t))
+                            t = (IRType*)spec->getBase();
+                        if (auto generic = as<IRGeneric>(t))
+                            t = (IRType*)findGenericReturnVal(generic);
+                        return as<IRInterfaceType>(t);
+                    };
+                    bool isInterfaceUpcast = rootInterface(resultType) &&
+                                             rootInterface(sourceType) &&
                                              !isTypeEqual(resultType, sourceType);
                     if (!isInterfaceUpcast)
                     {

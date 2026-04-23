@@ -2954,13 +2954,15 @@ SubtypeWitness* SemanticsVisitor::normalizeSubtypeWitnessForInterfaceUpcast(
 
     if (auto declared = as<DeclaredSubtypeWitness>(witness))
     {
-        auto parentDecl = declared->getDeclRef().getDecl()->parentDecl;
-        auto parentInterface = as<InterfaceDecl>(parentDecl);
-        if (!parentInterface)
+        // Use `getParentDeclRef` so substitutions from the witness's DeclRef
+        // propagate to the parent (e.g. for `IDerived<float>: IBase<float>`
+        // we need the parent to be `IDerived<float>`, not the unspecialized
+        // `IDerived<T>`).
+        auto parentInterfaceDeclRef = getParentDeclRef(declared->getDeclRef()).as<InterfaceDecl>();
+        if (!parentInterfaceDeclRef)
             return witness;
 
-        auto parentInterfaceType =
-            DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(parentInterface));
+        auto parentInterfaceType = DeclRefType::create(m_astBuilder, parentInterfaceDeclRef);
         if (parentInterfaceType->equals(subType))
             return witness;
 

@@ -33,12 +33,30 @@ struct GrandchildImpl : IGrandchild
     float extra() { return v * 2.0; }
 }
 
+// Generic interface hierarchy.
+interface IGenBase<T : IArithmetic>
+{
+    T getValue();
+}
+
+interface IGenDerived<T : IArithmetic> : IGenBase<T>
+{
+    T transform(T input);
+}
+
+struct GenImpl : IGenDerived<float>
+{
+    float v;
+    float getValue() { return v; }
+    float transform(float input) { return input + v; }
+}
+
 float useBase(IBase base)
 {
     return base.getValue();
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -66,9 +84,17 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     IDerived mid = gc;
     IBase seqBase = mid;
     outputBuffer[3] = seqBase.getValue();
+
+    // Generic interface upcast: IGenDerived<float> -> IGenBase<float>
+    GenImpl gImpl;
+    gImpl.v = 30.0;
+    IGenDerived<float> gDerived = gImpl;
+    IGenBase<float> gBase = gDerived;
+    outputBuffer[4] = gBase.getValue();
 }
 
 // CHECK: 10.0
 // CHECK: 10.0
 // CHECK: 20.0
 // CHECK: 20.0
+// CHECK: 30.0
