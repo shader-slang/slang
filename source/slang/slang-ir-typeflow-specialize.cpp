@@ -7911,6 +7911,11 @@ struct TypeFlowSpecializationContext
         //
         hasChanges |= performDynamicInstLowering();
 
+        // If lowering reported its own diagnostics, the IR is in a partially
+        // lowered state; don't pile cascade errors from the walker below.
+        if (sink->getErrorCount() > 0)
+            return hasChanges;
+
         // Part 3: Diagnose unresolved dispatch sites.
         //    Any `lookupWitnessMethod` that survived specialization with a
         //    non-concrete witness-table operand would ICE in codegen.  If the
