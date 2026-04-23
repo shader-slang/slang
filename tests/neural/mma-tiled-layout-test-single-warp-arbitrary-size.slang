@@ -37,7 +37,7 @@ public struct TestShMemSize : ISharedMemorySize {
 static const uint OffsetA = 0;
 static const uint OffsetB = 256;
 
-void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedK, int PaddedM>(uint tid)
+void fillWeightMatrixTiled<int InputSize, int OutputSize>(uint tid)
 {
     fillForwardWeightTiled<DType, InputSize, OutputSize, BatchSize>(tid, weightBuffer, DType(0.5));
 }
@@ -92,35 +92,35 @@ void computeMain(uint tid : SV_DispatchThreadID)
 
     // 3x5 (InputSize=3, OutputSize=5, padded to 16x16)
     {
-        fillWeightMatrixTiled<3, 5, 16, 16>(tid);
+        fillWeightMatrixTiled<3, 5>(tid);
         AllMemoryBarrierWithGroupSync();
         test<3, 5>(tid, 0);
     }
 
     // 11x18 (padded to 16x32)
     {
-        fillWeightMatrixTiled<11, 18, 16, 32>(tid);
+        fillWeightMatrixTiled<11, 18>(tid);
         AllMemoryBarrierWithGroupSync();
         test<11, 18>(tid, 1);
     }
 
     // 23x9 (padded to 32x16)
     {
-        fillWeightMatrixTiled<23, 9, 32, 16>(tid);
+        fillWeightMatrixTiled<23, 9>(tid);
         AllMemoryBarrierWithGroupSync();
         test<23, 9>(tid, 2);
     }
 
     // 35x3 (padded to 48x16)
     {
-        fillWeightMatrixTiled<35, 3, 48, 16>(tid);
+        fillWeightMatrixTiled<35, 3>(tid);
         AllMemoryBarrierWithGroupSync();
         test<35, 3>(tid, 3);
     }
 
     // 17x64 (padded to 32x64)
     {
-        fillWeightMatrixTiled<17, 64, 32, 64>(tid);
+        fillWeightMatrixTiled<17, 64>(tid);
         AllMemoryBarrierWithGroupSync();
         test<17, 64>(tid, 4);
     }
