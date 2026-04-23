@@ -2112,7 +2112,6 @@ struct TypeFlowSpecializationContext
                 sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
                     .interfaceType = typeStr.produceString(),
                     .location = inst->sourceLoc});
-                diagnosedNoTypeConformancesInterfaces.add(interfaceType);
                 module->getContainerPool().free(&tables);
                 return none();
             }
@@ -2364,7 +2363,6 @@ struct TypeFlowSpecializationContext
                     sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
                         .interfaceType = typeStr.produceString(),
                         .location = loadInst->sourceLoc});
-                    diagnosedNoTypeConformancesInterfaces.add(interfaceType);
                     module->getContainerPool().free(&tables);
                     return none();
                 }
@@ -2446,7 +2444,6 @@ struct TypeFlowSpecializationContext
                         sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
                             .interfaceType = typeStr.produceString(),
                             .location = inst->sourceLoc});
-                        diagnosedNoTypeConformancesInterfaces.add(interfaceType);
                         module->getContainerPool().free(&tables);
                         return none();
                     }
@@ -7963,10 +7960,11 @@ struct TypeFlowSpecializationContext
     HashSet<IRInst*> diagnosedBitCasts;
 
     // Set of interface types already diagnosed with E50100 "no type conformances"
-    // from any analysis path, so the compiler emits at most one E50100 per
-    // interface per module — avoids duplicate diagnostics when a single missing
-    // conformance surfaces at multiple dispatch sites (e.g. the
-    // `createDynamicObject` site *and* a subsequent `lookupWitnessMethod`).
+    // inside `diagnoseUnresolvedLookupWitnesses`, so a single missing conformance
+    // surfacing at multiple surviving `lookupWitnessMethod` sites fires at most
+    // one diagnostic.  Local to the post-specialization walker — `processModule`
+    // bails out on any Part-1 error before that walker runs, so there is no
+    // cross-phase deduplication to coordinate.
     HashSet<IRInst*> diagnosedNoTypeConformancesInterfaces;
 
     // Emit error 33180 for an invalid existential specialization, deduplicating by `dedupKey`.
