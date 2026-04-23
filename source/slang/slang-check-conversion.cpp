@@ -2969,7 +2969,7 @@ SubtypeWitness* SemanticsVisitor::normalizeSubtypeWitnessForInterfaceUpcast(
         // The declRef belongs to a different interface than `subType`.
         // Split into (subType : parentInterfaceType) ∘ (parentInterfaceType : sup).
         auto subToParent = tryGetSubtypeWitness(subType, parentInterfaceType);
-        SLANG_ASSERT(subToParent);
+        SLANG_RELEASE_ASSERT(subToParent);
         subToParent = normalizeSubtypeWitnessForInterfaceUpcast(subType, subToParent);
 
         auto parentToSup = m_astBuilder->getDeclaredSubtypeWitness(

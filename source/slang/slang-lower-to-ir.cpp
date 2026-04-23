@@ -6843,7 +6843,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     auto sourceWT = builder->emitExtractExistentialWitnessTable(concreteValue);
 
                     auto witness = as<SubtypeWitness>(expr->witnessArg);
-                    SLANG_ASSERT(witness);
+                    SLANG_RELEASE_ASSERT(witness);
                     auto targetWT = emitCastToInterfaceSuperTypeRec(sourceWT, witness);
 
                     return LoweredValInfo::simple(
