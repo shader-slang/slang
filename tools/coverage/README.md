@@ -5,7 +5,9 @@ This directory contains tools for generating and analyzing code coverage reports
 ## Prerequisites
 
 - **Linux / macOS**: LLVM coverage tools (`llvm-profdata`, `llvm-cov`) installed
-- **Windows**: [OpenCppCoverage](https://github.com/OpenCppCoverage/OpenCppCoverage/releases) installed (the `ci-slang-coverage.yml` workflow installs it via `choco install opencppcoverage --version 0.9.9.0`; for local dev either install the `.exe` from GitHub releases or `winget install --id OpenCppCoverage.OpenCppCoverage`)
+- **Windows**:
+  - [OpenCppCoverage](https://github.com/OpenCppCoverage/OpenCppCoverage/releases) (the `ci-slang-coverage.yml` workflow installs it via `choco install opencppcoverage --version 0.9.9.0`; for local dev either install the `.exe` from GitHub releases or `winget install --id OpenCppCoverage.OpenCppCoverage`).
+  - [ReportGenerator](https://github.com/danielpalme/ReportGenerator) for HTML rendering. Install via `dotnet tool install -g dotnet-reportgenerator-globaltool` and make sure `$env:USERPROFILE\.dotnet\tools` is on `PATH`. Requires a .NET SDK; the workflow uses the SDK preinstalled on `windows-latest`.
 
 ## Quick Start (HTML report)
 
@@ -39,7 +41,8 @@ powershell -File tools\coverage\run-coverage-local.ps1
 powershell -File tools\coverage\run-coverage-local.ps1 -SkipBuild -SkipTest
 
 # Outputs:
-#   coverage-html\index.html              -- full library HTML report
+#   coverage-html\index.html              -- full library HTML report (ReportGenerator)
+#   coverage-html-slangc\index.html       -- slangc compiler-only HTML report
 #   coverage.lcov                         -- full library LCOV
 #   coverage-slangc.lcov                  -- slangc compiler-only LCOV
 #   build\coverage-data\full.cobertura.xml
@@ -47,8 +50,8 @@ powershell -File tools\coverage\run-coverage-local.ps1 -SkipBuild -SkipTest
 
 Notes for Windows:
 - Coverage targets `slang-compiler.dll` (the real compiler lib; `slang.dll` is a thin proxy on Windows).
-- OpenCppCoverage emits Cobertura XML, which the script converts to LCOV internally for format parity with Linux/macOS.
-- No `coverage-html-slangc/` directory on Windows — the slangc-only filter runs post-hoc on the LCOV; generating an HTML view would require a second test pass (deferred).
+- OpenCppCoverage emits Cobertura XML, which the script converts to LCOV internally. ReportGenerator renders the Cobertura to HTML; the slangc-only HTML is produced by applying `-filefilters` at render time rather than running a second test pass.
+- Cobertura (and therefore Windows LCOV/HTML) carries only line-level data — no region/function/branch counts like `llvm-cov` emits on Linux/macOS.
 - Add `-WithSynthesis` to run the `-only-synthesized` pass. On runners without GPU drivers this provides a large backend-emit coverage boost; on machines with drivers it's a near no-op because Pass 1 already exercises the same paths.
 
 ## Command-Line Options and Environment Variables

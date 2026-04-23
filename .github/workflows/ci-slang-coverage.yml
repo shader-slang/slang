@@ -73,23 +73,31 @@ jobs:
         with:
           min-disk-gb: "10"
 
-      - name: Install OpenCppCoverage (Windows)
+      - name: Install OpenCppCoverage and ReportGenerator (Windows)
         if: inputs.os == 'windows'
         shell: pwsh
         run: |
-          # choco is preinstalled on GitHub-hosted windows-latest runners.
+          # OpenCppCoverage via Chocolatey (preinstalled on windows-latest).
           # Pin the version so failures are obvious (not an upstream regression).
           choco install opencppcoverage --version 0.9.9.0 -y --no-progress
           if ($LASTEXITCODE -ne 0) { throw "choco install exited $LASTEXITCODE" }
-          # Add to PATH for the rest of the job.
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\OpenCppCoverage"
-          # Verify by filesystem presence. Avoid invoking the tool here -- a
-          # piped `--help | Select-Object -First 1` closes the pipe early,
-          # and the resulting broken-pipe exit code trips the pwsh step
-          # failure check.
-          $exe = "C:\Program Files\OpenCppCoverage\OpenCppCoverage.exe"
-          if (-not (Test-Path $exe)) { throw "OpenCppCoverage.exe missing at $exe" }
-          Write-Host "OpenCppCoverage installed: $exe"
+          $occ = "C:\Program Files\OpenCppCoverage\OpenCppCoverage.exe"
+          if (-not (Test-Path $occ)) { throw "OpenCppCoverage.exe missing at $occ" }
+          Write-Host "OpenCppCoverage installed: $occ"
+
+          # ReportGenerator via dotnet tool -- used by run-coverage-windows.ps1
+          # to render the Cobertura XML as HTML (full + slangc-only variants).
+          # OCC's own HTML is line-level only and markedly less polished than
+          # llvm-cov's HTML on Linux/macOS; ReportGenerator's output is close
+          # to parity.
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          if ($LASTEXITCODE -ne 0) { throw "dotnet tool install reportgenerator exited $LASTEXITCODE" }
+          $toolsDir = Join-Path $env:USERPROFILE '.dotnet\tools'
+          Add-Content -Path $env:GITHUB_PATH -Value $toolsDir
+          $rg = Join-Path $toolsDir 'reportgenerator.exe'
+          if (-not (Test-Path $rg)) { throw "reportgenerator.exe missing at $rg" }
+          Write-Host "ReportGenerator installed: $rg"
 
       - name: Install Clang 18 and LLVM Tools
         if: inputs.compiler == 'clang-18' && inputs.os == 'linux' && inputs.container == ''

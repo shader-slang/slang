@@ -303,6 +303,7 @@ if (-not [System.IO.Path]::IsPathRooted($HtmlDir))  { $HtmlDir  = Join-Path $Rep
 $LcovDir   = Split-Path -Parent $LcovFile
 $LcovStem  = [IO.Path]::GetFileNameWithoutExtension($LcovFile)
 $SlangcLcov = Join-Path $LcovDir ("{0}-slangc.lcov" -f $LcovStem)
+$SlangcHtml = "$HtmlDir-slangc"
 
 # Cobertura is always emitted -- it's the source for both the summary parser
 # and the LCOV conversion. LCOV and HTML are opt-in via env vars (matches
@@ -373,19 +374,17 @@ function ConvertTo-Lcov {
 
 $FullCobertura = Join-Path $CoverageDir 'full.cobertura.xml'
 
-# OpenCppCoverage applies --excluded_sources only at *collection* time, so we
-# can't get a slangc-filtered HTML out of the same .cov without a second test
-# run. We emit one Cobertura/HTML (the full library), and produce the
-# slangc-only report by filtering inside ConvertTo-Lcov below. Net effect: full
-# HTML is browseable; slangc-only summary metrics still feed the dashboard.
-Write-Host "`nExporting full-library report..."
-$fullArgs = @('--input_coverage', $MergedCov, '--sources', $RepoRoot)
-$fullArgs += @('--export_type', "cobertura:$FullCobertura")
-if ($wantHtml) {
-    if (Test-Path $HtmlDir) { Remove-Item -Recurse -Force $HtmlDir }
-    $fullArgs += @('--export_type', "html:$HtmlDir")
-}
-Invoke-OCC -OccArgs $fullArgs
+# Emit Cobertura from OCC. HTML is rendered separately by ReportGenerator
+# below so that Windows HTML has parity with llvm-cov's HTML on Linux/macOS
+# (OCC's built-in HTML is line-level only and noticeably rougher). LCOV is
+# still converted from the Cobertura so Phase 2 (cross-platform aggregation)
+# has a common format to merge.
+Write-Host "`nExporting full-library Cobertura..."
+Invoke-OCC -OccArgs @(
+    '--input_coverage', $MergedCov
+    '--sources', $RepoRoot
+    '--export_type', "cobertura:$FullCobertura"
+)
 
 if ($wantLcov) {
     Write-Host "`nConverting Cobertura -> LCOV (full)..."
@@ -393,6 +392,46 @@ if ($wantLcov) {
     Write-Host "Converting Cobertura -> LCOV (slangc, post-hoc filter)..."
     ConvertTo-Lcov -CoberturaPath $FullCobertura -LcovPath $SlangcLcov `
         -ExcludePrefixes $SlangcExcluded
+}
+
+if ($wantHtml) {
+    # Resolve ReportGenerator. Explicit env var wins; then PATH; then the
+    # default `dotnet tool install -g` location under the user profile.
+    $rgPath = $env:ReportGenerator
+    if (-not $rgPath) {
+        $cmd = Get-Command reportgenerator.exe -ErrorAction SilentlyContinue
+        if (-not $cmd) { $cmd = Get-Command reportgenerator -ErrorAction SilentlyContinue }
+        if ($cmd) { $rgPath = $cmd.Source }
+    }
+    if (-not $rgPath) {
+        $default = Join-Path $env:USERPROFILE '.dotnet\tools\reportgenerator.exe'
+        if (Test-Path $default) { $rgPath = $default }
+    }
+    if (-not $rgPath) {
+        throw @"
+reportgenerator not found. Install with:
+  dotnet tool install -g dotnet-reportgenerator-globaltool
+then either add "$env:USERPROFILE\.dotnet\tools" to PATH or set
+`$env:ReportGenerator to the full exe path.
+"@
+    }
+
+    # Translate the slangc substring exclusion list to ReportGenerator file
+    # filter globs. RG's file filters accept glob wildcards and use ';' as a
+    # separator; '-pattern' excludes, '+pattern' includes. Substring '\x\'
+    # becomes '*\x\*' so the filter works whether the Cobertura paths are
+    # drive-relative or absolute.
+    $rgFilters = ($SlangcExcludePatterns | ForEach-Object { "-*${_}*" }) -join ';'
+
+    if (Test-Path $HtmlDir) { Remove-Item -Recurse -Force $HtmlDir }
+    Write-Host "`nGenerating HTML via ReportGenerator (full)..."
+    & $rgPath "-reports:$FullCobertura" "-targetdir:$HtmlDir" '-reporttypes:Html'
+    if ($LASTEXITCODE -ne 0) { throw "ReportGenerator (full) exited $LASTEXITCODE" }
+
+    if (Test-Path $SlangcHtml) { Remove-Item -Recurse -Force $SlangcHtml }
+    Write-Host "Generating HTML via ReportGenerator (slangc-only)..."
+    & $rgPath "-reports:$FullCobertura" "-targetdir:$SlangcHtml" '-reporttypes:Html' "-filefilters:$rgFilters"
+    if ($LASTEXITCODE -ne 0) { throw "ReportGenerator (slangc) exited $LASTEXITCODE" }
 }
 
 Write-Host "`nCoverage outputs:"
@@ -404,7 +443,7 @@ if ($wantLcov) {
 }
 if ($wantHtml) {
     Write-Host "  HTML (full):      $HtmlDir\index.html"
-    Write-Host "  (slangc-only HTML is not produced on Windows -- see script comment)"
+    Write-Host "  HTML (slangc):    $SlangcHtml\index.html"
 }
 
 # Explicitly signal success. Without this, the script's implicit exit code is
