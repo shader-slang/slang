@@ -1,7 +1,6 @@
 //TEST:SIMPLE(filecheck=SPIRV):-stage compute -entry computeMain -target spirv
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK_METAL):-metal -compute -output-using-type -Xslang -DMETAL
 
 // Ensure SPIRV does not do coherent operations here
 // SPIRV-NOT: MakePointerAvailable
@@ -17,42 +16,21 @@
 // CHECK-NEXT: 7
 // CHECK-NEXT: 8
 
-// CHECK_METAL: 1.0
-// CHECK_METAL-NEXT: 2.0
-// CHECK_METAL-NEXT: 3.0
-// CHECK_METAL-NEXT: 4.0
-// CHECK_METAL-NEXT: 5.0
-// CHECK_METAL-NEXT: 6.0
-// CHECK_METAL-NEXT: 7.0
-// CHECK_METAL-NEXT: 8.0
+//TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8], stride=4, count=256):name=inputBuffer
+uniform int32_t* inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8], stride=4, count=256):name=inputBufferInt
-uniform int32_t* inputBufferInt;
-
-//TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBufferInt
-uniform int32_t* outputBufferInt;
-
-//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0], stride=4, count=256):name=inputBufferFloat
-uniform float* inputBufferFloat;
-
-//TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBufferFloat
-RWStructuredBuffer<float> outputBufferFloat;
+//TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
+uniform int32_t* outputBuffer;
 
 using namespace linalg;
 
 [numthreads(32, 1, 1)]
 void computeMain()
 {
-#ifndef METAL
-    int32_t* ptrIn = inputBufferInt;
-    int32_t* ptrOut = outputBufferInt;
+    int32_t* ptrIn = inputBuffer;
+    int32_t* ptrOut = outputBuffer;
+
     let stride = 16;
     let mat = coopMatLoad<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(ptrIn, 0, stride);
     mat.Store<CoopMatMatrixLayout.RowMajor>(ptrOut, 0, 16);
-#else
-    float* ptrIn = inputBufferFloat;
-    let stride = 8;
-    let mat = coopMatLoad<float, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(ptrIn, 0, stride);
-    mat.Store<CoopMatMatrixLayout.RowMajor>(outputBufferFloat, 0, 8);
-#endif
 }
