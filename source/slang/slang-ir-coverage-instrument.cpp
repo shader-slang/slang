@@ -12,47 +12,82 @@ namespace Slang
 namespace
 {
 
+// The coverage buffer is synthesized as an AST-level VarDecl at
+// semantic-check time by `maybeSynthesizeCoverageBufferDecl` (see
+// slang-check-synthesize-coverage.cpp). By the time this IR pass
+// runs, the buffer is a normal reflection-visible `IRGlobalParam`
+// with a binding assigned by the regular parameter-binding phase —
+// indistinguishable from a user-declared one. This pass only locates
+// it by name and rewrites `IncrementCoverageCounter` ops against it.
 static const char kCoverageBufferName[] = "__slang_coverage";
 
-// Reserved register space + binding for the synthesized coverage
-// buffer. Chosen to sit high enough that it is unlikely to collide
-// with user resources. Will become configurable once the feature
-// grows a proper binding-CLI option.
-static const UInt kCoverageReservedSpace = 31;
-static const UInt kCoverageReservedBinding = 0;
-
-// Return true if any existing module-scope global parameter already
-// occupies the reserved `(space, binding)` we would assign to the
-// synthesized coverage buffer. Used to warn before synthesis rather
-// than aliasing a user resource silently.
-static bool hasResourceAtReservedBinding(IRModule* module)
+// Locate the coverage buffer's `IRGlobalParam`. Post-AST-synthesis
+// the buffer is always present when tracing is enabled, but we still
+// validate the type defensively so a user-declared `__slang_coverage`
+// with the wrong shape produces a diagnostic rather than invalid IR.
+static IRGlobalParam* findCoverageBuffer(IRModule* module, DiagnosticSink* sink)
 {
     for (auto inst : module->getGlobalInsts())
     {
         auto param = as<IRGlobalParam>(inst);
         if (!param)
             continue;
-        auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
-        if (!layoutDecor)
+        auto nameHint = param->findDecoration<IRNameHintDecoration>();
+        if (!nameHint || nameHint->getName() != UnownedStringSlice(kCoverageBufferName))
             continue;
-        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
-        if (!varLayout)
-            continue;
-        auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace);
-        auto bindingAttr = varLayout->findOffsetAttr(LayoutResourceKind::DescriptorTableSlot);
-        if (!spaceAttr || !bindingAttr)
-            continue;
-        if ((UInt)spaceAttr->getOffset() == kCoverageReservedSpace &&
-            (UInt)bindingAttr->getOffset() == kCoverageReservedBinding)
-            return true;
+        auto bufferType = as<IRHLSLRWStructuredBufferType>(param->getDataType());
+        if (!bufferType)
+        {
+            if (sink)
+                sink->diagnoseRaw(
+                    Severity::Warning,
+                    UnownedStringSlice("'__slang_coverage' must be 'RWStructuredBuffer<uint>' "
+                                       "for -trace-coverage; ignoring."));
+            return nullptr;
+        }
+        auto elementType = as<IRBasicType>(bufferType->getElementType());
+        if (!elementType || elementType->getBaseType() != BaseType::UInt)
+        {
+            if (sink)
+                sink->diagnoseRaw(
+                    Severity::Warning,
+                    UnownedStringSlice("'__slang_coverage' element type must be 'uint' for "
+                                       "-trace-coverage; ignoring."));
+            return nullptr;
+        }
+        return param;
     }
-    return false;
+    return nullptr;
 }
 
-// Collect every IncrementCoverageCounter op in the module across all
-// functions. Deterministic traversal order: module-scope insts in
-// declaration order, then for each function its blocks in declaration
-// order, then each block's instructions in position order.
+// Read the (space, binding) the parameter-binding pass assigned to
+// the coverage buffer. These are the real values the reflection API
+// will report and hosts will see via slang-rhi binding.
+static void readBufferBinding(IRGlobalParam* coverageBuffer, int32_t& outSpace, int32_t& outBinding)
+{
+    outSpace = -1;
+    outBinding = -1;
+    auto layoutDecor = coverageBuffer->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecor)
+        return;
+    auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+    if (!varLayout)
+        return;
+    if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+        outSpace = (int32_t)a->getOffset();
+    if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::DescriptorTableSlot))
+        outBinding = (int32_t)a->getOffset();
+    // For HLSL/D3D-style targets the binding comes in as UAV register.
+    if (outBinding < 0)
+    {
+        if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::UnorderedAccess))
+            outBinding = (int32_t)a->getOffset();
+    }
+}
+
+// Collect every IncrementCoverageCounter op in the module. Deterministic
+// traversal: module-scope insts in declaration order, then each
+// function's blocks in order, then each block's insts in position order.
 static void collectCoverageCounterOps(IRModule* module, List<IRInst*>& out)
 {
     auto visitFunc = [&](IRFunc* func)
@@ -75,51 +110,9 @@ static void collectCoverageCounterOps(IRModule* module, List<IRInst*>& out)
     }
 }
 
-// Synthesize an implicit `RWStructuredBuffer<uint> __slang_coverage`
-// global parameter with a reserved layout. Follows the pattern in
-// `lowerDynamicResourceHeap` — we manually build an IRTypeLayout /
-// IRVarLayout so the buffer survives later uniform-collection passes.
-// Emits a warning if any existing user resource already occupies the
-// reserved binding; synthesis proceeds anyway but aliasing risk is
-// documented to the user.
-static IRGlobalParam* synthesizeCoverageBuffer(IRModule* module, DiagnosticSink* sink)
-{
-    if (hasResourceAtReservedBinding(module) && sink)
-    {
-        sink->diagnoseRaw(
-            Severity::Warning,
-            UnownedStringSlice("-trace-coverage: an existing resource occupies the reserved "
-                               "binding (space=31, binding=0); coverage buffer may alias it."));
-    }
-
-    IRBuilder builder(module);
-    builder.setInsertInto(module->getModuleInst());
-
-    auto uintType = builder.getUIntType();
-    IRInst* elemOperand = uintType;
-    auto bufferType = (IRType*)builder.getType(kIROp_HLSLRWStructuredBufferType, 1, &elemOperand);
-
-    auto param = builder.createGlobalParam(bufferType);
-    builder.addNameHintDecoration(param, UnownedStringSlice(kCoverageBufferName));
-
-    IRTypeLayout::Builder typeLayoutBuilder(&builder);
-    typeLayoutBuilder.addResourceUsage(LayoutResourceKind::DescriptorTableSlot, LayoutSize(1));
-    auto typeLayout = typeLayoutBuilder.build();
-
-    IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
-    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->offset =
-        kCoverageReservedSpace;
-    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot)->offset =
-        kCoverageReservedBinding;
-    auto varLayout = varLayoutBuilder.build();
-    builder.addLayoutDecoration(param, varLayout);
-
-    return param;
-}
-
 // Resolve a counter op's source position from its built-in sourceLoc.
-// Returns false (with `outFile` / `outLine` untouched) when the
-// location is not valid, e.g. for synthetic/unknown sources.
+// Returns false when the location is not valid, e.g. for synthetic/
+// unknown sources.
 static bool resolveHumaneLoc(
     SourceManager* sourceManager,
     IRInst* counterOp,
@@ -161,7 +154,7 @@ struct CoverageInstrumenter
 
     // Lower a single IncrementCoverageCounter op to an atomic add on
     // `coverageBuffer[slot]`. Appends a metadata entry for `slot` and
-    // then removes the op.
+    // removes the op.
     void lowerCounterOp(IRInst* counterOp, UInt slot)
     {
         CoverageTracingEntry entry;
@@ -232,12 +225,11 @@ void instrumentCoverage(
     if (counterOps.getCount() == 0)
         return;
 
-    // Always synthesize the coverage buffer. Intentionally does not
-    // look for a user-declared `__slang_coverage` — a reserved name
-    // plus name-hint discovery is unreliable (e.g. after debug-info
-    // stripping or name mangling), and binding conflicts are better
-    // handled via a dedicated CLI option in a follow-up.
-    auto buffer = synthesizeCoverageBuffer(module, sink);
+    // The AST-time synthesizer guarantees `__slang_coverage` exists
+    // when the flag is on (or the user declared one themselves).
+    // If it doesn't, something earlier in the pipeline failed; bail
+    // gracefully rather than producing invalid IR.
+    auto buffer = findCoverageBuffer(module, sink);
     if (!buffer)
     {
         for (auto op : counterOps)
@@ -245,10 +237,14 @@ void instrumentCoverage(
         return;
     }
 
-    // Record the chosen binding on the metadata so hosts can query it
-    // via ICoverageTracingMetadata without having to walk reflection.
-    outMetadata.m_coverageBufferSpace = (int32_t)kCoverageReservedSpace;
-    outMetadata.m_coverageBufferBinding = (int32_t)kCoverageReservedBinding;
+    // Record the buffer's binding on the metadata so hosts can query
+    // it via ICoverageTracingMetadata. Binding was assigned by the
+    // normal parameter-binding phase, so it reflects whatever the
+    // front-end chose (not a hardcoded reservation).
+    readBufferBinding(
+        buffer,
+        outMetadata.m_coverageBufferSpace,
+        outMetadata.m_coverageBufferBinding);
 
     CoverageInstrumenter instrumenter(
         module,
