@@ -3282,7 +3282,8 @@ void addArg(
                     context->getSink()->diagnose(
                         Diagnostics::InvalidParameterPassingModeForWriteOnlyReference{
                             .location = loc});
-                    return;
+                    // Fall through without assigning so that we still add the arg below,
+                    // keeping ioArgs aligned with the callee's parameter list.
                 }
                 else
                 {

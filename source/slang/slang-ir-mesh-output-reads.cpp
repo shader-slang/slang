@@ -2,17 +2,13 @@
 #include "slang-ir-mesh-output-reads.h"
 
 #include "slang-ir-insts.h"
-#include "slang-ir-layout.h"
 #include "slang-ir.h"
 #include "slang.h"
 
 namespace Slang
 {
 
-class DiagnosticSink;
-struct IRModule;
-
-void checkForMeshOutputReadsRecursive(IRInst* inst, DiagnosticSink* sink)
+static void checkForMeshOutputReadsRecursive(IRInst* inst, DiagnosticSink* sink)
 {
     if (auto code = as<IRGlobalValueWithCode>(inst))
     {
@@ -29,7 +25,7 @@ void checkForMeshOutputReadsRecursive(IRInst* inst, DiagnosticSink* sink)
                         if (as<IRMeshOutputRef>(next))
                         {
                             sink->diagnose(
-                                Diagnostics::AttemptToReadFromMeshShaderOutput{.inst = next});
+                                Diagnostics::AttemptToReadFromMeshShaderOutput{.inst = opInst});
                             break;
                         }
                         else if (auto gep = as<IRGetElementPtr>(next))

@@ -4638,8 +4638,8 @@ err(
 err(
     "invalid-parameter-passing-mode-for-write-only-reference",
     54006,
-    "Invalid parameter passing mode for argument which is write-only.",
-    span { loc = "location", message = "Paramater passing mode requires a read from this value." }
+    "Parameter passing mode requires reading a write-only value.",
+    span { loc = "location", message = "Parameter passing mode requires reading this value, but it is write-only." }
 )
 
 err(
