@@ -2782,7 +2782,8 @@ public:
     /// any inheritance-graph discovery itself.
     SubtypeWitness* normalizeSubtypeWitnessForInterfaceUpcast(
         Type* subType,
-        SubtypeWitness* witness);
+        SubtypeWitness* witness,
+        int depth = 0);
 
     // Handles special modifier cases. In general case, calls createModifierCastExpr.
     Expr* createModifierCast(Type* toType, Type* fromType, Expr* fromExpr);

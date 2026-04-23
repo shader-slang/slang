@@ -30,8 +30,12 @@ struct ImplB : IDerived
 
 RWStructuredBuffer<float> outputBuffer;
 
-// Scenario 1: Non-generic upcast
+// Scenario 1: Non-generic upcast — verify the compiler lowers `base.getValue()`
+// to a dispatch through the witness-table chain walked at the upcast (IDerived's
+// `$inheritance` entry → IBase's `getValue`), not a direct call that would
+// indicate the upcast was folded away.
 // CHK1: void scenario1
+// CHK1: IDerived{{.*}}inheritance{{.*}}IBase{{.*}}getValue
 [numthreads(1, 1, 1)]
 void scenario1()
 {

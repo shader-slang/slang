@@ -5,6 +5,7 @@
 #include "../core/slang-hash.h"
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-random-generator.h"
+#include "slang-check-impl.h"
 #include "slang-check.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bit-field-accessors.h"
@@ -6829,13 +6830,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // Check the AST type (robust to generic instantiations whose
                 // IR form is `Specialize(Generic(...),...)` rather than a
                 // plain `IRInterfaceType`).
-                auto isInterfaceAstType = [](Type* t) -> bool
-                {
-                    if (auto drt = as<DeclRefType>(t))
-                        return drt->getDeclRef().as<InterfaceDecl>();
-                    return false;
-                };
-                if (expr->valueArg && isInterfaceAstType(expr->valueArg->type))
+                if (expr->valueArg && isInterfaceType(expr->valueArg->type))
                 {
                     auto extractedType = builder->emitExtractExistentialType(concreteValue);
                     auto extractedValue =

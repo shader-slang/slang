@@ -2935,18 +2935,29 @@ Expr* SemanticsVisitor::createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, 
 
 SubtypeWitness* SemanticsVisitor::normalizeSubtypeWitnessForInterfaceUpcast(
     Type* subType,
-    SubtypeWitness* witness)
+    SubtypeWitness* witness,
+    int depth)
 {
+    // Bound against a corrupt or cyclic inheritance graph.  Well-formed
+    // hierarchies are acyclic and extremely shallow in practice; 64 is a
+    // generous defensive limit.
+    static const int kMaxDepth = 64;
+    SLANG_RELEASE_ASSERT(depth < kMaxDepth);
+
     if (!witness)
         return witness;
 
     if (auto transitive = as<TransitiveSubtypeWitness>(witness))
     {
-        auto subToMid =
-            normalizeSubtypeWitnessForInterfaceUpcast(subType, transitive->getSubToMid());
+        auto subToMid = normalizeSubtypeWitnessForInterfaceUpcast(
+            subType,
+            transitive->getSubToMid(),
+            depth + 1);
         auto midType = subToMid->getSup();
-        auto midToSup =
-            normalizeSubtypeWitnessForInterfaceUpcast(midType, transitive->getMidToSup());
+        auto midToSup = normalizeSubtypeWitnessForInterfaceUpcast(
+            midType,
+            transitive->getMidToSup(),
+            depth + 1);
         if (subToMid == transitive->getSubToMid() && midToSup == transitive->getMidToSup())
             return witness;
         return m_astBuilder->getTransitiveSubtypeWitness(subToMid, midToSup);
@@ -2970,7 +2981,7 @@ SubtypeWitness* SemanticsVisitor::normalizeSubtypeWitnessForInterfaceUpcast(
         // Split into (subType : parentInterfaceType) ∘ (parentInterfaceType : sup).
         auto subToParent = tryGetSubtypeWitness(subType, parentInterfaceType);
         SLANG_RELEASE_ASSERT(subToParent);
-        subToParent = normalizeSubtypeWitnessForInterfaceUpcast(subType, subToParent);
+        subToParent = normalizeSubtypeWitnessForInterfaceUpcast(subType, subToParent, depth + 1);
 
         auto parentToSup = m_astBuilder->getDeclaredSubtypeWitness(
             parentInterfaceType,
