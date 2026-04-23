@@ -33,6 +33,9 @@ RWStructuredBuffer<half> outHalf;
 //TEST_INPUT:ubuffer(data=[5.0 5.0 5.0 5.0 5.0 5.0 5.0 5.0], stride=4, count=256):name=inputBAB
 ByteAddressBuffer inputBAB;
 
+//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 11.0 12.0 13.0 14.0 15.0 16.0], stride=4, count=256):name=inputSequential
+StructuredBuffer<float> inputSequential;
+
 using namespace linalg;
 
 typealias CMat = CoopMat<float, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse.MatrixAccumulator>;
@@ -103,14 +106,22 @@ void computeMain()
     // CHECK: type: float
     // CHECK-COUNT-8: 49.000000
 
-    // --- 9. Store/Load with ColMajor layout via groupshared ---
-    var matCol : CMat;
-    matCol.fill(5.0);
-    matCol.Store<CoopMatMatrixLayout.ColumnMajor>(gsFloat, 0u, kStride);
+    // --- 9. ColMajor round-trip with non-uniform data ---
+    // Load sequential data (1..16) in RowMajor, store ColMajor, load ColMajor, store RowMajor.
+    // If transpose semantics are correct, the round-trip preserves the original data.
+    let matSeq = CMat.Load<CoopMatMatrixLayout.RowMajor>(inputSequential, 0u, kStride);
+    matSeq.Store<CoopMatMatrixLayout.ColumnMajor>(gsFloat, 0u, kStride);
     let matColLoaded = CMat.Load<CoopMatMatrixLayout.ColumnMajor>(gsFloat, 0u, kStride);
     matColLoaded.Store<CoopMatMatrixLayout.RowMajor>(outColMajor, 0u, kStride);
     // CHECK: type: float
-    // CHECK-COUNT-8: 5.000000
+    // CHECK: 1.000000
+    // CHECK-NEXT: 2.000000
+    // CHECK-NEXT: 3.000000
+    // CHECK-NEXT: 4.000000
+    // CHECK-NEXT: 5.000000
+    // CHECK-NEXT: 6.000000
+    // CHECK-NEXT: 7.000000
+    // CHECK-NEXT: 8.000000
 
     // --- 10. half accumulator: fill + Store/Load ---
     typealias HMat = CoopMat<half, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse.MatrixAccumulator>;
