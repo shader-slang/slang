@@ -220,6 +220,12 @@ public:
     /// the singleton just to tear it down.
     SLANG_API static ReplayContext* tryGet();
 
+    /// Destroy the singleton and release all its heap allocations.
+    /// Called from slang_shutdown() so that _CrtDumpMemoryLeaks() does not
+    /// report the STL debug-proxy allocations owned by the singleton's
+    /// Dictionary members as leaks in MSVC Debug builds.
+    SLANG_API static void destroySingleton();
+
     /// Create an idle context.
     /// Will switch to Record mode if SLANG_RECORD_LAYER=1 is set.
     SLANG_API ReplayContext();
