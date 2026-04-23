@@ -751,7 +751,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 if (satLit->getValue())
                 {
                     getSink()->diagnose(Diagnostics::Unimplemented{
-                        .feature = "saturating accumulation for Metal cooperative matrices (simdgroup_matrix)",
+                        .feature = "saturating accumulation for Metal cooperative matrices "
+                                   "(simdgroup_matrix)",
                         .location = inst->sourceLoc});
                 }
             }
@@ -1391,14 +1392,16 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             if (rows != 8 || cols != 8)
             {
                 getSink()->diagnose(Diagnostics::Unimplemented{
-                    .feature = "Metal cooperative matrices (simdgroup_matrix) only support 8x8 dimensions",
+                    .feature =
+                        "Metal cooperative matrices (simdgroup_matrix) only support 8x8 dimensions",
                     .location = type->sourceLoc});
             }
             auto elementType = coopType->getElementType();
             if (elementType->getOp() != kIROp_HalfType && elementType->getOp() != kIROp_FloatType)
             {
                 getSink()->diagnose(Diagnostics::Unimplemented{
-                    .feature = "Metal cooperative matrices only support half and float element types",
+                    .feature =
+                        "Metal cooperative matrices only support half and float element types",
                     .location = type->sourceLoc});
             }
             // Metal's simdgroup_matrix<T, Cols, Rows> uses Cols, Rows order
