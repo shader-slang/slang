@@ -746,11 +746,15 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_CoopMatMulAdd:
         {
             auto coopMatMulAdd = cast<IRCoopMatMulAdd>(inst);
-            auto saturatingAccumulation =
-                cast<IRBoolLit>(coopMatMulAdd->getSaturatingAccumulation())->getValue();
-            SLANG_RELEASE_ASSERT(
-                !saturatingAccumulation &&
-                "Saturating accumulation is not supported for Metal cooperative matrix.");
+            if (auto satLit = as<IRBoolLit>(coopMatMulAdd->getSaturatingAccumulation()))
+            {
+                if (satLit->getValue())
+                {
+                    getSink()->diagnose(Diagnostics::Unimplemented{
+                        .feature = "saturating accumulation for Metal cooperative matrices (simdgroup_matrix)",
+                        .location = inst->sourceLoc});
+                }
+            }
             emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n");
             m_writer->emit("simdgroup_multiply_accumulate(");
@@ -1386,10 +1390,16 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             auto cols = getIntVal(coopType->getColumnCount());
             if (rows != 8 || cols != 8)
             {
-                getSink()->diagnose(
-                    type->sourceLoc,
-                    Diagnostics::unimplemented,
-                    "Metal cooperative matrices (simdgroup_matrix) only support 8x8 dimensions");
+                getSink()->diagnose(Diagnostics::Unimplemented{
+                    .feature = "Metal cooperative matrices (simdgroup_matrix) only support 8x8 dimensions",
+                    .location = type->sourceLoc});
+            }
+            auto elementType = coopType->getElementType();
+            if (elementType->getOp() != kIROp_HalfType && elementType->getOp() != kIROp_FloatType)
+            {
+                getSink()->diagnose(Diagnostics::Unimplemented{
+                    .feature = "Metal cooperative matrices only support half and float element types",
+                    .location = type->sourceLoc});
             }
             // Metal's simdgroup_matrix<T, Cols, Rows> uses Cols, Rows order
             m_writer->emit("simdgroup_matrix<");
