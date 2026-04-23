@@ -6666,21 +6666,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         if (!irInst)
             return false;
-        if (irInst->getOp() != kIROp_GlobalVar && irInst->getOp() != kIROp_GlobalParam)
+        if (irInst->getOp() != kIROp_GlobalVar && irInst->getOp() != kIROp_GlobalParam &&
+            irInst->getOp() != kIROp_SPIRVAsmOperandBuiltinVar)
             return false;
-        auto ptrType = as<IRPtrTypeBase>(irInst->getDataType());
-        if (!ptrType)
-            return false;
-        auto addrSpace = ptrType->getAddressSpace();
-        if (addrSpace == AddressSpace::Input || addrSpace == AddressSpace::BuiltinInput)
+
+        IRType* valueType = nullptr;
+        if (auto ptrType = as<IRPtrTypeBase>(irInst->getDataType()))
         {
-            if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
-            {
-                if (isInstUsedInStage(irInst, Stage::Fragment))
-                    return true;
-            }
+            auto addrSpace = ptrType->getAddressSpace();
+            if (addrSpace != AddressSpace::Input && addrSpace != AddressSpace::BuiltinInput)
+                return false;
+            valueType = ptrType->getValueType();
         }
-        return false;
+        else
+        {
+            valueType = irInst->getDataType();
+        }
+
+        return isIntegralScalarOrCompositeType(valueType) &&
+               isInstUsedInStage(irInst, Stage::Fragment);
     }
 
     SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal, IRInst* irInst)
