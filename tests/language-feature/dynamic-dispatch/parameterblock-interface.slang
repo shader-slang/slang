@@ -45,7 +45,12 @@ void computeMain()
 // HLSL: switch(
 // HLSL: void computeMain
 
+// Like `global-interface-param.slang`, check `OpSwitch` for SPIRV to
+// verify dispatch code was actually generated, not just that the entry
+// point survives.
 // SPIRV: OpEntryPoint
+// SPIRV: OpSwitch
+
 // GLSL: void main
 // CUDA: void computeMain
 // CPP: void computeMain

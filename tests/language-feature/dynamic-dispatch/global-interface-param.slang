@@ -10,6 +10,10 @@
 //TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
 //TEST:SIMPLE(filecheck=CPP): -target cpp -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
+// Single-conformance variant: with only one implementation the compiler
+// monomorphizes (no dispatch switch); verifies `seedGlobalScope` /
+// `TaggedUnionType` handle the singleton set correctly.
+//TEST:SIMPLE(filecheck=SINGLE): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0"
 //DISABLED_TEST:SIMPLE(filecheck=REPORT): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -report-dynamic-dispatch-sites
 
 [anyValueSize(16)]
@@ -50,9 +54,18 @@ void computeMain()
 // HLSL: switch(
 // HLSL: void computeMain
 
+// SPIRV verifies the dispatch was actually generated via `OpSwitch` on the
+// witness-table tag, not just that the entry point exists.
 // SPIRV: OpEntryPoint
+// SPIRV: OpSwitch
+
 // GLSL: void main()
 // CUDA: void computeMain
 // MTL: void computeMain
 // WGSL: fn computeMain
 // CPP: void computeMain
+
+// Single-conformance path: compiler monomorphizes so no dispatch switch,
+// but the concrete impl must still be invoked through the global.
+// SINGLE: ImplA_getValue
+// SINGLE: void computeMain
