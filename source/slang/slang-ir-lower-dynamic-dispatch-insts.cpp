@@ -1888,14 +1888,24 @@ struct ExistentialLoweringContext : public InstPassBase
             return false;
         }
 
+        auto valuePtrType = as<IRPtrTypeBase>(valueOutPtr->getDataType());
+        if (!valuePtrType)
+            return false;
+        auto valueType = valuePtrType->getValueType();
+
+        // Note on size-mismatch: `specializeExtractDynamicObject` in the
+        // type-flow pass is the primary site where storage-size validation
+        // (E41206) fires.  This fallback path runs only when specialization
+        // has lowered the existential to the full tuple form rather than a
+        // tagged union.  At that point the tuple's AnyValue field already
+        // encodes the interface's any-value payload, and any mismatch would
+        // have been diagnosed upstream.
+
         auto witnessTableIDVec = builder.emitGetTupleElement(witnessTableIDVecType, obj, (UInt)1);
         auto packedValue = builder.emitGetTupleElement(packedValueType, obj, (UInt)2);
 
         auto seqID = builder.emitElementExtract(witnessTableIDVec, IRIntegerValue(0));
         builder.emitStore(typeIDOutPtr, seqID);
-
-        auto valuePtrType = cast<IRPtrTypeBase>(valueOutPtr->getDataType());
-        auto valueType = valuePtrType->getValueType();
 
         IRInst* unpackedValue = nullptr;
         if (as<IRAnyValueType>(packedValueType))

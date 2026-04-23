@@ -7010,22 +7010,22 @@ struct TypeFlowSpecializationContext
             return false;
         }
 
-        IRBuilder builder(inst);
-        builder.setInsertBefore(inst);
+        // All validation happens before any IR emission so a bail-out after the
+        // diagnostic leaves the IR unchanged — no orphaned stores, no duplicate
+        // diagnostics on a re-visit.
+        auto valuePtrType = as<IRPtrTypeBase>(valueOutPtr->getDataType());
+        if (!valuePtrType)
+            return false;
+        auto valueType = valuePtrType->getValueType();
 
-        // Pull the witness-table tag out of the tagged union and convert it to
-        // the globally consistent sequential ID expected by the caller.
-        auto tag = builder.emitGetTagFromTaggedUnion(obj);
-        auto tagType = cast<IRSetTagType>(tag->getDataType());
-        auto set = tagType->getSet();
-        if (set->getCount() == 0)
+        auto tableSet = taggedUnionType->getWitnessTableSet();
+        if (tableSet->getCount() == 0)
         {
-            // No concrete conformances known; bail out rather than dereferencing
-            // a non-existent element.  The existential value itself is unusable
-            // in this state.
+            // No concrete conformances known; the existential value is unusable
+            // in this state.  Wait for a later round to resolve it.
             return false;
         }
-        auto firstTable = as<IRWitnessTable>(set->getElement(0));
+        auto firstTable = as<IRWitnessTable>(tableSet->getElement(0));
         if (!firstTable)
         {
             // Set entry was not a concrete witness table (e.g. unbounded or an
@@ -7036,6 +7036,47 @@ struct TypeFlowSpecializationContext
         auto interfaceType = as<IRInterfaceType>(firstTable->getConformanceType());
         if (!interfaceType)
             return false;
+
+        // Determine the packed-value type without emitting the
+        // `GetValueFromTaggedUnion` yet — we need it only for the size check
+        // below.  Mirrors `IRBuilder::emitGetValueFromTaggedUnion`.
+        auto typeSet = taggedUnionType->getTypeSet();
+        IRType* packedType = nullptr;
+        {
+            IRBuilder typeBuilder(module);
+            packedType = typeSet->isSingleton()
+                             ? (IRType*)typeSet->getElement(0)
+                             : (IRType*)typeBuilder.getUntaggedUnionType((IRType*)typeSet);
+        }
+
+        // Validate that the user-chosen storage type matches the interface's
+        // any-value payload size; a mismatch would silently truncate or leave
+        // trailing bytes undefined, defeating the serialize/deserialize pair.
+        // `inst->removeAndDeallocate(); return true;` after diagnosing so we
+        // don't get re-visited and emit a duplicate error.
+        if (auto targetReq = targetProgram ? targetProgram->getTargetReq() : nullptr)
+        {
+            auto anyValueSize = getAnyValueSize(packedType, targetReq);
+            auto userSize = getAnyValueSize(valueType, targetReq);
+            if (anyValueSize > 0 && userSize > 0 && anyValueSize != userSize)
+            {
+                sink->diagnose(Diagnostics::SerializeDynamicObjectSizeMismatch{
+                    .valueType = valueType,
+                    .valueSize = userSize,
+                    .interfaceType = interfaceType,
+                    .anyValueSize = anyValueSize,
+                    .location = inst->sourceLoc});
+                inst->removeAndDeallocate();
+                return true;
+            }
+        }
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+
+        // Pull the witness-table tag out of the tagged union and convert it to
+        // the globally consistent sequential ID expected by the caller.
+        auto tag = builder.emitGetTagFromTaggedUnion(obj);
         IRInst* seqIDArgs[] = {interfaceType, tag};
         auto seqID = builder.emitIntrinsicInst(
             builder.getUIntType(),
@@ -7047,28 +7088,6 @@ struct TypeFlowSpecializationContext
         // Extract the packed payload and reinterpret it as the user-chosen
         // storage type behind `valueOutPtr`.
         auto packedValue = builder.emitGetValueFromTaggedUnion(obj);
-        auto valuePtrType = cast<IRPtrTypeBase>(valueOutPtr->getDataType());
-        auto valueType = valuePtrType->getValueType();
-
-        // Validate that the user-chosen storage type matches the interface's
-        // any-value payload size; a mismatch would silently truncate or leave
-        // trailing bytes undefined, defeating the serialize/deserialize pair.
-        if (auto targetReq = targetProgram ? targetProgram->getTargetReq() : nullptr)
-        {
-            auto packedType = packedValue->getDataType();
-            auto anyValueSize = getAnyValueSize(packedType, targetReq);
-            auto userSize = getAnyValueSize(valueType, targetReq);
-            if (anyValueSize > 0 && userSize > 0 && anyValueSize != userSize)
-            {
-                sink->diagnose(Diagnostics::SerializeDynamicObjectSizeMismatch{
-                    .valueType = valueType,
-                    .valueSize = userSize,
-                    .interfaceType = interfaceType,
-                    .anyValueSize = anyValueSize,
-                    .location = inst->sourceLoc});
-                return false;
-            }
-        }
 
         IRInst* unpackedValue = nullptr;
         if (as<IRUntaggedUnionType>(packedValue->getDataType()))
