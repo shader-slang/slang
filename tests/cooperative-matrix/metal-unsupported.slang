@@ -4,6 +4,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SCALAR_MUL,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_SCALAR_MUL
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_BAD_DIM,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_BAD_DIM
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_BAD_TYPE,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_BAD_TYPE
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SAT_ACCUM,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_SAT_ACCUM
 
 // Verify the compiler rejects unsupported CoopMat operations on Metal.
 // Metal's simdgroup_matrix only supports fill, Load, Store, and coopMatMulAdd.
@@ -57,5 +58,15 @@ void computeMain()
     var matInt : CoopMat<int32_t, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse.MatrixAccumulator>;
     matInt.fill(1);
     matInt.Store<CoopMatMatrixLayout.RowMajor>(outputBuffer, 0u, 8u);
+#endif
+
+#ifdef TEST_SAT_ACCUM
+    // CHECK_SAT_ACCUM: error 99999
+    // CHECK_SAT_ACCUM: saturating accumulation
+    coopMatMulAdd<float, true>(
+        CoopMat<float, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse.MatrixA>(2.0),
+        CoopMat<float, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse.MatrixB>(3.0),
+        CoopMat<float, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse.MatrixAccumulator>(1.0)
+    ).Store<CoopMatMatrixLayout.RowMajor>(outputBuffer, 0u, 8u);
 #endif
 }
