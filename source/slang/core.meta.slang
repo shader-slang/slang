@@ -3321,11 +3321,15 @@ __generic<T, U>
 __intrinsic_op($(kIROp_CreateExistentialObject))
 T createDynamicObject(uint typeId, U value);
 
-// One-argument shorthand for interfaces whose conforming types have an empty
-// any-value payload (stateless dispatch).  Forwards to the two-argument form
-// with a dummy `uint` payload that is discarded when the interface's
-// any-value size is zero; for stateful interfaces the resulting value is
-// equivalent to a default-initialized concrete instance.
+// One-argument shorthand for stateless dispatch: interfaces whose conforming
+// types have an empty any-value payload.  Forwards to the two-argument form
+// with a zero `uint` so the overload resolver has a concrete `U` to infer.
+// When the interface's any-value size is zero this byte is discarded.
+// When the interface's any-value size is non-zero this form is *not*
+// equivalent to calling the two-argument form with a real payload — only the
+// first `sizeof(uint)` bytes are initialized and the rest are left as whatever
+// `emitPackAnyValue` leaves for narrow-to-wide packing; callers that need a
+// specific payload must pass it explicitly via the two-argument form.
 __generic<T>
 [__unsafeForceInlineEarly]
 T createDynamicObject(uint typeId)
