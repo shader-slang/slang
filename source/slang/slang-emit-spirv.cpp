@@ -6622,22 +6622,31 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvBuiltIn builtinName;
         SpvStorageClass storageClass = SpvStorageClassInput;
         bool flat = false;
+        IRType* pointeeType = nullptr;
         BuiltinSpvVarKey() = default;
-        BuiltinSpvVarKey(SpvBuiltIn builtin, SpvStorageClass storageClass, bool isFlat)
-            : builtinName(builtin), storageClass(storageClass), flat(isFlat)
+        BuiltinSpvVarKey(
+            SpvBuiltIn builtin,
+            SpvStorageClass storageClass,
+            bool isFlat,
+            IRType* pointeeType)
+            : builtinName(builtin)
+            , storageClass(storageClass)
+            , flat(isFlat)
+            , pointeeType(pointeeType)
         {
         }
         bool operator==(const BuiltinSpvVarKey& other) const
         {
             return builtinName == other.builtinName && storageClass == other.storageClass &&
-                   flat == other.flat;
+                   flat == other.flat && pointeeType == other.pointeeType;
         }
         HashCode getHashCode() const
         {
             return combineHash(
                 Slang::getHashCode(builtinName),
                 Slang::getHashCode(storageClass),
-                Slang::getHashCode(flat));
+                Slang::getHashCode(flat),
+                Slang::getHashCode(pointeeType));
         }
     };
     Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
@@ -6666,25 +6675,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         if (!irInst)
             return false;
-        if (irInst->getOp() != kIROp_GlobalVar && irInst->getOp() != kIROp_GlobalParam &&
-            irInst->getOp() != kIROp_SPIRVAsmOperandBuiltinVar)
+        if (irInst->getOp() != kIROp_GlobalVar && irInst->getOp() != kIROp_GlobalParam)
             return false;
-
-        IRType* valueType = nullptr;
-        if (auto ptrType = as<IRPtrTypeBase>(irInst->getDataType()))
+        auto ptrType = as<IRPtrTypeBase>(irInst->getDataType());
+        if (!ptrType)
+            return false;
+        auto addrSpace = ptrType->getAddressSpace();
+        if (addrSpace == AddressSpace::Input || addrSpace == AddressSpace::BuiltinInput)
         {
-            auto addrSpace = ptrType->getAddressSpace();
-            if (addrSpace != AddressSpace::Input && addrSpace != AddressSpace::BuiltinInput)
-                return false;
-            valueType = ptrType->getValueType();
+            if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
+            {
+                if (isInstUsedInStage(irInst, Stage::Fragment))
+                    return true;
+            }
         }
-        else
-        {
-            valueType = irInst->getDataType();
-        }
-
-        return isIntegralScalarOrCompositeType(valueType) &&
-               isInstUsedInStage(irInst, Stage::Fragment);
+        return false;
     }
 
     SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal, IRInst* irInst)
@@ -6694,7 +6699,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(ptrType && "`getBuiltinGlobalVar`: `type` must be ptr type.");
         auto storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
         bool isFlat = needFlatDecorationForBuiltinVar(irInst);
-        auto key = BuiltinSpvVarKey(builtinVal, storageClass, isFlat);
+        auto key = BuiltinSpvVarKey(builtinVal, storageClass, isFlat, ptrType->getValueType());
         if (m_builtinGlobalVars.tryGetValue(key, result))
         {
             return result;
