@@ -1,69 +1,80 @@
 # Entry Point Signature Validation
 
-This document describes the entry-point signature validation system in the Slang
-compiler frontend. The system catches invalid types in entry-point parameters and
-return types during semantic checking, before IR generation, preventing crashes
-and invalid code generation downstream.
+This document describes the entry-point signature validation system in the
+Slang compiler frontend. The system catches invalid types in entry-point
+parameters and return types during semantic checking, before IR generation,
+preventing crashes and invalid code generation downstream.
+
+## Scope
+
+The validation performed here is **strictly limited to entry-point parameters
+and return types**. Types that are valid internally but wrong as a shader
+varying are only rejected when they appear at an entry-point boundary; all
+other uses are left unaffected.
 
 ## Motivation
 
 Without frontend validation, certain types can appear as entry-point varying
-parameters or return types and cause the compiler to either crash (segfault in IR
-passes like `legalizeEntryPointsForGLSL`) or silently generate invalid SPIR-V.
-The validation system rejects these cases with clear error diagnostics.
+parameters or return types and cause the compiler to either crash (segfault
+in IR passes like `legalizeEntryPointsForGLSL`) or silently generate invalid
+SPIR-V. The validation system rejects these cases with clear error
+diagnostics.
 
 ## Architecture
 
-Validation happens at two sites in the frontend:
+Validation lives in `validateEntryPoint()` in
+`source/slang/slang-check-shader.cpp`. After the existing return-type checks
+(resource types, array types), a validation pass walks each varying parameter
+type and the return type, checking them against a **data-driven rule table**.
 
-### Site 1: Entry-Point Varying Type Validation
-
-**Location**: `validateEntryPoint()` in `source/slang/slang-check-shader.cpp`
-
-After the existing return-type checks (resource types, array types), a new
-validation pass walks each varying parameter type and the return type, checking
-them against a **data-driven rule table**.
-
-#### Rule Table
+### Rule Table
 
 Each rule specifies:
 
-- A **type predicate**: a function that returns `true` if the type matches (is
-  invalid)
-- A **reason string**: human-readable explanation for the diagnostic
-- An optional **target predicate**: when non-null, the rule only applies to
-  targets matching this predicate (e.g., SPIR-V only)
+- A **type predicate**: a function that returns `true` if the type matches
+  (is invalid).
+- A **reason string**: human-readable explanation for the diagnostic.
+- An optional **target predicate**: when non-null, the rule only applies when
+  at least one compilation target matches this predicate (e.g. SPIR-V only).
+- An optional **stage predicate**: when non-null, the rule only applies when
+  the entry-point stage matches (e.g. only stages that use interface-block
+  varyings).
 
 ```
-Rule                    Type Predicate                          Target
-----                    --------------                          ------
-DifferentialPair<T>     as<DifferentialPairType> or             all
+Rule                    Type Predicate                          Target      Stage
+----                    --------------                          ------      -----
+DifferentialPair<T>     as<DifferentialPairType> or             all         all varying
 DifferentialPtrPair<T>  as<DifferentialPtrPairType>
-Atomic<T>               as<AtomicType>                          all
-CoopVec<T, N>           IntrinsicTypeModifier with              all
+Atomic<T>               as<AtomicType>                          all         all varying
+CoopVec<T, N>           IntrinsicTypeModifier with              all         interface-block
                         irOp == kIROp_CoopVectorType
                         (or as<CoopVectorExpressionType>)
-CoopMat<T,S,M,N,R>      IntrinsicTypeModifier with              all
+CoopMat<T,S,M,N,R>      IntrinsicTypeModifier with              all         interface-block
                         irOp == kIROp_CoopMatrixType
-vector<bool>            VectorExpressionType with               SPIR-V only
+vector<bool>            VectorExpressionType with               SPIR-V      interface-block
                         Bool element type
-matrix<T, R, C>         MatrixExpressionType with element       SPIR-V only
-(bad element type)      type other than float/half/double/
-                        int/uint
+matrix<T, R, C>         MatrixExpressionType with row or        all         interface-block
+(out-of-range dims)     column count outside 1..4
 ```
 
-New rules are added by appending entries to the static array. No other code
-changes are needed to add a new "type X is never valid as a varying" rule.
+"Interface-block" means stages that use interface-block-style varyings in
+SPIR-V/GLSL: `Vertex`, `Fragment`, `Geometry`, `Hull`, `Domain`, `Mesh`, and
+`Amplification`. Ray-tracing payload/attribute stages (`Miss`, `AnyHit`,
+`ClosestHit`, `Callable`, `RayGen`, `Intersection`) and `Compute` do not use
+interface blocks and are not subject to these rules.
 
-#### Recursive Type Traversal
+New rules are added by appending entries to the static array. No other code
+changes are needed to add a new "type X is not a valid varying" rule.
+
+### Recursive Type Traversal
 
 The type walker recursively descends into:
 
 - **Array element types**: `DifferentialPair<float>[4]` is also caught. This
   check is performed *before* the struct-field recursion because
-  `ArrayExpressionType` inherits from `DeclRefType` and its decl is the builtin
-  `Array` struct; without ordering array first we would walk the internal
-  fields of `Array` instead of the element type.
+  `ArrayExpressionType` inherits from `DeclRefType` and its decl is the
+  builtin `Array` struct; without ordering array first we would walk the
+  internal fields of `Array` instead of the element type.
 - **Struct fields**: If a struct is used as a varying parameter, each field's
   type is checked against the rules. This catches cases like
   `struct Foo { DifferentialPair<float> x; }` used as a parameter. Fields are
@@ -72,41 +83,24 @@ The type walker recursively descends into:
   `struct Wrapper<T> { T x; }` is also caught.
 - **ModifiedType wrappers**: Unwrapped transparently.
 
-Cycle detection prevents infinite recursion on recursive struct types.
+Cycle detection prevents infinite recursion on self-referential struct types,
+and a recursion-depth bound (`kMaxTypeNestingDepth`) handles recursive
+generic-struct instantiations whose `Type*` pointer changes at every nesting
+level.
 
-#### Uniform vs. Varying
+### Uniform vs. Varying
 
 Only varying parameters are checked. Parameters that are uniform (explicit
-`uniform` modifier, or resource types like textures/samplers/buffers detected by
-`isUniformParameterType()`) are skipped. An `Atomic<T>` inside a constant buffer
-is valid; it only fails as a varying input/output.
+`uniform` modifier, or resource types like textures/samplers/buffers detected
+by `isUniformParameterType()`) are skipped. An `Atomic<T>` inside a constant
+buffer is valid; it only fails as a varying input/output.
 
-#### Target-Specific Rules
+### Target-Specific Rules
 
-For rules with a target predicate, the validation checks all compilation targets
-in `linkage->targets`. If any target matches the predicate, the error is emitted.
-This handles the case where a user compiles for both SPIR-V and HLSL -- the
-SPIR-V restriction still applies.
-
-### Site 2: Matrix Dimension Validation
-
-**Location**: `CoerceToUsableType()` in `source/slang/slang-check-type.cpp`
-
-Matrix **dimensions** are validated at type-construction time (not just at
-entry points) because matrix dimensions outside 1..4 produce broken output
-regardless of where the type appears.
-
-Row count and column count are checked when they are compile-time constants
-(`ConstantIntVal`). Values outside `1..4` are rejected. Non-constant dimensions
-(generic parameters) are not validated here -- they will be checked when the
-generic is instantiated with concrete values.
-
-**Note:** Matrix *element-type* validation is handled by Site 1 (the varying
-rule table), because the restriction on element types is specific to SPIR-V
-entry-point varyings rather than a universal type-system restriction. Matrices
-with `uint64_t` elements (for example) are fine inside a uniform buffer or
-internal computation; they only fail when used as an entry-point varying for
-SPIR-V.
+For rules with a target predicate, the validation checks all compilation
+targets in `linkage->targets`. If any target matches the predicate, the error
+is emitted. This handles the case where a user compiles for both SPIR-V and
+HLSL -- the SPIR-V restriction still applies.
 
 ## Diagnostics
 
@@ -114,7 +108,6 @@ SPIR-V.
 |-------|------|-------------|
 | 38050 | `invalid-entry-point-varying-type` | Type cannot be used as entry-point varying parameter or return type |
 | 38051 | `invalid-entry-point-varying-type-for-target` | Type cannot be used as entry-point varying for a specific target |
-| 38206 | `matrix-dimension-out-of-range` | Matrix row or column count is outside 1..4 |
 
 ## Extending the System
 
@@ -126,7 +119,8 @@ Add an entry to `kEntryPointVaryingTypeRules[]` in `slang-check-shader.cpp`:
 {
     [](Type* type) -> bool { return as<YourType>(type) != nullptr; },
     "YourType is not a valid varying type",
-    nullptr,  // all targets, or a target predicate
+    nullptr,  // target predicate (nullptr = all targets)
+    nullptr,  // stage predicate  (nullptr = all varying stages)
 },
 ```
 
@@ -139,14 +133,19 @@ Same as above, but provide a target predicate:
     [](Type* type) -> bool { /* match logic */ },
     "reason message",
     [](CodeGenTarget target) -> bool { return isSPIRV(target); },
+    nullptr,
 },
 ```
 
-## Future Work
+### Adding a stage-specific restriction
 
-The senior developer's comment on issue #9759 outlines a more comprehensive
-system with per-stage validation objects, semantic-level checking, and attribute
-validation. This first pass addresses the immediate crashes and invalid codegen
-by rejecting known-bad types. The rule table design is compatible with the
-broader vision -- rules could later be made stage-aware by adding a stage
-predicate field.
+Same as above, but provide a stage predicate:
+
+```cpp
+{
+    [](Type* type) -> bool { /* match logic */ },
+    "reason message",
+    nullptr,
+    [](Stage stage) -> bool { return stage == Stage::Fragment; },
+},
+```

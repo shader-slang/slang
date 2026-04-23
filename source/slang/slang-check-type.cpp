@@ -451,45 +451,6 @@ TypeExp SemanticsVisitor::CheckProperType(TypeExp typeExp)
     return CoerceToProperType(TranslateTypeNode(typeExp));
 }
 
-// Validates matrix dimensions at type-construction time.
-// Returns true if the matrix type is valid, false if an error was diagnosed.
-static bool validateMatrixType(
-    SemanticsVisitor* visitor,
-    MatrixExpressionType* matType,
-    SourceLoc loc)
-{
-    auto sink = visitor->getSink();
-    bool valid = true;
-
-    if (auto colCountVal = as<ConstantIntVal>(matType->getColumnCount()))
-    {
-        auto colCount = colCountVal->getValue();
-        if (colCount < 1 || colCount > 4)
-        {
-            sink->diagnose(Diagnostics::MatrixDimensionOutOfRange{
-                .dimName = "column count",
-                .dimValue = String(colCount),
-                .location = loc});
-            valid = false;
-        }
-    }
-
-    if (auto rowCountVal = as<ConstantIntVal>(matType->getRowCount()))
-    {
-        auto rowCount = rowCountVal->getValue();
-        if (rowCount < 1 || rowCount > 4)
-        {
-            sink->diagnose(Diagnostics::MatrixDimensionOutOfRange{
-                .dimName = "row count",
-                .dimValue = String(rowCount),
-                .location = loc});
-            valid = false;
-        }
-    }
-
-    return valid;
-}
-
 TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
 {
     TypeExp result = CoerceToProperType(typeExp);
@@ -506,18 +467,13 @@ TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
         }
     }
 
-    // Validate matrix dimensions. Element-type restrictions are handled by
-    // the entry-point varying rules (see validateEntryPoint) rather than here,
-    // since they are target-specific (SPIR-V) and only apply to varyings.
-    if (auto matType = as<MatrixExpressionType>(type))
-    {
-        SourceLoc loc = result.exp ? result.exp->loc : SourceLoc();
-        if (!validateMatrixType(this, matType, loc))
-        {
-            result.type = m_astBuilder->getErrorType();
-            return result;
-        }
-    }
+    // Matrix row/column dimension validation is intentionally *not* done at
+    // type-construction time. Rejecting a matrix here would also reject uses
+    // that may be valid on specific targets (e.g. the CPU target, or
+    // capability-gated code paths). Instead, matrices with out-of-range
+    // dimensions are caught at entry-point varying sites by a rule in
+    // `validateEntryPoint`, and downstream codegen for other contexts is
+    // responsible for its own diagnostics.
 
     // A type pack is not a usable type other than for defining parameters.
     if (!as<ParamDecl>(decl) && isTypePack(type))

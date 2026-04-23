@@ -3963,14 +3963,6 @@ err(
     span { loc = "location", message = "structured buffer element type '~type:Type' contains recursive type references" }
 )
 
-err(
-    "matrix-dimension-out-of-range",
-    38206,
-    "matrix dimension out of valid range",
-    span { loc = "location", message = "matrix type has ~dimName ~dimValue; matrix row and column counts must be between 1 and 4 inclusive" }
-)
-
-
 -- Load semantic checking diagnostics (part 11) - Type layout and parameter binding
 -- (inlined from slang-diagnostics-semantic-checking-11.lua)
 

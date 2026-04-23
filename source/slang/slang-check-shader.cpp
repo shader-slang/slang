@@ -725,6 +725,11 @@ struct EntryPointVaryingTypeRule
     // If non-null, this rule only applies when the target matches this predicate.
     // When null, the rule applies to all targets.
     bool (*targetPredicate)(CodeGenTarget target);
+
+    // If non-null, this rule only applies when the stage matches this predicate.
+    // When null, the rule applies to all stages for which the parameter/return
+    // can be a varying (see `canHaveVaryingInput` in `validateEntryPoint`).
+    bool (*stagePredicate)(Stage stage);
 };
 
 static bool _matchDifferentialPairType(Type* type)
@@ -765,25 +770,25 @@ static bool _matchVectorBoolType(Type* type)
     return elemType->getBaseType() == BaseType::Bool;
 }
 
-static bool _matchMatrixWithInvalidElementType(Type* type)
+static bool _matchMatrixWithOutOfRangeDimensions(Type* type)
 {
+    // Row and column counts outside the 1..4 range break downstream codegen
+    // (issue #9450). Only the entry-point varying site is restricted here;
+    // the constructed type itself is not rejected, so targets that can
+    // support larger matrices internally are unaffected.
     auto matType = as<MatrixExpressionType>(type);
     if (!matType)
         return false;
-    auto elemType = as<BasicExpressionType>(matType->getElementType());
-    if (!elemType)
-        return false;
-    switch (elemType->getBaseType())
+    auto isOutOfRange = [](IntVal* v)
     {
-    case BaseType::Float:
-    case BaseType::Half:
-    case BaseType::Double:
-    case BaseType::Int:
-    case BaseType::UInt:
+        if (auto cv = as<ConstantIntVal>(v))
+        {
+            auto n = cv->getValue();
+            return n < 1 || n > 4;
+        }
         return false;
-    default:
-        return true;
-    }
+    };
+    return isOutOfRange(matType->getRowCount()) || isOutOfRange(matType->getColumnCount());
 }
 
 static bool _isSpirvTarget(CodeGenTarget target)
@@ -791,17 +796,68 @@ static bool _isSpirvTarget(CodeGenTarget target)
     return isSPIRV(target);
 }
 
+// True for stages that use interface-block-style varyings in SPIR-V/GLSL
+// (i.e. the stages where the failure modes in issues #9446/#9448/#9449/#9452
+// were reproduced). Ray-tracing payload/attribute stages and the compute
+// stages do not use interface blocks and place fewer restrictions on the
+// varying type, so we avoid diagnosing those stages.
+static bool _isInterfaceBlockVaryingStage(Stage stage)
+{
+    switch (stage)
+    {
+    case Stage::Vertex:
+    case Stage::Fragment:
+    case Stage::Geometry:
+    case Stage::Hull:
+    case Stage::Domain:
+    case Stage::Mesh:
+    case Stage::Amplification:
+        return true;
+    default:
+        return false;
+    }
+}
+
 static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
+    // `DifferentialPair`/`DifferentialPtrPair` are autodiff wrapper types with
+    // no defined meaning at an inter-stage interface. Issue #9429 shows they
+    // crash the backend on every stage where they participate as varyings.
     {_matchDifferentialPairType,
      "DifferentialPair/DifferentialPtrPair is not a valid varying type",
+     nullptr,
      nullptr},
-    {_matchAtomicType, "Atomic is not a valid varying type", nullptr},
-    {_matchCoopVectorType, "CoopVec is not a valid varying type", nullptr},
-    {_matchCoopMatrixType, "CoopMat is not a valid varying type", nullptr},
-    {_matchVectorBoolType, "vector<bool> is not valid as a SPIR-V varying type", _isSpirvTarget},
-    {_matchMatrixWithInvalidElementType,
-     "matrix with this element type is not valid as a SPIR-V varying type",
-     _isSpirvTarget},
+
+    // `Atomic<T>` is a storage-class wrapper, not a value type that can be
+    // passed across a shader interface. Issue #9443.
+    {_matchAtomicType, "Atomic is not a valid varying type", nullptr, nullptr},
+
+    // `CoopVec` and `CoopMat` generate invalid SPIR-V when placed into an
+    // interface block. Ray-tracing payload/attribute stages tolerate them,
+    // so we restrict the rule to interface-block varying stages
+    // (issues #9446, #9448, #9449).
+    {_matchCoopVectorType,
+     "CoopVec is not a valid varying type for this stage",
+     nullptr,
+     _isInterfaceBlockVaryingStage},
+    {_matchCoopMatrixType,
+     "CoopMat is not a valid varying type for this stage",
+     nullptr,
+     _isInterfaceBlockVaryingStage},
+
+    // `vector<bool>` produces invalid SPIR-V on interface-block stages
+    // (issue #9452). Compute/ray/amplification stages accept it in practice;
+    // only diagnose where the failure actually occurs.
+    {_matchVectorBoolType,
+     "vector<bool> is not a valid SPIR-V varying type for this stage",
+     _isSpirvTarget,
+     _isInterfaceBlockVaryingStage},
+
+    // `matrix<T, R, C>` with row/column count outside 1..4 breaks downstream
+    // codegen on the interface-block stages (issue #9450).
+    {_matchMatrixWithOutOfRangeDimensions,
+     "matrix row and column counts must be between 1 and 4 inclusive",
+     nullptr,
+     _isInterfaceBlockVaryingStage},
 };
 
 struct VaryingTypeValidationContext
@@ -813,6 +869,7 @@ struct VaryingTypeValidationContext
     const char* direction;
     const char* context;
     ArrayView<CodeGenTarget> targets;
+    Stage stage;
     HashSet<Type*> seenTypes;
     UInt recursionDepth = 0;
     bool reportedNestingLimit = false;
@@ -862,6 +919,12 @@ static bool validateVaryingType(VaryingTypeValidationContext& ctx, Type* type)
     for (const auto& rule : kEntryPointVaryingTypeRules)
     {
         if (!rule.matches(type))
+            continue;
+
+        // A rule may scope itself to a subset of stages (e.g. only
+        // interface-block stages). If so, skip when the entry point's stage
+        // is outside that set.
+        if (rule.stagePredicate && !rule.stagePredicate(ctx.stage))
             continue;
 
         if (rule.targetPredicate)
@@ -925,10 +988,8 @@ static bool validateVaryingType(VaryingTypeValidationContext& ctx, Type* type)
             // type parameter substitutions are applied to each field's type.
             // Without this, `struct Wrapper<T> { T x; }` used as
             // `Wrapper<DifferentialPair<float>>` would not be caught.
-            for (auto fieldDeclRef : getMembersOfType<VarDecl>(
-                     ctx.astBuilder,
-                     structDeclRef,
-                     MemberFilterStyle::Instance))
+            for (auto fieldDeclRef :
+                 getFields(ctx.astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
                 auto fieldType = getType(ctx.astBuilder, fieldDeclRef);
                 if (validateVaryingType(ctx, fieldType))
@@ -1064,6 +1125,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             ctx.direction = "output";
             ctx.context = "return type";
             ctx.targets = targets.getArrayView();
+            ctx.stage = stage;
             validateVaryingType(ctx, returnType);
         }
 
@@ -1096,6 +1158,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             String contextStr = contextSb.produceString();
             ctx.context = contextStr.getBuffer();
             ctx.targets = targets.getArrayView();
+            ctx.stage = stage;
             validateVaryingType(ctx, param->getType());
         }
     }
