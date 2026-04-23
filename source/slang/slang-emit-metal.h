@@ -97,6 +97,7 @@ protected:
     bool _emitUserSemantic(UnownedStringSlice semanticName, IRIntegerValue semanticIndex);
     bool maybeEmitSystemSemantic(IRInst* inst);
 
+    void _validateCoopMatrixType(IRCoopMatrixType* coopType);
     void emitImageOperandWithAccessor(IRInst* imageOperand);
     void emitAtomicImageCoord(IRImageSubscript* subscript);
     void emitAtomicDestOperand(IRInst* operand);

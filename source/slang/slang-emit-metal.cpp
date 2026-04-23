@@ -754,6 +754,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                         .feature = "saturating accumulation for Metal cooperative matrices "
                                    "(simdgroup_matrix)",
                         .location = inst->sourceLoc});
+                    return false;
                 }
             }
             emitType(inst->getDataType(), getName(inst));
@@ -1226,6 +1227,32 @@ void MetalSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     emitType(type, name);
 }
 
+void MetalSourceEmitter::_validateCoopMatrixType(IRCoopMatrixType* coopType)
+{
+    auto rows = getIntVal(coopType->getRowCount());
+    auto cols = getIntVal(coopType->getColumnCount());
+    if (rows != 8 || cols != 8)
+    {
+        getSink()->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices (simdgroup_matrix) only support 8x8 dimensions",
+            .location = coopType->sourceLoc});
+    }
+    auto scope = getIntVal(coopType->getScope());
+    if (scope != (IRIntegerValue)MemoryScope::Subgroup)
+    {
+        getSink()->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices (simdgroup_matrix) only support Subgroup scope",
+            .location = coopType->sourceLoc});
+    }
+    auto elementType = coopType->getElementType();
+    if (elementType->getOp() != kIROp_HalfType && elementType->getOp() != kIROp_FloatType)
+    {
+        getSink()->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices only support half and float element types",
+            .location = coopType->sourceLoc});
+    }
+}
+
 void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->getOp())
@@ -1387,23 +1414,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_CoopMatrixType:
         {
             auto coopType = as<IRCoopMatrixType>(type);
-            auto rows = getIntVal(coopType->getRowCount());
-            auto cols = getIntVal(coopType->getColumnCount());
-            if (rows != 8 || cols != 8)
-            {
-                getSink()->diagnose(Diagnostics::Unimplemented{
-                    .feature =
-                        "Metal cooperative matrices (simdgroup_matrix) only support 8x8 dimensions",
-                    .location = type->sourceLoc});
-            }
-            auto elementType = coopType->getElementType();
-            if (elementType->getOp() != kIROp_HalfType && elementType->getOp() != kIROp_FloatType)
-            {
-                getSink()->diagnose(Diagnostics::Unimplemented{
-                    .feature =
-                        "Metal cooperative matrices only support half and float element types",
-                    .location = type->sourceLoc});
-            }
+            _validateCoopMatrixType(coopType);
             // Metal's simdgroup_matrix<T, Cols, Rows> uses Cols, Rows order
             m_writer->emit("simdgroup_matrix<");
             emitType(coopType->getElementType());
