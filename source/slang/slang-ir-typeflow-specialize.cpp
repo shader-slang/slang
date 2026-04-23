@@ -2112,6 +2112,7 @@ struct TypeFlowSpecializationContext
                 sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
                     .interfaceType = typeStr.produceString(),
                     .location = inst->sourceLoc});
+                diagnosedNoTypeConformancesInterfaces.add(interfaceType);
                 module->getContainerPool().free(&tables);
                 return none();
             }
@@ -2363,6 +2364,7 @@ struct TypeFlowSpecializationContext
                     sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
                         .interfaceType = typeStr.produceString(),
                         .location = loadInst->sourceLoc});
+                    diagnosedNoTypeConformancesInterfaces.add(interfaceType);
                     module->getContainerPool().free(&tables);
                     return none();
                 }
@@ -2444,6 +2446,7 @@ struct TypeFlowSpecializationContext
                         sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
                             .interfaceType = typeStr.produceString(),
                             .location = inst->sourceLoc});
+                        diagnosedNoTypeConformancesInterfaces.add(interfaceType);
                         module->getContainerPool().free(&tables);
                         return none();
                     }
@@ -3341,6 +3344,57 @@ struct TypeFlowSpecializationContext
             return none();
 
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeLookupWitnessMethod");
+    }
+
+    // After specialization has lowered every dispatch site it could, walk any
+    // remaining `lookupWitnessMethod` insts whose witness-table operand is not
+    // a concrete `IRWitnessTable` and whose interface has no registered
+    // conformances.  Those insts will ICE in codegen ("Unhandled local inst
+    // lookupWitness") with no indication that the real problem is missing
+    // conformance registration.  Emit E50100 instead.  Catches transitively-
+    // nested cases (e.g. interface field inside a struct loaded from a
+    // `StructuredBuffer`) that the load-site check in `analyzeLoad` misses —
+    // see #9445.
+    void diagnoseUnresolvedLookupWitnesses()
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            for (auto block : func->getChildren())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    auto lookup = as<IRLookupWitnessMethod>(inst);
+                    if (!lookup)
+                        continue;
+                    auto witnessTable = lookup->getWitnessTable();
+                    if (as<IRWitnessTable>(witnessTable))
+                        continue;
+                    auto witnessTableType = as<IRWitnessTableTypeBase>(witnessTable->getDataType());
+                    if (!witnessTableType)
+                        continue;
+                    auto interfaceType =
+                        as<IRInterfaceType>(witnessTableType->getConformanceType());
+                    if (!interfaceType || isComInterfaceType(interfaceType))
+                        continue;
+                    if (!diagnosedNoTypeConformancesInterfaces.add(interfaceType))
+                        continue;
+                    HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+                    collectExistentialTables(interfaceType, tables);
+                    if (tables.getCount() == 0)
+                    {
+                        StringBuilder typeStr;
+                        printDiagnosticArg(typeStr, interfaceType);
+                        sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                            .interfaceType = typeStr.produceString(),
+                            .location = lookup->sourceLoc});
+                    }
+                    module->getContainerPool().free(&tables);
+                }
+            }
+        }
     }
 
     // Check if an existential operand is an entry-point parameter of interface type
@@ -7857,6 +7911,13 @@ struct TypeFlowSpecializationContext
         //
         hasChanges |= performDynamicInstLowering();
 
+        // Part 3: Diagnose unresolved dispatch sites.
+        //    Any `lookupWitnessMethod` that survived specialization with a
+        //    non-concrete witness-table operand would ICE in codegen.  If the
+        //    corresponding interface has no conformances registered, report
+        //    E50100 pointing the user at the real fix.
+        diagnoseUnresolvedLookupWitnesses();
+
         return hasChanges;
     }
 
@@ -7895,6 +7956,13 @@ struct TypeFlowSpecializationContext
     // Set of bit-cast instructions already diagnosed for unsupported
     // non-concrete result types during propagation.
     HashSet<IRInst*> diagnosedBitCasts;
+
+    // Set of interface types already diagnosed with E50100 "no type conformances"
+    // from any analysis path, so the compiler emits at most one E50100 per
+    // interface per module — avoids duplicate diagnostics when a single missing
+    // conformance surfaces at multiple dispatch sites (e.g. the
+    // `createDynamicObject` site *and* a subsequent `lookupWitnessMethod`).
+    HashSet<IRInst*> diagnosedNoTypeConformancesInterfaces;
 
     // Emit error 33180 for an invalid existential specialization, deduplicating by `dedupKey`.
     // Returns true if the diagnostic was emitted (first time for this key).
