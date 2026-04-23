@@ -58,10 +58,15 @@ matrix<T, R, C>         MatrixExpressionType with row or        all         inte
 ```
 
 "Interface-block" means stages that use interface-block-style varyings in
-SPIR-V/GLSL: `Vertex`, `Fragment`, `Geometry`, `Hull`, `Domain`, `Mesh`, and
-`Amplification`. Ray-tracing payload/attribute stages (`Miss`, `AnyHit`,
-`ClosestHit`, `Callable`, `RayGen`, `Intersection`) and `Compute` do not use
-interface blocks and are not subject to these rules.
+SPIR-V/GLSL: `Vertex`, `Fragment`, `Geometry`, `Hull`, `Domain`, and `Mesh`.
+`Amplification` shaders output via `TaskPayloadWorkgroupEXT` rather than
+interface blocks, so they are not in this set. Ray-tracing payload/attribute
+stages (`Miss`, `AnyHit`, `ClosestHit`, `Callable`, `RayGen`, `Intersection`)
+and `Compute` also do not use interface blocks. These non-interface-block
+stages are exempt from the rules whose stage predicate is limited to
+interface-block varyings; rules with no stage predicate (e.g.
+`DifferentialPair`, `Atomic`) still apply to every stage that accepts
+varying parameters.
 
 New rules are added by appending entries to the static array. No other code
 changes are needed to add a new "type X is not a valid varying" rule.

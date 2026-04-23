@@ -6,6 +6,9 @@
 struct LoopField<each T>
 {
     LoopField<T, int> next;
+/*CHECK:
+    ^^^^^^^^^ maximum type nesting level exceeded
+*/
 }
 
 struct Params
@@ -16,6 +19,5 @@ struct Params
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(Params p)
-//CHECK:                ^ maximum type nesting level exceeded
 {
 }

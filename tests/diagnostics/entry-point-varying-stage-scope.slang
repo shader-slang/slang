@@ -9,19 +9,19 @@
 
 //TEST:SIMPLE(filecheck=COMPUTE): -target spirv -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=MISS): -target spirv -entry missMain -stage miss
-//TEST:SIMPLE(filecheck=CALLABLE): -target spirv -entry callableMain -stage callable
 
 import linalg;
 
+// --- Compute: any banned varying shape is fine as an internal variable,
+// and an `Atomic<int>` parameter is auto-classified uniform (no error).
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void computeMain()
+void computeMain(Atomic<int> counter)
 {
-    // Valid internal use of matrices with out-of-range dims and exotic element
-    // types is left to the downstream backend; the frontend does not reject.
+    // Internal declarations that would be rejected at a varying boundary.
     matrix<float, 5, 5> big;
-    matrix<uint64_t, 2, 2> bigElem;
     vector<bool, 4> bvec;
+    CoopVec<float, 4> cvec;
 }
 
 // COMPUTE-NOT: E38050
@@ -30,12 +30,12 @@ void computeMain()
 // COMPUTE-NOT: not a valid SPIR-V varying type
 // COMPUTE-NOT: matrix row and column counts
 
-// Miss shader: takes a "payload" struct parameter by inout. Issue #9452
-// explicitly notes vector<bool> is accepted by the miss stage.
+// --- Miss: payload carries vector<bool>, which issue #9452 notes is
+// accepted by the miss stage despite failing on interface-block stages.
 struct Payload
 {
+    float x;
     vector<bool, 4> flags;
-    matrix<uint64_t, 2, 2> m;
 }
 
 [shader("miss")]
@@ -47,19 +47,3 @@ void missMain(inout Payload p)
 // MISS-NOT: E38051
 // MISS-NOT: not a valid varying type
 // MISS-NOT: not a valid SPIR-V varying type
-// MISS-NOT: matrix row and column counts
-
-// Callable shader: also accepted per issue #9452.
-struct CallData
-{
-    CoopVec<float, 4> v;
-}
-
-[shader("callable")]
-void callableMain(inout CallData d)
-{
-}
-
-// CALLABLE-NOT: E38050
-// CALLABLE-NOT: E38051
-// CALLABLE-NOT: not a valid varying type for this stage

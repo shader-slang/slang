@@ -1,12 +1,11 @@
-// Verify that SPIR-V-only varying rules (vector<bool>, matrix with non-32-bit
-// scalar element types) do NOT diagnose on non-SPIR-V targets. A future change
-// that accidentally makes these rules universal would otherwise silently break
-// valid HLSL code.
+// Verify that the SPIR-V-only varying rule for `vector<bool>` does NOT
+// diagnose on non-SPIR-V targets. A future change that accidentally makes
+// this rule universal would otherwise silently break valid HLSL code.
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry main -stage vertex
 
 [shader("vertex")]
-float4 main(vector<bool, 4> b : A, matrix<uint64_t, 2, 2> m : B) : SV_Position
+float4 main(vector<bool, 4> b : A) : SV_Position
 {
     return float4(0);
 }

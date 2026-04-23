@@ -284,6 +284,68 @@ static void validateSystemValueSemanticForType(
     }
 }
 
+// Check if a system value semantic name is per-primitive in mesh shaders.
+// These semantics must only appear in OutputPrimitives (or 'out primitives') parameters.
+static bool isPerPrimitiveMeshSemantic(UnownedStringSlice semanticName)
+{
+    return semanticName.caseInsensitiveEquals(toSlice("sv_cullprimitive")) ||
+           semanticName.caseInsensitiveEquals(toSlice("sv_primitiveid")) ||
+           semanticName.caseInsensitiveEquals(toSlice("sv_rendertargetarrayindex")) ||
+           semanticName.caseInsensitiveEquals(toSlice("sv_viewportarrayindex")) ||
+           semanticName.caseInsensitiveEquals(toSlice("sv_shadingrate"));
+}
+
+// Recursively check struct fields for per-primitive mesh shader semantics.
+// Emits a diagnostic if any per-primitive semantic is found in a vertex/index output.
+static void validateNoPerPrimitiveSemanticsInType(
+    DiagnosticSink* sink,
+    Type* type,
+    ASTBuilder* astBuilder,
+    HashSet<Type*>& seenTypes)
+{
+    if (!type)
+        return;
+    if (seenTypes.contains(type))
+        return;
+    seenTypes.add(type);
+
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return;
+
+    auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
+    if (!structDeclRef)
+        return;
+
+    for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+    {
+        auto fieldDecl = fieldDeclRef.getDecl();
+
+        // Recurse into nested struct types, unwrapping conditional and array wrappers first
+        if (auto fieldVarDecl = as<VarDeclBase>(fieldDecl))
+        {
+            Type* fieldType = unwrapConditionalType(fieldVarDecl->getType());
+            while (auto arrayType = as<ArrayExpressionType>(fieldType))
+                fieldType = unwrapConditionalType(arrayType->getElementType());
+            validateNoPerPrimitiveSemanticsInType(sink, fieldType, astBuilder, seenTypes);
+        }
+
+        // Check if this field has a per-primitive system value semantic
+        auto semantic = fieldDecl->findModifier<HLSLSimpleSemantic>();
+        if (!semantic)
+            continue;
+
+        auto name = semantic->name.getContent();
+        if (isPerPrimitiveMeshSemantic(name))
+        {
+            sink->diagnose(Diagnostics::PerPrimitiveSemanticInVertexOutput{
+                .semantic = String(name),
+                .location = fieldDecl->loc});
+        }
+    }
+}
+
+
 // Validate system value semantics on a declaration recursively.
 // and validates any SV_ semantic against the SemanticDecl definitions in core module.
 static void validateSystemValueSemantic(
@@ -333,6 +395,27 @@ static void validateSystemValueSemantic(
     if (auto meshOutputType = as<MeshOutputType>(type))
     {
         auto elementType = meshOutputType->getElementType();
+        // If this is a vertex or index output, validate that no per-primitive semantics are used.
+        // Per-primitive semantics must only appear in OutputPrimitives / 'out primitives'.
+        if (stage == Stage::Mesh && !as<PrimitivesType>(meshOutputType))
+        {
+            if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
+            {
+                if (isPerPrimitiveMeshSemantic(semantic->name.getContent()))
+                {
+                    sink->diagnose(Diagnostics::PerPrimitiveSemanticInVertexOutput{
+                        .semantic = String(semantic->name.getContent()),
+                        .location = decl->loc});
+                }
+            }
+
+            HashSet<Type*> seenTypes;
+            validateNoPerPrimitiveSemanticsInType(
+                sink,
+                unwrapConditionalType(elementType),
+                visitor->getASTBuilder(),
+                seenTypes);
+        }
         type = unwrapConditionalType(elementType);
         direction = SemanticDirection::Output;
     }
@@ -748,10 +831,10 @@ static bool _matchAtomicType(Type* type)
 
 static bool _matchCoopVectorType(Type* type)
 {
-    // `CoopVec` is declared as an intrinsic type with kIROp_CoopVectorType.
-    // Also match the older `CoopVectorExpressionType` AST class for safety.
-    return as<CoopVectorExpressionType>(type) != nullptr ||
-           isIntrinsicTypeWithOp(type, kIROp_CoopVectorType);
+    // `CoopVec` is declared in the core module as a struct carrying
+    // `__intrinsic_type(kIROp_CoopVectorType)`. Detect it via that modifier
+    // to stay consistent with how `_matchCoopMatrixType` handles `CoopMat`.
+    return isIntrinsicTypeWithOp(type, kIROp_CoopVectorType);
 }
 
 static bool _matchCoopMatrixType(Type* type)
@@ -801,6 +884,10 @@ static bool _isSpirvTarget(CodeGenTarget target)
 // were reproduced). Ray-tracing payload/attribute stages and the compute
 // stages do not use interface blocks and place fewer restrictions on the
 // varying type, so we avoid diagnosing those stages.
+//
+// Note: `Amplification` (task) shaders output via `TaskPayloadWorkgroupEXT`
+// rather than interface blocks, so they are not included here. `Mesh` shader
+// varying outputs *do* lower to interface blocks in SPIR-V, so it is.
 static bool _isInterfaceBlockVaryingStage(Stage stage)
 {
     switch (stage)
@@ -811,7 +898,6 @@ static bool _isInterfaceBlockVaryingStage(Stage stage)
     case Stage::Hull:
     case Stage::Domain:
     case Stage::Mesh:
-    case Stage::Amplification:
         return true;
     default:
         return false;
@@ -845,8 +931,8 @@ static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
      _isInterfaceBlockVaryingStage},
 
     // `vector<bool>` produces invalid SPIR-V on interface-block stages
-    // (issue #9452). Compute/ray/amplification stages accept it in practice;
-    // only diagnose where the failure actually occurs.
+    // (issue #9452). Compute and ray-tracing payload stages accept it in
+    // practice; only diagnose where the failure actually occurs.
     {_matchVectorBoolType,
      "vector<bool> is not a valid SPIR-V varying type for this stage",
      _isSpirvTarget,
@@ -1106,62 +1192,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
-    // Validate that varying parameter/return types are legal.
-    {
-        List<CodeGenTarget> targets;
-        for (auto target : linkage->targets)
-            targets.add(target->getTarget());
-
-        auto astBuilder = linkage->getASTBuilder();
-
-        // Validate return type as varying output
-        if (returnType)
-        {
-            VaryingTypeValidationContext ctx;
-            ctx.astBuilder = astBuilder;
-            ctx.sink = sink;
-            ctx.entryPointName = entryPointName;
-            ctx.loc = entryPointFuncDecl->loc;
-            ctx.direction = "output";
-            ctx.context = "return type";
-            ctx.targets = targets.getArrayView();
-            ctx.stage = stage;
-            validateVaryingType(ctx, returnType);
-        }
-
-        // Validate each parameter that would be treated as varying
-        for (const auto& param : entryPointFuncDecl->getParameters())
-        {
-            if (param->hasModifier<HLSLUniformModifier>())
-                continue;
-            if (isUniformParameterType(param->getType()))
-                continue;
-
-            VaryingTypeValidationContext ctx;
-            ctx.astBuilder = astBuilder;
-            ctx.sink = sink;
-            ctx.entryPointName = entryPointName;
-            ctx.loc = param->loc;
-            // Note: `InOutModifier` inherits from `OutModifier`, so it must be
-            // checked first to avoid mislabeling `inout` parameters as "output".
-            ctx.direction = param->hasModifier<InOutModifier>() ? "input/output"
-                            : param->hasModifier<OutModifier>() ? "output"
-                            : param->hasModifier<RefModifier>() ? "input/output"
-                                                                : "input";
-
-            StringBuilder contextSb;
-            auto paramName = param->getName();
-            if (paramName)
-                contextSb << "parameter '" << paramName->text << "'";
-            else
-                contextSb << "parameter";
-            String contextStr = contextSb.produceString();
-            ctx.context = contextStr.getBuffer();
-            ctx.targets = targets.getArrayView();
-            ctx.stage = stage;
-            validateVaryingType(ctx, param->getType());
-        }
-    }
+    // NOTE: Varying-parameter / return-type validation happens *after* the
+    // auto-uniform classification below, so that parameters auto-marked
+    // `uniform` on non-varying stages (e.g. `compute`) are skipped rather
+    // than being diagnosed as if they were varyings.
 
     // Every entry point needs to have a stage specified either via
     // command-line/API options, or via an explicit `[shader("...")]` attribute.
@@ -1226,6 +1260,30 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             }
 
             attr->patchConstantFuncDecl = patchConstantFuncDeclRef.getDecl();
+        }
+    }
+    else if (stage == Stage::Geometry)
+    {
+        bool hasOutputStream = false;
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            if (as<HLSLStreamOutputType>(param->getType()))
+            {
+                hasOutputStream = true;
+                break;
+            }
+        }
+        if (!hasOutputStream)
+        {
+            sink->diagnose(Diagnostics::GeometryShaderMissingOutputStream{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+        if (!entryPointFuncDecl->findModifier<MaxVertexCountAttribute>())
+        {
+            sink->diagnose(Diagnostics::GeometryShaderMissingMaxVertexCount{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
         }
     }
     else if (stage == Stage::Compute)
@@ -1436,6 +1494,66 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         {
             sink->diagnose(
                 Diagnostics::NonUniformEntryPointParameterTreatedAsUniform{.param = param});
+        }
+    }
+
+    // Validate that varying parameter/return types are legal. Runs after the
+    // auto-uniform classification above so that parameters that will end up
+    // being treated as uniform on non-varying stages are not diagnosed.
+    {
+        List<CodeGenTarget> targets;
+        for (auto target : linkage->targets)
+            targets.add(target->getTarget());
+
+        auto astBuilder = linkage->getASTBuilder();
+
+        // Validate return type as varying output
+        if (returnType)
+        {
+            VaryingTypeValidationContext ctx;
+            ctx.astBuilder = astBuilder;
+            ctx.sink = sink;
+            ctx.entryPointName = entryPointName;
+            ctx.loc = entryPointFuncDecl->loc;
+            ctx.direction = "output";
+            ctx.context = "return type";
+            ctx.targets = targets.getArrayView();
+            ctx.stage = stage;
+            validateVaryingType(ctx, returnType);
+        }
+
+        // Validate each parameter that would be treated as varying. Parameters
+        // that were auto-marked uniform by the loop above are skipped here.
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            if (param->hasModifier<HLSLUniformModifier>())
+                continue;
+            if (isUniformParameterType(param->getType()))
+                continue;
+
+            VaryingTypeValidationContext ctx;
+            ctx.astBuilder = astBuilder;
+            ctx.sink = sink;
+            ctx.entryPointName = entryPointName;
+            ctx.loc = param->loc;
+            // Note: `InOutModifier` inherits from `OutModifier`, so it must be
+            // checked first to avoid mislabeling `inout` parameters as "output".
+            ctx.direction = param->hasModifier<InOutModifier>() ? "input/output"
+                            : param->hasModifier<OutModifier>() ? "output"
+                            : param->hasModifier<RefModifier>() ? "input/output"
+                                                                : "input";
+
+            StringBuilder contextSb;
+            auto paramName = param->getName();
+            if (paramName)
+                contextSb << "parameter '" << paramName->text << "'";
+            else
+                contextSb << "parameter";
+            String contextStr = contextSb.produceString();
+            ctx.context = contextStr.getBuffer();
+            ctx.targets = targets.getArrayView();
+            ctx.stage = stage;
+            validateVaryingType(ctx, param->getType());
         }
     }
 
