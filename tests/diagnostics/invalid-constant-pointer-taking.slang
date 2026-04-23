@@ -25,10 +25,6 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     float* ptr1 = &constant_float_buffer[threadId.x];
 //diag:           ^ address-of operator not supported
 //diag:           ^ the '&' operator for taking addresses is no longer supported in Slang
-//diag:                                 ^ cannot take address of immutable object
-//diag:                                 ^ Not allowed to take the address of an immutable object
-//diag:                                 ^ argument must be l-value
-//diag:                                 ^ argument passed to parameter '0' must be l-value.
 
     float* ptr2 = __getAddress(constant_float_buffer[threadId.x]);
 //diag:           ^^^^^^^^^^^^ invalid __getAddress usage

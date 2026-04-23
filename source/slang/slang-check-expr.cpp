@@ -3782,23 +3782,23 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             if (funcDeclRefExpr)
                 funcDeclBase = as<FunctionDeclBase>(funcDeclRefExpr->declRef.getDecl());
 
+            DeclRef<Decl> funcDeclRef;
             if (funcDeclRefExpr)
+                funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
+
+            KnownBuiltinAttribute* knownBuiltinAttr = nullptr;
+            if (funcDeclRef)
+                knownBuiltinAttr = funcDeclRef.getDecl()->findModifier<KnownBuiltinAttribute>();
+
+            ConstantIntVal* knownBuiltinName = nullptr;
+            if (knownBuiltinAttr)
+                knownBuiltinName = as<ConstantIntVal>(knownBuiltinAttr->name);
+
+            if (knownBuiltinName &&
+                knownBuiltinName->getValue() == (int)KnownBuiltinDeclName::OperatorAddressOf)
             {
-                auto knownBuiltinAttrDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr)
-                                                   .getDecl()
-                                                   ->findModifier<KnownBuiltinAttribute>();
-                if (auto knownBuiltinAttr = as<KnownBuiltinAttribute>(knownBuiltinAttrDeclRef))
-                {
-                    if (auto constantIntVal = as<ConstantIntVal>(knownBuiltinAttr->name))
-                    {
-                        if (constantIntVal->getValue() ==
-                            (int)KnownBuiltinDeclName::OperatorAddressOf)
-                        {
-                            getSink()->diagnose(
-                                Diagnostics::AddressOfOperatorNotSupported{.expr = invoke});
-                        }
-                    }
-                }
+                getSink()->diagnose(Diagnostics::AddressOfOperatorNotSupported{.expr = invoke});
+                return CreateErrorExpr(invoke);
             }
 
             Index paramCount = funcType->getParamCount();
