@@ -260,7 +260,7 @@ int runCompile(const Options& opt)
 
     ComPtr<slang::IBlob> diagnostics;
     ComPtr<slang::IModule> module;
-    module.attach(slangSession->loadModule(shaderPath.getBuffer(), diagnostics.writeRef()));
+    module = slangSession->loadModule(shaderPath.getBuffer(), diagnostics.writeRef());
     if (diagnostics)
         std::fprintf(stderr, "%s", (const char*)diagnostics->getBufferPointer());
     if (!module)
@@ -439,7 +439,7 @@ int runDispatch(const Options& opt)
 
     ComPtr<slang::IBlob> diagnostics;
     ComPtr<slang::IModule> module;
-    module.attach(slangSession->loadModule(shaderPath.getBuffer(), diagnostics.writeRef()));
+    module = slangSession->loadModule(shaderPath.getBuffer(), diagnostics.writeRef());
     if (diagnostics)
         std::fprintf(stderr, "%s", (const char*)diagnostics->getBufferPointer());
     if (!module)
@@ -465,7 +465,6 @@ int runDispatch(const Options& opt)
     if (!shaderProgram)
         return 1;
 
-    std::fprintf(stderr, "[dispatch] createComputePipeline...\n");
     ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram;
     ComPtr<IComputePipeline> pipeline = device->createComputePipeline(pipelineDesc);
@@ -477,7 +476,6 @@ int runDispatch(const Options& opt)
             opt.backend.c_str());
         return 1;
     }
-    std::fprintf(stderr, "[dispatch] pipeline OK\n");
 
     // Allocate particle & coverage buffers.
     uint32_t particleCount = 64;
@@ -491,7 +489,6 @@ int runDispatch(const Options& opt)
                      BufferUsage::CopyDestination | BufferUsage::CopySource;
     partDesc.memoryType = MemoryType::DeviceLocal;
     ComPtr<IBuffer> partBuf = device->createBuffer(partDesc, particles.data());
-    std::fprintf(stderr, "[dispatch] partBuf OK\n");
 
     // Query the freshly-compiled entry point's metadata and serialize
     // a manifest JSON file, so slang_coverage_create can ingest it the
@@ -520,7 +517,6 @@ int runDispatch(const Options& opt)
     covDesc.memoryType = MemoryType::DeviceLocal;
     std::vector<uint32_t> zeros(counterCount > 0 ? counterCount : 1, 0);
     ComPtr<IBuffer> covBuf = device->createBuffer(covDesc, zeros.data());
-    std::fprintf(stderr, "[dispatch] covBuf OK, dispatching...\n");
 
     // Dispatch `steps` times.
     auto queue = device->getQueue(QueueType::Graphics);
@@ -556,8 +552,6 @@ int runDispatch(const Options& opt)
         queue->submit(encoder->finish());
         queue->waitOnHost();
     }
-    std::fprintf(stderr, "[dispatch] dispatched, reading back...\n");
-
     // Read the coverage buffer back and accumulate into the context.
     ComPtr<ISlangBlob> blob;
     device->readBuffer(covBuf, 0, covDesc.size, blob.writeRef());
