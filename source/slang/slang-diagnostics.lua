@@ -2813,6 +2813,13 @@ err(
 )
 
 err(
+    "static-const-global-cannot-use-runtime-value",
+    30305,
+    "static const global cannot be initialized from a runtime value",
+    span { loc = "decl:Decl", message = "'~decl' is a 'static const' global and cannot be initialized from a runtime value such as a cbuffer or tbuffer member." }
+)
+
+err(
     "type-cannot-conform-to-both-value-and-pointer-diff-interfaces",
     30311,
     "type cannot conform to both value and pointer differentiation interfaces",

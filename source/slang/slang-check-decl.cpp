@@ -3210,6 +3210,80 @@ static Decl* findLegacyBwdDiffFunc(SemanticsVisitor* visitor, ExtensionDecl* ext
 
 void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
 
+/// Returns true if `expr` contains a reference to a global shader parameter
+/// (e.g. a cbuffer/tbuffer member), which is a runtime value and cannot be
+/// used to initialise a compile-time `static const` global variable.
+static bool _initExprContainsShaderParamRef(Expr* expr)
+{
+    if (!expr)
+        return false;
+    // Don't recurse into already-errored sub-expressions.
+    if (as<ErrorType>(expr->type.type))
+        return false;
+
+    // Member access (e.g. `cbuf.member`): check the base object.
+    if (auto memberExpr = as<MemberExpr>(expr))
+        return _initExprContainsShaderParamRef(memberExpr->baseExpression);
+
+    // Pointer dereference: ConstantBuffer<T> members are accessed via a deref of the
+    // cbuffer variable (e.g. `(*Options).Value`), so recurse into the operand.
+    if (auto derefExpr = as<DerefExpr>(expr))
+        return _initExprContainsShaderParamRef(derefExpr->base);
+
+    // Built-in casts (rank promotion, matrix layout change) wrap the source expression
+    // in a BuiltinCastExpr that is NOT a subclass of InvokeExpr, so handle it explicitly.
+    if (auto builtinCastExpr = as<BuiltinCastExpr>(expr))
+        return _initExprContainsShaderParamRef(builtinCastExpr->base);
+
+    // Swizzle expressions (e.g. `cbuf.Vec.xy`, `cbuf.Mat._m00_m01`): check the base.
+    if (auto swizzleExpr = as<SwizzleExpr>(expr))
+        return _initExprContainsShaderParamRef(swizzleExpr->base);
+    if (auto matSwizzleExpr = as<MatrixSwizzleExpr>(expr))
+        return _initExprContainsShaderParamRef(matSwizzleExpr->base);
+
+    // Subscript / element access (e.g. `cbuf.Arr[i]`, `cbuf.Vec[0]`): check the base.
+    if (auto indexExpr = as<IndexExpr>(expr))
+        return _initExprContainsShaderParamRef(indexExpr->baseExpression);
+
+    // Direct declaration reference.
+    if (auto declRefExpr = as<DeclRefExpr>(expr))
+    {
+        if (auto varDecl = as<VarDeclBase>(declRefExpr->declRef.getDecl()))
+        {
+            // References to other `static const` globals are compile-time constants.
+            if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
+                return false;
+            // Only flag global shader parameters that are cbuffer/tbuffer bindings
+            // (ConstantBufferType / TextureBufferType).  General resource globals
+            // (RWStructuredBuffer, Texture2D, etc.) may validly alias into a
+            // static const variable via type-legalization and must not be rejected.
+            if (isGlobalShaderParameter(varDecl))
+            {
+                if (as<UniformParameterGroupType>(varDecl->type.type))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    // Function calls and built-in operators: check all arguments.
+    if (auto invokeExpr = as<InvokeExpr>(expr))
+    {
+        if (_initExprContainsShaderParamRef(invokeExpr->functionExpr))
+            return true;
+        for (auto arg : invokeExpr->arguments)
+            if (_initExprContainsShaderParamRef(arg))
+                return true;
+        return false;
+    }
+
+    // Parenthesised expressions.
+    if (auto parenExpr = as<ParenExpr>(expr))
+        return _initExprContainsShaderParamRef(parenExpr->base);
+
+    return false;
+}
+
 void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     DiagnoseIsAllowedInitExpr(varDecl, getSink());
@@ -3243,6 +3317,14 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
         initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
         varDecl->initExpr = initExpr;
+
+        // A `static const` global variable must be initialised from a compile-time
+        // constant; cbuffer/tbuffer members are runtime values and cannot be used here.
+        if (isStaticConst && isGlobalDecl(varDecl) && _initExprContainsShaderParamRef(initExpr))
+        {
+            getSink()->diagnose(
+                Diagnostics::StaticConstGlobalCannotUseRuntimeValue{.decl = varDecl});
+        }
 
         // We need to ensure that any variable doesn't introduce
         // a constant with a circular definition.
