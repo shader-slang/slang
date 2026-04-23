@@ -1,5 +1,6 @@
 #include "slang-ir-coverage-instrument.h"
 
+#include "compiler-core/slang-artifact-associated-impl.h"
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "compiler-core/slang-source-loc.h"
 #include "slang-ir-insts.h"
@@ -19,28 +20,6 @@ static const char kCoverageBufferName[] = "__slang_coverage";
 // grows a proper binding-CLI option.
 static const UInt kCoverageReservedSpace = 31;
 static const UInt kCoverageReservedBinding = 0;
-
-// Key that identifies a counter slot: one slot per (file, line) pair.
-// Multiple coverage ops that share the same (file, line) alias onto
-// the same slot so that LCOV output matches gcov semantics.
-struct CoverageKey
-{
-    UnownedStringSlice file;
-    IRIntegerValue line;
-
-    bool operator==(CoverageKey const& other) const
-    {
-        return file == other.file && line == other.line;
-    }
-};
-
-struct CoverageKeyHasher
-{
-    HashCode operator()(CoverageKey const& key) const
-    {
-        return combineHash(getHashCode(key.file), getHashCode(key.line));
-    }
-};
 
 // Return true if any existing module-scope global parameter already
 // occupies the reserved `(space, binding)` we would assign to the
@@ -71,7 +50,9 @@ static bool hasResourceAtReservedBinding(IRModule* module)
 }
 
 // Collect every IncrementCoverageCounter op in the module across all
-// functions. Simple O(n) linear sweep.
+// functions. Deterministic traversal order: module-scope insts in
+// declaration order, then for each function its blocks in declaration
+// order, then each block's instructions in position order.
 static void collectCoverageCounterOps(IRModule* module, List<IRInst*>& out)
 {
     auto visitFunc = [&](IRFunc* func)
@@ -136,18 +117,22 @@ static IRGlobalParam* synthesizeCoverageBuffer(IRModule* module, DiagnosticSink*
     return param;
 }
 
-// Read the (file, line) for a coverage counter op from its built-in
-// `sourceLoc` field, resolving via the source manager. Returns false
-// when the location is not valid, e.g. for synthetic/unknown sources.
-static bool readCoverageKey(SourceManager* sourceManager, IRInst* counterOp, CoverageKey& outKey)
+// Resolve a counter op's source position from its built-in sourceLoc.
+// Returns false (with `outFile` / `outLine` untouched) when the
+// location is not valid, e.g. for synthetic/unknown sources.
+static bool resolveHumaneLoc(
+    SourceManager* sourceManager,
+    IRInst* counterOp,
+    String& outFile,
+    uint32_t& outLine)
 {
     if (!sourceManager || !counterOp->sourceLoc.isValid())
         return false;
     auto humane = sourceManager->getHumaneLoc(counterOp->sourceLoc, SourceLocType::Emit);
     if (humane.line <= 0)
         return false;
-    outKey.file = humane.pathInfo.foundPath.getUnownedSlice();
-    outKey.line = (IRIntegerValue)humane.line;
+    outFile = humane.pathInfo.foundPath;
+    outLine = (uint32_t)humane.line;
     return true;
 }
 
@@ -156,19 +141,17 @@ struct CoverageInstrumenter
     IRModule* module;
     IRGlobalParam* coverageBuffer;
     SourceManager* sourceManager;
+    ArtifactPostEmitMetadata& outMetadata;
     IRType* uintType;
     IRType* uintPtrType;
     IRType* intType;
 
-    Dictionary<CoverageKey, UInt, CoverageKeyHasher> keyToIndex;
-
-    // Owns the backing storage for each distinct key's file slice —
-    // the humane path string is transient, so we copy it to a stable
-    // buffer before storing in the dictionary.
-    List<String> ownedFiles;
-
-    CoverageInstrumenter(IRModule* m, IRGlobalParam* buf, SourceManager* sm)
-        : module(m), coverageBuffer(buf), sourceManager(sm)
+    CoverageInstrumenter(
+        IRModule* m,
+        IRGlobalParam* buf,
+        SourceManager* sm,
+        ArtifactPostEmitMetadata& md)
+        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md)
     {
         IRBuilder tmpBuilder(module);
         uintType = tmpBuilder.getUIntType();
@@ -176,64 +159,21 @@ struct CoverageInstrumenter
         intType = tmpBuilder.getIntType();
     }
 
-    // Assign counter slots to unique (file, line) keys in
-    // lexicographic order so slot indices are stable across unrelated
-    // source edits (inserting a statement in one file doesn't shift
-    // counter slots for other files).
-    void assignSlots(List<IRInst*> const& counterOps)
-    {
-        Dictionary<CoverageKey, bool, CoverageKeyHasher> seen;
-        List<CoverageKey> keys;
-        for (auto op : counterOps)
-        {
-            CoverageKey key;
-            if (!readCoverageKey(sourceManager, op, key))
-                continue;
-            if (seen.addIfNotExists(key, true))
-            {
-                // Copy the file path into a stable String so the slice
-                // remains valid after humaneLoc's arena is reclaimed.
-                ownedFiles.add(String(key.file));
-                key.file = ownedFiles.getLast().getUnownedSlice();
-                keys.add(key);
-            }
-        }
-        keys.sort(
-            [](CoverageKey const& a, CoverageKey const& b)
-            {
-                int cmp = compare(a.file, b.file);
-                if (cmp != 0)
-                    return cmp < 0;
-                return a.line < b.line;
-            });
-        for (auto const& k : keys)
-            keyToIndex[k] = (UInt)keyToIndex.getCount();
-    }
-
     // Lower a single IncrementCoverageCounter op to an atomic add on
-    // the coverage buffer slot for its (file, line). Always removes
-    // the op afterwards.
-    void lowerCounterOp(IRInst* counterOp)
+    // `coverageBuffer[slot]`. Appends a metadata entry for `slot` and
+    // then removes the op.
+    void lowerCounterOp(IRInst* counterOp, UInt slot)
     {
-        CoverageKey key;
-        if (!readCoverageKey(sourceManager, counterOp, key))
-        {
-            counterOp->removeAndDeallocate();
-            return;
-        }
-        UInt counterIdx = 0;
-        if (!keyToIndex.tryGetValue(key, counterIdx))
-        {
-            counterOp->removeAndDeallocate();
-            return;
-        }
+        CoverageTracingEntry entry;
+        resolveHumaneLoc(sourceManager, counterOp, entry.file, entry.line);
+        outMetadata.m_coverageEntries.add(entry);
 
         IRBuilder builder(module);
         builder.setInsertBefore(counterOp);
 
         IRInst* getElemArgs[] = {
             coverageBuffer,
-            builder.getIntValue(intType, (IRIntegerValue)counterIdx),
+            builder.getIntValue(intType, (IRIntegerValue)slot),
         };
         IRInst* slotPtr = builder.emitIntrinsicInst(
             uintPtrType,
@@ -257,18 +197,27 @@ struct CoverageInstrumenter
 
     void run(List<IRInst*> const& counterOps)
     {
-        assignSlots(counterOps);
-        for (auto op : counterOps)
-            lowerCounterOp(op);
+        outMetadata.m_coverageEntries.reserve(counterOps.getCount());
+        // Each counter op gets its own slot: the op's identity IS the
+        // UID, and we assign a consecutive index in traversal order.
+        // Multiple ops on the same source line get distinct slots; the
+        // LCOV converter aggregates per (file, line) at the host side
+        // via summation.
+        for (UInt slot = 0; slot < (UInt)counterOps.getCount(); ++slot)
+            lowerCounterOp(counterOps[slot], slot);
     }
 };
 
 } // anonymous namespace
 
-void instrumentCoverage(IRModule* module, DiagnosticSink* sink, bool enabled)
+void instrumentCoverage(
+    IRModule* module,
+    DiagnosticSink* sink,
+    bool enabled,
+    ArtifactPostEmitMetadata& outMetadata)
 {
-    // Always collect any counter ops so stale ones from cached modules
-    // can't leak into the backend when the flag is off.
+    // Collect any counter ops so stale ones from cached modules can't
+    // leak into the backend when the flag is off.
     List<IRInst*> counterOps;
     collectCoverageCounterOps(module, counterOps);
 
@@ -296,7 +245,16 @@ void instrumentCoverage(IRModule* module, DiagnosticSink* sink, bool enabled)
         return;
     }
 
-    CoverageInstrumenter instrumenter(module, buffer, sink ? sink->getSourceManager() : nullptr);
+    // Record the chosen binding on the metadata so hosts can query it
+    // via ICoverageTracingMetadata without having to walk reflection.
+    outMetadata.m_coverageBufferSpace = (int32_t)kCoverageReservedSpace;
+    outMetadata.m_coverageBufferBinding = (int32_t)kCoverageReservedBinding;
+
+    CoverageInstrumenter instrumenter(
+        module,
+        buffer,
+        sink ? sink->getSourceManager() : nullptr,
+        outMetadata);
     instrumenter.run(counterOps);
 }
 

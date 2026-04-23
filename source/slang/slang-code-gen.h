@@ -77,6 +77,7 @@ struct RequiredLoweringPassSet
     bool missingReturn;
     bool nonVectorCompositeSelect;
     bool matrixSwizzleStore;
+    bool coverageTracing;
 };
 
 /// A context for code generation in the compiler back-end

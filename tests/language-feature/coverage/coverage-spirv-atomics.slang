@@ -22,10 +22,22 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[0] = accum;
 }
 
-// At least one OpAtomicIAdd must appear in the output — this is the
-// native SPIR-V lowering of kIROp_AtomicAdd for our counter increment.
-//CHECK: OpAtomicIAdd
-
-// The synthesized coverage buffer should also show up in the module's
+// The synthesized coverage buffer should show up in the module's
 // debug name table so that a host can discover it via reflection.
 //CHECK: __slang_coverage
+
+// Each IncrementCoverageCounter op lowers to its own OpAtomicIAdd on a
+// distinct slot. We check three distinct slots (0, 1, 2) via the
+// access chains that feed OpAtomicIAdd. If the pass regresses to
+// deduping slots by (file, line), the second and third access-chain
+// assertions fail because multiple statements on the same source line
+// collapse into one slot.
+//CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_0
+//CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_1
+//CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_2
+
+// And each access chain feeds a real OpAtomicIAdd — native SPIR-V
+// lowering of kIROp_AtomicAdd, not a load-add-store fallback.
+//CHECK: OpAtomicIAdd
+//CHECK: OpAtomicIAdd
+//CHECK: OpAtomicIAdd

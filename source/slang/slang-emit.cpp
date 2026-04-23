@@ -542,6 +542,9 @@ void calcRequiredLoweringPassSet(
         if (!isScalarOrVectorType(inst->getFullType()))
             result.nonVectorCompositeSelect = true;
         break;
+    case kIROp_IncrementCoverageCounter:
+        result.coverageTracing = true;
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -930,6 +933,13 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // Create the post-emit metadata object up-front so that IR passes
+    // that need to record reportable data (e.g. `instrumentCoverage`'s
+    // slot → source mapping) can write into it directly. `collectMetadata`
+    // later fills in binding / exported-function fields.
+    auto metadata = new ArtifactPostEmitMetadata;
+    outLinkedIR.metadata = metadata;
+
     // For now, only emit the debug build identifier if separate debug info is enabled
     // and only if there are targets.
     // TODO: We will ultimately need to change this to always emit the instruction.
@@ -1018,8 +1028,12 @@ Result linkAndOptimizeIR(
     // synthesized `__slang_coverage` buffer is still visible as a
     // top-level IRGlobalParam. Counter ops carry source position on
     // their built-in `sourceLoc`, so this pass is independent of
-    // debug-info state.
-    SLANG_PASS(instrumentCoverage, sink, codeGenContext->shouldTraceCoverage());
+    // debug-info state. The pass writes its slot → source mapping
+    // into `metadata`, exposed to hosts via ICoverageTracingMetadata.
+    if (requiredLoweringPassSet.coverageTracing)
+    {
+        SLANG_PASS(instrumentCoverage, sink, codeGenContext->shouldTraceCoverage(), *metadata);
+    }
 
     SLANG_PASS(collectGlobalUniformParameters, outLinkedIR.globalScopeVarLayout, target);
     validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -2273,17 +2287,12 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(validateCooperativeOperations, sink);
 
-    auto metadata = new ArtifactPostEmitMetadata;
-    outLinkedIR.metadata = metadata;
-
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
     {
         SLANG_PASS(unexportNonEmbeddableIR, target);
     }
 
     SLANG_PASS(collectMetadata, *metadata);
-
-    outLinkedIR.metadata = metadata;
 
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);

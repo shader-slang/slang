@@ -174,7 +174,17 @@ struct ShaderBindingRange
     }
 };
 
-class ArtifactPostEmitMetadata : public ComBaseObject, public IArtifactPostEmitMetadata
+/// One counter slot → (file, line) mapping entry for coverage tracing.
+/// Populated by `instrumentCoverage` when `-trace-coverage` is active.
+struct CoverageTracingEntry
+{
+    String file;
+    uint32_t line = 0;
+};
+
+class ArtifactPostEmitMetadata : public ComBaseObject,
+                                 public IArtifactPostEmitMetadata,
+                                 public slang::ICoverageTracingMetadata
 {
 public:
     typedef ArtifactPostEmitMetadata ThisType;
@@ -201,6 +211,13 @@ public:
 
     SLANG_NO_THROW virtual const char* SLANG_MCALL getDebugBuildIdentifier() SLANG_OVERRIDE;
 
+    // ICoverageTracingMetadata
+    SLANG_NO_THROW virtual uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual const char* SLANG_MCALL getEntryFile(uint32_t index) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual uint32_t SLANG_MCALL getEntryLine(uint32_t index) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual int32_t SLANG_MCALL getBufferSpace() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual int32_t SLANG_MCALL getBufferBinding() SLANG_OVERRIDE;
+
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 
@@ -212,6 +229,12 @@ public:
     List<ShaderBindingRange> m_usedBindings;
     List<String> m_exportedFunctionMangledNames;
     String m_debugBuildIdentifier;
+
+    // Coverage tracing data, populated by `instrumentCoverage` when
+    // `-trace-coverage` is active. Empty otherwise.
+    List<CoverageTracingEntry> m_coverageEntries;
+    int32_t m_coverageBufferSpace = -1;
+    int32_t m_coverageBufferBinding = -1;
 };
 
 } // namespace Slang

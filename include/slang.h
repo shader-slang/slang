@@ -4506,6 +4506,46 @@ struct IMetadata : public ISlangCastable
 };
     #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
 
+/** Coverage tracing metadata produced when `-trace-coverage` is active.
+
+Each counter slot in the synthesized coverage buffer maps to a source
+`(file, line)` pair. The interface lets hosts read that mapping at
+compile time so they can attribute counter values back to source lines
+at runtime without a separate sidecar file. The metadata is retrieved
+by calling `castAs` / `queryInterface` on the artifact-associated
+`IMetadata` object.
+
+Extensible: future iterations may add accessors for branch coverage,
+function coverage, or column information.
+*/
+struct ICoverageTracingMetadata : public ISlangCastable
+{
+    SLANG_COM_INTERFACE(
+        0x7c9f1d50,
+        0x1e4a,
+        0x4b9c,
+        {0x8e, 0x21, 0x3f, 0x7b, 0x82, 0xa3, 0xd9, 0x51})
+
+    /// Number of counter slots in the synthesized coverage buffer.
+    virtual uint32_t SLANG_MCALL getCounterCount() = 0;
+
+    /// Source file for counter slot `index`, or `nullptr` if out of range.
+    /// The returned pointer is valid for the lifetime of this metadata object.
+    virtual const char* SLANG_MCALL getEntryFile(uint32_t index) = 0;
+
+    /// 1-based source line for counter slot `index`, or 0 if out of range.
+    virtual uint32_t SLANG_MCALL getEntryLine(uint32_t index) = 0;
+
+    /// Register space the coverage buffer is bound to (D3D12 `space`,
+    /// Vulkan descriptor set), or -1 if not assigned for this target.
+    virtual int32_t SLANG_MCALL getBufferSpace() = 0;
+
+    /// Binding index the coverage buffer is bound at (D3D12 `register`,
+    /// Vulkan `binding`), or -1 if not assigned for this target.
+    virtual int32_t SLANG_MCALL getBufferBinding() = 0;
+};
+    #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()
+
 /** Compile result for storing and retrieving multiple output blobs.
     This is needed for features such as separate debug compilation which
     output both base and debug spirv.
