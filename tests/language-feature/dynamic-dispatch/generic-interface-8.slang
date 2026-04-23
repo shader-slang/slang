@@ -1,19 +1,21 @@
-// createDynamicObject does not currently support generic interface types (bug #10063).
-// This tests three variants that should all produce clean errors (not crashes):
+// One-argument `createDynamicObject<T>(typeId)` now works for all three
+// generic-interface shapes that #10063 documented as failing:
 //   1. Concrete specialization: createDynamicObject<ICalculator<float>>
 //   2. Open type parameter:     createDynamicObject<ICalculator<T>>
-//   3. Interface type argument:  createDynamicObject<ICalculator<IFoo>>
+//   3. Interface type argument: createDynamicObject<ICalculator<IFoo>>
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -stage compute -entry computeMain
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target glsl -stage compute -entry computeMain
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target metal -stage compute -entry computeMain
-
-RWStructuredBuffer<float> outputBuffer;
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 
 interface IFoo
 {
     float eval();
+}
+
+struct FooA : IFoo
+{
+    float eval() { return 7.0; }
 }
 
 interface ICalculator<T>
@@ -31,46 +33,53 @@ struct Multiplier : ICalculator<float>
     float compute(float a, float b) { return a * b; }
 }
 
-// Case 1: Concrete type specialization.
-// createDynamicObject fails to specialize when given a concrete generic interface
-// like ICalculator<float>, producing a misleading "could not specialize generic
-// for arguments of type (uint)" error instead of creating the dynamic object.
-// See https://github.com/shader-slang/slang/issues/10063
+struct FooCalculator : ICalculator<IFoo>
+{
+    IFoo compute(IFoo a, IFoo b) { return a; }
+}
+
+//TEST_INPUT: type_conformance Adder:ICalculator<float> = 0
+//TEST_INPUT: type_conformance Multiplier:ICalculator<float> = 1
+//TEST_INPUT: type_conformance FooA:IFoo = 2
+//TEST_INPUT: type_conformance FooCalculator:ICalculator<IFoo> = 3
+
+// Case 1: Concrete specialization — dispatch through ICalculator<float>.
 ICalculator<float> createCalcFloat(uint id)
 {
     return createDynamicObject<ICalculator<float>>(id);
-//CHECK: could not specialize generic for arguments of type (uint)
 }
 
-// Case 2: Open type parameter.
-// Same issue as Case 1 but with an unresolved type parameter — the compiler
-// cannot specialize createDynamicObject when the interface type argument is
-// itself generic.
-// See https://github.com/shader-slang/slang/issues/10063
+// Case 2: Open type parameter — the generic is re-specialized at each caller.
 ICalculator<T> createCalcGeneric<T>(uint id)
 {
     return createDynamicObject<ICalculator<T>>(id);
-//CHECK: could not specialize generic for arguments of type (uint)
 }
 
 // Case 3: Interface type as type argument.
-// Using another interface (IFoo) as the type argument to a generic interface
-// hits the same createDynamicObject specialization failure.
-// See https://github.com/shader-slang/slang/issues/10063
 ICalculator<IFoo> createCalcInterface(uint id)
 {
     return createDynamicObject<ICalculator<IFoo>>(id);
-//CHECK: could not specialize generic for arguments of type (uint)
 }
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain()
 {
     let calcFloat = createCalcFloat(0);
     outputBuffer[0] = calcFloat.compute(3.0, 4.0);
+    // Adder(3, 4) = 7
+    // CHECK: 7.0
 
     let calcGeneric = createCalcGeneric<float>(1);
     outputBuffer[1] = calcGeneric.compute(3.0, 4.0);
+    // Multiplier(3, 4) = 12
+    // CHECK-NEXT: 12.0
 
-    let calcInterface = createCalcInterface(2);
+    let calcInterface = createCalcInterface(3);
+    let foo = createDynamicObject<IFoo>(2);
+    // FooCalculator returns its first operand; foo.eval() = 7.
+    outputBuffer[2] = calcInterface.compute(foo, foo).eval();
+    // CHECK-NEXT: 7.0
 }
