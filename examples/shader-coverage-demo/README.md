@@ -18,30 +18,32 @@ host-side helper library `slang-coverage-rt`. Runs in three modes:
   previous dispatch run, or any compatible host.
 
 - **`--mode=dispatch`** — Full compile → bind → dispatch → readback →
-  LCOV pipeline via slang-rhi. Works end-to-end on CPU and Vulkan
-  (tested via MoltenVK on Apple M4), producing matching non-zero
-  counter values on both backends. Metal runs but has pre-existing
-  slang-rhi quirks (see *Backend status matrix*).
+  LCOV pipeline via slang-rhi. Works end-to-end on CPU, Vulkan, D3D12
+  and CUDA, producing byte-identical LCOV across all four backends.
+  Metal runs but has pre-existing slang-rhi quirks (see *Backend
+  status matrix*).
 
 ## Usage
 
 ### Quick start (any validated backend)
 
 ```bash
-# CPU
+# Pick any of: cpu, vulkan, d3d12, cuda
 ./build/Debug/bin/shader-coverage-demo --mode=dispatch --backend=cpu
-
-# Vulkan (requires Vulkan SDK + MoltenVK on macOS, or native driver elsewhere)
 ./build/Debug/bin/shader-coverage-demo --mode=dispatch --backend=vulkan
+./build/Debug/bin/shader-coverage-demo --mode=dispatch --backend=d3d12
+./build/Debug/bin/shader-coverage-demo --mode=dispatch --backend=cuda
 
 genhtml coverage.lcov -o coverage-html/
 open coverage-html/index.html
 ```
 
-CPU and Vulkan produce **byte-identical LCOV output** — same hit
-counts per source line — which validates that instrumentation
+CPU, Vulkan, D3D12 and CUDA produce **byte-identical LCOV output** —
+same hit counts per source line — which validates that instrumentation
 semantics, slot assignment, and binding work consistently across
-backends.
+backends. D3D12 and Vulkan have been validated on desktop Windows
+with NVIDIA drivers; CPU runs via the slang-rhi CPU backend; CUDA
+requires an NVIDIA CUDA runtime.
 
 ### Separate compile + report (no GPU required)
 
@@ -97,10 +99,10 @@ The uncovered lines all live in the intentionally-unreachable
 | Backend | `--mode=compile` | `--mode=dispatch` |
 |---|---|---|
 | `cpu` | ✅ Works | ✅ **Fully working** — clean non-zero counter values, complete LCOV report, dead-code detection verified |
-| `vulkan` (incl. SPIR-V) | ✅ Works | ✅ **Fully working** — validated via MoltenVK on Apple M4; produces byte-identical output to CPU |
+| `vulkan` (incl. SPIR-V) | ✅ Works | ✅ **Fully working** — validated on macOS (MoltenVK) and desktop Windows with NVIDIA drivers; byte-identical LCOV to CPU |
+| `d3d12` | ✅ Works | ✅ **Fully working** — validated on desktop Windows; byte-identical LCOV to CPU/Vulkan |
+| `cuda` | ✅ Works | ✅ **Fully working** — validated on desktop Windows with NVIDIA CUDA runtime; byte-identical LCOV to CPU/Vulkan/D3D12 |
 | `metal` | ✅ Works (with benign unused-variable warnings from Metal's compiler) | ⚠️ Pipeline builds; dispatch runs; but counter values are unreliable — most slots are zero while others show overflow-like values. **Not a coverage-feature issue** — a pre-existing slang-rhi Metal binding / initialization quirk. To be filed against slang-rhi. |
-| `d3d12` | Untested | Untested |
-| `cuda` | Compiles cleanly (verified via slangc) | Untested (no CUDA runtime in this workstation) |
 
 ## SPIR-V integration (Vulkan, custom engines)
 
@@ -196,8 +198,18 @@ change lives in `source/slang/slang-check-synthesize-coverage.{h,cpp}`.
 
 The practical consequence: any backend that correctly handles a
 user-declared `RWStructuredBuffer<uint>` + `kIROp_AtomicAdd` also
-correctly handles coverage. Validated empirically on CPU and
-Vulkan — both produce byte-identical counter output.
+correctly handles coverage. Validated empirically on cpu, vulkan,
+d3d12 and cuda — all four produce byte-identical counter output.
+
+One host-side gotcha worth flagging: `slang::ISession::loadModule()`
+returns a module pointer that the session keeps its own ref on.
+Callers must `AddRef` (e.g. `ComPtr<IModule> m = session->loadModule(...)`)
+rather than steal the pointer via `ComPtr::attach()`. An early
+revision of this demo used `.attach()`, which left the caller and
+session sharing a single ref; the resulting double-release surfaced
+as heap corruption on Windows D3D12/CUDA/CPU device teardown while
+going silently unnoticed on macOS. Every other Slang example uses
+the `=` form; reuse that pattern.
 
 ## Scenarios (future expansion)
 
