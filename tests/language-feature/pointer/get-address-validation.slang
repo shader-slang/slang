@@ -39,7 +39,7 @@ void computeMain(int id : SV_DispatchThreadID)
 {
     int* ptr1 = __getAddress(bufferStorage[id.x]);
 //diag:         ^^^^^^^^^^^^ invalid __getAddress usage
-//diag:         ^^^^^^^^^^^^ '__getAddress' only supports groupshared variables and members of groupshared/device memory.
+//diag:         ^^^^^^^^^^^^ '__getAddress' cannot take the address of a function-local variable on this target.
 
     int[100]* ptr2 = __getAddress(bufferGroupShared);
 //diag:              ^^^^^^^^^^^^ type mismatch in expression

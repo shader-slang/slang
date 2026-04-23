@@ -17,7 +17,7 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
     float* mutablePtr2 = __getAddress(mutable_float_buffer[threadId.x]);
 //diag:                  ^^^^^^^^^^^^ invalid __getAddress usage
-//diag:                  ^^^^^^^^^^^^ '__getAddress' only supports groupshared variables and members of groupshared/device memory.
+//diag:                  ^^^^^^^^^^^^ '__getAddress' cannot take the address of a function-local variable on this target.
 
     InterlockedAdd(mutable_uint_buffer[threadId.x], 1);
 
@@ -32,7 +32,7 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
     float* ptr2 = __getAddress(constant_float_buffer[threadId.x]);
 //diag:           ^^^^^^^^^^^^ invalid __getAddress usage
-//diag:           ^^^^^^^^^^^^ '__getAddress' only supports groupshared variables and members of groupshared/device memory.
+//diag:           ^^^^^^^^^^^^ '__getAddress' cannot take the address of a function-local variable on this target.
 
     InterlockedAdd(constant_uint_buffer[0], 1);
 //diag:                                ^ argument must be l-value
