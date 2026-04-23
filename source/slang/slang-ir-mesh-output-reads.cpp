@@ -8,6 +8,23 @@
 namespace Slang
 {
 
+/// Returns true if `inst` is an IRMeshOutputRef or is derived from one via
+/// chains of GetElementPtr or FieldAddress instructions.
+static bool isDerivedFromMeshOutputRef(IRInst* inst)
+{
+    for (;;)
+    {
+        if (as<IRMeshOutputRef>(inst))
+            return true;
+        if (auto gep = as<IRGetElementPtr>(inst))
+            inst = gep->getBase();
+        else if (auto fa = as<IRFieldAddress>(inst))
+            inst = fa->getBase();
+        else
+            return false;
+    }
+}
+
 static void checkForMeshOutputReadsRecursive(IRInst* inst, DiagnosticSink* sink)
 {
     if (auto code = as<IRGlobalValueWithCode>(inst))
@@ -19,29 +36,37 @@ static void checkForMeshOutputReadsRecursive(IRInst* inst, DiagnosticSink* sink)
                 switch (opInst->getOp())
                 {
                 case kIROp_Load:
-                    IRInst* next = as<IRLoad>(opInst)->getPtr();
-                    for (;;)
+                    if (isDerivedFromMeshOutputRef(as<IRLoad>(opInst)->getPtr()))
                     {
-                        if (as<IRMeshOutputRef>(next))
-                        {
-                            sink->diagnose(
-                                Diagnostics::AttemptToReadFromMeshShaderOutput{.inst = opInst});
-                            break;
-                        }
-                        else if (auto gep = as<IRGetElementPtr>(next))
-                        {
-                            next = gep->getBase();
-                        }
-                        else if (auto fieldAddress = as<IRFieldAddress>(next))
-                        {
-                            next = fieldAddress->getBase();
-                        }
-                        else
-                        {
-                            break;
-                        }
+                        sink->diagnose(
+                            Diagnostics::AttemptToReadFromMeshShaderOutput{.inst = opInst});
                     }
                     break;
+
+                case kIROp_Call:
+                    {
+                        // Check for IRMeshOutputRef-derived pointers being passed as
+                        // non-output reference parameters (which implies a read).
+                        auto call = as<IRCall>(opInst);
+                        auto calleeType = as<IRFuncType>(call->getCallee()->getFullType());
+                        if (!calleeType)
+                            break;
+                        UInt argCount = call->getArgCount();
+                        for (UInt i = 0; i < argCount && i < calleeType->getParamCount(); ++i)
+                        {
+                            // Out-only parameters won't read from the argument.
+                            if (calleeType->getParamType(i)->getOp() == kIROp_OutParamType)
+                                continue;
+                            if (isDerivedFromMeshOutputRef(call->getArg(i)))
+                            {
+                                sink->diagnose(
+                                    Diagnostics::InvalidParameterPassingModeForWriteOnlyReference{
+                                        .location = opInst->sourceLoc});
+                                break;
+                            }
+                        }
+                        break;
+                    }
                 }
             }
         }

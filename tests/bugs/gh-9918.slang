@@ -60,9 +60,9 @@ void mesh_fn<V : VertexI, P : PrimitiveI>(
 
     if (tig < numPrimitives) {
         triangles[tig] = uint3(0, 1, 2);
-        // This is an error now: the parameter passing mode used here would require a read from
-        // primitives[] into a temporary variable, and we can't simply skip that read.
-        // CHECK: [E54006]:
+        // This is an error now: the BorrowInOut parameter passing mode generates a copy-in read
+        // from primitives[], which is write-only.
+        // CHECK: [E54005]:
         // CHECK: gh-9918.slang:[[# @LINE+1]]:
         primitives[tig].set_tint(float3(1, 0, 0));
     }

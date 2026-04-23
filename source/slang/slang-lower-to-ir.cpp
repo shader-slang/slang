@@ -3269,26 +3269,7 @@ void addArg(
             //
             if (paramPassingMode != ParamPassingMode::Out)
             {
-                // This parameter passing mode requires that we're able to read
-                // from argVal. If we can't (which we determine by checking if
-                // there are no getters), then issue an error.
-                if (argVal.flavor == LoweredValInfo::Flavor::BoundStorage &&
-                    getMembersOfType<GetterDecl>(
-                        context->astBuilder,
-                        argVal.getBoundStorageInfo()->declRef,
-                        MemberFilterStyle::Instance)
-                        .isEmpty())
-                {
-                    context->getSink()->diagnose(
-                        Diagnostics::InvalidParameterPassingModeForWriteOnlyReference{
-                            .location = loc});
-                    // Fall through without assigning so that we still add the arg below,
-                    // keeping ioArgs aligned with the callee's parameter list.
-                }
-                else
-                {
-                    assign(context, tempVar, argVal);
-                }
+                assign(context, tempVar, argVal);
             }
 
             // We can pass the address of the temporary variable directly

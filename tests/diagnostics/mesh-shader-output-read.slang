@@ -40,8 +40,8 @@ void entry_mesh(
     Vertex v = verts[2];
 
     if (tig < numVertices) {
-        // this should error: the required parameter passing mode produces a read from positions[tig].
-        // CHECK: [E54006]:
+        // this should error: the BorrowInOut parameter passing mode generates a copy-in read.
+        // CHECK: [E54005]:
         // CHECK: mesh-shader-output-read.slang:[[# @LINE+1]]:
         verts[tig].set_pos(float4(positions[tig], 0, 0));
     }
@@ -49,8 +49,8 @@ void entry_mesh(
     if (tig < numPrimitives) {
         triangles[tig] = uint3(0, 1, 2);
 
-        // this should error: the required parameter passing mode produces a read from primitives[tig].
-        // CHECK: [E54006]:
+        // this should error: the BorrowInOut parameter passing mode generates a copy-in read.
+        // CHECK: [E54005]:
         // CHECK: mesh-shader-output-read.slang:[[# @LINE+1]]:
         primitives[tig].set_tint(float3(1, 0, 0));
     }
