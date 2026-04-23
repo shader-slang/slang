@@ -90,9 +90,11 @@ if (-not $SkipTest) {
 }
 
 if (-not $SkipReport) {
-    # run-coverage-windows.ps1 already exports both LCOV and HTML when no
-    # COVERAGE_* env vars are set. In report-only mode we re-export from the
-    # cached .cov.
+    # run-coverage-windows.ps1 emits LCOV and HTML only when COVERAGE_LCOV=1
+    # and COVERAGE_HTML=1 are set (opt-in; Cobertura is always emitted). The
+    # -not $SkipTest branch above sets them before running the child; when
+    # $SkipTest is true we never took that path, so re-assert them here
+    # before re-exporting from the cached .cov.
     if ($SkipTest) {
         Write-Host "`nStep 4: Regenerating reports from existing coverage data..." -ForegroundColor Green
         $env:CONFIG = 'RelWithDebInfo'

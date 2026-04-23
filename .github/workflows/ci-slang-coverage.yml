@@ -45,9 +45,10 @@ jobs:
     # Windows coverage is the long pole: OpenCppCoverage ~2x overhead and
     # /Ob0 build another ~1.2x make the main + record-replay passes ~90
     # minutes. Synthesis is skipped on Windows CI for Phase 1 (measured
-    # ~2h on windows-latest with OCC + /Ob0, which would blow the 4h GHA
-    # job limit; see the "Run Tests with Coverage (Windows)" step below).
-    # Linux and macOS finish well under 240 min; longer timeout is harmless.
+    # ~2h on windows-latest with OCC + /Ob0, which would blow this job's
+    # 240-min timeout below; see the "Run Tests with Coverage (Windows)"
+    # step). Linux and macOS finish well under 240 min; longer timeout is
+    # harmless.
     timeout-minutes: 240
     container: ${{ inputs.container != '' && fromJSON(format('{{"image":"{0}","options":"--user root","credentials":{{"username":"{1}","password":"{2}"}}}}', inputs.container, github.actor, github.token)) || null }}
     permissions:
@@ -296,14 +297,14 @@ jobs:
           # when GPU/CUDA drivers are absent) and returns exit 0 when
           # coverage data + exports succeed. We do not retry on failure
           # here -- a single ~90-min Windows pass is the budget, and a
-          # second attempt would blow the 4h job timeout. If the script
-          # genuinely fails, the job fails fast and we iterate on the
-          # issue.
+          # second attempt would exceed this job's 240-min timeout. If
+          # the script genuinely fails, the job fails fast and we iterate
+          # on the issue.
           #
           # Synthesis pass (-WithSynthesis) is intentionally omitted on
           # Windows CI for Phase 1. Measured: Pass 3 (-only-synthesized)
           # takes ~2h on windows-latest with OCC + /Ob0, pushing the total
-          # job past the 4h GitHub Actions timeout. Phase 2 (self-hosted
+          # past this job's 240-min timeout. Phase 2 (self-hosted
           # Windows runner with GPU drivers) would exercise the backend
           # emit paths via Pass 1 directly and make synthesis unneeded.
           & 'tools/coverage/run-coverage-windows.ps1' @testArgs
