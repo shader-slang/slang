@@ -1878,8 +1878,15 @@ struct ExistentialLoweringContext : public InstPassBase
             return false;
         }
 
-        auto witnessTableIDVecType = (IRType*)tupleType->getOperand(1);
-        auto packedValueType = (IRType*)tupleType->getOperand(2);
+        auto witnessTableIDVecType = as<IRType>(tupleType->getOperand(1));
+        auto packedValueType = as<IRType>(tupleType->getOperand(2));
+        if (!witnessTableIDVecType || !packedValueType)
+        {
+            // The tuple was constructed with non-IRType operands in those
+            // positions (shouldn't happen for a well-formed existential
+            // tuple, but guard rather than blind-cast).
+            return false;
+        }
 
         auto witnessTableIDVec = builder.emitGetTupleElement(witnessTableIDVecType, obj, (UInt)1);
         auto packedValue = builder.emitGetTupleElement(packedValueType, obj, (UInt)2);

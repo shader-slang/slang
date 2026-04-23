@@ -2,7 +2,7 @@
 // `createDynamicObject` (raw -> existential) to round-trip an
 // interface-typed value through a raw uint buffer.  These are the
 // supported replacements for `bit_cast` on interface types; see
-// bit-cast-interface-roundtrip.slang (forward direction rejection) and
+// bit-cast-interface-forward.slang (forward direction rejection) and
 // bit-cast-interface-serialize.slang (reverse direction rejection) for
 // the rejected `bit_cast` cases.
 //
@@ -11,6 +11,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-d3d12 -compute -shaderobj -output-using-type
 
 [anyValueSize(16)]
 interface IFoo
