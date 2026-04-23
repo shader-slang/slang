@@ -138,6 +138,12 @@ Expr* SemanticsVisitor::maybeMoveTemp(Expr* const& expr, F const& func)
         if (auto varDeclRef = declRef.as<VarDecl>())
         {
             auto varDecl = varDeclRef.getDecl();
+            // Skip module-level / non-local vars: they can belong to shared
+            // built-in modules (e.g. gl_Position in glsl.meta.slang), and
+            // modifier allocations tied to this compile's ASTBuilder would
+            // dangle after the compile finishes.
+            if (as<ModuleDecl>(varDecl->parentDecl))
+                return moveTemp(expr, func);
             if (!varDecl->hasModifier<VarReassignedModifier>())
             {
                 if (!varDecl->hasModifier<ExistentialOpenedOnVarModifier>())
@@ -3497,7 +3503,10 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     {
         if (auto varDecl = as<VarDecl>(varExpr->declRef.getDecl()))
         {
-            if (!as<LetDecl>(varDecl))
+            // Skip module-level vars: they can be shared across compilations
+            // (e.g. glsl.meta.slang builtins) and must not be mutated with
+            // per-compile-arena modifiers.
+            if (!as<LetDecl>(varDecl) && !as<ModuleDecl>(varDecl->parentDecl))
             {
                 if (!varDecl->hasModifier<VarReassignedModifier>())
                     addModifier(varDecl, m_astBuilder->create<VarReassignedModifier>());
