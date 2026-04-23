@@ -3391,10 +3391,22 @@ struct TypeFlowSpecializationContext
                     // TODO: Make 'none witness' values a proper thing instead of three different
                     // possibilities..
                     //
+                    // Step 1: treat any non-concrete table (the explicit "none"
+                    // sentinels *or* a resolve-result that isn't an
+                    // `IRWitnessTable`) as a no-dispatch void entry.  Separating
+                    // the null guard from the dereference below makes it harder
+                    // for a future refactor to accidentally reorder the
+                    // conditions and reintroduce the crash this code originally
+                    // had.
                     auto witnessTab = as<IRWitnessTable>(resolvedTable);
-                    if (as<IRNoneWitnessTableElement>(table) || as<IRVoidLit>(table) ||
-                        !witnessTab ||
-                        (witnessTab->getConformanceType()->getOp() == kIROp_VoidType))
+                    if (as<IRNoneWitnessTableElement>(table) || as<IRVoidLit>(table) || !witnessTab)
+                    {
+                        results.add(builder.getVoidValue());
+                        return;
+                    }
+
+                    // Step 2: it is safe to dereference `witnessTab` now.
+                    if (witnessTab->getConformanceType()->getOp() == kIROp_VoidType)
                     {
                         results.add(builder.getVoidValue());
                         return;
