@@ -27,6 +27,9 @@ RWStructuredBuffer<float> outMMA;
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outColMajor
 RWStructuredBuffer<float> outColMajor;
 
+//TEST_INPUT:ubuffer(stride=2, count=256):out,name=outHalf
+RWStructuredBuffer<half> outHalf;
+
 //TEST_INPUT:ubuffer(data=[5.0 5.0 5.0 5.0 5.0 5.0 5.0 5.0], stride=4, count=256):name=inputBAB
 ByteAddressBuffer inputBAB;
 
@@ -108,4 +111,12 @@ void computeMain()
     matColLoaded.Store<CoopMatMatrixLayout.RowMajor>(outColMajor, 0u, kStride);
     // CHECK: type: float
     // CHECK-COUNT-8: 5.000000
+
+    // --- 10. half accumulator: fill + Store/Load ---
+    typealias HMat = CoopMat<half, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse.MatrixAccumulator>;
+    var matHalf : HMat;
+    matHalf.fill(half(7.0));
+    matHalf.Store<CoopMatMatrixLayout.RowMajor>(outHalf, 0u, kStride);
+    // CHECK: type: half
+    // CHECK-COUNT-8: 7.00
 }
