@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BAB):-vk -emit-spirv-directly -Xslang -DBAB
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BAB):-cuda -Xslang -DBAB
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK_METAL):-metal -compute -output-using-type -Xslang -DMETAL
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type -Xslang -DMETAL
 
 //DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include -DBAB
 //DXIL: result code = 0
@@ -15,15 +15,6 @@
 // CHECK-NEXT: 6.000000
 // CHECK-NEXT: 7.000000
 // CHECK-NEXT: 8.000000
-
-// CHECK_METAL: 1.000000
-// CHECK_METAL-NEXT: 2.000000
-// CHECK_METAL-NEXT: 3.000000
-// CHECK_METAL-NEXT: 4.000000
-// CHECK_METAL-NEXT: 5.000000
-// CHECK_METAL-NEXT: 6.000000
-// CHECK_METAL-NEXT: 7.000000
-// CHECK_METAL-NEXT: 8.000000
 
 // CHECK_BAB: 3F800000
 // CHECK_BAB-NEXT: 40000000

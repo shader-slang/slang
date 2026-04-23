@@ -27912,7 +27912,7 @@ struct CoopMat
     /// @param stride The stride in elements between consecutive rows (for row major layout) or
     ///        columns (for column major layout) and must be a multiple of 8 for __half element type
     ///        or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
-    [require(cuda_spirv_metal, cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(RWStructuredBuffer<T> buffer, uint element, uint stride)
@@ -27920,7 +27920,7 @@ struct CoopMat
         __store<matrixLayout>(buffer, element, stride);
     }
 
-    [require(cuda_spirv_metal, cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     internal void __store<
         let matrixLayout : CoopMatMatrixLayout
     >(RWStructuredBuffer<T> buffer, uint element, uint stride)
@@ -27954,7 +27954,7 @@ struct CoopMat
     /// @param buffer The pointer to the buffer to store the matrix into.
     /// @param element The starting element index in the buffer.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
-    [require(cuda_spirv_metal, cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
@@ -28011,7 +28011,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cuda_spirv_metal, cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
@@ -28041,7 +28041,7 @@ struct CoopMat
     }
 
     [ForceInline]
-    [require(cuda_spirv_metal, cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
     >(Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
@@ -28075,7 +28075,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cuda_spirv_metal, cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -28106,7 +28106,7 @@ struct CoopMat
     }
 
     [ForceInline]
-    [require(cuda_spirv_metal, cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -28192,7 +28192,7 @@ $}
     }
 
     [__NoSideEffect]
-    [require(cuda_spirv_metal, cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(
@@ -28236,7 +28236,7 @@ $}
     /// @return A cooperative matrix loaded from the buffer.
     [ForceInline]
     [__NoSideEffect]
-    [require(cuda_spirv_metal, cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
@@ -28297,7 +28297,7 @@ $}
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cuda_spirv_metal, cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
@@ -28327,7 +28327,7 @@ $}
     }
 
     [ForceInline]
-    [require(cuda_spirv_metal, cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
     >(Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
@@ -28362,7 +28362,7 @@ $}
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cuda_spirv_metal, cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -28393,7 +28393,7 @@ $}
     }
 
     [ForceInline]
-    [require(cuda_spirv_metal, cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -29060,7 +29060,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cuda_spirv_metal, cooperative_matrix)]
+[require(cuda_metal_spirv, cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : ICoopElement,
     let S : MemoryScope,
@@ -29089,7 +29089,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cuda_spirv_metal, cooperative_matrix)]
+[require(cuda_metal_spirv, cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : ICoopElement,
     let S : MemoryScope,
@@ -29118,7 +29118,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cuda_spirv_metal, cooperative_matrix)]
+[require(cuda_metal_spirv, cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : ICoopElement,
     let S : MemoryScope,
@@ -29180,7 +29180,7 @@ CoopMat<T, S, M, N, R> coopMatLoadCoherent<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the groupshared array.
 [ForceInline]
-[require(cuda_spirv_metal, cooperative_matrix)]
+[require(cuda_metal_spirv, cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : ICoopElement,
     let S : MemoryScope,

@@ -103,6 +103,12 @@ protected:
     void emitAtomicDestOperand(IRInst* operand);
     void emitAtomicSrcOperand(bool isImage, IRInst* operand);
     void emitAtomicSemanticOperand(IRInst* inst);
+
+    static const char* kMetalBuiltinPreludeMatrixCompMult;
+    static const char* kMetalBuiltinPreludeMatrixReshape;
+    static const char* kMetalBuiltinPreludeVectorReshape;
+    static const char* kMetalBuiltinPreludeMatrixFmod;
+    static const char* kMetalBuiltinPreludeSimdgroupMatrixOps;
 };
 
 } // namespace Slang
