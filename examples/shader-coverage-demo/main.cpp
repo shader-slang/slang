@@ -4,17 +4,19 @@
 // This prototype demo runs in two modes:
 //
 //   --mode=compile (default)
-//       Compiles `simulate.slang` with `-trace-coverage` via slang-rhi.
-//       Produces `simulate.slangcov` (the counter->source manifest).
-//       This demonstrates that the compiler flag is reachable from a
-//       normal slang-rhi host and that the manifest ships alongside
-//       compiled output.
+//       Compiles `simulate.slang` with `-trace-coverage` via slang-rhi,
+//       then queries `slang::ICoverageTracingMetadata` through the
+//       Slang API to retrieve the counter → (file, line) mapping and
+//       the synthesized coverage-buffer binding. Serializes that into
+//       a JSON manifest at `opt.manifest`. This demonstrates that a
+//       host integration can obtain coverage metadata directly from
+//       the compile result, without relying on slangc's sidecar file.
 //
 //   --mode=report
-//       Parses an existing `.slangcov` manifest + a counter buffer
-//       (binary uint32 little-endian) and writes an LCOV `.info` file
-//       via the `slang-coverage-rt` helper. Demonstrates that the
-//       full manifest/counters → LCOV pipeline is runnable end-to-end
+//       Parses an existing manifest + a counter buffer (binary uint32
+//       little-endian) and writes an LCOV `.info` file via the
+//       `slang-coverage-rt` helper. Demonstrates that the full
+//       manifest/counters → LCOV pipeline is runnable end-to-end
 //       without a GPU. The counter buffer can be produced by any
 //       dispatch path (slang-test CPU output, a hand-written test
 //       harness, etc.).
@@ -52,7 +54,7 @@ struct Options
 {
     std::string mode = "compile";
     std::string backend = "cpu";
-    std::string manifest = "simulate.slangcov";
+    std::string manifest = "simulate.coverage-mapping.json";
     std::string countersFile;
     std::string outputLcov = "coverage.lcov";
     std::string testName = "shader_coverage_demo";
@@ -98,19 +100,143 @@ DeviceType pickDeviceType(const std::string& backend)
 
 // ---- mode=compile ---------------------------------------------------
 
+// JSON-escape one character into `out`. Handles `\`, `"`, control
+// characters per RFC 8259 — enough for file paths.
+static void appendJsonEscaped(std::string& out, char c)
+{
+    unsigned char uc = (unsigned char)c;
+    switch (uc)
+    {
+    case '\\':
+        out += "\\\\";
+        break;
+    case '"':
+        out += "\\\"";
+        break;
+    case '\b':
+        out += "\\b";
+        break;
+    case '\f':
+        out += "\\f";
+        break;
+    case '\n':
+        out += "\\n";
+        break;
+    case '\r':
+        out += "\\r";
+        break;
+    case '\t':
+        out += "\\t";
+        break;
+    default:
+        if (uc < 0x20)
+        {
+            char buf[8];
+            std::snprintf(buf, sizeof(buf), "\\u%04x", (unsigned)uc);
+            out += buf;
+        }
+        else
+        {
+            out.push_back((char)uc);
+        }
+    }
+}
+
+// Build a `.coverage-mapping.json` payload from the compiler's
+// ICoverageTracingMetadata. This matches the same JSON shape that
+// slangc emits via `_maybeWriteCoverageMapping`, so the resulting
+// file is interchangeable with slangc's sidecar output.
+static std::string buildManifestJson(slang::ICoverageTracingMetadata* coverage)
+{
+    std::string out;
+    out += "{\n";
+    out += "  \"version\": 1,\n";
+    char countBuf[64];
+    std::snprintf(countBuf, sizeof(countBuf), "  \"counters\": %u,\n", coverage->getCounterCount());
+    out += countBuf;
+    out += "  \"buffer\": {\n";
+    out += "    \"name\": \"__slang_coverage\",\n";
+    out += "    \"element_type\": \"uint32\",\n";
+    out += "    \"element_stride\": 4,\n";
+    out += "    \"synthesized\": true";
+    int32_t space = coverage->getBufferSpace();
+    int32_t binding = coverage->getBufferBinding();
+    if (space >= 0)
+    {
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), ",\n    \"space\": %d", (int)space);
+        out += buf;
+    }
+    if (binding >= 0)
+    {
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), ",\n    \"binding\": %d", (int)binding);
+        out += buf;
+    }
+    out += "\n  },\n";
+    out += "  \"entries\": [";
+    for (uint32_t i = 0; i < coverage->getCounterCount(); ++i)
+    {
+        if (i > 0)
+            out += ",";
+        char idxBuf[64];
+        std::snprintf(idxBuf, sizeof(idxBuf), "\n    {\"index\": %u, \"file\": \"", i);
+        out += idxBuf;
+        const char* file = coverage->getEntryFile(i);
+        for (const char* p = file; p && *p; ++p)
+            appendJsonEscaped(out, *p);
+        char tail[64];
+        std::snprintf(tail, sizeof(tail), "\", \"line\": %u}", coverage->getEntryLine(i));
+        out += tail;
+    }
+    out += "\n  ]\n";
+    out += "}\n";
+    return out;
+}
+
+// Fetch ICoverageTracingMetadata from a linked program and serialize
+// it to `path` as a JSON manifest in the same shape slangc writes.
+// Returns the counter count on success, or 0 on failure.
+static uint32_t writeManifestFromMetadata(
+    slang::IComponentType* linked,
+    const std::string& path)
+{
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IMetadata> metadata;
+    if (SLANG_FAILED(linked->getEntryPointMetadata(0, 0, metadata.writeRef(), diagnostics.writeRef())))
+    {
+        if (diagnostics)
+            std::fprintf(stderr, "%s", (const char*)diagnostics->getBufferPointer());
+        std::fprintf(stderr, "failed to query entry-point metadata\n");
+        return 0;
+    }
+    auto* coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
+        slang::ICoverageTracingMetadata::getTypeGuid());
+    if (!coverage || coverage->getCounterCount() == 0)
+    {
+        std::fprintf(stderr, "no coverage tracing metadata on the compile result\n");
+        return 0;
+    }
+    std::string json = buildManifestJson(coverage);
+    FILE* f = std::fopen(path.c_str(), "wb");
+    if (!f)
+    {
+        std::fprintf(stderr, "failed to open '%s' for writing\n", path.c_str());
+        return 0;
+    }
+    std::fwrite(json.data(), 1, json.size(), f);
+    std::fclose(f);
+    return coverage->getCounterCount();
+}
+
 // Compile the demo shader with `-trace-coverage` pinned on the
-// session so the coverage pass runs and writes the manifest sidecar.
-// We stop before building the ComputePipeline because on current
-// slang-rhi, the synthesized coverage buffer trips pipeline builder
-// reflection. The manifest is still produced during shader-program
-// linking, which is all this mode needs to demonstrate.
+// session so the coverage pass runs and records slot → source mapping
+// in the artifact's post-emit metadata. Query
+// `slang::ICoverageTracingMetadata` via the standard compile API,
+// then serialize it to `opt.manifest` in the same JSON shape that
+// slangc would write as a sidecar.
 int runCompile(const Options& opt)
 {
-    // Tell the coverage pass where to write the sidecar manifest.
-    static std::string manifestEnv;
-    manifestEnv = "SLANG_COVERAGE_MANIFEST_PATH=" + opt.manifest;
-    putenv(const_cast<char*>(manifestEnv.c_str()));
-
     slang::CompilerOptionEntry covOption = {};
     covOption.name = slang::CompilerOptionName::TraceCoverage;
     covOption.value.kind = slang::CompilerOptionValueKind::Int;
@@ -154,16 +280,22 @@ int runCompile(const Options& opt)
     if (diagnostics)
         std::fprintf(stderr, "%s", (const char*)diagnostics->getBufferPointer());
 
-    // Force codegen so the coverage pass runs and the manifest is
-    // written.  This triggers the full IR pipeline for the selected
-    // target; the coverage pass writes the `.slangcov` sidecar during
-    // that pipeline.
+    // Force codegen so the coverage pass runs. We don't need the
+    // emitted code here — metadata is populated as a side effect of
+    // the back-end pipeline.
     ComPtr<slang::IBlob> codeBlob;
     linked->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnostics.writeRef());
     if (diagnostics)
         std::fprintf(stderr, "%s", (const char*)diagnostics->getBufferPointer());
 
-    std::printf("compile: manifest written to %s\n", opt.manifest.c_str());
+    uint32_t counterCount = writeManifestFromMetadata(linked, opt.manifest);
+    if (counterCount == 0)
+        return 1;
+
+    std::printf(
+        "compile: %u counter slots, manifest written to %s\n",
+        counterCount,
+        opt.manifest.c_str());
     std::printf(
         "  run scenarios, then: %s --mode=report --counters=<file>\n",
         "shader-coverage-demo");
@@ -284,10 +416,6 @@ std::vector<Particle> makeParticles(const std::string& scenario, uint32_t count)
 
 int runDispatch(const Options& opt)
 {
-    static std::string manifestEnv;
-    manifestEnv = "SLANG_COVERAGE_MANIFEST_PATH=" + opt.manifest;
-    putenv(const_cast<char*>(manifestEnv.c_str()));
-
     slang::CompilerOptionEntry covOption = {};
     covOption.name = slang::CompilerOptionName::TraceCoverage;
     covOption.value.kind = slang::CompilerOptionValueKind::Int;
@@ -365,7 +493,13 @@ int runDispatch(const Options& opt)
     ComPtr<IBuffer> partBuf = device->createBuffer(partDesc, particles.data());
     std::fprintf(stderr, "[dispatch] partBuf OK\n");
 
-    // Size the coverage buffer from the manifest the compile just wrote.
+    // Query the freshly-compiled entry point's metadata and serialize
+    // a manifest JSON file, so slang_coverage_create can ingest it the
+    // same way it would a slangc-produced sidecar.
+    if (writeManifestFromMetadata(linked, opt.manifest) == 0)
+        return 1;
+
+    // Size the coverage buffer from the manifest we just wrote.
     SlangCoverageContext* covCtx = nullptr;
     if (slang_coverage_create(opt.manifest.c_str(), &covCtx) != SLANG_COVERAGE_OK)
     {
