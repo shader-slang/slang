@@ -7050,6 +7050,26 @@ struct TypeFlowSpecializationContext
         auto valuePtrType = cast<IRPtrTypeBase>(valueOutPtr->getDataType());
         auto valueType = valuePtrType->getValueType();
 
+        // Validate that the user-chosen storage type matches the interface's
+        // any-value payload size; a mismatch would silently truncate or leave
+        // trailing bytes undefined, defeating the serialize/deserialize pair.
+        if (auto targetReq = targetProgram ? targetProgram->getTargetReq() : nullptr)
+        {
+            auto packedType = packedValue->getDataType();
+            auto anyValueSize = getAnyValueSize(packedType, targetReq);
+            auto userSize = getAnyValueSize(valueType, targetReq);
+            if (anyValueSize > 0 && userSize > 0 && anyValueSize != userSize)
+            {
+                sink->diagnose(Diagnostics::SerializeDynamicObjectSizeMismatch{
+                    .valueType = valueType,
+                    .valueSize = userSize,
+                    .interfaceType = interfaceType,
+                    .anyValueSize = anyValueSize,
+                    .location = inst->sourceLoc});
+                return false;
+            }
+        }
+
         IRInst* unpackedValue = nullptr;
         if (as<IRUntaggedUnionType>(packedValue->getDataType()))
         {
@@ -7951,6 +7971,7 @@ struct TypeFlowSpecializationContext
         SpecializationContext* specContext,
         bool shouldReportDynamicDispatchSites)
         : module(module)
+        , targetProgram(target)
         , sink(sink)
         , shouldReportDynamicDispatchSites(shouldReportDynamicDispatchSites)
         , specContext(specContext)
@@ -7961,6 +7982,7 @@ struct TypeFlowSpecializationContext
 
     // Basic context
     IRModule* module;
+    TargetProgram* targetProgram;
     DiagnosticSink* sink;
     bool shouldReportDynamicDispatchSites;
 

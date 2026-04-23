@@ -4561,6 +4561,13 @@ err(
 )
 
 err(
+    "serialize-dynamic-object-size-mismatch",
+    41206,
+    "serializeDynamicObject storage size mismatch",
+    span { loc = "location", message = "`serializeDynamicObject` payload type '~valueType:IRInst' has size '~valueSize:Int' but interface '~interfaceType:IRInst' requires any-value size '~anyValueSize:Int'" }
+)
+
+err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",

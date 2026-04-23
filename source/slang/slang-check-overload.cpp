@@ -3094,6 +3094,12 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     // concrete payloads.
     if (calleeIntrinsicOp == kIROp_BitCast)
     {
+        // Result-type check: by the time `ResolveInvoke` runs, `funcExpr->type`
+        // may not yet be a resolved `FuncType` (the generic application is often
+        // a `TypeType` at this point).  When it is, we can check the result type
+        // directly; when it isn't, the IR-level `isConcreteType` guard in
+        // type-flow specialization catches the interface-containing cases with
+        // diagnostic E41204.
         if (auto funcType = as<FuncType>(funcExpr->type.type))
         {
             auto resultType = funcType->getResultType();

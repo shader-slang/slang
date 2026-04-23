@@ -1,13 +1,13 @@
-// `bit_cast` where the operand or result transitively contains an
-// interface type is also rejected.  Covers struct fields (including
-// generic instantiations) and `Optional<IFoo>`.
+// `bit_cast` where the operand transitively contains an interface type
+// is rejected with E41205.  Covers struct fields (including generic
+// instantiations), `Optional<IFoo>`, arrays of interfaces, and
+// interface conjunctions (`IFoo & IBar`).
 //
-// Complements bit-cast-interface-roundtrip.slang (forward direction,
-// bare interface) and bit-cast-interface-serialize.slang (reverse
-// direction).  See also serialize-dynamic-object.slang for the
-// supported `serializeDynamicObject` / `createDynamicObject` pair.
+// Reverse direction (result type contains interface) lives in
+// bit-cast-interface-reverse-wrapped.slang because the reverse path
+// is caught at IR layer and requires its own compilation.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FooA:IFoo=0"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FooA:IFoo=0" -conformance "FooA:IBar=1"
 
 [anyValueSize(16)]
 interface IFoo
@@ -15,10 +15,16 @@ interface IFoo
     float eval();
 }
 
-struct FooA : IFoo
+interface IBar
+{
+    int bar();
+}
+
+struct FooA : IFoo, IBar
 {
     float x;
     float eval() { return x; }
+    int bar() { return 7; }
 }
 
 struct Wrapper
@@ -56,23 +62,24 @@ void testOptional(Optional<IFoo> opt)
 //CHECK:                            ^^^ 'Optional<IFoo>' involves an interface type
 }
 
+void testArrayOfInterface(IFoo arr[2])
+{
+    RawData raw = bit_cast<RawData>(arr);
+//CHECK:                            ^^^ bit_cast involving interface type is not supported
+//CHECK:                            ^^^ 'IFoo[2]' involves an interface type
+}
+
+void testAndType(IFoo & IBar value)
+{
+    RawData raw = bit_cast<RawData>(value);
+//CHECK:                            ^^^^^ bit_cast involving interface type is not supported
+//CHECK:                            ^^^^^ 'IFoo & IBar' involves an interface type
+}
+
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
-    Wrapper w;
-    w.foo = createDynamicObject<IFoo>(0, 3.0);
-    w.extra = 1.0;
-    testStructField(w);
-
-    Generic<IFoo> g;
-    g.value = createDynamicObject<IFoo>(0, 4.0);
-    g.pad = 0;
-    testGenericField(g);
-
-    Optional<IFoo> opt = none;
-    testOptional(opt);
-
     outputBuffer[0] = 0.0;
 }

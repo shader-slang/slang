@@ -1852,6 +1852,55 @@ struct ExistentialLoweringContext : public InstPassBase
         }
     }
 
+    bool lowerExtractDynamicObject(IRExtractDynamicObject* inst)
+    {
+        // Fallback when the type-flow specialization pass did not remove
+        // `ExtractDynamicObject`.  At this point the operand's existential
+        // type has been lowered to the (RTTI, WitnessTableIDVec, AnyValue)
+        // tuple that `lowerCreateExistentialObject` produces: we recover
+        // the sequential witness-table ID from the first element of the
+        // ID vector (tuple field 1), and forward the packed any-value
+        // payload into the user's raw storage (tuple field 2).
+
+        IRBuilder builder(module);
+        builder.setInsertBefore(inst);
+
+        auto obj = inst->getOperand(0);
+        auto typeIDOutPtr = inst->getOperand(1);
+        auto valueOutPtr = inst->getOperand(2);
+
+        auto tupleType = as<IRTupleType>(obj->getDataType());
+        if (!tupleType || tupleType->getOperandCount() < 3)
+        {
+            // The existential was not lowered to the expected tuple shape —
+            // leave the inst in place and let downstream validation report
+            // the unsupported state rather than silently miscompiling.
+            return false;
+        }
+
+        auto witnessTableIDVecType = (IRType*)tupleType->getOperand(1);
+        auto packedValueType = (IRType*)tupleType->getOperand(2);
+
+        auto witnessTableIDVec = builder.emitGetTupleElement(witnessTableIDVecType, obj, (UInt)1);
+        auto packedValue = builder.emitGetTupleElement(packedValueType, obj, (UInt)2);
+
+        auto seqID = builder.emitElementExtract(witnessTableIDVec, IRIntegerValue(0));
+        builder.emitStore(typeIDOutPtr, seqID);
+
+        auto valuePtrType = cast<IRPtrTypeBase>(valueOutPtr->getDataType());
+        auto valueType = valuePtrType->getValueType();
+
+        IRInst* unpackedValue = nullptr;
+        if (as<IRAnyValueType>(packedValueType))
+            unpackedValue = builder.emitUnpackAnyValue(valueType, packedValue);
+        else
+            unpackedValue = builder.emitReinterpret(valueType, packedValue);
+        builder.emitStore(valueOutPtr, unpackedValue);
+
+        inst->removeAndDeallocate();
+        return true;
+    }
+
     bool lowerCreateExistentialObject(IRCreateExistentialObject* inst)
     {
         // Turn an instruction of the form `IRCreateExistentialObject(witnessTableID, value)`
@@ -2023,6 +2072,11 @@ struct ExistentialLoweringContext : public InstPassBase
                 case kIROp_CreateExistentialObject:
                     // Should have been removed during tagged-union lowering.
                     lowerCreateExistentialObject(cast<IRCreateExistentialObject>(inst));
+                    break;
+                case kIROp_ExtractDynamicObject:
+                    // Should have been removed during tagged-union lowering; mirrors
+                    // `CreateExistentialObject` fallback above.
+                    lowerExtractDynamicObject(cast<IRExtractDynamicObject>(inst));
                     break;
                 case kIROp_GetValueFromBoundInterface:
                     lowerGetValueFromBoundInterface(cast<IRGetValueFromBoundInterface>(inst));

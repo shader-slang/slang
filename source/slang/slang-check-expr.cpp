@@ -6751,6 +6751,11 @@ static bool typeInvolvesInterfaceImpl(ASTBuilder* astBuilder, Type* type, HashSe
 
     if (auto modifiedType = as<ModifiedType>(type))
         return typeInvolvesInterfaceImpl(astBuilder, modifiedType->getBase(), visiting);
+    if (auto andType = as<AndType>(type))
+    {
+        return typeInvolvesInterfaceImpl(astBuilder, andType->getLeft(), visiting) ||
+               typeInvolvesInterfaceImpl(astBuilder, andType->getRight(), visiting);
+    }
     if (auto optionalType = as<OptionalType>(type))
         return typeInvolvesInterfaceImpl(astBuilder, optionalType->getValueType(), visiting);
     if (auto tupleType = as<TupleType>(type))
