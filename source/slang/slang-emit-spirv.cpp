@@ -6666,30 +6666,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         if (!irInst)
             return false;
-        if (irInst->getOp() == kIROp_SPIRVAsmOperandBuiltinVar)
+        if (irInst->getOp() != kIROp_GlobalVar && irInst->getOp() != kIROp_GlobalParam &&
+            irInst->getOp() != kIROp_SPIRVAsmOperandBuiltinVar)
+            return false;
+
+        IRType* valueType = nullptr;
+        if (auto ptrType = as<IRPtrTypeBase>(irInst->getDataType()))
         {
-            if (isIntegralScalarOrCompositeType(irInst->getDataType()))
-            {
-                if (isInstUsedInStage(irInst, Stage::Fragment))
-                    return true;
-            }
-            return false;
+            auto addrSpace = ptrType->getAddressSpace();
+            if (addrSpace != AddressSpace::Input && addrSpace != AddressSpace::BuiltinInput)
+                return false;
+            valueType = ptrType->getValueType();
         }
-        if (irInst->getOp() != kIROp_GlobalVar && irInst->getOp() != kIROp_GlobalParam)
-            return false;
-        auto ptrType = as<IRPtrTypeBase>(irInst->getDataType());
-        if (!ptrType)
-            return false;
-        auto addrSpace = ptrType->getAddressSpace();
-        if (addrSpace == AddressSpace::Input || addrSpace == AddressSpace::BuiltinInput)
+        else
         {
-            if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
-            {
-                if (isInstUsedInStage(irInst, Stage::Fragment))
-                    return true;
-            }
+            valueType = irInst->getDataType();
         }
-        return false;
+
+        return isIntegralScalarOrCompositeType(valueType) &&
+               isInstUsedInStage(irInst, Stage::Fragment);
     }
 
     SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal, IRInst* irInst)
