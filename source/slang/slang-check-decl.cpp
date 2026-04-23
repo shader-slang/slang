@@ -3265,8 +3265,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             if (isStaticConst && isGlobalDecl(varDecl) && isScalarIntegerType(varDecl->type) &&
                 !varDecl->val && getSink()->getErrorCount() == errorCountBeforeInitCheck)
             {
-                getSink()->diagnose(
-                    Diagnostics::StaticConstGlobalNonConstantInit{.decl = varDecl});
+                getSink()->diagnose(Diagnostics::StaticConstGlobalNonConstantInit{.decl = varDecl});
             }
         }
     }
