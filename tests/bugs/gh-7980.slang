@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target wgsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl
 
 // Arrays of resource types are illegal in WGSL because these buffer types map
 // to runtime-sized arrays, and WGSL does not allow runtime-sized arrays as
@@ -6,11 +6,14 @@
 // GitHub issue: https://github.com/shader-slang/slang/issues/7980
 
 RWStructuredBuffer<float> result[2];
-//CHECK: array of resource types not supported in WGSL
+//CHECK:                  ^^^^^^ E56105
+//CHECK:                  ^^^^^^ arrays of resource types
 StructuredBuffer<float> input[2];
-//CHECK: array of resource types not supported in WGSL
+//CHECK:                ^^^^^ E56105
+//CHECK:                ^^^^^ arrays of resource types
 RWByteAddressBuffer raw[2];
-//CHECK: array of resource types not supported in WGSL
+//CHECK:            ^^^ E56105
+//CHECK:            ^^^ arrays of resource types
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
