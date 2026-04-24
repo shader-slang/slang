@@ -185,6 +185,10 @@ struct CoverageInstrumenter
         };
         builder.emitIntrinsicInst(uintType, kIROp_AtomicAdd, 3, atomicArgs);
 
+        // The counter op has void return type and, by construction, no uses.
+        // Catch a future IR transform that takes a use of it before we reach
+        // this removal — the op would otherwise be silently dropped here.
+        SLANG_ASSERT(!counterOp->hasUses());
         counterOp->removeAndDeallocate();
     }
 
