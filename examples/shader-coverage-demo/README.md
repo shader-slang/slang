@@ -62,8 +62,28 @@ requires an NVIDIA CUDA runtime.
     --counters=counters.bin \
     --output=coverage.lcov
 
-# 4. Render.
+# 4. Render. See "Rendering the report" below for alternatives.
 genhtml coverage.lcov -o coverage-html/
+```
+
+### Rendering the report
+
+The `coverage.lcov` output is the industry-standard LCOV format,
+consumable by several tools depending on platform and workflow:
+
+| Tool | Platforms | When to use |
+|---|---|---|
+| `genhtml` (from the `lcov` package) | Linux, macOS, WSL | CLI-driven Linux / macOS workflows |
+| `reportgenerator` (.NET tool) | Windows native, Linux, macOS | Windows workstations; CI that already has .NET available |
+| VS Code Coverage Gutters | Any (in-editor) | Per-developer view; no HTML output needed |
+| Codecov / Coveralls | SaaS | Team-wide dashboards and PR annotations |
+
+On Windows specifically, `reportgenerator` avoids the Perl install
+that `genhtml` requires:
+
+```powershell
+dotnet tool install --global dotnet-reportgenerator-globaltool
+reportgenerator -reports:coverage.lcov -targetdir:out-html -reporttypes:Html
 ```
 
 ## What the shader exercises
