@@ -101,11 +101,12 @@ jobs:
             slang_test_args+=("-api" "cpu+llvm")
           fi
 
-          # Restrict to GPU APIs; no-API tests (SIMPLE/DIAGNOSTIC/compile-only)
-          # are covered by the CPU-only tier and skipped here to save GPU time.
+          # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped — the
+          # CPU-only tier covers those. Intentionally NOT using -api-only:
+          # COMPILE directives in multi-step compile→dispatch tests have
+          # requiredFlags==0 and would be skipped, breaking the dispatch.
           if [[ "${{ inputs.gpu-api-only }}" == "true" ]]; then
             slang_test_args+=("-api" "vk+cuda+dx11+dx12+mtl+wgpu")
-            slang_test_args+=("-api-only")
           fi
 
           # Add test server arguments only if server count > 1
