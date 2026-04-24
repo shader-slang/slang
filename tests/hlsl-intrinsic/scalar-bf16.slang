@@ -26,14 +26,11 @@ void computeMain()
 
     BFloat16 valBF16 = BFloat16(3.0);
     outputBuffer[5] = bit_cast<uint16_t>(valBF16);
-    __target_switch
-    {
-    case cuda:
-        vector<BFloat16, 4> vecBF16_2 = vector<BFloat16, 4>(BFloat16(0.5), BFloat16(0.5), BFloat16(1.0), BFloat16(1.0));
-        BFloat16 dotResult = dot(vecBF16, vecBF16_2);
-        outputBuffer[6] = (int)((float)(dotResult) * 10);
-    default:
-        // Vulkan/NVIDIA currently does not support dot product.
-        outputBuffer[6] = 85;
-    }
+
+    // dot(bf16, bf16) on Vulkan uses OpDot under BFloat16DotProductKHR (SPV_KHR_bfloat16).
+    // CUDA lowers to a per-lane multiply-add loop via _slang_vector_dot.
+    vector<BFloat16, 4> vecBF16_2 = vector<BFloat16, 4>(BFloat16(0.5), BFloat16(0.5), BFloat16(1.0), BFloat16(1.0));
+    BFloat16 dotResult = dot(vecBF16, vecBF16_2);
+    // 1.0*0.5 + 2.0*0.5 + 3.0*1.0 + 4.0*1.0 = 8.5, *10 = 85
+    outputBuffer[6] = (int)((float)(dotResult) * 10);
 }
