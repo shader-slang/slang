@@ -1966,10 +1966,9 @@ bool SemanticsVisitor::_coerce(
         if (typeTransitivelyContainsOpaqueHandle(this, optType->getValueType()))
         {
             if (sink && outToExpr)
-                sink->diagnose(
-                    Diagnostics::OptionalCannotWrapResourceType{
-                        .type = optType->getValueType(),
-                        .expr = fromExpr});
+                sink->diagnose(Diagnostics::OptionalCannotWrapResourceType{
+                    .type = optType->getValueType(),
+                    .expr = fromExpr});
             return false;
         }
         if (outCost)

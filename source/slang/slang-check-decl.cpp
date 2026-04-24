@@ -18867,10 +18867,9 @@ static bool _typeTransitivelyContainsOpaqueHandleImpl(
             for (auto field : structDecl->getFields())
             {
                 visitor->ensureDecl(field, DeclCheckState::CanUseTypeOfValueDecl);
-                auto fieldDeclRef =
-                    visitor->getASTBuilder()
-                        ->getMemberDeclRef(declRefType->getDeclRef(), field)
-                        .template as<VarDeclBase>();
+                auto fieldDeclRef = visitor->getASTBuilder()
+                                        ->getMemberDeclRef(declRefType->getDeclRef(), field)
+                                        .template as<VarDeclBase>();
                 auto fieldType = fieldDeclRef ? getType(visitor->getASTBuilder(), fieldDeclRef)
                                               : field->type.type;
                 if (fieldType &&
