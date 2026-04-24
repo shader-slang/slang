@@ -44,10 +44,12 @@ slang-coverage-html <input.lcov> [options]
 --source-root PATH     Directory used as a root when resolving SF: paths
 --filter-include GLOB  Include-only glob, applied to SF: path (repeatable)
 --filter-exclude GLOB  Exclude glob, applied to SF: path (repeatable)
---show-branches        Phase-2 placeholder (currently a no-op)
---show-functions       Phase-2 placeholder (currently a no-op)
 --quiet                Suppress progress output
 ```
+
+Function and branch columns render automatically when the input LCOV
+carries `FN:` / `FNDA:` / `BRDA:` records. No flag needed to enable
+them — they disappear again when the LCOV has none.
 
 ### Source resolution
 
@@ -76,15 +78,17 @@ later runs:
 
 ## Phase matrix
 
-| Phase | Features                                                                                                                        | Status                        |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| **1** | Line coverage (`DA:` records); overall + per-file %; index + annotated source view; source resolution; marker-guarded overwrite | **Shipped**                   |
-| 2     | Branch coverage (`BRDA:`) inline; function coverage (`FN:`/`FNDA:`) summary; uncalled-functions callout                         | Parsed but not rendered       |
-| 3     | Per-test `TN:` drill-down; per-test tabs on file pages                                                                          | Aggregated (max-across) today |
+| Phase | Features                                                                                                                                                                                        | Status                        |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| **1** | Line coverage (`DA:` records); overall + per-file %; index + annotated source view; source resolution; marker-guarded overwrite                                                                 | **Shipped**                   |
+| **2** | Branch coverage (`BRDA:`) summary (header + index column); function coverage (`FN:`/`FNDA:`) summary (header + index column + per-file "Functions" table with hit counts and line anchor links) | **Shipped**                   |
+| 2b    | Inline per-line branch annotations (`[+]` / `[-]` next to source lines), uncalled-functions callout                                                                                             | Not rendered yet              |
+| 3     | Per-test `TN:` drill-down; per-test tabs on file pages                                                                                                                                          | Aggregated (max-across) today |
 
-`BRDA`, `FN`, `FNDA` etc. are parsed and silently dropped today;
-the flags `--show-branches` / `--show-functions` reserve the CLI
-surface for phase 2.
+Phase 2 surfaces branches/functions only in aggregates and the
+per-file functions table; the per-line source view still shows only
+line-level coverage. Adding inline branch annotations (phase 2b) is
+the logical next step but needs UI iteration and is deferred.
 
 ## Explicit non-goals
 
@@ -121,12 +125,14 @@ across every platform our customers run.
 python3 -m unittest discover -s tools/coverage-html/tests -v
 ```
 
-25 unit + integration tests cover: LCOV parsing (incl. TN: max-
-aggregation, corrupt-input detection, unknown-record tolerance),
-source resolution (path variants, caching, miss → placeholder),
-filter globs, tier thresholds, CLI round-trip, empty-input
-rendering, idempotency modulo timestamp, foreign-dir overwrite
-guard.
+31 unit + integration tests cover: LCOV parsing (incl. TN: max-
+aggregation, corrupt-input detection, unknown-record tolerance, BRDA
+with `-` tokens, FN/FNDA join-by-name), source resolution (path
+variants, caching, miss → placeholder), filter globs, tier
+thresholds, function/branch percent calcs, CLI round-trip, empty-
+input rendering, idempotency modulo timestamp, foreign-dir overwrite
+guard, phase-1-regression check against the real-data phase-2
+fixture.
 
 ### Updating the demo fixture
 
@@ -169,6 +175,8 @@ tools/coverage-html/
         ├── demo-cpu.coverage-mapping.json
         ├── genhtml-reference/     # visual target for parity
         ├── VISUAL-PARITY.md       # acceptance checklist
+        ├── slangc-llvm-cov-sample.info  # real-data BRDA + FN/FNDA fixture
+        ├── branches-and-functions.info  # small hand-crafted phase-2 fixture
         ├── empty.info
         ├── corrupt-bad-da.info
         ├── mixed-paths.info

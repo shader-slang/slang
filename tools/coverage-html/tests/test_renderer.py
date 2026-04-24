@@ -63,10 +63,50 @@ class ParserTests(unittest.TestCase):
         records = renderer.parse_lcov(
             os.path.join(FIXTURES, "unknown-records.info")
         )
-        # The unknown FUTURETAG and the BRDA / FN / FNDA records should be
-        # parsed and ignored, leaving only the DA-derived data.
+        # The unknown FUTURETAG is ignored; BRDA / FN / FNDA are parsed.
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].lines, {1: 1, 2: 0})
+        # The fixture also carries one function + two branch entries.
+        self.assertEqual(records[0].total_functions, 1)
+        self.assertEqual(records[0].hit_functions, 1)
+        self.assertEqual(records[0].total_branches, 2)
+        self.assertEqual(records[0].hit_branches, 1)
+
+    def test_branch_and_function_records_parse(self):
+        records = renderer.parse_lcov(
+            os.path.join(FIXTURES, "branches-and-functions.info")
+        )
+        self.assertEqual(len(records), 1)
+        r = records[0]
+        # BRDA parsing: taken '-' maps to None; integers map to int.
+        self.assertEqual(r.branches[(15, 0, 0)], 2)
+        self.assertEqual(r.branches[(15, 0, 1)], 1)
+        self.assertIsNone(r.branches[(16, 0, 0)])
+        self.assertIsNone(r.branches[(16, 0, 1)])
+        self.assertEqual(r.total_branches, 4)
+        self.assertEqual(r.hit_branches, 2)
+        # FN / FNDA join on function name.
+        self.assertEqual(set(r.functions.keys()), {"_Z3addii", "_Z3subii", "_Z6divideii"})
+        self.assertEqual(r.functions["_Z3addii"].first_line, 4)
+        self.assertEqual(r.functions["_Z3addii"].hits, 100)
+        self.assertEqual(r.functions["_Z3subii"].hits, 0)
+        self.assertEqual(r.total_functions, 3)
+        self.assertEqual(r.hit_functions, 2)
+
+    def test_corrupt_brda_raises(self):
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".info", delete=False
+        ) as tmp:
+            tmp.write("TN:test\nSF:x.c\nBRDA:5,0,0,not-an-int\nend_of_record\n")
+            path = tmp.name
+        try:
+            with self.assertRaises(renderer.LcovParseError) as ctx:
+                renderer.parse_lcov(path)
+            self.assertIn("BRDA", str(ctx.exception))
+        finally:
+            os.remove(path)
 
     def test_corrupt_raises_with_line_number(self):
         with self.assertRaises(renderer.LcovParseError) as ctx:
@@ -94,6 +134,35 @@ class FileRecordTests(unittest.TestCase):
     def test_empty_record_is_zero_percent(self):
         r = renderer.FileRecord(path="x")
         self.assertEqual(r.percent, 0.0)
+        self.assertEqual(r.percent_branches, 0.0)
+        self.assertEqual(r.percent_functions, 0.0)
+
+    def test_branch_counts(self):
+        r = renderer.FileRecord(
+            path="x",
+            branches={
+                (5, 0, 0): 3,       # taken
+                (5, 0, 1): 0,       # evaluated but never taken
+                (6, 0, 0): None,    # not evaluated at all
+                (6, 0, 1): None,
+            },
+        )
+        self.assertEqual(r.total_branches, 4)
+        self.assertEqual(r.hit_branches, 1)
+        self.assertEqual(r.percent_branches, 25.0)
+
+    def test_function_counts(self):
+        r = renderer.FileRecord(
+            path="x",
+            functions={
+                "foo": renderer.Function(first_line=1, hits=10),
+                "bar": renderer.Function(first_line=5, hits=0),
+                "baz": renderer.Function(first_line=9, hits=3),
+            },
+        )
+        self.assertEqual(r.total_functions, 3)
+        self.assertEqual(r.hit_functions, 2)
+        self.assertAlmostEqual(r.percent_functions, 2 / 3 * 100)
 
 
 class TierTests(unittest.TestCase):
@@ -269,6 +338,40 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(res.returncode, 0, msg=res.stderr)
         with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
             self.assertIn("No coverage data found", f.read())
+
+    def test_real_lcov_with_branches_and_functions(self):
+        """Render the trimmed real-world fixture and assert phase-2 output."""
+        out_dir = os.path.join(self.tmp, "real")
+        res = self._run(
+            os.path.join(FIXTURES, "slangc-llvm-cov-sample.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        self.assertEqual(res.returncode, 0, msg=res.stderr)
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        # New column groups appear only when data is present.
+        self.assertIn("Function Coverage", idx)
+        self.assertIn("Branch Coverage", idx)
+        # Header summary rows include Functions and Branches lines.
+        self.assertIn("Functions:", idx)
+        self.assertIn("Branches:", idx)
+
+    def test_phase1_fixture_has_no_extra_columns(self):
+        """Regression: the demo fixture (no branches / functions)
+        must not grow extra columns when phase-2 code is present."""
+        out_dir = os.path.join(self.tmp, "phase1")
+        self._run(
+            os.path.join(FIXTURES, "demo-cpu.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        self.assertNotIn("Function Coverage", idx)
+        self.assertNotIn("Branch Coverage", idx)
 
     def test_idempotent_modulo_timestamp(self):
         """Two back-to-back runs differ only in the Date: row."""

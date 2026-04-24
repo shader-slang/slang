@@ -43,19 +43,44 @@ TIER_MED = 75.0
 
 
 @dataclass
+class Function:
+    """One function-level coverage entry.
+
+    `first_line` is the declaring line; `hits` is the call count
+    aggregated across any TN: blocks that reported it.
+    """
+
+    first_line: int
+    hits: int = 0
+
+
+@dataclass
 class FileRecord:
     """One coverage record for a single source file.
 
-    `lines` is the aggregated per-line hit count across any TN: blocks
-    that referenced this file. `reported_lf/lh` are the sums declared
-    by the producer (used only for post-validation).
+    - `lines`    — aggregated per-line hit count across TN: blocks
+                   (DA: records).
+    - `branches` — {(line, block, branch_id) -> taken_count or None}
+                   aggregated across TN: blocks (BRDA:). None means the
+                   branch was not executed; integers mean it was
+                   executed at least once and taken `n` times.
+    - `functions` — {mangled_name -> Function} (FN: + FNDA:).
+
+    Reported LF/LH/BRF/BRH/FNF/FNH are stored for post-validation.
     """
 
     path: str
     lines: Dict[int, int] = field(default_factory=dict)
+    branches: Dict[Tuple[int, int, int], Optional[int]] = field(default_factory=dict)
+    functions: Dict[str, Function] = field(default_factory=dict)
     reported_lf: Optional[int] = None
     reported_lh: Optional[int] = None
+    reported_brf: Optional[int] = None
+    reported_brh: Optional[int] = None
+    reported_fnf: Optional[int] = None
+    reported_fnh: Optional[int] = None
 
+    # --- line coverage ---
     @property
     def total_lines(self) -> int:
         return len(self.lines)
@@ -69,6 +94,39 @@ class FileRecord:
         if not self.lines:
             return 0.0
         return 100.0 * self.hit_lines / self.total_lines
+
+    # --- branch coverage ---
+    @property
+    def total_branches(self) -> int:
+        return len(self.branches)
+
+    @property
+    def hit_branches(self) -> int:
+        # A branch is "hit" when it was evaluated at least once and
+        # the condition took the edge at least once. `None` → not
+        # evaluated; `0` → evaluated but never taken.
+        return sum(1 for t in self.branches.values() if t is not None and t > 0)
+
+    @property
+    def percent_branches(self) -> float:
+        if not self.branches:
+            return 0.0
+        return 100.0 * self.hit_branches / self.total_branches
+
+    # --- function coverage ---
+    @property
+    def total_functions(self) -> int:
+        return len(self.functions)
+
+    @property
+    def hit_functions(self) -> int:
+        return sum(1 for fn in self.functions.values() if fn.hits > 0)
+
+    @property
+    def percent_functions(self) -> float:
+        if not self.functions:
+            return 0.0
+        return 100.0 * self.hit_functions / self.total_functions
 
 
 # ---------------------------------------------------------------------------
@@ -156,9 +214,115 @@ def parse_lcov(path: str) -> List[FileRecord]:
                         current.reported_lh = int(value)
                     except ValueError:
                         pass
-            elif tag in ("BRDA", "BRF", "BRH", "FN", "FNDA", "FNF", "FNH"):
-                # Phase 2/3 — parsed but ignored.
-                continue
+            elif tag == "BRDA":
+                if current is None:
+                    raise LcovParseError(
+                        f"{path}:{lineno}: BRDA record outside SF block"
+                    )
+                parts = value.split(",")
+                if len(parts) < 4:
+                    raise LcovParseError(
+                        f"{path}:{lineno}: malformed BRDA record {value!r}"
+                    )
+                try:
+                    br_line = int(parts[0])
+                    block = int(parts[1])
+                    branch_id = int(parts[2])
+                except ValueError:
+                    raise LcovParseError(
+                        f"{path}:{lineno}: non-integer BRDA fields {value!r}"
+                    )
+                taken_raw = parts[3]
+                taken: Optional[int]
+                if taken_raw == "-":
+                    taken = None
+                else:
+                    try:
+                        taken = int(taken_raw)
+                    except ValueError:
+                        raise LcovParseError(
+                            f"{path}:{lineno}: non-integer BRDA taken "
+                            f"field {taken_raw!r}"
+                        )
+                key = (br_line, block, branch_id)
+                prev = current.branches.get(key, None) if key in current.branches else None
+                # Max-aggregate: any int beats None; larger int wins.
+                if key not in current.branches:
+                    current.branches[key] = taken
+                else:
+                    if taken is None:
+                        pass  # keep whatever we had
+                    elif prev is None:
+                        current.branches[key] = taken
+                    else:
+                        current.branches[key] = max(prev, taken)
+            elif tag == "BRF":
+                if current is not None:
+                    try:
+                        current.reported_brf = int(value)
+                    except ValueError:
+                        pass
+            elif tag == "BRH":
+                if current is not None:
+                    try:
+                        current.reported_brh = int(value)
+                    except ValueError:
+                        pass
+            elif tag == "FN":
+                if current is None:
+                    raise LcovParseError(
+                        f"{path}:{lineno}: FN record outside SF block"
+                    )
+                # FN:<line>,<name>  (name may contain commas — split once)
+                first_line_str, comma, name = value.partition(",")
+                if not comma:
+                    raise LcovParseError(
+                        f"{path}:{lineno}: malformed FN record {value!r}"
+                    )
+                try:
+                    first_line = int(first_line_str)
+                except ValueError:
+                    raise LcovParseError(
+                        f"{path}:{lineno}: non-integer FN line {value!r}"
+                    )
+                # First FN wins for first_line; later FN lines on the same
+                # name are ignored (some producers re-declare).
+                if name not in current.functions:
+                    current.functions[name] = Function(first_line=first_line, hits=0)
+            elif tag == "FNDA":
+                if current is None:
+                    raise LcovParseError(
+                        f"{path}:{lineno}: FNDA record outside SF block"
+                    )
+                hits_str, comma, name = value.partition(",")
+                if not comma:
+                    raise LcovParseError(
+                        f"{path}:{lineno}: malformed FNDA record {value!r}"
+                    )
+                try:
+                    hits = int(hits_str)
+                except ValueError:
+                    raise LcovParseError(
+                        f"{path}:{lineno}: non-integer FNDA hits {value!r}"
+                    )
+                # Defensive: FNDA before FN is legal; create a placeholder.
+                fn = current.functions.get(name)
+                if fn is None:
+                    fn = Function(first_line=0, hits=0)
+                    current.functions[name] = fn
+                fn.hits = max(fn.hits, hits)
+            elif tag == "FNF":
+                if current is not None:
+                    try:
+                        current.reported_fnf = int(value)
+                    except ValueError:
+                        pass
+            elif tag == "FNH":
+                if current is not None:
+                    try:
+                        current.reported_fnh = int(value)
+                    except ValueError:
+                        pass
             elif tag in ("VER", "FNL"):
                 # Version / function-with-line — ignored.
                 continue
@@ -313,6 +477,13 @@ span.lineNum      { background-color: #efe383; display: inline-block;
 span.tlaGNC       { background-color: #CAD7FE; }
 span.tlaUNC       { background-color: #FF6230; }
 
+td.coverFn        { text-align: left; padding: 2px 20px 2px 10px; color: #284fa8;
+                    background-color: #dae7fe; font-family: monospace; }
+td.coverFnHi      { text-align: right; padding: 2px 10px;
+                    background-color: #a7fc9d; font-weight: bold; }
+td.coverFnLo      { text-align: right; padding: 2px 10px;
+                    background-color: #ff6230; font-weight: bold; }
+
 .sourceUnavailable { color: #a33; font-style: italic; padding: 8px; }
 """
 
@@ -360,17 +531,56 @@ def _display_path(full: str, prefix: str) -> str:
     return norm
 
 
+@dataclass
+class Metric:
+    """One summary metric row on a page (Lines, Functions, Branches)."""
+
+    label: str       # "Lines", "Functions", "Branches"
+    pct: float
+    total: int
+    hit: int
+
+
+def _render_metric_row(
+    left_label: str, left_value: str, metric: Metric
+) -> str:
+    pct_str = f"{metric.pct:.1f}&nbsp;%" if metric.total > 0 else "-"
+    tier = _tier(metric.pct) if metric.total > 0 else "Hi"
+    return (
+        "          <tr>\n"
+        f"            <td class=\"headerItem\">{html.escape(left_label)}</td>\n"
+        f"            <td class=\"headerValue\">{left_value}</td>\n"
+        "            <td></td>\n"
+        f"            <td class=\"headerItem\">{metric.label}:</td>\n"
+        f"            <td class=\"headerCovTableEntry{tier}\">{pct_str}</td>\n"
+        f"            <td class=\"headerCovTableEntry\">{metric.total}</td>\n"
+        f"            <td class=\"headerCovTableEntry\">{metric.hit}</td>\n"
+        "          </tr>"
+    )
+
+
 def _render_page_header(
     title: str,
     breadcrumb_html: str,
     test_name: str,
     test_date: str,
-    overall_pct: float,
-    total: int,
-    hit: int,
+    metrics: List[Metric],
 ) -> str:
-    tier = _tier(overall_pct) if total > 0 else "Hi"
-    pct_str = f"{overall_pct:.1f}&nbsp;%" if total > 0 else "-"
+    # Always show at least the Lines metric. Left-column rows are
+    # Test / Date / (blank) — extra rows beyond 2 metrics get a blank
+    # left label.
+    left_rows = [
+        ("Test:", html.escape(test_name)),
+        ("Date:", html.escape(test_date)),
+    ]
+    while len(left_rows) < len(metrics):
+        left_rows.append(("", ""))
+
+    rows_html = "\n".join(
+        _render_metric_row(left_rows[i][0], left_rows[i][1], metrics[i])
+        for i in range(len(metrics))
+    )
+
     return f"""<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html lang="en">
 <head>
@@ -394,24 +604,7 @@ def _render_page_header(
             <td width="5%" class="headerCovTableHead" title="Covered + Uncovered code">Total</td>
             <td width="5%" class="headerCovTableHead" title="Exercised code only">Hit</td>
           </tr>
-          <tr>
-            <td class="headerItem">Test:</td>
-            <td class="headerValue">{html.escape(test_name)}</td>
-            <td></td>
-            <td class="headerItem">Lines:</td>
-            <td class="headerCovTableEntry{tier}">{pct_str}</td>
-            <td class="headerCovTableEntry">{total}</td>
-            <td class="headerCovTableEntry">{hit}</td>
-          </tr>
-          <tr>
-            <td class="headerItem">Date:</td>
-            <td class="headerValue">{html.escape(test_date)}</td>
-            <td></td>
-            <td class="headerItem">Functions:</td>
-            <td class="headerCovTableEntryHi">-</td>
-            <td class="headerCovTableEntry">0</td>
-            <td class="headerCovTableEntry">0</td>
-          </tr>
+{rows_html}
         </table>
       </td>
     </tr>
@@ -445,6 +638,71 @@ def _render_rate_bar(pct: float) -> str:
     )
 
 
+def _overall_metrics(records: List[FileRecord]) -> List[Metric]:
+    """Compute the summary metrics to display in the page header.
+
+    Lines is always shown. Functions and Branches appear only if
+    the LCOV carries any such records.
+    """
+    total_l = sum(r.total_lines for r in records)
+    hit_l = sum(r.hit_lines for r in records)
+    metrics = [
+        Metric(
+            label="Lines",
+            pct=(100.0 * hit_l / total_l) if total_l else 0.0,
+            total=total_l,
+            hit=hit_l,
+        )
+    ]
+    if has_any_functions(records):
+        total_fn = sum(r.total_functions for r in records)
+        hit_fn = sum(r.hit_functions for r in records)
+        metrics.append(
+            Metric(
+                label="Functions",
+                pct=(100.0 * hit_fn / total_fn) if total_fn else 0.0,
+                total=total_fn,
+                hit=hit_fn,
+            )
+        )
+    if has_any_branches(records):
+        total_br = sum(r.total_branches for r in records)
+        hit_br = sum(r.hit_branches for r in records)
+        metrics.append(
+            Metric(
+                label="Branches",
+                pct=(100.0 * hit_br / total_br) if total_br else 0.0,
+                total=total_br,
+                hit=hit_br,
+            )
+        )
+    return metrics
+
+
+def _index_col_group(
+    has_bar: bool,
+    rate: float,
+    total: int,
+    hit: int,
+) -> str:
+    """Render one metric's cells inside an index row.
+
+    Returns either bar+rate+total+hit (has_bar) or rate+total+hit.
+    """
+    tier = _tier(rate) if total > 0 else "Hi"
+    rate_str = f"{rate:.1f}&nbsp;%" if total > 0 else "-"
+    parts = []
+    if has_bar:
+        parts.append(
+            f'              <td class="coverBar" align="center">'
+            f'{_render_rate_bar(rate)}</td>'
+        )
+    parts.append(f'              <td class="coverPer{tier}">{rate_str}</td>')
+    parts.append(f'              <td class="coverNumDflt">{total}</td>')
+    parts.append(f'              <td class="coverNumDflt">{hit}</td>')
+    return "\n".join(parts)
+
+
 def render_index(
     records: List[FileRecord],
     output_dir: str,
@@ -454,68 +712,106 @@ def render_index(
     prefix: str,
     file_map: Dict[str, str],
 ) -> None:
-    total = sum(r.total_lines for r in records)
-    hit = sum(r.hit_lines for r in records)
-    pct = (100.0 * hit / total) if total else 0.0
+    show_fns = has_any_functions(records)
+    show_br = has_any_branches(records)
 
     header = _render_page_header(
         title=title,
         breadcrumb_html="top level",
         test_name=test_name,
         test_date=test_date,
-        overall_pct=pct,
-        total=total,
-        hit=hit,
+        metrics=_overall_metrics(records),
     )
 
-    # Table rows, one per file. Sort by display-path for determinism.
+    # Build the column-header rows. Line group always has the bar
+    # (4 cells); function/branch groups omit the bar (3 cells) to
+    # keep the table narrow enough to read.
+    extra_header_cells = ""
+    sub_rate_cells = (
+        '        <td class="tableHead" colspan="2">Rate</td>\n'
+        '        <td class="tableHead">Total</td>\n'
+        '        <td class="tableHead">Hit</td>'
+    )
+    extra_sub_rate = ""
+    cols_for_empty = 5
+    if show_fns:
+        extra_header_cells += (
+            '\n        <td class="tableHead" colspan="3">Function Coverage</td>'
+        )
+        extra_sub_rate += (
+            '\n        <td class="tableHead">Rate</td>'
+            '\n        <td class="tableHead">Total</td>'
+            '\n        <td class="tableHead">Hit</td>'
+        )
+        cols_for_empty += 3
+    if show_br:
+        extra_header_cells += (
+            '\n        <td class="tableHead" colspan="3">Branch Coverage</td>'
+        )
+        extra_sub_rate += (
+            '\n        <td class="tableHead">Rate</td>'
+            '\n        <td class="tableHead">Total</td>'
+            '\n        <td class="tableHead">Hit</td>'
+        )
+        cols_for_empty += 3
+
+    # Per-file rows. Sort by display-path for determinism.
     rows_html: List[str] = []
     sorted_records = sorted(records, key=lambda r: _display_path(r.path, prefix))
     for rec in sorted_records:
         display = _display_path(rec.path, prefix)
         href = file_map[rec.path]
-        rate = rec.percent
-        tier = _tier(rate)
-        rate_cell_class = f"coverPer{tier}"
-        rate_str = f"{rate:.1f}&nbsp;%" if rec.total_lines else "-"
-        rows_html.append(
-            f"""            <tr>
-              <td class="coverFile"><a href="{html.escape(href)}">{html.escape(display)}</a></td>
-              <td class="coverBar" align="center">{_render_rate_bar(rate)}</td>
-              <td class="{rate_cell_class}">{rate_str}</td>
-              <td class="coverNumDflt">{rec.total_lines}</td>
-              <td class="coverNumDflt">{rec.hit_lines}</td>
-            </tr>"""
-        )
+        cells: List[str] = [
+            f'              <td class="coverFile">'
+            f'<a href="{html.escape(href)}">{html.escape(display)}</a></td>',
+            _index_col_group(
+                has_bar=True,
+                rate=rec.percent,
+                total=rec.total_lines,
+                hit=rec.hit_lines,
+            ),
+        ]
+        if show_fns:
+            cells.append(
+                _index_col_group(
+                    has_bar=False,
+                    rate=rec.percent_functions,
+                    total=rec.total_functions,
+                    hit=rec.hit_functions,
+                )
+            )
+        if show_br:
+            cells.append(
+                _index_col_group(
+                    has_bar=False,
+                    rate=rec.percent_branches,
+                    total=rec.total_branches,
+                    hit=rec.hit_branches,
+                )
+            )
+        rows_html.append("            <tr>\n" + "\n".join(cells) + "\n            </tr>")
 
     if not records:
         rows_html.append(
-            '            <tr><td colspan="5" class="footnote" '
-            'style="text-align:center">No coverage data found in input.</td></tr>'
+            f'            <tr><td colspan="{cols_for_empty}" class="footnote" '
+            f'style="text-align:center">No coverage data found in input.</td></tr>'
         )
 
     prefix_note = ""
     if prefix:
         prefix_note = (
-            f'        <tr><td colspan="5" class="footnote">Common path prefix: '
-            f'<code>{html.escape(prefix)}</code></td></tr>\n'
+            f'        <tr><td colspan="{cols_for_empty}" class="footnote">'
+            f"Common path prefix: <code>{html.escape(prefix)}</code></td></tr>\n"
         )
 
     body = f"""  <center>
     <table class="indexTable" cellpadding="1" cellspacing="1" border="0">
       <tr>
-        <td width="40%"><br></td>
-        <td width="15%"></td><td width="15%"></td>
-        <td width="15%"></td><td width="15%"></td>
-      </tr>
-      <tr>
         <td class="tableHead" rowspan="2">File</td>
-        <td class="tableHead" colspan="4">Line Coverage</td>
+        <td class="tableHead" colspan="4">Line Coverage</td>{extra_header_cells}
       </tr>
       <tr>
-        <td class="tableHead" colspan="2">Rate</td>
-        <td class="tableHead">Total</td>
-        <td class="tableHead">Hit</td>
+{sub_rate_cells}{extra_sub_rate}
       </tr>
 {chr(10).join(rows_html)}
 {prefix_note}    </table>
@@ -541,24 +837,89 @@ def render_file_page(
         f'<a href="index.html" title="Click to go to top-level">top level</a> '
         f"- {html.escape(display_name)}"
     )
+    metrics = [
+        Metric(
+            label="Lines",
+            pct=record.percent,
+            total=record.total_lines,
+            hit=record.hit_lines,
+        )
+    ]
+    if record.functions:
+        metrics.append(
+            Metric(
+                label="Functions",
+                pct=record.percent_functions,
+                total=record.total_functions,
+                hit=record.hit_functions,
+            )
+        )
+    if record.branches:
+        metrics.append(
+            Metric(
+                label="Branches",
+                pct=record.percent_branches,
+                total=record.total_branches,
+                hit=record.hit_branches,
+            )
+        )
+
     header = _render_page_header(
         title=f"{title} - {display_name}",
         breadcrumb_html=breadcrumb,
         test_name=test_name,
         test_date=test_date,
-        overall_pct=record.percent,
-        total=record.total_lines,
-        hit=record.hit_lines,
+        metrics=metrics,
     )
 
+    parts: List[str] = []
+    if record.functions:
+        parts.append(_render_functions_table(record))
     if source_text is not None:
-        body = _render_source_view(record, source_text)
+        parts.append(_render_source_view(record, source_text))
     else:
-        body = _render_placeholder_view(record)
+        parts.append(_render_placeholder_view(record))
+
+    body = "\n".join(parts)
 
     out = header + body + _render_page_footer()
     with open(os.path.join(output_dir, out_filename), "w", encoding="utf-8") as f:
         f.write(out)
+
+
+def _render_functions_table(record: FileRecord) -> str:
+    """Render the 'Functions' summary table for a per-file page."""
+    # Sort by first line so the table reflects source order.
+    items = sorted(record.functions.items(), key=lambda kv: (kv[1].first_line, kv[0]))
+    rows: List[str] = []
+    for name, fn in items:
+        cls = "coverFnHi" if fn.hits > 0 else "coverFnLo"
+        line_link = (
+            f'<a href="#L{fn.first_line}">{fn.first_line}</a>'
+            if fn.first_line > 0
+            else "-"
+        )
+        rows.append(
+            "      <tr>"
+            f'<td class="coverFn">{html.escape(name)}</td>'
+            f'<td class="coverNumDflt">{line_link}</td>'
+            f'<td class="{cls}">{fn.hits}</td>'
+            "</tr>"
+        )
+
+    return (
+        '  <center>\n'
+        '    <table class="indexTable" cellpadding="1" cellspacing="1" border="0" '
+        'style="margin-top: 10px;">\n'
+        '      <tr>\n'
+        '        <td class="tableHead">Function</td>\n'
+        '        <td class="tableHead">Line</td>\n'
+        '        <td class="tableHead">Hit count</td>\n'
+        '      </tr>\n'
+        + "\n".join(rows)
+        + "\n    </table>\n"
+        "  </center>\n"
+    )
 
 
 def _render_source_view(record: FileRecord, source_text: str) -> str:
@@ -680,6 +1041,14 @@ def validate_totals(records: List[FileRecord]) -> None:
             )
 
 
+def has_any_branches(records: List[FileRecord]) -> bool:
+    return any(r.branches for r in records)
+
+
+def has_any_functions(records: List[FileRecord]) -> bool:
+    return any(r.functions for r in records)
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -721,16 +1090,6 @@ def build_argparser() -> argparse.ArgumentParser:
         help="Exclude glob (repeatable). Applied to SF: path.",
     )
     p.add_argument(
-        "--show-branches",
-        action="store_true",
-        help="Reserved for phase 2; currently a no-op with a notice.",
-    )
-    p.add_argument(
-        "--show-functions",
-        action="store_true",
-        help="Reserved for phase 2; currently a no-op with a notice.",
-    )
-    p.add_argument(
         "--quiet",
         action="store_true",
         help="Suppress progress output",
@@ -740,13 +1099,6 @@ def build_argparser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_argparser().parse_args(argv)
-
-    if args.show_branches or args.show_functions:
-        print(
-            "slang-coverage-html: note: --show-branches / --show-functions "
-            "are phase-2 features and are currently no-ops.",
-            file=sys.stderr,
-        )
 
     try:
         records = parse_lcov(args.input)
