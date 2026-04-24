@@ -1155,7 +1155,7 @@ typedef uint32_t SlangSizeT;
 
         // Add new options HERE, immediately before CountOf.
 
-        TraceCoverage, // bool: insert per-statement execution counters
+        TraceCoverage = 145, // bool: insert per-statement execution counters
 
         CountOf,
     };
@@ -4529,11 +4529,13 @@ struct ICoverageTracingMetadata : public ISlangCastable
     /// Number of counter slots in the synthesized coverage buffer.
     virtual uint32_t SLANG_MCALL getCounterCount() = 0;
 
-    /// Source file for counter slot `index`, or `nullptr` if out of range.
+    /// Source file for counter slot `index`, or `nullptr` if the index is out
+    /// of range or the slot could not be attributed to a real source file.
     /// The returned pointer is valid for the lifetime of this metadata object.
     virtual const char* SLANG_MCALL getEntryFile(uint32_t index) = 0;
 
-    /// 1-based source line for counter slot `index`, or 0 if out of range.
+    /// 1-based source line for counter slot `index`, or 0 if the index is out
+    /// of range or the slot could not be attributed to a real source line.
     virtual uint32_t SLANG_MCALL getEntryLine(uint32_t index) = 0;
 
     /// Register space the coverage buffer is bound to (D3D12 `space`,

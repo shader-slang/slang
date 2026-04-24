@@ -544,9 +544,10 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Prototype: instrument the shader with per-statement execution counters. "
          "Emits IncrementCoverageCounter placeholders at AST lowering that a later IR "
-         "pass rewrites into counter writes on a synthesized `RWStructuredBuffer<uint> "
-         "__slang_coverage` buffer bound at a reserved space/binding. A sidecar manifest "
-         "(set SLANG_COVERAGE_MANIFEST_PATH) maps counters back to source positions."},
+         "pass rewrites into counter writes on the synthesized "
+         "`RWStructuredBuffer<uint> __slang_coverage` parameter. "
+         "When writing compiled output to a file, slangc also emits "
+         "`<output>.coverage-mapping.json` to map counters back to source positions."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,

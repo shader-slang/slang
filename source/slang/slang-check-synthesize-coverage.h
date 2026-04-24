@@ -4,7 +4,7 @@
 namespace Slang
 {
 class ModuleDecl;
-class SemanticsVisitor;
+struct SemanticsVisitor;
 
 // When `-trace-coverage` is enabled, synthesize a module-scope
 // `RWStructuredBuffer<uint> __slang_coverage` declaration in the

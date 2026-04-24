@@ -6,6 +6,11 @@ counter at runtime; the counter buffer is read back by the host and
 converted to LCOV `.info` for rendering by `genhtml`, Codecov, VS
 Code Coverage Gutters, or any other LCOV consumer.
 
+For the maintainer-facing architectural rationale behind the current
+design, including why AST-time synthesis is paired with post-emit
+coverage metadata, see
+[`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md).
+
 Not to be confused with `tools/coverage/`, which measures C++ coverage
 of the Slang compiler itself.
 
@@ -42,8 +47,18 @@ Enable with `-trace-coverage` on the `slangc` CLI.
      door open for branch/function coverage later).
    - Rewrites each op as `AtomicAdd(__slang_coverage[slot], 1,
      Relaxed)`.
-   - Records `(slot → file, line)` and the buffer's binding on the
-     artifact's `ICoverageTracingMetadata` (see next section).
+   - Records `(slot → file, line)` plus the buffer's binding on the
+     artifact's `ICoverageTracingMetadata` (see next section). Some
+     slots may remain unattributable if they do not correspond to a
+     real source file/line.
+
+AST synthesis and `ICoverageTracingMetadata` serve different roles:
+- AST synthesis is the binding/discoverability mechanism. It makes the
+  coverage buffer reflection-visible so reflection-driven hosts can bind it.
+- `ICoverageTracingMetadata` is the reporting mechanism. It tells the host
+  which slot maps to which source location and what binding was chosen.
+
+They are complementary, not alternatives.
 4. **Emission.** Each backend already handles `kIROp_AtomicAdd` on
    `RWStructuredBuffer<uint>`:
    - HLSL/DXIL → `InterlockedAdd`
@@ -63,8 +78,9 @@ coverage pass rewrites it.
 
 ## Accessing the manifest
 
-Two paths, both carrying the same `(slot → file, line)` mapping plus
-the coverage buffer's binding.
+Two paths, both carrying the same raw per-slot attribution data plus
+the coverage buffer's binding. A slot may have no real source file/line;
+that is preserved in metadata and filtered out later when exporting LCOV.
 
 ### `.coverage-mapping.json` sidecar (slangc CLI)
 
@@ -104,6 +120,11 @@ for (uint32_t i = 0; i < n; ++i) {
 
 Extensible: future revisions will add branch/function coverage and
 column data through the same interface.
+
+`slang-coverage-to-lcov.py` applies gcov/LCOV-style reporting rules at
+export time: entries without a real source file or with a non-positive
+line number are skipped instead of being written as synthetic `SF:` /
+`DA:` records.
 
 ---
 
@@ -171,7 +192,9 @@ by slot. Saturates at ~4 × 10⁹ hits per slot (see *Current scope*).
 
 Aggregates counter values by `(file, line)` at LCOV-emission time,
 so multiple slots on the same source line contribute their hit
-counts together.
+counts together. Entries that do not resolve to a real source file
+and positive source line are skipped to match normal gcov/LCOV line
+coverage semantics.
 
 ---
 

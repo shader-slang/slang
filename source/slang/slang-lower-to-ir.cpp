@@ -9002,8 +9002,9 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
         // source location to `stmt->loc`, so the emitted instruction
         // inherits that as its `sourceLoc` — no separate decoration
         // needed. The pass in slang-ir-coverage-instrument.cpp later
-        // rewrites these ops into counter writes and deduplicates by
-        // `(file, line)` when assigning slot indices.
+        // rewrites these ops into counter writes, assigning one slot
+        // per op in traversal order. The host-side LCOV conversion
+        // layer aggregates slots back to `(file, line)` as needed.
         //
         // Empty statements are skipped because they have no observable
         // execution.

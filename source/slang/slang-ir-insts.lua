@@ -1101,9 +1101,9 @@ local insts = {
 	-- the standard per-instruction `sourceLoc` field, which is always
 	-- preserved and never stripped by `stripDebugInfo`. The coverage-
 	-- instrument IR pass later rewrites each occurrence into an atomic
-	-- add on a synthesized counter buffer; counter slots are assigned
-	-- by deduplicating (file, line) keys sorted lexicographically, so
-	-- slot assignment is stable across unrelated source edits.
+	-- add on the AST-synthesized coverage buffer; counter slots are
+	-- assigned one-per-op in traversal order. Host-side tooling can
+	-- aggregate those slots back to `(file, line)` when producing LCOV.
 	-- Inherent side-effect semantics keep the optimizer from deleting
 	-- or hoisting this op.
 	{ IncrementCoverageCounter = {} },

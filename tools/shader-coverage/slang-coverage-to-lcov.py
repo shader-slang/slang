@@ -6,19 +6,18 @@ Pipeline:
     1. Compile a shader with:
            slangc shader.slang -trace-coverage ...
        This instruments the shader with a synthesized
-       `RWStructuredBuffer<uint> __slang_coverage`. The slot ordering
-       is (file, line) sorted lexicographically.
-    2. Produce a `.slangcov` manifest describing each counter's
-       (file, line). Until the compiler exposes this via a
-       post-emit-metadata API, the host must construct it from its
-       own knowledge of the shader source.
+       `RWStructuredBuffer<uint> __slang_coverage`. Counter slots are
+       assigned one-per-op in traversal order.
+    2. Read the `.coverage-mapping.json` sidecar describing each
+       counter's `(file, line)`, or query the same data through
+       `ICoverageTracingMetadata`.
     3. Dispatch the shader, bound to the coverage buffer at the
-       reserved binding (space 31, binding 0 — prototype default).
+       reflected binding reported by the metadata / sidecar.
     4. Read the UAV back to a binary file of little-endian uint32's,
        one per counter.
     5. Run this script:
            slang-coverage-to-lcov.py \\
-               --manifest shader.slangcov \\
+               --manifest shader.spv.coverage-mapping.json \\
                --counters shader.buffer.bin \\
                --output shader.lcov
 
@@ -66,7 +65,12 @@ def main():
     p = argparse.ArgumentParser(
         description="Convert Slang coverage buffer + manifest to LCOV .info."
     )
-    p.add_argument("--manifest", required=True, help="path to .slangcov JSON")
+    p.add_argument(
+        "--manifest",
+        required=True,
+        help="path to .coverage-mapping.json (or equivalent JSON built from "
+        "ICoverageTracingMetadata)",
+    )
     p.add_argument("--counters", help="binary uint32 little-endian counter buffer")
     p.add_argument(
         "--counters-text", help="whitespace-separated integers (file or '-' for stdin)"
@@ -98,15 +102,25 @@ def main():
     else:
         counters = load_counters_text(args.counters_text, total)
 
-    # Aggregate by (file, line).  The pass already dedupes at
-    # compile time, so normally each (file, line) maps to a single
-    # counter — but accept multiple mappings gracefully by summing.
+    # Aggregate by (file, line). Multiple counter slots may map to the
+    # same line because the compiler assigns one slot per counter op;
+    # LCOV wants line-oriented reporting, so sum them here.
+    #
+    # GCOV/LCOV-style output only admits real source files and positive
+    # line numbers. Keep unattributable slots in the manifest/metadata,
+    # but filter them out when exporting LCOV.
     hits_by_line = collections.defaultdict(lambda: collections.defaultdict(int))
+    skipped_entries = 0
     for entry in manifest["entries"]:
         idx = entry["index"]
         if idx < 0 or idx >= len(counters):
             sys.exit(f"error: entry index {idx} out of range [0, {len(counters)})")
-        hits_by_line[entry["file"]][int(entry["line"])] += counters[idx]
+        source = entry.get("file")
+        line = int(entry["line"])
+        if not source or line <= 0:
+            skipped_entries += 1
+            continue
+        hits_by_line[source][line] += counters[idx]
 
     out = sys.stdout if args.output == "-" else open(args.output, "w")
     out.write(f"TN:{args.test_name}\n")
@@ -117,6 +131,12 @@ def main():
         out.write("end_of_record\n")
     if out is not sys.stdout:
         out.close()
+    if skipped_entries:
+        print(
+            f"note: skipped {skipped_entries} coverage entr"
+            f"{'y' if skipped_entries == 1 else 'ies'} without attributable source location",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

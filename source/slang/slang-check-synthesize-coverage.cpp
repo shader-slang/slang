@@ -28,8 +28,8 @@ namespace Slang
 {
 
 // Well-known buffer name. Matches the IR pass that rewrites
-// IncrementCoverageCounter placeholders and the `.slangcov` manifest
-// format.
+// IncrementCoverageCounter ops and the coverage metadata / sidecar
+// output that describes the buffer to hosts.
 static const char* kCoverageBufferName = "__slang_coverage";
 
 // Find an existing module-scope decl named `__slang_coverage`. If
