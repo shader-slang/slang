@@ -165,6 +165,49 @@ class FileRecordTests(unittest.TestCase):
         self.assertAlmostEqual(r.percent_functions, 2 / 3 * 100)
 
 
+class BranchCellTests(unittest.TestCase):
+    """Unit tests for the phase-2b per-line branch cell."""
+
+    def test_empty_is_plain_spaces(self):
+        cell = renderer._render_branch_cell([])
+        self.assertEqual(cell, " " * renderer.BRANCH_COL_WIDTH)
+        self.assertNotIn("<span", cell)
+
+    def test_all_taken_is_branchAll(self):
+        cell = renderer._render_branch_cell([5, 2, 17])
+        self.assertIn('class="branchAll"', cell)
+        self.assertIn("(3/3)", cell)
+        # The tooltip should carry per-branch details.
+        self.assertIn("br0: 5", cell)
+        self.assertIn("br2: 17", cell)
+        # Total visual width must equal BRANCH_COL_WIDTH.
+        visible = _strip_tags(cell)
+        self.assertEqual(len(visible), renderer.BRANCH_COL_WIDTH)
+
+    def test_partial_is_branchPart(self):
+        cell = renderer._render_branch_cell([3, 0, None])
+        self.assertIn('class="branchPart"', cell)
+        self.assertIn("(1/3)", cell)
+        self.assertIn("br2: -", cell)
+
+    def test_none_taken_is_branchNone(self):
+        cell = renderer._render_branch_cell([0, 0])
+        self.assertIn('class="branchNone"', cell)
+        self.assertIn("(0/2)", cell)
+
+    def test_not_evaluated_is_branchNone(self):
+        # All "-" (not evaluated) counts as none-taken.
+        cell = renderer._render_branch_cell([None, None])
+        self.assertIn('class="branchNone"', cell)
+        self.assertIn("(0/2)", cell)
+
+
+def _strip_tags(s: str) -> str:
+    import re
+
+    return re.sub(r"<[^>]+>", "", s)
+
+
 class TierTests(unittest.TestCase):
     def test_thresholds(self):
         self.assertEqual(renderer._tier(100.0), "Hi")
@@ -357,6 +400,52 @@ class CliIntegrationTests(unittest.TestCase):
         # Header summary rows include Functions and Branches lines.
         self.assertIn("Functions:", idx)
         self.assertIn("Branches:", idx)
+
+    def test_real_lcov_renders_inline_branch_column(self):
+        """Phase 2b: per-file source view shows the branch gutter."""
+        out_dir = os.path.join(self.tmp, "real-2b")
+        # Resolve sources from the repo root so the source view isn't a
+        # placeholder.
+        repo_root = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+        res = self._run(
+            os.path.join(FIXTURES, "slangc-llvm-cov-sample.info"),
+            "--output-dir",
+            out_dir,
+            "--source-root",
+            repo_root,
+            "--quiet",
+        )
+        self.assertEqual(res.returncode, 0, msg=res.stderr)
+
+        # Find a per-file .html from the output and grep for branch spans.
+        per_file_pages = [
+            os.path.join(out_dir, e)
+            for e in os.listdir(out_dir)
+            if e.endswith(".html") and e != "index.html"
+        ]
+        self.assertTrue(per_file_pages, "expected at least one per-file page")
+
+        found_all = False
+        found_part = False
+        found_none = False
+        found_heading = False
+        for p in per_file_pages:
+            with open(p, encoding="utf-8") as f:
+                text = f.read()
+            if 'class="branchAll"' in text:
+                found_all = True
+            if 'class="branchPart"' in text:
+                found_part = True
+            if 'class="branchNone"' in text:
+                found_none = True
+            if "Branch" in text and "Source code" in text:
+                found_heading = True
+
+        # The slang-name.cpp sample carries all three tiers.
+        self.assertTrue(found_all, "expected a branchAll span somewhere")
+        self.assertTrue(found_part, "expected a branchPart span somewhere")
+        self.assertTrue(found_none, "expected a branchNone span somewhere")
+        self.assertTrue(found_heading, "expected 'Branch' column heading")
 
     def test_phase1_fixture_has_no_extra_columns(self):
         """Regression: the demo fixture (no branches / functions)

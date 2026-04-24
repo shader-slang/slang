@@ -78,17 +78,18 @@ later runs:
 
 ## Phase matrix
 
-| Phase | Features                                                                                                                                                                                        | Status                        |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| **1** | Line coverage (`DA:` records); overall + per-file %; index + annotated source view; source resolution; marker-guarded overwrite                                                                 | **Shipped**                   |
-| **2** | Branch coverage (`BRDA:`) summary (header + index column); function coverage (`FN:`/`FNDA:`) summary (header + index column + per-file "Functions" table with hit counts and line anchor links) | **Shipped**                   |
-| 2b    | Inline per-line branch annotations (`[+]` / `[-]` next to source lines), uncalled-functions callout                                                                                             | Not rendered yet              |
-| 3     | Per-test `TN:` drill-down; per-test tabs on file pages                                                                                                                                          | Aggregated (max-across) today |
+| Phase  | Features                                                                                                                                                                                                                                                                                        | Status                        |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| **1**  | Line coverage (`DA:` records); overall + per-file %; index + annotated source view; source resolution; marker-guarded overwrite                                                                                                                                                                 | **Shipped**                   |
+| **2**  | Branch coverage (`BRDA:`) summary (header + index column); function coverage (`FN:`/`FNDA:`) summary (header + index column + per-file "Functions" table with hit counts and line anchor links)                                                                                                 | **Shipped**                   |
+| **2b** | Inline per-line branch column between hit count and source. Collapsed `(hit/total)` summary with tier-colored span (`branchAll` green, `branchPart` amber, `branchNone` red) and per-branch tooltip (`title="br0: N; br1: N; br2: -"`). Gutter widens only on files that carry any BRDA records | **Shipped**                   |
+| 3      | Per-test `TN:` drill-down; per-test tabs on file pages                                                                                                                                                                                                                                          | Aggregated (max-across) today |
 
-Phase 2 surfaces branches/functions only in aggregates and the
-per-file functions table; the per-line source view still shows only
-line-level coverage. Adding inline branch annotations (phase 2b) is
-the logical next step but needs UI iteration and is deferred.
+Phase 2b preserves phase-1 byte-identical rendering when a file has
+no branches — the branch column only appears on per-file pages whose
+LCOV carries BRDA records. Lines without branches on such files
+render their branch column as plain spaces, keeping the gutter
+aligned down the whole page.
 
 ## Explicit non-goals
 
@@ -125,14 +126,15 @@ across every platform our customers run.
 python3 -m unittest discover -s tools/coverage-html/tests -v
 ```
 
-31 unit + integration tests cover: LCOV parsing (incl. TN: max-
+37 unit + integration tests cover: LCOV parsing (incl. TN: max-
 aggregation, corrupt-input detection, unknown-record tolerance, BRDA
 with `-` tokens, FN/FNDA join-by-name), source resolution (path
 variants, caching, miss → placeholder), filter globs, tier
-thresholds, function/branch percent calcs, CLI round-trip, empty-
-input rendering, idempotency modulo timestamp, foreign-dir overwrite
-guard, phase-1-regression check against the real-data phase-2
-fixture.
+thresholds, function/branch percent calcs, per-line branch-cell
+rendering (empty / all-taken / partial / none / not-evaluated), CLI
+round-trip, empty-input rendering, idempotency modulo timestamp,
+foreign-dir overwrite guard, phase-1-regression check against the
+real-data phase-2 fixture.
 
 ### Updating the demo fixture
 

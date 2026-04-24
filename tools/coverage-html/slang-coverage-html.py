@@ -484,6 +484,10 @@ td.coverFnHi      { text-align: right; padding: 2px 10px;
 td.coverFnLo      { text-align: right; padding: 2px 10px;
                     background-color: #ff6230; font-weight: bold; }
 
+span.branchAll   { background-color: #a7fc9d; }
+span.branchPart  { background-color: #ffea20; }
+span.branchNone  { background-color: #FF6230; }
+
 .sourceUnavailable { color: #a33; font-style: italic; padding: 8px; }
 """
 
@@ -922,37 +926,123 @@ def _render_functions_table(record: FileRecord) -> str:
     )
 
 
+BRANCH_COL_WIDTH = 10  # chars, wide enough for "(999/999)" + padding
+
+
+def _branches_by_line(
+    record: FileRecord,
+) -> Dict[int, List[Optional[int]]]:
+    """Group BRDA records by source line. Preserves (block, branch_id)
+    order so tooltip indexing matches LCOV's."""
+    result: Dict[int, List[Optional[int]]] = {}
+    for (line, block, branch_id), taken in sorted(record.branches.items()):
+        result.setdefault(line, []).append(taken)
+    return result
+
+
+def _render_branch_cell(branches_on_line: List[Optional[int]]) -> str:
+    """Render the branch-column content for one source line.
+
+    Returns a string exactly BRANCH_COL_WIDTH visual chars wide. When
+    no branches exist on this line, returns plain spaces (so it still
+    aligns with branched lines below). Otherwise returns a tiered span
+    with a title tooltip listing per-branch counts.
+    """
+    if not branches_on_line:
+        return " " * BRANCH_COL_WIDTH
+
+    total = len(branches_on_line)
+    hit = sum(1 for t in branches_on_line if t is not None and t > 0)
+    if hit == total:
+        cls = "branchAll"
+    elif hit == 0:
+        cls = "branchNone"
+    else:
+        cls = "branchPart"
+
+    text = f"({hit}/{total})"
+    if len(text) > BRANCH_COL_WIDTH:
+        text = text[:BRANCH_COL_WIDTH]
+
+    # Per-branch tooltip: "br0: 42; br1: 0; br2: -"
+    tt_parts = [
+        f"br{i}: {t if t is not None else '-'}"
+        for i, t in enumerate(branches_on_line)
+    ]
+    title = html.escape("; ".join(tt_parts), quote=True)
+
+    pad_after = BRANCH_COL_WIDTH - len(text)
+    return f'<span class="{cls}" title="{title}">{text}</span>{" " * pad_after}'
+
+
 def _render_source_view(record: FileRecord, source_text: str) -> str:
     # Split source into lines; preserve numbering 1-based.
     src_lines = source_text.splitlines()
 
-    parts: List[str] = ['<table><tr><td>']
-    parts.append(
-        '<pre class="sourceHeading">'
-        '            Line data    Source code'
-        '</pre>'
-    )
+    has_branches = bool(record.branches)
+    branches_by_line = _branches_by_line(record) if has_branches else {}
+
+    parts: List[str] = ["<table><tr><td>"]
+    if has_branches:
+        # Headings: "Line data" above the 12-char hits column (starts at
+        # col 13); "Branch" above the 10-char branch column (cols 23-32);
+        # "Source code" above the source body (col 36+).
+        heading = (
+            "            Line data     Branch    Source code"
+        )
+    else:
+        heading = "            Line data    Source code"
+    parts.append(f'<pre class="sourceHeading">{heading}</pre>')
     parts.append('<pre class="source">')
+
     for idx, raw in enumerate(src_lines, start=1):
         esc = html.escape(raw)
         hits = record.lines.get(idx)
         line_num_cell = f'<span class="lineNum">{idx:>8}</span>'
-        if hits is None:
-            # Non-executable: no coverage info for this line.
-            parts.append(
-                f'<span id="L{idx}">{line_num_cell}'
-                f'              : {esc}</span>'
-            )
-        elif hits > 0:
-            parts.append(
-                f'<span id="L{idx}">{line_num_cell} '
-                f'<span class="tlaGNC">{hits:>12} : {esc}</span></span>'
-            )
+        if not has_branches:
+            # Phase-1 layout, preserved byte-for-byte for files with no
+            # branch records.
+            if hits is None:
+                parts.append(
+                    f'<span id="L{idx}">{line_num_cell}'
+                    f'              : {esc}</span>'
+                )
+            elif hits > 0:
+                parts.append(
+                    f'<span id="L{idx}">{line_num_cell} '
+                    f'<span class="tlaGNC">{hits:>12} : {esc}</span></span>'
+                )
+            else:
+                parts.append(
+                    f'<span id="L{idx}">{line_num_cell} '
+                    f'<span class="tlaUNC">{0:>12} : {esc}</span></span>'
+                )
         else:
-            parts.append(
-                f'<span id="L{idx}">{line_num_cell} '
-                f'<span class="tlaUNC">{0:>12} : {esc}</span></span>'
-            )
+            # Phase-2b layout: insert a 10-char branch column between
+            # hits and ` : source`.
+            branch_cell = _render_branch_cell(branches_by_line.get(idx, []))
+            if hits is None:
+                # Non-executable: 14 spaces where covered would have
+                # "[sp outside tlaGNC][12-char hits][sp]", then the
+                # 10-char branch cell, then ` : source`. Branch cell
+                # may still be populated (e.g. for condition lines
+                # that carry BRDA but no DA).
+                parts.append(
+                    f'<span id="L{idx}">{line_num_cell}'
+                    f'              {branch_cell} : {esc}</span>'
+                )
+            elif hits > 0:
+                parts.append(
+                    f'<span id="L{idx}">{line_num_cell} '
+                    f'<span class="tlaGNC">{hits:>12} {branch_cell} : '
+                    f"{esc}</span></span>"
+                )
+            else:
+                parts.append(
+                    f'<span id="L{idx}">{line_num_cell} '
+                    f'<span class="tlaUNC">{0:>12} {branch_cell} : '
+                    f"{esc}</span></span>"
+                )
     parts.append("</pre></td></tr></table>")
     return "\n".join(parts) + "\n"
 
