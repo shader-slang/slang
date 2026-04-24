@@ -27602,7 +27602,7 @@ struct CoopMat
     /// @param value The 32-bit value to write (packs 1 float, 2 halves, or 4 int8s).
     [ForceInline]
     [mutating]
-    [require(cooperative_matrix)]
+    [require(cuda_hlsl_spirv, cooperative_matrix)]
     void __fragmentWrite(int regIndex, uint value)
     {
         __target_switch
@@ -27636,7 +27636,7 @@ struct CoopMat
     /// @return The raw 32-bit register value.
     [ForceInline]
     [__NoSideEffect]
-    [require(cooperative_matrix)]
+    [require(cuda_hlsl_spirv, cooperative_matrix)]
     uint __fragmentRead(int regIndex)
     {
         __target_switch
