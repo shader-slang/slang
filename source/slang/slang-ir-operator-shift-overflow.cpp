@@ -31,9 +31,17 @@ void checkForOperatorShiftOverflowRecursive(IRInst* inst, DiagnosticSink* sink)
                         IRInst* lhs = opInst->getOperand(0);
                         IRType* lhsType = lhs->getDataType();
 
+                        // For vector types, check the element type — not the aggregate size.
+                        // e.g. uint8_t4 has 4-byte aggregate but 1-byte elements.
+                        IRType* lhsElemType = lhsType;
+                        if (auto vecType = as<IRVectorType>(lhsType))
+                            lhsElemType = vecType->getElementType();
+
                         IRSizeAndAlignment lhsSizeAlignment;
-                        if (SLANG_FAILED(
-                                getNaturalSizeAndAlignment(nullptr, lhsType, &lhsSizeAlignment)))
+                        if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                                nullptr,
+                                lhsElemType,
+                                &lhsSizeAlignment)))
                             break;
 
                         IRInst* rhs = opInst->getOperand(1);
