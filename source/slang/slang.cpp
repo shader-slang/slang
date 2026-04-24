@@ -45,6 +45,7 @@
 
 #include <cinttypes>
 #include <cstdio>
+#include <mutex>
 #include <sys/stat.h>
 
 // Used to print exception type names in internal-compiler-error messages
