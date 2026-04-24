@@ -64,6 +64,7 @@ void computeMain2()
     // note is suppressed for MyDerived. Cascade also errors on MyBase.
     MyDerived d = MyDerived({ 1 });
 //CHECK: cannot use initializer list for type 'MyDerived'
+//CHECK-NOT: member 'data' is private, but 'MyDerived' is public
 //CHECK: cannot use initializer list for type 'MyBase'
 //CHECK: member 'x' is internal, but 'MyBase' is public; all members must be public to use an initializer list
 }
@@ -72,10 +73,10 @@ void computeMain2()
 void computeMain3()
 {
     // Should error: ctor takes 1 arg, 2 were given.
-    // Exhaustive mode verifies no visibility note appears: the explicit ctor
-    // path routes through the synthesized-ctor branch, which never enters the
-    // note-emission block.
+    // Visibility note must NOT appear: the explicit ctor is the root cause, not
+    // the member visibility mismatch.
     HasExplicitCtorAndPrivateMember h = HasExplicitCtorAndPrivateMember({ 1, 2 });
 //CHECK: too many initializers in initializer list
 //CHECK: too many initializers (expected 1, got 2)
+//CHECK-NOT: member 'x' is private, but 'HasExplicitCtorAndPrivateMember' is public
 }
