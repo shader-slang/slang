@@ -2267,7 +2267,7 @@ void SemanticsDeclHeaderVisitor::checkExtensionExternVarAttribute(
     VarDeclBase* varDecl,
     ExtensionExternVarModifier* extensionExternMemberModifier)
 {
-    if (const auto parentExtension = as<ExtensionDecl>(varDecl->parentDecl))
+    if (const auto parentExtension = as<ExtensionDecl>(varDecl->parentDecl); parentExtension)
     {
         if (auto originalVarDecl = extensionExternMemberModifier->originalDecl.as<VarDeclBase>())
         {
@@ -2750,7 +2750,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         }
     }
 
-    if (const auto interfaceDecl = as<InterfaceDecl>(varDecl->parentDecl))
+    if (const auto interfaceDecl = as<InterfaceDecl>(varDecl->parentDecl); interfaceDecl)
     {
         if (auto basicType = as<BasicExpressionType>(varDecl->getType()))
         {
@@ -10110,7 +10110,7 @@ bool SemanticsVisitor::checkConformance(
                             Diagnostics::InterfaceInheritingComMustBeCom{.decl = inheritanceDecl});
                     }
                 }
-                else if (const auto structDecl = as<StructDecl>(subTypeDecl))
+                else if (const auto structDecl = as<StructDecl>(subTypeDecl); structDecl)
                 {
                     getSink()->diagnose(
                         Diagnostics::StructCannotImplementComInterface{.decl = inheritanceDecl});
@@ -10251,12 +10251,12 @@ void SemanticsVisitor::checkAggTypeConformance(AggTypeDecl* decl)
     // confirm that the type actually provides whatever
     // those clauses require.
 
-    if (const auto interfaceDecl = as<InterfaceDecl>(decl))
+    if (const auto interfaceDecl = as<InterfaceDecl>(decl); interfaceDecl)
     {
         // Don't check that an interface conforms to the
         // things it inherits from.
     }
-    else if (const auto assocTypeDecl = as<AssocTypeDecl>(decl))
+    else if (const auto assocTypeDecl = as<AssocTypeDecl>(decl); assocTypeDecl)
     {
         // Don't check that an associated type decl conforms to the
         // things it inherits from.
@@ -10593,7 +10593,7 @@ void SemanticsDeclBasesVisitor::visitInterfaceDecl(InterfaceDecl* decl)
         // It is possible that there was an error in checking the base type
         // expression, and in such a case we shouldn't emit a cascading error.
         //
-        if (const auto baseErrorType = as<ErrorType>(baseType))
+        if (const auto baseErrorType = as<ErrorType>(baseType); baseErrorType)
         {
             continue;
         }
@@ -10667,6 +10667,7 @@ void SemanticsDeclBasesVisitor::visitCallableDecl(CallableDecl* decl)
     for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
     {
         inheritanceClauseCounter++;
+        SLANG_UNUSED(inheritanceClauseCounter);
 
         ensureDecl(inheritanceDecl, DeclCheckState::CanUseBaseOfInheritanceDecl);
         auto baseType = inheritanceDecl->base.type;
@@ -10674,7 +10675,7 @@ void SemanticsDeclBasesVisitor::visitCallableDecl(CallableDecl* decl)
         // It is possible that there was an error in checking the base type
         // expression, and in such a case we shouldn't emit a cascading error.
         //
-        if (const auto baseErrorType = as<ErrorType>(baseType))
+        if (const auto baseErrorType = as<ErrorType>(baseType); baseErrorType)
         {
             continue;
         }
@@ -10741,7 +10742,7 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
         // It is possible that there was an error in checking the base type
         // expression, and in such a case we shouldn't emit a cascading error.
         //
-        if (const auto baseErrorType = as<ErrorType>(baseType))
+        if (const auto baseErrorType = as<ErrorType>(baseType); baseErrorType)
         {
             continue;
         }
@@ -10858,7 +10859,7 @@ void SemanticsDeclBasesVisitor::visitClassDecl(ClassDecl* decl)
         // It is possible that there was an error in checking the base type
         // expression, and in such a case we shouldn't emit a cascading error.
         //
-        if (const auto baseErrorType = as<ErrorType>(baseType))
+        if (const auto baseErrorType = as<ErrorType>(baseType); baseErrorType)
         {
             continue;
         }
@@ -11074,7 +11075,7 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
         // It is possible that there was an error in checking the base type
         // expression, and in such a case we shouldn't emit a cascading error.
         //
-        if (const auto baseErrorType = as<ErrorType>(baseType))
+        if (const auto baseErrorType = as<ErrorType>(baseType); baseErrorType)
         {
             continue;
         }
@@ -11491,7 +11492,7 @@ void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     }
 
     decl->body = maybeParseStmt(decl->body, newContext);
-    if (const auto body = decl->body)
+    if (const auto body = decl->body; body)
     {
         checkStmt(decl->body, newContext);
     }
@@ -14296,7 +14297,7 @@ void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
         // It is possible that there was an error in checking the base type
         // expression, and in such a case we shouldn't emit a cascading error.
         //
-        if (const auto baseErrorType = as<ErrorType>(baseType))
+        if (const auto baseErrorType = as<ErrorType>(baseType); baseErrorType)
         {
             continue;
         }

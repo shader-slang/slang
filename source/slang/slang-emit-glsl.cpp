@@ -2438,7 +2438,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_Not:
         {
             IRInst* operand = inst->getOperand(0);
-            if (const auto vectorType = as<IRVectorType>(operand->getDataType()))
+            if (const auto vectorType = as<IRVectorType>(operand->getDataType()); vectorType)
             {
                 EmitOpInfo outerPrec = inOuterPrec;
                 bool needClose = false;
@@ -3557,7 +3557,8 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         _emitGLSLSubpassInputType(subpassType);
         return;
     }
-    else if (const auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+    else if (const auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
+             structuredBufferType)
     {
         // TODO: We desugar global variables with structured-buffer type into GLSL
         // `buffer` declarations, but we don't currently handle structured-buffer types

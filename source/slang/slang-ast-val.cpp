@@ -234,15 +234,15 @@ Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet
             (*ioDiff)++;
             return args[argIndex];
         }
-        else if (const auto typeParam = as<GenericTypeParamDeclBase>(m))
+        else if (const auto typeParam = as<GenericTypeParamDeclBase>(m); typeParam)
         {
             argIndex++;
         }
-        else if (const auto valPackParam = as<GenericValuePackParamDecl>(m))
+        else if (const auto valPackParam = as<GenericValuePackParamDecl>(m); valPackParam)
         {
             argIndex++;
         }
-        else if (const auto valParam = as<GenericValueParamDecl>(m))
+        else if (const auto valParam = as<GenericValueParamDecl>(m); valParam)
         {
             argIndex++;
         }
@@ -1887,7 +1887,7 @@ IntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1)
     }
     else if (auto val0 = as<IntVal>(op0))
     {
-        if (const auto poly1 = as<PolynomialIntVal>(op1))
+        if (auto poly1 = as<PolynomialIntVal>(op1); poly1)
         {
             return mul(astBuilder, op1, op0);
         }

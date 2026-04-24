@@ -333,9 +333,6 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
     if (as<IRParam>(inst))
         return inst;
 
-    List<IRInst*> operands;
-    bool changed = false;
-
     IRBuilder builder(ctx->getModule());
     IRWeakUse* instRef = builder.getWeakUse(inst);
 
@@ -343,9 +340,7 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
     for (UInt i = 0; i < inst->getOperandCount(); ++i)
     {
         auto operand = inst->getOperand(i);
-        auto resolvedOperand = ctx->resolveInst(operand);
-        if (resolvedOperand != operand)
-            changed = true;
+        ctx->resolveInst(operand);
     }
 
     // Extract effective inst post-resolution. (the inst may have changed).
