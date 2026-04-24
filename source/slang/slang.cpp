@@ -66,11 +66,13 @@ const char* getBuildTagString()
         // _CrtDumpMemoryLeaks() at exit does not false-report that allocation.
         static char timeStampBuffer[32] = {};
         static std::once_flag initFlag;
-        std::call_once(initFlag, []()
-        {
-            uint64_t ts = SharedLibraryUtils::getSharedLibraryTimestamp((void*)spCreateSession);
-            snprintf(timeStampBuffer, sizeof(timeStampBuffer), "%" PRIu64, ts);
-        });
+        std::call_once(
+            initFlag,
+            []()
+            {
+                uint64_t ts = SharedLibraryUtils::getSharedLibraryTimestamp((void*)spCreateSession);
+                snprintf(timeStampBuffer, sizeof(timeStampBuffer), "%" PRIu64, ts);
+            });
         return timeStampBuffer;
     }
     return SLANG_TAG_VERSION;
