@@ -60,11 +60,11 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
     }
 
     [require(cuda, subgroup_shuffle)]
-    internal static void toArrayPacked<T, int PackedSize>(
-        MatrixC<T, N, K> mat,
+    internal static void toArrayPacked<U, int PackedSize>(
+        MatrixC<U, N, K> mat,
         inout uint packedOut[PackedSize])
-            where T : __BuiltinFloatingPointType
-            where T.Differential == T
+            where U : __BuiltinFloatingPointType
+            where U.Differential == U
     {
         mat.toArrayPacked<PackedSize>(packedOut);
     }
