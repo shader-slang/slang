@@ -39,6 +39,16 @@ on:
         type: string
         default: ""
         description: "Optional suffix for artifact name (e.g., '-cuda')"
+      cpu-only:
+        required: false
+        type: boolean
+        default: false
+        description: "Restrict slang-test to CPU and LLVM backends via -api cpu+llvm"
+      gpu-api-only:
+        required: false
+        type: boolean
+        default: false
+        description: "Restrict slang-test to GPU APIs (vk+cuda+dx11+dx12+mtl+wgpu) and skip no-API tests — used on GPU runners to avoid redundant CPU-capable test work"
 
 jobs:
   test-slang:
@@ -62,10 +72,12 @@ jobs:
 
       - name: Test Slang
         run: |
-          export SLANG_RUN_SPIRV_VALIDATION=1
-          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-          if [ "${{ inputs.enable-debug-layers }}" == "true" ]; then
-            export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
+          if [[ "${{ inputs.cpu-only }}" != "true" ]]; then
+            export SLANG_RUN_SPIRV_VALIDATION=1
+            export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+            if [ "${{ inputs.enable-debug-layers }}" == "true" ]; then
+              export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
+            fi
           fi
           # Build common slang-test arguments
           slang_test_args=(
@@ -75,6 +87,19 @@ jobs:
             "-show-adapter-info"
             "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
           )
+
+          # Restrict to CPU / LLVM backends; tests requiring any GPU API get
+          # ignored by the test filter rather than run-and-failed.
+          if [[ "${{ inputs.cpu-only }}" == "true" ]]; then
+            slang_test_args+=("-api" "cpu+llvm")
+          fi
+
+          # Restrict to GPU APIs; no-API tests (SIMPLE/DIAGNOSTIC/compile-only)
+          # are covered by the CPU-only tier and skipped here to save GPU time.
+          if [[ "${{ inputs.gpu-api-only }}" == "true" ]]; then
+            slang_test_args+=("-api" "vk+cuda+dx11+dx12+mtl+wgpu")
+            slang_test_args+=("-api-only")
+          fi
 
           # Add test server arguments only if server count > 1
           if [ "${{ inputs.server-count }}" -gt 1 ]; then

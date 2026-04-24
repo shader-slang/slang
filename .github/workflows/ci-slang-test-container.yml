@@ -101,8 +101,13 @@ jobs:
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
 
+          # Run only tests that exercise a GPU API; backend-agnostic tests
+          # (SIMPLE, DIAGNOSTIC, compile-only, CPU, LLVM) are covered by the
+          # separate CPU-only tier and don't need the T4 runner.
           slang_test_args=(
             "-category" "full"
+            "-api" "vk+cuda+dx11+dx12+mtl+wgpu"
+            "-api-only"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-linux.txt"
             "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"
