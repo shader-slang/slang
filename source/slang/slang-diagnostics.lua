@@ -4629,7 +4629,7 @@ warning(
 )
 
 err(
-    "attempt-to-read-from-mesh-shader-output",
+    "cannot-read-from-mesh-shader-output",
     54005,
     "cannot read values from mesh shader outputs",
     span { loc = "inst:IRInst", message = "Cannot read values from mesh shader outputs" }

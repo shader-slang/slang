@@ -39,7 +39,7 @@ static void checkForMeshOutputReadsRecursive(IRInst* inst, DiagnosticSink* sink)
                     if (isDerivedFromMeshOutputRef(as<IRLoad>(opInst)->getPtr()))
                     {
                         sink->diagnose(
-                            Diagnostics::AttemptToReadFromMeshShaderOutput{.inst = opInst});
+                            Diagnostics::CannotReadFromMeshShaderOutput{.inst = opInst});
                     }
                     break;
 
