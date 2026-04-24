@@ -27,15 +27,16 @@ host-side helper library `slang-coverage-rt`. Runs in three modes:
 
 ### Quick start (any validated backend)
 
-```bash
-# Pick any of: cpu, vulkan, d3d12, cuda
-./build/Debug/bin/shader-coverage-demo --mode=dispatch --backend=cpu
-./build/Debug/bin/shader-coverage-demo --mode=dispatch --backend=vulkan
-./build/Debug/bin/shader-coverage-demo --mode=dispatch --backend=d3d12
-./build/Debug/bin/shader-coverage-demo --mode=dispatch --backend=cuda
+Two steps: run the demo to produce `coverage.lcov`, then render it
+to HTML. Platform-specific rendering commands are in
+[Rendering the report](#rendering-the-report) below.
 
-genhtml coverage.lcov -o coverage-html/
-open coverage-html/index.html
+```bash
+# Step 1: run the demo. Pick any of: cpu, vulkan, d3d12, cuda.
+./build/Debug/bin/shader-coverage-demo --mode=dispatch --backend=cpu
+# → produces coverage.lcov and simulate.coverage-mapping.json
+
+# Step 2: render. See "Rendering the report" below for your platform.
 ```
 
 CPU, Vulkan, D3D12 and CUDA produce **byte-identical LCOV output** —
@@ -62,29 +63,58 @@ requires an NVIDIA CUDA runtime.
     --counters=counters.bin \
     --output=coverage.lcov
 
-# 4. Render. See "Rendering the report" below for alternatives.
-genhtml coverage.lcov -o coverage-html/
+# 4. Render to HTML. See "Rendering the report" below.
 ```
 
 ### Rendering the report
 
-The `coverage.lcov` output is the industry-standard LCOV format,
-consumable by several tools depending on platform and workflow:
+`coverage.lcov` is the industry-standard LCOV format, consumable by
+several tools. Pick the instructions for your platform; the result is
+a `coverage-html/` directory with `index.html` you can open in any
+browser.
 
-| Tool | Platforms | When to use |
-|---|---|---|
-| `genhtml` (from the `lcov` package) | Linux, macOS, WSL | CLI-driven Linux / macOS workflows |
-| `reportgenerator` (.NET tool) | Windows native, Linux, macOS | Windows workstations; CI that already has .NET available |
-| VS Code Coverage Gutters | Any (in-editor) | Per-developer view; no HTML output needed |
-| Codecov / Coveralls | SaaS | Team-wide dashboards and PR annotations |
+#### Linux
 
-On Windows specifically, `reportgenerator` avoids the Perl install
-that `genhtml` requires:
+```bash
+sudo apt install lcov         # Debian/Ubuntu; or: dnf install lcov / pacman -S lcov
+genhtml coverage.lcov -o coverage-html/
+xdg-open coverage-html/index.html
+```
+
+#### macOS
+
+```bash
+brew install lcov
+genhtml coverage.lcov -o coverage-html/
+open coverage-html/index.html
+```
+
+#### Windows
+
+`genhtml` requires Perl; easier to use `reportgenerator` (.NET tool):
 
 ```powershell
 dotnet tool install --global dotnet-reportgenerator-globaltool
-reportgenerator -reports:coverage.lcov -targetdir:out-html -reporttypes:Html
+reportgenerator -reports:coverage.lcov -targetdir:coverage-html -reporttypes:Html
+start coverage-html\index.html
 ```
+
+#### Other renderer options
+
+| Tool | Platforms | When to use |
+|---|---|---|
+| `reportgenerator` (.NET tool) | Linux, macOS, Windows | Cross-platform alternative to `genhtml`; no Perl required |
+| VS Code Coverage Gutters | Any (in-editor) | Per-developer view; inline line-level coverage in the editor, no HTML needed |
+| Codecov / Coveralls | SaaS | Team-wide dashboards and PR annotations |
+
+#### What the report shows
+
+`index.html` lists every source file with its per-file coverage
+percentage (sortable). Click through to a file to see each line
+color-coded: green for covered, red for uncovered, gray for
+non-executable. The demo's `simulate.slang` + `physics.slang`
+should show ~84.6% coverage with the unreachable "unknown type"
+branch flagged red — that's the dead-code-detection signal.
 
 ## What the shader exercises
 
