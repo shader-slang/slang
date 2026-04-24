@@ -35,3 +35,13 @@
 # Leak from _maybeBeginMacroInvocation() and type layout objects
 # created during compilation.
 LEAK: _maybeBeginMacroInvocation
+
+# #10893: Use-after-free of TypeLayoutReflection in slang-rhi
+# ShaderObjectLayout cache during render-test CPU compute tests.
+# All three SUMMARY lines below cascade from a single dangling vptr
+# dereference in TypeLayout::FindResourceInfo / List::begin(). UBSan
+# SUMMARY lines only carry file:line -- update line numbers if the
+# surrounding code shifts, or remove entries when #10893 is fixed.
+Slang::List<Slang::TypeLayout::ResourceInfo, Slang::StandardAllocator>::begin()
+slang-reflection-api.cpp:1384
+slang-type-layout.h:772
