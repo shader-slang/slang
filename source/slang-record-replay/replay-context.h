@@ -216,14 +216,13 @@ public:
 
     /// Return the singleton if it has already been constructed, or nullptr.
     /// Thread-safe - uses a mutex to synchronize with get().
-    /// Use this in cleanup paths (e.g. slang_shutdown) to avoid constructing
+    /// Use this in cleanup paths to avoid constructing
     /// the singleton just to tear it down.
     SLANG_API static ReplayContext* tryGet();
 
-    /// Destroy the singleton and release all its heap allocations.
-    /// Called from slang_shutdown() so that _CrtDumpMemoryLeaks() does not
-    /// report the STL debug-proxy allocations owned by the singleton's
-    /// Dictionary members as leaks in MSVC Debug builds.
+    /// Return the singleton if it has already been constructed, or nullptr.
+    /// Thread-safe - uses a mutex to synchronize with get().
+    /// Use this to check whether the singleton exists without constructing it.
     SLANG_API static void destroySingleton();
 
     /// Create an idle context.

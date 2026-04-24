@@ -64,11 +64,12 @@ const char* getBuildTagString()
         // Use a static char buffer (BSS) instead of a heap String so MSVC
         // _CrtDumpMemoryLeaks() at exit does not false-report that allocation.
         static char timeStampBuffer[32] = {};
-        if (timeStampBuffer[0] == '\0')
+        static std::once_flag initFlag;
+        std::call_once(initFlag, []()
         {
             uint64_t ts = SharedLibraryUtils::getSharedLibraryTimestamp((void*)spCreateSession);
             snprintf(timeStampBuffer, sizeof(timeStampBuffer), "%" PRIu64, ts);
-        }
+        });
         return timeStampBuffer;
     }
     return SLANG_TAG_VERSION;
