@@ -2325,6 +2325,20 @@ warning(
     span { loc = "location" }  -- No span message: this diagnostic has no meaningful source location
 )
 
+warning(
+    "special-type-leaks-from-parameter-group",
+    31106,
+    "Parameter group type includes some members with types which cannot be included in the same binding. These types will be moved into another parameter binding slot.",
+    span { loc = "location" }
+)
+
+warning(
+    "special-type-member-leaks-from-parameter-group",
+    31107,
+    "This member cannot be included in the same binding as some other parts of this struct, and will be moved into another parameter binding slot.",
+    span { loc = "member:IRInst", message = "This member will leak into a separate binding slot." }
+)
+
 err(
     "invalid-attribute-target",
     31120,
