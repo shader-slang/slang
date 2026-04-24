@@ -543,7 +543,7 @@ void initCommandOptions(CommandOptions& options)
          "-trace-coverage",
          nullptr,
          "Prototype: instrument the shader with per-statement execution counters. "
-         "Emits IncrementCoverageCounter placeholders at AST lowering that a later IR "
+         "Emits IncrementCoverageCounter ops at AST lowering that a later IR "
          "pass rewrites into counter writes on the synthesized "
          "`RWStructuredBuffer<uint> __slang_coverage` parameter. "
          "When writing compiled output to a file, slangc also emits "
