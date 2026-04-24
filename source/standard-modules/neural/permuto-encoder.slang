@@ -68,13 +68,13 @@ public struct PermutoEncoder<T,
     /// @param shiftsPerDim Per-dimension shifts [Dimensions].
     /// @param elevated Output elevated coordinates [Dimensions+1].
     [Differentiable]
-    static void permutoElevate<InArray>(
-        InArray pos,
+    static void permutoElevate<InputArray>(
+        InputArray pos,
         no_diff in float scalesPerDim[Dimensions],
         no_diff in float shiftsPerDim[Dimensions],
         out float elevated[Dimensions + 1])
-            where InArray : IArrayAccessor<T>
-            where InArray : IDifferentiable
+            where InputArray : IArrayAccessor<T>
+            where InputArray : IDifferentiable
     {
         float sum = 0.0f;
         [ForceUnroll]
