@@ -1,0 +1,31 @@
+//TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+
+// Double pointer: the slangpy failure case.
+// Slang emits `device int *device *` which Metal rejects in [[buffer(N)]]
+// parameter types. The outermost pointer must be lowered to ulong.
+//
+// See: https://github.com/shader-slang/slang/issues/10841
+
+struct PointerArray
+{
+    int** ptrs;
+};
+
+ParameterBlock<PointerArray> params;
+
+// The struct field type must not contain pointer-to-pointer.
+// CHECK: struct PointerArray
+// CHECK: ulong
+// CHECK-NOT: device*
+// CHECK: };
+
+// The kernel body should cast ulong back to the appropriate pointer type.
+// CHECK: computeMain
+// CHECK: int device*
+
+[shader("compute")]
+[numthreads(32, 1, 1)]
+void computeMain(uint3 tid : SV_DispatchThreadID)
+{
+    params.ptrs[tid.x][0] = int(tid.x);
+}

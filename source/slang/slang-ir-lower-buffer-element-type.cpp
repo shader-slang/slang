@@ -2831,17 +2831,30 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
 
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
     {
-        if (config.layoutRuleName == IRTypeLayoutRuleName::MetalParameterBlock &&
-            isResourceType(type))
+        if (config.layoutRuleName == IRTypeLayoutRuleName::MetalParameterBlock)
         {
-            IRBuilder builder(type);
-            builder.setInsertBefore(type);
-            LoweredElementTypeInfo info = {};
-            info.originalType = type;
-            info.loweredType = builder.getType(kIROp_DescriptorHandleType, type);
-            info.convertLoweredToOriginal = kIROp_CastDescriptorHandleToResource;
-            info.convertOriginalToLowered = kIROp_CastResourceToDescriptorHandle;
-            return info;
+            if (isResourceType(type))
+            {
+                IRBuilder builder(type);
+                builder.setInsertBefore(type);
+                LoweredElementTypeInfo info = {};
+                info.originalType = type;
+                info.loweredType = builder.getType(kIROp_DescriptorHandleType, type);
+                info.convertLoweredToOriginal = kIROp_CastDescriptorHandleToResource;
+                info.convertOriginalToLowered = kIROp_CastResourceToDescriptorHandle;
+                return info;
+            }
+            if (as<IRPtrType>(type))
+            {
+                IRBuilder builder(type);
+                builder.setInsertBefore(type);
+                LoweredElementTypeInfo info = {};
+                info.originalType = type;
+                info.loweredType = builder.getUInt64Type();
+                info.convertLoweredToOriginal = kIROp_CastIntToPtr;
+                info.convertOriginalToLowered = kIROp_CastPtrToInt;
+                return info;
+            }
         }
         return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
     }
