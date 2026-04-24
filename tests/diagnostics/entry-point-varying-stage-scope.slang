@@ -1,6 +1,8 @@
 // Positive test: verify the stage-scoped varying-type rules do NOT fire on
 // stages where the reporter (issues #9446, #9448, #9449, #9450, #9452) saw
-// no failure, namely compute/ray-tracing-payload-style stages.
+// no failure, namely compute/ray-tracing-payload-style stages and
+// amplification (task) shaders, whose outputs use `TaskPayloadWorkgroupEXT`
+// rather than an interface block.
 //
 // Rejecting any of these would be over-rejection: the user instruction is
 // "never reject a potentially valid shader". If the downstream backend has
@@ -9,6 +11,7 @@
 
 //TEST:SIMPLE(filecheck=COMPUTE): -target spirv -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=MISS): -target spirv -entry missMain -stage miss
+//TEST:SIMPLE(filecheck=TASK): -target spirv -entry taskMain -stage amplification
 
 import linalg;
 
@@ -47,3 +50,28 @@ void missMain(inout Payload p)
 // MISS-NOT: E38051
 // MISS-NOT: not a valid varying type
 // MISS-NOT: not a valid SPIR-V varying type
+
+// --- Amplification: task shaders ship their payload via
+// `TaskPayloadWorkgroupEXT`, not an interface block, so the interface-block
+// rules must not fire here either.
+struct TaskPayload
+{
+    float x;
+    vector<bool, 4> flags;
+    matrix<float, 5, 5> oversized;
+}
+
+[shader("amplification")]
+[numthreads(1, 1, 1)]
+void taskMain()
+{
+    TaskPayload p;
+    p.x = 0;
+    DispatchMesh(1, 1, 1, p);
+}
+
+// TASK-NOT: E38050
+// TASK-NOT: E38051
+// TASK-NOT: not a valid varying type
+// TASK-NOT: not a valid SPIR-V varying type
+// TASK-NOT: matrix row and column counts

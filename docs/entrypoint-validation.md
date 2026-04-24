@@ -80,6 +80,12 @@ The type walker recursively descends into:
   `ArrayExpressionType` inherits from `DeclRefType` and its decl is the
   builtin `Array` struct; without ordering array first we would walk the
   internal fields of `Array` instead of the element type.
+- **Geometry-shader stream and mesh-shader output wrappers**:
+  `PointStream<T>` / `LineStream<T>` / `TriangleStream<T>` (geometry) and
+  `OutputVertices<T, N>` / `OutputIndices<T, N>` / `OutputPrimitives<T, N>`
+  (mesh) are unwrapped to their payload element type. Like arrays, these are
+  `DeclRefType`s whose decl is an empty `struct`, so they need an explicit
+  unwrap to avoid the struct-field recursion walking zero fields.
 - **Struct fields**: If a struct is used as a varying parameter, each field's
   type is checked against the rules. This catches cases like
   `struct Foo { DifferentialPair<float> x; }` used as a parameter. Fields are

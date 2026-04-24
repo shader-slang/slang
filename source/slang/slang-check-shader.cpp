@@ -874,11 +874,6 @@ static bool _matchMatrixWithOutOfRangeDimensions(Type* type)
     return isOutOfRange(matType->getRowCount()) || isOutOfRange(matType->getColumnCount());
 }
 
-static bool _isSpirvTarget(CodeGenTarget target)
-{
-    return isSPIRV(target);
-}
-
 // True for stages that use interface-block-style varyings in SPIR-V/GLSL
 // (i.e. the stages where the failure modes in issues #9446/#9448/#9449/#9452
 // were reproduced). Ray-tracing payload/attribute stages and the compute
@@ -935,7 +930,7 @@ static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
     // practice; only diagnose where the failure actually occurs.
     {_matchVectorBoolType,
      "vector<bool> is not a valid SPIR-V varying type for this stage",
-     _isSpirvTarget,
+     isSPIRV,
      _isInterfaceBlockVaryingStage},
 
     // `matrix<T, R, C>` with row/column count outside 1..4 breaks downstream
@@ -1058,6 +1053,17 @@ static bool validateVaryingType(VaryingTypeValidationContext& ctx, Type* type)
     // recursion below to avoid iterating the internal fields of `Array`.
     if (auto arrayType = as<ArrayExpressionType>(type))
         return validateVaryingType(ctx, arrayType->getElementType());
+
+    // Recurse through geometry-shader stream output wrappers
+    // (`PointStream`/`LineStream`/`TriangleStream<T>`) and mesh-shader output
+    // wrappers (`Vertices`/`Indices`/`Primitives<T>`). Like arrays, these are
+    // `DeclRefType`s whose decl is an empty `struct`, so without an explicit
+    // unwrap the struct-field recursion below would walk zero fields and miss
+    // an invalid inner varying type such as `TriangleStream<BadStruct>`.
+    if (auto streamType = as<HLSLStreamOutputType>(type))
+        return validateVaryingType(ctx, streamType->getElementType());
+    if (auto meshOutputType = as<MeshOutputType>(type))
+        return validateVaryingType(ctx, meshOutputType->getElementType());
 
     // Recurse into struct fields
     if (auto declRefType = as<DeclRefType>(type))
