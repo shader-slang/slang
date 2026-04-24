@@ -61,6 +61,11 @@ runs:
         tar -xzf /tmp/llvm-prebuilt.tar.gz -C build/llvm-project-install
         rm /tmp/llvm-prebuilt.tar.gz
 
+        if [ ! -d "build/llvm-project-install/lib/cmake/clang" ]; then
+          echo "::error::Downloaded LLVM prebuilt is missing build/llvm-project-install/lib/cmake/clang/; cache entry ${LLVM_KEY} is invalid or stale."
+          exit 1
+        fi
+
         echo "cache-hit=true" >> $GITHUB_OUTPUT
         echo "✅ LLVM restored from GCS"
 
@@ -112,7 +117,7 @@ runs:
         # rather than letting the subsequent Slang configure fail with an
         # opaque find_package(Clang) error.
         if [ ! -d "${LLVM_INSTALL}/lib/cmake/clang" ]; then
-          echo "::error::LLVM install is missing ${LLVM_INSTALL}/lib/cmake/clang/ — the component install targets in external/build-llvm.sh did not produce ClangConfig.cmake."
+          echo "::error::LLVM install is missing ${LLVM_INSTALL}/lib/cmake/clang/; install-distribution in external/build-llvm.sh did not produce ClangConfig.cmake."
           exit 1
         fi
         echo "📊 LLVM installation contents:"

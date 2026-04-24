@@ -294,6 +294,11 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     if(SLANG_EMBED_CORE_MODULE)
         add_dependencies(slang-test slang-neural-module)
     endif()
+    # Keep targeted slang-test builds creating the module files even though gfx
+    # owns the dependency for release/package builds.
+    if(TARGET copy-gfx-slang-modules)
+        add_dependencies(slang-test copy-gfx-slang-modules)
+    endif()
 
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}

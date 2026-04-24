@@ -12,6 +12,7 @@ Options:
   --source-dir: Unpack and build in this directory: default $source_dir
   --config: The configuration to build, default $config
   --install-prefix: Install under this prefix
+  --targets: Semicolon-separated LLVM target architectures, default: $llvmTargets
   --: Any following arguments will be passed to the CMake configuration command
 "
 }
@@ -59,6 +60,7 @@ $branch = "llvmorg-21.1.2"
 $sourceDir = $tempDir.FullName
 $installPrefix = ""
 $config = "Release"
+$llvmTargets = "X86;ARM;AArch64"
 $extraArguments = @()
 
 # Argument parsing
@@ -82,6 +84,9 @@ for ($i = 0; $i -lt $args.Length; $i++) {
         }
         "--install-prefix" {
             $installPrefix = $args[++$i]
+        }
+        "--targets" {
+            $llvmTargets = $args[++$i]
         }
         "--" {
             $extraArguments = $args[$i + 1..$args.Length]
@@ -130,7 +135,7 @@ $cmakeArgumentsForSlang = @(
     "-DCLANG_INCLUDE_DOCS=0"
     "-DCLANG_INCLUDE_TESTS=0"
     "-DLLVM_ENABLE_PROJECTS=clang"
-    "-DLLVM_TARGETS_TO_BUILD=X86;ARM;AArch64"
+    "-DLLVM_TARGETS_TO_BUILD=$llvmTargets"
     "-DLLVM_BUILD_TOOLS=0"
     "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>"
     "-DLLVM_USE_CRT_RELEASE=MT"

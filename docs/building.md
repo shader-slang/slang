@@ -255,6 +255,7 @@ works for any given binary.
 | `SLANG_ENABLE_SLANGD`             | `TRUE`                     | Enable language server target                                                                                                            |
 | `SLANG_ENABLE_SLANGC`             | `TRUE`                     | Enable standalone compiler target                                                                                                        |
 | `SLANG_ENABLE_SLANGI`             | `TRUE`                     | Enable Slang interpreter target                                                                                                          |
+| `SLANG_ENABLE_REPLAYER`           | `TRUE`                     | Enable the slang-replay tool                                                                                                             |
 | `SLANG_ENABLE_SLANGRT`            | `TRUE`                     | Enable runtime target                                                                                                                    |
 | `SLANG_ENABLE_SLANG_GLSLANG`      | `TRUE`                     | Enable glslang dependency and slang-glslang wrapper target                                                                               |
 | `SLANG_ENABLE_TESTS`              | `TRUE`                     | Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT                                             |
@@ -343,11 +344,11 @@ but can also be run locally to get a predictable LLVM tree.
 The script builds a deliberately **minimal** LLVM tree:
 
 - Only the LLVM/Clang libraries and headers that `slang-llvm` links against
-  are compiled. It does this by building LLVM's component install targets
-  (`install-clang-libraries`, `install-llvm-libraries`, etc.) instead of
-  the default `ninja all`. This skips the Clang Static Analyzer (~180
-  sources), `opt`/`llc` and other LLVM tools, tests, examples, and
-  components Slang does not use. Dropping the Static Analyzer is a
+  are compiled and installed. It does this by setting
+  `LLVM_DISTRIBUTION_COMPONENTS` and building LLVM's `install-distribution`
+  target instead of the default `ninja all`. This skips the Clang Static
+  Analyzer (~180 sources), `opt`/`llc` and other LLVM tools, tests, examples,
+  and components Slang does not use. Dropping the Static Analyzer is a
   deliberate workaround for
   [llvm/llvm-project#117705](https://github.com/llvm/llvm-project/issues/117705),
   where `CLANG_ENABLE_STATIC_ANALYZER=OFF` does not actually prevent those
