@@ -1650,6 +1650,7 @@ interface IAllocator<AddressSpace addrSpace>
     /// @param count Number of `T` to allocate.
     /// @return pointer to at least enough memory to store `T[count]`
     /// @throws MemoryAllocationError
+    /// @remarks It is undefined behavior if count * sizeof(T, L) > size_t.maxValue.
     [mutating]
     Ptr<T, Access.ReadWrite, addrSpace, L>
         allocate<T, L:IBufferDataLayout = DefaultDataLayout>(size_t count) throws MemoryAllocationError;
@@ -1686,7 +1687,9 @@ interface IAllocator<AddressSpace addrSpace>
     /// `oldPtr` must have been allocated by this allocator instance using
     /// `allocate<T>()` or `reallocate<T>()`, where the `oldCount` parameter is
     /// smaller than or equal to `count` or `newCount` used to allocate the
-    /// memory.
+    /// memory. It is undefined behavior to call this function with a pointer
+    /// that was not allocated with `allocate` or `reallocate`, even if it is
+    /// nullptr.
     ///
     /// The returned pointer is either `oldPtr` if the existing allocation was
     /// extended, or a new pointer to a new allocation. Either way, you must not
@@ -1699,6 +1702,7 @@ interface IAllocator<AddressSpace addrSpace>
     /// @return pointer to at least enough memory to store `T[newCount]`,
     /// initialized with contents from `oldPtr`.
     /// @throws MemoryAllocationError
+    /// @remarks It is undefined behavior if newCount * sizeof(T, L) > size_t.maxValue.
     [mutating]
     Ptr<T, Access.ReadWrite, addrSpace, L> reallocate<T, L:IBufferDataLayout = DefaultDataLayout>(
         Ptr<T, Access.ReadWrite, addrSpace, L> oldPtr,
@@ -1716,7 +1720,9 @@ interface IAllocator<AddressSpace addrSpace>
     /// This function may free the given pointer. The behavior is undefined if
     /// the pointer was not acquired via `allocate<T>()` or `reallocate<T>()` of
     /// the same allocator instance, and if the type of the given pointer has
-    /// different alignment than it was allocated with.
+    /// different alignment than it was allocated with. It is undefined behavior
+    /// to call this function with a pointer that was not allocated with
+    /// `allocate` or `reallocate`, even if it is nullptr.
     ///
     /// After this call, you must not dereference the pointer.
     ///
@@ -1729,7 +1735,8 @@ interface IAllocator<AddressSpace addrSpace>
     }
 
     /// This function may free the given pointer, which must have been
-    /// allocated with `alignedAllocate()`.
+    /// allocated with `alignedAllocate()`. It is undefined behavior if the
+    /// pointer was not allocated with that function, including nullptr.
     ///
     /// @param data A pointer to an allocation that should be released.
     [mutating]
