@@ -364,9 +364,11 @@ static ImageFormat getImageFormat(IRTextureType* texType)
 
 static bool wgslFormatSupportsReadWrite(ImageFormat fmt)
 {
-    // Per https://www.w3.org/TR/WGSL/#storage-texel-formats, rgba16float only
-    // supports read and write access modes, not read_write.
-    // All other formats supported by the WGSL backend allow read_write.
+    // Per https://www.w3.org/TR/WGSL/#storage-texel-formats, rgba16float is explicitly
+    // prohibited from read_write access even when the readonly_and_readwrite_storage_textures
+    // WGSL feature is available. All other formats that Slang's WGSL backend emits
+    // (r32float, rg32float, rgba32float, rgba8unorm, bgra8unorm, and their integer
+    // variants) support read_write under that feature.
     switch (fmt)
     {
     case ImageFormat::rgba16f:
