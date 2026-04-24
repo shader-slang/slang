@@ -61,6 +61,7 @@ SLANG_UNIT_TEST(replayContextDestroyedByShutdown)
     SLANG_UNUSED(unitTestContext);
 
     ReplayContext::get();
+    SLANG_CHECK(ReplayContext::tryGet() != nullptr);
 
     // Simulate what slang_shutdown() now does
     ReplayContext::destroySingleton();

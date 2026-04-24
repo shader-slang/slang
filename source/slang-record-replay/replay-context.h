@@ -216,13 +216,14 @@ public:
 
     /// Return the singleton if it has already been constructed, or nullptr.
     /// Thread-safe - uses a mutex to synchronize with get().
-    /// Use this in cleanup paths to avoid constructing
+    /// Use this in cleanup paths (e.g. slang_shutdown) to avoid constructing
     /// the singleton just to tear it down.
     SLANG_API static ReplayContext* tryGet();
 
-    /// Return the singleton if it has already been constructed, or nullptr.
-    /// Thread-safe - uses a mutex to synchronize with get().
-    /// Use this to check whether the singleton exists without constructing it.
+    /// Destroy the singleton instance if it exists, freeing all resources.
+    /// Thread-safe - uses a mutex to synchronize with get() and tryGet().
+    /// Safe to call when no singleton exists (no-op). After this call,
+    /// get() will lazily re-create a fresh instance if called again.
     SLANG_API static void destroySingleton();
 
     /// Create an idle context.
