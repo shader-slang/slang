@@ -1,6 +1,49 @@
 implementing neural;
 
 
+// Read a packed uint32 from a cooperative matrix tile at the given fragment register index.
+// On CUDA, uses the hardware __fragmentRead intrinsic. On other targets, reads elements
+// via the index operator and packs them into a uint32.
+[ForceInline]
+internal uint fragmentReadAsUint<T : __BuiltinFloatingPointType, let S : MemoryScope, let M : int, let N : int, let R : linalg.CoopMatMatrixUse>(
+    linalg.CoopMat<T, S, M, N, R> tile, int regIndex)
+{
+    __target_switch
+    {
+    case cuda:
+        return tile.__fragmentRead(regIndex);
+    default:
+        static const int ElemsPerReg = 4 / sizeof(T);
+        int base = regIndex * ElemsPerReg;
+        vector<T, ElemsPerReg> val;
+        [ForceUnroll]
+        for (int e = 0; e < ElemsPerReg; e++)
+            val[e] = tile[base + e];
+        return bit_cast<uint>(val);
+    }
+}
+
+// Write a packed uint32 to a cooperative matrix tile at the given fragment register index.
+// On CUDA, uses the hardware __fragmentWrite intrinsic. On other targets, unpacks the
+// uint32 into elements and writes them via the index operator.
+[ForceInline]
+internal void fragmentWriteFromUint<T : __BuiltinFloatingPointType, let S : MemoryScope, let M : int, let N : int, let R : linalg.CoopMatMatrixUse>(
+    inout linalg.CoopMat<T, S, M, N, R> tile, int regIndex, uint value)
+{
+    __target_switch
+    {
+    case cuda:
+        tile.__fragmentWrite(regIndex, value);
+    default:
+        static const int ElemsPerReg = 4 / sizeof(T);
+        int base = regIndex * ElemsPerReg;
+        let val = bit_cast<vector<T, ElemsPerReg>>(value);
+        [ForceUnroll]
+        for (int e = 0; e < ElemsPerReg; e++)
+            tile[base + e] = val[e];
+    }
+}
+
 // WaveMatrix: A tiled matrix type over 16x16 cooperative matrix fragments.
 //
 // Maps directly to Tin2's MatrixBase<T, N_ROWS, N_COLS, ROW_MAJOR>:
@@ -441,16 +484,16 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
             uint offset = baseOffset + uint(i) * uint(TileStride);
             if (RegsPerLane <= 4)
             {
-                uint4 v = uint4(tiles[i].__fragmentRead(0), tiles[i].__fragmentRead(1),
-                                tiles[i].__fragmentRead(2), tiles[i].__fragmentRead(3));
+                uint4 v = uint4(fragmentReadAsUint(tiles[i], 0), fragmentReadAsUint(tiles[i], 1),
+                                fragmentReadAsUint(tiles[i], 2), fragmentReadAsUint(tiles[i], 3));
                 ShMemPool.smemStore<uint4, ShmemAddressMode.Shared>(offset, int(laneId), v);
             }
             else
             {
-                uint4 v0 = uint4(tiles[i].__fragmentRead(0), tiles[i].__fragmentRead(1),
-                                 tiles[i].__fragmentRead(2), tiles[i].__fragmentRead(3));
-                uint4 v1 = uint4(tiles[i].__fragmentRead(4), tiles[i].__fragmentRead(5),
-                                 tiles[i].__fragmentRead(6), tiles[i].__fragmentRead(7));
+                uint4 v0 = uint4(fragmentReadAsUint(tiles[i], 0), fragmentReadAsUint(tiles[i], 1),
+                                 fragmentReadAsUint(tiles[i], 2), fragmentReadAsUint(tiles[i], 3));
+                uint4 v1 = uint4(fragmentReadAsUint(tiles[i], 4), fragmentReadAsUint(tiles[i], 5),
+                                 fragmentReadAsUint(tiles[i], 6), fragmentReadAsUint(tiles[i], 7));
                 ShMemPool.smemStore<uint4, ShmemAddressMode.Shared>(offset, int(laneId * 2), v0);
                 ShMemPool.smemStore<uint4, ShmemAddressMode.Shared>(offset, int(laneId * 2 + 1), v1);
             }
@@ -471,23 +514,23 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
             if (RegsPerLane <= 4)
             {
                 uint4 v = ShMemPool.smemLoad<uint4, ShmemAddressMode.Shared>(offset, int(laneId));
-                tiles[i].__fragmentWrite(0, v.x);
-                tiles[i].__fragmentWrite(1, v.y);
-                tiles[i].__fragmentWrite(2, v.z);
-                tiles[i].__fragmentWrite(3, v.w);
+                fragmentWriteFromUint(tiles[i], 0, v.x);
+                fragmentWriteFromUint(tiles[i], 1, v.y);
+                fragmentWriteFromUint(tiles[i], 2, v.z);
+                fragmentWriteFromUint(tiles[i], 3, v.w);
             }
             else
             {
                 uint4 v0 = ShMemPool.smemLoad<uint4, ShmemAddressMode.Shared>(offset, int(laneId * 2));
                 uint4 v1 = ShMemPool.smemLoad<uint4, ShmemAddressMode.Shared>(offset, int(laneId * 2 + 1));
-                tiles[i].__fragmentWrite(0, v0.x);
-                tiles[i].__fragmentWrite(1, v0.y);
-                tiles[i].__fragmentWrite(2, v0.z);
-                tiles[i].__fragmentWrite(3, v0.w);
-                tiles[i].__fragmentWrite(4, v1.x);
-                tiles[i].__fragmentWrite(5, v1.y);
-                tiles[i].__fragmentWrite(6, v1.z);
-                tiles[i].__fragmentWrite(7, v1.w);
+                fragmentWriteFromUint(tiles[i], 0, v0.x);
+                fragmentWriteFromUint(tiles[i], 1, v0.y);
+                fragmentWriteFromUint(tiles[i], 2, v0.z);
+                fragmentWriteFromUint(tiles[i], 3, v0.w);
+                fragmentWriteFromUint(tiles[i], 4, v1.x);
+                fragmentWriteFromUint(tiles[i], 5, v1.y);
+                fragmentWriteFromUint(tiles[i], 6, v1.z);
+                fragmentWriteFromUint(tiles[i], 7, v1.w);
             }
         }
     }

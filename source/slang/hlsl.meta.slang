@@ -27602,30 +27602,13 @@ struct CoopMat
     /// @param value The 32-bit value to write (packs 1 float, 2 halves, or 4 int8s).
     [ForceInline]
     [mutating]
-    [require(cuda_hlsl_spirv, cooperative_matrix)]
+    [require(cuda, cooperative_matrix)]
     void __fragmentWrite(int regIndex, uint value)
     {
         __target_switch
         {
         case cuda:
             __intrinsic_asm "($0)->FragmentWrite($1, $2)";
-        default:
-            let elementsPerReg = 4 / sizeof(T);
-            int base = regIndex * elementsPerReg;
-            if (sizeof(T) == 4)
-                this[base] = bit_cast<T>(value);
-            else if (sizeof(T) == 2)
-            {
-                this[base]     = bit_cast<T>(uint16_t(value & 0xFFFF));
-                this[base + 1] = bit_cast<T>(uint16_t(value >> 16));
-            }
-            else if (sizeof(T) == 1)
-            {
-                this[base]     = bit_cast<T>(uint8_t(value & 0xFF));
-                this[base + 1] = bit_cast<T>(uint8_t((value >> 8) & 0xFF));
-                this[base + 2] = bit_cast<T>(uint8_t((value >> 16) & 0xFF));
-                this[base + 3] = bit_cast<T>(uint8_t((value >> 24) & 0xFF));
-            }
         }
     }
 
@@ -27636,33 +27619,13 @@ struct CoopMat
     /// @return The raw 32-bit register value.
     [ForceInline]
     [__NoSideEffect]
-    [require(cuda_hlsl_spirv, cooperative_matrix)]
+    [require(cuda, cooperative_matrix)]
     uint __fragmentRead(int regIndex)
     {
         __target_switch
         {
         case cuda:
             __intrinsic_asm "($0).FragmentRead($1)";
-        default:
-            let elementsPerReg = 4 / sizeof(T);
-            int base = regIndex * elementsPerReg;
-            if (sizeof(T) == 4)
-                return bit_cast<uint>(this[base]);
-            else if (sizeof(T) == 2)
-            {
-                uint lo = uint(bit_cast<uint16_t>(this[base]));
-                uint hi = uint(bit_cast<uint16_t>(this[base + 1]));
-                return lo | (hi << 16);
-            }
-            else if (sizeof(T) == 1)
-            {
-                uint b0 = uint(bit_cast<uint8_t>(this[base]));
-                uint b1 = uint(bit_cast<uint8_t>(this[base + 1]));
-                uint b2 = uint(bit_cast<uint8_t>(this[base + 2]));
-                uint b3 = uint(bit_cast<uint8_t>(this[base + 3]));
-                return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
-            }
-            return 0;
         }
     }
 
@@ -27845,8 +27808,6 @@ struct CoopMat
         case cuda:
             This result;
             return int(__cuda_getPackedFragmentCount(result));
-        default:
-            return int(GetLength()) / (4 / sizeof(T));
         }
     }
 

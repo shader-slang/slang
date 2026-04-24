@@ -140,6 +140,8 @@ public void testOuterProductAccumulateTiled<
 
         Vulkan.outerProductAccumulate<Address, InputSize>(dOutA, inputArr, address, 0u);
     }
+    default:
+        static_assert(false, "Unsupported target");
     }
 }
 

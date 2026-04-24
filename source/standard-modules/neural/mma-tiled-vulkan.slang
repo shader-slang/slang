@@ -209,7 +209,8 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
     // =========================================================================
 
     [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
+    [require(spirv, cooperative_matrix)]
+    [require(subgroup_basic)]
     internal static void outerProductAccumulate<Address, int InputVecSize>(
         MatrixA<M, N> dOutA,
         T inputArr[InputVecSize],
@@ -348,7 +349,7 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
 
     // Store one row of tiles from shmem to global using atomicAdd.
     [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
+    [require(spirv, cooperative_matrix, subgroup_basic)]
     internal static void storeTileRowToGlobal<U, Address>(
         uint sharedMemoryOffset,
         int tileRow,

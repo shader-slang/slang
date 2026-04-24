@@ -569,16 +569,16 @@ internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, Ta
 
         if (TileRegsPerLane <= 4)
         {
-            uint4 v = uint4(tile.__fragmentRead(0), tile.__fragmentRead(1),
-                            tile.__fragmentRead(2), tile.__fragmentRead(3));
+            uint4 v = uint4(fragmentReadAsUint(tile, 0), fragmentReadAsUint(tile, 1),
+                            fragmentReadAsUint(tile, 2), fragmentReadAsUint(tile, 3));
             ShMemPool.smemStore<uint4, ShmemAddressMode.Generic>(offset, int(laneId), v);
         }
         else
         {
-            uint4 v0 = uint4(tile.__fragmentRead(0), tile.__fragmentRead(1),
-                             tile.__fragmentRead(2), tile.__fragmentRead(3));
-            uint4 v1 = uint4(tile.__fragmentRead(4), tile.__fragmentRead(5),
-                             tile.__fragmentRead(6), tile.__fragmentRead(7));
+            uint4 v0 = uint4(fragmentReadAsUint(tile, 0), fragmentReadAsUint(tile, 1),
+                             fragmentReadAsUint(tile, 2), fragmentReadAsUint(tile, 3));
+            uint4 v1 = uint4(fragmentReadAsUint(tile, 4), fragmentReadAsUint(tile, 5),
+                             fragmentReadAsUint(tile, 6), fragmentReadAsUint(tile, 7));
             ShMemPool.smemStore<uint4, ShmemAddressMode.Generic>(offset, int(laneId * 2), v0);
             ShMemPool.smemStore<uint4, ShmemAddressMode.Generic>(offset, int(laneId * 2 + 1), v1);
         }
@@ -594,23 +594,23 @@ internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, Ta
         if (TileRegsPerLane <= 4)
         {
             uint4 v = ShMemPool.smemLoad<uint4, ShmemAddressMode.Generic>(offset, int(laneId));
-            tile.__fragmentWrite(0, v.x);
-            tile.__fragmentWrite(1, v.y);
-            tile.__fragmentWrite(2, v.z);
-            tile.__fragmentWrite(3, v.w);
+            fragmentWriteFromUint(tile, 0, v.x);
+            fragmentWriteFromUint(tile, 1, v.y);
+            fragmentWriteFromUint(tile, 2, v.z);
+            fragmentWriteFromUint(tile, 3, v.w);
         }
         else
         {
             uint4 v0 = ShMemPool.smemLoad<uint4, ShmemAddressMode.Generic>(offset, int(laneId * 2));
             uint4 v1 = ShMemPool.smemLoad<uint4, ShmemAddressMode.Generic>(offset, int(laneId * 2 + 1));
-            tile.__fragmentWrite(0, v0.x);
-            tile.__fragmentWrite(1, v0.y);
-            tile.__fragmentWrite(2, v0.z);
-            tile.__fragmentWrite(3, v0.w);
-            tile.__fragmentWrite(4, v1.x);
-            tile.__fragmentWrite(5, v1.y);
-            tile.__fragmentWrite(6, v1.z);
-            tile.__fragmentWrite(7, v1.w);
+            fragmentWriteFromUint(tile, 0, v0.x);
+            fragmentWriteFromUint(tile, 1, v0.y);
+            fragmentWriteFromUint(tile, 2, v0.z);
+            fragmentWriteFromUint(tile, 3, v0.w);
+            fragmentWriteFromUint(tile, 4, v1.x);
+            fragmentWriteFromUint(tile, 5, v1.y);
+            fragmentWriteFromUint(tile, 6, v1.z);
+            fragmentWriteFromUint(tile, 7, v1.w);
         }
         return tile;
     }
