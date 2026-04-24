@@ -69,7 +69,7 @@ bool reallocTest<T: __BuiltinIntegerType>()
 
     do
     {
-        rePtr = StackFrameAllocator.reallocate<T, DefaultDataLayout>(ptr, 16, 8);
+        rePtr = StackFrameAllocator.reallocate<T, DefaultDataLayout>(rePtr, 16, 8);
     }
     catch
     {

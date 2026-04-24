@@ -1650,7 +1650,11 @@ interface IAllocator<AddressSpace addrSpace>
     /// @param count Number of `T` to allocate.
     /// @return pointer to at least enough memory to store `T[count]`
     /// @throws MemoryAllocationError
+    ///
     /// @remarks It is undefined behavior if count * sizeof(T, L) > size_t.maxValue.
+    ///
+    /// @remarks It is valid for `count` to be zero, but there is no guarantee
+    /// that the returned pointer would be unique.
     [mutating]
     Ptr<T, Access.ReadWrite, addrSpace, L>
         allocate<T, L:IBufferDataLayout = DefaultDataLayout>(size_t count) throws MemoryAllocationError;
@@ -1665,10 +1669,14 @@ interface IAllocator<AddressSpace addrSpace>
     /// bytes that is also aligned as requested.
     /// @throws MemoryAllocationError Can run out of memory or reject given
     /// alignment depending on allocator.
+    ///
     /// @remarks the regular `allocate()` already returns pointers aligned
     /// correctly for `T`, so this function only needs to be used in very
     /// specific circumstances where e.g. cache line or page alignment is
     /// required.
+    ///
+    /// @remarks It is valid for `bytes` to be zero, but there is no guarantee
+    /// that the returned pointer would be unique.
     [mutating]
     Ptr<void, Access.ReadWrite, addrSpace>
         alignedAllocate(size_t bytes, uint alignment) throws MemoryAllocationError
@@ -1703,6 +1711,9 @@ interface IAllocator<AddressSpace addrSpace>
     /// initialized with contents from `oldPtr`.
     /// @throws MemoryAllocationError
     /// @remarks It is undefined behavior if newCount * sizeof(T, L) > size_t.maxValue.
+    ///
+    /// @remarks It is valid for `newCount` to be zero, but there is no
+    /// guarantee that the returned pointer would be unique.
     [mutating]
     Ptr<T, Access.ReadWrite, addrSpace, L> reallocate<T, L:IBufferDataLayout = DefaultDataLayout>(
         Ptr<T, Access.ReadWrite, addrSpace, L> oldPtr,
@@ -1727,6 +1738,7 @@ interface IAllocator<AddressSpace addrSpace>
     /// After this call, you must not dereference the pointer.
     ///
     /// @param data A pointer to an allocation that should be released.
+    ///
     /// @remarks It is possible that an allocator does not support this
     /// operation, in which case the behavior will be a no-op.
     [mutating]
@@ -1750,6 +1762,7 @@ interface IAllocator<AddressSpace addrSpace>
     /// This function may free all prior allocations made through this
     /// allocator. After calling `close()`, you must never dereference pointers
     /// allocated prior to the call.
+    ///
     /// @remarks It is possible that an allocator does not support this
     /// operation, in which case the behavior will be a no-op.
     [mutating]
