@@ -88,6 +88,58 @@ In short:
 - coverage metadata answers: "how does the host interpret the recorded
   counter data?"
 
+Two reporting channels
+----------------------
+
+Coverage metadata is exposed through two channels that carry the same
+data in different forms:
+
+- `ICoverageTracingMetadata` — an in-process query interface exposed
+  on compiled artifacts through the compile API.
+- `<output>.coverage-mapping.json` — an on-disk sidecar serialized as
+  JSON, written alongside each compiled artifact.
+
+The sidecar exists to bridge compile time and run time. A typical
+`slangc` build step produces a compiled shader (`shader.spv`,
+`shader.dxil`, ...) that is shipped to a runtime host; by the time
+the runtime reads the counter buffer back, `slangc` is no longer
+running and the in-memory metadata cannot be queried. Writing the
+mapping next to the compiled artifact lets any later step attribute
+runtime counter values back to source locations.
+
+This is the pre-built-shader pattern: shaders are compiled offline,
+binaries plus sidecars ship with the game engine, DCC tool, or vendor
+runtime, and a later dispatch on the end user's machine attributes
+counters back to source using the sidecar alone — no Slang toolchain
+needed on the target. The same companion-file role is played by
+`.pdb` files for native Windows binaries and `.dSYM` bundles for
+Mach-O: build-time information preserved for runtime/post-mortem
+use.
+
+Consumers of the sidecar include:
+
+- `tools/shader-coverage/slang-coverage-to-lcov.py` — reads the
+  sidecar plus a counter-buffer snapshot, emits LCOV consumable by
+  `genhtml`, `reportgenerator`, VS Code Coverage Gutters, Codecov.
+- `slang-coverage-rt` — a C helper library that parses the sidecar
+  so hosts can accumulate hits and emit reports programmatically
+  (entry point `slang_coverage_create(path, ...)`).
+- External integrators and CI scripts that want to produce coverage
+  data without linking against Slang or writing their own parser.
+
+Compile-API hosts (in-process compile + dispatch) typically do not
+need the sidecar: they already hold the compiled artifact in memory,
+so they query `ICoverageTracingMetadata` directly. This dual-channel
+approach mirrors the pattern Slang uses for debug info and reflection
+output: the same information flows through both an in-process API
+and an on-disk artifact, and hosts choose the channel that matches
+their integration model.
+
+Rule of thumb:
+
+- `slangc` CLI workflow, consumer runs later → sidecar
+- compile-API workflow, consumer runs in-process → metadata API
+
 Alternative designs
 -------------------
 
