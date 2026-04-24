@@ -38,8 +38,7 @@ static void checkForMeshOutputReadsRecursive(IRInst* inst, DiagnosticSink* sink)
                 case kIROp_Load:
                     if (isDerivedFromMeshOutputRef(as<IRLoad>(opInst)->getPtr()))
                     {
-                        sink->diagnose(
-                            Diagnostics::CannotReadFromMeshShaderOutput{.inst = opInst});
+                        sink->diagnose(Diagnostics::CannotReadFromMeshShaderOutput{.inst = opInst});
                     }
                     break;
 
