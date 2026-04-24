@@ -6,6 +6,7 @@ RWStructuredBuffer<float> buffer;
 [numthreads(1,1,1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
-    // CHECK: error[E30087]: address-of operator not supported
+    // CHECK: error[E31207]: use of removed declaration
+    // CHECK: the '&' operator for taking addresses is no longer supported in Slang
     float* p = &buffer[threadId.x];
 }

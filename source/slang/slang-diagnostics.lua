@@ -1390,13 +1390,6 @@ err(
 )
 
 err(
-    "address-of-operator-not-supported",
-    30087,
-    "address-of operator not supported",
-    span { loc = "expr:Expr", message = "the '&' operator for taking addresses is no longer supported in Slang" }
-)
-
-err(
     "cannot-specialize-generic-with-existential",
     33180,
     "cannot specialize generic with existential type",
