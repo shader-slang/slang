@@ -6440,6 +6440,17 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     }
 
     expr->value = CheckTerm(expr->value);
+
+    // Reject `expr as OpaqueType` (and structs containing opaque fields) because
+    // Optional<T> cannot wrap resource/opaque types.
+    if (typeTransitivelyContainsOpaqueHandle(this, typeExpr.type))
+    {
+        getSink()->diagnose(
+            Diagnostics::OptionalCannotWrapResourceType{.type = typeExpr.type, .expr = expr});
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
     auto optType = m_astBuilder->getOptionalType(typeExpr.type);
     expr->type = optType;
 

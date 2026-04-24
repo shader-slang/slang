@@ -3391,6 +3391,12 @@ err(
     span { loc = "location", message = "__subscript declaration must have a return type specified after '->'" }
 )
 
+err(
+    "optional-cannot-wrap-resource-type",
+    30902,
+    "'Optional<T>' cannot wrap a resource or opaque type",
+    span { loc = "expr:Expr", message = "'~type:Type' is a resource or opaque type and cannot be used as the value type of 'Optional<T>'." }
+)
 
 -- Load semantic checking diagnostics (part 8) - Accessors, Bit Fields, Integer Constants, Overloads, Switch, Generics, Ambiguity
 -- (inlined from slang-diagnostics-semantic-checking-8.lua)
