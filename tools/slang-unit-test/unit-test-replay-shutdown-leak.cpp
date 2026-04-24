@@ -53,3 +53,17 @@ SLANG_UNIT_TEST(replayTryGetSkipsConstruction)
     SLANG_CHECK(ptr != nullptr);
     SLANG_CHECK(ptr == &ReplayContext::get());
 }
+
+// Make sure the singleton is released after destroySingleton().
+SLANG_UNIT_TEST(replayContextDestroyedByShutdown)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ReplayContext::get();
+    SLANG_CHECK(ReplayContext::tryGet() != nullptr);
+
+    // Simulate what slang_shutdown() now does
+    ReplayContext::destroySingleton();
+    SLANG_CHECK(ReplayContext::tryGet() == nullptr);
+}
