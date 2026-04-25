@@ -165,24 +165,41 @@ td.title   { text-align: center; padding: 14px 0 10px; font-size: 22pt;
              letter-spacing: 0.02em; }
 td.ruler   { background-color: var(--slang-teal); height: 3px; padding: 0; }
 
-/* Sticky page chrome: title + meta + transposed metric grid stay
-   visible when the user scrolls. The data table's <thead> sticks
-   directly underneath at top: var(--chrome-h), measured by JS on
-   page load. */
+/* Sticky page chrome: title + meta + metric cards stay visible
+   when the user scrolls. The data table's <thead> sticks directly
+   underneath at top: var(--chrome-h), measured by JS on page load. */
 div.topChrome { position: sticky; top: 0; z-index: 20;
                 background-color: #fff;
                 box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08); }
 table.chromeMeta { width: 100%; border-collapse: collapse;
                    margin: 6px 0; }
 table.chromeMeta td { padding: 2px 8px; }
-table.metricGrid { margin: 8px auto 12px;
-                   border-collapse: collapse; }
-table.metricGrid td { padding: 4px 14px; text-align: center;
-                      min-width: 6em; }
-td.metricColHead { background-color: var(--slang-teal); color: #fff;
-                   font-weight: 600; }
-td.metricRowLabel { background-color: var(--row-bg); color: var(--text-muted);
-                    font-weight: 600; text-align: right; }
+
+/* Per-file summary cards. Wide flex row, one card per metric
+   (Lines / Functions / Branches), each showing the metric name,
+   the rate %, a thin progress bar and the hit/total counts on
+   one line. Replaces the old 4×N transposed grid that was tall
+   and narrow. */
+div.metricCards { display: flex; flex-wrap: wrap; gap: 12px;
+                  margin: 10px 0 12px; }
+div.metricCard  { flex: 1 1 240px; padding: 8px 14px;
+                  background-color: var(--row-bg-alt);
+                  border: 1px solid var(--row-bg);
+                  border-radius: 6px;
+                  display: flex; align-items: center; gap: 12px;
+                  font-size: 90%; }
+span.metricLabel { font-weight: 600; color: var(--text-muted);
+                   text-transform: uppercase; letter-spacing: 0.04em;
+                   font-size: 78%; min-width: 4.5em; }
+span.metricValue { font-size: 16pt; font-weight: 700;
+                   color: var(--text); min-width: 4em;
+                   text-align: right; }
+div.metricBarMini { flex: 1; height: 6px; min-width: 60px;
+                    background-color: #e0e3e6; border-radius: 3px;
+                    overflow: hidden; }
+div.metricBarFill { height: 100%; }
+span.metricCounts { color: var(--text-muted); white-space: nowrap;
+                    min-width: 5em; text-align: right; font-variant-numeric: tabular-nums; }
 
 td.headerItem        { text-align: right; padding-right: 6px; font-weight: 600;
                        vertical-align: top; white-space: nowrap; color: var(--text-muted); }
@@ -412,49 +429,37 @@ def _render_page_header(
     `position: sticky; top: 0` so it stays visible when the user
     scrolls down through the file/source list.
     """
-    # The metric grid: one column per metric, three rows for
-    # Coverage / Total / Hit. Lines is always present; Functions /
-    # Branches only when the LCOV carries them.
-    cols_html = "\n".join(
-        f'        <td class="metricColHead">{html.escape(m.label)}</td>'
-        for m in metrics
-    )
+    # Metric cards: one flex card per metric. Each card shows the
+    # label, the rate %, a thin progress bar, and `hit / total`.
+    # Wider and shorter than the old transposed table.
+    def _metric_card(m: Metric) -> str:
+        if m.total > 0:
+            fill_color = _gradient_color(m.pct)
+            fill_pct = max(0, min(100, m.pct))
+            value_html = f"{m.pct:.1f}&nbsp;%"
+            counts_html = f"{m.hit:,} / {m.total:,}"
+        else:
+            fill_color = "#cfd4d8"
+            fill_pct = 0
+            value_html = "-"
+            counts_html = "-"
+        return (
+            f'    <div class="metricCard">\n'
+            f'      <span class="metricLabel">{html.escape(m.label)}</span>\n'
+            f'      <span class="metricValue">{value_html}</span>\n'
+            f'      <div class="metricBarMini">'
+            f'<div class="metricBarFill" style="width:{fill_pct:.1f}%;'
+            f'background-color:{fill_color}"></div></div>\n'
+            f'      <span class="metricCounts">{counts_html}</span>\n'
+            f"    </div>"
+        )
 
-    rate_row = "\n".join(
-        f"        {_rate_cell(m.pct, m.total)}" for m in metrics
-    )
-    total_row = "\n".join(
-        f'        <td class="coverNumDflt">{m.total if m.total else "-"}</td>'
-        for m in metrics
-    )
-    hit_row = "\n".join(
-        f'        <td class="coverNumDflt">{m.hit if m.total else "-"}</td>'
-        for m in metrics
-    )
+    cards_html = "\n".join(_metric_card(m) for m in metrics)
 
     metric_grid_html = (
-        f"""  <table class="metricGrid">
-    <thead>
-      <tr>
-        <td class="metricRowLabel"></td>
-{cols_html}
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td class="metricRowLabel">Coverage</td>
-{rate_row}
-      </tr>
-      <tr>
-        <td class="metricRowLabel">Total</td>
-{total_row}
-      </tr>
-      <tr>
-        <td class="metricRowLabel">Hit</td>
-{hit_row}
-      </tr>
-    </tbody>
-  </table>"""
+        f"""  <div class="metricCards">
+{cards_html}
+  </div>"""
         if show_metric_grid
         else ""
     )

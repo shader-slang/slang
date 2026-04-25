@@ -666,25 +666,22 @@ class CliIntegrationTests(unittest.TestCase):
         # Per-file pages still emit the grid; that's covered below.
         self.assertNotIn('class="metricColHead"', idx)
 
-    def test_transposed_metric_grid_only_on_per_file_pages(self):
-        """The transposed metric grid (Lines/Functions/Branches as
-        columns; Coverage/Total/Hit as rows) appears on per-file
-        pages, not on the index — the index has a dirHeader row
-        showing the same totals."""
-        out_dir = os.path.join(self.tmp, "transposed")
+    def test_metric_cards_only_on_per_file_pages(self):
+        """Per-file pages carry a flex row of metric cards (one per
+        Lines/Functions/Branches). The index page suppresses them
+        because its first dirHeader row shows the same totals."""
+        out_dir = os.path.join(self.tmp, "cards")
         self._run(
             os.path.join(FIXTURES, "branches-and-functions.info"),
             "--output-dir",
             out_dir,
             "--quiet",
         )
-        # Index does NOT carry the metric grid.
         with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
             idx = f.read()
-        self.assertNotIn('table class="metricGrid"', idx)
-        self.assertNotIn('class="metricColHead"', idx)
+        self.assertNotIn('class="metricCards"', idx)
+        self.assertNotIn('class="metricCard"', idx)
 
-        # Per-file pages DO carry it.
         per_file = [
             os.path.join(out_dir, e)
             for e in os.listdir(out_dir)
@@ -693,11 +690,12 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(per_file)
         with open(per_file[0], encoding="utf-8") as f:
             page = f.read()
-        self.assertIn('table class="metricGrid"', page)
-        self.assertIn('class="metricColHead">Lines</td>', page)
-        self.assertIn('class="metricRowLabel">Coverage</td>', page)
-        self.assertIn('class="metricRowLabel">Total</td>', page)
-        self.assertIn('class="metricRowLabel">Hit</td>', page)
+        self.assertIn('class="metricCards"', page)
+        self.assertIn('class="metricCard"', page)
+        self.assertIn('class="metricLabel">Lines</span>', page)
+        self.assertIn('class="metricValue"', page)
+        self.assertIn('class="metricBarMini"', page)
+        self.assertIn('class="metricCounts"', page)
 
     def test_top_chrome_is_sticky(self):
         """Whole top chrome is wrapped in a `topChrome` div with
@@ -1080,9 +1078,9 @@ class CliIntegrationTests(unittest.TestCase):
                 text,
                 msg=f"per-file page {p} still has Hit-count header",
             )
-            # The transposed metric grid retains a Functions column
-            # in the page chrome (not as the old "Functions:" label).
-            self.assertIn('class="metricColHead">Functions</td>', text)
+            # The per-file chrome's metric cards include a Functions
+            # card.
+            self.assertIn('class="metricLabel">Functions</span>', text)
 
     def test_real_lcov_renders_inline_branch_column(self):
         """Phase 2b: per-file source view shows the branch gutter."""
