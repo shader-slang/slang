@@ -1,14 +1,27 @@
 # slang-coverage-html + slang-coverage-merge
 
-> **Status: not yet ready to ship as Slang's official coverage
-> reporter.** Functions and lines match `llvm-cov report` (CI's
-> current source of truth) within 0.5 pp; **branches still run
-> ~8 pp below CI on the same data**, and that gap will need
-> matching before this replaces / supplements the per-OS reports
-> at <https://shader-slang.org/slang-coverage-reports/>. See
-> "Methodology vs `llvm-cov report`" below and
-> `tmp/coverage-renderer/plan.md` § "CI changes needed" for the
-> path forward.
+> **Shipping scope: per-OS reports OK; merged cross-OS report gated
+> on branch counting.**
+>
+> - **Single-OS Windows**: ready to use. Windows LCOV carries no
+>   BRDA records anyway (OpenCppCoverage limitation), so the
+>   methodology gap below doesn't apply. The merger gives Windows
+>   a publishable HTML report it doesn't have today on
+>   <https://shader-slang.org/slang-coverage-reports/>.
+> - **Single-OS Linux / macOS**: lines match CI within 0.5 pp,
+>   functions match exactly. Branch numbers run ~8 pp below CI's
+>   published values because `llvm-cov report` applies a different
+>   collapse to BRDA records than we can derive from the LCOV
+>   alone. Fine for ad-hoc use; **don't publish these as Slang's
+>   official coverage** alongside or instead of the existing CI
+>   per-OS dashboards.
+> - **Merged cross-OS**: same branch concern, plus the merge
+>   itself surfaces the discrepancy more visibly. Held until the
+>   branch metric matches CI; see `tmp/coverage-renderer/plan.md`
+>   § "CI changes needed to enable matching" for the concrete
+>   path (small CI workflow change to upload an `llvm-cov report`
+>   summary as an extra artifact, then a small consumer-side flag
+>   in the merger).
 
 Two cooperating Python 3 tools for Slang-ecosystem coverage
 workflows:
