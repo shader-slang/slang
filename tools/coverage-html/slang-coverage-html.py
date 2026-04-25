@@ -16,6 +16,7 @@ See tools/coverage-html/README.md for the full flag list.
 """
 
 import argparse
+import collections
 import datetime
 import fnmatch
 import hashlib
@@ -127,124 +128,194 @@ class SourceResolver:
 
 
 INLINE_CSS = """\
-body { color: #000; background-color: #fff; font-family: sans-serif; }
-a:link    { color: #284fa8; text-decoration: underline; }
-a:visited { color: #00cb40; text-decoration: underline; }
-a:active  { color: #ff0040; text-decoration: underline; }
+/* Palette pulled from shader-slang.org:
+   primary teal #105f65, accent orange #F14D1B, success green #2c882c,
+   amber #ffc107, red #dc3545, body bg #fff, subtle gray #f8f9fa.
+   Tier cells use the categorical brand colors; rate bars use a
+   continuous HSL gradient (set per-row inline). */
+:root {
+  --slang-teal:   #105f65;
+  --slang-teal-hover: #0d4d52;
+  --slang-orange: #F14D1B;
+  --tier-hi:      #2c882c;
+  --tier-hi-bg:   #d6ebd5;
+  --tier-med:     #ffc107;
+  --tier-med-bg:  #fff3cd;
+  --tier-lo:      #dc3545;
+  --tier-lo-bg:   #f8d7da;
+  --row-bg:       #f8f9fa;
+  --row-bg-alt:   #ffffff;
+  --row-hover:    #e9ecef;
+  --text:         #212529;
+  --text-muted:   #6c757d;
+  --link:         #105f65;
+}
+
+body { color: var(--text); background-color: #fff;
+       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                    Roboto, Helvetica, Arial, sans-serif; margin: 0; }
+a:link, a:visited { color: var(--link); text-decoration: underline; }
+a:hover           { color: var(--slang-teal-hover); }
+a:active          { color: var(--slang-orange); }
 
 table.chrome { width: 100%; border-collapse: collapse; }
-td.title   { text-align: center; padding-bottom: 10px; font-size: 20pt;
-             font-style: italic; font-weight: bold; }
-td.ruler   { background-color: #6688d4; height: 3px; padding: 0; }
+td.title   { text-align: center; padding: 14px 0 10px; font-size: 22pt;
+             font-weight: 600; color: var(--slang-teal);
+             letter-spacing: 0.02em; }
+td.ruler   { background-color: var(--slang-teal); height: 3px; padding: 0; }
 
-td.headerItem        { text-align: right; padding-right: 6px; font-weight: bold;
-                       vertical-align: top; white-space: nowrap; }
-td.headerValue       { text-align: left; color: #284fa8; font-weight: bold;
+td.headerItem        { text-align: right; padding-right: 6px; font-weight: 600;
+                       vertical-align: top; white-space: nowrap; color: var(--text-muted); }
+td.headerValue       { text-align: left; color: var(--slang-teal); font-weight: 600;
                        white-space: nowrap; }
-td.headerCovTableHead { text-align: center; padding: 0 6px; white-space: nowrap; }
-td.headerCovTableEntry    { text-align: right; color: #284fa8; font-weight: bold;
+td.headerCovTableHead { text-align: center; padding: 0 6px; white-space: nowrap;
+                        color: var(--text-muted); }
+td.headerCovTableEntry    { text-align: right; color: var(--text); font-weight: 600;
                             padding-left: 12px; padding-right: 4px;
-                            background-color: #dae7fe; white-space: nowrap; }
-td.headerCovTableEntryHi  { text-align: right; color: #000; font-weight: bold;
+                            background-color: var(--row-bg); white-space: nowrap; }
+td.headerCovTableEntryHi  { text-align: right; color: var(--text); font-weight: 700;
                             padding-left: 12px; padding-right: 4px;
-                            background-color: #a7fc9d; white-space: nowrap; }
-td.headerCovTableEntryMed { text-align: right; color: #000; font-weight: bold;
+                            background-color: var(--tier-hi-bg); white-space: nowrap; }
+td.headerCovTableEntryMed { text-align: right; color: var(--text); font-weight: 700;
                             padding-left: 12px; padding-right: 4px;
-                            background-color: #ffea20; white-space: nowrap; }
-td.headerCovTableEntryLo  { text-align: right; color: #000; font-weight: bold;
+                            background-color: var(--tier-med-bg); white-space: nowrap; }
+td.headerCovTableEntryLo  { text-align: right; color: var(--text); font-weight: 700;
                             padding-left: 12px; padding-right: 4px;
-                            background-color: #ff0000; white-space: nowrap; }
+                            background-color: var(--tier-lo-bg); white-space: nowrap; }
 
-table.indexTable { margin: 0 auto; width: 80%; border-collapse: collapse; }
-td.tableHead { text-align: center; color: #fff; background-color: #6688d4;
-               font-size: 120%; font-weight: bold; padding: 2px 4px;
-               white-space: nowrap; }
+/* Top-level index table: full window width with a small breathing
+   margin. Both the file-summary table and any embedded fnInner
+   share these column widths so the same metric column lines up
+   vertically across the file row and its expanded function rows. */
+table.indexTable { margin: 0 auto; width: 100%;
+                   border-collapse: collapse; }
+table.indexTable col.colFile   { width: 47%; }
+table.indexTable col.colLBar   { width: 9%; }
+table.indexTable col.colLRate  { width: 5%; }
+table.indexTable col.colLTotal { width: 4%; }
+table.indexTable col.colLHit   { width: 4%; }
+table.indexTable col.colFRate  { width: 5%; }
+table.indexTable col.colFTotal { width: 4%; }
+table.indexTable col.colFHit   { width: 4%; }
+table.indexTable col.colBRate  { width: 5%; }
+table.indexTable col.colBTotal { width: 4%; }
+table.indexTable col.colBHit   { width: 4%; }
 
-td.coverFile       { text-align: left; padding: 2px 20px 2px 10px; color: #284fa8;
-                     background-color: #dae7fe; font-family: monospace; }
-td.coverDirectory  { text-align: left; padding: 2px 20px 2px 10px; color: #284fa8;
-                     background-color: #b8d0ff; font-family: monospace; }
-td.coverBar        { padding: 2px 10px; background-color: #dae7fe; }
+td.tableHead { text-align: center; color: #fff; background-color: var(--slang-teal);
+               font-size: 110%; font-weight: 600; padding: 4px 6px;
+               white-space: nowrap; letter-spacing: 0.02em; }
+
+tr.fileSummary > td:not(.coverBar):not(.coverFile):not(.coverDirectory) {
+  text-align: right;
+}
+tr.fileSummary:nth-child(odd)  > td.coverFile,
+tr.fileSummary:nth-child(odd)  > td.coverNumDflt { background-color: var(--row-bg); }
+
+td.coverFile       { text-align: left; padding: 3px 20px 3px 10px;
+                     color: var(--link); background-color: var(--row-bg-alt);
+                     font-family: ui-monospace, SFMono-Regular, Menlo,
+                                  Monaco, Consolas, monospace;
+                     overflow-wrap: anywhere; }
+td.coverDirectory  { text-align: left; padding: 4px 20px 4px 10px;
+                     color: #fff; background-color: var(--slang-teal);
+                     font-family: ui-monospace, SFMono-Regular, Menlo,
+                                  Monaco, Consolas, monospace;
+                     font-weight: 600; }
+td.coverBar        { padding: 3px 10px; background-color: var(--row-bg-alt); }
+tr.fileSummary:nth-child(odd) > td.coverBar { background-color: var(--row-bg); }
 span.coverBarOutline { display: inline-block; height: 10px; width: 100px;
-                       background-color: #000; vertical-align: middle;
-                       line-height: 0; }
-/* Bar fill is a continuous gradient from red (0%) → green (100%);
-   the per-row inline `style="background-color: hsl(...)"` selects
-   the spot on the gradient for that file. */
+                       background-color: #cfd4d8; vertical-align: middle;
+                       line-height: 0; border-radius: 1px; overflow: hidden; }
 span.coverBarFill  { display: inline-block; height: 10px; vertical-align: top; }
-span.coverBarRest    { background-color: #fff; display: inline-block;
+span.coverBarRest    { background-color: transparent; display: inline-block;
                        height: 10px; vertical-align: top; }
 
-td.coverPerHi  { text-align: right; padding: 2px 10px; background-color: #a7fc9d;
-                 font-weight: bold; }
-td.coverPerMed { text-align: right; padding: 2px 10px; background-color: #ffea20;
-                 font-weight: bold; }
-td.coverPerLo  { text-align: right; padding: 2px 10px; background-color: #ff0000;
-                 font-weight: bold; }
-td.coverNumDflt { text-align: right; padding: 2px 10px; background-color: #dae7fe;
-                  white-space: nowrap; }
-td.coverNumHi   { text-align: right; padding: 2px 10px; background-color: #a7fc9d;
-                  white-space: nowrap; }
-td.coverNumMed  { text-align: right; padding: 2px 10px; background-color: #ffea20;
-                  white-space: nowrap; }
-td.coverNumLo   { text-align: right; padding: 2px 10px; background-color: #ff0000;
-                  white-space: nowrap; }
+td.coverPerHi   { text-align: right; padding: 3px 10px;
+                  background-color: var(--tier-hi-bg);  color: var(--text);
+                  font-weight: 700; }
+td.coverPerMed  { text-align: right; padding: 3px 10px;
+                  background-color: var(--tier-med-bg); color: var(--text);
+                  font-weight: 700; }
+td.coverPerLo   { text-align: right; padding: 3px 10px;
+                  background-color: var(--tier-lo-bg);  color: var(--text);
+                  font-weight: 700; }
+td.coverNumDflt { text-align: right; padding: 3px 10px;
+                  background-color: var(--row-bg-alt); white-space: nowrap; }
 
-td.footnote    { padding: 4px 10px; background-color: #dae7fe;
-                 font-style: italic; font-size: 85%; }
-td.versionInfo { text-align: center; padding-top: 2px; font-style: italic;
+td.footnote    { padding: 6px 10px; background-color: var(--row-bg);
+                 color: var(--text-muted); font-style: italic; font-size: 85%; }
+td.versionInfo { text-align: center; padding: 8px; color: var(--text-muted);
                  font-size: 90%; }
 
-pre.sourceHeading { font-family: monospace; font-weight: bold; margin: 0; }
-pre.source        { font-family: monospace; margin-top: 2px; }
-span.lineNum      { background-color: #efe383; display: inline-block;
-                    min-width: 6em; text-align: right; padding-right: 4px; }
-span.tlaGNC       { background-color: #CAD7FE; }
-span.tlaUNC       { background-color: #FF6230; }
+pre.sourceHeading { font-family: ui-monospace, SFMono-Regular, Menlo,
+                                 Monaco, Consolas, monospace;
+                    font-weight: 700; margin: 0; color: var(--text-muted); }
+pre.source        { font-family: ui-monospace, SFMono-Regular, Menlo,
+                                 Monaco, Consolas, monospace;
+                    margin-top: 2px; }
+span.lineNum      { background-color: #f1f3f5; display: inline-block;
+                    min-width: 6em; text-align: right; padding-right: 4px;
+                    color: var(--text-muted); }
+span.tlaGNC       { background-color: #d6ebd5; }
+span.tlaUNC       { background-color: #f8d7da; }
 
-td.coverFn        { text-align: left; padding: 2px 20px 2px 10px; color: #284fa8;
-                    background-color: #dae7fe; font-family: monospace;
-                    word-break: break-all; }
+td.coverFn        { text-align: left; padding: 2px 20px 2px 10px;
+                    color: var(--text);
+                    background-color: var(--row-bg-alt);
+                    font-family: ui-monospace, SFMono-Regular, Menlo,
+                                 Monaco, Consolas, monospace;
+                    word-break: break-all; font-size: 92%; }
 td.coverFnHi      { text-align: right; padding: 2px 10px;
-                    background-color: #a7fc9d; font-weight: bold;
-                    white-space: nowrap; }
+                    background-color: var(--tier-hi-bg); color: var(--text);
+                    font-weight: 600; white-space: nowrap; }
 td.coverFnLo      { text-align: right; padding: 2px 10px;
-                    background-color: #ff6230; font-weight: bold;
-                    white-space: nowrap; }
+                    background-color: var(--tier-lo-bg); color: var(--text);
+                    font-weight: 600; white-space: nowrap; }
 
-span.branchAll   { background-color: #a7fc9d; }
-span.branchPart  { background-color: #ffea20; }
-span.branchNone  { background-color: #FF6230; }
+span.branchAll   { background-color: var(--tier-hi-bg);  color: var(--text); }
+span.branchPart  { background-color: var(--tier-med-bg); color: var(--text); }
+span.branchNone  { background-color: var(--tier-lo-bg);  color: var(--text); }
 
-/* Per-file expand chevron in the index. The placeholder variant
-   reserves the same column width on rows that have no functions, so
-   the file-name column stays vertically aligned across all rows. */
-span.fnToggle, span.fnTogglePlaceholder
+/* Expand-chevrons. The placeholder variant reserves the same column
+   width on rows that have no functions, so the file-name column
+   stays vertically aligned across all rows. */
+span.fnToggle, span.fnTogglePlaceholder, span.dirToggle
                  { display: inline-block; width: 1em;
-                   font-family: monospace; user-select: none;
-                   margin-right: 4px; text-align: center; }
-span.fnToggle    { cursor: pointer; color: #284fa8; }
+                   font-family: ui-monospace, SFMono-Regular, Menlo,
+                                Monaco, Consolas, monospace;
+                   user-select: none; margin-right: 4px; text-align: center; }
+span.fnToggle    { cursor: pointer; color: var(--slang-teal); }
+span.dirToggle   { cursor: pointer; color: #fff; }
 span.fnTogglePlaceholder { color: transparent; }
-span.fnToggle:focus { outline: 1px dotted #284fa8; }
-tr.fileFunctions[hidden] { display: none; }
-tr.fileFunctions > td   { background-color: #f4f8ff; padding: 6px 24px; }
-/* fnInner fills the parent <td> so the dropdown matches the index
-   table's width; table-layout:fixed plus a max-width on the function
-   name cell prevents long mangled names from blowing the row open. */
-table.fnInner   { border-collapse: collapse; margin: 4px 0;
-                  table-layout: fixed; width: 100%; }
-table.fnInner td { padding: 1px 6px; font-family: monospace;
-                   overflow-wrap: break-word; }
-table.fnInner col.fnNameCol  { width: auto; }
-table.fnInner col.fnLineCol  { width: 5em; }
-table.fnInner col.fnCallsCol { width: 7em; }
-table.fnInner col.fnBarCol   { width: 8em; }
-table.fnInner col.fnRateCol  { width: 5em; }
-table.fnInner col.fnTotalCol { width: 5em; }
-table.fnInner col.fnHitCol   { width: 5em; }
-table.fnInner td.tableHead { font-family: sans-serif; }
+span.fnToggle:focus, span.dirToggle:focus { outline: 1px dotted var(--slang-orange); }
+tr.fileFunctions[hidden]  { display: none; }
+tr.fileSummary[hidden]    { display: none; }
+tr.fileFunctions > td   { background-color: #fdfdfe; padding: 6px 24px;
+                          border-left: 3px solid var(--slang-teal); }
 
-.sourceUnavailable { color: #a33; font-style: italic; padding: 8px; }
+/* Embedded function table inside an expanded file row. Column
+   widths are chosen so the Bar / Rate / Total / Hit cells line up
+   underneath their counterparts in the parent indexTable's
+   "Lines" group; the fns/branches columns to the right stay
+   blank since they don't apply to a single function. */
+table.fnInner   { border-collapse: collapse; margin: 0; width: 100%;
+                  table-layout: fixed; }
+table.fnInner td { padding: 2px 8px;
+                   font-family: ui-monospace, SFMono-Regular, Menlo,
+                                Monaco, Consolas, monospace;
+                   overflow-wrap: break-word; }
+table.fnInner td.tableHead { font-family: -apple-system, BlinkMacSystemFont,
+                             "Segoe UI", Roboto, sans-serif; }
+/* fn-specific cols subdivide the parent's File column (47%) into
+   Name (38%) + Line (4%) + Calls (5%). The remaining cols reuse
+   the parent's classes so the line-coverage / fn / branch columns
+   line up vertically with the file-summary row above. */
+table.fnInner col.fnNameCol  { width: 38%; }
+table.fnInner col.fnLineCol  { width: 4%; }
+table.fnInner col.fnCallsCol { width: 5%; }
+
+.sourceUnavailable { color: var(--slang-orange); font-style: italic;
+                     padding: 8px; }
 """
 
 
@@ -350,7 +421,7 @@ def _render_page_header(
 </head>
 <body>
   <table class="chrome" cellpadding="0" cellspacing="0">
-    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="title">{html.escape(title)}</td></tr>
     <tr><td class="ruler"></td></tr>
     <tr>
       <td>
@@ -376,7 +447,8 @@ def _render_page_header(
 INDEX_TOGGLE_SCRIPT = """\
 <script>
 (function () {
-  function toggle(el) {
+  // Per-file toggle: reveals the next sibling fileFunctions row.
+  function toggleFn(el) {
     var row = el.closest('tr');
     if (!row) return;
     var next = row.nextElementSibling;
@@ -384,26 +456,61 @@ INDEX_TOGGLE_SCRIPT = """\
     var hidden = next.hasAttribute('hidden');
     if (hidden) {
       next.removeAttribute('hidden');
-      el.textContent = '\\u25BC';  // ▼
+      el.textContent = '\\u25BC';
       el.setAttribute('aria-expanded', 'true');
     } else {
       next.setAttribute('hidden', '');
-      el.textContent = '\\u25B6';  // ▶
+      el.textContent = '\\u25B6';
       el.setAttribute('aria-expanded', 'false');
     }
   }
+
+  // Per-directory toggle: hides/shows every fileSummary and
+  // fileFunctions row matching this directory's data-dir attribute.
+  // When expanding, only fileSummary rows are revealed; fileFunctions
+  // rows stay hidden until the user toggles individual files.
+  function toggleDir(el) {
+    var dir = el.getAttribute('data-dir');
+    if (!dir) return;
+    var rows = document.querySelectorAll(
+      'tr.fileSummary[data-dir="' + dir + '"], ' +
+      'tr.fileFunctions[data-dir="' + dir + '"]'
+    );
+    var collapsing = el.getAttribute('aria-expanded') !== 'false';
+    rows.forEach(function (r) {
+      if (collapsing) {
+        r.setAttribute('hidden', '');
+      } else if (r.classList.contains('fileSummary')) {
+        r.removeAttribute('hidden');
+        // Reset its fnToggle (if any) to closed state.
+        var t = r.querySelector('.fnToggle');
+        if (t) {
+          t.textContent = '\\u25B6';
+          t.setAttribute('aria-expanded', 'false');
+        }
+      }
+      // fileFunctions rows stay hidden when expanding the directory.
+    });
+    el.textContent = collapsing ? '\\u25B6' : '\\u25BC';
+    el.setAttribute('aria-expanded', collapsing ? 'false' : 'true');
+  }
+
   document.addEventListener('click', function (e) {
     var t = e.target;
-    if (t && t.classList && t.classList.contains('fnToggle')) {
-      toggle(t);
-    }
+    if (!t || !t.classList) return;
+    if (t.classList.contains('fnToggle'))   toggleFn(t);
+    else if (t.classList.contains('dirToggle')) toggleDir(t);
   });
   document.addEventListener('keydown', function (e) {
     var t = e.target;
-    if (t && t.classList && t.classList.contains('fnToggle') &&
-        (e.key === 'Enter' || e.key === ' ')) {
+    if (!t || !t.classList) return;
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (t.classList.contains('fnToggle')) {
       e.preventDefault();
-      toggle(t);
+      toggleFn(t);
+    } else if (t.classList.contains('dirToggle')) {
+      e.preventDefault();
+      toggleDir(t);
     }
   });
 })();
@@ -563,70 +670,122 @@ def render_index(
         )
         cols_for_empty += 3
 
-    # Per-file rows. Sort by display-path for determinism. When a file
-    # has function records, emit a second hidden <tr> immediately after
-    # the summary row holding the function table; a click on the file
-    # name's chevron reveals it (handled by inline JS at the bottom of
-    # the page; without JS, it stays hidden and per-file pages remain
-    # the way to drill in).
-    rows_html: List[str] = []
+    # Group records by their first-segment directory so the index can
+    # show "compiler-core/", "core/", "slang/" etc. as collapsible
+    # parents. Files at the top level (no slash after the common-prefix
+    # strip) get their own "(root)" group at the top.
     sorted_records = sorted(records, key=lambda r: _display_path(r.path, prefix))
+    by_dir: "collections.OrderedDict[str, List[FileRecord]]" = collections.OrderedDict()
     for rec in sorted_records:
         display = _display_path(rec.path, prefix)
-        href = file_map[rec.path]
-        has_fn_table = bool(rec.functions)
-        # Leading column: optional expand chevron + the file link.
-        if has_fn_table:
-            toggle = (
-                '<span class="fnToggle" tabindex="0" role="button" '
-                f'aria-label="Toggle functions for {html.escape(display)}" '
-                'aria-expanded="false">▶</span>'
-            )
-        else:
-            # Placeholder reserves the same column width so file-name
-            # columns line up across rows. Hidden via color: transparent.
-            toggle = '<span class="fnTogglePlaceholder">▶</span>'
-        cells: List[str] = [
-            f'              <td class="coverFile">{toggle}'
-            f'<a href="{html.escape(href)}">{html.escape(display)}</a></td>',
+        first, sep, _ = display.partition("/")
+        dir_key = first if sep else ""
+        by_dir.setdefault(dir_key, []).append(rec)
+    # Stable order: root first if present, then alphabetical.
+    dir_order = sorted(by_dir.keys(), key=lambda d: (d != "", d))
+
+    rows_html: List[str] = []
+
+    for dir_key in dir_order:
+        dir_records = by_dir[dir_key]
+        dir_safe = re.sub(r"[^A-Za-z0-9]+", "_", dir_key) or "root"
+        dir_label = (dir_key + "/") if dir_key else "(top level)"
+
+        # Aggregated stats for the dir-summary row
+        d_total_l = sum(r.total_lines for r in dir_records)
+        d_hit_l = sum(r.hit_lines for r in dir_records)
+        d_rate_l = (100.0 * d_hit_l / d_total_l) if d_total_l else 0.0
+        d_total_fn = sum(r.total_functions for r in dir_records)
+        d_hit_fn = sum(r.hit_functions for r in dir_records)
+        d_rate_fn = (100.0 * d_hit_fn / d_total_fn) if d_total_fn else 0.0
+        d_total_br = sum(r.total_branches for r in dir_records)
+        d_hit_br = sum(r.hit_branches for r in dir_records)
+        d_rate_br = (100.0 * d_hit_br / d_total_br) if d_total_br else 0.0
+
+        dir_cells: List[str] = [
+            f'              <td class="coverDirectory">'
+            f'<span class="dirToggle" tabindex="0" role="button" '
+            f'aria-expanded="true" data-dir="{html.escape(dir_safe)}" '
+            f'aria-label="Toggle directory {html.escape(dir_label)}">▼</span>'
+            f"{html.escape(dir_label)}"
+            f' <span style="opacity:.7;font-weight:400">'
+            f"({len(dir_records)} file{'s' if len(dir_records) != 1 else ''})</span>"
+            f"</td>",
             _index_col_group(
-                has_bar=True,
-                rate=rec.percent,
-                total=rec.total_lines,
-                hit=rec.hit_lines,
+                has_bar=True, rate=d_rate_l, total=d_total_l, hit=d_hit_l
             ),
         ]
         if show_fns:
-            cells.append(
+            dir_cells.append(
                 _index_col_group(
-                    has_bar=False,
-                    rate=rec.percent_functions,
-                    total=rec.total_functions,
-                    hit=rec.hit_functions,
+                    has_bar=False, rate=d_rate_fn, total=d_total_fn, hit=d_hit_fn
                 )
             )
         if show_br:
-            cells.append(
+            dir_cells.append(
                 _index_col_group(
-                    has_bar=False,
-                    rate=rec.percent_branches,
-                    total=rec.total_branches,
-                    hit=rec.hit_branches,
+                    has_bar=False, rate=d_rate_br, total=d_total_br, hit=d_hit_br
                 )
             )
         rows_html.append(
-            '            <tr class="fileSummary">\n'
-            + "\n".join(cells)
+            f'            <tr class="dirHeader" data-dir="{html.escape(dir_safe)}">\n'
+            + "\n".join(dir_cells)
             + "\n            </tr>"
         )
-        if has_fn_table:
+
+        for rec in dir_records:
+            display = _display_path(rec.path, prefix)
+            href = file_map[rec.path]
+            has_fn_table = bool(rec.functions)
+            if has_fn_table:
+                toggle = (
+                    '<span class="fnToggle" tabindex="0" role="button" '
+                    f'aria-label="Toggle functions for {html.escape(display)}" '
+                    'aria-expanded="false">▶</span>'
+                )
+            else:
+                toggle = '<span class="fnTogglePlaceholder">▶</span>'
+            cells: List[str] = [
+                f'              <td class="coverFile">{toggle}'
+                f'<a href="{html.escape(href)}">{html.escape(display)}</a></td>',
+                _index_col_group(
+                    has_bar=True,
+                    rate=rec.percent,
+                    total=rec.total_lines,
+                    hit=rec.hit_lines,
+                ),
+            ]
+            if show_fns:
+                cells.append(
+                    _index_col_group(
+                        has_bar=False,
+                        rate=rec.percent_functions,
+                        total=rec.total_functions,
+                        hit=rec.hit_functions,
+                    )
+                )
+            if show_br:
+                cells.append(
+                    _index_col_group(
+                        has_bar=False,
+                        rate=rec.percent_branches,
+                        total=rec.total_branches,
+                        hit=rec.hit_branches,
+                    )
+                )
             rows_html.append(
-                f'            <tr class="fileFunctions" hidden>\n'
-                f'              <td colspan="{cols_for_empty}">'
-                f"{_render_inline_functions_table(rec, href)}"
-                f"</td>\n"
-                f"            </tr>"
+                f'            <tr class="fileSummary" data-dir="{html.escape(dir_safe)}">\n'
+                + "\n".join(cells)
+                + "\n            </tr>"
             )
+            if has_fn_table:
+                rows_html.append(
+                    f'            <tr class="fileFunctions" data-dir="{html.escape(dir_safe)}" hidden>\n'
+                    f'              <td colspan="{cols_for_empty}">'
+                    f"{_render_inline_functions_table(rec, href, show_fns=show_fns, show_br=show_br)}"
+                    f"</td>\n"
+                    f"            </tr>"
+                )
 
     if not records:
         rows_html.append(
@@ -641,8 +800,26 @@ def render_index(
             f"Common path prefix: <code>{html.escape(prefix)}</code></td></tr>\n"
         )
 
-    body = f"""  <center>
-    <table class="indexTable" cellpadding="1" cellspacing="1" border="0">
+    # colgroup widths must match what fnInner uses so the per-function
+    # rate / total / hit cells line up vertically with the parent's
+    # corresponding "Lines" columns.
+    colgroup = '      <colgroup>\n        <col class="colFile">\n'
+    colgroup += '        <col class="colLBar">\n'
+    colgroup += '        <col class="colLRate">\n'
+    colgroup += '        <col class="colLTotal">\n'
+    colgroup += '        <col class="colLHit">\n'
+    if show_fns:
+        colgroup += '        <col class="colFRate">\n'
+        colgroup += '        <col class="colFTotal">\n'
+        colgroup += '        <col class="colFHit">\n'
+    if show_br:
+        colgroup += '        <col class="colBRate">\n'
+        colgroup += '        <col class="colBTotal">\n'
+        colgroup += '        <col class="colBHit">\n'
+    colgroup += "      </colgroup>"
+
+    body = f"""  <table class="indexTable" cellpadding="1" cellspacing="1" border="0">
+{colgroup}
       <tr>
         <td class="tableHead" rowspan="2">File</td>
         <td class="tableHead" colspan="4">Line Coverage</td>{extra_header_cells}
@@ -652,10 +829,9 @@ def render_index(
       </tr>
 {chr(10).join(rows_html)}
 {prefix_note}    </table>
-  </center>
 """
 
-    extra_script = INDEX_TOGGLE_SCRIPT if any(r.functions for r in records) else ""
+    extra_script = INDEX_TOGGLE_SCRIPT
     out = header + body + _render_page_footer(extra_body=extra_script)
     with open(os.path.join(output_dir, "index.html"), "w", encoding="utf-8") as f:
         f.write(out)
@@ -726,16 +902,23 @@ def render_file_page(
         f.write(out)
 
 
-def _render_inline_functions_table(record: FileRecord, file_href: str) -> str:
+def _render_inline_functions_table(
+    record: FileRecord,
+    file_href: str,
+    show_fns: bool = False,
+    show_br: bool = False,
+) -> str:
     """Render a Functions table to embed inside an index <td>.
 
     Columns mirror the file row's layout for the line-coverage half:
 
-      Function name | Line | Calls | Bar | Rate% | Total | Hit
+      Function name | Line | Calls | Bar | Rate% | Total | Hit | (empty)
 
-    where "Calls" is the FNDA hit count and the right-hand four cells
-    describe the function's *line* coverage (how many DA lines that
-    fall inside the function's range were exercised).
+    where "Calls" is the FNDA hit count and the four cells after it
+    describe the function's *line* coverage (DA lines inside the
+    function's range). The trailing empty col matches the parent
+    indexTable's Functions+Branches columns so per-function rows
+    line up vertically with their containing file row.
     """
     from lcov_io import function_line_coverage
 
@@ -743,6 +926,15 @@ def _render_inline_functions_table(record: FileRecord, file_href: str) -> str:
         record.functions.items(), key=lambda kv: (kv[1].first_line, kv[0])
     )
     coverage = function_line_coverage(record)
+
+    # Single colspan'd empty cell at the end of each function row to
+    # span the parent's Functions+Branches columns. Cuts ~6 TDs per
+    # row × tens of thousands of rows on real data.
+    trailing = (3 if show_fns else 0) + (3 if show_br else 0)
+    trailing_td = (
+        f'<td class="coverNumDflt" colspan="{trailing}"></td>'
+        if trailing else ""
+    )
 
     rows: List[str] = []
     for name, fn in items:
@@ -759,18 +951,13 @@ def _render_inline_functions_table(record: FileRecord, file_href: str) -> str:
         if total > 0:
             pct = 100.0 * hit / total
             tier = _tier(pct)
-            rate_cell = (
-                f'<td class="coverPer{tier}">{pct:.1f}&nbsp;%</td>'
-            )
+            rate_cell = f'<td class="coverPer{tier}">{pct:.1f}&nbsp;%</td>'
             bar_cell = (
                 f'<td class="coverBar" align="center">{_render_rate_bar(pct)}</td>'
             )
             total_cell = f'<td class="coverNumDflt">{total}</td>'
             hit_cell = f'<td class="coverNumDflt">{hit}</td>'
         else:
-            # No DA lines fall in the function's range — usually
-            # because first_line == 0 (orphan FNDA) or the file has
-            # no DA records at all. Render dashes.
             rate_cell = '<td class="coverNumDflt">-</td>'
             bar_cell = '<td class="coverBar"></td>'
             total_cell = '<td class="coverNumDflt">-</td>'
@@ -782,7 +969,23 @@ def _render_inline_functions_table(record: FileRecord, file_href: str) -> str:
             f'<td class="coverNumDflt">{line_cell}</td>'
             f'<td class="{calls_cls}">{fn.hits}</td>'
             f"{bar_cell}{rate_cell}{total_cell}{hit_cell}"
+            f"{trailing_td}"
             "</tr>"
+        )
+
+    # Trailing empty <col> elements match the parent's Functions and
+    # Branches columns so the visual grid extends to the right edge.
+    extra_cols = ""
+    if show_fns:
+        extra_cols += '          <col class="colFRate">\n          <col class="colFTotal">\n          <col class="colFHit">\n'
+    if show_br:
+        extra_cols += '          <col class="colBRate">\n          <col class="colBTotal">\n          <col class="colBHit">\n'
+
+    extra_heads = ""
+    extra_head_span = (3 if show_fns else 0) + (3 if show_br else 0)
+    if extra_head_span:
+        extra_heads = (
+            f'          <td class="tableHead" colspan="{extra_head_span}"></td>\n'
         )
 
     return (
@@ -791,11 +994,12 @@ def _render_inline_functions_table(record: FileRecord, file_href: str) -> str:
         '          <col class="fnNameCol">\n'
         '          <col class="fnLineCol">\n'
         '          <col class="fnCallsCol">\n'
-        '          <col class="fnBarCol">\n'
-        '          <col class="fnRateCol">\n'
-        '          <col class="fnTotalCol">\n'
-        '          <col class="fnHitCol">\n'
-        '        </colgroup>\n'
+        '          <col class="colLBar">\n'
+        '          <col class="colLRate">\n'
+        '          <col class="colLTotal">\n'
+        '          <col class="colLHit">\n'
+        + extra_cols
+        + "        </colgroup>\n"
         "        <tr>\n"
         '          <td class="tableHead">Function</td>\n'
         '          <td class="tableHead">Line</td>\n'
@@ -803,7 +1007,8 @@ def _render_inline_functions_table(record: FileRecord, file_href: str) -> str:
         '          <td class="tableHead" colspan="2">Line Coverage</td>\n'
         '          <td class="tableHead">Total</td>\n'
         '          <td class="tableHead">Hit</td>\n'
-        "        </tr>\n"
+        + extra_heads
+        + "        </tr>\n"
         + "\n".join(rows)
         + "\n      </table>"
     )

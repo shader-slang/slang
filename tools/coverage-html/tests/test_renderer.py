@@ -587,6 +587,77 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertIn("Functions:", idx)
         self.assertIn("Branches:", idx)
 
+    def test_directory_grouping_in_index(self):
+        """Files are grouped by their first-segment directory; each
+        group gets a `dirHeader` row with a chevron toggle."""
+        out_dir = os.path.join(self.tmp, "dirs")
+        # The slangc-llvm-cov sample's three files live under different
+        # directories: source/compiler-core/, source/core/, source/slang/.
+        self._run(
+            os.path.join(FIXTURES, "slangc-llvm-cov-sample.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        self.assertIn('class="dirHeader"', idx)
+        self.assertIn('class="dirToggle"', idx)
+        # Header label includes a directory name and a file count.
+        self.assertRegex(idx, r"\(\d+ files?\)")
+        # Each fileSummary row gets the data-dir attribute.
+        self.assertIn('data-dir="', idx)
+
+    def test_index_uses_full_width_no_center(self):
+        """Index table is full-width, not the old `<center>` 80%."""
+        out_dir = os.path.join(self.tmp, "fullwidth")
+        self._run(
+            os.path.join(FIXTURES, "slangc-llvm-cov-sample.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        # No <center> wrapper around the index table anymore.
+        self.assertNotIn("<center>", idx)
+        # indexTable uses 100% width.
+        self.assertIn("table.indexTable", idx)
+        self.assertIn("width: 100%", idx)
+
+    def test_title_no_lcov_branding(self):
+        """LCOV branding stripped from the page title."""
+        out_dir = os.path.join(self.tmp, "title")
+        self._run(
+            os.path.join(FIXTURES, "demo-cpu.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        # The visible page title is no longer "LCOV - code coverage report".
+        self.assertNotIn("LCOV - code coverage report", idx)
+        # Default title is "Coverage report".
+        self.assertIn(">Coverage report</td>", idx)
+
+    def test_slang_brand_palette_applied(self):
+        """CSS uses the Slang teal / orange tokens, not the old genhtml
+        blue/red bar colors."""
+        out_dir = os.path.join(self.tmp, "palette")
+        self._run(
+            os.path.join(FIXTURES, "demo-cpu.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        # Slang teal & orange present, old hard-coded blue gone.
+        self.assertIn("#105f65", idx)
+        self.assertIn("#F14D1B", idx)
+        self.assertNotIn("#6688d4", idx)  # old genhtml ruler/header blue
+
     def test_chevron_placeholder_keeps_columns_aligned(self):
         """Files without function records still get a same-width
         invisible chevron placeholder so the file-name column lines
@@ -641,11 +712,14 @@ class CliIntegrationTests(unittest.TestCase):
             idx = f.read()
         self.assertIn('table-layout: fixed', idx)
         self.assertIn('<colgroup>', idx)
+        # fnInner subdivides the parent's File column for Name/Line/Calls,
+        # then reuses the parent's colgroup classes for Bar/Rate/Total/Hit
+        # so the per-function cells line up with the file row above.
         self.assertIn('class="fnNameCol"', idx)
         self.assertIn('class="fnLineCol"', idx)
         self.assertIn('class="fnCallsCol"', idx)
-        self.assertIn('class="fnBarCol"', idx)
-        self.assertIn('class="fnRateCol"', idx)
+        self.assertIn('class="colLBar"', idx)
+        self.assertIn('class="colLRate"', idx)
         # Long mangled names should wrap via word-break / overflow-wrap.
         self.assertIn('word-break: break-all', idx)
 
@@ -706,12 +780,19 @@ class CliIntegrationTests(unittest.TestCase):
             idx = f.read()
         self.assertIn('class="fnToggle"', idx)
         self.assertIn('aria-expanded="false"', idx)
-        self.assertIn('class="fileFunctions" hidden', idx)
+        # fileFunctions row carries the data-dir attribute (so it can
+        # be collapsed/expanded as part of its parent directory) and
+        # starts hidden.
+        self.assertRegex(idx, r'class="fileFunctions"[^>]*\bhidden\b')
         self.assertIn('<table class="fnInner"', idx)
         self.assertIn("addEventListener('click'", idx)
         self.assertIn("_Z3addii", idx)
         # Line column links to per-file anchor.
         self.assertIn("#L4", idx)
+        # New expectations: directory header and dir toggle.
+        self.assertIn('class="dirToggle"', idx)
+        self.assertIn('class="dirHeader"', idx)
+        self.assertIn('class="coverDirectory"', idx)
         # Per-function line-coverage cells (Bar + Rate + Total + Hit)
         # appear in each row; tier classes carry through.
         self.assertIn('Line Coverage', idx)
