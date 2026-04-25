@@ -1,10 +1,18 @@
-# slang-coverage-html
+# slang-coverage-html + slang-coverage-merge
 
-Render LCOV `.info` coverage files to static HTML. Zero-install on
-any platform with Python 3 — no `pip`, no Perl (`genhtml`), no .NET
-runtime (ReportGenerator).
+Two cooperating Python 3 tools for Slang-ecosystem coverage
+workflows:
+
+- **`slang-coverage-html`** — render an LCOV `.info` file to static
+  HTML. Zero-install on any platform — no `pip`, no Perl
+  (`genhtml`), no .NET runtime (ReportGenerator).
+- **`slang-coverage-merge`** — combine multiple LCOV inputs (e.g.
+  one per CI host) into a single merged LCOV using max-aggregation.
+  Pipe the result through the renderer for a unified report.
 
 ## Quick start
+
+### Render one LCOV
 
 ```bash
 python3 tools/coverage-html/slang-coverage-html.py coverage.lcov
@@ -12,6 +20,19 @@ python3 tools/coverage-html/slang-coverage-html.py coverage.lcov
 open coverage-html/index.html       # macOS
 xdg-open coverage-html/index.html   # Linux
 start coverage-html\index.html      # Windows
+```
+
+### Merge per-OS LCOVs into one report
+
+```bash
+# Three inputs from CI artifacts (gzipped or plain).
+python3 tools/coverage-html/slang-coverage-merge.py \
+    linux.lcov.gz macos.lcov.gz windows.lcov.gz \
+    -o merged.lcov
+
+# Render as usual.
+python3 tools/coverage-html/slang-coverage-html.py merged.lcov \
+    --output-dir merged-html/
 ```
 
 The output directory is fully static and self-contained. Double-click
@@ -34,7 +55,7 @@ supported today:
 If outside users adopt it for other LCOV producers, great — but we
 don't promise support for every LCOV extension in the wild.
 
-## Options
+## Options — `slang-coverage-html`
 
 ```
 slang-coverage-html <input.lcov> [options]
@@ -50,6 +71,43 @@ slang-coverage-html <input.lcov> [options]
 Function and branch columns render automatically when the input LCOV
 carries `FN:` / `FNDA:` / `BRDA:` records. No flag needed to enable
 them — they disappear again when the LCOV has none.
+
+## Options — `slang-coverage-merge`
+
+```
+slang-coverage-merge <LCOV ...> [options]
+
+-o, --output PATH        Output path (default: stdout, "-")
+--strip-prefix PREFIX    Extra path prefix to strip from SF: paths
+                         (repeatable). Built-in defaults already cover
+                         the three Slang CI runner roots.
+--no-default-prefixes    Skip the built-in path prefixes
+--quiet                  Suppress progress output on stderr
+```
+
+Aggregation rules (max-across-inputs):
+
+- `DA:` line hit count → max.
+- `BRDA:` taken count → max; an integer beats `-` (None); "absent on
+  this input" is treated as "no information", **not** as 0. So a
+  branch with data on one OS and nothing on another counts as one
+  branch with that OS's data, not two branches half-uncovered.
+- `FN`/`FNDA` → first-FN line declaration wins (with fallback if one
+  input has `first_line=0`); max FNDA hit count.
+- `LF/LH/BRF/BRH/FNF/FNH` are **recomputed** from merged data; the
+  inputs' totals are ignored (they'd be wrong after merging anyway).
+- `TN:` is dropped from output. The merged file isn't attributable
+  to a single test name.
+
+Path normalization:
+
+- Backslashes → forward slashes (Windows artifacts use `D:\...`).
+- Built-in defaults strip the three Slang CI runner roots:
+  `/__w/slang/slang/`, `/Users/runner/work/slang/slang/`,
+  `D:\a\slang\slang\`. Use `--strip-prefix` to add more.
+- Unmatched paths pass through unchanged.
+
+Auto-detect: inputs ending in `.gz` are decompressed transparently.
 
 ### Source resolution
 
@@ -126,7 +184,7 @@ across every platform our customers run.
 python3 -m unittest discover -s tools/coverage-html/tests -v
 ```
 
-37 unit + integration tests cover: LCOV parsing (incl. TN: max-
+56 unit + integration tests cover: LCOV parsing (incl. TN: max-
 aggregation, corrupt-input detection, unknown-record tolerance, BRDA
 with `-` tokens, FN/FNDA join-by-name), source resolution (path
 variants, caching, miss → placeholder), filter globs, tier
@@ -134,7 +192,11 @@ thresholds, function/branch percent calcs, per-line branch-cell
 rendering (empty / all-taken / partial / none / not-evaluated), CLI
 round-trip, empty-input rendering, idempotency modulo timestamp,
 foreign-dir overwrite guard, phase-1-regression check against the
-real-data phase-2 fixture.
+real-data phase-2 fixture, plus merge-tool path normalization
+(forward-slash, longest-prefix-wins, custom prefixes), max-
+aggregation (lines, branches, functions), absent-vs-zero handling,
+gzipped-input auto-decompression, file-output mode, and end-to-end
+"merge → render" smoke.
 
 ### Updating the demo fixture
 
@@ -168,10 +230,13 @@ that our output is designed to match.
 
 ```
 tools/coverage-html/
-├── slang-coverage-html.py         # the renderer (single file)
+├── slang-coverage-html.py         # the renderer
+├── slang-coverage-merge.py        # the multi-LCOV merger
+├── lcov_io.py                     # shared parser / writer / data model
 ├── README.md                      # this file
 └── tests/
-    ├── test_renderer.py           # unit + integration tests
+    ├── test_renderer.py           # renderer unit + integration tests
+    ├── test_merge.py              # merge unit + integration tests
     └── fixtures/
         ├── demo-cpu.info          # real LCOV from shader-coverage-demo
         ├── demo-cpu.coverage-mapping.json
