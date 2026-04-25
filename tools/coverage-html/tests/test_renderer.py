@@ -401,6 +401,58 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertIn("Functions:", idx)
         self.assertIn("Branches:", idx)
 
+    def test_index_has_expandable_function_rows(self):
+        """Goal 2: per-file Functions tables live inline in the index,
+        wrapped in a hidden <tr class="fileFunctions"> revealed by an
+        fnToggle chevron in the file row."""
+        out_dir = os.path.join(self.tmp, "expand")
+        res = self._run(
+            os.path.join(FIXTURES, "branches-and-functions.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        self.assertEqual(res.returncode, 0, msg=res.stderr)
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        self.assertIn('class="fnToggle"', idx)
+        self.assertIn('aria-expanded="false"', idx)
+        self.assertIn('class="fileFunctions" hidden', idx)
+        self.assertIn('<table class="fnInner"', idx)
+        self.assertIn("addEventListener('click'", idx)
+        self.assertIn("_Z3addii", idx)
+        # Line column links to per-file anchor.
+        self.assertIn("#L4", idx)
+
+    def test_per_file_page_no_longer_has_functions_table(self):
+        """Goal 2 partner: per-file pages drop the Functions table
+        (it moved into the index expansion)."""
+        out_dir = os.path.join(self.tmp, "no-fn-table")
+        self._run(
+            os.path.join(FIXTURES, "branches-and-functions.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        per_file = [
+            os.path.join(out_dir, e)
+            for e in os.listdir(out_dir)
+            if e.endswith(".html") and e != "index.html"
+        ]
+        self.assertTrue(per_file)
+        for p in per_file:
+            with open(p, encoding="utf-8") as f:
+                text = f.read()
+            # "Hit count" header is unique to the function table; its
+            # absence confirms the table is gone.
+            self.assertNotIn(
+                '<td class="tableHead">Hit count</td>',
+                text,
+                msg=f"per-file page {p} still has Hit-count header",
+            )
+            # The header summary row for Functions remains.
+            self.assertIn("Functions:", text)
+
     def test_real_lcov_renders_inline_branch_column(self):
         """Phase 2b: per-file source view shows the branch gutter."""
         out_dir = os.path.join(self.tmp, "real-2b")

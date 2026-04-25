@@ -139,8 +139,9 @@ later runs:
 | Phase  | Features                                                                                                                                                                                                                                                                                        | Status                        |
 | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
 | **1**  | Line coverage (`DA:` records); overall + per-file %; index + annotated source view; source resolution; marker-guarded overwrite                                                                                                                                                                 | **Shipped**                   |
-| **2**  | Branch coverage (`BRDA:`) summary (header + index column); function coverage (`FN:`/`FNDA:`) summary (header + index column + per-file "Functions" table with hit counts and line anchor links)                                                                                                 | **Shipped**                   |
+| **2**  | Branch coverage (`BRDA:`) summary (header + index column); function coverage (`FN:`/`FNDA:`) summary (header + index column)                                                                                                                                                                    | **Shipped**                   |
 | **2b** | Inline per-line branch column between hit count and source. Collapsed `(hit/total)` summary with tier-colored span (`branchAll` green, `branchPart` amber, `branchNone` red) and per-branch tooltip (`title="br0: N; br1: N; br2: -"`). Gutter widens only on files that carry any BRDA records | **Shipped**                   |
+| **2c** | Per-file Functions table moved into the index as an expandable row (chevron + hidden `<tr class="fileFunctions">` revealed by a tiny inline JS toggle). Per-file pages drop the Functions table; their header still shows the Functions summary metric                                          | **Shipped**                   |
 | 3      | Per-test `TN:` drill-down; per-test tabs on file pages                                                                                                                                                                                                                                          | Aggregated (max-across) today |
 
 Phase 2b preserves phase-1 byte-identical rendering when a file has
@@ -184,7 +185,7 @@ across every platform our customers run.
 python3 -m unittest discover -s tools/coverage-html/tests -v
 ```
 
-56 unit + integration tests cover: LCOV parsing (incl. TN: max-
+58 unit + integration tests cover: LCOV parsing (incl. TN: max-
 aggregation, corrupt-input detection, unknown-record tolerance, BRDA
 with `-` tokens, FN/FNDA join-by-name), source resolution (path
 variants, caching, miss → placeholder), filter globs, tier
