@@ -447,7 +447,21 @@ def _render_page_header(
 INDEX_TOGGLE_SCRIPT = """\
 <script>
 (function () {
-  // Per-file toggle: reveals the next sibling fileFunctions row.
+  // Per-file toggle: reveals the next sibling fileFunctions row,
+  // lazy-cloning the function table from a <template> on first
+  // open so the initial DOM stays small.
+  function ensureFnLoaded(row) {
+    if (row.dataset.loaded === '1') return;
+    var tid = row.getAttribute('data-fn-tmpl');
+    if (tid) {
+      var tmpl = document.getElementById(tid);
+      var td = row.querySelector('td');
+      if (tmpl && td && td.children.length === 0) {
+        td.appendChild(tmpl.content.cloneNode(true));
+      }
+    }
+    row.dataset.loaded = '1';
+  }
   function toggleFn(el) {
     var row = el.closest('tr');
     if (!row) return;
@@ -455,6 +469,7 @@ INDEX_TOGGLE_SCRIPT = """\
     if (!next || !next.classList.contains('fileFunctions')) return;
     var hidden = next.hasAttribute('hidden');
     if (hidden) {
+      ensureFnLoaded(next);
       next.removeAttribute('hidden');
       el.textContent = '\\u25BC';
       el.setAttribute('aria-expanded', 'true');
@@ -476,17 +491,23 @@ INDEX_TOGGLE_SCRIPT = """\
     if (parentPath === '') return rowKey !== '';
     return rowKey === parentPath || rowKey.indexOf(parentPath + '/') === 0;
   }
+  function pathDepth(p) {
+    return p === '' ? 0 : p.split('/').length;
+  }
   function toggleDir(el) {
     var path = el.getAttribute('data-path');
     if (path === null) return;
     var collapsing = el.getAttribute('aria-expanded') !== 'false';
-    var parentDepth = path === '' ? -1 : path.split('/').length - 1;
+    var directChildDepth = pathDepth(path) + 1;
 
     var rows = document.querySelectorAll(
       'tr.dirHeader, tr.fileSummary, tr.fileFunctions'
     );
     rows.forEach(function (r) {
-      if (r.querySelector('.dirToggle[data-path="' + path + '"]')) return;
+      // Skip the dir-header row that owns this toggle.
+      if (r.classList.contains('dirHeader') &&
+          r.getAttribute('data-path') === path) return;
+
       var rowKey = r.getAttribute('data-dir');
       if (rowKey === null) rowKey = r.getAttribute('data-path');
       if (!isDescendant(rowKey, path)) return;
@@ -495,8 +516,7 @@ INDEX_TOGGLE_SCRIPT = """\
         r.setAttribute('hidden', '');
         return;
       }
-      // Expanding: show only direct children of `path`.
-      var rDepth = parseInt(r.getAttribute('data-depth') || '0', 10);
+      // Expanding: reveal only direct children of `path`.
       if (r.classList.contains('fileSummary')) {
         if (rowKey === path) {
           r.removeAttribute('hidden');
@@ -507,10 +527,9 @@ INDEX_TOGGLE_SCRIPT = """\
           }
         }
       } else if (r.classList.contains('dirHeader')) {
-        if (rDepth === parentDepth + 1) {
+        var rDepth = parseInt(r.getAttribute('data-depth') || '0', 10);
+        if (rDepth === directChildDepth) {
           r.removeAttribute('hidden');
-          // Make this re-revealed sub-dir collapsed by default;
-          // the user re-expands as needed.
           var dt = r.querySelector('.dirToggle');
           if (dt) {
             dt.textContent = '\\u25B6';
@@ -745,6 +764,7 @@ def render_index(
         return f"padding-left: calc(10px + {1.4 * depth:.2f}em);"
 
     rows_html: List[str] = []
+    fn_templates: List[Tuple[str, str]] = []  # (template_id, fnInner HTML)
 
     for dirpath in sorted_all_dirs:
         dir_records = _files_under(dirpath)
@@ -853,12 +873,22 @@ def render_index(
                 + "\n            </tr>"
             )
             if has_fn_table:
+                # Lazy-render: each file's fnInner table is stored in
+                # an out-of-table <template>, the row's td is empty
+                # until the user clicks the chevron. Keeps initial
+                # DOM small even on the 660-file slangc merge.
+                tmpl_id = "fn_" + hashlib.sha1(
+                    rec.path.encode("utf-8")
+                ).hexdigest()[:10]
+                fn_templates.append(
+                    (tmpl_id, _render_inline_functions_table(
+                        rec, href, show_fns=show_fns, show_br=show_br
+                    ))
+                )
                 rows_html.append(
                     f'            <tr class="fileFunctions" data-dir="{dir_path_attr}" '
-                    f'data-depth="{file_depth}" hidden>\n'
-                    f'              <td colspan="{cols_for_empty}">'
-                    f"{_render_inline_functions_table(rec, href, show_fns=show_fns, show_br=show_br)}"
-                    f"</td>\n"
+                    f'data-depth="{file_depth}" data-fn-tmpl="{tmpl_id}" hidden>\n'
+                    f'              <td colspan="{cols_for_empty}"></td>\n'
                     f"            </tr>"
                 )
 
@@ -893,6 +923,15 @@ def render_index(
         colgroup += '        <col class="colBHit">\n'
     colgroup += "      </colgroup>"
 
+    # Out-of-table <template>s for each file's expanded function
+    # listing. Browsers parse <template> children as a DocumentFragment
+    # without painting them, so initial DOM stays small even when we
+    # have thousands of functions across hundreds of files.
+    templates_html = "\n".join(
+        f'<template id="{tid}">{thtml}</template>'
+        for tid, thtml in fn_templates
+    )
+
     body = f"""  <table class="indexTable" cellpadding="1" cellspacing="1" border="0">
 {colgroup}
       <tr>
@@ -904,6 +943,7 @@ def render_index(
       </tr>
 {chr(10).join(rows_html)}
 {prefix_note}    </table>
+{templates_html}
 """
 
     extra_script = INDEX_TOGGLE_SCRIPT
