@@ -26,7 +26,11 @@ import posixpath
 import re
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+# Sibling assets — kept on disk so CSS / JS linters can see them.
+_ASSET_DIR = Path(__file__).resolve().parent
 
 # Shared LCOV parser / writer / data model. Sibling module so both the
 # renderer and the merge tool import the same code.
@@ -35,6 +39,7 @@ from lcov_io import (  # noqa: E402
     FileRecord,
     Function,
     LcovParseError,
+    SourceResolver,
     apply_slangc_filter,
     parse_lcov,
 )
@@ -43,83 +48,35 @@ MARKER_NAME = "slang-coverage-html.marker"
 GENERATOR_NAME = "slang-coverage-html"
 GENERATOR_URL = "https://github.com/shader-slang/slang"
 
-# Rate tier thresholds (match genhtml defaults)
+# ---------------------------------------------------------------------------
+# Style constants
+# ---------------------------------------------------------------------------
+#
+# Magic numbers and characters that affect rendering live here so a
+# style change is one edit, not a grep across the file.
+
+# Rate tier thresholds (match genhtml defaults). Used by `_tier`.
 TIER_HI = 90.0
 TIER_MED = 75.0
 
+# Bar fill geometry. The progress bar is a 100 px outline filled
+# proportional to the coverage percent.
+BAR_PIXEL_WIDTH = 100
 
-# ---------------------------------------------------------------------------
-# Source resolver
-# ---------------------------------------------------------------------------
+# HSL gradient parameters for the bar fill / rate-cell backgrounds.
+# Hue maps 0 % → 0 (red), 100 % → 120 (green) via a 1.2 multiplier.
+GRADIENT_HUE_PER_PCT = 1.2
+GRADIENT_BAR_SATURATION = "70%"
+GRADIENT_BAR_LIGHTNESS = "50%"
+GRADIENT_CELL_SATURATION = "60%"
+GRADIENT_CELL_LIGHTNESS = "85%"
 
+# Phase-2b branch column. Width in monospace character cells.
+BRANCH_COL_WIDTH = 10
 
-class SourceResolver:
-    """Resolve an LCOV SF: path to source text on disk.
-
-    Tries (in order):
-      1. direct open of the path as given (absolute) or relative to
-         the LCOV file's directory
-      2. relative to the user's invocation cwd — covers the common
-         case of running the tool from a repo root with a merged
-         LCOV that lives in /tmp
-      3. source_root / path (if --source-root)
-      4. source_root / basename(path)  (basename fallback)
-
-    Caches hits and misses. `load(path)` returns (text, resolved_path)
-    or (None, None) on miss.
-    """
-
-    def __init__(
-        self,
-        source_root: Optional[str],
-        cwd: str,
-        invocation_cwd: Optional[str] = None,
-    ):
-        self.source_root = source_root
-        self.cwd = cwd
-        # Where the user invoked the tool from. Often the repo root,
-        # which is the right base for repo-relative SF: paths emitted
-        # by `slang-coverage-merge`.
-        self.invocation_cwd = invocation_cwd or os.getcwd()
-        self._cache: Dict[str, Tuple[Optional[str], Optional[str]]] = {}
-
-    def load(self, path: str) -> Tuple[Optional[str], Optional[str]]:
-        if path in self._cache:
-            return self._cache[path]
-        text, resolved = self._locate(path)
-        self._cache[path] = (text, resolved)
-        return text, resolved
-
-    def _locate(self, path: str) -> Tuple[Optional[str], Optional[str]]:
-        candidates: List[str] = []
-        # 1. As-is (absolute or relative to LCOV-dir).
-        if os.path.isabs(path):
-            candidates.append(path)
-        else:
-            candidates.append(os.path.join(self.cwd, path))
-            # 2. Relative to the user's invocation cwd. Distinct from
-            #    self.cwd (LCOV-dir): merged LCOVs typically sit in
-            #    /tmp while the user runs the tool from the repo root.
-            if self.invocation_cwd != self.cwd:
-                candidates.append(os.path.join(self.invocation_cwd, path))
-        # 3. source_root / path.
-        if self.source_root:
-            if os.path.isabs(path):
-                rel = path.lstrip(os.sep).lstrip("/")
-                candidates.append(os.path.join(self.source_root, rel))
-            else:
-                candidates.append(os.path.join(self.source_root, path))
-            # 4. source_root / basename fallback (last resort).
-            candidates.append(os.path.join(self.source_root, os.path.basename(path)))
-
-        for c in candidates:
-            if os.path.isfile(c):
-                try:
-                    with open(c, "r", encoding="utf-8-sig", errors="replace") as fh:
-                        return fh.read(), os.path.abspath(c)
-                except OSError:
-                    continue
-        return None, None
+# Disclosure widget glyphs.
+CHEVRON_OPEN = "\u25BC"   # ▼
+CHEVRON_CLOSED = "\u25B6"  # ▶
 
 
 # ---------------------------------------------------------------------------
@@ -127,238 +84,7 @@ class SourceResolver:
 # ---------------------------------------------------------------------------
 
 
-INLINE_CSS = """\
-/* Palette pulled from shader-slang.org:
-   primary teal #105f65, accent orange #F14D1B, success green #2c882c,
-   amber #ffc107, red #dc3545, body bg #fff, subtle gray #f8f9fa.
-   Tier cells use the categorical brand colors; rate bars use a
-   continuous HSL gradient (set per-row inline). */
-:root {
-  --slang-teal:   #105f65;
-  --slang-teal-hover: #0d4d52;
-  --slang-orange: #F14D1B;
-  --tier-hi:      #2c882c;
-  --tier-hi-bg:   #d6ebd5;
-  --tier-med:     #ffc107;
-  --tier-med-bg:  #fff3cd;
-  --tier-lo:      #dc3545;
-  --tier-lo-bg:   #f8d7da;
-  --row-bg:       #f8f9fa;
-  --row-bg-alt:   #ffffff;
-  --row-hover:    #e9ecef;
-  --text:         #212529;
-  --text-muted:   #6c757d;
-  --link:         #105f65;
-}
-
-body { color: var(--text); background-color: #fff;
-       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                    Roboto, Helvetica, Arial, sans-serif;
-       margin: 0; padding: 0 24px; }
-a:link, a:visited { color: var(--link); text-decoration: underline; }
-a:hover           { color: var(--slang-teal-hover); }
-a:active          { color: var(--slang-orange); }
-
-table.chrome { width: 100%; border-collapse: collapse; }
-td.title   { text-align: center; padding: 14px 0 10px; font-size: 22pt;
-             font-weight: 600; color: var(--slang-teal);
-             letter-spacing: 0.02em; }
-td.ruler   { background-color: var(--slang-teal); height: 3px; padding: 0; }
-
-/* Sticky page chrome: title + meta + metric cards stay visible
-   when the user scrolls. The data table's <thead> sticks directly
-   underneath at top: var(--chrome-h), measured by JS on page load. */
-div.topChrome { position: sticky; top: 0; z-index: 20;
-                background-color: #fff;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08); }
-table.chromeMeta { width: 100%; border-collapse: collapse;
-                   margin: 6px 0; }
-table.chromeMeta td { padding: 2px 8px; }
-
-/* Per-file summary cards. Wide flex row, one card per metric
-   (Lines / Functions / Branches), each showing the metric name,
-   the rate %, a thin progress bar and the hit/total counts on
-   one line. Replaces the old 4×N transposed grid that was tall
-   and narrow. */
-div.metricCards { display: flex; flex-wrap: wrap; gap: 12px;
-                  margin: 10px 0 12px; }
-div.metricCard  { flex: 1 1 240px; padding: 8px 14px;
-                  background-color: var(--row-bg-alt);
-                  border: 1px solid var(--row-bg);
-                  border-radius: 6px;
-                  display: flex; align-items: center; gap: 12px;
-                  font-size: 90%; }
-span.metricLabel { font-weight: 600; color: var(--text-muted);
-                   text-transform: uppercase; letter-spacing: 0.04em;
-                   font-size: 78%; min-width: 4.5em; }
-span.metricValue { font-size: 16pt; font-weight: 700;
-                   color: var(--text); min-width: 4em;
-                   text-align: right; }
-div.metricBarMini { flex: 1; height: 6px; min-width: 60px;
-                    background-color: #e0e3e6; border-radius: 3px;
-                    overflow: hidden; }
-div.metricBarFill { height: 100%; }
-span.metricCounts { color: var(--text-muted); white-space: nowrap;
-                    min-width: 5em; text-align: right; font-variant-numeric: tabular-nums; }
-
-td.headerItem        { text-align: right; padding-right: 6px; font-weight: 600;
-                       vertical-align: top; white-space: nowrap; color: var(--text-muted); }
-td.headerValue       { text-align: left; color: var(--slang-teal); font-weight: 600;
-                       white-space: nowrap; }
-td.headerCovTableHead { text-align: center; padding: 0 6px; white-space: nowrap;
-                        color: var(--text-muted); }
-td.headerCovTableEntry    { text-align: right; color: var(--text); font-weight: 600;
-                            padding-left: 12px; padding-right: 4px;
-                            background-color: var(--row-bg); white-space: nowrap; }
-
-/* Top-level index table: full window width with a small breathing
-   margin. Both the file-summary table and any embedded fnInner
-   share these column widths so the same metric column lines up
-   vertically across the file row and its expanded function rows. */
-table.indexTable { margin: 0 auto; width: 100%;
-                   border-collapse: collapse; }
-table.indexTable col.colFile   { width: 47%; }
-table.indexTable col.colLBar   { width: 9%; }
-table.indexTable col.colLRate  { width: 5%; }
-table.indexTable col.colLTotal { width: 4%; }
-table.indexTable col.colLHit   { width: 4%; }
-table.indexTable col.colFRate  { width: 5%; }
-table.indexTable col.colFTotal { width: 4%; }
-table.indexTable col.colFHit   { width: 4%; }
-table.indexTable col.colBRate  { width: 5%; }
-table.indexTable col.colBTotal { width: 4%; }
-table.indexTable col.colBHit   { width: 4%; }
-
-td.tableHead { text-align: center; color: #fff; background-color: var(--slang-teal);
-               font-size: 110%; font-weight: 600; padding: 4px 6px;
-               white-space: nowrap; letter-spacing: 0.02em; }
-
-/* Make the index table's <thead> sticky right under the chrome.
-   `--chrome-h` is set by the inline JS at page load to the
-   measured height of `div.topChrome` so the two sticky layers
-   stack without overlap. */
-table.indexTable thead    { position: sticky;
-                            top: var(--chrome-h, 200px);
-                            z-index: 10; }
-table.indexTable thead td { background-color: var(--slang-teal); }
-
-tr.fileSummary > td:not(.coverBar):not(.coverFile):not(.coverDirectory) {
-  text-align: right;
-}
-tr.fileSummary:nth-child(odd)  > td.coverFile,
-tr.fileSummary:nth-child(odd)  > td.coverNumDflt { background-color: var(--row-bg); }
-
-td.coverFile       { text-align: left; padding: 3px 20px 3px 10px;
-                     color: var(--link); background-color: var(--row-bg-alt);
-                     font-family: ui-monospace, SFMono-Regular, Menlo,
-                                  Monaco, Consolas, monospace;
-                     overflow-wrap: anywhere; }
-/* Directory rows: white background like file rows so they don't get
-   confused with the teal column-header. A 3 px teal stripe on the
-   left edge plus a teal chevron and bold dark-teal text mark them
-   as expandable parents. */
-td.coverDirectory  { text-align: left; padding: 4px 20px 4px 10px;
-                     color: var(--slang-teal);
-                     background-color: var(--row-bg-alt);
-                     border-left: 3px solid var(--slang-teal);
-                     font-family: ui-monospace, SFMono-Regular, Menlo,
-                                  Monaco, Consolas, monospace;
-                     font-weight: 700; }
-td.coverBar        { padding: 3px 10px; background-color: var(--row-bg-alt); }
-tr.fileSummary:nth-child(odd) > td.coverBar { background-color: var(--row-bg); }
-span.coverBarOutline { display: inline-block; height: 10px; width: 100px;
-                       background-color: #cfd4d8; vertical-align: middle;
-                       line-height: 0; border-radius: 1px; overflow: hidden; }
-span.coverBarFill  { display: inline-block; height: 10px; vertical-align: top; }
-span.coverBarRest    { background-color: transparent; display: inline-block;
-                       height: 10px; vertical-align: top; }
-
-/* Rate cells use a continuous gradient background that matches
-   the progress-bar fill. The exact color is computed per-row and
-   set via inline `style="background-color: hsl(...)"`. The class
-   provides only the layout / typography. */
-td.coverPerCell { text-align: right; padding: 3px 10px;
-                  color: var(--text); font-weight: 700; }
-td.coverNumDflt { text-align: right; padding: 3px 10px;
-                  background-color: var(--row-bg-alt); white-space: nowrap; }
-
-td.footnote    { padding: 6px 10px; background-color: var(--row-bg);
-                 color: var(--text-muted); font-style: italic; font-size: 85%; }
-td.versionInfo { text-align: center; padding: 8px; color: var(--text-muted);
-                 font-size: 90%; }
-
-pre.sourceHeading { font-family: ui-monospace, SFMono-Regular, Menlo,
-                                 Monaco, Consolas, monospace;
-                    font-weight: 700; margin: 0; padding: 6px 0;
-                    color: var(--text-muted);
-                    background-color: #fff;
-                    border-bottom: 1px solid var(--row-bg);
-                    position: sticky;
-                    top: var(--chrome-h, 200px);
-                    z-index: 5; }
-pre.source        { font-family: ui-monospace, SFMono-Regular, Menlo,
-                                 Monaco, Consolas, monospace;
-                    margin-top: 2px; }
-span.lineNum      { background-color: #f1f3f5; display: inline-block;
-                    min-width: 6em; text-align: right; padding-right: 4px;
-                    color: var(--text-muted); }
-span.tlaGNC       { background-color: #d6ebd5; }
-span.tlaUNC       { background-color: #f8d7da; }
-
-td.coverFn        { text-align: left; padding: 2px 20px 2px 10px;
-                    color: var(--text);
-                    background-color: var(--row-bg-alt);
-                    font-family: ui-monospace, SFMono-Regular, Menlo,
-                                 Monaco, Consolas, monospace;
-                    word-break: break-all; font-size: 92%; }
-
-span.branchAll   { background-color: var(--tier-hi-bg);  color: var(--text); }
-span.branchPart  { background-color: var(--tier-med-bg); color: var(--text); }
-span.branchNone  { background-color: var(--tier-lo-bg);  color: var(--text); }
-
-/* Expand-chevrons. The placeholder variant reserves the same column
-   width on rows that have no functions, so the file-name column
-   stays vertically aligned across all rows. */
-span.fnToggle, span.fnTogglePlaceholder, span.dirToggle
-                 { display: inline-block; width: 1em;
-                   font-family: ui-monospace, SFMono-Regular, Menlo,
-                                Monaco, Consolas, monospace;
-                   user-select: none; margin-right: 4px; text-align: center; }
-span.fnToggle    { cursor: pointer; color: var(--slang-teal); }
-span.dirToggle   { cursor: pointer; color: var(--slang-teal); }
-span.fnTogglePlaceholder { color: transparent; }
-span.fnToggle:focus, span.dirToggle:focus { outline: 1px dotted var(--slang-orange); }
-tr.fileFunctions[hidden]  { display: none; }
-tr.fileSummary[hidden]    { display: none; }
-/* fileFunctions row's <td> matches the parent indexTable edges
-   (body padding already provides the 24px window inset).  A 3px
-   teal stripe on the left visually marks the expanded region. */
-tr.fileFunctions > td   { background-color: #fdfdfe; padding: 6px 0;
-                          border-left: 3px solid var(--slang-teal); }
-
-/* Embedded function table inside an expanded file row. The colgroup
-   widths mirror the parent indexTable so cells line up vertically
-   across the file row and its expanded function rows.
-   Cells inherit padding / font from their class-specific rules
-   above (coverPerHi/Med/Lo, coverNumDflt, coverBar, coverFn …) —
-   no generic `table.fnInner td` overrides — which is what makes
-   metric cells use the parent's sans-serif and 3px/10px padding,
-   while only the function name cell (td.coverFn) stays monospace. */
-table.fnInner   { border-collapse: collapse; margin: 0; width: 100%;
-                  table-layout: fixed; }
-table.fnInner td { overflow-wrap: break-word; }
-table.fnInner td.tableHead { font-family: -apple-system, BlinkMacSystemFont,
-                             "Segoe UI", Roboto, sans-serif; }
-/* fn-specific cols subdivide the parent's File column (47%) into
-   Name (43%) + Line (4%). The remaining cols reuse the parent's
-   classes so the line-coverage / fn / branch columns line up
-   vertically with the file-summary row above. */
-table.fnInner col.fnNameCol  { width: 43%; }
-table.fnInner col.fnLineCol  { width: 4%; }
-
-.sourceUnavailable { color: var(--slang-orange); font-style: italic;
-                     padding: 8px; }
-"""
+INLINE_CSS = _ASSET_DIR.joinpath("style.css").read_text(encoding="utf-8")
 
 
 def _tier(pct: float) -> str:
@@ -501,149 +227,13 @@ def _render_page_header(
 """
 
 
-CHROME_MEASURE_SCRIPT = """\
-<script>
-(function () {
-  // Measure the sticky chrome's height once after layout so any
-  // sticky element below it (table <thead>, source heading, …)
-  // can stack directly underneath via top: var(--chrome-h).
-  function measureChrome() {
-    var c = document.querySelector('.topChrome');
-    if (c) {
-      document.documentElement.style.setProperty(
-        '--chrome-h', c.offsetHeight + 'px'
-      );
-    }
-  }
-  if (document.readyState === 'complete') measureChrome();
-  else window.addEventListener('load', measureChrome);
-  window.addEventListener('resize', measureChrome);
-})();
-</script>
-"""
+_INLINE_JS = _ASSET_DIR.joinpath("script.js").read_text(encoding="utf-8")
+CHROME_MEASURE_SCRIPT = "<script>\n" + _INLINE_JS + "</script>\n"
 
 
-INDEX_TOGGLE_SCRIPT = CHROME_MEASURE_SCRIPT + """\
-<script>
-(function () {
-  // Per-file toggle: reveals the next sibling fileFunctions row,
-  // lazy-cloning the function table from a <template> on first
-  // open so the initial DOM stays small.
-  function ensureFnLoaded(row) {
-    if (row.dataset.loaded === '1') return;
-    var tid = row.getAttribute('data-fn-tmpl');
-    if (tid) {
-      var tmpl = document.getElementById(tid);
-      var td = row.querySelector('td');
-      if (tmpl && td && td.children.length === 0) {
-        td.appendChild(tmpl.content.cloneNode(true));
-      }
-    }
-    row.dataset.loaded = '1';
-  }
-  function toggleFn(el) {
-    var row = el.closest('tr');
-    if (!row) return;
-    var next = row.nextElementSibling;
-    if (!next || !next.classList.contains('fileFunctions')) return;
-    var hidden = next.hasAttribute('hidden');
-    if (hidden) {
-      ensureFnLoaded(next);
-      next.removeAttribute('hidden');
-      el.textContent = '\\u25BC';
-      el.setAttribute('aria-expanded', 'true');
-    } else {
-      next.setAttribute('hidden', '');
-      el.textContent = '\\u25B6';
-      el.setAttribute('aria-expanded', 'false');
-    }
-  }
-
-  // Per-directory toggle: hides every descendant row when collapsing
-  // (anything whose data-dir or data-path lives under this dir's
-  // path); when expanding, reveals only direct children — files
-  // sitting in this dir, plus immediate sub-directory headers — all
-  // in collapsed state. The user can drill further by clicking any
-  // child chevron.
-  function isDescendant(rowKey, parentPath) {
-    if (rowKey === null) return false;
-    if (parentPath === '') return rowKey !== '';
-    return rowKey === parentPath || rowKey.indexOf(parentPath + '/') === 0;
-  }
-  function pathDepth(p) {
-    return p === '' ? 0 : p.split('/').length;
-  }
-  function toggleDir(el) {
-    var path = el.getAttribute('data-path');
-    if (path === null) return;
-    var collapsing = el.getAttribute('aria-expanded') !== 'false';
-    var directChildDepth = pathDepth(path) + 1;
-
-    var rows = document.querySelectorAll(
-      'tr.dirHeader, tr.fileSummary, tr.fileFunctions'
-    );
-    rows.forEach(function (r) {
-      // Skip the dir-header row that owns this toggle.
-      if (r.classList.contains('dirHeader') &&
-          r.getAttribute('data-path') === path) return;
-
-      var rowKey = r.getAttribute('data-dir');
-      if (rowKey === null) rowKey = r.getAttribute('data-path');
-      if (!isDescendant(rowKey, path)) return;
-
-      if (collapsing) {
-        r.setAttribute('hidden', '');
-        return;
-      }
-      // Expanding: reveal only direct children of `path`.
-      if (r.classList.contains('fileSummary')) {
-        if (rowKey === path) {
-          r.removeAttribute('hidden');
-          var t = r.querySelector('.fnToggle');
-          if (t) {
-            t.textContent = '\\u25B6';
-            t.setAttribute('aria-expanded', 'false');
-          }
-        }
-      } else if (r.classList.contains('dirHeader')) {
-        var rDepth = parseInt(r.getAttribute('data-depth') || '0', 10);
-        if (rDepth === directChildDepth) {
-          r.removeAttribute('hidden');
-          var dt = r.querySelector('.dirToggle');
-          if (dt) {
-            dt.textContent = '\\u25B6';
-            dt.setAttribute('aria-expanded', 'false');
-          }
-        }
-      }
-      // fileFunctions rows stay hidden when expanding a directory.
-    });
-
-    el.textContent = collapsing ? '\\u25B6' : '\\u25BC';
-    el.setAttribute('aria-expanded', collapsing ? 'false' : 'true');
-  }
-
-  document.addEventListener('click', function (e) {
-    var t = e.target;
-    if (!t || !t.classList) return;
-    if (t.classList.contains('fnToggle'))   toggleFn(t);
-    else if (t.classList.contains('dirToggle')) toggleDir(t);
-  });
-  document.addEventListener('keydown', function (e) {
-    var t = e.target;
-    if (!t || !t.classList) return;
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    if (t.classList.contains('fnToggle')) {
-      e.preventDefault();
-      toggleFn(t);
-    } else if (t.classList.contains('dirToggle')) {
-      e.preventDefault();
-      toggleDir(t);
-    }
-  });
-})();
-</script>
-"""
+# INDEX_TOGGLE_SCRIPT historically wrapped two IIFEs (chrome-height
+# measure + dir/file toggle handlers); they're both in script.js now.
+INDEX_TOGGLE_SCRIPT = CHROME_MEASURE_SCRIPT
 
 
 def _render_page_footer(extra_body: str = "") -> str:
@@ -658,26 +248,29 @@ def _render_page_footer(extra_body: str = "") -> str:
 """
 
 
+def _hue_for_pct(pct: float) -> float:
+    """Map a coverage percentage to a hue in HSL space.
+    0 % → 0 (red), 100 % → 120 (green); linear in between."""
+    return max(0.0, min(100.0, pct)) * GRADIENT_HUE_PER_PCT
+
+
 def _gradient_color(pct: float) -> str:
-    """HSL color for a coverage rate. 0 % → red (hue 0); 100 % →
-    green (hue 120). Linear interpolation in hue space gives a
-    smooth red → orange → yellow → lime → green ramp without the
-    bright-tier banding. This is the *bar fill* color: vivid,
+    """HSL color for a coverage rate — the *bar fill*: vivid,
     saturated, fully visible on a small fixed-size element."""
-    pct = max(0.0, min(100.0, pct))
-    hue = pct * 1.2  # 0..120
-    return f"hsl({hue:.0f}, 70%, 50%)"
+    return (
+        f"hsl({_hue_for_pct(pct):.0f}, "
+        f"{GRADIENT_BAR_SATURATION}, {GRADIENT_BAR_LIGHTNESS})"
+    )
 
 
 def _gradient_cell_bg(pct: float) -> str:
-    """Soft gradient background for a percent-rate cell. Same hue
-    ramp as `_gradient_color` but at high lightness so dark body
-    text stays legible on top. Replaces the discrete Hi/Med/Lo
-    tier backgrounds — rate cells now ride the same continuous
-    gradient as the bar fill."""
-    pct = max(0.0, min(100.0, pct))
-    hue = pct * 1.2
-    return f"hsl({hue:.0f}, 60%, 85%)"
+    """Soft gradient background for a percent-rate cell — same hue
+    ramp as `_gradient_color`, at high lightness so dark body text
+    stays legible on top."""
+    return (
+        f"hsl({_hue_for_pct(pct):.0f}, "
+        f"{GRADIENT_CELL_SATURATION}, {GRADIENT_CELL_LIGHTNESS})"
+    )
 
 
 def _rate_cell(pct: float, total: int) -> str:
@@ -692,8 +285,8 @@ def _rate_cell(pct: float, total: int) -> str:
 
 
 def _render_rate_bar(pct: float) -> str:
-    fill_w = max(0, min(100, int(round(pct))))
-    rest_w = 100 - fill_w
+    fill_w = max(0, min(BAR_PIXEL_WIDTH, int(round(pct * BAR_PIXEL_WIDTH / 100))))
+    rest_w = BAR_PIXEL_WIDTH - fill_w
     color = _gradient_color(pct)
     return (
         f'<span class="coverBarOutline">'
@@ -767,6 +360,237 @@ def _index_col_group(
     return "\n".join(parts)
 
 
+def _index_dir_tree(
+    records: List[FileRecord], prefix: str
+) -> Tuple["collections.OrderedDict[str, List[FileRecord]]", List[str]]:
+    """Group records by their parent directory (post-prefix-strip)
+    and return the lexicographically-sorted set of all directory
+    paths including ancestors. Walking that list in order is a
+    natural DFS — each `source/`, `source/slang/`,
+    `source/slang/optimizer/`, etc. surfaces in order so nested
+    rows can be emitted with one pass."""
+    sorted_records = sorted(records, key=lambda r: _display_path(r.path, prefix))
+    files_by_dir: "collections.OrderedDict[str, List[FileRecord]]" = (
+        collections.OrderedDict()
+    )
+    for rec in sorted_records:
+        display = _display_path(rec.path, prefix)
+        if "/" in display:
+            dirpath, _, _ = display.rpartition("/")
+        else:
+            dirpath = ""
+        files_by_dir.setdefault(dirpath, []).append(rec)
+
+    all_dirs = set()
+    for dirpath in files_by_dir:
+        parts = dirpath.split("/") if dirpath else []
+        for i in range(len(parts) + 1):
+            all_dirs.add("/".join(parts[:i]))
+    return files_by_dir, sorted(all_dirs)
+
+
+def _files_under(
+    files_by_dir: Dict[str, List[FileRecord]], target: str
+) -> List[FileRecord]:
+    """All FileRecords whose dirpath equals or descends from `target`."""
+    if target == "":
+        return [f for fs in files_by_dir.values() for f in fs]
+    return [
+        f
+        for d, fs in files_by_dir.items()
+        for f in fs
+        if d == target or d.startswith(target + "/")
+    ]
+
+
+def _dir_depth(dirpath: str) -> int:
+    return 0 if dirpath == "" else dirpath.count("/") + 1
+
+
+def _indent_style(depth: int) -> str:
+    """Per-row left padding so the tree shape is visible even when
+    row backgrounds are uniform."""
+    return f"padding-left: calc(10px + {1.4 * depth:.2f}em);"
+
+
+def _index_thead_html(
+    show_fns: bool, show_br: bool
+) -> Tuple[str, str, int]:
+    """Returns (top-row extra cells, sub-rate-row extra cells, total
+    columns). The line group always has 4 cells (Bar+Rate+Total+Hit);
+    fns / branches groups have 3 cells each (no bar) when present."""
+    extra_top = ""
+    extra_sub = ""
+    cols_total = 5
+    if show_fns:
+        extra_top += '\n        <td class="tableHead" colspan="3">Function Coverage</td>'
+        extra_sub += (
+            '\n        <td class="tableHead">Rate</td>'
+            '\n        <td class="tableHead">Total</td>'
+            '\n        <td class="tableHead">Hit</td>'
+        )
+        cols_total += 3
+    if show_br:
+        extra_top += '\n        <td class="tableHead" colspan="3">Branch Coverage</td>'
+        extra_sub += (
+            '\n        <td class="tableHead">Rate</td>'
+            '\n        <td class="tableHead">Total</td>'
+            '\n        <td class="tableHead">Hit</td>'
+        )
+        cols_total += 3
+    return extra_top, extra_sub, cols_total
+
+
+def _index_colgroup_html(show_fns: bool, show_br: bool) -> str:
+    """Colgroup widths driven by CSS classes; defined here once and
+    reused by `fnInner` so per-function cells line up under their
+    parent column."""
+    cols = [
+        '        <col class="colFile">',
+        '        <col class="colLBar">',
+        '        <col class="colLRate">',
+        '        <col class="colLTotal">',
+        '        <col class="colLHit">',
+    ]
+    if show_fns:
+        cols += [
+            '        <col class="colFRate">',
+            '        <col class="colFTotal">',
+            '        <col class="colFHit">',
+        ]
+    if show_br:
+        cols += [
+            '        <col class="colBRate">',
+            '        <col class="colBTotal">',
+            '        <col class="colBHit">',
+        ]
+    return "      <colgroup>\n" + "\n".join(cols) + "\n      </colgroup>"
+
+
+def _render_dir_header_row(
+    dirpath: str,
+    dir_records: List[FileRecord],
+    show_fns: bool,
+    show_br: bool,
+) -> str:
+    depth = _dir_depth(dirpath)
+    label = (dirpath.rsplit("/", 1)[-1] + "/") if dirpath else "(top level)"
+    file_count = len(dir_records)
+    file_count_label = f"{file_count} file{'s' if file_count != 1 else ''}"
+
+    # Aggregated stats over this dir + all descendants.
+    t_l = sum(r.total_lines for r in dir_records)
+    h_l = sum(r.hit_lines for r in dir_records)
+    rate_l = (100.0 * h_l / t_l) if t_l else 0.0
+    t_fn = sum(r.total_functions for r in dir_records)
+    h_fn = sum(r.hit_functions for r in dir_records)
+    rate_fn = (100.0 * h_fn / t_fn) if t_fn else 0.0
+    t_br = sum(r.total_branches for r in dir_records)
+    h_br = sum(r.hit_branches for r in dir_records)
+    rate_br = (100.0 * h_br / t_br) if t_br else 0.0
+
+    dir_attr = html.escape(dirpath)
+    cells: List[str] = [
+        f'              <td class="coverDirectory" style="{_indent_style(depth)}">'
+        f'<span class="dirToggle" tabindex="0" role="button" '
+        f'aria-expanded="true" data-path="{dir_attr}" '
+        f'aria-label="Toggle directory {html.escape(label)}">'
+        f"{CHEVRON_OPEN}</span>{html.escape(label)} "
+        f'<span style="opacity:.7;font-weight:400">({file_count_label})</span>'
+        f"</td>",
+        _index_col_group(has_bar=True, rate=rate_l, total=t_l, hit=h_l),
+    ]
+    if show_fns:
+        cells.append(_index_col_group(has_bar=False, rate=rate_fn, total=t_fn, hit=h_fn))
+    if show_br:
+        cells.append(_index_col_group(has_bar=False, rate=rate_br, total=t_br, hit=h_br))
+    return (
+        f'            <tr class="dirHeader" data-path="{dir_attr}" '
+        f'data-depth="{depth}">\n'
+        + "\n".join(cells)
+        + "\n            </tr>"
+    )
+
+
+def _render_file_row(
+    rec: FileRecord,
+    prefix: str,
+    file_map: Dict[str, str],
+    dir_attr: str,
+    file_depth: int,
+    show_fns: bool,
+    show_br: bool,
+) -> str:
+    display = _display_path(rec.path, prefix)
+    display_basename = display.rsplit("/", 1)[-1]
+    href = file_map[rec.path]
+    if rec.functions:
+        toggle = (
+            '<span class="fnToggle" tabindex="0" role="button" '
+            f'aria-label="Toggle functions for {html.escape(display)}" '
+            f'aria-expanded="false">{CHEVRON_CLOSED}</span>'
+        )
+    else:
+        toggle = f'<span class="fnTogglePlaceholder">{CHEVRON_CLOSED}</span>'
+    cells: List[str] = [
+        f'              <td class="coverFile" style="{_indent_style(file_depth)}">'
+        f"{toggle}"
+        f'<a href="{html.escape(href)}">{html.escape(display_basename)}</a></td>',
+        _index_col_group(
+            has_bar=True, rate=rec.percent, total=rec.total_lines, hit=rec.hit_lines
+        ),
+    ]
+    if show_fns:
+        cells.append(
+            _index_col_group(
+                has_bar=False,
+                rate=rec.percent_functions,
+                total=rec.total_functions,
+                hit=rec.hit_functions,
+            )
+        )
+    if show_br:
+        cells.append(
+            _index_col_group(
+                has_bar=False,
+                rate=rec.percent_branches,
+                total=rec.total_branches,
+                hit=rec.hit_branches,
+            )
+        )
+    return (
+        f'            <tr class="fileSummary" data-dir="{dir_attr}" '
+        f'data-depth="{file_depth}">\n'
+        + "\n".join(cells)
+        + "\n            </tr>"
+    )
+
+
+def _render_file_functions_row(
+    rec: FileRecord,
+    file_href: str,
+    dir_attr: str,
+    file_depth: int,
+    show_fns: bool,
+    show_br: bool,
+    cols_for_empty: int,
+) -> Tuple[str, str, str]:
+    """Returns (template_id, template_html, hidden_row_html). The
+    template carries the fnInner table; the hidden row references it
+    via `data-fn-tmpl` and gets cloned in on first chevron click."""
+    tmpl_id = "fn_" + hashlib.sha1(rec.path.encode("utf-8")).hexdigest()[:10]
+    template_html = _render_inline_functions_table(
+        rec, file_href, show_fns=show_fns, show_br=show_br
+    )
+    row_html = (
+        f'            <tr class="fileFunctions" data-dir="{dir_attr}" '
+        f'data-depth="{file_depth}" data-fn-tmpl="{tmpl_id}" hidden>\n'
+        f'              <td colspan="{cols_for_empty}"></td>\n'
+        f"            </tr>"
+    )
+    return tmpl_id, template_html, row_html
+
+
 def render_index(
     records: List[FileRecord],
     output_dir: str,
@@ -790,210 +614,33 @@ def render_index(
         show_metric_grid=False,
     )
 
-    # Build the column-header rows. Line group always has the bar
-    # (4 cells); function/branch groups omit the bar (3 cells) to
-    # keep the table narrow enough to read.
-    extra_header_cells = ""
-    sub_rate_cells = (
-        '        <td class="tableHead" colspan="2">Rate</td>\n'
-        '        <td class="tableHead">Total</td>\n'
-        '        <td class="tableHead">Hit</td>'
-    )
-    extra_sub_rate = ""
-    cols_for_empty = 5
-    if show_fns:
-        extra_header_cells += (
-            '\n        <td class="tableHead" colspan="3">Function Coverage</td>'
-        )
-        extra_sub_rate += (
-            '\n        <td class="tableHead">Rate</td>'
-            '\n        <td class="tableHead">Total</td>'
-            '\n        <td class="tableHead">Hit</td>'
-        )
-        cols_for_empty += 3
-    if show_br:
-        extra_header_cells += (
-            '\n        <td class="tableHead" colspan="3">Branch Coverage</td>'
-        )
-        extra_sub_rate += (
-            '\n        <td class="tableHead">Rate</td>'
-            '\n        <td class="tableHead">Total</td>'
-            '\n        <td class="tableHead">Hit</td>'
-        )
-        cols_for_empty += 3
-
-    # Group records by their FULL parent directory (relative to the
-    # common-prefix-stripped display path). Then walk the directory
-    # tree depth-first so each level — `source/`, `source/slang/`,
-    # `source/slang/optimizer/`, etc. — gets its own collapsible
-    # row independently. Walking lexicographically-sorted dir paths
-    # produces the right DFS order naturally.
-    sorted_records = sorted(records, key=lambda r: _display_path(r.path, prefix))
-    files_by_dir: Dict[str, List[FileRecord]] = collections.OrderedDict()
-    for rec in sorted_records:
-        display = _display_path(rec.path, prefix)
-        if "/" in display:
-            dirpath, _, _ = display.rpartition("/")
-        else:
-            dirpath = ""
-        files_by_dir.setdefault(dirpath, []).append(rec)
-
-    # Build the set of all directory paths, including ancestors.
-    all_dirs = set()
-    for dirpath in files_by_dir:
-        parts = dirpath.split("/") if dirpath else []
-        for i in range(len(parts) + 1):
-            all_dirs.add("/".join(parts[:i]))
-    sorted_all_dirs = sorted(all_dirs)
-
-    # Aggregate stats for any directory (its own files + all
-    # descendants).
-    def _files_under(target: str) -> List[FileRecord]:
-        if target == "":
-            return [f for fs in files_by_dir.values() for f in fs]
-        return [
-            f
-            for d, fs in files_by_dir.items()
-            for f in fs
-            if d == target or d.startswith(target + "/")
-        ]
-
-    def _depth_of(dirpath: str) -> int:
-        return 0 if dirpath == "" else dirpath.count("/") + 1
-
-    def _indent_style(depth: int) -> str:
-        # Nested dirs each get an extra ~1.4em of left padding so the
-        # tree shape is visible even when row backgrounds are uniform.
-        return f"padding-left: calc(10px + {1.4 * depth:.2f}em);"
+    extra_top, extra_sub, cols_for_empty = _index_thead_html(show_fns, show_br)
+    files_by_dir, sorted_all_dirs = _index_dir_tree(records, prefix)
 
     rows_html: List[str] = []
-    fn_templates: List[Tuple[str, str]] = []  # (template_id, fnInner HTML)
-
+    fn_templates: List[Tuple[str, str]] = []
     for dirpath in sorted_all_dirs:
-        dir_records = _files_under(dirpath)
+        dir_records = _files_under(files_by_dir, dirpath)
         if not dir_records:
             continue
-        depth = _depth_of(dirpath)
-        last_segment = (dirpath.rsplit("/", 1)[-1] + "/") if dirpath else "(top level)"
-        # Aggregated stats for this dir (incl. all descendants).
-        d_total_l = sum(r.total_lines for r in dir_records)
-        d_hit_l = sum(r.hit_lines for r in dir_records)
-        d_rate_l = (100.0 * d_hit_l / d_total_l) if d_total_l else 0.0
-        d_total_fn = sum(r.total_functions for r in dir_records)
-        d_hit_fn = sum(r.hit_functions for r in dir_records)
-        d_rate_fn = (100.0 * d_hit_fn / d_total_fn) if d_total_fn else 0.0
-        d_total_br = sum(r.total_branches for r in dir_records)
-        d_hit_br = sum(r.hit_branches for r in dir_records)
-        d_rate_br = (100.0 * d_hit_br / d_total_br) if d_total_br else 0.0
-
-        dir_path_attr = html.escape(dirpath)
-        dir_cells: List[str] = [
-            f'              <td class="coverDirectory" '
-            f'style="{_indent_style(depth)}">'
-            f'<span class="dirToggle" tabindex="0" role="button" '
-            f'aria-expanded="true" data-path="{dir_path_attr}" '
-            f'aria-label="Toggle directory {html.escape(last_segment)}">▼</span>'
-            f"{html.escape(last_segment)}"
-            f' <span style="opacity:.7;font-weight:400">'
-            f"({len(dir_records)} file{'s' if len(dir_records) != 1 else ''})</span>"
-            f"</td>",
-            _index_col_group(
-                has_bar=True, rate=d_rate_l, total=d_total_l, hit=d_hit_l
-            ),
-        ]
-        if show_fns:
-            dir_cells.append(
-                _index_col_group(
-                    has_bar=False, rate=d_rate_fn, total=d_total_fn, hit=d_hit_fn
-                )
-            )
-        if show_br:
-            dir_cells.append(
-                _index_col_group(
-                    has_bar=False, rate=d_rate_br, total=d_total_br, hit=d_hit_br
-                )
-            )
         rows_html.append(
-            f'            <tr class="dirHeader" data-path="{dir_path_attr}" '
-            f'data-depth="{depth}">\n'
-            + "\n".join(dir_cells)
-            + "\n            </tr>"
+            _render_dir_header_row(dirpath, dir_records, show_fns, show_br)
         )
-
-        # File rows directly inside this directory (NOT descendants).
-        direct = files_by_dir.get(dirpath, [])
-        file_depth = depth + 1
-        file_indent = _indent_style(file_depth)
-        for rec in direct:
-            display = _display_path(rec.path, prefix)
-            # On nested dirs, show only the file basename in the row;
-            # the dir hierarchy is conveyed by the indented dir headers
-            # above. The link still points at the full per-file page.
-            display_basename = display.rsplit("/", 1)[-1]
-            href = file_map[rec.path]
-            has_fn_table = bool(rec.functions)
-            if has_fn_table:
-                toggle = (
-                    '<span class="fnToggle" tabindex="0" role="button" '
-                    f'aria-label="Toggle functions for {html.escape(display)}" '
-                    'aria-expanded="false">▶</span>'
-                )
-            else:
-                toggle = '<span class="fnTogglePlaceholder">▶</span>'
-            cells: List[str] = [
-                f'              <td class="coverFile" style="{file_indent}">'
-                f'{toggle}'
-                f'<a href="{html.escape(href)}">{html.escape(display_basename)}</a></td>',
-                _index_col_group(
-                    has_bar=True,
-                    rate=rec.percent,
-                    total=rec.total_lines,
-                    hit=rec.hit_lines,
-                ),
-            ]
-            if show_fns:
-                cells.append(
-                    _index_col_group(
-                        has_bar=False,
-                        rate=rec.percent_functions,
-                        total=rec.total_functions,
-                        hit=rec.hit_functions,
-                    )
-                )
-            if show_br:
-                cells.append(
-                    _index_col_group(
-                        has_bar=False,
-                        rate=rec.percent_branches,
-                        total=rec.total_branches,
-                        hit=rec.hit_branches,
-                    )
-                )
+        dir_attr = html.escape(dirpath)
+        file_depth = _dir_depth(dirpath) + 1
+        for rec in files_by_dir.get(dirpath, []):
             rows_html.append(
-                f'            <tr class="fileSummary" data-dir="{dir_path_attr}" '
-                f'data-depth="{file_depth}">\n'
-                + "\n".join(cells)
-                + "\n            </tr>"
+                _render_file_row(
+                    rec, prefix, file_map, dir_attr, file_depth, show_fns, show_br
+                )
             )
-            if has_fn_table:
-                # Lazy-render: each file's fnInner table is stored in
-                # an out-of-table <template>, the row's td is empty
-                # until the user clicks the chevron. Keeps initial
-                # DOM small even on the 660-file slangc merge.
-                tmpl_id = "fn_" + hashlib.sha1(
-                    rec.path.encode("utf-8")
-                ).hexdigest()[:10]
-                fn_templates.append(
-                    (tmpl_id, _render_inline_functions_table(
-                        rec, href, show_fns=show_fns, show_br=show_br
-                    ))
+            if rec.functions:
+                tid, thtml, hidden_row = _render_file_functions_row(
+                    rec, file_map[rec.path], dir_attr, file_depth,
+                    show_fns, show_br, cols_for_empty,
                 )
-                rows_html.append(
-                    f'            <tr class="fileFunctions" data-dir="{dir_path_attr}" '
-                    f'data-depth="{file_depth}" data-fn-tmpl="{tmpl_id}" hidden>\n'
-                    f'              <td colspan="{cols_for_empty}"></td>\n'
-                    f"            </tr>"
-                )
+                fn_templates.append((tid, thtml))
+                rows_html.append(hidden_row)
 
     if not records:
         rows_html.append(
@@ -1008,24 +655,6 @@ def render_index(
             f"Common path prefix: <code>{html.escape(prefix)}</code></td></tr>\n"
         )
 
-    # colgroup widths must match what fnInner uses so the per-function
-    # rate / total / hit cells line up vertically with the parent's
-    # corresponding "Lines" columns.
-    colgroup = '      <colgroup>\n        <col class="colFile">\n'
-    colgroup += '        <col class="colLBar">\n'
-    colgroup += '        <col class="colLRate">\n'
-    colgroup += '        <col class="colLTotal">\n'
-    colgroup += '        <col class="colLHit">\n'
-    if show_fns:
-        colgroup += '        <col class="colFRate">\n'
-        colgroup += '        <col class="colFTotal">\n'
-        colgroup += '        <col class="colFHit">\n'
-    if show_br:
-        colgroup += '        <col class="colBRate">\n'
-        colgroup += '        <col class="colBTotal">\n'
-        colgroup += '        <col class="colBHit">\n'
-    colgroup += "      </colgroup>"
-
     # Out-of-table <template>s for each file's expanded function
     # listing. Browsers parse <template> children as a DocumentFragment
     # without painting them, so initial DOM stays small even when we
@@ -1036,14 +665,16 @@ def render_index(
     )
 
     body = f"""  <table class="indexTable" cellpadding="1" cellspacing="1" border="0">
-{colgroup}
+{_index_colgroup_html(show_fns, show_br)}
     <thead>
       <tr>
         <td class="tableHead" rowspan="2">File</td>
-        <td class="tableHead" colspan="4">Line Coverage</td>{extra_header_cells}
+        <td class="tableHead" colspan="4">Line Coverage</td>{extra_top}
       </tr>
       <tr>
-{sub_rate_cells}{extra_sub_rate}
+        <td class="tableHead" colspan="2">Rate</td>
+        <td class="tableHead">Total</td>
+        <td class="tableHead">Hit</td>{extra_sub}
       </tr>
     </thead>
     <tbody>
@@ -1053,8 +684,7 @@ def render_index(
 {templates_html}
 """
 
-    extra_script = INDEX_TOGGLE_SCRIPT
-    out = header + body + _render_page_footer(extra_body=extra_script)
+    out = header + body + _render_page_footer(extra_body=INDEX_TOGGLE_SCRIPT)
     with open(os.path.join(output_dir, "index.html"), "w", encoding="utf-8") as f:
         f.write(out)
 
@@ -1126,30 +756,116 @@ def render_file_page(
         f.write(out)
 
 
+def _fn_line_coverage_cells(l_total: int, l_hit: int) -> str:
+    """Bar | Rate | Total | Hit cells for a single function's line
+    coverage. Renders dashes when the function has no DA lines in
+    its range (orphan FN or untracked body)."""
+    if l_total > 0:
+        pct = 100.0 * l_hit / l_total
+        bar = (
+            f'<td class="coverBar" align="center">{_render_rate_bar(pct)}</td>'
+        )
+        return (
+            bar
+            + _rate_cell(pct, l_total)
+            + f'<td class="coverNumDflt">{l_total}</td>'
+            + f'<td class="coverNumDflt">{l_hit}</td>'
+        )
+    return (
+        '<td class="coverBar"></td>'
+        '<td class="coverNumDflt">-</td>'
+        '<td class="coverNumDflt">-</td>'
+        '<td class="coverNumDflt">-</td>'
+    )
+
+
+def _fn_function_coverage_cells(is_hit: bool) -> str:
+    """Per-function function-coverage cells (Rate / Total / Hit).
+    "Effective" hit semantics — see FileRecord._effective_fn_hit."""
+    pct = 100.0 if is_hit else 0.0
+    return (
+        _rate_cell(pct, 1)
+        + '<td class="coverNumDflt">1</td>'
+        + f'<td class="coverNumDflt">{1 if is_hit else 0}</td>'
+    )
+
+
+def _fn_branch_coverage_cells(b_total: int, b_hit: int) -> str:
+    """Per-function branch-coverage cells (Rate / Total / Hit)."""
+    if b_total > 0:
+        pct = 100.0 * b_hit / b_total
+        return (
+            _rate_cell(pct, b_total)
+            + f'<td class="coverNumDflt">{b_total}</td>'
+            + f'<td class="coverNumDflt">{b_hit}</td>'
+        )
+    return (
+        '<td class="coverNumDflt">-</td>'
+        '<td class="coverNumDflt">-</td>'
+        '<td class="coverNumDflt">-</td>'
+    )
+
+
+def _fn_inner_colgroup(show_fns: bool, show_br: bool) -> str:
+    """Colgroup for fnInner: subdivides parent's File column into
+    Name + Line, then reuses the parent's colgroup classes for the
+    metric cells (so column widths line up vertically with the
+    file-summary row above)."""
+    cols = [
+        '          <col class="fnNameCol">',
+        '          <col class="fnLineCol">',
+        '          <col class="colLBar">',
+        '          <col class="colLRate">',
+        '          <col class="colLTotal">',
+        '          <col class="colLHit">',
+    ]
+    if show_fns:
+        cols += [
+            '          <col class="colFRate">',
+            '          <col class="colFTotal">',
+            '          <col class="colFHit">',
+        ]
+    if show_br:
+        cols += [
+            '          <col class="colBRate">',
+            '          <col class="colBTotal">',
+            '          <col class="colBHit">',
+        ]
+    return "        <colgroup>\n" + "\n".join(cols) + "\n        </colgroup>"
+
+
+def _fn_inner_thead(show_fns: bool, show_br: bool) -> str:
+    extra = ""
+    if show_fns:
+        extra += '          <td class="tableHead" colspan="3">Function Coverage</td>\n'
+    if show_br:
+        extra += '          <td class="tableHead" colspan="3">Branch Coverage</td>\n'
+    return (
+        "        <tr>\n"
+        '          <td class="tableHead">Function</td>\n'
+        '          <td class="tableHead">Line</td>\n'
+        '          <td class="tableHead" colspan="2">Line Coverage</td>\n'
+        '          <td class="tableHead">Total</td>\n'
+        '          <td class="tableHead">Hit</td>\n'
+        + extra
+        + "        </tr>"
+    )
+
+
 def _render_inline_functions_table(
     record: FileRecord,
     file_href: str,
     show_fns: bool = False,
     show_br: bool = False,
 ) -> str:
-    """Render a Functions table to embed inside an index <td>.
+    """Render the per-file Functions table embedded in an index
+    `<td>` (lazy-loaded via <template>).
 
-    Each row carries:
-
-      Function | Line | Calls | LineBar | LineRate | LineTotal | LineHit
-               | <Function-Coverage cells empty>
-               | BrRate | BrTotal | BrHit
-
-    The Bar / Rate / Total / Hit cells line up underneath the parent
-    indexTable's "Lines" group; BrRate / BrTotal / BrHit line up
-    under the parent's "Branch Coverage" group; the parent's
-    "Function Coverage" group is left empty per row (function-level
-    coverage isn't a meaningful drilldown when each row IS one
-    function).
-
-    "Calls" is the FNDA hit count — the number of times the function
-    was invoked during the run. The header carries a tooltip
-    explaining that since "Calls" alone can be ambiguous.
+    Each row carries: Function | Line | LineBar | LineRate |
+    LineTotal | LineHit | (FRate | FTotal | FHit) | (BRate | BTotal
+    | BHit). Cells line up vertically with the parent indexTable's
+    columns of the same names — colgroup widths shared via the
+    `colLBar`, `colFRate`, … classes.
     """
     from lcov_io import function_line_coverage, function_branch_coverage
 
@@ -1171,48 +887,15 @@ def _render_inline_functions_table(
             line_cell = "-"
 
         l_total, l_hit = line_cov.get(name, (0, 0))
-        if l_total > 0:
-            pct = 100.0 * l_hit / l_total
-            rate_cell = _rate_cell(pct, l_total)
-            bar_cell = (
-                f'<td class="coverBar" align="center">{_render_rate_bar(pct)}</td>'
-            )
-            total_cell = f'<td class="coverNumDflt">{l_total}</td>'
-            hit_cell = f'<td class="coverNumDflt">{l_hit}</td>'
-        else:
-            rate_cell = '<td class="coverNumDflt">-</td>'
-            bar_cell = '<td class="coverBar"></td>'
-            total_cell = '<td class="coverNumDflt">-</td>'
-            hit_cell = '<td class="coverNumDflt">-</td>'
-
-        # Per-function function-coverage cells. "Effective" hit:
-        # FNDA-was-called OR any DA line in the function's range
-        # was hit (handles inlined-only callees where FNDA stays 0
-        # but the body code ran via inlining). Same gradient as
-        # every other rate cell.
-        if show_fns:
-            is_effective_hit = eff_hit.get(name, fn.hits > 0)
-            fn_hit_int = 1 if is_effective_hit else 0
-            fn_pct = 100.0 if is_effective_hit else 0.0
-            fn_rate_cell = _rate_cell(fn_pct, 1)
-            fn_total_cell = '<td class="coverNumDflt">1</td>'
-            fn_hit_cell = f'<td class="coverNumDflt">{fn_hit_int}</td>'
-            fn_cells = fn_rate_cell + fn_total_cell + fn_hit_cell
-        else:
-            fn_cells = ""
-
+        line_cells = _fn_line_coverage_cells(l_total, l_hit)
+        fn_cells = (
+            _fn_function_coverage_cells(eff_hit.get(name, fn.hits > 0))
+            if show_fns
+            else ""
+        )
         if show_br:
             b_total, b_hit = br_cov.get(name, (0, 0))
-            if b_total > 0:
-                bpct = 100.0 * b_hit / b_total
-                br_rate_cell = _rate_cell(bpct, b_total)
-                br_total_cell = f'<td class="coverNumDflt">{b_total}</td>'
-                br_hit_cell = f'<td class="coverNumDflt">{b_hit}</td>'
-            else:
-                br_rate_cell = '<td class="coverNumDflt">-</td>'
-                br_total_cell = '<td class="coverNumDflt">-</td>'
-                br_hit_cell = '<td class="coverNumDflt">-</td>'
-            br_cells = br_rate_cell + br_total_cell + br_hit_cell
+            br_cells = _fn_branch_coverage_cells(b_total, b_hit)
         else:
             br_cells = ""
 
@@ -1220,63 +903,19 @@ def _render_inline_functions_table(
             "        <tr>"
             f'<td class="coverFn">{html.escape(name)}</td>'
             f'<td class="coverNumDflt">{line_cell}</td>'
-            f"{bar_cell}{rate_cell}{total_cell}{hit_cell}"
-            f"{fn_cells}{br_cells}"
+            f"{line_cells}{fn_cells}{br_cells}"
             "</tr>"
-        )
-
-    # Matching trailing <col> elements for the parent's Function
-    # Coverage and (if present) Branch Coverage groups, so column
-    # widths align across the file row and its expanded function rows.
-    extra_cols = ""
-    if show_fns:
-        extra_cols += (
-            '          <col class="colFRate">\n'
-            '          <col class="colFTotal">\n'
-            '          <col class="colFHit">\n'
-        )
-    if show_br:
-        extra_cols += (
-            '          <col class="colBRate">\n'
-            '          <col class="colBTotal">\n'
-            '          <col class="colBHit">\n'
-        )
-
-    extra_heads = ""
-    if show_fns:
-        extra_heads += (
-            '          <td class="tableHead" colspan="3">Function Coverage</td>\n'
-        )
-    if show_br:
-        extra_heads += (
-            '          <td class="tableHead" colspan="3">Branch Coverage</td>\n'
         )
 
     return (
         '<table class="fnInner" cellpadding="1" cellspacing="1" border="0">\n'
-        '        <colgroup>\n'
-        '          <col class="fnNameCol">\n'
-        '          <col class="fnLineCol">\n'
-        '          <col class="colLBar">\n'
-        '          <col class="colLRate">\n'
-        '          <col class="colLTotal">\n'
-        '          <col class="colLHit">\n'
-        + extra_cols
-        + "        </colgroup>\n"
-        "        <tr>\n"
-        '          <td class="tableHead">Function</td>\n'
-        '          <td class="tableHead">Line</td>\n'
-        '          <td class="tableHead" colspan="2">Line Coverage</td>\n'
-        '          <td class="tableHead">Total</td>\n'
-        '          <td class="tableHead">Hit</td>\n'
-        + extra_heads
-        + "        </tr>\n"
+        + _fn_inner_colgroup(show_fns, show_br)
+        + "\n"
+        + _fn_inner_thead(show_fns, show_br)
+        + "\n"
         + "\n".join(rows)
         + "\n      </table>"
     )
-
-
-BRANCH_COL_WIDTH = 10  # chars, wide enough for "(999/999)" + padding
 
 
 def _branches_by_line(

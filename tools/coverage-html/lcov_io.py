@@ -14,9 +14,71 @@ operate.
 """
 
 import collections
+import os
 import sys
 from dataclasses import dataclass, field
 from typing import Any, Dict, IO, Iterable, List, Optional, Tuple
+
+
+class SourceResolver:
+    """Resolve an LCOV SF: path to source text on disk.
+
+    Tries (in order):
+      1. direct open of the path as given (absolute) or relative to
+         the LCOV file's directory
+      2. relative to the user's invocation cwd — covers the common
+         case of running the tool from a repo root with a merged
+         LCOV that lives in /tmp
+      3. source_root / path (if --source-root)
+      4. source_root / basename(path)  (basename fallback)
+
+    Caches hits and misses. `load(path)` returns (text, resolved_path)
+    or (None, None) on miss.
+    """
+
+    def __init__(
+        self,
+        source_root: Optional[str],
+        cwd: str,
+        invocation_cwd: Optional[str] = None,
+    ):
+        self.source_root = source_root
+        self.cwd = cwd
+        self.invocation_cwd = invocation_cwd or os.getcwd()
+        self._cache: Dict[str, Tuple[Optional[str], Optional[str]]] = {}
+
+    def load(self, path: str) -> Tuple[Optional[str], Optional[str]]:
+        if path in self._cache:
+            return self._cache[path]
+        text, resolved = self._locate(path)
+        self._cache[path] = (text, resolved)
+        return text, resolved
+
+    def _locate(self, path: str) -> Tuple[Optional[str], Optional[str]]:
+        candidates: List[str] = []
+        if os.path.isabs(path):
+            candidates.append(path)
+        else:
+            candidates.append(os.path.join(self.cwd, path))
+            if self.invocation_cwd != self.cwd:
+                candidates.append(os.path.join(self.invocation_cwd, path))
+        if self.source_root:
+            if os.path.isabs(path):
+                rel = path.lstrip(os.sep).lstrip("/")
+                candidates.append(os.path.join(self.source_root, rel))
+            else:
+                candidates.append(os.path.join(self.source_root, path))
+            candidates.append(
+                os.path.join(self.source_root, os.path.basename(path))
+            )
+        for c in candidates:
+            if os.path.isfile(c):
+                try:
+                    with open(c, "r", encoding="utf-8-sig", errors="replace") as fh:
+                        return fh.read(), os.path.abspath(c)
+                except OSError:
+                    continue
+        return None, None
 
 
 # ---------------------------------------------------------------------------
