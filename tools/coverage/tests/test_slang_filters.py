@@ -77,6 +77,36 @@ class SlangcExcludePatternsTests(unittest.TestCase):
         )
         self.assertFalse(self._excluded("source/core/slang-string.cpp"))
 
+    def test_compiler_core_lsp_excluded(self):
+        # source/compiler-core/ also has LSP / doc-only files that
+        # used to leak into the slangc report; they're excluded too.
+        self.assertTrue(self._excluded(
+            "source/compiler-core/slang-language-server-protocol.cpp"
+        ))
+        self.assertTrue(self._excluded(
+            "source/compiler-core/slang-language-server-protocol.h"
+        ))
+        self.assertTrue(self._excluded(
+            "source/compiler-core/slang-json-rpc.cpp"
+        ))
+        self.assertTrue(self._excluded(
+            "source/compiler-core/slang-json-rpc-connection.cpp"
+        ))
+        self.assertTrue(self._excluded(
+            "source/compiler-core/slang-doc-extractor.cpp"
+        ))
+        # General JSON helpers used by the pipeline (e.g. SPIRV
+        # grammar parsing, source maps) are kept.
+        self.assertFalse(self._excluded(
+            "source/compiler-core/slang-json-native.cpp"
+        ))
+        self.assertFalse(self._excluded(
+            "source/compiler-core/slang-json-source-map-util.cpp"
+        ))
+        self.assertFalse(self._excluded(
+            "source/compiler-core/slang-pretty-writer.cpp"
+        ))
+
     def test_backslash_paths_normalized(self):
         self.assertTrue(self._excluded(r"external\cmark\src\blocks.c"))
 
