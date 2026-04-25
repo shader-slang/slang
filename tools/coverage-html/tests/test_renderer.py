@@ -641,9 +641,69 @@ class CliIntegrationTests(unittest.TestCase):
         # New column groups appear only when data is present.
         self.assertIn("Function Coverage", idx)
         self.assertIn("Branch Coverage", idx)
-        # Header summary rows include Functions and Branches lines.
-        self.assertIn("Functions:", idx)
-        self.assertIn("Branches:", idx)
+        # The transposed metric grid in the page chrome lists each
+        # metric as a column header.
+        self.assertIn('class="metricColHead">Functions</td>', idx)
+        self.assertIn('class="metricColHead">Branches</td>', idx)
+        self.assertIn('class="metricColHead">Lines</td>', idx)
+
+    def test_transposed_metric_grid_in_chrome(self):
+        """Page header chrome carries a transposed metric grid: one
+        column per metric (Lines / Functions / Branches), three rows
+        for Coverage / Total / Hit."""
+        out_dir = os.path.join(self.tmp, "transposed")
+        self._run(
+            os.path.join(FIXTURES, "branches-and-functions.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        self.assertIn('table class="metricGrid"', idx)
+        self.assertIn('class="metricColHead">Lines</td>', idx)
+        self.assertIn('class="metricColHead">Functions</td>', idx)
+        self.assertIn('class="metricColHead">Branches</td>', idx)
+        self.assertIn('class="metricRowLabel">Coverage</td>', idx)
+        self.assertIn('class="metricRowLabel">Total</td>', idx)
+        self.assertIn('class="metricRowLabel">Hit</td>', idx)
+
+    def test_top_chrome_is_sticky(self):
+        """Whole top chrome is wrapped in a `topChrome` div with
+        `position: sticky` so the title + meta + metric grid stay
+        visible while the user scrolls. The data table also uses
+        `<thead>` for sticky column headers."""
+        out_dir = os.path.join(self.tmp, "sticky")
+        self._run(
+            os.path.join(FIXTURES, "branches-and-functions.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        self.assertIn('div class="topChrome"', idx)
+        self.assertIn("position: sticky", idx)
+        # The indexTable's column headers live inside <thead> for
+        # the table-internal sticky offset.
+        self.assertRegex(idx, r'<table class="indexTable"[^>]*>\s*<colgroup')
+        self.assertIn("<thead>", idx)
+        self.assertIn("</thead>", idx)
+        self.assertIn("<tbody>", idx)
+
+    def test_body_padding_matches_fnInner_inset(self):
+        """Body has 24px horizontal padding so the top-level table
+        edges line up with the function dropdown's natural inset."""
+        out_dir = os.path.join(self.tmp, "padding")
+        self._run(
+            os.path.join(FIXTURES, "branches-and-functions.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        self.assertIn("padding: 0 24px", idx)
 
     def test_directory_grouping_in_index(self):
         """Files are grouped by their full parent directory and the
@@ -980,8 +1040,9 @@ class CliIntegrationTests(unittest.TestCase):
                 text,
                 msg=f"per-file page {p} still has Hit-count header",
             )
-            # The header summary row for Functions remains.
-            self.assertIn("Functions:", text)
+            # The transposed metric grid retains a Functions column
+            # in the page chrome (not as the old "Functions:" label).
+            self.assertIn('class="metricColHead">Functions</td>', text)
 
     def test_real_lcov_renders_inline_branch_column(self):
         """Phase 2b: per-file source view shows the branch gutter."""

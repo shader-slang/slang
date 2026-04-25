@@ -153,7 +153,8 @@ INLINE_CSS = """\
 
 body { color: var(--text); background-color: #fff;
        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                    Roboto, Helvetica, Arial, sans-serif; margin: 0; }
+                    Roboto, Helvetica, Arial, sans-serif;
+       margin: 0; padding: 0 24px; }
 a:link, a:visited { color: var(--link); text-decoration: underline; }
 a:hover           { color: var(--slang-teal-hover); }
 a:active          { color: var(--slang-orange); }
@@ -163,6 +164,25 @@ td.title   { text-align: center; padding: 14px 0 10px; font-size: 22pt;
              font-weight: 600; color: var(--slang-teal);
              letter-spacing: 0.02em; }
 td.ruler   { background-color: var(--slang-teal); height: 3px; padding: 0; }
+
+/* Sticky page chrome: title + meta + transposed metric grid stay
+   visible when the user scrolls. The data table's <thead> sticks
+   directly underneath at top: var(--chrome-h), measured by JS on
+   page load. */
+div.topChrome { position: sticky; top: 0; z-index: 20;
+                background-color: #fff;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08); }
+table.chromeMeta { width: 100%; border-collapse: collapse;
+                   margin: 6px 0; }
+table.chromeMeta td { padding: 2px 8px; }
+table.metricGrid { margin: 8px auto 12px;
+                   border-collapse: collapse; }
+table.metricGrid td { padding: 4px 14px; text-align: center;
+                      min-width: 6em; }
+td.metricColHead { background-color: var(--slang-teal); color: #fff;
+                   font-weight: 600; }
+td.metricRowLabel { background-color: var(--row-bg); color: var(--text-muted);
+                    font-weight: 600; text-align: right; }
 
 td.headerItem        { text-align: right; padding-right: 6px; font-weight: 600;
                        vertical-align: top; white-space: nowrap; color: var(--text-muted); }
@@ -204,6 +224,15 @@ table.indexTable col.colBHit   { width: 4%; }
 td.tableHead { text-align: center; color: #fff; background-color: var(--slang-teal);
                font-size: 110%; font-weight: 600; padding: 4px 6px;
                white-space: nowrap; letter-spacing: 0.02em; }
+
+/* Make the index table's <thead> sticky right under the chrome.
+   `--chrome-h` is set by the inline JS at page load to the
+   measured height of `div.topChrome` so the two sticky layers
+   stack without overlap. */
+table.indexTable thead    { position: sticky;
+                            top: var(--chrome-h, 200px);
+                            z-index: 10; }
+table.indexTable thead td { background-color: var(--slang-teal); }
 
 tr.fileSummary > td:not(.coverBar):not(.coverFile):not(.coverDirectory) {
   text-align: right;
@@ -290,7 +319,10 @@ span.fnTogglePlaceholder { color: transparent; }
 span.fnToggle:focus, span.dirToggle:focus { outline: 1px dotted var(--slang-orange); }
 tr.fileFunctions[hidden]  { display: none; }
 tr.fileSummary[hidden]    { display: none; }
-tr.fileFunctions > td   { background-color: #fdfdfe; padding: 6px 24px;
+/* fileFunctions row's <td> matches the parent indexTable edges
+   (body padding already provides the 24px window inset).  A 3px
+   teal stripe on the left visually marks the expanded region. */
+tr.fileFunctions > td   { background-color: #fdfdfe; padding: 6px 0;
                           border-left: 3px solid var(--slang-teal); }
 
 /* Embedded function table inside an expanded file row. The colgroup
@@ -372,24 +404,6 @@ class Metric:
     hit: int
 
 
-def _render_metric_row(
-    left_label: str, left_value: str, metric: Metric
-) -> str:
-    pct_str = f"{metric.pct:.1f}&nbsp;%" if metric.total > 0 else "-"
-    tier = _tier(metric.pct) if metric.total > 0 else "Hi"
-    return (
-        "          <tr>\n"
-        f"            <td class=\"headerItem\">{html.escape(left_label)}</td>\n"
-        f"            <td class=\"headerValue\">{left_value}</td>\n"
-        "            <td></td>\n"
-        f"            <td class=\"headerItem\">{metric.label}:</td>\n"
-        f"            <td class=\"headerCovTableEntry{tier}\">{pct_str}</td>\n"
-        f"            <td class=\"headerCovTableEntry\">{metric.total}</td>\n"
-        f"            <td class=\"headerCovTableEntry\">{metric.hit}</td>\n"
-        "          </tr>"
-    )
-
-
 def _render_page_header(
     title: str,
     breadcrumb_html: str,
@@ -397,19 +411,38 @@ def _render_page_header(
     test_date: str,
     metrics: List[Metric],
 ) -> str:
-    # Always show at least the Lines metric. Left-column rows are
-    # Test / Date / (blank) — extra rows beyond 2 metrics get a blank
-    # left label.
-    left_rows = [
-        ("Test:", html.escape(test_name)),
-        ("Date:", html.escape(test_date)),
-    ]
-    while len(left_rows) < len(metrics):
-        left_rows.append(("", ""))
+    """Top-of-page chrome: title bar, breadcrumb / test / date,
+    and a *transposed* metric grid where columns are
+    Lines / Functions / Branches and rows are Coverage / Total / Hit.
 
-    rows_html = "\n".join(
-        _render_metric_row(left_rows[i][0], left_rows[i][1], metrics[i])
-        for i in range(len(metrics))
+    The whole block is wrapped in `<div class="topChrome">` with
+    `position: sticky; top: 0` so it stays visible when the user
+    scrolls down through the file/source list.
+    """
+    # The metric grid: one column per metric, three rows for
+    # Coverage / Total / Hit. Lines is always present; Functions /
+    # Branches only when the LCOV carries them.
+    cols_html = "\n".join(
+        f'        <td class="metricColHead">{html.escape(m.label)}</td>'
+        for m in metrics
+    )
+
+    def _rate_cell(m: Metric) -> str:
+        if m.total <= 0:
+            return '<td class="coverNumDflt">-</td>'
+        tier = _tier(m.pct)
+        return f'<td class="coverPer{tier}">{m.pct:.1f}&nbsp;%</td>'
+
+    rate_row = "\n".join(
+        f"        {_rate_cell(m)}" for m in metrics
+    )
+    total_row = "\n".join(
+        f'        <td class="coverNumDflt">{m.total if m.total else "-"}</td>'
+        for m in metrics
+    )
+    hit_row = "\n".join(
+        f'        <td class="coverNumDflt">{m.hit if m.total else "-"}</td>'
+        for m in metrics
     )
 
     return f"""<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
@@ -420,33 +453,67 @@ def _render_page_header(
   <style>{INLINE_CSS}</style>
 </head>
 <body>
+<div class="topChrome">
   <table class="chrome" cellpadding="0" cellspacing="0">
     <tr><td class="title">{html.escape(title)}</td></tr>
     <tr><td class="ruler"></td></tr>
+  </table>
+  <table class="chromeMeta">
     <tr>
-      <td>
-        <table cellpadding="1" border="0" width="100%">
-          <tr>
-            <td width="10%" class="headerItem">Current view:</td>
-            <td width="10%" class="headerValue">{breadcrumb_html}</td>
-            <td width="5%"></td>
-            <td width="5%"></td>
-            <td width="5%" class="headerCovTableHead">Coverage</td>
-            <td width="5%" class="headerCovTableHead" title="Covered + Uncovered code">Total</td>
-            <td width="5%" class="headerCovTableHead" title="Exercised code only">Hit</td>
-          </tr>
-{rows_html}
-        </table>
-      </td>
+      <td class="headerItem">Current view:</td>
+      <td class="headerValue">{breadcrumb_html}</td>
+      <td class="headerItem">Test:</td>
+      <td class="headerValue">{html.escape(test_name)}</td>
+      <td class="headerItem">Date:</td>
+      <td class="headerValue">{html.escape(test_date)}</td>
     </tr>
+  </table>
+  <table class="metricGrid">
+    <thead>
+      <tr>
+        <td class="metricRowLabel"></td>
+{cols_html}
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="metricRowLabel">Coverage</td>
+{rate_row}
+      </tr>
+      <tr>
+        <td class="metricRowLabel">Total</td>
+{total_row}
+      </tr>
+      <tr>
+        <td class="metricRowLabel">Hit</td>
+{hit_row}
+      </tr>
+    </tbody>
+  </table>
+  <table class="chrome" cellpadding="0" cellspacing="0">
     <tr><td class="ruler"></td></tr>
   </table>
+</div>
 """
 
 
 INDEX_TOGGLE_SCRIPT = """\
 <script>
 (function () {
+  // Measure the sticky chrome's height once after layout so the
+  // table's <thead> can stick directly underneath.
+  function measureChrome() {
+    var c = document.querySelector('.topChrome');
+    if (c) {
+      document.documentElement.style.setProperty(
+        '--chrome-h', c.offsetHeight + 'px'
+      );
+    }
+  }
+  if (document.readyState === 'complete') measureChrome();
+  else window.addEventListener('load', measureChrome);
+  window.addEventListener('resize', measureChrome);
+
   // Per-file toggle: reveals the next sibling fileFunctions row,
   // lazy-cloning the function table from a <template> on first
   // open so the initial DOM stays small.
@@ -934,6 +1001,7 @@ def render_index(
 
     body = f"""  <table class="indexTable" cellpadding="1" cellspacing="1" border="0">
 {colgroup}
+    <thead>
       <tr>
         <td class="tableHead" rowspan="2">File</td>
         <td class="tableHead" colspan="4">Line Coverage</td>{extra_header_cells}
@@ -941,8 +1009,11 @@ def render_index(
       <tr>
 {sub_rate_cells}{extra_sub_rate}
       </tr>
+    </thead>
+    <tbody>
 {chr(10).join(rows_html)}
-{prefix_note}    </table>
+{prefix_note}    </tbody>
+  </table>
 {templates_html}
 """
 
