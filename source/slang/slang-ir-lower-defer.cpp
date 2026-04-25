@@ -125,12 +125,13 @@ struct DeferLoweringContext : InstPassBase
 
     void processFunc(IRGlobalValueWithCode* func)
     {
-        // Iterating over `defer` instructions in reverse order allows us to
+        // Iterating over `defer` instructions in postorder (effectively
+        // reverse, as successors occur before predecessors) allows us to
         // expand them in the correct order, including nested `defer`s.
-        List<IRBlock*> reverseBlocks = getPostorder(func);
+        List<IRBlock*> postorderBlocks = getPostorder(func);
         List<IRDefer*> unhandledDefers;
 
-        for (IRBlock* block : reverseBlocks)
+        for (IRBlock* block : postorderBlocks)
         {
             for (auto child = block->getLastChild(); child; child = child->getPrevInst())
             {
