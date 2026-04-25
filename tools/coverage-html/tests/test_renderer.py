@@ -895,10 +895,22 @@ class CliIntegrationTests(unittest.TestCase):
         )
         with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
             idx = f.read()
-        # The fn dropdown header shows "Branch Coverage".
+        # The fn dropdown header shows both "Branch Coverage" and the
+        # newly-populated "Function Coverage" group (used to be empty
+        # cells until users complained the function data was missing).
         self.assertIn(
             '<td class="tableHead" colspan="3">Branch Coverage</td>', idx
         )
+        self.assertIn(
+            '<td class="tableHead" colspan="3">Function Coverage</td>', idx
+        )
+        # Per-function fc cells appear in the body: 100% green for a
+        # called function, 0% red for an uncalled one. The fixture's
+        # `getUnownedStringSliceText` is uncalled (FNDA 0), so
+        # somewhere a 0&nbsp;% coverPerLo cell exists.
+        self.assertRegex(idx, r'<td class="coverPerLo">0&nbsp;%</td>')
+        # And called functions get 100&nbsp;% coverPerHi.
+        self.assertRegex(idx, r'<td class="coverPerHi">100&nbsp;%</td>')
         # The Calls column header carries an explanation tooltip.
         self.assertIn('title="Number of invocations', idx)
 

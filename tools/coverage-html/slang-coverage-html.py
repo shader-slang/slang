@@ -293,17 +293,17 @@ tr.fileSummary[hidden]    { display: none; }
 tr.fileFunctions > td   { background-color: #fdfdfe; padding: 6px 24px;
                           border-left: 3px solid var(--slang-teal); }
 
-/* Embedded function table inside an expanded file row. Column
-   widths are chosen so the Bar / Rate / Total / Hit cells line up
-   underneath their counterparts in the parent indexTable's
-   "Lines" group; the fns/branches columns to the right stay
-   blank since they don't apply to a single function. */
+/* Embedded function table inside an expanded file row. The colgroup
+   widths mirror the parent indexTable so cells line up vertically
+   across the file row and its expanded function rows.
+   Cells inherit padding / font from their class-specific rules
+   above (coverPerHi/Med/Lo, coverNumDflt, coverBar, coverFn …) —
+   no generic `table.fnInner td` overrides — which is what makes
+   metric cells use the parent's sans-serif and 3px/10px padding,
+   while only the function name cell (td.coverFn) stays monospace. */
 table.fnInner   { border-collapse: collapse; margin: 0; width: 100%;
                   table-layout: fixed; }
-table.fnInner td { padding: 2px 8px;
-                   font-family: ui-monospace, SFMono-Regular, Menlo,
-                                Monaco, Consolas, monospace;
-                   overflow-wrap: break-word; }
+table.fnInner td { overflow-wrap: break-word; }
 table.fnInner td.tableHead { font-family: -apple-system, BlinkMacSystemFont,
                              "Segoe UI", Roboto, sans-serif; }
 /* fn-specific cols subdivide the parent's File column (47%) into
@@ -1050,12 +1050,6 @@ def _render_inline_functions_table(
     line_cov = function_line_coverage(record)
     br_cov = function_branch_coverage(record)
 
-    # Empty-cell colspan for the parent's "Function Coverage" group
-    # (3 cells) when present.
-    empty_fn_td = (
-        '<td class="coverNumDflt" colspan="3"></td>' if show_fns else ""
-    )
-
     rows: List[str] = []
     for name, fn in items:
         calls_cls = "coverFnHi" if fn.hits > 0 else "coverFnLo"
@@ -1083,6 +1077,22 @@ def _render_inline_functions_table(
             total_cell = '<td class="coverNumDflt">-</td>'
             hit_cell = '<td class="coverNumDflt">-</td>'
 
+        # Per-function function-coverage cells: 1/1 (covered) when
+        # the function was called at least once, 0/1 otherwise.
+        # Aligns with the parent's "Function Coverage" group.
+        if show_fns:
+            fn_hit_int = 1 if fn.hits > 0 else 0
+            fn_pct = 100.0 if fn.hits > 0 else 0.0
+            fn_tier = _tier(fn_pct)
+            fn_rate_cell = (
+                f'<td class="coverPer{fn_tier}">{fn_pct:.0f}&nbsp;%</td>'
+            )
+            fn_total_cell = '<td class="coverNumDflt">1</td>'
+            fn_hit_cell = f'<td class="coverNumDflt">{fn_hit_int}</td>'
+            fn_cells = fn_rate_cell + fn_total_cell + fn_hit_cell
+        else:
+            fn_cells = ""
+
         if show_br:
             b_total, b_hit = br_cov.get(name, (0, 0))
             if b_total > 0:
@@ -1107,7 +1117,7 @@ def _render_inline_functions_table(
             f'<td class="coverNumDflt">{line_cell}</td>'
             f'<td class="{calls_cls}">{fn.hits}</td>'
             f"{bar_cell}{rate_cell}{total_cell}{hit_cell}"
-            f"{empty_fn_td}{br_cells}"
+            f"{fn_cells}{br_cells}"
             "</tr>"
         )
 
@@ -1130,7 +1140,9 @@ def _render_inline_functions_table(
 
     extra_heads = ""
     if show_fns:
-        extra_heads += '          <td class="tableHead" colspan="3"></td>\n'
+        extra_heads += (
+            '          <td class="tableHead" colspan="3">Function Coverage</td>\n'
+        )
     if show_br:
         extra_heads += (
             '          <td class="tableHead" colspan="3">Branch Coverage</td>\n'
