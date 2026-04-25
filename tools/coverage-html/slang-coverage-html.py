@@ -162,10 +162,10 @@ td.coverBar        { padding: 2px 10px; background-color: #dae7fe; }
 span.coverBarOutline { display: inline-block; height: 10px; width: 100px;
                        background-color: #000; vertical-align: middle;
                        line-height: 0; }
+/* Bar fill is a continuous gradient from red (0%) → green (100%);
+   the per-row inline `style="background-color: hsl(...)"` selects
+   the spot on the gradient for that file. */
 span.coverBarFill  { display: inline-block; height: 10px; vertical-align: top; }
-span.coverBarFillHi  { background-color: #a7fc9d; }
-span.coverBarFillMed { background-color: #ffea20; }
-span.coverBarFillLo  { background-color: #ff0000; }
 span.coverBarRest    { background-color: #fff; display: inline-block;
                        height: 10px; vertical-align: top; }
 
@@ -229,9 +229,13 @@ table.fnInner   { border-collapse: collapse; margin: 4px 0;
                   table-layout: fixed; width: 100%; }
 table.fnInner td { padding: 1px 6px; font-family: monospace;
                    overflow-wrap: break-word; }
-table.fnInner col.fnNameCol { width: auto; }
-table.fnInner col.fnLineCol { width: 6em; }
-table.fnInner col.fnHitsCol { width: 10em; }
+table.fnInner col.fnNameCol  { width: auto; }
+table.fnInner col.fnLineCol  { width: 5em; }
+table.fnInner col.fnCallsCol { width: 7em; }
+table.fnInner col.fnBarCol   { width: 8em; }
+table.fnInner col.fnRateCol  { width: 5em; }
+table.fnInner col.fnTotalCol { width: 5em; }
+table.fnInner col.fnHitCol   { width: 5em; }
 table.fnInner td.tableHead { font-family: sans-serif; }
 
 .sourceUnavailable { color: #a33; font-style: italic; padding: 8px; }
@@ -413,14 +417,24 @@ def _render_page_footer(extra_body: str = "") -> str:
 """
 
 
+def _gradient_color(pct: float) -> str:
+    """HSL color for a coverage rate. 0 % → red (hue 0); 100 % →
+    green (hue 120). Linear interpolation in hue space gives a
+    smooth red → orange → yellow → lime → green ramp without the
+    bright-tier banding."""
+    pct = max(0.0, min(100.0, pct))
+    hue = pct * 1.2  # 0..120
+    return f"hsl({hue:.0f}, 70%, 50%)"
+
+
 def _render_rate_bar(pct: float) -> str:
-    tier = _tier(pct)
     fill_w = max(0, min(100, int(round(pct))))
     rest_w = 100 - fill_w
+    color = _gradient_color(pct)
     return (
         f'<span class="coverBarOutline">'
-        f'<span class="coverBarFill coverBarFill{tier}" '
-        f'style="width:{fill_w}px"></span>'
+        f'<span class="coverBarFill" '
+        f'style="background-color:{color};width:{fill_w}px"></span>'
         f'<span class="coverBarRest" style="width:{rest_w}px"></span>'
         f"</span>"
     )
@@ -709,16 +723,24 @@ def render_file_page(
 def _render_inline_functions_table(record: FileRecord, file_href: str) -> str:
     """Render a Functions table to embed inside an index <td>.
 
-    Differs from the old per-file version: no `<center>` wrapper, no
-    margin-top, and line-number links target the per-file page (since
-    we're rendered on the index, not the file page itself).
+    Columns mirror the file row's layout for the line-coverage half:
+
+      Function name | Line | Calls | Bar | Rate% | Total | Hit
+
+    where "Calls" is the FNDA hit count and the right-hand four cells
+    describe the function's *line* coverage (how many DA lines that
+    fall inside the function's range were exercised).
     """
+    from lcov_io import function_line_coverage
+
     items = sorted(
         record.functions.items(), key=lambda kv: (kv[1].first_line, kv[0])
     )
+    coverage = function_line_coverage(record)
+
     rows: List[str] = []
     for name, fn in items:
-        cls = "coverFnHi" if fn.hits > 0 else "coverFnLo"
+        calls_cls = "coverFnHi" if fn.hits > 0 else "coverFnLo"
         if fn.first_line > 0:
             line_cell = (
                 f'<a href="{html.escape(file_href)}#L{fn.first_line}">'
@@ -726,11 +748,34 @@ def _render_inline_functions_table(record: FileRecord, file_href: str) -> str:
             )
         else:
             line_cell = "-"
+
+        total, hit = coverage.get(name, (0, 0))
+        if total > 0:
+            pct = 100.0 * hit / total
+            tier = _tier(pct)
+            rate_cell = (
+                f'<td class="coverPer{tier}">{pct:.1f}&nbsp;%</td>'
+            )
+            bar_cell = (
+                f'<td class="coverBar" align="center">{_render_rate_bar(pct)}</td>'
+            )
+            total_cell = f'<td class="coverNumDflt">{total}</td>'
+            hit_cell = f'<td class="coverNumDflt">{hit}</td>'
+        else:
+            # No DA lines fall in the function's range — usually
+            # because first_line == 0 (orphan FNDA) or the file has
+            # no DA records at all. Render dashes.
+            rate_cell = '<td class="coverNumDflt">-</td>'
+            bar_cell = '<td class="coverBar"></td>'
+            total_cell = '<td class="coverNumDflt">-</td>'
+            hit_cell = '<td class="coverNumDflt">-</td>'
+
         rows.append(
             "        <tr>"
             f'<td class="coverFn">{html.escape(name)}</td>'
             f'<td class="coverNumDflt">{line_cell}</td>'
-            f'<td class="{cls}">{fn.hits}</td>'
+            f'<td class="{calls_cls}">{fn.hits}</td>'
+            f"{bar_cell}{rate_cell}{total_cell}{hit_cell}"
             "</tr>"
         )
 
@@ -739,12 +784,19 @@ def _render_inline_functions_table(record: FileRecord, file_href: str) -> str:
         '        <colgroup>\n'
         '          <col class="fnNameCol">\n'
         '          <col class="fnLineCol">\n'
-        '          <col class="fnHitsCol">\n'
+        '          <col class="fnCallsCol">\n'
+        '          <col class="fnBarCol">\n'
+        '          <col class="fnRateCol">\n'
+        '          <col class="fnTotalCol">\n'
+        '          <col class="fnHitCol">\n'
         '        </colgroup>\n'
         "        <tr>\n"
         '          <td class="tableHead">Function</td>\n'
         '          <td class="tableHead">Line</td>\n'
-        '          <td class="tableHead">Hit count</td>\n'
+        '          <td class="tableHead">Calls</td>\n'
+        '          <td class="tableHead" colspan="2">Line Coverage</td>\n'
+        '          <td class="tableHead">Total</td>\n'
+        '          <td class="tableHead">Hit</td>\n'
         "        </tr>\n"
         + "\n".join(rows)
         + "\n      </table>"

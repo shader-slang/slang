@@ -111,6 +111,54 @@ class FileRecord:
         return 100.0 * self.hit_functions / self.total_functions
 
 
+def function_line_coverage(record: FileRecord) -> Dict[str, Tuple[int, int]]:
+    """For each function in `record`, compute (total_lines, hit_lines)
+    from the DA records that fall in the function's source range.
+
+    LCOV doesn't carry a function's end-line. We approximate the
+    range as `[first_line, next_function_first_line)` where "next"
+    means the next function in source order; the last function picks
+    up all remaining DA lines.
+
+    Functions with `first_line == 0` (FNDA reported without an FN
+    declaration) report `(0, 0)` — there is no source range to attach
+    them to.
+    """
+    by_name: Dict[str, Tuple[int, int]] = {}
+
+    # Sort functions by first_line, breaking ties on name for
+    # determinism. Skip functions without a declared first line.
+    items = [
+        (name, fn) for name, fn in record.functions.items() if fn.first_line > 0
+    ]
+    items.sort(key=lambda kv: (kv[1].first_line, kv[0]))
+
+    if not items:
+        return {name: (0, 0) for name in record.functions}
+
+    sorted_lines = sorted(record.lines.items())  # [(line, hits), ...]
+
+    for i, (name, fn) in enumerate(items):
+        start = fn.first_line
+        end = items[i + 1][1].first_line if i + 1 < len(items) else 10**9
+        total = 0
+        hit = 0
+        for ln, hits in sorted_lines:
+            if ln < start:
+                continue
+            if ln >= end:
+                break
+            total += 1
+            if hits > 0:
+                hit += 1
+        by_name[name] = (total, hit)
+
+    # Fill in (0, 0) for any functions we skipped (first_line == 0).
+    for name in record.functions:
+        by_name.setdefault(name, (0, 0))
+    return by_name
+
+
 # ---------------------------------------------------------------------------
 # LCOV parser
 # ---------------------------------------------------------------------------

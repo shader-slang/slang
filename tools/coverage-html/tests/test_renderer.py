@@ -208,6 +208,65 @@ def _strip_tags(s: str) -> str:
     return re.sub(r"<[^>]+>", "", s)
 
 
+class FunctionLineCoverageTests(unittest.TestCase):
+    """Per-function line coverage derived from FN: + DA: ranges."""
+
+    def _build(self, lines, fns):
+        from lcov_io import FileRecord, Function
+
+        r = FileRecord(path="x.c")
+        r.lines = dict(lines)
+        r.functions = {n: Function(first_line=fl, hits=h) for n, (fl, h) in fns.items()}
+        return r
+
+    def test_simple_two_function_split(self):
+        from lcov_io import function_line_coverage
+
+        # foo: lines 1-4 (foo declared at 1; bar at 5)
+        # bar: lines 5+
+        r = self._build(
+            lines={1: 1, 2: 1, 3: 0, 4: 1, 5: 1, 6: 0},
+            fns={"foo": (1, 7), "bar": (5, 1)},
+        )
+        cov = function_line_coverage(r)
+        self.assertEqual(cov["foo"], (4, 3))
+        self.assertEqual(cov["bar"], (2, 1))
+
+    def test_function_without_first_line_is_zero(self):
+        from lcov_io import function_line_coverage
+
+        r = self._build(
+            lines={1: 1, 2: 0},
+            fns={"orphan": (0, 5)},  # FNDA without FN
+        )
+        self.assertEqual(function_line_coverage(r)["orphan"], (0, 0))
+
+    def test_last_function_captures_all_remaining(self):
+        from lcov_io import function_line_coverage
+
+        r = self._build(
+            lines={10: 1, 100: 1, 1000: 0},
+            fns={"only_one": (5, 1)},
+        )
+        self.assertEqual(function_line_coverage(r)["only_one"], (3, 2))
+
+
+class GradientColorTests(unittest.TestCase):
+    def test_endpoints(self):
+        # 0% → red (hue 0), 100% → green (hue 120).
+        self.assertIn("hsl(0,", renderer._gradient_color(0.0))
+        self.assertIn("hsl(120,", renderer._gradient_color(100.0))
+
+    def test_midpoint_is_yellow(self):
+        # 50% → hue 60 (yellow).
+        self.assertIn("hsl(60,", renderer._gradient_color(50.0))
+
+    def test_clamps(self):
+        # Out-of-range inputs clamp to [0, 100].
+        self.assertIn("hsl(0,", renderer._gradient_color(-5.0))
+        self.assertIn("hsl(120,", renderer._gradient_color(200.0))
+
+
 class TierTests(unittest.TestCase):
     def test_thresholds(self):
         self.assertEqual(renderer._tier(100.0), "Hi")
@@ -457,7 +516,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertIn('<colgroup>', idx)
         self.assertIn('class="fnNameCol"', idx)
         self.assertIn('class="fnLineCol"', idx)
-        self.assertIn('class="fnHitsCol"', idx)
+        self.assertIn('class="fnCallsCol"', idx)
+        self.assertIn('class="fnBarCol"', idx)
+        self.assertIn('class="fnRateCol"', idx)
         # Long mangled names should wrap via word-break / overflow-wrap.
         self.assertIn('word-break: break-all', idx)
 
@@ -524,6 +585,16 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertIn("_Z3addii", idx)
         # Line column links to per-file anchor.
         self.assertIn("#L4", idx)
+        # Per-function line-coverage cells (Bar + Rate + Total + Hit)
+        # appear in each row; tier classes carry through.
+        self.assertIn('Line Coverage', idx)
+        self.assertIn('class="coverPer', idx)
+        # Bar fills use the gradient-color inline style, not the old
+        # tier classes.
+        self.assertIn('background-color:hsl(', idx)
+        self.assertNotIn('coverBarFillHi', idx)
+        self.assertNotIn('coverBarFillMed', idx)
+        self.assertNotIn('coverBarFillLo', idx)
 
     def test_per_file_page_no_longer_has_functions_table(self):
         """Goal 2 partner: per-file pages drop the Functions table
