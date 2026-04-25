@@ -310,8 +310,9 @@ SLANG_UNIT_TEST(writerSingleCategoryDoesNotLeakOthers)
     writer->appendDescriptionForCategory(&opts, compileIdx);
     String text = writer->getBuilder().produceString();
 
-    // 'compile' content present.
-    SLANG_CHECK(contains(text, "compile"));
+    // 'compile' content present (heading + underline; matches the
+    // TEXT contract pinned in writerTextRendersOptionCategories).
+    SLANG_CHECK(contains(text, "compile\n======="));
     SLANG_CHECK(contains(text, "<format>"));
     SLANG_CHECK(contains(text, "Target format"));
 

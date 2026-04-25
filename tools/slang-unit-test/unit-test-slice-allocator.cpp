@@ -76,12 +76,20 @@ SLANG_UNIT_TEST(sliceAllocatorAllocatedDataIsIndependent)
 {
     SliceAllocator alloc;
 
-    // The backing buffer of the input string can change without
-    // affecting the allocated slice.
-    String input = "snapshot-me";
-    TerminatedCharSlice s = alloc.allocate(input);
+    // Allocate from a mutable buffer, then mutate the buffer
+    // in-place. If the allocator borrowed the source memory rather
+    // than copying it, the slice would observe the mutation. (A
+    // String reassignment wouldn't catch this — the original
+    // String storage might still be readable post-rebind under
+    // common allocators, hiding a use-after-free.)
+    char buf[12] = {'s', 'n', 'a', 'p', 's', 'h', 'o', 't', '-', 'm', 'e', '\0'};
+    TerminatedCharSlice s = alloc.allocate(UnownedStringSlice(buf, buf + 11));
 
-    input = "different";
+    // Overwrite every byte of the source.
+    for (int i = 0; i < 11; ++i)
+        buf[i] = 'X';
+
+    // The slice must retain the original content.
     SLANG_CHECK(strcmp(s.begin(), "snapshot-me") == 0);
 }
 

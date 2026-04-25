@@ -236,8 +236,11 @@ SLANG_UNIT_TEST(mathFloatAsIntRespectsBits)
     // 1.0f has IEEE-754 representation 0x3F800000.
     SLANG_CHECK(FloatAsInt(1.0f) == 0x3F800000);
     SLANG_CHECK(FloatAsInt(0.0f) == 0);
-    // -0.0f is sign-bit only.
-    SLANG_CHECK((unsigned)FloatAsInt(-0.0f) == 0x80000000u);
+    // -0.0f is sign-bit only. Construct it via IntAsFloat so the
+    // value isn't a `-0.0f` literal that fast-math compile flags
+    // (e.g. -fno-signed-zeros) could fold to +0.0f at compile time.
+    const float negZero = IntAsFloat((int)0x80000000);
+    SLANG_CHECK((unsigned)FloatAsInt(negZero) == 0x80000000u);
 }
 
 // -- Half conversion ---------------------------------------------
@@ -279,7 +282,51 @@ SLANG_UNIT_TEST(mathBFloatRoundTripExactValues)
     }
 }
 
-// `Math::Pi` is declared but defined in slang-math.cpp; it isn't
-// exported from libslang-compiler so the unit-test linker can't see
-// it. Skipping the value check; the constant exists at compile time
-// and is referenced widely.
+// `Math::Pi` is declared in slang-math.h as `static const float Pi`
+// but has no out-of-line definition (no `Slang::Math::Pi` in any
+// `.cpp`). Any test that ODR-uses it would fail to link. Tracked
+// as shader-slang/slang#10952; no test is added here.
+
+// -- E4M3 / E5M2 8-bit float formats -----------------------------
+
+SLANG_UNIT_TEST(mathFloatE4M3RoundTripExactValues)
+{
+    // E4M3 has 4 exponent + 3 mantissa bits; values exactly
+    // representable in this format round-trip without loss.
+    for (float f : {0.0f, 1.0f, -1.0f, 0.5f, -0.5f, 2.0f, -2.0f, 4.0f})
+    {
+        unsigned int e = FloatToFloatE4M3(f);
+        float back = FloatE4M3ToFloat(e);
+        SLANG_CHECK(back == f);
+    }
+}
+
+SLANG_UNIT_TEST(mathFloatE4M3SaturatesAtMax)
+{
+    // E4M3 max is 448; values above the format's range either
+    // saturate or produce NaN. Either way the value must NOT
+    // round-trip back to the original 1e10.
+    unsigned int e = FloatToFloatE4M3(1e10f);
+    float back = FloatE4M3ToFloat(e);
+    SLANG_CHECK(back != 1e10f);
+}
+
+SLANG_UNIT_TEST(mathFloatE5M2RoundTripExactValues)
+{
+    // E5M2: 5 exponent + 2 mantissa bits. Wider range than E4M3,
+    // less precision. {0, ±1, ±0.5, powers of two} round-trip.
+    for (float f : {0.0f, 1.0f, -1.0f, 0.5f, -0.5f, 2.0f, -2.0f, 1024.0f})
+    {
+        unsigned int e = FloatToFloatE5M2(f);
+        float back = FloatE5M2ToFloat(e);
+        SLANG_CHECK(back == f);
+    }
+}
+
+SLANG_UNIT_TEST(mathFloatE5M2SaturatesAtMax)
+{
+    // E5M2 max is ~57344 (2^15 * 1.75). 1e10 exceeds that.
+    unsigned int e = FloatToFloatE5M2(1e10f);
+    float back = FloatE5M2ToFloat(e);
+    SLANG_CHECK(back != 1e10f);
+}

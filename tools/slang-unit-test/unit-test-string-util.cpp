@@ -11,9 +11,11 @@
 // What this suite pins:
 //
 //   * `split(in, sep, out)` decomposes `in` at every occurrence of
-//     `sep`. Adjacent separators produce empty slices. Empty input
-//     produces a single empty slice. Length-bounded `split` returns
-//     SLANG_FAIL when the input has more than `maxSlices` segments.
+//     `sep`. Adjacent separators produce empty slices. **Empty
+//     input yields no slices** (the implementation returns with
+//     `out` left empty rather than a single empty slice). Length-
+//     bounded `split` returns SLANG_FAIL when the input has more
+//     than `maxSlices` segments.
 //   * `splitOnWhitespace` collapses runs of whitespace and skips
 //     leading / trailing whitespace.
 //   * `join` is the inverse of `split` for non-empty separators —
@@ -198,17 +200,23 @@ SLANG_UNIT_TEST(stringUtilReplaceAll)
     String r = StringUtil::replaceAll(toSlice("foo bar foo"), toSlice("foo"), toSlice("baz"));
     SLANG_CHECK(r == "baz bar baz");
 
+    // Left-to-right, non-overlapping replacement: "aaaa" with
+    // "aa"→"b" matches positions 0 and 2, producing "bb".
     r = StringUtil::replaceAll(toSlice("aaaa"), toSlice("aa"), toSlice("b"));
-    // Replacing aa→b in "aaaa" iterates: aaaa → baa → ... depending
-    // on whether the implementation re-scans. Either "bb" (two
-    // non-overlapping replacements) or some variant. Either way, no
-    // 'a' remains.
-    SLANG_CHECK(r.indexOf('a') == -1);
-    SLANG_CHECK(r.getLength() > 0);
+    SLANG_CHECK(r == "bb");
+
+    // Replacement longer than the needle expands the result; the
+    // overlapping prefix "aa" of "aaa" is consumed first.
+    r = StringUtil::replaceAll(toSlice("aaaa"), toSlice("aa"), toSlice("XYZ"));
+    SLANG_CHECK(r == "XYZXYZ");
 
     // No-op when needle absent.
     r = StringUtil::replaceAll(toSlice("hello"), toSlice("xxx"), toSlice("yyy"));
     SLANG_CHECK(r == "hello");
+
+    // Single-char needle replacement.
+    r = StringUtil::replaceAll(toSlice("a-b-c"), toSlice("-"), toSlice("__"));
+    SLANG_CHECK(r == "a__b__c");
 }
 
 // -- line extraction --------------------------------------------------

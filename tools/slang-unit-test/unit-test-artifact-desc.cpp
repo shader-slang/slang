@@ -2,7 +2,7 @@
 //
 // Contract under test
 // -------------------
-// `ArtifactDesc` is a (kind, payload, style, flags) triple
+// `ArtifactDesc` is a (kind, payload, style, flags) 4-tuple
 // classifying any compiler artifact (source files, intermediate
 // representations, compiled binaries, debug info, etc.).
 // `ArtifactDescUtil` and the kind/payload/style hierarchy

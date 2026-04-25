@@ -224,13 +224,13 @@ SLANG_UNIT_TEST(rttiUtilDefaultTypeFuncsAreInvokable)
     int32_t arr[3] = {99, 99, 99};
     int32_t src[3] = {1, 2, 3};
     RttiTypeFuncsMap typeMap;
-    funcs.ctorArray(&typeMap, rtti<int32_t>(), arr, 3);
+    funcs.ctorArray(&typeMap, rtti<int32_t>(), arr, SLANG_COUNT_OF(arr));
     SLANG_CHECK(arr[0] == 0 && arr[1] == 0 && arr[2] == 0);
 
-    funcs.copyArray(&typeMap, rtti<int32_t>(), arr, src, 3);
+    funcs.copyArray(&typeMap, rtti<int32_t>(), arr, src, SLANG_COUNT_OF(src));
     SLANG_CHECK(arr[0] == 1 && arr[1] == 2 && arr[2] == 3);
 
-    funcs.dtorArray(&typeMap, rtti<int32_t>(), arr, 3); // no-op on POD
+    funcs.dtorArray(&typeMap, rtti<int32_t>(), arr, SLANG_COUNT_OF(arr)); // no-op on POD
     SLANG_CHECK(arr[0] == 1); // memory still readable
 }
 
@@ -241,8 +241,9 @@ SLANG_UNIT_TEST(rttiUtilCopyArrayPodIsBitwiseCopy)
     int32_t src[5] = {1, 2, 3, 4, 5};
     int32_t dst[5] = {0, 0, 0, 0, 0};
     RttiTypeFuncsMap typeMap;
-    RttiUtil::copyArray(&typeMap, rtti<int32_t>(), dst, src, sizeof(int32_t), 5);
-    for (int i = 0; i < 5; ++i)
+    RttiUtil::copyArray(
+        &typeMap, rtti<int32_t>(), dst, src, sizeof(int32_t), SLANG_COUNT_OF(src));
+    for (Index i = 0; i < SLANG_COUNT_OF(dst); ++i)
     {
         SLANG_CHECK(dst[i] == src[i]);
     }
