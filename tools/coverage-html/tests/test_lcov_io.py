@@ -10,7 +10,7 @@ Runs with stdlib unittest; no pip deps. From the repo root:
 
 Or directly:
 
-    python3 tools/coverage-html/tests/test_renderer.py
+    python3 tools/coverage-html/tests/test_lcov_io.py
 """
 
 import os
@@ -56,6 +56,37 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(shared.lines, {1: 5, 2: 4, 3: 0})
         self.assertEqual(shared.hit_lines, 2)
         self.assertEqual(shared.total_lines, 3)
+
+    def test_fn_after_fnda_fills_first_line(self):
+        # Regression: LCOV does not mandate FN-before-FNDA ordering.
+        # If FNDA arrives first, the parser created a stub with
+        # first_line=0; a later FN for the same name must update
+        # that stub rather than be silently ignored. Otherwise the
+        # function is mis-classified as an orphan FNDA and per-
+        # function range queries return (0, 0).
+        import tempfile
+        content = (
+            "TN:\n"
+            "SF:foo.c\n"
+            "FNDA:5,_Z3foov\n"   # FNDA first (out of order)
+            "FN:10,_Z3foov\n"     # FN second
+            "DA:10,5\n"
+            "DA:11,5\n"
+            "end_of_record\n"
+        )
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".info", delete=False, encoding="utf-8"
+        )
+        try:
+            tmp.write(content)
+            tmp.close()
+            records = renderer.parse_lcov(tmp.name)
+        finally:
+            os.unlink(tmp.name)
+        self.assertEqual(len(records), 1)
+        fn = records[0].functions["_Z3foov"]
+        self.assertEqual(fn.first_line, 10)
+        self.assertEqual(fn.hits, 5)
 
     def test_unknown_records_are_tolerated(self):
         records = renderer.parse_lcov(

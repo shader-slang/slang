@@ -1,7 +1,16 @@
 (function () {
-  // Measure the sticky chrome's height once after layout so any
-  // sticky element below it (table <thead>, source heading, …)
-  // can stack directly underneath via top: var(--chrome-h).
+  // Measure the sticky chrome's height after layout so any sticky
+  // element below it (table <thead>, source heading, …) can stack
+  // directly underneath via top: var(--chrome-h).
+  //
+  // We listen for several signals because chrome height can shift
+  // after the initial `load`:
+  //   * `load` — basic case after document is ready.
+  //   * `resize` — viewport changes.
+  //   * `document.fonts.ready` — late web-font swap can change
+  //     the title's measured height. Baseline-widely-available.
+  //   * `ResizeObserver` — any other reflow (zoom, expanding an
+  //     auth-summary banner, etc.) re-syncs the variable.
   function measureChrome() {
     var c = document.querySelector('.topChrome');
     if (c) {
@@ -13,6 +22,13 @@
   if (document.readyState === 'complete') measureChrome();
   else window.addEventListener('load', measureChrome);
   window.addEventListener('resize', measureChrome);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(measureChrome);
+  }
+  if ('ResizeObserver' in window) {
+    var c = document.querySelector('.topChrome');
+    if (c) new ResizeObserver(measureChrome).observe(c);
+  }
 })();
 (function () {
   // Per-file toggle: reveals the next sibling fileFunctions row,
@@ -82,6 +98,17 @@
 
       if (collapsing) {
         r.setAttribute('hidden', '');
+        // Also reset any toggle widget on a hidden descendant so
+        // the chevron / aria-expanded state matches "hidden" when
+        // the user re-expands later. Without this, deep `fnToggle`
+        // / `dirToggle` widgets keep stale "open" state from a
+        // previous session and the chevron disagrees with the
+        // hidden content for one click.
+        var collapseToggle = r.querySelector('.fnToggle, .dirToggle');
+        if (collapseToggle) {
+          collapseToggle.textContent = '\u25B6';
+          collapseToggle.setAttribute('aria-expanded', 'false');
+        }
         return;
       }
       // Expanding: reveal only direct children of `path`.

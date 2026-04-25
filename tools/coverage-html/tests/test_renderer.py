@@ -413,24 +413,14 @@ class CliIntegrationTests(unittest.TestCase):
         (parent + each child), so a tree like
             external/cmark/src/foo.c
         gives us four headers: '', 'external', 'external/cmark',
-        'external/cmark/src'."""
-        # Build a tiny synthetic LCOV with one file deep in a tree.
-        deep = os.path.join(self.tmp, "deep.info")
-        with open(deep, "w") as f:
-            f.write(
-                "TN:\nSF:external/cmark/src/blocks.c\n"
-                "DA:1,1\nLF:1\nLH:1\nend_of_record\n"
-            )
-        out_dir = os.path.join(self.tmp, "deep-out")
-        self._run(deep, "--output-dir", out_dir, "--quiet")
-        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
-            idx = f.read()
-        # Each ancestor has its own dirHeader.
-        # Note: slang-coverage-html strips the common prefix; with
-        # a single-file LCOV that prefix is the file's full directory,
-        # so the hierarchy collapses to "(top level)" + just the file.
-        # To validate nesting we add a second file outside the deep
-        # tree so the common prefix stays at the root.
+        'external/cmark/src'.
+
+        slang-coverage-html strips the common prefix; with a
+        single-file LCOV that prefix is the file's full directory,
+        so the hierarchy collapses to "(top level)" + just the file.
+        To validate nesting we use two files so the common prefix
+        stays at the root.
+        """
         deep2 = os.path.join(self.tmp, "deep2.info")
         with open(deep2, "w") as f:
             f.write(

@@ -114,6 +114,20 @@ class MergeRecordsTests(unittest.TestCase):
         merged = merger.merge_records([[a], [b]])
         self.assertEqual(merged[0].lines, {1: 1, 2: 1})
 
+    def test_lines_zero_hit_only_in_later_input_is_preserved(self):
+        # Regression: a 0-hit DA line present only in input B (which
+        # is processed second) must still survive the merge. The
+        # earlier `dst.lines.get(ln, 0)` default conflated "absent"
+        # with "previously 0 hits", silently dropping the record.
+        a = self._record("x.c", lines={1: 1})
+        b = self._record("x.c", lines={1: 0, 2: 0, 3: 0})
+        merged = merger.merge_records([[a], [b]])
+        self.assertEqual(merged[0].lines, {1: 1, 2: 0, 3: 0})
+        self.assertEqual(merged[0].total_lines, 3)
+        # And the bug is order-independent: same outcome reversed.
+        merged_rev = merger.merge_records([[b], [a]])
+        self.assertEqual(merged_rev[0].lines, {1: 1, 2: 0, 3: 0})
+
     def test_branches_int_beats_dash(self):
         # `-` (None) loses to any integer; absent input contributes
         # nothing.

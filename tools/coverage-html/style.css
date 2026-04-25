@@ -115,8 +115,14 @@ table.indexTable thead td { background-color: var(--slang-teal); }
 tr.fileSummary > td:not(.coverBar):not(.coverFile):not(.coverDirectory) {
   text-align: right;
 }
-tr.fileSummary:nth-child(odd)  > td.coverFile,
-tr.fileSummary:nth-child(odd)  > td.coverNumDflt { background-color: var(--row-bg); }
+/* Zebra-stripe ONLY .fileSummary rows. Plain `:nth-child(odd)`
+   counts position among ALL siblings in the <tbody>, which mixes
+   dirHeader / fileSummary / fileFunctions and produces sporadic
+   striping. The CSS-Selectors-Level-4 `of S` form fixes the count
+   to the .fileSummary subset; baseline-widely-available in modern
+   evergreen browsers (Chromium/Firefox/Safari). */
+tr:nth-child(odd of tr.fileSummary) > td.coverFile,
+tr:nth-child(odd of tr.fileSummary) > td.coverNumDflt { background-color: var(--row-bg); }
 
 td.coverFile       { text-align: left; padding: 3px 20px 3px 10px;
                      color: var(--link); background-color: var(--row-bg-alt);
@@ -135,7 +141,7 @@ td.coverDirectory  { text-align: left; padding: 4px 20px 4px 10px;
                                   Monaco, Consolas, monospace;
                      font-weight: 700; }
 td.coverBar        { padding: 3px 10px; background-color: var(--row-bg-alt); }
-tr.fileSummary:nth-child(odd) > td.coverBar { background-color: var(--row-bg); }
+tr:nth-child(odd of tr.fileSummary) > td.coverBar { background-color: var(--row-bg); }
 span.coverBarOutline { display: inline-block; height: 10px; width: 100px;
                        background-color: #cfd4d8; vertical-align: middle;
                        line-height: 0; border-radius: 1px; overflow: hidden; }

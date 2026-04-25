@@ -1061,12 +1061,22 @@ def _render_placeholder_view(record: FileRecord) -> str:
     rows.append(
         '    <tr><td class="tableHead">Line</td><td class="tableHead">Hits</td></tr>'
     )
+    # Reuse the same gradient-cell helper the rest of the renderer
+    # uses for unhit cells, so the placeholder view stays visually
+    # consistent (no orphan `coverNumLo` class — there's no rule
+    # for it in style.css; the tier classes were superseded by
+    # inline gradient styles).
     for ln in sorted(record.lines):
         hits = record.lines[ln]
-        cls = "coverNumDflt" if hits > 0 else "coverNumLo"
+        if hits > 0:
+            cell = f'<td class="coverNumDflt">{hits}</td>'
+        else:
+            cell = (
+                f'<td class="coverNumDflt" '
+                f'style="background-color:{_gradient_cell_bg(0.0)}">{hits}</td>'
+            )
         rows.append(
-            f'    <tr><td class="coverFile">{ln}</td>'
-            f'<td class="{cls}">{hits}</td></tr>'
+            f'    <tr><td class="coverFile">{ln}</td>{cell}</tr>'
         )
     rows.append("  </table>")
     return "\n".join(rows) + "\n"

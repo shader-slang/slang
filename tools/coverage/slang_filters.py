@@ -31,19 +31,25 @@ SLANG_CI_STRIP_PREFIXES: Tuple[str, ...] = (
 )
 
 
+# Patterns are matched via `re.search()` on repo-relative paths
+# (post `--strip-prefix`). Top-level segments (`external/`,
+# `include/`, `tools/`, `source/...`) are anchored with `^` so nested
+# directories like `tests/preprocessor/include/` aren't swept up by
+# an unanchored substring match — those are test fixtures, not
+# top-level non-pipeline source segments.
 SLANGC_EXCLUDE_PATTERNS: Tuple[str, ...] = (
-    r"build/prelude/",
-    r"build/source/slang/(capability|fiddle|slang-lookup-tables)/",
-    r"build/source/slang-core-module/",
-    r"external/",
-    r"include/",
-    r"source/slang-core-module/",
-    r"source/slang-glslang/",
-    r"source/slang-record-replay/",
-    r"tools/",
-    r"source/slang/slang-(language-server|doc-markdown-writer|doc-ast|ast-dump|repro|workspace-version)[.\-]",
+    r"^build/prelude/",
+    r"^build/source/slang/(capability|fiddle|slang-lookup-tables)/",
+    r"^build/source/slang-core-module/",
+    r"^external/",
+    r"^include/",
+    r"^source/slang-core-module/",
+    r"^source/slang-glslang/",
+    r"^source/slang-record-replay/",
+    r"^tools/",
+    r"^source/slang/slang-(language-server|doc-markdown-writer|doc-ast|ast-dump|repro|workspace-version)[.\-]",
     # Language-server / doc-only files that live in compiler-core
     # (LSP protocol structs, JSON-RPC framing, doc-comment extraction).
-    r"source/compiler-core/slang-(language-server-protocol|json-rpc|doc-extractor)[.\-]",
-    r"source/slang/slang-ast-(expr|modifier|stmt)\.h$",
+    r"^source/compiler-core/slang-(language-server-protocol|json-rpc|doc-extractor)[.\-]",
+    r"^source/slang/slang-ast-(expr|modifier|stmt)\.h$",
 )

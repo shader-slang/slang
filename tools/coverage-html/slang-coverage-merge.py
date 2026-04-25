@@ -30,6 +30,7 @@ Standard library only; no pip deps.
 """
 
 import argparse
+import atexit
 import gzip
 import io
 import os
@@ -85,16 +86,41 @@ def normalized_records(
 # ---------------------------------------------------------------------------
 
 
+_temp_files: List[str] = []
+
+
+@atexit.register
+def _cleanup_temp_files() -> None:
+    """Best-effort cleanup of gunzipped temp files on process exit.
+
+    The merger may decompress multiple `.gz` inputs into temp files;
+    on long-lived hosts (e.g. CI runners with persistent /tmp), they
+    accumulate without this hook. `os.remove` may race or fail if
+    the file is already gone — swallow any error.
+    """
+    for p in _temp_files:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+
+
 def _gunzip_to_temp(gz_path: str) -> str:
     """Decompress a .gz LCOV to a temp file and return the temp path.
 
-    parse_lcov takes a path, not a stream — so we materialize the
-    decompressed text on disk. The temp file is left in place; callers
-    are CLI invocations with short lifetimes, OS will clean it up.
+    `parse_lcov` takes a path, not a stream, so we materialize the
+    decompressed text on disk. The temp file is registered for
+    cleanup via `atexit` (see `_cleanup_temp_files`).
+
+    No upper bound on decompressed size — inputs are expected to be
+    trusted CI artifacts. A crafted gzip bomb could exhaust /tmp;
+    callers passing untrusted inputs should set their own size cap
+    before invoking this tool.
     """
     import tempfile
 
     fd, tmp = tempfile.mkstemp(suffix=".lcov", prefix="scv-merge-")
+    _temp_files.append(tmp)
     with os.fdopen(fd, "wb") as out, gzip.open(gz_path, "rb") as gz:
         while True:
             chunk = gz.read(1 << 16)
@@ -193,8 +219,10 @@ def _merge_into(dst: FileRecord, src: FileRecord) -> None:
     """Fold `src`'s coverage into `dst` in place using max rules."""
     # Lines: max hit count per source line.
     for ln, hits in src.lines.items():
-        prev = dst.lines.get(ln, 0)
-        if hits > prev:
+        # NOTE: must distinguish "absent" from "previously zero".
+        # Using `dict.get(ln, 0)` would treat both as the same and
+        # silently drop a 0-hit DA record present only in `src`.
+        if ln not in dst.lines or hits > dst.lines[ln]:
             dst.lines[ln] = hits
 
     # Branches: integer beats None; integer max wins.

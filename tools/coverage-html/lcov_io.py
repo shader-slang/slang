@@ -455,7 +455,7 @@ def parse_lcov(
     try:
         f = open(path, "r", encoding="utf-8-sig", errors="replace")
     except OSError as e:
-        raise LcovParseError(f"cannot open LCOV file {path!r}: {e}")
+        raise LcovParseError(f"cannot open LCOV file {path!r}: {e}") from e
 
     with f:
         for lineno, raw in enumerate(f, start=1):
@@ -580,8 +580,16 @@ def parse_lcov(
                     raise LcovParseError(
                         f"{path}:{lineno}: non-integer FN line {value!r}"
                     ) from e
-                if name not in current.functions:
+                # FN may legally arrive after FNDA for the same name
+                # (LCOV doesn't mandate ordering). If so, the FNDA-
+                # first path created a stub with first_line=0; fill
+                # it in now so per-function range queries don't treat
+                # it as an orphan.
+                fn = current.functions.get(name)
+                if fn is None:
                     current.functions[name] = Function(first_line=first_line, hits=0)
+                elif fn.first_line == 0:
+                    fn.first_line = first_line
             elif tag == "FNDA":
                 if current is None:
                     raise LcovParseError(
@@ -655,6 +663,11 @@ def write_lcov(
         out.write(f"TN:{tn_value}\n")
         out.write(f"SF:{r.path}\n")
 
+        # All FNF/FNH/BRF/BRH/LF/LH below report the *derived* totals
+        # from the raw dicts, NOT the FileRecord properties — those
+        # consult auth_override, which is for display, not for round-
+        # tripping through LCOV.
+
         # FN: lines first (declaring line + name).
         for name, fn in r.functions.items():
             out.write(f"FN:{fn.first_line},{name}\n")
@@ -662,8 +675,22 @@ def write_lcov(
         for name, fn in r.functions.items():
             out.write(f"FNDA:{fn.hits},{name}\n")
         if r.functions:
-            out.write(f"FNF:{r.total_functions}\n")
-            out.write(f"FNH:{r.hit_functions}\n")
+            # Match the same dedup-by-(file, first_line) rule the
+            # in-memory model uses, but compute it inline here so we
+            # don't reach for r.total_functions (which honours
+            # auth_override).
+            line_set = {fn.first_line for fn in r.functions.values() if fn.first_line > 0}
+            orphan_total = sum(1 for fn in r.functions.values() if fn.first_line <= 0)
+            line_hit_set = {
+                fn.first_line for fn in r.functions.values()
+                if fn.first_line > 0 and fn.hits > 0
+            }
+            orphan_hit = sum(
+                1 for fn in r.functions.values()
+                if fn.first_line <= 0 and fn.hits > 0
+            )
+            out.write(f"FNF:{len(line_set) + orphan_total}\n")
+            out.write(f"FNH:{len(line_hit_set) + orphan_hit}\n")
 
         # DA: per source line.
         for ln in sorted(r.lines):
@@ -674,11 +701,13 @@ def write_lcov(
             taken_str = "-" if taken is None else str(taken)
             out.write(f"BRDA:{ln},{block},{branch_id},{taken_str}\n")
         if r.branches:
-            out.write(f"BRF:{r.total_branches}\n")
-            out.write(f"BRH:{r.hit_branches}\n")
+            out.write(f"BRF:{len(r.branches)}\n")
+            out.write(
+                "BRH:"
+                f"{sum(1 for t in r.branches.values() if t is not None and t > 0)}\n"
+            )
 
-        # LF/LH last. Report the *derived* totals — auth_override
-        # is for display, not for round-tripping through LCOV.
+        # LF/LH.
         if r.lines:
             out.write(f"LF:{len(r.lines)}\n")
             out.write(
@@ -716,7 +745,7 @@ def parse_llvm_cov_report(path: str) -> AuthSummary:
         with open(path, "r", encoding="utf-8-sig", errors="replace") as fh:
             text = fh.read()
     except OSError as e:
-        raise LcovParseError(f"cannot open report file {path!r}: {e}")
+        raise LcovParseError(f"cannot open report file {path!r}: {e}") from e
 
     for raw in text.splitlines():
         line = raw.rstrip()
