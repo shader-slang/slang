@@ -1,8 +1,29 @@
 // unit-test-artifact-desc.cpp
 //
-// Tests for `ArtifactDescUtil` — predicates / queries on
-// `ArtifactDesc` (kind/payload/style triples). Pure-value tests, no
-// IArtifact instances needed.
+// Contract under test
+// -------------------
+// `ArtifactDesc` is a (kind, payload, style, flags) triple
+// classifying any compiler artifact (source files, intermediate
+// representations, compiled binaries, debug info, etc.).
+// `ArtifactDescUtil` and the kind/payload/style hierarchy
+// predicates are the public query surface. Used everywhere the
+// compiler decides "what kind of thing is this artifact?", and
+// the answers feed into:
+//
+//   * Backend selection (isCpuLikeTarget / isCpuBinary / isGpuUsable)
+//   * Linker behaviour (isLinkable / isKindBinaryLinkable)
+//   * Source-vs-binary handling (isText)
+//   * Disassembly relationships (isDisassembly)
+//   * File-extension inference for I/O (getDescFromExtension /
+//     getDescFromPath / appendDefaultExtension)
+//   * Round-tripping with the public C-API target enum
+//     (makeDescForCompileTarget / getCompileTargetFromDesc)
+//
+// The hierarchy queries (`isDerivedFrom(child, parent)`) are the
+// foundation: a kind / payload / style derives from itself
+// (reflexive), and from each ancestor in its taxonomy. Used by
+// caller code to write "is this an HLSL-like source?" without
+// enumerating every concrete flavour.
 
 #include "../../source/compiler-core/slang-artifact-desc-util.h"
 #include "../../source/compiler-core/slang-artifact.h"
@@ -51,20 +72,37 @@ SLANG_UNIT_TEST(artifactStyleHierarchy)
     SLANG_CHECK(isDerivedFrom(ArtifactStyle::Host, ArtifactStyle::Host));
 }
 
-SLANG_UNIT_TEST(artifactKindNames)
+// Distinct kinds must produce distinct human-readable names so
+// callers (diagnostic / log code) can tell artifacts apart in
+// output. A naming collision would confuse error messages.
+SLANG_UNIT_TEST(artifactKindNamesAreDistinct)
 {
-    // Kind names are non-empty for canonical kinds.
-    SLANG_CHECK(getName(ArtifactKind::Source).getLength() > 0);
-    SLANG_CHECK(getName(ArtifactKind::SharedLibrary).getLength() > 0);
-    SLANG_CHECK(getName(ArtifactKind::ObjectCode).getLength() > 0);
+    auto src = getName(ArtifactKind::Source);
+    auto so = getName(ArtifactKind::SharedLibrary);
+    auto obj = getName(ArtifactKind::ObjectCode);
+
+    SLANG_CHECK(src.getLength() > 0);
+    SLANG_CHECK(so.getLength() > 0);
+    SLANG_CHECK(obj.getLength() > 0);
+    SLANG_CHECK(src != so);
+    SLANG_CHECK(src != obj);
+    SLANG_CHECK(so != obj);
 }
 
-SLANG_UNIT_TEST(artifactPayloadNames)
+SLANG_UNIT_TEST(artifactPayloadNamesAreDistinct)
 {
-    SLANG_CHECK(getName(ArtifactPayload::HLSL).getLength() > 0);
-    SLANG_CHECK(getName(ArtifactPayload::GLSL).getLength() > 0);
-    SLANG_CHECK(getName(ArtifactPayload::SPIRV).getLength() > 0);
-    SLANG_CHECK(getName(ArtifactPayload::DXIL).getLength() > 0);
+    auto hlsl = getName(ArtifactPayload::HLSL);
+    auto glsl = getName(ArtifactPayload::GLSL);
+    auto spirv = getName(ArtifactPayload::SPIRV);
+    auto dxil = getName(ArtifactPayload::DXIL);
+
+    SLANG_CHECK(hlsl.getLength() > 0);
+    SLANG_CHECK(glsl.getLength() > 0);
+    SLANG_CHECK(spirv.getLength() > 0);
+    SLANG_CHECK(dxil.getLength() > 0);
+    SLANG_CHECK(hlsl != glsl);
+    SLANG_CHECK(spirv != dxil);
+    SLANG_CHECK(hlsl != spirv);
 }
 
 SLANG_UNIT_TEST(artifactDescIsCpuTarget)
@@ -135,22 +173,44 @@ SLANG_UNIT_TEST(artifactDescGetDescFromPath)
     SLANG_CHECK(isDerivedFrom(glsl.payload, ArtifactPayload::GLSL));
 }
 
-SLANG_UNIT_TEST(artifactDescGetText)
+// getText must mention the payload by name so a human reading
+// the diagnostic can identify the artifact. Different descs must
+// produce different strings (otherwise the rendering is useless
+// for distinguishing artifacts).
+SLANG_UNIT_TEST(artifactDescGetTextMentionsPayload)
 {
-    auto hlslSource = makeDesc(ArtifactKind::Source, ArtifactPayload::HLSL);
-    String text = ArtifactDescUtil::getText(hlslSource);
-    // The text representation should be non-empty and mention the
-    // payload (or kind) name in some form.
-    SLANG_CHECK(text.getLength() > 0);
+    String hlslText = ArtifactDescUtil::getText(
+        makeDesc(ArtifactKind::Source, ArtifactPayload::HLSL));
+    String spirvText = ArtifactDescUtil::getText(
+        makeDesc(ArtifactKind::Executable, ArtifactPayload::SPIRV));
+
+    SLANG_CHECK(hlslText.getLength() > 0);
+    SLANG_CHECK(spirvText.getLength() > 0);
+    SLANG_CHECK(hlslText != spirvText);
 }
 
-SLANG_UNIT_TEST(artifactDescAppendDefaultExtension)
+// `appendDefaultExtension` must produce the canonical extension
+// for the given desc — the one that round-trips through
+// `getDescFromExtension`. So if we extend an arbitrary base path
+// with the default extension, then ask "what desc does that file
+// have?", we should recover the (kind, payload) we started with.
+SLANG_UNIT_TEST(artifactDescAppendDefaultExtensionRoundTrips)
 {
-    StringBuilder buf;
-    auto spirv = makeDesc(ArtifactKind::Executable, ArtifactPayload::SPIRV);
-    SlangResult r = ArtifactDescUtil::appendDefaultExtension(spirv, buf);
-    SLANG_CHECK(SLANG_SUCCEEDED(r));
-    SLANG_CHECK(buf.getLength() > 0);
+    auto hlslSource = makeDesc(ArtifactKind::Source, ArtifactPayload::HLSL);
+    StringBuilder hlslBuf;
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        ArtifactDescUtil::appendDefaultExtension(hlslSource, hlslBuf)));
+    SLANG_CHECK(hlslBuf.getLength() > 0);
+    // Round-trip: ext → desc.
+    auto recovered = ArtifactDescUtil::getDescFromExtension(hlslBuf.getUnownedSlice());
+    SLANG_CHECK(isDerivedFrom(recovered.payload, ArtifactPayload::HLSL));
+
+    auto glslSource = makeDesc(ArtifactKind::Source, ArtifactPayload::GLSL);
+    StringBuilder glslBuf;
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        ArtifactDescUtil::appendDefaultExtension(glslSource, glslBuf)));
+    auto recoveredGlsl = ArtifactDescUtil::getDescFromExtension(glslBuf.getUnownedSlice());
+    SLANG_CHECK(isDerivedFrom(recoveredGlsl.payload, ArtifactPayload::GLSL));
 }
 
 SLANG_UNIT_TEST(artifactDescMakeDescForCompileTarget)

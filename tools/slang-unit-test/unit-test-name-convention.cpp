@@ -1,4 +1,26 @@
 // unit-test-name-convention.cpp
+//
+// Contract under test
+// -------------------
+// `NameConventionUtil` decomposes a name into "words" and rebuilds
+// it in another convention. Used by Slang's reflection / option-
+// printing code to surface enum names in whichever style the
+// caller wants. The contract:
+//
+//   * `inferStyleFromText` infers the *style* (Kabab / Snake /
+//     Camel) from the separator chars in a name; no separators →
+//     Camel.
+//   * `inferConventionFromText` additionally infers Upper vs
+//     Lower from the alphabetic case.
+//   * `split` decomposes a name into words for a given style.
+//     Camel splits at every uppercase boundary; Kabab/Snake split
+//     at the separator char.
+//   * `convert` is round-trippable: convert(A, slice, B) followed
+//     by convert(B, that, A) reproduces the original (modulo case
+//     for case-insensitive styles).
+//   * Bit-mask helpers (`isUpper`, `isLower`, `getNameStyle`,
+//     `makeUpper`, `makeLower`) decode/encode the
+//     NameConvention enum's flag layout.
 
 #include "../../source/compiler-core/slang-name-convention-util.h"
 #include "../../source/core/slang-string.h"

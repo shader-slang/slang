@@ -1,4 +1,27 @@
 // unit-test-slice-allocator.cpp
+//
+// Contract under test
+// -------------------
+// `SliceAllocator` is a small wrapper around `MemoryArena` that
+// returns `TerminatedCharSlice`s. Used by the artifact / blob
+// machinery to hand out slang-API-shaped string slices without
+// each caller managing its own arena lifetime. The contract:
+//
+//   * `allocate(...)` copies the input into the arena and returns
+//     a TerminatedCharSlice whose `.begin()` points at a NUL-
+//     terminated copy. The original input may freely change after
+//     the call (independence guarantee).
+//   * Length-preserving — embedded NULs in slice inputs are kept
+//     verbatim. The terminator is always one byte past `.count`.
+//   * `deallocateAll()` invalidates all prior slices but leaves
+//     the allocator usable for fresh allocations.
+//   * `getArena()` exposes the underlying MemoryArena for direct
+//     allocations of non-string objects from the same arena.
+//
+// The independence guarantee is the load-bearing one — many
+// callers store a SliceAllocator alongside a List<TerminatedCharSlice>
+// and rely on the slices remaining valid after the source Strings
+// go out of scope.
 
 #include "../../source/compiler-core/slang-slice-allocator.h"
 #include "../../source/core/slang-string.h"
@@ -144,12 +167,26 @@ SLANG_UNIT_TEST(sliceAllocatorPreservesEmbeddedNuls)
     SLANG_CHECK(s.begin()[5] == '\0');
 }
 
-SLANG_UNIT_TEST(sliceAllocatorArenaAccessor)
+SLANG_UNIT_TEST(sliceAllocatorArenaIsTheSameArena)
 {
+    // The arena exposed via getArena() must be the *same* arena
+    // that allocate(...) uses, so callers can safely co-allocate
+    // string slices and ad-hoc structures together. We verify by
+    // allocating a string, then checking that a subsequent direct
+    // arena allocation produces a pointer in the same arena.
     SliceAllocator alloc;
-    // Sanity: the public arena accessor is callable and returns a
-    // reference to a usable arena (block-allocate something).
+    TerminatedCharSlice s = alloc.allocate("test-string");
+    SLANG_CHECK(s.count == 11);
+
     MemoryArena& arena = alloc.getArena();
-    void* p = arena.allocate(64);
+    char* p = static_cast<char*>(arena.allocate(64));
     SLANG_CHECK(p != nullptr);
+
+    // Both allocations must survive a subsequent allocate() call —
+    // the arena doesn't move existing pointers.
+    TerminatedCharSlice s2 = alloc.allocate("another");
+    SLANG_CHECK(strcmp(s.begin(), "test-string") == 0); // s still valid
+    SLANG_CHECK(strcmp(s2.begin(), "another") == 0);
+    p[0] = 'X'; // p still writable; arena didn't reuse the storage
+    SLANG_CHECK(p[0] == 'X');
 }

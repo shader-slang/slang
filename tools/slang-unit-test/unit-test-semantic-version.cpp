@@ -1,4 +1,27 @@
 // unit-test-semantic-version.cpp
+//
+// Contract under test
+// -------------------
+// `SemanticVersion` is a (major, minor, patch) triple used for
+// downstream-tool version compatibility checks (DXC, FXC, Metal
+// SDK, etc.). The contract this suite pins:
+//
+//   * Parse accepts `M`, `M.N`, `M.N.P` decimal forms with `.` (or
+//     a custom char) as separator. Empty / non-numeric / >3-segment
+//     inputs fail.
+//   * `append` produces a deterministic textual form: patch is
+//     elided when zero (`1.2.0` formats as `1.2`); non-zero patch
+//     is always kept.
+//   * Ordering is lexicographic on (major, minor, patch) — same
+//     order as comparing the `RawValue` packed integer.
+//   * `fromRaw(getRawValue(v)) == v` — the raw form is a bijection.
+//   * `isBackwardsCompatibleWith(other)` returns true iff the major
+//     versions match AND `this.minor >= other.minor`. Patch is
+//     intentionally ignored — the check is "could code targeting
+//     `other` work against `this`?", which doesn't depend on patch.
+//   * `getEarliest` / `getLatest` over an array — min and max under
+//     the same lexicographic ordering. Empty input returns the
+//     default (zero) version.
 
 #include "../../source/core/slang-semantic-version.h"
 #include "../../source/core/slang-string.h"

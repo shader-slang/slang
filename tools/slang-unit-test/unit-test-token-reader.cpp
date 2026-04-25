@@ -1,8 +1,29 @@
 // unit-test-token-reader.cpp
 //
-// Tests for `Slang::Misc::TokenReader` — a small recursive-descent
-// tokenizer used by SPIR-V intrinsic snippets and similar text
-// formats. Distinct from the main Slang lexer.
+// Contract under test
+// -------------------
+// `Slang::Misc::TokenReader` is a small tokenizer used by the
+// SPIR-V intrinsic snippet parser (`slang-ir-spirv-snippet.cpp`)
+// and similar internal text formats. It is *not* the main Slang
+// lexer. The contract:
+//
+//   * Tokenization happens eagerly in the constructor — the input
+//     string is split into a list of tokens, each carrying type,
+//     content and position.
+//   * Identifiers, integer / float / string literals, and the
+//     punctuation set listed in `TokenType` each get their own
+//     token type. Operators (`+`, `==`, `<<`, etc.) are
+//     pre-classified.
+//   * `ReadInt` / `ReadUInt` / `ReadDouble` / `ReadFloat` /
+//     `ReadWord` / `ReadStringLiteral` / `Read(expectedStr)` /
+//     `Read(TokenType)` consume one token and assert its type;
+//     mismatches throw `TextFormatException`. Reading past the end
+//     also throws.
+//   * `LookAhead` / `NextToken` are non-consuming. `AdvanceIf`
+//     consumes only on match.
+//   * `Back(n)` rewinds N tokens so a caller can re-read.
+//   * `Position.Line` is monotonically non-decreasing as tokens
+//     are produced (a token after a newline is on a later line).
 
 #include "../../source/core/slang-token-reader.h"
 #include "unit-test/slang-unit-test.h"
