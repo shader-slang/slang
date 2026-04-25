@@ -870,6 +870,40 @@ struct LoweredElementTypeContext
 
             return info;
         }
+
+        // Metal ParameterBlock: lower element types inside resource types so that e.g.
+        // RWStructuredBuffer<int*> becomes DescriptorHandle(RWStructuredBuffer<ulong>)
+        // instead of DescriptorHandle(RWStructuredBuffer<int*>) which emits the
+        // rejected `device int* device*` in the argument buffer struct.
+        if (config.layoutRuleName == IRTypeLayoutRuleName::MetalParameterBlock &&
+            isResourceType(type))
+        {
+            IRType* elemType = nullptr;
+            if (auto builtinGeneric = as<IRBuiltinGenericType>(type))
+                elemType = builtinGeneric->getElementType();
+
+            if (elemType)
+            {
+                auto loweredElemInfo = getLoweredTypeInfo(elemType, config);
+                if (loweredElemInfo.loweredType != loweredElemInfo.originalType)
+                {
+                    ShortList<IRInst*> typeOperands;
+                    for (UInt i = 0; i < type->getOperandCount(); i++)
+                        typeOperands.add(type->getOperand(i));
+                    typeOperands[0] = loweredElemInfo.loweredType;
+                    auto resourceTypeForDescriptor = builder.getType(
+                        type->getOp(),
+                        (UInt)typeOperands.getCount(),
+                        typeOperands.getArrayView().getBuffer());
+
+                    auto leafInfo = leafTypeLoweringPolicy->lowerLeafLogicalType(
+                        resourceTypeForDescriptor, config);
+                    leafInfo.originalType = type;
+                    return leafInfo;
+                }
+            }
+        }
+
         return leafTypeLoweringPolicy->lowerLeafLogicalType(type, config);
     }
 
@@ -898,6 +932,14 @@ struct LoweredElementTypeContext
         }
         if (loweredTypeInfo.tryGetValue(type, info))
             return info;
+
+        // Pre-populate cache with identity mapping as a sentinel to break cycles
+        // from buffer-indirected recursive types (e.g. struct A { RWStructuredBuffer<B> }
+        // + struct B { A a; }). Re-entrant calls hit this sentinel and return "no change".
+        info.originalType = type;
+        info.loweredType = type;
+        loweredTypeInfo.set(type, info);
+
         info = getLoweredTypeInfoImpl(type, config);
         IRSizeAndAlignment sizeAlignment;
         getSizeAndAlignment(
@@ -1698,9 +1740,15 @@ struct LoweredElementTypeContext
 
             if (as<IRTextureBufferType>(globalInst))
                 continue;
-            if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) &&
-                !as<IRArrayType>(elementType) && !as<IRBoolType>(elementType))
-                continue;
+            {
+                bool needsElementLowering =
+                    as<IRStructType>(elementType) || as<IRMatrixType>(elementType) ||
+                    as<IRArrayType>(elementType) || as<IRBoolType>(elementType);
+                if (!needsElementLowering && isMetalTarget(target->getTargetReq()))
+                    needsElementLowering = as<IRPtrType>(elementType) != nullptr;
+                if (!needsElementLowering)
+                    continue;
+            }
             bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
         }
 
@@ -2860,6 +2908,35 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
     }
 };
 
+struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
+{
+    MetalBufferElementTypeLoweringPolicy(
+        TargetProgram* inTarget,
+        BufferElementTypeLoweringOptions inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
+    {
+    }
+
+    LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
+    {
+        // Only lower pointer types stored as data inside storage buffers (e.g.
+        // RWStructuredBuffer<int*>). Pointers in constant buffers / entry point
+        // param structs are runtime-set device handles and must stay as pointers.
+        if (as<IRPtrType>(type) && config.addressSpace == AddressSpace::StorageBuffer)
+        {
+            IRBuilder builder(type);
+            builder.setInsertBefore(type);
+            LoweredElementTypeInfo info = {};
+            info.originalType = type;
+            info.loweredType = builder.getUInt64Type();
+            info.convertLoweredToOriginal = kIROp_CastIntToPtr;
+            info.convertOriginalToLowered = kIROp_CastPtrToInt;
+            return info;
+        }
+        return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
+    }
+};
+
 struct WGSLBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
 {
     WGSLBufferElementTypeLoweringPolicy(
@@ -2903,6 +2980,8 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
         return new DefaultBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::KhronosTarget:
         return new KhronosTargetBufferElementTypeLoweringPolicy(target, options);
+    case BufferElementTypeLoweringPolicyKind::Metal:
+        return new MetalBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::MetalParameterBlock:
         return new MetalParameterBlockElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::WGSL:

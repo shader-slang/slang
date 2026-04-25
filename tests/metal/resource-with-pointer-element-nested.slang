@@ -1,0 +1,36 @@
+//TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry compute_main
+
+// Reproduces the exact slangpy test_copy_pointer / test_raw_buffer_of_pointers
+// failure: RWStructuredBuffer<int*> wrapped in a struct (RWValueRef), which is
+// then a field of a ParameterBlock struct alongside a bare pointer field.
+//
+// See: https://github.com/shader-slang/slang/issues/10841
+
+struct RWValueRef
+{
+    RWStructuredBuffer<int*> value;
+};
+
+struct CallData
+{
+    uint3 _thread_count;
+    int* ptr;
+    RWValueRef _result;
+};
+
+ParameterBlock<CallData> call_data;
+
+// The argument-buffer struct must not contain any multi-level device pointers.
+// CHECK: struct CallData
+// CHECK: ulong
+// CHECK-NOT: device{{.*}}device
+// CHECK: };
+
+// CHECK: compute_main
+
+[shader("compute")]
+[numthreads(32, 1, 1)]
+void compute_main(uint3 tid : SV_DispatchThreadID)
+{
+    call_data._result.value[0] = call_data.ptr;
+}
