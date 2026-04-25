@@ -117,6 +117,58 @@ def load(path: str) -> List[FileRecord]:
 
 
 # ---------------------------------------------------------------------------
+# Function synthesis (from sibling FN positions + own DA)
+# ---------------------------------------------------------------------------
+
+
+def synthesize_missing_functions(
+    inputs: List[List[FileRecord]],
+) -> int:
+    """For each file present in multiple inputs, fill in FN/FNDA on
+    inputs that lack them, using sibling inputs' (name, first_line)
+    map and the silent input's own DA hit count at first_line as the
+    proxy call count.
+
+    Returns the number of synthesized FNDA entries.
+
+    Use case: the OpenCppCoverage → LCOV converter on Windows emits
+    DA records but no FN/FNDA. Linux/macOS (clang's llvm-cov export)
+    emit both. Synthesis lets a 3-OS merge surface a per-function
+    Windows hit count that rides off Linux/macOS's function map and
+    Windows's own line-execution data.
+
+    Modifies `inputs` in place.
+    """
+    # path -> {name: first_line}, deduped across inputs (first FN wins).
+    fn_positions: Dict[str, Dict[str, int]] = {}
+    for record_list in inputs:
+        for r in record_list:
+            for name, fn in r.functions.items():
+                if fn.first_line <= 0:
+                    continue
+                fn_positions.setdefault(r.path, {}).setdefault(name, fn.first_line)
+
+    synthesized = 0
+    for record_list in inputs:
+        for r in record_list:
+            if r.functions:
+                # This input already reported functions for this file;
+                # leave it alone.
+                continue
+            positions = fn_positions.get(r.path)
+            if not positions:
+                # No sibling input has FN data for this file either.
+                continue
+            for name, first_line in positions.items():
+                hits = r.lines.get(first_line, 0)
+                r.functions[name] = Function(
+                    first_line=first_line, hits=hits
+                )
+                synthesized += 1
+    return synthesized
+
+
+# ---------------------------------------------------------------------------
 # Cross-file merge
 # ---------------------------------------------------------------------------
 
@@ -235,6 +287,21 @@ def build_argparser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--synthesize-functions",
+        action="store_true",
+        help=(
+            "EXPERIMENTAL. For inputs that emit DA but no FN/FNDA "
+            "(notably the Windows OpenCppCoverage → LCOV converter), "
+            "fill in FN/FNDA from sibling inputs' (name, first_line) "
+            "map plus this input's own DA hit count at first_line. "
+            "Lets Windows contribute to per-function coverage in the "
+            "merged report. Caveat: DA-at-first-line is a proxy for "
+            "FNDA call count and can over-count when the entry line "
+            "is shared with a callee or fall-through; treat the "
+            "result as an upper bound on function coverage."
+        ),
+    )
+    p.add_argument(
         "--quiet",
         action="store_true",
         help="Suppress progress output on stderr.",
@@ -272,6 +339,17 @@ def main(argv: Optional[List[str]] = None) -> int:
             if args.slangc_filter:
                 line += f" (slangc-filter dropped {before - len(recs)})"
             print(line, file=sys.stderr)
+
+    if args.synthesize_functions:
+        synth = synthesize_missing_functions(inputs)
+        if not args.quiet and synth > 0:
+            print(
+                f"{GENERATOR_NAME}: --synthesize-functions: filled in "
+                f"{synth} FNDA entr{'y' if synth == 1 else 'ies'} for "
+                f"inputs lacking FN/FNDA (using sibling FN positions "
+                f"+ own DA hits at first_line; treat as upper bound)",
+                file=sys.stderr,
+            )
 
     merged = merge_records(inputs)
 

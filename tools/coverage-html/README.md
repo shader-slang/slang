@@ -88,6 +88,14 @@ slang-coverage-merge <LCOV ...> [options]
                          compiler-only file set CI uses (mirrors
                          tools/coverage/slangc-ignore-patterns.sh).
                          Applied per-input after path normalization.
+--synthesize-functions   EXPERIMENTAL. Fill in FN/FNDA on inputs that
+                         emit DA but no FN/FNDA (notably the Windows
+                         OpenCppCoverage → LCOV converter), using
+                         sibling inputs' (name, first_line) map and
+                         this input's own DA at first_line as the
+                         hit-count proxy. Treat as upper bound — DA
+                         at entry can over-count for tail-merged or
+                         fall-through entry lines.
 --quiet                  Suppress progress output on stderr
 ```
 
@@ -114,6 +122,31 @@ Path normalization:
 - Unmatched paths pass through unchanged.
 
 Auto-detect: inputs ending in `.gz` are decompressed transparently.
+
+## Methodology vs `llvm-cov report`
+
+Our percentages are computed from **raw LCOV records** the same way
+genhtml does. CI's published per-platform numbers come from
+**`llvm-cov report`**, which uses different counting rules for the
+same underlying data.
+
+For Linux slangc-filtered (PR-10884 run as a stable reference):
+
+| Metric    | Ours (raw LCOV) | CI (`llvm-cov report`) | Gap     |
+| --------- | --------------- | ---------------------- | ------- |
+| Lines     | 77.75 %         | 78.21 %                | -0.5 pp |
+| Branches  | 65.79 %         | 74.08 %                | -8.3 pp |
+| Functions | 61.35 %         | 79.45 %                | -18 pp  |
+
+Lines agree closely after the slangc filter (the bulk of the gap
+on the unfiltered view comes from prelude / external / build-
+generated files that llvm-cov excludes anyway). Branches and
+functions show larger gaps — `llvm-cov report` collapses some
+records that `llvm-cov export -format=lcov` faithfully emits. This
+isn't a bug in the merger; it's a known cross-tool methodology gap.
+If you need numbers directly comparable to CI, take CI's published
+numbers; if you need a **single merged number across all hosts**,
+use ours and accept the methodology delta.
 
 ### Source resolution
 
