@@ -897,7 +897,8 @@ struct LoweredElementTypeContext
                         typeOperands.getArrayView().getBuffer());
 
                     auto leafInfo = leafTypeLoweringPolicy->lowerLeafLogicalType(
-                        resourceTypeForDescriptor, config);
+                        resourceTypeForDescriptor,
+                        config);
                     leafInfo.originalType = type;
                     return leafInfo;
                 }
@@ -2919,19 +2920,33 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
 
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
     {
-        // Only lower pointer types stored as data inside storage buffers (e.g.
-        // RWStructuredBuffer<int*>). Pointers in constant buffers / entry point
-        // param structs are runtime-set device handles and must stay as pointers.
-        if (as<IRPtrType>(type) && config.addressSpace == AddressSpace::StorageBuffer)
+        if (auto ptrType = as<IRPtrType>(type))
         {
-            IRBuilder builder(type);
-            builder.setInsertBefore(type);
-            LoweredElementTypeInfo info = {};
-            info.originalType = type;
-            info.loweredType = builder.getUInt64Type();
-            info.convertLoweredToOriginal = kIROp_CastIntToPtr;
-            info.convertOriginalToLowered = kIROp_CastPtrToInt;
-            return info;
+            bool needsLowering = false;
+
+            // Pointers as data inside storage buffers (e.g. RWStructuredBuffer<int*>)
+            // always need lowering since the buffer itself is already a device pointer.
+            if (config.addressSpace == AddressSpace::StorageBuffer)
+                needsLowering = true;
+
+            // Multi-level pointers (e.g. int**) in any buffer context need lowering
+            // to avoid `device T* device*` in Metal structs bound via [[buffer(N)]].
+            // Single-level pointers (e.g. int*) in constant buffers are runtime-set
+            // device handles and must stay as typed pointers.
+            if (as<IRPtrType>(ptrType->getValueType()))
+                needsLowering = true;
+
+            if (needsLowering)
+            {
+                IRBuilder builder(type);
+                builder.setInsertBefore(type);
+                LoweredElementTypeInfo info = {};
+                info.originalType = type;
+                info.loweredType = builder.getUInt64Type();
+                info.convertLoweredToOriginal = kIROp_CastIntToPtr;
+                info.convertOriginalToLowered = kIROp_CastPtrToInt;
+                return info;
+            }
         }
         return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
     }
