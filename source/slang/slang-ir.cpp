@@ -1861,7 +1861,19 @@ IRInst* IRBuilder::_createInst(
     m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
     type = (IRType*)instReplacement;
 
-    if (isInstHoistable(op, type, fixedArgs))
+    if (type && shouldHaveSpecConstRate(op, type, fixedArgCount, fixedArgs))
+    {
+        type = ensureSpecConstRate(this, type);
+        return _findOrEmitHoistableInst(
+            type,
+            op,
+            fixedArgCount,
+            fixedArgs,
+            varArgListCount,
+            listArgCounts,
+            listArgs);
+    }
+    else if (isInstHoistable(op))
     {
         return _findOrEmitHoistableInst(
             type,
@@ -3209,7 +3221,7 @@ IRCompilerDictionaryEntry* IRBuilder::fetchCompilerDictionaryEntry(
 
 void IRBuilder::setCompilerDictionaryEntryValue(IRCompilerDictionaryEntry* entry, IRInst* valueInst)
 {
-    if (auto existingVal = entry->getValue())
+    if (auto existingVal = entry->getValue(); existingVal)
     {
         // Invalid.
         SLANG_UNEXPECTED("Translation entry already exists");
@@ -3240,7 +3252,7 @@ void IRBuilder::addCompilerDictionaryEntry(
     }
 
     auto entry = _getCompilerDictionaryEntry(keyVals);
-    if (auto existingVal = entry->getValue())
+    if (auto existingVal = entry->getValue(); existingVal)
     {
         // Invalid.
         SLANG_UNEXPECTED("Translation entry already exists");

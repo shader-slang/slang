@@ -23,6 +23,7 @@
 #include "slang-ir-lower-defer.h"
 #include "slang-ir-lower-error-handling.h"
 #include "slang-ir-lower-expand-type.h"
+#include "slang-ir-mesh-output-reads.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-obfuscate-loc.h"
 #include "slang-ir-operator-shift-overflow.h"
@@ -2476,6 +2477,20 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitDifferentialPairType(DifferentialPairType* pairType)
     {
         IRType* primalType = lowerType(context, pairType->getPrimalType());
+        if (isDeclRefTypeOf<InterfaceDecl>(pairType->getPrimalType()))
+        {
+            // Existential differential pairs are handled specially later in autodiff lowering:
+            // their differential type is modeled as `IDifferentiable`, and the witness operand
+            // on `DifferentialPair<interface>` is not consulted.
+            //
+            // We intentionally lower a poison witness for any interface primal so we don't try to
+            // eagerly materialize front-end interface conformance through this operand.
+            //
+            // Use a sub-builder so that the insert point isn't affected.
+            IRBuilder subBuilder(context->irBuilder->getModule());
+            auto poisonWitness = getUnitPoisonVal(&subBuilder, context->irBuilder->getModule());
+            return getBuilder()->getDifferentialPairType(primalType, poisonWitness);
+        }
         if (as<IRAssociatedType>(primalType) || as<IRThisType>(primalType))
         {
             List<IRInst*> operands;
@@ -2491,8 +2506,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             auto undefined = getBuilder()->emitPoison(operands[1]->getFullType());
             return getBuilder()->getDifferentialPairType(primalType, undefined);
         }
-        else
-            return lowerSimpleIntrinsicType(pairType);
+
+        return lowerSimpleIntrinsicType(pairType);
     }
 
     IRFuncType* visitFuncType(FuncType* type)
@@ -5384,22 +5399,24 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
         case LoweredValInfo::Flavor::Ptr:
             {
-                // TODO: This is a hack. We should just be returning `ptr`. We do not do this since
-                // `ptr` may have the wrong address space. This happens since when lowering-to-ir we
-                // don't check what addres-space info we should be using for variables we create.
-                // example: `groupshared int ptr` ==> lower-to-ir lowers as default address-space
-                // with groupshared-rate.
+                // When lowering a GetAddress expression like `__getAddress(x)`, the
+                // recursive lowering of the inner expression `x` returns a LoweredVal
+                // with Ptr flavor (i.e. `<IRVar inst>`), and the lowering of GetAddress
+                // can simply return the lowered value of the inner expr directly.
+                // However, we want to check for invalid uses of GetAddress, e.g.
+                // `__getAddress(localVar)` after lowering to IR.
                 //
-                // We need to emit a temporary variable (and cannot emit a cast) since `operator*`
-                // has its own hacks and is an incorrect implementation of its own. To elaborate,
-                // `operator*` is defined as `__intrinsic_op(0)`, which means "pass arguments
-                // through a function `in`, then set as result". This is an issue since this means
-                // that our function (which should be returning a `ref`) may in fact, not be
-                // returning a `ref` but instead be loading via the `in` parameter and generating a
-                // non-pointer result.
-                auto irVar = context->irBuilder->emitVar(loweredType);
-                context->irBuilder->emitStore(irVar, ptr.val);
-                return LoweredValInfo::ptr(irVar);
+                // Here we simply insert an `AssumeAddress(innerVal)` instruction,
+                // so the later IR validation pass can pick it up and produce a
+                // diagnostic if the user is trying to get the address of something
+                // allowed by the type system but not allowed by the target (e.g.
+                // a local variable or a function parameter).
+                auto assumeAddr = context->irBuilder->emitIntrinsicInst(
+                    loweredType,
+                    kIROp_AssumeAddress,
+                    1,
+                    &ptr.val);
+                return LoweredValInfo::simple(assumeAddr);
             }
         default:
             SLANG_UNIMPLEMENTED_X("cannot get address of __getAddress(...) argument");
@@ -14454,6 +14471,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             // We do not allow specializing a generic function with an existential type.
             addDecorationsForGenericsSpecializedWithExistentials(module, compileRequest->getSink());
         }
+
+        // Reading from mesh shader outputs is not allowed.
+        checkForMeshOutputReads(module, compileRequest->getSink());
     }
 
     // The "mandatory" optimization passes may make use of the
@@ -15100,10 +15120,10 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     if (m_irModuleForLayout)
         return m_irModuleForLayout;
 
+    // `getOrCreateIRModuleForLayout()` is responsible for ensuring layout creation first.
+    SLANG_ASSERT(m_layout);
 
-    // Okay, now we need to fill it in.
-
-    auto programLayout = getOrCreateLayout(sink);
+    auto programLayout = m_layout;
     if (!programLayout)
         return nullptr;
 

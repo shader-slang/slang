@@ -11,14 +11,12 @@ jobs:
     uses: ./.github/workflows/ci-slang-sanitizer.yml
     with:
       runs-on: '["ubuntu-22.04"]'
-      # Nightly uses the same smoke scope as PR runs: this runs on a
-      # GitHub-hosted CPU runner with the sanitizer workflow's 120-minute
-      # budget. Broader full coverage already exists in the regular
-      # GPU/container CI jobs.
-      # TODO: Expand to test-category: full once we have a dedicated runner
-      # with enough time budget, or after smoke stabilizes with zero findings.
-      test-category: smoke
-      server-count: 8
+      # Full test category on a GitHub-hosted CPU runner. GPU-requiring
+      # tests are skipped (no GPU available); this maximizes coverage of
+      # CPU, SPIRV-emit, and diagnostic tests under sanitizer.
+      test-category: full
+      server-count: 1
+      timeout-minutes: 90
     secrets: inherit
 
   notify:

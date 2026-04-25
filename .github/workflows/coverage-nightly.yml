@@ -13,6 +13,7 @@ concurrency:
 permissions:
   id-token: write # Required for Workload Identity (GCS auth)
   contents: read # Read slang repo
+  packages: read # Pull container images from ghcr.io
   pull-requests: write # For PR comments (if needed)
 
 jobs:
@@ -24,6 +25,7 @@ jobs:
       platform: x86_64
       config: relwithdebinfo
       runs-on: '["ubuntu-22.04"]'
+      container: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
       build-llvm: true
       deploy-pages: false
       server-count: 1
@@ -42,8 +44,30 @@ jobs:
       server-count: 1
     secrets: inherit
 
+  coverage-windows:
+    uses: ./.github/workflows/ci-slang-coverage.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: relwithdebinfo
+      runs-on: '["windows-latest"]'
+      build-llvm: true
+      deploy-pages: false
+      server-count: 1
+    secrets: inherit
+
   merge-and-deploy:
-    needs: [coverage-linux, coverage-macos]
+    needs: [coverage-linux, coverage-macos, coverage-windows]
+    # Deploy as long as Linux and macOS succeed; Windows is newly added and
+    # still stabilizing, and the Organize Coverage Data step below guards
+    # the Windows artifact copy with `if [ -d ... ]`, so a missing Windows
+    # artifact is harmless for the combined report.
+    if: |
+      github.ref == 'refs/heads/master' &&
+      !cancelled() &&
+      needs.coverage-linux.result == 'success' &&
+      needs.coverage-macos.result == 'success'
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -62,7 +86,7 @@ jobs:
       - name: Organize Coverage Data
         run: |
           # Create organized structure
-          mkdir -p coverage-reports/{linux,macos}
+          mkdir -p coverage-reports/{linux,macos,windows}
 
           # Extract Linux coverage
           if [ -d "coverage-artifacts/coverage-linux-x86_64" ]; then
@@ -82,6 +106,19 @@ jobs:
             fi
           fi
 
+          # Extract Windows coverage. OpenCppCoverage does not produce a
+          # slangc-only HTML report on Windows (would require a second test
+          # pass with --excluded_sources baked in, doubling test-run time);
+          # the slangc LCOV is still captured and its totals flow through
+          # the JSON summary.
+          if [ -d "coverage-artifacts/coverage-windows-x86_64" ]; then
+            cp coverage-artifacts/coverage-windows-x86_64/coverage-summary.json coverage-reports/windows/
+            cp -r coverage-artifacts/coverage-windows-x86_64/coverage-html coverage-reports/windows/
+            if [ -f "coverage-artifacts/coverage-windows-x86_64/coverage-slangc.lcov" ]; then
+              cp coverage-artifacts/coverage-windows-x86_64/coverage-slangc.lcov coverage-reports/windows/
+            fi
+          fi
+
           echo "Organized coverage data:"
           ls -R coverage-reports/
 
@@ -92,8 +129,9 @@ jobs:
           COMMIT_SHORT=$(git rev-parse --short HEAD)
 
           # Read platform summaries
-          LINUX_JSON=$(cat coverage-reports/linux/coverage-summary.json || echo "{}")
-          MACOS_JSON=$(cat coverage-reports/macos/coverage-summary.json || echo "{}")
+          LINUX_JSON=$(cat coverage-reports/linux/coverage-summary.json 2>/dev/null || echo "{}")
+          MACOS_JSON=$(cat coverage-reports/macos/coverage-summary.json 2>/dev/null || echo "{}")
+          WINDOWS_JSON=$(cat coverage-reports/windows/coverage-summary.json 2>/dev/null || echo "{}")
 
           # Create combined summary (platforms only for now, merged TBD)
           cat > coverage-reports/combined-summary.json <<EOF
@@ -102,7 +140,8 @@ jobs:
             "commit": "${COMMIT_SHORT}",
             "platforms": {
               "linux": ${LINUX_JSON},
-              "macos": ${MACOS_JSON}
+              "macos": ${MACOS_JSON},
+              "windows": ${WINDOWS_JSON}
             }
           }
           EOF
@@ -131,8 +170,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # Create directory structure
-          mkdir -p "${REPORT_DIR}"/{linux,macos}
-          mkdir -p reports/latest/{linux,macos}
+          mkdir -p "${REPORT_DIR}"/{linux,macos,windows}
+          mkdir -p reports/latest/{linux,macos,windows}
 
           # Copy Linux coverage
           cp -r ../coverage-reports/linux/coverage-html/* "${REPORT_DIR}/linux/"
@@ -150,11 +189,22 @@ jobs:
             cp -r ../coverage-reports/macos/coverage-html-slangc/* "${REPORT_DIR}/macos/slangc/"
           fi
 
+          # Copy Windows coverage. No coverage-html-slangc/ on Windows -- the
+          # full HTML report is the only browseable view; slangc totals come
+          # from coverage-slangc.lcov which we stash next to the summary.
+          if [ -d "../coverage-reports/windows/coverage-html" ]; then
+            cp -r ../coverage-reports/windows/coverage-html/* "${REPORT_DIR}/windows/"
+            cp ../coverage-reports/windows/coverage-summary.json "${REPORT_DIR}/windows/"
+            if [ -f "../coverage-reports/windows/coverage-slangc.lcov" ]; then
+              cp ../coverage-reports/windows/coverage-slangc.lcov "${REPORT_DIR}/windows/"
+            fi
+          fi
+
           # Copy combined summary
           cp ../coverage-reports/combined-summary.json "${REPORT_DIR}/"
 
           # Update latest
-          rm -rf reports/latest/{linux,macos}/*
+          rm -rf reports/latest/{linux,macos,windows}/*
           cp -r ../coverage-reports/linux/coverage-html/* reports/latest/linux/
           cp ../coverage-reports/linux/coverage-summary.json reports/latest/linux/
           if [ -d "../coverage-reports/linux/coverage-html-slangc" ]; then
@@ -166,6 +216,13 @@ jobs:
           if [ -d "../coverage-reports/macos/coverage-html-slangc" ]; then
             mkdir -p reports/latest/macos/slangc
             cp -r ../coverage-reports/macos/coverage-html-slangc/* reports/latest/macos/slangc/
+          fi
+          if [ -d "../coverage-reports/windows/coverage-html" ]; then
+            cp -r ../coverage-reports/windows/coverage-html/* reports/latest/windows/
+            cp ../coverage-reports/windows/coverage-summary.json reports/latest/windows/
+            if [ -f "../coverage-reports/windows/coverage-slangc.lcov" ]; then
+              cp ../coverage-reports/windows/coverage-slangc.lcov reports/latest/windows/
+            fi
           fi
           cp ../coverage-reports/combined-summary.json reports/latest/
 
@@ -190,7 +247,7 @@ jobs:
             TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
             git commit -m "Add multi-platform coverage report for ${REPORT_DATE} (${COMMIT_SHORT})" \
                        -m "Generated from shader-slang/slang@${FULL_COMMIT}" \
-                       -m "Platforms: Linux (x86_64), macOS (aarch64)" \
+                       -m "Platforms: Linux (x86_64), macOS (aarch64), Windows (x86_64)" \
                        -m "Date: ${TIMESTAMP}"
 
             git push origin main

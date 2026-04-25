@@ -1212,26 +1212,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
-    SpvInst* emitNullPtr(IRType* type, IRInst* inst = nullptr)
-    {
-        ConstantValueKey<IRFloatingPointValue> key;
-        key.value = 0;
-        key.type = type;
-
-        SpvInst* result = nullptr;
-        if (m_spvFloatConstants.tryGetValue(key, result))
-        {
-            m_mapIRInstToSpvInst[inst] = result;
-            return result;
-        }
-
-        return emitInst(
-            getSection(SpvLogicalSectionID::ConstantsAndTypes),
-            inst,
-            SpvOpConstantNull,
-            inst->getDataType());
-    }
-
     SpvInst* emitFloatConstant(IRFloatingPointValue val, IRType* type, IRInst* inst = nullptr)
     {
         ConstantValueKey<IRFloatingPointValue> key;
@@ -3569,15 +3549,55 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
 
         // Handle integer casts in spec constant context.
-        // Inside OpSpecConstantOp, UConvert/SConvert require different bit widths
-        // and matching signedness on the result type, and OpBitcast is not in the
-        // set of allowed opcodes. See emitSpecConstantSignReinterpret for the
-        // workaround used for signedness changes.
         auto irOp = inst->getOp();
         if (irOp == kIROp_IntCast || irOp == kIROp_ConstexprIntCast)
         {
             auto srcType = inst->getOperand(0)->getDataType();
             auto dstType = inst->getDataType();
+
+            // bool to integer: UConvert/SConvert cannot accept a bool operand,
+            // so we use OpSelect to pick between literal 1 and 0 instead.
+            if (srcType->getOp() == kIROp_BoolType && isIntegralType(dstType))
+            {
+                auto operand = emitSpecializationConstantOp(inst->getOperand(0));
+                IRBuilder builder(m_irModule);
+                auto one = emitLit(builder.getIntValue(dstType, 1));
+                auto zero = emitLit(builder.getIntValue(dstType, 0));
+                return emitInst(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    inst,
+                    SpvOpSpecConstantOp,
+                    inst->getFullType(),
+                    kResultID,
+                    SpvOpSelect,
+                    operand,
+                    one,
+                    zero);
+            }
+
+            // integer to bool: UConvert/SConvert cannot produce a bool result,
+            // so we compare the operand against zero with OpINotEqual instead.
+            if (isIntegralType(srcType) && dstType->getOp() == kIROp_BoolType)
+            {
+                auto operand = emitSpecializationConstantOp(inst->getOperand(0));
+                IRBuilder builder(m_irModule);
+                auto zero = emitLit(builder.getIntValue(srcType, 0));
+                return emitInst(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    inst,
+                    SpvOpSpecConstantOp,
+                    inst->getFullType(),
+                    kResultID,
+                    SpvOpINotEqual,
+                    operand,
+                    zero);
+            }
+
+            // Inside OpSpecConstantOp, UConvert/SConvert require different bit
+            // widths and matching signedness on the result type, and OpBitcast
+            // is not in the set of allowed opcodes. See
+            // emitSpecConstantSignReinterpret for the workaround used for
+            // signedness changes.
             if (isIntegralType(srcType) && isIntegralType(dstType))
             {
                 auto srcInfo = getIntTypeInfo(m_targetRequest, srcType);
@@ -6602,22 +6622,31 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvBuiltIn builtinName;
         SpvStorageClass storageClass = SpvStorageClassInput;
         bool flat = false;
+        IRType* pointeeType = nullptr;
         BuiltinSpvVarKey() = default;
-        BuiltinSpvVarKey(SpvBuiltIn builtin, SpvStorageClass storageClass, bool isFlat)
-            : builtinName(builtin), storageClass(storageClass), flat(isFlat)
+        BuiltinSpvVarKey(
+            SpvBuiltIn builtin,
+            SpvStorageClass storageClass,
+            bool isFlat,
+            IRType* pointeeType)
+            : builtinName(builtin)
+            , storageClass(storageClass)
+            , flat(isFlat)
+            , pointeeType(pointeeType)
         {
         }
         bool operator==(const BuiltinSpvVarKey& other) const
         {
             return builtinName == other.builtinName && storageClass == other.storageClass &&
-                   flat == other.flat;
+                   flat == other.flat && pointeeType == other.pointeeType;
         }
         HashCode getHashCode() const
         {
             return combineHash(
                 Slang::getHashCode(builtinName),
                 Slang::getHashCode(storageClass),
-                Slang::getHashCode(flat));
+                Slang::getHashCode(flat),
+                Slang::getHashCode(pointeeType));
         }
     };
     Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
@@ -6670,7 +6699,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(ptrType && "`getBuiltinGlobalVar`: `type` must be ptr type.");
         auto storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
         bool isFlat = needFlatDecorationForBuiltinVar(irInst);
-        auto key = BuiltinSpvVarKey(builtinVal, storageClass, isFlat);
+        auto key = BuiltinSpvVarKey(builtinVal, storageClass, isFlat, ptrType->getValueType());
         if (m_builtinGlobalVars.tryGetValue(key, result))
         {
             return result;
