@@ -199,6 +199,45 @@ def apply_slangc_filter(records: List[FileRecord]) -> List[FileRecord]:
     return [r for r in records if not is_slangc_filtered_out(r.path)]
 
 
+def function_branch_coverage(record: FileRecord) -> Dict[str, Tuple[int, int]]:
+    """For each function in `record`, compute (total_branches,
+    hit_branches) from the BRDA records that fall in the function's
+    source range, using the same first_line-based partition as
+    `function_line_coverage`.
+
+    Returns `(0, 0)` for functions with `first_line == 0` (orphan
+    FNDA without FN) or for files without BRDA records.
+    """
+    by_name: Dict[str, Tuple[int, int]] = {}
+    items = [
+        (name, fn) for name, fn in record.functions.items() if fn.first_line > 0
+    ]
+    items.sort(key=lambda kv: (kv[1].first_line, kv[0]))
+    if not items:
+        return {name: (0, 0) for name in record.functions}
+
+    # Sort BRDA keys once so we can range-scan each function.
+    sorted_branches = sorted(record.branches.items())  # [((line, blk, br), taken), ...]
+
+    for i, (name, fn) in enumerate(items):
+        start = fn.first_line
+        end = items[i + 1][1].first_line if i + 1 < len(items) else 10**9
+        total = 0
+        hit = 0
+        for (br_line, _block, _branch_id), taken in sorted_branches:
+            if br_line < start:
+                continue
+            if br_line >= end:
+                break
+            total += 1
+            if taken is not None and taken > 0:
+                hit += 1
+        by_name[name] = (total, hit)
+    for name in record.functions:
+        by_name.setdefault(name, (0, 0))
+    return by_name
+
+
 def function_line_coverage(record: FileRecord) -> Dict[str, Tuple[int, int]]:
     """For each function in `record`, compute (total_lines, hit_lines)
     from the DA records that fall in the function's source range.

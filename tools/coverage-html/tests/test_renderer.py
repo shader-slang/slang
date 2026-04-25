@@ -335,6 +335,64 @@ class FunctionDedupByLineTests(unittest.TestCase):
         self.assertEqual(r.hit_functions, 2)
 
 
+class FunctionBranchCoverageTests(unittest.TestCase):
+    """Per-function branch coverage uses the same first_line-based
+    range partition as `function_line_coverage` to assign each BRDA
+    record to the function whose source range it falls within."""
+
+    def _build(self, lines, branches, fns):
+        from lcov_io import FileRecord, Function
+
+        r = FileRecord(path="x.cpp")
+        r.lines = dict(lines)
+        r.branches = dict(branches)
+        for n, (fl, h) in fns.items():
+            r.functions[n] = Function(first_line=fl, hits=h)
+        return r
+
+    def test_two_function_branch_split(self):
+        from lcov_io import function_branch_coverage
+
+        # foo: lines 1-9 (foo at 1, bar at 10)
+        # bar: lines 10+
+        # Branches: BRDA at line 5 (in foo) and BRDA at line 12 (in bar).
+        r = self._build(
+            lines={1: 1, 5: 1, 10: 1, 12: 1},
+            branches={
+                (5, 0, 0): 7,
+                (5, 0, 1): 0,
+                (12, 0, 0): None,
+                (12, 0, 1): 3,
+            },
+            fns={"foo": (1, 1), "bar": (10, 1)},
+        )
+        cov = function_branch_coverage(r)
+        # foo has the (5,0,0) and (5,0,1): one taken (>0), one zero.
+        self.assertEqual(cov["foo"], (2, 1))
+        # bar has the (12,0,0) and (12,0,1): one None (no info), one taken.
+        self.assertEqual(cov["bar"], (2, 1))
+
+    def test_orphan_function_zero(self):
+        from lcov_io import function_branch_coverage
+
+        r = self._build(
+            lines={1: 1},
+            branches={(1, 0, 0): 5},
+            fns={"orphan": (0, 1)},
+        )
+        self.assertEqual(function_branch_coverage(r)["orphan"], (0, 0))
+
+    def test_no_branches_in_file(self):
+        from lcov_io import function_branch_coverage
+
+        r = self._build(
+            lines={1: 1},
+            branches={},
+            fns={"foo": (1, 1)},
+        )
+        self.assertEqual(function_branch_coverage(r)["foo"], (0, 0))
+
+
 class FunctionLineCoverageTests(unittest.TestCase):
     """Per-function line coverage derived from FN: + DA: ranges."""
 
@@ -820,6 +878,29 @@ class CliIntegrationTests(unittest.TestCase):
         # found.
         self.assertNotIn("Source file not found", content)
         self.assertIn('class="lineNum"', content)
+
+    def test_function_dropdown_includes_branch_coverage(self):
+        """The per-function dropdown grew a Branch Coverage column
+        group aligned with the parent's Branch columns. Hits and
+        total per function come from BRDA records partitioned by
+        function range."""
+        out_dir = os.path.join(self.tmp, "fn-branches")
+        # The slangc-llvm-cov sample carries both BRDA and FN/FNDA
+        # for source/compiler-core/slang-name.cpp.
+        self._run(
+            os.path.join(FIXTURES, "slangc-llvm-cov-sample.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        # The fn dropdown header shows "Branch Coverage".
+        self.assertIn(
+            '<td class="tableHead" colspan="3">Branch Coverage</td>', idx
+        )
+        # The Calls column header carries an explanation tooltip.
+        self.assertIn('title="Number of invocations', idx)
 
     def test_index_has_expandable_function_rows(self):
         """Goal 2: per-file Functions tables live inline in the index,

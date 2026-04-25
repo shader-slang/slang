@@ -985,30 +985,35 @@ def _render_inline_functions_table(
 ) -> str:
     """Render a Functions table to embed inside an index <td>.
 
-    Columns mirror the file row's layout for the line-coverage half:
+    Each row carries:
 
-      Function name | Line | Calls | Bar | Rate% | Total | Hit | (empty)
+      Function | Line | Calls | LineBar | LineRate | LineTotal | LineHit
+               | <Function-Coverage cells empty>
+               | BrRate | BrTotal | BrHit
 
-    where "Calls" is the FNDA hit count and the four cells after it
-    describe the function's *line* coverage (DA lines inside the
-    function's range). The trailing empty col matches the parent
-    indexTable's Functions+Branches columns so per-function rows
-    line up vertically with their containing file row.
+    The Bar / Rate / Total / Hit cells line up underneath the parent
+    indexTable's "Lines" group; BrRate / BrTotal / BrHit line up
+    under the parent's "Branch Coverage" group; the parent's
+    "Function Coverage" group is left empty per row (function-level
+    coverage isn't a meaningful drilldown when each row IS one
+    function).
+
+    "Calls" is the FNDA hit count — the number of times the function
+    was invoked during the run. The header carries a tooltip
+    explaining that since "Calls" alone can be ambiguous.
     """
-    from lcov_io import function_line_coverage
+    from lcov_io import function_line_coverage, function_branch_coverage
 
     items = sorted(
         record.functions.items(), key=lambda kv: (kv[1].first_line, kv[0])
     )
-    coverage = function_line_coverage(record)
+    line_cov = function_line_coverage(record)
+    br_cov = function_branch_coverage(record)
 
-    # Single colspan'd empty cell at the end of each function row to
-    # span the parent's Functions+Branches columns. Cuts ~6 TDs per
-    # row × tens of thousands of rows on real data.
-    trailing = (3 if show_fns else 0) + (3 if show_br else 0)
-    trailing_td = (
-        f'<td class="coverNumDflt" colspan="{trailing}"></td>'
-        if trailing else ""
+    # Empty-cell colspan for the parent's "Function Coverage" group
+    # (3 cells) when present.
+    empty_fn_td = (
+        '<td class="coverNumDflt" colspan="3"></td>' if show_fns else ""
     )
 
     rows: List[str] = []
@@ -1022,21 +1027,39 @@ def _render_inline_functions_table(
         else:
             line_cell = "-"
 
-        total, hit = coverage.get(name, (0, 0))
-        if total > 0:
-            pct = 100.0 * hit / total
+        l_total, l_hit = line_cov.get(name, (0, 0))
+        if l_total > 0:
+            pct = 100.0 * l_hit / l_total
             tier = _tier(pct)
             rate_cell = f'<td class="coverPer{tier}">{pct:.1f}&nbsp;%</td>'
             bar_cell = (
                 f'<td class="coverBar" align="center">{_render_rate_bar(pct)}</td>'
             )
-            total_cell = f'<td class="coverNumDflt">{total}</td>'
-            hit_cell = f'<td class="coverNumDflt">{hit}</td>'
+            total_cell = f'<td class="coverNumDflt">{l_total}</td>'
+            hit_cell = f'<td class="coverNumDflt">{l_hit}</td>'
         else:
             rate_cell = '<td class="coverNumDflt">-</td>'
             bar_cell = '<td class="coverBar"></td>'
             total_cell = '<td class="coverNumDflt">-</td>'
             hit_cell = '<td class="coverNumDflt">-</td>'
+
+        if show_br:
+            b_total, b_hit = br_cov.get(name, (0, 0))
+            if b_total > 0:
+                bpct = 100.0 * b_hit / b_total
+                btier = _tier(bpct)
+                br_rate_cell = (
+                    f'<td class="coverPer{btier}">{bpct:.1f}&nbsp;%</td>'
+                )
+                br_total_cell = f'<td class="coverNumDflt">{b_total}</td>'
+                br_hit_cell = f'<td class="coverNumDflt">{b_hit}</td>'
+            else:
+                br_rate_cell = '<td class="coverNumDflt">-</td>'
+                br_total_cell = '<td class="coverNumDflt">-</td>'
+                br_hit_cell = '<td class="coverNumDflt">-</td>'
+            br_cells = br_rate_cell + br_total_cell + br_hit_cell
+        else:
+            br_cells = ""
 
         rows.append(
             "        <tr>"
@@ -1044,24 +1067,39 @@ def _render_inline_functions_table(
             f'<td class="coverNumDflt">{line_cell}</td>'
             f'<td class="{calls_cls}">{fn.hits}</td>'
             f"{bar_cell}{rate_cell}{total_cell}{hit_cell}"
-            f"{trailing_td}"
+            f"{empty_fn_td}{br_cells}"
             "</tr>"
         )
 
-    # Trailing empty <col> elements match the parent's Functions and
-    # Branches columns so the visual grid extends to the right edge.
+    # Matching trailing <col> elements for the parent's Function
+    # Coverage and (if present) Branch Coverage groups, so column
+    # widths align across the file row and its expanded function rows.
     extra_cols = ""
     if show_fns:
-        extra_cols += '          <col class="colFRate">\n          <col class="colFTotal">\n          <col class="colFHit">\n'
+        extra_cols += (
+            '          <col class="colFRate">\n'
+            '          <col class="colFTotal">\n'
+            '          <col class="colFHit">\n'
+        )
     if show_br:
-        extra_cols += '          <col class="colBRate">\n          <col class="colBTotal">\n          <col class="colBHit">\n'
+        extra_cols += (
+            '          <col class="colBRate">\n'
+            '          <col class="colBTotal">\n'
+            '          <col class="colBHit">\n'
+        )
 
     extra_heads = ""
-    extra_head_span = (3 if show_fns else 0) + (3 if show_br else 0)
-    if extra_head_span:
-        extra_heads = (
-            f'          <td class="tableHead" colspan="{extra_head_span}"></td>\n'
+    if show_fns:
+        extra_heads += '          <td class="tableHead" colspan="3"></td>\n'
+    if show_br:
+        extra_heads += (
+            '          <td class="tableHead" colspan="3">Branch Coverage</td>\n'
         )
+
+    calls_tooltip = (
+        "Number of invocations of the function during the run "
+        "(LCOV FNDA hit count). 0 means uncalled."
+    )
 
     return (
         '<table class="fnInner" cellpadding="1" cellspacing="1" border="0">\n'
@@ -1078,7 +1116,7 @@ def _render_inline_functions_table(
         "        <tr>\n"
         '          <td class="tableHead">Function</td>\n'
         '          <td class="tableHead">Line</td>\n'
-        '          <td class="tableHead">Calls</td>\n'
+        f'          <td class="tableHead" title="{html.escape(calls_tooltip)}">Calls</td>\n'
         '          <td class="tableHead" colspan="2">Line Coverage</td>\n'
         '          <td class="tableHead">Total</td>\n'
         '          <td class="tableHead">Hit</td>\n'
