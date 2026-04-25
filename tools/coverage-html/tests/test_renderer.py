@@ -401,6 +401,107 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertIn("Functions:", idx)
         self.assertIn("Branches:", idx)
 
+    def test_chevron_placeholder_keeps_columns_aligned(self):
+        """Files without function records still get a same-width
+        invisible chevron placeholder so the file-name column lines
+        up across rows in mixed datasets."""
+        out_dir = os.path.join(self.tmp, "placeholder")
+        # mixed-paths.info has two files, neither with functions.
+        # branches-and-functions.info has one file with functions.
+        # We want a fixture mixing both shapes — easiest: use the
+        # llvm-cov sample (functions on some files, not all).
+        self._run(
+            os.path.join(FIXTURES, "slangc-llvm-cov-sample.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        # Both visible chevron and placeholder should be present in the
+        # same index when at least one file has functions and another
+        # doesn't (or, at minimum: placeholder is rendered for the
+        # always-applicable case when functions are absent globally).
+        # In this fixture all three files have functions, so we just
+        # assert the visible chevron is present.
+        self.assertIn('class="fnToggle"', idx)
+
+        # And the demo fixture (no functions anywhere) renders
+        # placeholder rows so other CSS columns stay aligned.
+        out_dir2 = os.path.join(self.tmp, "no-fn")
+        self._run(
+            os.path.join(FIXTURES, "demo-cpu.info"),
+            "--output-dir",
+            out_dir2,
+            "--quiet",
+        )
+        with open(os.path.join(out_dir2, "index.html"), encoding="utf-8") as f:
+            idx2 = f.read()
+        self.assertIn('class="fnTogglePlaceholder"', idx2)
+        self.assertNotIn('class="fnToggle"', idx2)
+
+    def test_inline_function_table_fixed_width_layout(self):
+        """fnInner must have table-layout: fixed + colgroup so long
+        mangled function names wrap inside the cell rather than
+        blowing out the row width."""
+        out_dir = os.path.join(self.tmp, "fixed-layout")
+        self._run(
+            os.path.join(FIXTURES, "slangc-llvm-cov-sample.info"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        self.assertIn('table-layout: fixed', idx)
+        self.assertIn('<colgroup>', idx)
+        self.assertIn('class="fnNameCol"', idx)
+        self.assertIn('class="fnLineCol"', idx)
+        self.assertIn('class="fnHitsCol"', idx)
+        # Long mangled names should wrap via word-break / overflow-wrap.
+        self.assertIn('word-break: break-all', idx)
+
+    def test_invocation_cwd_resolves_repo_relative_paths(self):
+        """A merged LCOV holds repo-relative SF: paths like
+        `tools/coverage-html/slang-coverage-html.py`. Running the
+        renderer from the repo root must find them via invocation_cwd
+        even when the LCOV file itself sits in /tmp."""
+        # Build a tiny LCOV in /tmp pointing at a file that exists in
+        # the repo, and assert it gets resolved.
+        repo_root = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+        rel_target = "tools/coverage-html/README.md"
+        self.assertTrue(os.path.exists(os.path.join(repo_root, rel_target)))
+
+        lcov_path = os.path.join(self.tmp, "merged-style.info")
+        with open(lcov_path, "w") as f:
+            f.write(f"TN:\nSF:{rel_target}\nDA:1,1\nLF:1\nLH:1\nend_of_record\n")
+
+        out_dir = os.path.join(self.tmp, "invocation-cwd")
+        # Run with cwd = repo_root. Without --source-root.
+        env = dict(os.environ)
+        res = subprocess.run(
+            [sys.executable, SCRIPT, lcov_path,
+             "--output-dir", out_dir, "--quiet"],
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=repo_root,
+        )
+        self.assertEqual(res.returncode, 0, msg=res.stderr)
+        # Find the per-file page.
+        pages = [
+            os.path.join(out_dir, e)
+            for e in os.listdir(out_dir)
+            if e.endswith(".html") and e != "index.html"
+        ]
+        self.assertEqual(len(pages), 1)
+        with open(pages[0], encoding="utf-8") as f:
+            content = f.read()
+        # Source view (not placeholder) is present when the file is
+        # found.
+        self.assertNotIn("Source file not found", content)
+        self.assertIn('class="lineNum"', content)
+
     def test_index_has_expandable_function_rows(self):
         """Goal 2: per-file Functions tables live inline in the index,
         wrapped in a hidden <tr class="fileFunctions"> revealed by an

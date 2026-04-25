@@ -50,17 +50,30 @@ class SourceResolver:
     """Resolve an LCOV SF: path to source text on disk.
 
     Tries (in order):
-      1. direct open of the path as given
-      2. source_root / path (if --source-root)
-      3. source_root / basename(path)  (basename fallback)
+      1. direct open of the path as given (absolute) or relative to
+         the LCOV file's directory
+      2. relative to the user's invocation cwd — covers the common
+         case of running the tool from a repo root with a merged
+         LCOV that lives in /tmp
+      3. source_root / path (if --source-root)
+      4. source_root / basename(path)  (basename fallback)
 
     Caches hits and misses. `load(path)` returns (text, resolved_path)
     or (None, None) on miss.
     """
 
-    def __init__(self, source_root: Optional[str], cwd: str):
+    def __init__(
+        self,
+        source_root: Optional[str],
+        cwd: str,
+        invocation_cwd: Optional[str] = None,
+    ):
         self.source_root = source_root
         self.cwd = cwd
+        # Where the user invoked the tool from. Often the repo root,
+        # which is the right base for repo-relative SF: paths emitted
+        # by `slang-coverage-merge`.
+        self.invocation_cwd = invocation_cwd or os.getcwd()
         self._cache: Dict[str, Tuple[Optional[str], Optional[str]]] = {}
 
     def load(self, path: str) -> Tuple[Optional[str], Optional[str]]:
@@ -72,20 +85,24 @@ class SourceResolver:
 
     def _locate(self, path: str) -> Tuple[Optional[str], Optional[str]]:
         candidates: List[str] = []
-        # 1. As-is (absolute or relative to cwd).
+        # 1. As-is (absolute or relative to LCOV-dir).
         if os.path.isabs(path):
             candidates.append(path)
         else:
             candidates.append(os.path.join(self.cwd, path))
-        # 2. source_root / path.
+            # 2. Relative to the user's invocation cwd. Distinct from
+            #    self.cwd (LCOV-dir): merged LCOVs typically sit in
+            #    /tmp while the user runs the tool from the repo root.
+            if self.invocation_cwd != self.cwd:
+                candidates.append(os.path.join(self.invocation_cwd, path))
+        # 3. source_root / path.
         if self.source_root:
             if os.path.isabs(path):
-                # Strip leading slash so join keeps it as a subpath.
                 rel = path.lstrip(os.sep).lstrip("/")
                 candidates.append(os.path.join(self.source_root, rel))
             else:
                 candidates.append(os.path.join(self.source_root, path))
-            # 3. source_root / basename fallback (last resort).
+            # 4. source_root / basename fallback (last resort).
             candidates.append(os.path.join(self.source_root, os.path.basename(path)))
 
         for c in candidates:
@@ -180,25 +197,41 @@ span.tlaGNC       { background-color: #CAD7FE; }
 span.tlaUNC       { background-color: #FF6230; }
 
 td.coverFn        { text-align: left; padding: 2px 20px 2px 10px; color: #284fa8;
-                    background-color: #dae7fe; font-family: monospace; }
+                    background-color: #dae7fe; font-family: monospace;
+                    word-break: break-all; }
 td.coverFnHi      { text-align: right; padding: 2px 10px;
-                    background-color: #a7fc9d; font-weight: bold; }
+                    background-color: #a7fc9d; font-weight: bold;
+                    white-space: nowrap; }
 td.coverFnLo      { text-align: right; padding: 2px 10px;
-                    background-color: #ff6230; font-weight: bold; }
+                    background-color: #ff6230; font-weight: bold;
+                    white-space: nowrap; }
 
 span.branchAll   { background-color: #a7fc9d; }
 span.branchPart  { background-color: #ffea20; }
 span.branchNone  { background-color: #FF6230; }
 
-span.fnToggle    { display: inline-block; min-width: 1em;
-                   font-family: monospace; cursor: pointer;
-                   color: #284fa8; user-select: none;
-                   margin-right: 4px; }
+/* Per-file expand chevron in the index. The placeholder variant
+   reserves the same column width on rows that have no functions, so
+   the file-name column stays vertically aligned across all rows. */
+span.fnToggle, span.fnTogglePlaceholder
+                 { display: inline-block; width: 1em;
+                   font-family: monospace; user-select: none;
+                   margin-right: 4px; text-align: center; }
+span.fnToggle    { cursor: pointer; color: #284fa8; }
+span.fnTogglePlaceholder { color: transparent; }
 span.fnToggle:focus { outline: 1px dotted #284fa8; }
 tr.fileFunctions[hidden] { display: none; }
 tr.fileFunctions > td   { background-color: #f4f8ff; padding: 6px 24px; }
-table.fnInner   { border-collapse: collapse; margin: 4px 0; }
-table.fnInner td { padding: 1px 6px; font-family: monospace; }
+/* fnInner fills the parent <td> so the dropdown matches the index
+   table's width; table-layout:fixed plus a max-width on the function
+   name cell prevents long mangled names from blowing the row open. */
+table.fnInner   { border-collapse: collapse; margin: 4px 0;
+                  table-layout: fixed; width: 100%; }
+table.fnInner td { padding: 1px 6px; font-family: monospace;
+                   overflow-wrap: break-word; }
+table.fnInner col.fnNameCol { width: auto; }
+table.fnInner col.fnLineCol { width: 6em; }
+table.fnInner col.fnHitsCol { width: 10em; }
 table.fnInner td.tableHead { font-family: sans-serif; }
 
 .sourceUnavailable { color: #a33; font-style: italic; padding: 8px; }
@@ -523,13 +556,16 @@ def render_index(
         href = file_map[rec.path]
         has_fn_table = bool(rec.functions)
         # Leading column: optional expand chevron + the file link.
-        toggle = (
-            '<span class="fnToggle" tabindex="0" role="button" '
-            f'aria-label="Toggle functions for {html.escape(display)}" '
-            'aria-expanded="false">▶</span> '
-            if has_fn_table
-            else ""
-        )
+        if has_fn_table:
+            toggle = (
+                '<span class="fnToggle" tabindex="0" role="button" '
+                f'aria-label="Toggle functions for {html.escape(display)}" '
+                'aria-expanded="false">▶</span>'
+            )
+        else:
+            # Placeholder reserves the same column width so file-name
+            # columns line up across rows. Hidden via color: transparent.
+            toggle = '<span class="fnTogglePlaceholder">▶</span>'
         cells: List[str] = [
             f'              <td class="coverFile">{toggle}'
             f'<a href="{html.escape(href)}">{html.escape(display)}</a></td>',
@@ -700,6 +736,11 @@ def _render_inline_functions_table(record: FileRecord, file_href: str) -> str:
 
     return (
         '<table class="fnInner" cellpadding="1" cellspacing="1" border="0">\n'
+        '        <colgroup>\n'
+        '          <col class="fnNameCol">\n'
+        '          <col class="fnLineCol">\n'
+        '          <col class="fnHitsCol">\n'
+        '        </colgroup>\n'
         "        <tr>\n"
         '          <td class="tableHead">Function</td>\n'
         '          <td class="tableHead">Line</td>\n'
