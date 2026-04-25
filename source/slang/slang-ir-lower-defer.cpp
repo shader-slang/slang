@@ -127,8 +127,7 @@ struct DeferLoweringContext : InstPassBase
     {
         // Iterating over `defer` instructions in reverse order allows us to
         // expand them in the correct order, including nested `defer`s.
-        // We also use this to determine scope extents.
-        List<IRBlock*> reverseBlocks = getReversePostorderOnReverseCFG(func);
+        List<IRBlock*> reverseBlocks = getPostorder(func);
         List<IRDefer*> unhandledDefers;
 
         for (IRBlock* block : reverseBlocks)
