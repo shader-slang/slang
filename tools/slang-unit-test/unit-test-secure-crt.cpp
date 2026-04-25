@@ -182,6 +182,12 @@ SLANG_UNIT_TEST(secureCrtWcsnlenS)
     {
         SLANG_CHECK(wcsnlen_s(L"hello", 3) == 3);
     }
+    // Exact length — the `count < numberOfElements` loop bound
+    // exits because `count == numberOfElements`, not because of
+    // null. Mirrors the `strnlen_s` exact-length test.
+    {
+        SLANG_CHECK(wcsnlen_s(L"hi", 2) == 2);
+    }
     // null pointer
     {
         SLANG_CHECK(wcsnlen_s(nullptr, 10) == 0);
@@ -273,6 +279,16 @@ SLANG_UNIT_TEST(secureCrtSwprintfS)
         SLANG_CHECK(n == -1);
         SLANG_CHECK(buf[0] == L'\0');
     }
+    // Exact fit (needs room for null terminator) — mirrors the
+    // `sprintf_s` exact-fit test. With a 4-element buffer and a
+    // 3-wchar payload, `vswprintf` returns 3 (< sizeOfBuffer) so
+    // the success branch is taken.
+    {
+        wchar_t buf[4];
+        int n = swprintf_s(buf, 4, L"%ls", L"abc");
+        SLANG_CHECK(n == 3);
+        SLANG_CHECK(wcscmp(buf, L"abc") == 0);
+    }
 }
 
 SLANG_UNIT_TEST(secureCrtStrcpyS)
@@ -319,6 +335,25 @@ SLANG_UNIT_TEST(secureCrtStrcpyS)
         SLANG_CHECK(strcpy_s(dst, sizeof(dst), "abc") == 0);
         SLANG_CHECK(strcmp(dst, "abc") == 0);
     }
+    // dest_size == 1, empty src — boundary case where the copy
+    // loop's `dest_size - 1` is zero, so the body doesn't execute.
+    // dest[0] gets the null terminator, src[0] is also '\0', no
+    // ERANGE.
+    {
+        char dst[1];
+        dst[0] = 'x';
+        SLANG_CHECK(strcpy_s(dst, 1, "") == 0);
+        SLANG_CHECK(dst[0] == '\0');
+    }
+    // dest_size == 1, non-empty src — same boundary, but src[0] is
+    // not '\0', triggering the post-loop truncation check.
+    {
+        char dst[1];
+        dst[0] = 'x';
+        errno = 0;
+        SLANG_CHECK(strcpy_s(dst, 1, "hi") == ERANGE);
+        SLANG_CHECK(dst[0] == '\0');
+    }
 }
 
 SLANG_UNIT_TEST(secureCrtWcscpyS)
@@ -357,6 +392,30 @@ SLANG_UNIT_TEST(secureCrtWcscpyS)
         errno = 0;
         SLANG_CHECK(wcscpy_s(dst, 4, L"toolong") == ERANGE);
         SLANG_CHECK(errno == ERANGE);
+        SLANG_CHECK(dst[0] == L'\0');
+    }
+    // Exact fit — mirrors the `strcpy_s` exact-fit test.
+    {
+        wchar_t dst[4];
+        SLANG_CHECK(wcscpy_s(dst, 4, L"abc") == 0);
+        SLANG_CHECK(wcscmp(dst, L"abc") == 0);
+    }
+    // dest_size == 1 with empty source — the copy loop doesn't
+    // execute (limit is 0), `dest[0]` is set to `L'\0'`, and
+    // `src[0]` is also `L'\0'` so no ERANGE.
+    {
+        wchar_t dst[1];
+        dst[0] = L'x';
+        SLANG_CHECK(wcscpy_s(dst, 1, L"") == 0);
+        SLANG_CHECK(dst[0] == L'\0');
+    }
+    // dest_size == 1 with non-empty source — loop doesn't run,
+    // src[0] != '\0' so the ERANGE branch fires.
+    {
+        wchar_t dst[1];
+        dst[0] = L'x';
+        errno = 0;
+        SLANG_CHECK(wcscpy_s(dst, 1, L"hi") == ERANGE);
         SLANG_CHECK(dst[0] == L'\0');
     }
 }
@@ -482,6 +541,16 @@ SLANG_UNIT_TEST(secureCrtWcsncpyS)
         SLANG_CHECK(wcsncpy_s(dst, 4, L"toolong", 7) == ERANGE);
         SLANG_CHECK(errno == ERANGE);
         SLANG_CHECK(dst[0] == L'\0');
+    }
+    // count < numberOfElements with src longer than count — limit
+    // is `count`, copy stops at count chars, dest gets null-
+    // terminated, no ERANGE because count < numberOfElements
+    // (truncation is the documented success behaviour). Mirrors
+    // the corresponding `strncpy_s` case.
+    {
+        wchar_t dst[16];
+        SLANG_CHECK(wcsncpy_s(dst, 16, L"hello", 3) == 0);
+        SLANG_CHECK(wcscmp(dst, L"hel") == 0);
     }
 }
 
