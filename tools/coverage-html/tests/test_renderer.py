@@ -588,11 +588,16 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertIn("Branches:", idx)
 
     def test_directory_grouping_in_index(self):
-        """Files are grouped by their first-segment directory; each
-        group gets a `dirHeader` row with a chevron toggle."""
+        """Files are grouped by their full parent directory and the
+        index emits one `dirHeader` row per directory in the
+        hierarchy — each level (e.g. `source/`, `source/compiler-core/`,
+        `source/slang/`) is independently collapsible."""
         out_dir = os.path.join(self.tmp, "dirs")
-        # The slangc-llvm-cov sample's three files live under different
-        # directories: source/compiler-core/, source/core/, source/slang/.
+        # The slangc-llvm-cov sample's three files live under
+        # source/compiler-core/, source/core/, source/slang/. After
+        # the common-prefix strip those become compiler-core/, core/,
+        # slang/, so we get a "(top level)" header at the root plus
+        # one per immediate subdir.
         self._run(
             os.path.join(FIXTURES, "slangc-llvm-cov-sample.info"),
             "--output-dir",
@@ -603,10 +608,62 @@ class CliIntegrationTests(unittest.TestCase):
             idx = f.read()
         self.assertIn('class="dirHeader"', idx)
         self.assertIn('class="dirToggle"', idx)
-        # Header label includes a directory name and a file count.
         self.assertRegex(idx, r"\(\d+ files?\)")
-        # Each fileSummary row gets the data-dir attribute.
-        self.assertIn('data-dir="', idx)
+        # Each dirHeader carries data-path and data-depth so the
+        # toggle JS can identify descendants and immediate children.
+        self.assertIn('data-path="', idx)
+        self.assertIn('data-depth="', idx)
+        # Every fileSummary carries data-dir referencing its parent
+        # directory's full path (not a sanitized hash).
+        self.assertRegex(idx, r'class="fileSummary" data-dir="')
+        # The hierarchy includes both top-level and nested dirs.
+        self.assertIn('data-path=""', idx)  # root
+
+    def test_nested_directory_levels_each_collapsible(self):
+        """Deeply-nested paths produce a dirHeader at every level
+        (parent + each child), so a tree like
+            external/cmark/src/foo.c
+        gives us four headers: '', 'external', 'external/cmark',
+        'external/cmark/src'."""
+        # Build a tiny synthetic LCOV with one file deep in a tree.
+        deep = os.path.join(self.tmp, "deep.info")
+        with open(deep, "w") as f:
+            f.write(
+                "TN:\nSF:external/cmark/src/blocks.c\n"
+                "DA:1,1\nLF:1\nLH:1\nend_of_record\n"
+            )
+        out_dir = os.path.join(self.tmp, "deep-out")
+        self._run(deep, "--output-dir", out_dir, "--quiet")
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        # Each ancestor has its own dirHeader.
+        # Note: slang-coverage-html strips the common prefix; with
+        # a single-file LCOV that prefix is the file's full directory,
+        # so the hierarchy collapses to "(top level)" + just the file.
+        # To validate nesting we add a second file outside the deep
+        # tree so the common prefix stays at the root.
+        deep2 = os.path.join(self.tmp, "deep2.info")
+        with open(deep2, "w") as f:
+            f.write(
+                "TN:\nSF:external/cmark/src/blocks.c\n"
+                "DA:1,1\nLF:1\nLH:1\nend_of_record\n"
+                "TN:\nSF:other.c\n"
+                "DA:1,1\nLF:1\nLH:1\nend_of_record\n"
+            )
+        out_dir2 = os.path.join(self.tmp, "deep2-out")
+        self._run(deep2, "--output-dir", out_dir2, "--quiet")
+        with open(os.path.join(out_dir2, "index.html"), encoding="utf-8") as f:
+            idx2 = f.read()
+        self.assertIn('data-path=""', idx2)
+        self.assertIn('data-path="external"', idx2)
+        self.assertIn('data-path="external/cmark"', idx2)
+        self.assertIn('data-path="external/cmark/src"', idx2)
+        # The deepest header has data-depth="3".
+        self.assertRegex(
+            idx2,
+            r'data-path="external/cmark/src"[^>]*data-depth="3"|'
+            r'data-depth="3"[^>]*data-path="external/cmark/src"',
+        )
 
     def test_index_uses_full_width_no_center(self):
         """Index table is full-width, not the old `<center>` 80%."""

@@ -465,32 +465,62 @@ INDEX_TOGGLE_SCRIPT = """\
     }
   }
 
-  // Per-directory toggle: hides/shows every fileSummary and
-  // fileFunctions row matching this directory's data-dir attribute.
-  // When expanding, only fileSummary rows are revealed; fileFunctions
-  // rows stay hidden until the user toggles individual files.
+  // Per-directory toggle: hides every descendant row when collapsing
+  // (anything whose data-dir or data-path lives under this dir's
+  // path); when expanding, reveals only direct children — files
+  // sitting in this dir, plus immediate sub-directory headers — all
+  // in collapsed state. The user can drill further by clicking any
+  // child chevron.
+  function isDescendant(rowKey, parentPath) {
+    if (rowKey === null) return false;
+    if (parentPath === '') return rowKey !== '';
+    return rowKey === parentPath || rowKey.indexOf(parentPath + '/') === 0;
+  }
   function toggleDir(el) {
-    var dir = el.getAttribute('data-dir');
-    if (!dir) return;
-    var rows = document.querySelectorAll(
-      'tr.fileSummary[data-dir="' + dir + '"], ' +
-      'tr.fileFunctions[data-dir="' + dir + '"]'
-    );
+    var path = el.getAttribute('data-path');
+    if (path === null) return;
     var collapsing = el.getAttribute('aria-expanded') !== 'false';
+    var parentDepth = path === '' ? -1 : path.split('/').length - 1;
+
+    var rows = document.querySelectorAll(
+      'tr.dirHeader, tr.fileSummary, tr.fileFunctions'
+    );
     rows.forEach(function (r) {
+      if (r.querySelector('.dirToggle[data-path="' + path + '"]')) return;
+      var rowKey = r.getAttribute('data-dir');
+      if (rowKey === null) rowKey = r.getAttribute('data-path');
+      if (!isDescendant(rowKey, path)) return;
+
       if (collapsing) {
         r.setAttribute('hidden', '');
-      } else if (r.classList.contains('fileSummary')) {
-        r.removeAttribute('hidden');
-        // Reset its fnToggle (if any) to closed state.
-        var t = r.querySelector('.fnToggle');
-        if (t) {
-          t.textContent = '\\u25B6';
-          t.setAttribute('aria-expanded', 'false');
+        return;
+      }
+      // Expanding: show only direct children of `path`.
+      var rDepth = parseInt(r.getAttribute('data-depth') || '0', 10);
+      if (r.classList.contains('fileSummary')) {
+        if (rowKey === path) {
+          r.removeAttribute('hidden');
+          var t = r.querySelector('.fnToggle');
+          if (t) {
+            t.textContent = '\\u25B6';
+            t.setAttribute('aria-expanded', 'false');
+          }
+        }
+      } else if (r.classList.contains('dirHeader')) {
+        if (rDepth === parentDepth + 1) {
+          r.removeAttribute('hidden');
+          // Make this re-revealed sub-dir collapsed by default;
+          // the user re-expands as needed.
+          var dt = r.querySelector('.dirToggle');
+          if (dt) {
+            dt.textContent = '\\u25B6';
+            dt.setAttribute('aria-expanded', 'false');
+          }
         }
       }
-      // fileFunctions rows stay hidden when expanding the directory.
+      // fileFunctions rows stay hidden when expanding a directory.
     });
+
     el.textContent = collapsing ? '\\u25B6' : '\\u25BC';
     el.setAttribute('aria-expanded', collapsing ? 'false' : 'true');
   }
@@ -670,28 +700,59 @@ def render_index(
         )
         cols_for_empty += 3
 
-    # Group records by their first-segment directory so the index can
-    # show "compiler-core/", "core/", "slang/" etc. as collapsible
-    # parents. Files at the top level (no slash after the common-prefix
-    # strip) get their own "(root)" group at the top.
+    # Group records by their FULL parent directory (relative to the
+    # common-prefix-stripped display path). Then walk the directory
+    # tree depth-first so each level — `source/`, `source/slang/`,
+    # `source/slang/optimizer/`, etc. — gets its own collapsible
+    # row independently. Walking lexicographically-sorted dir paths
+    # produces the right DFS order naturally.
     sorted_records = sorted(records, key=lambda r: _display_path(r.path, prefix))
-    by_dir: "collections.OrderedDict[str, List[FileRecord]]" = collections.OrderedDict()
+    files_by_dir: Dict[str, List[FileRecord]] = collections.OrderedDict()
     for rec in sorted_records:
         display = _display_path(rec.path, prefix)
-        first, sep, _ = display.partition("/")
-        dir_key = first if sep else ""
-        by_dir.setdefault(dir_key, []).append(rec)
-    # Stable order: root first if present, then alphabetical.
-    dir_order = sorted(by_dir.keys(), key=lambda d: (d != "", d))
+        if "/" in display:
+            dirpath, _, _ = display.rpartition("/")
+        else:
+            dirpath = ""
+        files_by_dir.setdefault(dirpath, []).append(rec)
+
+    # Build the set of all directory paths, including ancestors.
+    all_dirs = set()
+    for dirpath in files_by_dir:
+        parts = dirpath.split("/") if dirpath else []
+        for i in range(len(parts) + 1):
+            all_dirs.add("/".join(parts[:i]))
+    sorted_all_dirs = sorted(all_dirs)
+
+    # Aggregate stats for any directory (its own files + all
+    # descendants).
+    def _files_under(target: str) -> List[FileRecord]:
+        if target == "":
+            return [f for fs in files_by_dir.values() for f in fs]
+        return [
+            f
+            for d, fs in files_by_dir.items()
+            for f in fs
+            if d == target or d.startswith(target + "/")
+        ]
+
+    def _depth_of(dirpath: str) -> int:
+        return 0 if dirpath == "" else dirpath.count("/") + 1
+
+    def _indent_style(depth: int) -> str:
+        # Nested dirs each get an extra ~1.4em of left padding so the
+        # tree shape is visible even when row backgrounds are uniform.
+        return f"padding-left: calc(10px + {1.4 * depth:.2f}em);"
 
     rows_html: List[str] = []
 
-    for dir_key in dir_order:
-        dir_records = by_dir[dir_key]
-        dir_safe = re.sub(r"[^A-Za-z0-9]+", "_", dir_key) or "root"
-        dir_label = (dir_key + "/") if dir_key else "(top level)"
-
-        # Aggregated stats for the dir-summary row
+    for dirpath in sorted_all_dirs:
+        dir_records = _files_under(dirpath)
+        if not dir_records:
+            continue
+        depth = _depth_of(dirpath)
+        last_segment = (dirpath.rsplit("/", 1)[-1] + "/") if dirpath else "(top level)"
+        # Aggregated stats for this dir (incl. all descendants).
         d_total_l = sum(r.total_lines for r in dir_records)
         d_hit_l = sum(r.hit_lines for r in dir_records)
         d_rate_l = (100.0 * d_hit_l / d_total_l) if d_total_l else 0.0
@@ -702,12 +763,14 @@ def render_index(
         d_hit_br = sum(r.hit_branches for r in dir_records)
         d_rate_br = (100.0 * d_hit_br / d_total_br) if d_total_br else 0.0
 
+        dir_path_attr = html.escape(dirpath)
         dir_cells: List[str] = [
-            f'              <td class="coverDirectory">'
+            f'              <td class="coverDirectory" '
+            f'style="{_indent_style(depth)}">'
             f'<span class="dirToggle" tabindex="0" role="button" '
-            f'aria-expanded="true" data-dir="{html.escape(dir_safe)}" '
-            f'aria-label="Toggle directory {html.escape(dir_label)}">▼</span>'
-            f"{html.escape(dir_label)}"
+            f'aria-expanded="true" data-path="{dir_path_attr}" '
+            f'aria-label="Toggle directory {html.escape(last_segment)}">▼</span>'
+            f"{html.escape(last_segment)}"
             f' <span style="opacity:.7;font-weight:400">'
             f"({len(dir_records)} file{'s' if len(dir_records) != 1 else ''})</span>"
             f"</td>",
@@ -728,13 +791,22 @@ def render_index(
                 )
             )
         rows_html.append(
-            f'            <tr class="dirHeader" data-dir="{html.escape(dir_safe)}">\n'
+            f'            <tr class="dirHeader" data-path="{dir_path_attr}" '
+            f'data-depth="{depth}">\n'
             + "\n".join(dir_cells)
             + "\n            </tr>"
         )
 
-        for rec in dir_records:
+        # File rows directly inside this directory (NOT descendants).
+        direct = files_by_dir.get(dirpath, [])
+        file_depth = depth + 1
+        file_indent = _indent_style(file_depth)
+        for rec in direct:
             display = _display_path(rec.path, prefix)
+            # On nested dirs, show only the file basename in the row;
+            # the dir hierarchy is conveyed by the indented dir headers
+            # above. The link still points at the full per-file page.
+            display_basename = display.rsplit("/", 1)[-1]
             href = file_map[rec.path]
             has_fn_table = bool(rec.functions)
             if has_fn_table:
@@ -746,8 +818,9 @@ def render_index(
             else:
                 toggle = '<span class="fnTogglePlaceholder">▶</span>'
             cells: List[str] = [
-                f'              <td class="coverFile">{toggle}'
-                f'<a href="{html.escape(href)}">{html.escape(display)}</a></td>',
+                f'              <td class="coverFile" style="{file_indent}">'
+                f'{toggle}'
+                f'<a href="{html.escape(href)}">{html.escape(display_basename)}</a></td>',
                 _index_col_group(
                     has_bar=True,
                     rate=rec.percent,
@@ -774,13 +847,15 @@ def render_index(
                     )
                 )
             rows_html.append(
-                f'            <tr class="fileSummary" data-dir="{html.escape(dir_safe)}">\n'
+                f'            <tr class="fileSummary" data-dir="{dir_path_attr}" '
+                f'data-depth="{file_depth}">\n'
                 + "\n".join(cells)
                 + "\n            </tr>"
             )
             if has_fn_table:
                 rows_html.append(
-                    f'            <tr class="fileFunctions" data-dir="{html.escape(dir_safe)}" hidden>\n'
+                    f'            <tr class="fileFunctions" data-dir="{dir_path_attr}" '
+                    f'data-depth="{file_depth}" hidden>\n'
                     f'              <td colspan="{cols_for_empty}">'
                     f"{_render_inline_functions_table(rec, href, show_fns=show_fns, show_br=show_br)}"
                     f"</td>\n"
