@@ -193,15 +193,6 @@ td.headerCovTableHead { text-align: center; padding: 0 6px; white-space: nowrap;
 td.headerCovTableEntry    { text-align: right; color: var(--text); font-weight: 600;
                             padding-left: 12px; padding-right: 4px;
                             background-color: var(--row-bg); white-space: nowrap; }
-td.headerCovTableEntryHi  { text-align: right; color: var(--text); font-weight: 700;
-                            padding-left: 12px; padding-right: 4px;
-                            background-color: var(--tier-hi-bg); white-space: nowrap; }
-td.headerCovTableEntryMed { text-align: right; color: var(--text); font-weight: 700;
-                            padding-left: 12px; padding-right: 4px;
-                            background-color: var(--tier-med-bg); white-space: nowrap; }
-td.headerCovTableEntryLo  { text-align: right; color: var(--text); font-weight: 700;
-                            padding-left: 12px; padding-right: 4px;
-                            background-color: var(--tier-lo-bg); white-space: nowrap; }
 
 /* Top-level index table: full window width with a small breathing
    margin. Both the file-summary table and any embedded fnInner
@@ -259,15 +250,12 @@ span.coverBarFill  { display: inline-block; height: 10px; vertical-align: top; }
 span.coverBarRest    { background-color: transparent; display: inline-block;
                        height: 10px; vertical-align: top; }
 
-td.coverPerHi   { text-align: right; padding: 3px 10px;
-                  background-color: var(--tier-hi-bg);  color: var(--text);
-                  font-weight: 700; }
-td.coverPerMed  { text-align: right; padding: 3px 10px;
-                  background-color: var(--tier-med-bg); color: var(--text);
-                  font-weight: 700; }
-td.coverPerLo   { text-align: right; padding: 3px 10px;
-                  background-color: var(--tier-lo-bg);  color: var(--text);
-                  font-weight: 700; }
+/* Rate cells use a continuous gradient background that matches
+   the progress-bar fill. The exact color is computed per-row and
+   set via inline `style="background-color: hsl(...)"`. The class
+   provides only the layout / typography. */
+td.coverPerCell { text-align: right; padding: 3px 10px;
+                  color: var(--text); font-weight: 700; }
 td.coverNumDflt { text-align: right; padding: 3px 10px;
                   background-color: var(--row-bg-alt); white-space: nowrap; }
 
@@ -300,12 +288,6 @@ td.coverFn        { text-align: left; padding: 2px 20px 2px 10px;
                     font-family: ui-monospace, SFMono-Regular, Menlo,
                                  Monaco, Consolas, monospace;
                     word-break: break-all; font-size: 92%; }
-td.coverFnHi      { text-align: right; padding: 2px 10px;
-                    background-color: var(--tier-hi-bg); color: var(--text);
-                    font-weight: 600; white-space: nowrap; }
-td.coverFnLo      { text-align: right; padding: 2px 10px;
-                    background-color: var(--tier-lo-bg); color: var(--text);
-                    font-weight: 600; white-space: nowrap; }
 
 span.branchAll   { background-color: var(--tier-hi-bg);  color: var(--text); }
 span.branchPart  { background-color: var(--tier-med-bg); color: var(--text); }
@@ -438,14 +420,8 @@ def _render_page_header(
         for m in metrics
     )
 
-    def _rate_cell(m: Metric) -> str:
-        if m.total <= 0:
-            return '<td class="coverNumDflt">-</td>'
-        tier = _tier(m.pct)
-        return f'<td class="coverPer{tier}">{m.pct:.1f}&nbsp;%</td>'
-
     rate_row = "\n".join(
-        f"        {_rate_cell(m)}" for m in metrics
+        f"        {_rate_cell(m.pct, m.total)}" for m in metrics
     )
     total_row = "\n".join(
         f'        <td class="coverNumDflt">{m.total if m.total else "-"}</td>'
@@ -675,10 +651,33 @@ def _gradient_color(pct: float) -> str:
     """HSL color for a coverage rate. 0 % → red (hue 0); 100 % →
     green (hue 120). Linear interpolation in hue space gives a
     smooth red → orange → yellow → lime → green ramp without the
-    bright-tier banding."""
+    bright-tier banding. This is the *bar fill* color: vivid,
+    saturated, fully visible on a small fixed-size element."""
     pct = max(0.0, min(100.0, pct))
     hue = pct * 1.2  # 0..120
     return f"hsl({hue:.0f}, 70%, 50%)"
+
+
+def _gradient_cell_bg(pct: float) -> str:
+    """Soft gradient background for a percent-rate cell. Same hue
+    ramp as `_gradient_color` but at high lightness so dark body
+    text stays legible on top. Replaces the discrete Hi/Med/Lo
+    tier backgrounds — rate cells now ride the same continuous
+    gradient as the bar fill."""
+    pct = max(0.0, min(100.0, pct))
+    hue = pct * 1.2
+    return f"hsl({hue:.0f}, 60%, 85%)"
+
+
+def _rate_cell(pct: float, total: int) -> str:
+    """Standard percent-rate <td> with the gradient background."""
+    if total <= 0:
+        return '<td class="coverNumDflt">-</td>'
+    color = _gradient_cell_bg(pct)
+    return (
+        f'<td class="coverPerCell" style="background-color:{color}">'
+        f"{pct:.1f}&nbsp;%</td>"
+    )
 
 
 def _render_rate_bar(pct: float) -> str:
@@ -745,15 +744,13 @@ def _index_col_group(
 
     Returns either bar+rate+total+hit (has_bar) or rate+total+hit.
     """
-    tier = _tier(rate) if total > 0 else "Hi"
-    rate_str = f"{rate:.1f}&nbsp;%" if total > 0 else "-"
     parts = []
     if has_bar:
         parts.append(
             f'              <td class="coverBar" align="center">'
             f'{_render_rate_bar(rate)}</td>'
         )
-    parts.append(f'              <td class="coverPer{tier}">{rate_str}</td>')
+    parts.append(f"              {_rate_cell(rate, total)}")
     parts.append(f'              <td class="coverNumDflt">{total}</td>')
     parts.append(f'              <td class="coverNumDflt">{hit}</td>')
     return "\n".join(parts)
@@ -1164,8 +1161,7 @@ def _render_inline_functions_table(
         l_total, l_hit = line_cov.get(name, (0, 0))
         if l_total > 0:
             pct = 100.0 * l_hit / l_total
-            tier = _tier(pct)
-            rate_cell = f'<td class="coverPer{tier}">{pct:.1f}&nbsp;%</td>'
+            rate_cell = _rate_cell(pct, l_total)
             bar_cell = (
                 f'<td class="coverBar" align="center">{_render_rate_bar(pct)}</td>'
             )
@@ -1178,19 +1174,12 @@ def _render_inline_functions_table(
             hit_cell = '<td class="coverNumDflt">-</td>'
 
         # Per-function function-coverage cells: 1/1 (covered) when
-        # the function was called at least once, 0/1 otherwise. The
-        # actual call count was previously a separate "Calls" column
-        # but it duplicated information already in the line-coverage
-        # cells (a function with hits>0 = covered = 100%) — dropped
-        # for readability, the FNDA value still drives the Hi/Lo
-        # tier on this rate cell.
+        # the function was called at least once, 0/1 otherwise.
+        # Uses the same gradient as every other rate cell.
         if show_fns:
             fn_hit_int = 1 if fn.hits > 0 else 0
             fn_pct = 100.0 if fn.hits > 0 else 0.0
-            fn_tier = _tier(fn_pct)
-            fn_rate_cell = (
-                f'<td class="coverPer{fn_tier}">{fn_pct:.0f}&nbsp;%</td>'
-            )
+            fn_rate_cell = _rate_cell(fn_pct, 1)
             fn_total_cell = '<td class="coverNumDflt">1</td>'
             fn_hit_cell = f'<td class="coverNumDflt">{fn_hit_int}</td>'
             fn_cells = fn_rate_cell + fn_total_cell + fn_hit_cell
@@ -1201,10 +1190,7 @@ def _render_inline_functions_table(
             b_total, b_hit = br_cov.get(name, (0, 0))
             if b_total > 0:
                 bpct = 100.0 * b_hit / b_total
-                btier = _tier(bpct)
-                br_rate_cell = (
-                    f'<td class="coverPer{btier}">{bpct:.1f}&nbsp;%</td>'
-                )
+                br_rate_cell = _rate_cell(bpct, b_total)
                 br_total_cell = f'<td class="coverNumDflt">{b_total}</td>'
                 br_hit_cell = f'<td class="coverNumDflt">{b_hit}</td>'
             else:

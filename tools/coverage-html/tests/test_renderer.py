@@ -451,6 +451,25 @@ class GradientColorTests(unittest.TestCase):
         self.assertIn("hsl(0,", renderer._gradient_color(-5.0))
         self.assertIn("hsl(120,", renderer._gradient_color(200.0))
 
+    def test_cell_bg_uses_high_lightness(self):
+        # Rate-cell backgrounds use the same hue ramp as the bar but
+        # at much higher lightness so dark text stays legible.
+        self.assertIn("hsl(0, 60%, 85%)", renderer._gradient_cell_bg(0.0))
+        self.assertIn("hsl(60, 60%, 85%)", renderer._gradient_cell_bg(50.0))
+        self.assertIn("hsl(120, 60%, 85%)", renderer._gradient_cell_bg(100.0))
+
+    def test_rate_cell_emits_gradient_inline_style(self):
+        # _rate_cell emits the coverPerCell class with an inline
+        # background-color hsl() set per-percentage.
+        cell = renderer._rate_cell(78.0, 100)
+        self.assertIn('class="coverPerCell"', cell)
+        self.assertIn("background-color:hsl(", cell)
+        # Below-threshold (no data) renders as a plain dash cell.
+        self.assertEqual(
+            renderer._rate_cell(0.0, 0),
+            '<td class="coverNumDflt">-</td>',
+        )
+
 
 class TierTests(unittest.TestCase):
     def test_thresholds(self):
@@ -976,13 +995,20 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertIn(
             '<td class="tableHead" colspan="3">Function Coverage</td>', idx
         )
-        # Per-function fc cells appear in the body: 100% green for a
-        # called function, 0% red for an uncalled one. The fixture's
-        # `getUnownedStringSliceText` is uncalled (FNDA 0), so
-        # somewhere a 0&nbsp;% coverPerLo cell exists.
-        self.assertRegex(idx, r'<td class="coverPerLo">0&nbsp;%</td>')
-        # And called functions get 100&nbsp;% coverPerHi.
-        self.assertRegex(idx, r'<td class="coverPerHi">100&nbsp;%</td>')
+        # Per-function fc cells appear in the body. Rate cells now
+        # use a continuous gradient backgound via inline style on
+        # `coverPerCell`. Uncalled functions land at hue 0 (red);
+        # fully-covered ones at hue 120 (green).
+        self.assertRegex(
+            idx,
+            r'<td class="coverPerCell" style="background-color:hsl\(0,'
+            r' 60%, 85%\)">0\.0&nbsp;%</td>',
+        )
+        self.assertRegex(
+            idx,
+            r'<td class="coverPerCell" style="background-color:hsl\(120,'
+            r' 60%, 85%\)">100\.0&nbsp;%</td>',
+        )
         # Calls column was dropped from the dropdown — it duplicated
         # what the per-function function-coverage cell already says
         # ("hit > 0 = covered = 100%").
