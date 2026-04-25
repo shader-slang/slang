@@ -278,7 +278,13 @@ td.versionInfo { text-align: center; padding: 8px; color: var(--text-muted);
 
 pre.sourceHeading { font-family: ui-monospace, SFMono-Regular, Menlo,
                                  Monaco, Consolas, monospace;
-                    font-weight: 700; margin: 0; color: var(--text-muted); }
+                    font-weight: 700; margin: 0; padding: 6px 0;
+                    color: var(--text-muted);
+                    background-color: #fff;
+                    border-bottom: 1px solid var(--row-bg);
+                    position: sticky;
+                    top: var(--chrome-h, 200px);
+                    z-index: 5; }
 pre.source        { font-family: ui-monospace, SFMono-Regular, Menlo,
                                  Monaco, Consolas, monospace;
                     margin-top: 2px; }
@@ -339,12 +345,11 @@ table.fnInner td { overflow-wrap: break-word; }
 table.fnInner td.tableHead { font-family: -apple-system, BlinkMacSystemFont,
                              "Segoe UI", Roboto, sans-serif; }
 /* fn-specific cols subdivide the parent's File column (47%) into
-   Name (38%) + Line (4%) + Calls (5%). The remaining cols reuse
-   the parent's classes so the line-coverage / fn / branch columns
-   line up vertically with the file-summary row above. */
-table.fnInner col.fnNameCol  { width: 38%; }
+   Name (43%) + Line (4%). The remaining cols reuse the parent's
+   classes so the line-coverage / fn / branch columns line up
+   vertically with the file-summary row above. */
+table.fnInner col.fnNameCol  { width: 43%; }
 table.fnInner col.fnLineCol  { width: 4%; }
-table.fnInner col.fnCallsCol { width: 5%; }
 
 .sourceUnavailable { color: var(--slang-orange); font-style: italic;
                      padding: 8px; }
@@ -410,10 +415,16 @@ def _render_page_header(
     test_name: str,
     test_date: str,
     metrics: List[Metric],
+    show_metric_grid: bool = True,
 ) -> str:
     """Top-of-page chrome: title bar, breadcrumb / test / date,
-    and a *transposed* metric grid where columns are
+    and (optionally) a transposed metric grid where columns are
     Lines / Functions / Branches and rows are Coverage / Total / Hit.
+
+    `show_metric_grid=False` is the right call on the top-level
+    index page: the index table's first dirHeader row already shows
+    the same totals, so the chrome grid would be redundant. Per-file
+    pages keep the grid (no equivalent dirHeader available).
 
     The whole block is wrapped in `<div class="topChrome">` with
     `position: sticky; top: 0` so it stays visible when the user
@@ -445,6 +456,33 @@ def _render_page_header(
         for m in metrics
     )
 
+    metric_grid_html = (
+        f"""  <table class="metricGrid">
+    <thead>
+      <tr>
+        <td class="metricRowLabel"></td>
+{cols_html}
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="metricRowLabel">Coverage</td>
+{rate_row}
+      </tr>
+      <tr>
+        <td class="metricRowLabel">Total</td>
+{total_row}
+      </tr>
+      <tr>
+        <td class="metricRowLabel">Hit</td>
+{hit_row}
+      </tr>
+    </tbody>
+  </table>"""
+        if show_metric_grid
+        else ""
+    )
+
     return f"""<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html lang="en">
 <head>
@@ -468,28 +506,7 @@ def _render_page_header(
       <td class="headerValue">{html.escape(test_date)}</td>
     </tr>
   </table>
-  <table class="metricGrid">
-    <thead>
-      <tr>
-        <td class="metricRowLabel"></td>
-{cols_html}
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td class="metricRowLabel">Coverage</td>
-{rate_row}
-      </tr>
-      <tr>
-        <td class="metricRowLabel">Total</td>
-{total_row}
-      </tr>
-      <tr>
-        <td class="metricRowLabel">Hit</td>
-{hit_row}
-      </tr>
-    </tbody>
-  </table>
+{metric_grid_html}
   <table class="chrome" cellpadding="0" cellspacing="0">
     <tr><td class="ruler"></td></tr>
   </table>
@@ -497,11 +514,12 @@ def _render_page_header(
 """
 
 
-INDEX_TOGGLE_SCRIPT = """\
+CHROME_MEASURE_SCRIPT = """\
 <script>
 (function () {
-  // Measure the sticky chrome's height once after layout so the
-  // table's <thead> can stick directly underneath.
+  // Measure the sticky chrome's height once after layout so any
+  // sticky element below it (table <thead>, source heading, …)
+  // can stack directly underneath via top: var(--chrome-h).
   function measureChrome() {
     var c = document.querySelector('.topChrome');
     if (c) {
@@ -513,7 +531,14 @@ INDEX_TOGGLE_SCRIPT = """\
   if (document.readyState === 'complete') measureChrome();
   else window.addEventListener('load', measureChrome);
   window.addEventListener('resize', measureChrome);
+})();
+</script>
+"""
 
+
+INDEX_TOGGLE_SCRIPT = CHROME_MEASURE_SCRIPT + """\
+<script>
+(function () {
   // Per-file toggle: reveals the next sibling fileFunctions row,
   // lazy-cloning the function table from a <template> on first
   // open so the initial DOM stays small.
@@ -752,6 +777,9 @@ def render_index(
         test_name=test_name,
         test_date=test_date,
         metrics=_overall_metrics(records),
+        # The first dirHeader row already shows aggregated totals;
+        # the chrome metric grid would be redundant on the index.
+        show_metric_grid=False,
     )
 
     # Build the column-header rows. Line group always has the bar
@@ -1083,7 +1111,9 @@ def render_file_page(
 
     body = "\n".join(parts)
 
-    out = header + body + _render_page_footer()
+    # Per-file pages also need the chrome-height measurement script
+    # so the sticky source heading sits directly under the chrome.
+    out = header + body + _render_page_footer(extra_body=CHROME_MEASURE_SCRIPT)
     with open(os.path.join(output_dir, out_filename), "w", encoding="utf-8") as f:
         f.write(out)
 
@@ -1123,7 +1153,6 @@ def _render_inline_functions_table(
 
     rows: List[str] = []
     for name, fn in items:
-        calls_cls = "coverFnHi" if fn.hits > 0 else "coverFnLo"
         if fn.first_line > 0:
             line_cell = (
                 f'<a href="{html.escape(file_href)}#L{fn.first_line}">'
@@ -1149,8 +1178,12 @@ def _render_inline_functions_table(
             hit_cell = '<td class="coverNumDflt">-</td>'
 
         # Per-function function-coverage cells: 1/1 (covered) when
-        # the function was called at least once, 0/1 otherwise.
-        # Aligns with the parent's "Function Coverage" group.
+        # the function was called at least once, 0/1 otherwise. The
+        # actual call count was previously a separate "Calls" column
+        # but it duplicated information already in the line-coverage
+        # cells (a function with hits>0 = covered = 100%) — dropped
+        # for readability, the FNDA value still drives the Hi/Lo
+        # tier on this rate cell.
         if show_fns:
             fn_hit_int = 1 if fn.hits > 0 else 0
             fn_pct = 100.0 if fn.hits > 0 else 0.0
@@ -1186,7 +1219,6 @@ def _render_inline_functions_table(
             "        <tr>"
             f'<td class="coverFn">{html.escape(name)}</td>'
             f'<td class="coverNumDflt">{line_cell}</td>'
-            f'<td class="{calls_cls}">{fn.hits}</td>'
             f"{bar_cell}{rate_cell}{total_cell}{hit_cell}"
             f"{fn_cells}{br_cells}"
             "</tr>"
@@ -1219,17 +1251,11 @@ def _render_inline_functions_table(
             '          <td class="tableHead" colspan="3">Branch Coverage</td>\n'
         )
 
-    calls_tooltip = (
-        "Number of invocations of the function during the run "
-        "(LCOV FNDA hit count). 0 means uncalled."
-    )
-
     return (
         '<table class="fnInner" cellpadding="1" cellspacing="1" border="0">\n'
         '        <colgroup>\n'
         '          <col class="fnNameCol">\n'
         '          <col class="fnLineCol">\n'
-        '          <col class="fnCallsCol">\n'
         '          <col class="colLBar">\n'
         '          <col class="colLRate">\n'
         '          <col class="colLTotal">\n'
@@ -1239,7 +1265,6 @@ def _render_inline_functions_table(
         "        <tr>\n"
         '          <td class="tableHead">Function</td>\n'
         '          <td class="tableHead">Line</td>\n'
-        f'          <td class="tableHead" title="{html.escape(calls_tooltip)}">Calls</td>\n'
         '          <td class="tableHead" colspan="2">Line Coverage</td>\n'
         '          <td class="tableHead">Total</td>\n'
         '          <td class="tableHead">Hit</td>\n'
@@ -1306,18 +1331,26 @@ def _render_source_view(record: FileRecord, source_text: str) -> str:
     has_branches = bool(record.branches)
     branches_by_line = _branches_by_line(record) if has_branches else {}
 
-    parts: List[str] = ["<table><tr><td>"]
+    # Heading positions match the data layout exactly, so the column
+    # labels sit directly above their data:
+    #   no branches:
+    #     "    Line"(1-8) " "(9) "        Hits"(10-21) "   "(22-24) Source(25+)
+    #   with branches:
+    #     "    Line"(1-8) " "(9) "        Hits"(10-21) " "(22)
+    #     "  Branch  "(23-32) " : "(33-35) Source(36+)
+    #
+    # The heading is rendered as a sibling <pre> before <pre class="source">
+    # (no surrounding table) so it can be `position: sticky` underneath
+    # the page chrome.
     if has_branches:
-        # Headings: "Line data" above the 12-char hits column (starts at
-        # col 13); "Branch" above the 10-char branch column (cols 23-32);
-        # "Source code" above the source body (col 36+).
-        heading = (
-            "            Line data     Branch    Source code"
-        )
+        heading = "    Line        Hits   Branch    Source code"
     else:
-        heading = "            Line data    Source code"
-    parts.append(f'<pre class="sourceHeading">{heading}</pre>')
-    parts.append('<pre class="source">')
+        heading = "    Line        Hits    Source code"
+
+    parts: List[str] = [
+        f'<pre class="sourceHeading">{heading}</pre>',
+        '<pre class="source">',
+    ]
 
     for idx, raw in enumerate(src_lines, start=1):
         esc = html.escape(raw)
@@ -1367,7 +1400,7 @@ def _render_source_view(record: FileRecord, source_text: str) -> str:
                     f'<span class="tlaUNC">{0:>12} {branch_cell} : '
                     f"{esc}</span></span>"
                 )
-    parts.append("</pre></td></tr></table>")
+    parts.append("</pre>")
     return "\n".join(parts) + "\n"
 
 

@@ -638,19 +638,20 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(res.returncode, 0, msg=res.stderr)
         with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
             idx = f.read()
-        # New column groups appear only when data is present.
+        # Function and branch column groups appear only when data is
+        # present in the LCOV.
         self.assertIn("Function Coverage", idx)
         self.assertIn("Branch Coverage", idx)
-        # The transposed metric grid in the page chrome lists each
-        # metric as a column header.
-        self.assertIn('class="metricColHead">Functions</td>', idx)
-        self.assertIn('class="metricColHead">Branches</td>', idx)
-        self.assertIn('class="metricColHead">Lines</td>', idx)
+        # On the index page the chrome's metric grid is suppressed —
+        # the first dirHeader row already shows the same totals.
+        # Per-file pages still emit the grid; that's covered below.
+        self.assertNotIn('class="metricColHead"', idx)
 
-    def test_transposed_metric_grid_in_chrome(self):
-        """Page header chrome carries a transposed metric grid: one
-        column per metric (Lines / Functions / Branches), three rows
-        for Coverage / Total / Hit."""
+    def test_transposed_metric_grid_only_on_per_file_pages(self):
+        """The transposed metric grid (Lines/Functions/Branches as
+        columns; Coverage/Total/Hit as rows) appears on per-file
+        pages, not on the index — the index has a dirHeader row
+        showing the same totals."""
         out_dir = os.path.join(self.tmp, "transposed")
         self._run(
             os.path.join(FIXTURES, "branches-and-functions.info"),
@@ -658,15 +659,26 @@ class CliIntegrationTests(unittest.TestCase):
             out_dir,
             "--quiet",
         )
+        # Index does NOT carry the metric grid.
         with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
             idx = f.read()
-        self.assertIn('table class="metricGrid"', idx)
-        self.assertIn('class="metricColHead">Lines</td>', idx)
-        self.assertIn('class="metricColHead">Functions</td>', idx)
-        self.assertIn('class="metricColHead">Branches</td>', idx)
-        self.assertIn('class="metricRowLabel">Coverage</td>', idx)
-        self.assertIn('class="metricRowLabel">Total</td>', idx)
-        self.assertIn('class="metricRowLabel">Hit</td>', idx)
+        self.assertNotIn('table class="metricGrid"', idx)
+        self.assertNotIn('class="metricColHead"', idx)
+
+        # Per-file pages DO carry it.
+        per_file = [
+            os.path.join(out_dir, e)
+            for e in os.listdir(out_dir)
+            if e.endswith(".html") and e != "index.html"
+        ]
+        self.assertTrue(per_file)
+        with open(per_file[0], encoding="utf-8") as f:
+            page = f.read()
+        self.assertIn('table class="metricGrid"', page)
+        self.assertIn('class="metricColHead">Lines</td>', page)
+        self.assertIn('class="metricRowLabel">Coverage</td>', page)
+        self.assertIn('class="metricRowLabel">Total</td>', page)
+        self.assertIn('class="metricRowLabel">Hit</td>', page)
 
     def test_top_chrome_is_sticky(self):
         """Whole top chrome is wrapped in a `topChrome` div with
@@ -887,12 +899,12 @@ class CliIntegrationTests(unittest.TestCase):
             idx = f.read()
         self.assertIn('table-layout: fixed', idx)
         self.assertIn('<colgroup>', idx)
-        # fnInner subdivides the parent's File column for Name/Line/Calls,
+        # fnInner subdivides the parent's File column for Name/Line,
         # then reuses the parent's colgroup classes for Bar/Rate/Total/Hit
         # so the per-function cells line up with the file row above.
         self.assertIn('class="fnNameCol"', idx)
         self.assertIn('class="fnLineCol"', idx)
-        self.assertIn('class="fnCallsCol"', idx)
+        self.assertNotIn('class="fnCallsCol"', idx)  # Calls col removed
         self.assertIn('class="colLBar"', idx)
         self.assertIn('class="colLRate"', idx)
         # Long mangled names should wrap via word-break / overflow-wrap.
@@ -971,8 +983,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertRegex(idx, r'<td class="coverPerLo">0&nbsp;%</td>')
         # And called functions get 100&nbsp;% coverPerHi.
         self.assertRegex(idx, r'<td class="coverPerHi">100&nbsp;%</td>')
-        # The Calls column header carries an explanation tooltip.
-        self.assertIn('title="Number of invocations', idx)
+        # Calls column was dropped from the dropdown — it duplicated
+        # what the per-function function-coverage cell already says
+        # ("hit > 0 = covered = 100%").
+        self.assertNotIn('class="tableHead">Calls</td>', idx)
 
     def test_index_has_expandable_function_rows(self):
         """Goal 2: per-file Functions tables live inline in the index,
