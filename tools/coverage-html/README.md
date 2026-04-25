@@ -125,28 +125,39 @@ Auto-detect: inputs ending in `.gz` are decompressed transparently.
 
 ## Methodology vs `llvm-cov report`
 
-Our percentages are computed from **raw LCOV records** the same way
-genhtml does. CI's published per-platform numbers come from
-**`llvm-cov report`**, which uses different counting rules for the
-same underlying data.
+Our percentages are computed from raw LCOV records, with one
+deliberate adjustment so the numbers line up with CI's published
+per-platform metrics:
+
+- **Functions** are deduped by `(file, first_line)`. Each LCOV `FN:`
+  record carries a mangled name, and the `llvm-cov export` step
+  emits one record per template instantiation / compiler-generated
+  duplicate of a single source-level function — so a single source
+  function can appear as dozens of FN records, all sharing the
+  same `first_line`. We collapse them: any instantiation hit counts
+  the underlying source function as hit. This mirrors what
+  `llvm-cov report` reports on the same `.profdata`.
+
+- **Lines** are counted one per `DA:` record. Matches genhtml.
+- **Branches** are counted one per `BRDA:` outcome. Matches genhtml.
 
 For Linux slangc-filtered (PR-10884 run as a stable reference):
 
-| Metric    | Ours (raw LCOV) | CI (`llvm-cov report`) | Gap     |
-| --------- | --------------- | ---------------------- | ------- |
-| Lines     | 77.75 %         | 78.21 %                | -0.5 pp |
-| Branches  | 65.79 %         | 74.08 %                | -8.3 pp |
-| Functions | 61.35 %         | 79.45 %                | -18 pp  |
+| Metric    | Ours    | CI (`llvm-cov report`) | Gap     |
+| --------- | ------- | ---------------------- | ------- |
+| Lines     | 77.75 % | 78.21 %                | -0.5 pp |
+| Branches  | 65.79 % | 74.08 %                | -8.3 pp |
+| Functions | 79.42 % | 79.45 %                | ~0 ✅   |
 
-Lines agree closely after the slangc filter (the bulk of the gap
-on the unfiltered view comes from prelude / external / build-
-generated files that llvm-cov excludes anyway). Branches and
-functions show larger gaps — `llvm-cov report` collapses some
-records that `llvm-cov export -format=lcov` faithfully emits. This
-isn't a bug in the merger; it's a known cross-tool methodology gap.
-If you need numbers directly comparable to CI, take CI's published
-numbers; if you need a **single merged number across all hosts**,
-use ours and accept the methodology delta.
+Functions match exactly after the line-dedup. Lines are within 0.5
+pp (residual is generated headers like `hlsl.meta.slang.h` that
+llvm-cov treats as non-instrumented). Branches are still 8 pp
+below — `llvm-cov report` appears to collapse some BRDA records
+that `llvm-cov export` emits faithfully; matching it exactly
+without re-running `llvm-cov` ourselves is hard. Numbers we
+publish are correct **per the LCOV** that CI hands us; if a
+direct apples-to-apples branch number is needed, report CI's
+per-OS branch %.
 
 ### Source resolution
 

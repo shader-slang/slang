@@ -96,19 +96,60 @@ class FileRecord:
         return 100.0 * self.hit_branches / self.total_branches
 
     # --- function coverage ---
+    #
+    # NOTE on counting: LCOV emits one FN/FNDA pair per *mangled name*,
+    # so template instantiations, implicit copy/move constructors, and
+    # other compiler-generated duplicates of a single source function
+    # appear as multiple FN records — typically all sharing the same
+    # `first_line`. The percentages a user wants reported are
+    # "fraction of *source-level* functions covered", which is what
+    # `llvm-cov report` computes on the same `.profdata`. We match it
+    # by deduping FN records on `(first_line)` per file: any
+    # instantiation hit counts the underlying function as hit.
+    #
+    # Functions with first_line == 0 (orphan FNDA-without-FN — possible
+    # but rare from llvm-cov export) can't be deduped by line, so they
+    # each count as their own entry by mangled name.
+
+    def _function_buckets(self) -> Tuple[set, set]:
+        """Return (all_first_lines, hit_first_lines) and the orphan
+        count, suitable for rate computation.
+
+        Internal helper — total/hit/percent properties wrap it.
+        """
+        line_set: set = set()
+        hit_line_set: set = set()
+        orphan_total = 0
+        orphan_hit = 0
+        for fn in self.functions.values():
+            if fn.first_line > 0:
+                line_set.add(fn.first_line)
+                if fn.hits > 0:
+                    hit_line_set.add(fn.first_line)
+            else:
+                orphan_total += 1
+                if fn.hits > 0:
+                    orphan_hit += 1
+        # Encode orphan count by extending the sets with synthetic keys.
+        # Easier: return the totals separately.
+        return line_set, hit_line_set, orphan_total, orphan_hit  # type: ignore[return-value]
+
     @property
     def total_functions(self) -> int:
-        return len(self.functions)
+        line_set, _hit_line_set, orphan_total, _ = self._function_buckets()
+        return len(line_set) + orphan_total
 
     @property
     def hit_functions(self) -> int:
-        return sum(1 for fn in self.functions.values() if fn.hits > 0)
+        _line_set, hit_line_set, _, orphan_hit = self._function_buckets()
+        return len(hit_line_set) + orphan_hit
 
     @property
     def percent_functions(self) -> float:
-        if not self.functions:
+        total = self.total_functions
+        if total == 0:
             return 0.0
-        return 100.0 * self.hit_functions / self.total_functions
+        return 100.0 * self.hit_functions / total
 
 
 # ---------------------------------------------------------------------------

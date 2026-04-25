@@ -301,6 +301,40 @@ class SlangcFilterTests(unittest.TestCase):
         )
 
 
+class FunctionDedupByLineTests(unittest.TestCase):
+    """Multiple FN records at the same first_line are template
+    instantiations / compiler-generated duplicates of one source-level
+    function. total_functions / hit_functions dedupe by first_line so
+    the published rate matches `llvm-cov report`."""
+
+    def _r(self, fns):
+        from lcov_io import FileRecord, Function
+
+        r = FileRecord(path="x.cpp")
+        for name, (fl, h) in fns.items():
+            r.functions[name] = Function(first_line=fl, hits=h)
+        return r
+
+    def test_three_instantiations_at_same_line_count_once(self):
+        # `foo<int>`, `foo<float>`, `foo<bool>` all declared at line 10.
+        r = self._r({"foo_int": (10, 5), "foo_float": (10, 0), "foo_bool": (10, 0)})
+        self.assertEqual(r.total_functions, 1)
+        self.assertEqual(r.hit_functions, 1)  # any instantiation hit → counted
+        self.assertEqual(r.percent_functions, 100.0)
+
+    def test_distinct_first_lines_count_separately(self):
+        r = self._r({"foo": (10, 5), "bar": (20, 0), "baz": (30, 7)})
+        self.assertEqual(r.total_functions, 3)
+        self.assertEqual(r.hit_functions, 2)
+
+    def test_orphan_first_line_zero_keeps_per_name(self):
+        # FNDA-without-FN: first_line=0. Can't dedupe by line; each
+        # mangled name counts on its own.
+        r = self._r({"orphan_a": (0, 1), "orphan_b": (0, 0), "real": (5, 1)})
+        self.assertEqual(r.total_functions, 3)
+        self.assertEqual(r.hit_functions, 2)
+
+
 class FunctionLineCoverageTests(unittest.TestCase):
     """Per-function line coverage derived from FN: + DA: ranges."""
 
