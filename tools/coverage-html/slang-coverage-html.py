@@ -253,11 +253,17 @@ td.coverFile       { text-align: left; padding: 3px 20px 3px 10px;
                      font-family: ui-monospace, SFMono-Regular, Menlo,
                                   Monaco, Consolas, monospace;
                      overflow-wrap: anywhere; }
+/* Directory rows: white background like file rows so they don't get
+   confused with the teal column-header. A 3 px teal stripe on the
+   left edge plus a teal chevron and bold dark-teal text mark them
+   as expandable parents. */
 td.coverDirectory  { text-align: left; padding: 4px 20px 4px 10px;
-                     color: #fff; background-color: var(--slang-teal);
+                     color: var(--slang-teal);
+                     background-color: var(--row-bg-alt);
+                     border-left: 3px solid var(--slang-teal);
                      font-family: ui-monospace, SFMono-Regular, Menlo,
                                   Monaco, Consolas, monospace;
-                     font-weight: 600; }
+                     font-weight: 700; }
 td.coverBar        { padding: 3px 10px; background-color: var(--row-bg-alt); }
 tr.fileSummary:nth-child(odd) > td.coverBar { background-color: var(--row-bg); }
 span.coverBarOutline { display: inline-block; height: 10px; width: 100px;
@@ -319,7 +325,7 @@ span.fnToggle, span.fnTogglePlaceholder, span.dirToggle
                                 Monaco, Consolas, monospace;
                    user-select: none; margin-right: 4px; text-align: center; }
 span.fnToggle    { cursor: pointer; color: var(--slang-teal); }
-span.dirToggle   { cursor: pointer; color: #fff; }
+span.dirToggle   { cursor: pointer; color: var(--slang-teal); }
 span.fnTogglePlaceholder { color: transparent; }
 span.fnToggle:focus, span.dirToggle:focus { outline: 1px dotted var(--slang-orange); }
 tr.fileFunctions[hidden]  { display: none; }
