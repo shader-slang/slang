@@ -65,6 +65,8 @@ slang-coverage-html <input.lcov> [options]
 --source-root PATH     Directory used as a root when resolving SF: paths
 --filter-include GLOB  Include-only glob, applied to SF: path (repeatable)
 --filter-exclude GLOB  Exclude glob, applied to SF: path (repeatable)
+--slangc-filter        Restrict to the slangc compiler-only file set
+                       CI uses (mirrors slangc-ignore-patterns.sh)
 --quiet                Suppress progress output
 ```
 
@@ -82,6 +84,10 @@ slang-coverage-merge <LCOV ...> [options]
                          (repeatable). Built-in defaults already cover
                          the three Slang CI runner roots.
 --no-default-prefixes    Skip the built-in path prefixes
+--slangc-filter          Restrict the merged output to the slangc
+                         compiler-only file set CI uses (mirrors
+                         tools/coverage/slangc-ignore-patterns.sh).
+                         Applied per-input after path normalization.
 --quiet                  Suppress progress output on stderr
 ```
 

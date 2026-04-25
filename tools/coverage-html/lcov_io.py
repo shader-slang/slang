@@ -111,6 +111,53 @@ class FileRecord:
         return 100.0 * self.hit_functions / self.total_functions
 
 
+# ---------------------------------------------------------------------------
+# slangc-only filter
+# ---------------------------------------------------------------------------
+#
+# Mirrors `tools/coverage/slangc-ignore-patterns.sh`, the shared
+# definition CI uses for the "slangc compiler-only" coverage view.
+# Patterns match repo-relative paths (forward slashes); apply after
+# `slang-coverage-merge`'s path normalization, or after manually
+# converting absolute / backslash paths.
+#
+# Each entry is a Python regex that, when found anywhere in the path,
+# means the file should be excluded from the slangc-only report.
+
+import re as _re
+
+SLANGC_EXCLUDE_PATTERNS: Tuple[str, ...] = (
+    r"build/prelude/",
+    r"build/source/slang/(capability|fiddle|slang-lookup-tables)/",
+    r"build/source/slang-core-module/",
+    r"external/",
+    r"include/",
+    r"source/slang-core-module/",
+    r"source/slang-glslang/",
+    r"source/slang-record-replay/",
+    r"tools/",
+    r"source/slang/slang-(language-server|doc-markdown-writer|doc-ast|ast-dump|repro|workspace-version)[.\-]",
+    r"source/slang/slang-ast-(expr|modifier|stmt)\.h$",
+)
+
+_SLANGC_RE = _re.compile("|".join(SLANGC_EXCLUDE_PATTERNS))
+
+
+def is_slangc_filtered_out(path: str) -> bool:
+    """True if `path` matches any slangc exclude pattern.
+
+    `path` should be repo-relative with forward slashes — same shape
+    as `slang-coverage-merge` produces. Backslashes are normalized
+    here for safety.
+    """
+    return bool(_SLANGC_RE.search(path.replace("\\", "/")))
+
+
+def apply_slangc_filter(records: List[FileRecord]) -> List[FileRecord]:
+    """Return records whose path is NOT excluded by the slangc patterns."""
+    return [r for r in records if not is_slangc_filtered_out(r.path)]
+
+
 def function_line_coverage(record: FileRecord) -> Dict[str, Tuple[int, int]]:
     """For each function in `record`, compute (total_lines, hit_lines)
     from the DA records that fall in the function's source range.

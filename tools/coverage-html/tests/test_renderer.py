@@ -208,6 +208,99 @@ def _strip_tags(s: str) -> str:
     return re.sub(r"<[^>]+>", "", s)
 
 
+class SlangcFilterTests(unittest.TestCase):
+    """Mirrors tools/coverage/slangc-ignore-patterns.sh."""
+
+    def test_external_excluded(self):
+        from lcov_io import is_slangc_filtered_out
+
+        self.assertTrue(is_slangc_filtered_out("external/cmark/src/blocks.c"))
+
+    def test_build_prelude_excluded(self):
+        from lcov_io import is_slangc_filtered_out
+
+        self.assertTrue(
+            is_slangc_filtered_out("build/prelude/slang-cpp-prelude.h.cpp")
+        )
+
+    def test_build_fiddle_excluded(self):
+        from lcov_io import is_slangc_filtered_out
+
+        self.assertTrue(
+            is_slangc_filtered_out(
+                "build/source/slang/fiddle/slang-rich-diagnostics.h.fiddle"
+            )
+        )
+
+    def test_tools_excluded(self):
+        from lcov_io import is_slangc_filtered_out
+
+        self.assertTrue(is_slangc_filtered_out("tools/slang-test/main.cpp"))
+
+    def test_language_server_excluded(self):
+        from lcov_io import is_slangc_filtered_out
+
+        self.assertTrue(
+            is_slangc_filtered_out(
+                "source/slang/slang-language-server.cpp"
+            )
+        )
+        self.assertTrue(
+            is_slangc_filtered_out(
+                "source/slang/slang-language-server-protocol.h"
+            )
+        )
+
+    def test_ast_decl_headers_excluded(self):
+        from lcov_io import is_slangc_filtered_out
+
+        self.assertTrue(
+            is_slangc_filtered_out("source/slang/slang-ast-expr.h")
+        )
+        self.assertTrue(
+            is_slangc_filtered_out("source/slang/slang-ast-modifier.h")
+        )
+        # But the .cpp counterpart is kept.
+        self.assertFalse(
+            is_slangc_filtered_out("source/slang/slang-ast-modifier.cpp")
+        )
+
+    def test_compiler_files_kept(self):
+        from lcov_io import is_slangc_filtered_out
+
+        self.assertFalse(is_slangc_filtered_out("source/slang/slang-check.cpp"))
+        self.assertFalse(
+            is_slangc_filtered_out("source/compiler-core/slang-name.cpp")
+        )
+        self.assertFalse(
+            is_slangc_filtered_out("source/core/slang-string.cpp")
+        )
+
+    def test_backslash_paths_normalized(self):
+        from lcov_io import is_slangc_filtered_out
+
+        # Pre-normalization Windows paths still match.
+        self.assertTrue(
+            is_slangc_filtered_out(r"external\cmark\src\blocks.c")
+        )
+
+    def test_apply_slangc_filter_keeps_compiler_only(self):
+        from lcov_io import FileRecord, apply_slangc_filter
+
+        records = [
+            FileRecord(path="source/slang/slang-check.cpp"),
+            FileRecord(path="external/cmark/src/blocks.c"),
+            FileRecord(path="tools/slang-test/main.cpp"),
+            FileRecord(path="source/compiler-core/slang-name.cpp"),
+        ]
+        kept = apply_slangc_filter(records)
+        kept_paths = {r.path for r in kept}
+        self.assertEqual(
+            kept_paths,
+            {"source/slang/slang-check.cpp", "source/compiler-core/slang-name.cpp"},
+        )
+
+
 class FunctionLineCoverageTests(unittest.TestCase):
     """Per-function line coverage derived from FN: + DA: ranges."""
 

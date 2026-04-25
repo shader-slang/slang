@@ -30,7 +30,13 @@ from typing import Dict, List, Optional, Tuple
 # Shared LCOV parser / writer / data model. Sibling module so both the
 # renderer and the merge tool import the same code.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lcov_io import FileRecord, Function, LcovParseError, parse_lcov  # noqa: E402
+from lcov_io import (  # noqa: E402
+    FileRecord,
+    Function,
+    LcovParseError,
+    apply_slangc_filter,
+    parse_lcov,
+)
 
 MARKER_NAME = "slang-coverage-html.marker"
 GENERATOR_NAME = "slang-coverage-html"
@@ -1057,6 +1063,17 @@ def build_argparser() -> argparse.ArgumentParser:
         help="Exclude glob (repeatable). Applied to SF: path.",
     )
     p.add_argument(
+        "--slangc-filter",
+        action="store_true",
+        help=(
+            "Restrict to the slangc compiler-only file set CI uses "
+            "(mirrors tools/coverage/slangc-ignore-patterns.sh: drops "
+            "external/, build/prelude/, generated FIDDLE / capability "
+            "tables, language-server / record-replay / glslang, etc.). "
+            "Applied on top of --filter-include / --filter-exclude."
+        ),
+    )
+    p.add_argument(
         "--quiet",
         action="store_true",
         help="Suppress progress output",
@@ -1074,6 +1091,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 2
 
     records = apply_filters(records, args.filter_include, args.filter_exclude)
+    if args.slangc_filter:
+        before = len(records)
+        records = apply_slangc_filter(records)
+        if not args.quiet:
+            dropped = before - len(records)
+            print(
+                f"slang-coverage-html: --slangc-filter dropped "
+                f"{dropped} file(s); {len(records)} kept",
+                file=sys.stderr,
+            )
     validate_totals(records)
 
     prepare_output_dir(args.output_dir)

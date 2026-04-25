@@ -38,7 +38,14 @@ from typing import Dict, List, Optional, Tuple
 
 # Shared parser / writer / data model.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lcov_io import FileRecord, Function, LcovParseError, parse_lcov, write_lcov  # noqa: E402
+from lcov_io import (  # noqa: E402
+    FileRecord,
+    Function,
+    LcovParseError,
+    apply_slangc_filter,
+    parse_lcov,
+    write_lcov,
+)
 
 GENERATOR_NAME = "slang-coverage-merge"
 
@@ -216,6 +223,18 @@ def build_argparser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--slangc-filter",
+        action="store_true",
+        help=(
+            "Restrict the merged output to the slangc compiler-only file "
+            "set CI uses (mirrors tools/coverage/slangc-ignore-patterns.sh: "
+            "drops external/, build/prelude/, generated FIDDLE / capability "
+            "tables, language-server / record-replay / glslang, etc.). "
+            "Applied after path normalization, before merging — so it "
+            "always sees repo-relative paths regardless of input shape."
+        ),
+    )
+    p.add_argument(
         "--quiet",
         action="store_true",
         help="Suppress progress output on stderr.",
@@ -239,15 +258,20 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"{GENERATOR_NAME}: {e}", file=sys.stderr)
             return 2
         recs = normalized_records(recs, tuple(prefixes))
+        before = len(recs)
+        if args.slangc_filter:
+            recs = apply_slangc_filter(recs)
         inputs.append(recs)
         if not args.quiet:
-            print(
+            line = (
                 f"{GENERATOR_NAME}: {path}: {len(recs)} files / "
                 f"{sum(r.total_lines for r in recs)} lines / "
                 f"{sum(r.total_branches for r in recs)} branches / "
-                f"{sum(r.total_functions for r in recs)} functions",
-                file=sys.stderr,
+                f"{sum(r.total_functions for r in recs)} functions"
             )
+            if args.slangc_filter:
+                line += f" (slangc-filter dropped {before - len(recs)})"
+            print(line, file=sys.stderr)
 
     merged = merge_records(inputs)
 
