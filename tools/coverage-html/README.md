@@ -17,11 +17,18 @@
 >   per-OS dashboards.
 > - **Merged cross-OS**: same branch concern, plus the merge
 >   itself surfaces the discrepancy more visibly. Held until the
->   branch metric matches CI; see `tmp/coverage-renderer/plan.md`
->   § "CI changes needed to enable matching" for the concrete
->   path (small CI workflow change to upload an `llvm-cov report`
->   summary as an extra artifact, then a small consumer-side flag
->   in the merger).
+>   branch metric matches CI.
+>
+> **Branch-coverage follow-up**: the LCOV produced by `llvm-cov
+export -format=lcov` has more BRDA records than `llvm-cov report`
+> counts (post-export, the report tool collapses some). We can't
+> reproduce that collapse from the LCOV alone, so the merger's
+> branch numbers run below CI's. The plan to close the gap is a
+> tiny CI workflow change — also dump `llvm-cov report` text per
+> OS as an artifact — plus a `--auth-summary <file>` consumer flag
+> on the merger that reads those numbers as the source of truth.
+> Tracked as a follow-up; **branch coverage isn't reliable for
+> publishing until that lands.**
 
 Two cooperating Python 3 tools for Slang-ecosystem coverage
 workflows:
@@ -268,7 +275,9 @@ across every platform our customers run.
 python3 -m unittest discover -s tools/coverage-html/tests -v
 ```
 
-58 unit + integration tests cover: LCOV parsing (incl. TN: max-
+96 unit + integration tests across three files
+(`tests/test_lcov_io.py`, `tests/test_renderer.py`,
+`tests/test_merge.py`) cover: LCOV parsing (incl. TN: max-
 aggregation, corrupt-input detection, unknown-record tolerance, BRDA
 with `-` tokens, FN/FNDA join-by-name), source resolution (path
 variants, caching, miss → placeholder), filter globs, tier
@@ -314,13 +323,18 @@ that our output is designed to match.
 
 ```
 tools/coverage-html/
-├── slang-coverage-html.py         # the renderer
-├── slang-coverage-merge.py        # the multi-LCOV merger
+├── slang-coverage-html.py         # the renderer (CLI)
+├── slang-coverage-merge.py        # the multi-LCOV merger (CLI)
 ├── lcov_io.py                     # shared parser / writer / data model
+│                                  #   + SourceResolver, function-coverage
+│                                  #   helpers, slangc-filter patterns
+├── style.css                      # inlined into every page at render time
+├── script.js                      # toggle / chrome-measure JS, same
 ├── README.md                      # this file
 └── tests/
-    ├── test_renderer.py           # renderer unit + integration tests
-    ├── test_merge.py              # merge unit + integration tests
+    ├── test_lcov_io.py            # parser + data model + helpers
+    ├── test_renderer.py           # HTML rendering + CLI integration
+    ├── test_merge.py              # merger unit + integration tests
     └── fixtures/
         ├── demo-cpu.info          # real LCOV from shader-coverage-demo
         ├── demo-cpu.coverage-mapping.json
