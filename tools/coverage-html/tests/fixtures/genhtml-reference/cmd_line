@@ -1,0 +1,1 @@
+genhtml /Users/jvepsalainen/github/jvepsalainen-nv-3/slang/tools/coverage-html/tests/fixtures/demo-cpu.info -o /Users/jvepsalainen/github/jvepsalainen-nv-3/slang/tools/coverage-html/tests/fixtures/genhtml-reference/
