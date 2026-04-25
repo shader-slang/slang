@@ -111,24 +111,64 @@ class FileRecord:
     # but rare from llvm-cov export) can't be deduped by line, so they
     # each count as their own entry by mangled name.
 
-    def _function_buckets(self) -> Tuple[set, set]:
-        """Return (all_first_lines, hit_first_lines) and the orphan
-        count, suitable for rate computation.
+    def _effective_fn_hit(self) -> Dict[str, bool]:
+        """For each function, return True if it should be treated as
+        covered for reporting purposes — either FNDA reports calls
+        OR any DA line inside the function's source range was hit.
 
-        Internal helper — total/hit/percent properties wrap it.
+        This bridges a real-world LCOV quirk: when the compiler
+        inlines a callee at every call site (typical for
+        constructors / destructors / RAII helpers in headers), the
+        FNDA hit count stays 0 even though the body code executed,
+        because llvm's coverage instrumentation tracks function
+        entries via dedicated counters that no inlined call ever
+        triggers. Pure FNDA accounting then reports 0/N for files
+        that LINE coverage shows as 100 % — confusing.
         """
+        result: Dict[str, bool] = {}
+        items = sorted(
+            ((n, fn) for n, fn in self.functions.items() if fn.first_line > 0),
+            key=lambda kv: kv[1].first_line,
+        )
+        sorted_lines = sorted(self.lines.items())
+        for i, (name, fn) in enumerate(items):
+            if fn.hits > 0:
+                result[name] = True
+                continue
+            start = fn.first_line
+            end = items[i + 1][1].first_line if i + 1 < len(items) else 10**9
+            any_hit = False
+            for ln, hits in sorted_lines:
+                if ln < start:
+                    continue
+                if ln >= end:
+                    break
+                if hits > 0:
+                    any_hit = True
+                    break
+            result[name] = any_hit
+        # Orphan FNDAs (first_line==0): can only use FNDA counts.
+        for name, fn in self.functions.items():
+            if name not in result:
+                result[name] = fn.hits > 0
+        return result
+
+    def _function_buckets(self) -> Tuple[set, set]:
+        """Return (all_first_lines, hit_first_lines, orphan_total,
+        orphan_hit). Hit status uses `_effective_fn_hit`."""
         line_set: set = set()
         hit_line_set: set = set()
         orphan_total = 0
         orphan_hit = 0
-        for fn in self.functions.values():
+        eff = self._effective_fn_hit()
+        for name, fn in self.functions.items():
             if fn.first_line > 0:
                 line_set.add(fn.first_line)
-                if fn.hits > 0:
+                if eff.get(name, False):
                     hit_line_set.add(fn.first_line)
             else:
                 orphan_total += 1
-                if fn.hits > 0:
+                if eff.get(name, False):
                     orphan_hit += 1
         # Encode orphan count by extending the sets with synthetic keys.
         # Easier: return the totals separately.

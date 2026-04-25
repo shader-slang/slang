@@ -301,6 +301,49 @@ class SlangcFilterTests(unittest.TestCase):
         )
 
 
+class EffectiveFunctionHitTests(unittest.TestCase):
+    """A function is "effectively hit" if FNDA reports calls OR any
+    DA line in its source range was hit. The latter half handles the
+    inlined-only callee case (RAII helpers in headers): FNDA stays
+    0 because no separate function-entry counter fires, but the body
+    code ran via inlining and the DA lines reflect that."""
+
+    def _build(self, lines, fns):
+        from lcov_io import FileRecord, Function
+
+        r = FileRecord(path="x.cpp")
+        r.lines = dict(lines)
+        r.functions = {n: Function(first_line=fl, hits=h) for n, (fl, h) in fns.items()}
+        return r
+
+    def test_inlined_only_callee_counts_as_hit(self):
+        # ctor at line 5 with 3 hit body lines but FNDA=0 (inlined).
+        r = self._build(
+            lines={5: 1, 6: 1, 7: 1},
+            fns={"ctor": (5, 0)},
+        )
+        self.assertEqual(r.hit_functions, 1)
+        self.assertEqual(r.percent_functions, 100.0)
+
+    def test_uncalled_no_lines_stays_uncovered(self):
+        # Function declared at line 10 but no DA records in its range
+        # AND FNDA=0 → not effectively hit.
+        r = self._build(
+            lines={5: 1, 6: 1},  # belong to a hypothetical function before line 10
+            fns={"a": (5, 1), "b": (10, 0)},
+        )
+        self.assertEqual(r.hit_functions, 1)  # only `a`
+        self.assertEqual(r.total_functions, 2)
+
+    def test_fnda_called_is_always_hit(self):
+        # FNDA > 0 always counts, regardless of line coverage.
+        r = self._build(
+            lines={},
+            fns={"a": (1, 5)},
+        )
+        self.assertEqual(r.hit_functions, 1)
+
+
 class FunctionDedupByLineTests(unittest.TestCase):
     """Multiple FN records at the same first_line are template
     instantiations / compiler-generated duplicates of one source-level

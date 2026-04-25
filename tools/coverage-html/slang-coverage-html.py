@@ -1152,6 +1152,7 @@ def _render_inline_functions_table(
     )
     line_cov = function_line_coverage(record)
     br_cov = function_branch_coverage(record)
+    eff_hit = record._effective_fn_hit()
 
     rows: List[str] = []
     for name, fn in items:
@@ -1178,12 +1179,15 @@ def _render_inline_functions_table(
             total_cell = '<td class="coverNumDflt">-</td>'
             hit_cell = '<td class="coverNumDflt">-</td>'
 
-        # Per-function function-coverage cells: 1/1 (covered) when
-        # the function was called at least once, 0/1 otherwise.
-        # Uses the same gradient as every other rate cell.
+        # Per-function function-coverage cells. "Effective" hit:
+        # FNDA-was-called OR any DA line in the function's range
+        # was hit (handles inlined-only callees where FNDA stays 0
+        # but the body code ran via inlining). Same gradient as
+        # every other rate cell.
         if show_fns:
-            fn_hit_int = 1 if fn.hits > 0 else 0
-            fn_pct = 100.0 if fn.hits > 0 else 0.0
+            is_effective_hit = eff_hit.get(name, fn.hits > 0)
+            fn_hit_int = 1 if is_effective_hit else 0
+            fn_pct = 100.0 if is_effective_hit else 0.0
             fn_rate_cell = _rate_cell(fn_pct, 1)
             fn_total_cell = '<td class="coverNumDflt">1</td>'
             fn_hit_cell = f'<td class="coverNumDflt">{fn_hit_int}</td>'

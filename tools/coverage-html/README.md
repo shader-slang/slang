@@ -161,6 +161,16 @@ per-platform metrics:
   the underlying source function as hit. This mirrors what
   `llvm-cov report` reports on the same `.profdata`.
 
+  Additionally, a function counts as covered if **any of its body
+  lines was hit**, even when its FNDA call count is 0. LLVM's
+  coverage instrumentation tracks function entry via a dedicated
+  counter that no inlined call ever bumps, so RAII helpers /
+  constructors / destructors that the compiler inlines at every
+  call site report FNDA=0 even when their bodies clearly ran.
+  Pure FNDA accounting was reporting 0/N function coverage on
+  files showing 100 % line coverage — confusing. We fall back to
+  line-derived coverage when FNDA is silent.
+
 - **Lines** are counted one per `DA:` record. Matches genhtml.
 - **Branches** are counted one per `BRDA:` outcome. Matches genhtml.
 
