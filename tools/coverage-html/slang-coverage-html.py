@@ -56,12 +56,6 @@ GENERATOR_URL = "https://github.com/shader-slang/slang"
 # Magic numbers and characters that affect rendering live here so a
 # style change is one edit, not a grep across the file.
 
-# Rate tier thresholds. Aligned with the gradient watermarks below
-# so the categorical tier (Lo/Med/Hi) matches what the bar color
-# already communicates: green at 80, warm under 70, red at 0.
-TIER_HI = 80.0
-TIER_MED = 70.0
-
 # Bar fill geometry. The progress bar is a 100 px outline filled
 # proportional to the coverage percent.
 BAR_PIXEL_WIDTH = 100
@@ -98,14 +92,6 @@ CHEVRON_CLOSED = "\u25B6"  # ▶
 
 
 INLINE_CSS = _ASSET_DIR.joinpath("style.css").read_text(encoding="utf-8")
-
-
-def _tier(pct: float) -> str:
-    if pct >= TIER_HI:
-        return "Hi"
-    if pct >= TIER_MED:
-        return "Med"
-    return "Lo"
 
 
 def _escape_path_for_filename(relpath: str) -> str:

@@ -126,20 +126,6 @@ class GradientColorTests(unittest.TestCase):
 
 
 
-class TierTests(unittest.TestCase):
-    def test_thresholds(self):
-        # Tier breakpoints align with the gradient watermarks: Hi ≥80,
-        # Med 70-80, Lo <70.
-        self.assertEqual(renderer._tier(100.0), "Hi")
-        self.assertEqual(renderer._tier(80.0), "Hi")
-        self.assertEqual(renderer._tier(79.9), "Med")
-        self.assertEqual(renderer._tier(70.0), "Med")
-        self.assertEqual(renderer._tier(69.9), "Lo")
-        self.assertEqual(renderer._tier(0.0), "Lo")
-
-
-
-
 class FilterTests(unittest.TestCase):
     def _records(self):
         return [

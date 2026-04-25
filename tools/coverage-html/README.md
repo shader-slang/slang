@@ -287,21 +287,26 @@ across every platform our customers run.
 python3 -m unittest discover -s tools/coverage-html/tests -v
 ```
 
-113 unit + integration tests across three files
-(`tests/test_lcov_io.py`, `tests/test_renderer.py`,
-`tests/test_merge.py`) cover: LCOV parsing (incl. TN: max-
-aggregation, corrupt-input detection, unknown-record tolerance, BRDA
-with `-` tokens, FN/FNDA join-by-name), source resolution (path
-variants, caching, miss → placeholder), filter globs, tier
-thresholds, function/branch percent calcs, per-line branch-cell
-rendering (empty / all-taken / partial / none / not-evaluated), CLI
-round-trip, empty-input rendering, idempotency modulo timestamp,
+108 unit + integration tests across `tests/test_lcov_io.py`,
+`tests/test_renderer.py`, and `tests/test_merge.py` cover: LCOV
+parsing (incl. TN: max-aggregation, corrupt-input detection,
+unknown-record tolerance, BRDA with `-` tokens, FN/FNDA join-by-
+name), `llvm-cov report` text parsing + auth-summary override,
+source resolution (path variants, caching, miss → placeholder),
+filter globs + regexes (composition rules), tier thresholds,
+function/branch percent calcs, per-line branch-cell rendering
+(empty / all-taken / partial / none / not-evaluated), CLI round-
+trip, empty-input rendering, idempotency modulo timestamp,
 foreign-dir overwrite guard, phase-1-regression check against the
 real-data phase-2 fixture, plus merge-tool path normalization
-(forward-slash, longest-prefix-wins, custom prefixes), max-
-aggregation (lines, branches, functions), absent-vs-zero handling,
+(forward-slash, longest-prefix-wins), max-aggregation (lines,
+branches, functions, auth summaries), absent-vs-zero handling,
 gzipped-input auto-decompression, file-output mode, and end-to-end
 "merge → render" smoke.
+
+The Slang wrapper at `tools/coverage/` carries an additional 13
+tests (`tools/coverage/tests/test_slang_filters.py`) for the
+slangc-ignore pattern set and the wrapper-CLI plumbing.
 
 ### Updating the demo fixture
 
@@ -339,7 +344,8 @@ tools/coverage-html/
 ├── slang-coverage-merge.py        # the multi-LCOV merger (CLI)
 ├── lcov_io.py                     # shared parser / writer / data model
 │                                  #   + SourceResolver, function-coverage
-│                                  #   helpers, slangc-filter patterns
+│                                  #   helpers, llvm-cov report parser /
+│                                  #   AuthSummary merger / writer
 ├── style.css                      # inlined into every page at render time
 ├── script.js                      # toggle / chrome-measure JS, same
 ├── README.md                      # this file
@@ -354,9 +360,19 @@ tools/coverage-html/
         ├── VISUAL-PARITY.md       # acceptance checklist
         ├── slangc-llvm-cov-sample.info  # real-data BRDA + FN/FNDA fixture
         ├── branches-and-functions.info  # small hand-crafted phase-2 fixture
+        ├── llvm-cov-report-sample.txt   # auth-summary parser fixture
         ├── empty.info
         ├── corrupt-bad-da.info
         ├── mixed-paths.info
         ├── tn-groups.info
         └── unknown-records.info
+
+tools/coverage/
+├── slang_filters.py               # canonical Python copy of slangc patterns
+│                                  #   + Slang CI runner path roots
+├── slang-render.py                # wrapper: slang-coverage-html with
+│                                  #   slangc filter injected
+├── slang-merge.py                 # wrapper: slang-coverage-merge with
+│                                  #   filter + CI prefixes injected
+└── tests/test_slang_filters.py    # filter set + wrapper CLI tests
 ```

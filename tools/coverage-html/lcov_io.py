@@ -34,6 +34,13 @@ class SourceResolver:
 
     Caches hits and misses. `load(path)` returns (text, resolved_path)
     or (None, None) on miss.
+
+    When `source_root` is set, every resolved candidate must lie
+    under it. Without that constraint, a malicious LCOV with
+    e.g. `SF:/etc/passwd` would let an automated job embed sensitive
+    file contents in the rendered HTML report. With the constraint,
+    `--source-root` doubles as a containment boundary; users who
+    don't pass it accept that the LCOV's SF: paths are trusted.
     """
 
     def __init__(
@@ -43,6 +50,9 @@ class SourceResolver:
         invocation_cwd: Optional[str] = None,
     ):
         self.source_root = source_root
+        self._source_root_abs: Optional[str] = (
+            os.path.realpath(source_root) if source_root else None
+        )
         self.cwd = cwd
         self.invocation_cwd = invocation_cwd or os.getcwd()
         self._cache: Dict[str, Tuple[Optional[str], Optional[str]]] = {}
@@ -53,6 +63,23 @@ class SourceResolver:
         text, resolved = self._locate(path)
         self._cache[path] = (text, resolved)
         return text, resolved
+
+    def _within_source_root(self, candidate: str) -> bool:
+        """Return True if `candidate` resolves under source_root.
+
+        Used as a containment check when --source-root is set so a
+        crafted LCOV can't reach arbitrary files via `..` or absolute
+        paths. Symlinks are followed via realpath so a symlink inside
+        the root pointing outside still counts as outside.
+        """
+        if self._source_root_abs is None:
+            return True
+        cand_abs = os.path.realpath(candidate)
+        try:
+            common = os.path.commonpath([cand_abs, self._source_root_abs])
+        except ValueError:
+            return False  # different drives on Windows
+        return common == self._source_root_abs
 
     def _locate(self, path: str) -> Tuple[Optional[str], Optional[str]]:
         candidates: List[str] = []
@@ -72,12 +99,15 @@ class SourceResolver:
                 os.path.join(self.source_root, os.path.basename(path))
             )
         for c in candidates:
-            if os.path.isfile(c):
-                try:
-                    with open(c, "r", encoding="utf-8-sig", errors="replace") as fh:
-                        return fh.read(), os.path.abspath(c)
-                except OSError:
-                    continue
+            if not os.path.isfile(c):
+                continue
+            if not self._within_source_root(c):
+                continue
+            try:
+                with open(c, "r", encoding="utf-8-sig", errors="replace") as fh:
+                    return fh.read(), os.path.abspath(c)
+            except OSError:
+                continue
         return None, None
 
 
@@ -269,7 +299,7 @@ class FileRecord:
                 result[name] = fn.hits > 0
         return result
 
-    def _function_buckets(self) -> Tuple[set, set]:
+    def _function_buckets(self) -> Tuple[set, set, int, int]:
         """Return (all_first_lines, hit_first_lines, orphan_total,
         orphan_hit). Hit status uses `_effective_fn_hit`."""
         line_set: set = set()
@@ -286,9 +316,7 @@ class FileRecord:
                 orphan_total += 1
                 if eff.get(name, False):
                     orphan_hit += 1
-        # Encode orphan count by extending the sets with synthetic keys.
-        # Easier: return the totals separately.
-        return line_set, hit_line_set, orphan_total, orphan_hit  # type: ignore[return-value]
+        return line_set, hit_line_set, orphan_total, orphan_hit
 
     @property
     def total_functions(self) -> int:
@@ -465,10 +493,10 @@ def parse_lcov(
                 try:
                     ln = int(parts[0])
                     hits = int(parts[1])
-                except ValueError:
+                except ValueError as e:
                     raise LcovParseError(
                         f"{path}:{lineno}: non-integer DA fields {value!r}"
-                    )
+                    ) from e
                 prev = current.lines.get(ln, 0)
                 current.lines[ln] = max(prev, hits)
             elif tag == "LF":
@@ -497,10 +525,10 @@ def parse_lcov(
                     br_line = int(parts[0])
                     block = int(parts[1])
                     branch_id = int(parts[2])
-                except ValueError:
+                except ValueError as e:
                     raise LcovParseError(
                         f"{path}:{lineno}: non-integer BRDA fields {value!r}"
-                    )
+                    ) from e
                 taken_raw = parts[3]
                 taken: Optional[int]
                 if taken_raw == "-":
@@ -508,16 +536,16 @@ def parse_lcov(
                 else:
                     try:
                         taken = int(taken_raw)
-                    except ValueError:
+                    except ValueError as e:
                         raise LcovParseError(
                             f"{path}:{lineno}: non-integer BRDA taken "
                             f"field {taken_raw!r}"
-                        )
+                        ) from e
                 key = (br_line, block, branch_id)
-                prev = current.branches.get(key, None) if key in current.branches else None
                 if key not in current.branches:
                     current.branches[key] = taken
                 else:
+                    prev = current.branches[key]
                     if taken is None:
                         pass
                     elif prev is None:
@@ -548,10 +576,10 @@ def parse_lcov(
                     )
                 try:
                     first_line = int(first_line_str)
-                except ValueError:
+                except ValueError as e:
                     raise LcovParseError(
                         f"{path}:{lineno}: non-integer FN line {value!r}"
-                    )
+                    ) from e
                 if name not in current.functions:
                     current.functions[name] = Function(first_line=first_line, hits=0)
             elif tag == "FNDA":
@@ -566,10 +594,10 @@ def parse_lcov(
                     )
                 try:
                     hits = int(hits_str)
-                except ValueError:
+                except ValueError as e:
                     raise LcovParseError(
                         f"{path}:{lineno}: non-integer FNDA hits {value!r}"
-                    )
+                    ) from e
                 fn = current.functions.get(name)
                 if fn is None:
                     fn = Function(first_line=0, hits=0)
@@ -619,9 +647,8 @@ def write_lcov(
       omit (default) to emit a single empty TN: per LCOV convention.
     - Computed totals (LF/LH/BRF/BRH/FNF/FNH) are recomputed from
       the in-memory model, NOT taken from `reported_*` fields.
-    - Record ordering inside each block matches the LCOV de-facto
-      ordering: TN, SF, FN/FNDA pairs, FNF/FNH, DA, LF/LH, BRDA,
-      BRF/BRH, end_of_record.
+    - Record ordering inside each block: TN, SF, FN (all), FNDA
+      (all), FNF/FNH, DA, BRDA, BRF/BRH, LF/LH, end_of_record.
     """
     tn_value = test_name if test_name is not None else ""
     for r in records:

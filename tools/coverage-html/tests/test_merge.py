@@ -161,6 +161,130 @@ class MergeRecordsTests(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Function synthesis (--synthesize-functions code path)
+# ---------------------------------------------------------------------------
+
+
+class SynthesizeMissingFunctionsTests(unittest.TestCase):
+    """`synthesize_missing_functions` fills FN/FNDA on inputs that
+    have DA records but no functions, using sibling inputs' (name,
+    first_line) map and the silent input's own DA hit count at
+    first_line."""
+
+    def _record(self, path, **kw):
+        from lcov_io import FileRecord, Function
+
+        r = FileRecord(path=path)
+        r.lines = dict(kw.get("lines", {}))
+        r.functions = {
+            name: Function(first_line=fl, hits=h)
+            for name, (fl, h) in kw.get("functions", {}).items()
+        }
+        return r
+
+    def test_synthesizes_from_sibling_function_map(self):
+        # Input A has FN/FNDA, B only has DA. After synthesis, B
+        # gains the function map from A with hit counts taken from
+        # B's own DA at first_line.
+        a = self._record(
+            "x.c",
+            functions={"foo": (10, 5), "bar": (20, 0)},
+        )
+        b = self._record("x.c", lines={10: 7, 20: 0})
+        synthesized = merger.synthesize_missing_functions([[a], [b]])
+        self.assertEqual(synthesized, 2)
+        self.assertEqual(b.functions["foo"].first_line, 10)
+        self.assertEqual(b.functions["foo"].hits, 7)   # from DA[10]
+        self.assertEqual(b.functions["bar"].first_line, 20)
+        self.assertEqual(b.functions["bar"].hits, 0)   # DA[20] = 0
+
+    def test_no_op_when_input_already_has_functions(self):
+        a = self._record(
+            "x.c", functions={"foo": (10, 5)}, lines={10: 5},
+        )
+        b = self._record(
+            "x.c", functions={"foo": (10, 100)}, lines={10: 100},
+        )
+        synthesized = merger.synthesize_missing_functions([[a], [b]])
+        self.assertEqual(synthesized, 0)
+        self.assertEqual(b.functions["foo"].hits, 100)  # unchanged
+
+    def test_no_op_when_no_sibling_has_functions(self):
+        # Both inputs have only DA records → nothing to synthesize.
+        a = self._record("x.c", lines={1: 1})
+        b = self._record("x.c", lines={2: 1})
+        synthesized = merger.synthesize_missing_functions([[a], [b]])
+        self.assertEqual(synthesized, 0)
+        self.assertEqual(a.functions, {})
+        self.assertEqual(b.functions, {})
+
+    def test_only_applies_to_files_with_no_functions(self):
+        # File present in only one input that has functions; no
+        # silent sibling means nothing to synthesize.
+        a = self._record("x.c", functions={"foo": (10, 5)}, lines={10: 5})
+        synthesized = merger.synthesize_missing_functions([[a]])
+        self.assertEqual(synthesized, 0)
+        self.assertEqual(a.functions["foo"].hits, 5)
+
+
+# ---------------------------------------------------------------------------
+# LCOV writer round-trip
+# ---------------------------------------------------------------------------
+
+
+class WriteLcovRoundTripTests(unittest.TestCase):
+    """Parse → write → re-parse should preserve all coverage data
+    we model in FileRecord (lines, branches, functions). Reported
+    LF/LH/BRF/BRH/FNF/FNH are recomputed by the writer."""
+
+    def test_round_trip_preserves_coverage(self):
+        from lcov_io import (
+            FileRecord, Function, parse_lcov, write_lcov,
+        )
+        original = FileRecord(path="src/foo.c")
+        # foo lives at lines 1-2 (DA hits there); bar is at line 100
+        # with no DA in its range — so its effective-hit stays False.
+        original.lines = {1: 5, 2: 0, 100: 0}
+        original.branches = {
+            (1, 0, 0): 3, (1, 0, 1): 0, (100, 0, 0): None,
+        }
+        original.functions = {
+            "foo": Function(first_line=1, hits=5),
+            "bar": Function(first_line=100, hits=0),
+        }
+
+        path = os.path.join(tempfile.gettempdir(), "scv-rt.lcov")
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                write_lcov([original], f)
+            roundtrip = parse_lcov(path)
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+        self.assertEqual(len(roundtrip), 1)
+        r = roundtrip[0]
+        self.assertEqual(r.path, "src/foo.c")
+        self.assertEqual(r.lines, {1: 5, 2: 0, 100: 0})
+        self.assertEqual(r.branches[(1, 0, 0)], 3)
+        self.assertEqual(r.branches[(1, 0, 1)], 0)
+        self.assertEqual(r.branches[(100, 0, 0)], None)
+        self.assertEqual(r.functions["foo"].first_line, 1)
+        self.assertEqual(r.functions["foo"].hits, 5)
+        self.assertEqual(r.functions["bar"].first_line, 100)
+        self.assertEqual(r.functions["bar"].hits, 0)
+        # Recomputed totals match the in-memory model.
+        self.assertEqual(r.reported_lf, 3)
+        self.assertEqual(r.reported_lh, 1)   # only line 1 had hits>0
+        self.assertEqual(r.reported_brf, 3)
+        self.assertEqual(r.reported_brh, 1)
+        self.assertEqual(r.reported_fnf, 2)
+        self.assertEqual(r.reported_fnh, 1)
+
+
+# ---------------------------------------------------------------------------
 # CLI integration
 # ---------------------------------------------------------------------------
 
@@ -273,6 +397,15 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(res.stdout, "")
         with open(out) as f:
             self.assertIn("DA:1,1", f.read())
+
+    def test_exit_nonzero_on_corrupt_lcov(self):
+        # Mirrors the renderer's corrupt-input test. parse_lcov should
+        # raise LcovParseError, the merger should print a diagnostic
+        # and exit with code 2.
+        corrupt = os.path.join(FIXTURES, "corrupt-bad-da.info")
+        res = self._run(corrupt, "--quiet")
+        self.assertEqual(res.returncode, 2)
+        self.assertIn("non-integer DA fields", res.stderr)
 
     def test_renderer_consumes_merged_output(self):
         """Smoke: pipe merged output into the renderer; no errors."""
