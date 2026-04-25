@@ -1,5 +1,15 @@
 # slang-coverage-html + slang-coverage-merge
 
+> **Status: not yet ready to ship as Slang's official coverage
+> reporter.** Functions and lines match `llvm-cov report` (CI's
+> current source of truth) within 0.5 pp; **branches still run
+> ~8 pp below CI on the same data**, and that gap will need
+> matching before this replaces / supplements the per-OS reports
+> at <https://shader-slang.org/slang-coverage-reports/>. See
+> "Methodology vs `llvm-cov report`" below and
+> `tmp/coverage-renderer/plan.md` § "CI changes needed" for the
+> path forward.
+
 Two cooperating Python 3 tools for Slang-ecosystem coverage
 workflows:
 
