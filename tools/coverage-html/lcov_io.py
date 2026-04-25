@@ -99,6 +99,48 @@ class Function:
 
 
 @dataclass
+class AuthFileSummary:
+    """Per-file totals from the `llvm-cov report` text dump.
+
+    These are the numbers CI's coverage dashboard quotes — they differ
+    from a verbose `llvm-cov export -format=lcov` output because
+    `llvm-cov report` collapses templated/inlined entries that the
+    LCOV form keeps separate. When supplied via the `--auth-summary`
+    flag, they override LCOV-derived totals on FileRecord.
+    """
+
+    line_total: int = 0
+    line_missed: int = 0
+    func_total: int = 0
+    func_missed: int = 0
+    branch_total: int = 0
+    branch_missed: int = 0
+
+    @property
+    def line_hit(self) -> int:
+        return self.line_total - self.line_missed
+
+    @property
+    def func_hit(self) -> int:
+        return self.func_total - self.func_missed
+
+    @property
+    def branch_hit(self) -> int:
+        return self.branch_total - self.branch_missed
+
+
+@dataclass
+class AuthSummary:
+    """Set of per-file authoritative summaries plus the TOTAL row."""
+
+    files: Dict[str, AuthFileSummary] = field(default_factory=dict)
+    total: AuthFileSummary = field(default_factory=AuthFileSummary)
+
+    def get(self, path: str) -> Optional[AuthFileSummary]:
+        return self.files.get(path)
+
+
+@dataclass
 class FileRecord:
     """One coverage record for a single source file.
 
@@ -123,29 +165,42 @@ class FileRecord:
     reported_brh: Optional[int] = None
     reported_fnf: Optional[int] = None
     reported_fnh: Optional[int] = None
+    # When set (via --auth-summary), the totals/percent properties
+    # below return values from the authoritative `llvm-cov report`
+    # numbers instead of the LCOV-derived ones. The lines / branches /
+    # functions dicts themselves are NOT overridden — per-line and
+    # per-function rendering keeps using the LCOV detail.
+    auth_override: Optional[AuthFileSummary] = None
 
     # --- line coverage ---
     @property
     def total_lines(self) -> int:
+        if self.auth_override is not None:
+            return self.auth_override.line_total
         return len(self.lines)
 
     @property
     def hit_lines(self) -> int:
+        if self.auth_override is not None:
+            return self.auth_override.line_hit
         return sum(1 for h in self.lines.values() if h > 0)
 
     @property
     def percent(self) -> float:
-        if not self.lines:
-            return 0.0
-        return 100.0 * self.hit_lines / self.total_lines
+        t = self.total_lines
+        return 100.0 * self.hit_lines / t if t else 0.0
 
     # --- branch coverage ---
     @property
     def total_branches(self) -> int:
+        if self.auth_override is not None:
+            return self.auth_override.branch_total
         return len(self.branches)
 
     @property
     def hit_branches(self) -> int:
+        if self.auth_override is not None:
+            return self.auth_override.branch_hit
         # A branch is "hit" when it was evaluated at least once and
         # the condition took the edge at least once. `None` → not
         # evaluated; `0` → evaluated but never taken.
@@ -153,9 +208,8 @@ class FileRecord:
 
     @property
     def percent_branches(self) -> float:
-        if not self.branches:
-            return 0.0
-        return 100.0 * self.hit_branches / self.total_branches
+        t = self.total_branches
+        return 100.0 * self.hit_branches / t if t else 0.0
 
     # --- function coverage ---
     #
@@ -238,11 +292,15 @@ class FileRecord:
 
     @property
     def total_functions(self) -> int:
+        if self.auth_override is not None:
+            return self.auth_override.func_total
         line_set, _hit_line_set, orphan_total, _ = self._function_buckets()
         return len(line_set) + orphan_total
 
     @property
     def hit_functions(self) -> int:
+        if self.auth_override is not None:
+            return self.auth_override.func_hit
         _line_set, hit_line_set, _, orphan_hit = self._function_buckets()
         return len(hit_line_set) + orphan_hit
 
@@ -252,53 +310,6 @@ class FileRecord:
         if total == 0:
             return 0.0
         return 100.0 * self.hit_functions / total
-
-
-# ---------------------------------------------------------------------------
-# slangc-only filter
-# ---------------------------------------------------------------------------
-#
-# Mirrors `tools/coverage/slangc-ignore-patterns.sh`, the shared
-# definition CI uses for the "slangc compiler-only" coverage view.
-# Patterns match repo-relative paths (forward slashes); apply after
-# `slang-coverage-merge`'s path normalization, or after manually
-# converting absolute / backslash paths.
-#
-# Each entry is a Python regex that, when found anywhere in the path,
-# means the file should be excluded from the slangc-only report.
-
-import re as _re
-
-SLANGC_EXCLUDE_PATTERNS: Tuple[str, ...] = (
-    r"build/prelude/",
-    r"build/source/slang/(capability|fiddle|slang-lookup-tables)/",
-    r"build/source/slang-core-module/",
-    r"external/",
-    r"include/",
-    r"source/slang-core-module/",
-    r"source/slang-glslang/",
-    r"source/slang-record-replay/",
-    r"tools/",
-    r"source/slang/slang-(language-server|doc-markdown-writer|doc-ast|ast-dump|repro|workspace-version)[.\-]",
-    r"source/slang/slang-ast-(expr|modifier|stmt)\.h$",
-)
-
-_SLANGC_RE = _re.compile("|".join(SLANGC_EXCLUDE_PATTERNS))
-
-
-def is_slangc_filtered_out(path: str) -> bool:
-    """True if `path` matches any slangc exclude pattern.
-
-    `path` should be repo-relative with forward slashes — same shape
-    as `slang-coverage-merge` produces. Backslashes are normalized
-    here for safety.
-    """
-    return bool(_SLANGC_RE.search(path.replace("\\", "/")))
-
-
-def apply_slangc_filter(records: List[FileRecord]) -> List[FileRecord]:
-    """Return records whose path is NOT excluded by the slangc patterns."""
-    return [r for r in records if not is_slangc_filtered_out(r.path)]
 
 
 def function_branch_coverage(record: FileRecord) -> Dict[str, Tuple[int, int]]:
@@ -639,9 +650,174 @@ def write_lcov(
             out.write(f"BRF:{r.total_branches}\n")
             out.write(f"BRH:{r.hit_branches}\n")
 
-        # LF/LH last.
+        # LF/LH last. Report the *derived* totals — auth_override
+        # is for display, not for round-tripping through LCOV.
         if r.lines:
-            out.write(f"LF:{r.total_lines}\n")
-            out.write(f"LH:{r.hit_lines}\n")
+            out.write(f"LF:{len(r.lines)}\n")
+            out.write(
+                "LH:"
+                f"{sum(1 for h in r.lines.values() if h > 0)}\n"
+            )
 
         out.write("end_of_record\n")
+
+
+# ---------------------------------------------------------------------------
+# llvm-cov report text parser / merger / writer
+# ---------------------------------------------------------------------------
+#
+# Companion to `llvm-cov export -format=lcov`: a CI artifact that
+# captures the text published by `llvm-cov report`. Used by the
+# `--auth-summary` flag on the renderer and merger to override
+# LCOV-derived totals with the authoritative numbers CI's coverage
+# dashboard quotes. See `tools/coverage-html/README.md` "Branch
+# coverage methodology".
+
+# Column order (after Filename) in `llvm-cov report` text:
+#   Regions, MissedRegions, Cover%, Functions, MissedFunctions,
+#   Executed%, Lines, MissedLines, Cover%, Branches, MissedBranches,
+#   Cover%
+# Cover/Executed cells are `-` when the corresponding total is zero.
+# We only consume the integer columns (4, 5, 7, 8, 10, 11) and
+# recompute percentages from total/missed.
+
+
+def parse_llvm_cov_report(path: str) -> AuthSummary:
+    """Parse an `llvm-cov report` text dump into an AuthSummary."""
+    summary = AuthSummary()
+    try:
+        with open(path, "r", encoding="utf-8-sig", errors="replace") as fh:
+            text = fh.read()
+    except OSError as e:
+        raise LcovParseError(f"cannot open report file {path!r}: {e}")
+
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        if not line:
+            continue
+        stripped = line.lstrip()
+        if stripped.startswith("---"):
+            continue
+        if stripped.startswith("Filename"):
+            continue
+        # Split off the trailing 12 fields. With `None` separator,
+        # rsplit collapses runs of whitespace, which is what we want.
+        parts = line.rsplit(None, 12)
+        if len(parts) != 13:
+            continue
+        try:
+            funcs = int(parts[4])
+            miss_funcs = int(parts[5])
+            lines_ = int(parts[7])
+            miss_lines = int(parts[8])
+            brs = int(parts[10])
+            miss_brs = int(parts[11])
+        except ValueError:
+            continue
+        fs = AuthFileSummary(
+            line_total=lines_,
+            line_missed=miss_lines,
+            func_total=funcs,
+            func_missed=miss_funcs,
+            branch_total=brs,
+            branch_missed=miss_brs,
+        )
+        name = parts[0].strip()
+        if name == "TOTAL":
+            summary.total = fs
+        else:
+            summary.files[name] = fs
+    return summary
+
+
+def _merge_file_summaries(items: List[AuthFileSummary]) -> AuthFileSummary:
+    """Combine a list of summaries by max(total) and min(missed).
+
+    For a single file across N OSes: merged.total is the largest
+    line/func/branch count any OS reported (union of source locations
+    after #ifdef expansion); merged.missed is the smallest count any
+    OS reported (best coverage). The pair is an upper bound — true
+    merged numbers from a max-aggregated LCOV may be slightly tighter,
+    but they're not derivable from per-OS report text alone.
+    """
+    if not items:
+        return AuthFileSummary()
+    line_items = [i for i in items if i.line_total > 0]
+    func_items = [i for i in items if i.func_total > 0]
+    br_items = [i for i in items if i.branch_total > 0]
+    return AuthFileSummary(
+        line_total=max((i.line_total for i in items), default=0),
+        line_missed=min((i.line_missed for i in line_items), default=0),
+        func_total=max((i.func_total for i in items), default=0),
+        func_missed=min((i.func_missed for i in func_items), default=0),
+        branch_total=max((i.branch_total for i in items), default=0),
+        branch_missed=min((i.branch_missed for i in br_items), default=0),
+    )
+
+
+def merge_auth_summaries(summaries: List[AuthSummary]) -> AuthSummary:
+    """Merge multiple AuthSummaries (one per OS, typically) into one."""
+    out = AuthSummary()
+    paths: set = set()
+    for s in summaries:
+        paths.update(s.files.keys())
+    for p in sorted(paths):
+        out.files[p] = _merge_file_summaries(
+            [s.files[p] for s in summaries if p in s.files]
+        )
+    totals = [
+        s.total
+        for s in summaries
+        if s.total.line_total or s.total.func_total or s.total.branch_total
+    ]
+    if totals:
+        out.total = _merge_file_summaries(totals)
+    return out
+
+
+def write_llvm_cov_report(summary: AuthSummary, out: IO[str]) -> None:
+    """Serialize an AuthSummary back to `llvm-cov report`-shaped text.
+
+    Used by the merger to emit a combined per-file summary derived
+    from per-OS report text. The Regions column is not tracked in our
+    data model, so we emit Lines/MissedLines as filler in those slots
+    — the `parse_llvm_cov_report` consumer ignores the Regions
+    columns. Percentages are computed from total/missed and emit `-`
+    when the corresponding total is zero.
+    """
+
+    def _pct(hit: int, total: int) -> str:
+        return "-" if total <= 0 else f"{100.0 * hit / total:.2f}%"
+
+    def _row(name: str, fs: AuthFileSummary) -> str:
+        # Filler Regions/MissedRegions columns mirror Lines/MissedLines.
+        regions = fs.line_total
+        miss_regions = fs.line_missed
+        return (
+            f"{name:<100}"
+            f" {regions:>10} {miss_regions:>17} {_pct(regions - miss_regions, regions):>9}"
+            f" {fs.func_total:>11} {fs.func_missed:>17} {_pct(fs.func_hit, fs.func_total):>9}"
+            f" {fs.line_total:>11} {fs.line_missed:>17} {_pct(fs.line_hit, fs.line_total):>9}"
+            f" {fs.branch_total:>11} {fs.branch_missed:>17} {_pct(fs.branch_hit, fs.branch_total):>9}\n"
+        )
+
+    has_total = (
+        summary.total.line_total
+        or summary.total.func_total
+        or summary.total.branch_total
+    )
+
+    header = (
+        f"{'Filename':<100}"
+        f" {'Regions':>10} {'Missed Regions':>17} {'Cover':>9}"
+        f" {'Functions':>11} {'Missed Functions':>17} {'Executed':>9}"
+        f" {'Lines':>11} {'Missed Lines':>17} {'Cover':>9}"
+        f" {'Branches':>11} {'Missed Branches':>17} {'Cover':>9}\n"
+    )
+    out.write(header)
+    out.write("-" * 269 + "\n")
+    for name, fs in sorted(summary.files.items()):
+        out.write(_row(name, fs))
+    if has_total:
+        out.write("-" * 269 + "\n")
+        out.write(_row("TOTAL", summary.total))

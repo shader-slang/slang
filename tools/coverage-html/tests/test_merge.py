@@ -45,39 +45,33 @@ merger = _import_merger()
 
 
 class NormalizePathTests(unittest.TestCase):
-    def test_default_prefixes_strip_clean(self):
+    def test_strip_prefix_basic(self):
         f = merger.normalize_path
-        prefixes = merger.DEFAULT_STRIP_PREFIXES
         self.assertEqual(
-            f("/__w/slang/slang/source/slang/x.cpp", prefixes),
-            "source/slang/x.cpp",
-        )
-        self.assertEqual(
-            f("/Users/runner/work/slang/slang/source/slang/x.cpp", prefixes),
+            f("/repo/root/source/slang/x.cpp", ("/repo/root/",)),
             "source/slang/x.cpp",
         )
 
     def test_windows_backslashes_normalize_to_forward(self):
         f = merger.normalize_path
-        prefixes = merger.DEFAULT_STRIP_PREFIXES
         self.assertEqual(
-            f(r"D:\a\slang\slang\source\slang\x.cpp", prefixes),
-            "source/slang/x.cpp",
+            f(r"D:\repo\src\x.cpp", ("D:/repo/",)),
+            "src/x.cpp",
         )
 
     def test_unmatched_path_passes_through(self):
         f = merger.normalize_path
         self.assertEqual(
-            f("/some/unrelated/path/file.c", merger.DEFAULT_STRIP_PREFIXES),
+            f("/some/unrelated/path/file.c", ("/repo/root/",)),
             "/some/unrelated/path/file.c",
         )
 
-    def test_extra_prefix(self):
+    def test_no_prefixes_passes_through(self):
         f = merger.normalize_path
-        # User-supplied extras should also strip.
+        # Empty prefix tuple → only backslash normalization is applied.
         self.assertEqual(
-            f("/custom/repo/foo.c", ("/custom/repo/",)),
-            "foo.c",
+            f(r"D:\a\slang\slang\source\slang\x.cpp", ()),
+            "D:/a/slang/slang/source/slang/x.cpp",
         )
 
     def test_longest_prefix_wins(self):
@@ -220,20 +214,26 @@ class CliIntegrationTests(unittest.TestCase):
     def test_path_normalization_collapses_per_os_paths(self):
         a = self._write(
             "linux.info",
-            "TN:\nSF:/__w/slang/slang/source/foo.c\n"
+            "TN:\nSF:/runner-a/repo/source/foo.c\n"
             "DA:1,1\nLF:1\nLH:1\nend_of_record\n",
         )
         b = self._write(
             "macos.info",
-            "TN:\nSF:/Users/runner/work/slang/slang/source/foo.c\n"
+            "TN:\nSF:/runner-b/repo/source/foo.c\n"
             "DA:2,1\nLF:1\nLH:1\nend_of_record\n",
         )
         c = self._write(
             "windows.info",
-            "TN:\nSF:D:\\a\\slang\\slang\\source\\foo.c\n"
+            "TN:\nSF:D:\\runner-c\\repo\\source\\foo.c\n"
             "DA:3,1\nLF:1\nLH:1\nend_of_record\n",
         )
-        res = self._run(a, b, c, "--quiet")
+        res = self._run(
+            a, b, c,
+            "--strip-prefix=/runner-a/repo/",
+            "--strip-prefix=/runner-b/repo/",
+            "--strip-prefix=D:/runner-c/repo/",
+            "--quiet",
+        )
         self.assertEqual(res.returncode, 0, msg=res.stderr)
         # All three OS path variants collapse to one repo-relative SF:.
         self.assertEqual(res.stdout.count("SF:source/foo.c"), 1)
@@ -299,6 +299,171 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(render.returncode, 0, msg=render.stderr)
         self.assertTrue(os.path.exists(os.path.join(out_dir, "index.html")))
+
+
+class AuthSummaryCliTests(unittest.TestCase):
+    """End-to-end: merger consumes per-OS llvm-cov report text dumps,
+    writes a merged report-text file, and the renderer reads it."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _write(self, name, content):
+        path = os.path.join(self.tmp, name)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return path
+
+    def _report(self, name, rows, total_row):
+        """Build a minimal `llvm-cov report`-shaped text file."""
+        header = (
+            "Filename                                                                                             "
+            "Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      "
+            "Missed Lines     Cover    Branches   Missed Branches     Cover\n"
+        )
+        sep = "-" * 200 + "\n"
+        body = "".join(rows) + sep + total_row
+        return self._write(name, header + sep + body)
+
+    def test_merge_two_reports_writes_combined(self):
+        # Per-OS reports for the same file; merge takes max(total) /
+        # min(missed). Stub LCOV input is required by the merger.
+        a_lcov = self._write(
+            "a.info",
+            "TN:\nSF:source/foo.c\nDA:1,1\nLF:1\nLH:1\nend_of_record\n",
+        )
+        a_rep = self._report(
+            "a-report.txt",
+            [
+                "source/foo.c"
+                "                                                                                         "
+                "      100                20    80.00%          10                 2    80.00%         "
+                "100                20    80.00%          50                10    80.00%\n"
+            ],
+            "TOTAL                                                                                                "
+            "      100                20    80.00%          10                 2    80.00%         "
+            "100                20    80.00%          50                10    80.00%\n",
+        )
+        b_rep = self._report(
+            "b-report.txt",
+            [
+                "source/foo.c"
+                "                                                                                         "
+                "      110                15    86.36%          12                 1    91.67%         "
+                "110                15    86.36%          55                 5    90.91%\n"
+            ],
+            "TOTAL                                                                                                "
+            "      110                15    86.36%          12                 1    91.67%         "
+            "110                15    86.36%          55                 5    90.91%\n",
+        )
+        out_lcov = os.path.join(self.tmp, "merged.lcov")
+        out_auth = os.path.join(self.tmp, "merged-auth.txt")
+        res = subprocess.run(
+            [sys.executable, MERGE_SCRIPT, a_lcov,
+             "-o", out_lcov,
+             "--auth-summary", a_rep,
+             "--auth-summary", b_rep,
+             "--auth-summary-out", out_auth,
+             "--quiet"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(res.returncode, 0, msg=res.stderr)
+
+        # Re-parse the merged auth summary and confirm max/min rules.
+        import lcov_io
+        merged = lcov_io.parse_llvm_cov_report(out_auth)
+        foo = merged.files["source/foo.c"]
+        self.assertEqual(foo.line_total, 110)   # max
+        self.assertEqual(foo.line_missed, 15)   # min
+        self.assertEqual(foo.func_total, 12)
+        self.assertEqual(foo.func_missed, 1)
+        self.assertEqual(foo.branch_total, 55)
+        self.assertEqual(foo.branch_missed, 5)
+        self.assertEqual(merged.total.line_total, 110)
+        self.assertEqual(merged.total.line_missed, 15)
+
+    def test_auth_summary_requires_out_path(self):
+        a_lcov = self._write(
+            "a.info",
+            "TN:\nSF:foo.c\nDA:1,1\nend_of_record\n",
+        )
+        a_rep = self._report(
+            "a-report.txt",
+            [],
+            "TOTAL                                                                                                "
+            "        0                 0         -           0                 0         -           "
+            "  0                 0         -           0                 0         -\n",
+        )
+        res = subprocess.run(
+            [sys.executable, MERGE_SCRIPT, a_lcov,
+             "--auth-summary", a_rep, "--quiet"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(res.returncode, 2)
+        self.assertIn("--auth-summary-out is required", res.stderr)
+
+
+class RendererAuthSummaryCliTests(unittest.TestCase):
+    """End-to-end: rendered HTML reflects authoritative numbers."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_overrides_show_in_index(self):
+        lcov = os.path.join(self.tmp, "in.info")
+        # LCOV says foo.c has 1 line, 1 hit.
+        with open(lcov, "w") as f:
+            f.write(
+                "TN:\nSF:source/foo.c\nDA:1,1\n"
+                "LF:1\nLH:1\nend_of_record\n"
+            )
+        # Auth summary says 200 lines, 50 missed (150 hit, 75.0%).
+        rep = os.path.join(self.tmp, "report.txt")
+        with open(rep, "w") as f:
+            f.write(
+                "Filename                                                                                             "
+                "Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      "
+                "Missed Lines     Cover    Branches   Missed Branches     Cover\n"
+            )
+            f.write("-" * 200 + "\n")
+            f.write(
+                "source/foo.c                                                                                         "
+                "      200                50    75.00%           5                 1    80.00%         "
+                "200                50    75.00%          40                10    75.00%\n"
+            )
+            f.write("-" * 200 + "\n")
+            f.write(
+                "TOTAL                                                                                                "
+                "      200                50    75.00%           5                 1    80.00%         "
+                "200                50    75.00%          40                10    75.00%\n"
+            )
+
+        out_dir = os.path.join(self.tmp, "out")
+        res = subprocess.run(
+            [sys.executable, RENDER_SCRIPT, lcov,
+             "--output-dir", out_dir,
+             "--auth-summary", rep,
+             "--quiet"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(res.returncode, 0, msg=res.stderr)
+
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            html = f.read()
+        # Expected per-file row totals come from the auth summary, not
+        # from LCOV's "1 line, 1 hit".
+        self.assertIn(">200<", html)        # line total
+        self.assertIn(">150<", html)        # line hit
+        self.assertNotIn(">1<", html.split("<tbody>", 1)[1].split("</tbody>", 1)[0]
+                         .replace("colspan=\"1\"", ""))  # rough sanity
 
 
 if __name__ == "__main__":

@@ -167,101 +167,6 @@ class FileRecordTests(unittest.TestCase):
 
 
 
-class SlangcFilterTests(unittest.TestCase):
-    """Mirrors tools/coverage/slangc-ignore-patterns.sh."""
-
-    def test_external_excluded(self):
-        from lcov_io import is_slangc_filtered_out
-
-        self.assertTrue(is_slangc_filtered_out("external/cmark/src/blocks.c"))
-
-    def test_build_prelude_excluded(self):
-        from lcov_io import is_slangc_filtered_out
-
-        self.assertTrue(
-            is_slangc_filtered_out("build/prelude/slang-cpp-prelude.h.cpp")
-        )
-
-    def test_build_fiddle_excluded(self):
-        from lcov_io import is_slangc_filtered_out
-
-        self.assertTrue(
-            is_slangc_filtered_out(
-                "build/source/slang/fiddle/slang-rich-diagnostics.h.fiddle"
-            )
-        )
-
-    def test_tools_excluded(self):
-        from lcov_io import is_slangc_filtered_out
-
-        self.assertTrue(is_slangc_filtered_out("tools/slang-test/main.cpp"))
-
-    def test_language_server_excluded(self):
-        from lcov_io import is_slangc_filtered_out
-
-        self.assertTrue(
-            is_slangc_filtered_out(
-                "source/slang/slang-language-server.cpp"
-            )
-        )
-        self.assertTrue(
-            is_slangc_filtered_out(
-                "source/slang/slang-language-server-protocol.h"
-            )
-        )
-
-    def test_ast_decl_headers_excluded(self):
-        from lcov_io import is_slangc_filtered_out
-
-        self.assertTrue(
-            is_slangc_filtered_out("source/slang/slang-ast-expr.h")
-        )
-        self.assertTrue(
-            is_slangc_filtered_out("source/slang/slang-ast-modifier.h")
-        )
-        # But the .cpp counterpart is kept.
-        self.assertFalse(
-            is_slangc_filtered_out("source/slang/slang-ast-modifier.cpp")
-        )
-
-    def test_compiler_files_kept(self):
-        from lcov_io import is_slangc_filtered_out
-
-        self.assertFalse(is_slangc_filtered_out("source/slang/slang-check.cpp"))
-        self.assertFalse(
-            is_slangc_filtered_out("source/compiler-core/slang-name.cpp")
-        )
-        self.assertFalse(
-            is_slangc_filtered_out("source/core/slang-string.cpp")
-        )
-
-    def test_backslash_paths_normalized(self):
-        from lcov_io import is_slangc_filtered_out
-
-        # Pre-normalization Windows paths still match.
-        self.assertTrue(
-            is_slangc_filtered_out(r"external\cmark\src\blocks.c")
-        )
-
-    def test_apply_slangc_filter_keeps_compiler_only(self):
-        from lcov_io import FileRecord, apply_slangc_filter
-
-        records = [
-            FileRecord(path="source/slang/slang-check.cpp"),
-            FileRecord(path="external/cmark/src/blocks.c"),
-            FileRecord(path="tools/slang-test/main.cpp"),
-            FileRecord(path="source/compiler-core/slang-name.cpp"),
-        ]
-        kept = apply_slangc_filter(records)
-        kept_paths = {r.path for r in kept}
-        self.assertEqual(
-            kept_paths,
-            {"source/slang/slang-check.cpp", "source/compiler-core/slang-name.cpp"},
-        )
-
-
-
-
 class EffectiveFunctionHitTests(unittest.TestCase):
     """A function is "effectively hit" if FNDA reports calls OR any
     DA line in its source range was hit. The latter half handles the
@@ -486,6 +391,181 @@ class ResolverTests(unittest.TestCase):
         self.assertEqual(text, "line1\nline2\n")
 
 
+
+
+class ParseLlvmCovReportTests(unittest.TestCase):
+    def setUp(self):
+        self.path = os.path.join(FIXTURES, "llvm-cov-report-sample.txt")
+
+    def test_parses_per_file_rows(self):
+        s = renderer.parse_llvm_cov_report(self.path)
+        self.assertEqual(len(s.files), 3)
+        foo = s.files["source/compiler-core/slang-foo.cpp"]
+        self.assertEqual(foo.line_total, 245)
+        self.assertEqual(foo.line_missed, 70)
+        self.assertEqual(foo.line_hit, 175)
+        self.assertEqual(foo.func_total, 28)
+        self.assertEqual(foo.func_missed, 6)
+        self.assertEqual(foo.func_hit, 22)
+        self.assertEqual(foo.branch_total, 80)
+        self.assertEqual(foo.branch_missed, 32)
+        self.assertEqual(foo.branch_hit, 48)
+
+    def test_total_row_captured(self):
+        s = renderer.parse_llvm_cov_report(self.path)
+        self.assertEqual(s.total.line_total, 325)
+        self.assertEqual(s.total.line_missed, 91)
+        self.assertEqual(s.total.func_total, 44)
+        self.assertEqual(s.total.func_missed, 11)
+        self.assertEqual(s.total.branch_total, 130)
+        self.assertEqual(s.total.branch_missed, 34)
+
+    def test_dash_in_cover_column_is_tolerated(self):
+        # The third file row has '-' in the branch Cover column
+        # because branch_total == 0; it should still parse.
+        s = renderer.parse_llvm_cov_report(self.path)
+        baz = s.files["source/compiler-core/slang-baz.h"]
+        self.assertEqual(baz.branch_total, 0)
+        self.assertEqual(baz.branch_missed, 0)
+
+    def test_missing_file_raises(self):
+        with self.assertRaises(renderer.LcovParseError):
+            renderer.parse_llvm_cov_report(
+                os.path.join(FIXTURES, "does-not-exist.txt")
+            )
+
+
+class AuthOverrideTests(unittest.TestCase):
+    """FileRecord properties consult auth_override transparently."""
+
+    def _record(self) -> "renderer.FileRecord":
+        r = renderer.FileRecord(path="foo.cpp")
+        # foo() lives at lines 1-3; bar() starts at 10 with no DA in range
+        # so the effective-hit logic still classifies it as not-hit.
+        r.lines = {1: 1, 2: 0, 3: 5, 10: 0, 11: 0}
+        r.branches = {(1, 0, 0): 1, (1, 0, 1): None}
+        r.functions = {
+            "_Z3foov": renderer.Function(first_line=1, hits=1),
+            "_Z3barv": renderer.Function(first_line=10, hits=0),
+        }
+        return r
+
+    def test_lcov_derived_when_no_override(self):
+        r = self._record()
+        self.assertEqual(r.total_lines, 5)
+        self.assertEqual(r.hit_lines, 2)
+        self.assertEqual(r.total_branches, 2)
+        self.assertEqual(r.hit_branches, 1)
+        self.assertEqual(r.total_functions, 2)
+        self.assertEqual(r.hit_functions, 1)
+
+    def test_override_replaces_totals(self):
+        r = self._record()
+        r.auth_override = renderer.AuthFileSummary(
+            line_total=100, line_missed=20,
+            func_total=8, func_missed=2,
+            branch_total=30, branch_missed=10,
+        )
+        self.assertEqual(r.total_lines, 100)
+        self.assertEqual(r.hit_lines, 80)
+        self.assertAlmostEqual(r.percent, 80.0)
+        self.assertEqual(r.total_branches, 30)
+        self.assertEqual(r.hit_branches, 20)
+        self.assertAlmostEqual(r.percent_branches, 100.0 * 20 / 30)
+        self.assertEqual(r.total_functions, 8)
+        self.assertEqual(r.hit_functions, 6)
+        self.assertAlmostEqual(r.percent_functions, 75.0)
+
+    def test_override_does_not_touch_lcov_dicts(self):
+        # Per-line / per-branch / per-function rendering should keep
+        # using the LCOV detail even with an override.
+        r = self._record()
+        r.auth_override = renderer.AuthFileSummary(line_total=999)
+        self.assertEqual(len(r.lines), 5)
+        self.assertEqual(len(r.branches), 2)
+        self.assertEqual(len(r.functions), 2)
+
+
+class MergeAuthSummariesTests(unittest.TestCase):
+    def _summary(self, line_total, line_missed, **kwargs):
+        s = renderer.AuthSummary()
+        s.files["foo.cpp"] = renderer.AuthFileSummary(
+            line_total=line_total, line_missed=line_missed, **kwargs
+        )
+        s.total = renderer.AuthFileSummary(
+            line_total=line_total, line_missed=line_missed, **kwargs
+        )
+        return s
+
+    def test_max_total_min_missed(self):
+        a = self._summary(100, 20)   # line_hit = 80
+        b = self._summary(110, 15)   # line_hit = 95
+        merged = renderer.merge_auth_summaries([a, b])
+        self.assertEqual(merged.files["foo.cpp"].line_total, 110)
+        self.assertEqual(merged.files["foo.cpp"].line_missed, 15)
+        self.assertEqual(merged.files["foo.cpp"].line_hit, 95)
+
+    def test_total_aggregates_across_inputs(self):
+        a = self._summary(100, 20)
+        b = self._summary(110, 30)
+        merged = renderer.merge_auth_summaries([a, b])
+        self.assertEqual(merged.total.line_total, 110)
+        self.assertEqual(merged.total.line_missed, 20)
+
+    def test_union_of_files(self):
+        a = renderer.AuthSummary()
+        a.files["a.cpp"] = renderer.AuthFileSummary(line_total=10, line_missed=2)
+        b = renderer.AuthSummary()
+        b.files["b.cpp"] = renderer.AuthFileSummary(line_total=20, line_missed=5)
+        merged = renderer.merge_auth_summaries([a, b])
+        self.assertEqual(set(merged.files.keys()), {"a.cpp", "b.cpp"})
+
+    def test_zero_total_skipped_when_picking_min_missed(self):
+        # An OS that doesn't report this file should not contribute a
+        # spurious 0 to the min(missed) calculation.
+        a = renderer.AuthSummary()
+        a.files["foo.cpp"] = renderer.AuthFileSummary(
+            line_total=100, line_missed=20
+        )
+        b = renderer.AuthSummary()
+        b.files["foo.cpp"] = renderer.AuthFileSummary(
+            line_total=0, line_missed=0
+        )
+        merged = renderer.merge_auth_summaries([a, b])
+        self.assertEqual(merged.files["foo.cpp"].line_total, 100)
+        self.assertEqual(merged.files["foo.cpp"].line_missed, 20)
+
+
+class WriteLlvmCovReportTests(unittest.TestCase):
+    def test_round_trip_preserves_numbers(self):
+        import io
+        original = renderer.parse_llvm_cov_report(
+            os.path.join(FIXTURES, "llvm-cov-report-sample.txt")
+        )
+        buf = io.StringIO()
+        renderer.write_llvm_cov_report(original, buf)
+        # Write to disk and re-parse so we hit the same code path
+        # consumers will hit.
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        )
+        try:
+            tmp.write(buf.getvalue())
+            tmp.close()
+            roundtrip = renderer.parse_llvm_cov_report(tmp.name)
+        finally:
+            os.unlink(tmp.name)
+        self.assertEqual(roundtrip.files.keys(), original.files.keys())
+        for path, fs in original.files.items():
+            r = roundtrip.files[path]
+            self.assertEqual(r.line_total, fs.line_total)
+            self.assertEqual(r.line_missed, fs.line_missed)
+            self.assertEqual(r.func_total, fs.func_total)
+            self.assertEqual(r.func_missed, fs.func_missed)
+            self.assertEqual(r.branch_total, fs.branch_total)
+            self.assertEqual(r.branch_missed, fs.branch_missed)
+        self.assertEqual(roundtrip.total.line_total, original.total.line_total)
+        self.assertEqual(roundtrip.total.line_missed, original.total.line_missed)
 
 
 if __name__ == "__main__":

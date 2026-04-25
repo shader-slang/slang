@@ -82,34 +82,42 @@ def _strip_tags(s: str) -> str:
 
 
 class GradientColorTests(unittest.TestCase):
-    def test_endpoints(self):
-        # 0% → red (hue 0), 100% → green (hue 120).
+    def test_watermark_endpoints(self):
+        # Watermarks: 0%→0 (red), 70%→30, 80%→90, 100%→120 (green).
         self.assertIn("hsl(0,", renderer._gradient_color(0.0))
+        self.assertIn("hsl(30,", renderer._gradient_color(70.0))
+        self.assertIn("hsl(90,", renderer._gradient_color(80.0))
         self.assertIn("hsl(120,", renderer._gradient_color(100.0))
 
-    def test_midpoint_is_yellow(self):
-        # 50% → hue 60 (yellow).
-        self.assertIn("hsl(60,", renderer._gradient_color(50.0))
+    def test_under_70_stays_warm(self):
+        # 35% is halfway from (0,0) to (70,30) → hue 15 (red-orange).
+        self.assertIn("hsl(15,", renderer._gradient_color(35.0))
+        # 50% is 50/70 of the way → hue ~21 (rounded).
+        self.assertIn("hsl(21,", renderer._gradient_color(50.0))
+
+    def test_70_to_80_ramps_through_yellow(self):
+        # 75% is halfway from (70,30) to (80,90) → hue 60 (yellow).
+        self.assertIn("hsl(60,", renderer._gradient_color(75.0))
+
+    def test_over_80_is_green(self):
+        # 90% is halfway from (80,90) to (100,120) → hue 105.
+        self.assertIn("hsl(105,", renderer._gradient_color(90.0))
 
     def test_clamps(self):
-        # Out-of-range inputs clamp to [0, 100].
         self.assertIn("hsl(0,", renderer._gradient_color(-5.0))
         self.assertIn("hsl(120,", renderer._gradient_color(200.0))
 
     def test_cell_bg_uses_high_lightness(self):
-        # Rate-cell backgrounds use the same hue ramp as the bar but
-        # at much higher lightness so dark text stays legible.
+        # Cell bg uses the same hue ramp as the bar at high lightness.
         self.assertIn("hsl(0, 60%, 85%)", renderer._gradient_cell_bg(0.0))
-        self.assertIn("hsl(60, 60%, 85%)", renderer._gradient_cell_bg(50.0))
+        self.assertIn("hsl(30, 60%, 85%)", renderer._gradient_cell_bg(70.0))
+        self.assertIn("hsl(90, 60%, 85%)", renderer._gradient_cell_bg(80.0))
         self.assertIn("hsl(120, 60%, 85%)", renderer._gradient_cell_bg(100.0))
 
     def test_rate_cell_emits_gradient_inline_style(self):
-        # _rate_cell emits the coverPerCell class with an inline
-        # background-color hsl() set per-percentage.
         cell = renderer._rate_cell(78.0, 100)
         self.assertIn('class="coverPerCell"', cell)
         self.assertIn("background-color:hsl(", cell)
-        # Below-threshold (no data) renders as a plain dash cell.
         self.assertEqual(
             renderer._rate_cell(0.0, 0),
             '<td class="coverNumDflt">-</td>',
@@ -120,11 +128,13 @@ class GradientColorTests(unittest.TestCase):
 
 class TierTests(unittest.TestCase):
     def test_thresholds(self):
+        # Tier breakpoints align with the gradient watermarks: Hi ≥80,
+        # Med 70-80, Lo <70.
         self.assertEqual(renderer._tier(100.0), "Hi")
-        self.assertEqual(renderer._tier(90.0), "Hi")
-        self.assertEqual(renderer._tier(89.9), "Med")
-        self.assertEqual(renderer._tier(75.0), "Med")
-        self.assertEqual(renderer._tier(74.9), "Lo")
+        self.assertEqual(renderer._tier(80.0), "Hi")
+        self.assertEqual(renderer._tier(79.9), "Med")
+        self.assertEqual(renderer._tier(70.0), "Med")
+        self.assertEqual(renderer._tier(69.9), "Lo")
         self.assertEqual(renderer._tier(0.0), "Lo")
 
 
@@ -149,6 +159,37 @@ class FilterTests(unittest.TestCase):
     def test_no_filters_is_identity(self):
         recs = self._records()
         self.assertEqual(renderer.apply_filters(recs, [], []), recs)
+
+    def test_regex_exclude(self):
+        out = renderer.apply_filters(
+            self._records(), [], [], exclude_regex=[r"^test/"]
+        )
+        self.assertEqual([r.path for r in out], ["src/a/foo.c", "src/b/bar.c"])
+
+    def test_regex_include(self):
+        out = renderer.apply_filters(
+            self._records(), [], [], include_regex=[r"^src/a/"]
+        )
+        self.assertEqual([r.path for r in out], ["src/a/foo.c"])
+
+    def test_regex_alternation(self):
+        # Multiple --filter-exclude-regex flags are OR'd: a path
+        # matching either pattern is dropped.
+        out = renderer.apply_filters(
+            self._records(), [], [],
+            exclude_regex=[r"^src/a/", r"^test/"],
+        )
+        self.assertEqual([r.path for r in out], ["src/b/bar.c"])
+
+    def test_glob_and_regex_compose(self):
+        # Glob include narrows the universe; regex exclude further
+        # filters down. Both must hold for a record to survive.
+        out = renderer.apply_filters(
+            self._records(),
+            ["src/*/*.c"], [],
+            exclude_regex=[r"foo"],
+        )
+        self.assertEqual([r.path for r in out], ["src/b/bar.c"])
 
 
 

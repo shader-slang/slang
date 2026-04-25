@@ -1,44 +1,31 @@
 # slang-coverage-html + slang-coverage-merge
 
-> **Shipping scope: per-OS reports OK; merged cross-OS report gated
-> on branch counting.**
->
-> - **Single-OS Windows**: ready to use. Windows LCOV carries no
->   BRDA records anyway (OpenCppCoverage limitation), so the
->   methodology gap below doesn't apply. The merger gives Windows
->   a publishable HTML report it doesn't have today on
->   <https://shader-slang.org/slang-coverage-reports/>.
-> - **Single-OS Linux / macOS**: lines match CI within 0.5 pp,
->   functions match exactly. Branch numbers run ~8 pp below CI's
->   published values because `llvm-cov report` applies a different
->   collapse to BRDA records than we can derive from the LCOV
->   alone. Fine for ad-hoc use; **don't publish these as Slang's
->   official coverage** alongside or instead of the existing CI
->   per-OS dashboards.
-> - **Merged cross-OS**: same branch concern, plus the merge
->   itself surfaces the discrepancy more visibly. Held until the
->   branch metric matches CI.
->
-> **Branch-coverage follow-up**: the LCOV produced by `llvm-cov
-export -format=lcov` has more BRDA records than `llvm-cov report`
-> counts (post-export, the report tool collapses some). We can't
-> reproduce that collapse from the LCOV alone, so the merger's
-> branch numbers run below CI's. The plan to close the gap is a
-> tiny CI workflow change — also dump `llvm-cov report` text per
-> OS as an artifact — plus a `--auth-summary <file>` consumer flag
-> on the merger that reads those numbers as the source of truth.
-> Tracked as a follow-up; **branch coverage isn't reliable for
-> publishing until that lands.**
+Two cooperating Python 3 tools for static-HTML coverage reports
+from LCOV `.info` files:
 
-Two cooperating Python 3 tools for Slang-ecosystem coverage
-workflows:
-
-- **`slang-coverage-html`** — render an LCOV `.info` file to static
-  HTML. Zero-install on any platform — no `pip`, no Perl
+- **`slang-coverage-html`** — render one LCOV to a directory of
+  static HTML. Zero-install on any platform — no `pip`, no Perl
   (`genhtml`), no .NET runtime (ReportGenerator).
 - **`slang-coverage-merge`** — combine multiple LCOV inputs (e.g.
   one per CI host) into a single merged LCOV using max-aggregation.
   Pipe the result through the renderer for a unified report.
+
+Both are **deliberately project-neutral**: they consume any standard
+LCOV file. Project-specific filtering (e.g. exclude rules for a
+particular code base) belongs in a thin wrapper around them — see
+`tools/coverage/` for the Slang wrapper that injects slangc-only
+filters and Slang's GitHub Actions runner path roots.
+
+> **Branch coverage from `llvm-cov export -format=lcov` runs
+> below `llvm-cov report`.** The export emits more BRDA records
+> than the report counts (the report tool collapses some
+> templated/inlined entries that the LCOV form keeps separate),
+> so LCOV-derived branch numbers come in lower. The fix is the
+> `--auth-summary` flag: pass an `llvm-cov report` text dump and
+> per-file totals are taken from the report instead of derived
+> from the LCOV. With it, branch / function / line numbers match
+> the report exactly. Without it, branches are still useful but
+> not directly comparable to a `llvm-cov report` number.
 
 ## Quick start
 
@@ -95,8 +82,12 @@ slang-coverage-html <input.lcov> [options]
 --source-root PATH     Directory used as a root when resolving SF: paths
 --filter-include GLOB  Include-only glob, applied to SF: path (repeatable)
 --filter-exclude GLOB  Exclude glob, applied to SF: path (repeatable)
---slangc-filter        Restrict to the slangc compiler-only file set
-                       CI uses (mirrors slangc-ignore-patterns.sh)
+--filter-include-regex REGEX  Include-only Python regex, matched
+                              anywhere in SF: path (repeatable).
+--filter-exclude-regex REGEX  Exclude Python regex (repeatable).
+--auth-summary FILE    Override LCOV-derived per-file totals with the
+                       authoritative numbers from an `llvm-cov report`
+                       text dump (e.g. CI's source of truth).
 --quiet                Suppress progress output
 ```
 
@@ -110,14 +101,17 @@ them — they disappear again when the LCOV has none.
 slang-coverage-merge <LCOV ...> [options]
 
 -o, --output PATH        Output path (default: stdout, "-")
---strip-prefix PREFIX    Extra path prefix to strip from SF: paths
-                         (repeatable). Built-in defaults already cover
-                         the three Slang CI runner roots.
---no-default-prefixes    Skip the built-in path prefixes
---slangc-filter          Restrict the merged output to the slangc
-                         compiler-only file set CI uses (mirrors
-                         tools/coverage/slangc-ignore-patterns.sh).
-                         Applied per-input after path normalization.
+--strip-prefix PREFIX    Path prefix to strip from SF: paths
+                         (repeatable). Use this to collapse per-OS
+                         CI runner roots into stable repo-relative
+                         paths before merging.
+--filter-include-regex REGEX  Include-only Python regex (repeatable;
+                              matched anywhere in SF: path). Applied
+                              after path normalization.
+--filter-exclude-regex REGEX  Exclude Python regex (repeatable).
+                              Applied after path normalization, so
+                              it always sees the same shape regardless
+                              of input.
 --synthesize-functions   EXPERIMENTAL. Fill in FN/FNDA on inputs that
                          emit DA but no FN/FNDA (notably the Windows
                          OpenCppCoverage → LCOV converter), using
@@ -126,6 +120,13 @@ slang-coverage-merge <LCOV ...> [options]
                          hit-count proxy. Treat as upper bound — DA
                          at entry can over-count for tail-merged or
                          fall-through entry lines.
+--auth-summary FILE      `llvm-cov report` text dump (repeatable, one
+                         per OS). Combined into one merged summary by
+                         max(total) / min(missed) per file across
+                         inputs.
+--auth-summary-out PATH  Output path for the merged summary; required
+                         when --auth-summary is given. Pass the result
+                         to the renderer's --auth-summary flag.
 --quiet                  Suppress progress output on stderr
 ```
 
@@ -146,12 +147,22 @@ Aggregation rules (max-across-inputs):
 Path normalization:
 
 - Backslashes → forward slashes (Windows artifacts use `D:\...`).
-- Built-in defaults strip the three Slang CI runner roots:
-  `/__w/slang/slang/`, `/Users/runner/work/slang/slang/`,
-  `D:\a\slang\slang\`. Use `--strip-prefix` to add more.
+- Each `--strip-prefix` is matched left-anchored; the longest
+  matching prefix wins. No project defaults are baked in — pass
+  the prefixes your CI uses (e.g. `--strip-prefix=/__w/repo/repo/`).
 - Unmatched paths pass through unchanged.
 
 Auto-detect: inputs ending in `.gz` are decompressed transparently.
+
+## Project-specific defaults
+
+The tools take **no project-specific defaults** — no
+`--slangc-filter`, no built-in CI path prefixes. To pre-inject a
+project's defaults (file-set filters, runner path roots), wrap
+the tool. Slang's wrapper is at `tools/coverage/slang-render.py`
+and `tools/coverage/slang-merge.py`; it consumes
+`tools/coverage/slang_filters.py` and forwards the rest of the
+arguments to the generic tool.
 
 ## Methodology vs `llvm-cov report`
 
@@ -181,23 +192,24 @@ per-platform metrics:
 - **Lines** are counted one per `DA:` record. Matches genhtml.
 - **Branches** are counted one per `BRDA:` outcome. Matches genhtml.
 
-For Linux slangc-filtered (PR-10884 run as a stable reference):
+As a reference, on a representative slangc-filtered Linux LCOV
+of ~530 files:
 
-| Metric    | Ours    | CI (`llvm-cov report`) | Gap     |
-| --------- | ------- | ---------------------- | ------- |
-| Lines     | 77.75 % | 78.21 %                | -0.5 pp |
-| Branches  | 65.79 % | 74.08 %                | -8.3 pp |
-| Functions | 79.42 % | 79.45 %                | ~0 ✅   |
+| Metric    | LCOV-derived | `llvm-cov report` | Gap     |
+| --------- | ------------ | ----------------- | ------- |
+| Lines     | 77.75 %      | 78.21 %           | -0.5 pp |
+| Branches  | 65.79 %      | 74.08 %           | -8.3 pp |
+| Functions | 79.42 %      | 79.45 %           | ~0 ✅   |
 
-Functions match exactly after the line-dedup. Lines are within 0.5
-pp (residual is generated headers like `hlsl.meta.slang.h` that
-llvm-cov treats as non-instrumented). Branches are still 8 pp
-below — `llvm-cov report` appears to collapse some BRDA records
-that `llvm-cov export` emits faithfully; matching it exactly
-without re-running `llvm-cov` ourselves is hard. Numbers we
-publish are correct **per the LCOV** that CI hands us; if a
-direct apples-to-apples branch number is needed, report CI's
-per-OS branch %.
+Functions match exactly after the line-dedup. Lines are within
+0.5 pp (residual is generated headers that `llvm-cov` treats as
+non-instrumented). Branches run 8 pp below because `llvm-cov
+report` collapses some BRDA records the export emits faithfully.
+
+To match `llvm-cov report` exactly, pass `--auth-summary
+<coverage-report.txt>` — per-file Lines/Functions/Branches totals
+on the index, directory aggregates and per-file pages then come
+from the report instead of being derived from LCOV.
 
 ### Source resolution
 
@@ -275,7 +287,7 @@ across every platform our customers run.
 python3 -m unittest discover -s tools/coverage-html/tests -v
 ```
 
-96 unit + integration tests across three files
+113 unit + integration tests across three files
 (`tests/test_lcov_io.py`, `tests/test_renderer.py`,
 `tests/test_merge.py`) cover: LCOV parsing (incl. TN: max-
 aggregation, corrupt-input detection, unknown-record tolerance, BRDA

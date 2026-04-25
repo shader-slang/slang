@@ -33,30 +33,25 @@ import argparse
 import gzip
 import io
 import os
+import re
 import sys
 from typing import Dict, List, Optional, Tuple
 
 # Shared parser / writer / data model.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lcov_io import (  # noqa: E402
+    AuthSummary,
     FileRecord,
     Function,
     LcovParseError,
-    apply_slangc_filter,
+    merge_auth_summaries,
     parse_lcov,
+    parse_llvm_cov_report,
     write_lcov,
+    write_llvm_cov_report,
 )
 
 GENERATOR_NAME = "slang-coverage-merge"
-
-# Path prefixes seen on Slang CI runners. Stripping them produces a
-# repo-relative path that's stable across hosts. Backslashes are
-# already normalized to forward slashes before this is applied.
-DEFAULT_STRIP_PREFIXES: Tuple[str, ...] = (
-    "/__w/slang/slang/",                  # Linux GitHub Actions
-    "/Users/runner/work/slang/slang/",    # macOS GitHub Actions
-    "D:/a/slang/slang/",                  # Windows GitHub Actions
-)
 
 
 # ---------------------------------------------------------------------------
@@ -260,30 +255,33 @@ def build_argparser() -> argparse.ArgumentParser:
         default=[],
         metavar="PREFIX",
         help=(
-            "Extra path prefix to strip from SF: paths (repeatable). "
+            "Path prefix to strip from SF: paths (repeatable). "
             "Backslashes inside the prefix are normalized to forward "
-            "slashes before matching. Built-in defaults already cover "
-            "the three Slang CI runner roots; use this to add extras."
+            "slashes before matching. The longest matching prefix "
+            "wins. Use this to collapse per-OS CI runner roots into "
+            "a stable repo-relative path."
         ),
     )
     p.add_argument(
-        "--no-default-prefixes",
-        action="store_true",
+        "--filter-include-regex",
+        action="append",
+        default=[],
+        metavar="REGEX",
         help=(
-            "Skip the built-in path prefixes "
-            f"({', '.join(DEFAULT_STRIP_PREFIXES)})."
+            "Include-only Python regex (repeatable; matched anywhere "
+            "in the SF: path). Applied after path normalization."
         ),
     )
     p.add_argument(
-        "--slangc-filter",
-        action="store_true",
+        "--filter-exclude-regex",
+        action="append",
+        default=[],
+        metavar="REGEX",
         help=(
-            "Restrict the merged output to the slangc compiler-only file "
-            "set CI uses (mirrors tools/coverage/slangc-ignore-patterns.sh: "
-            "drops external/, build/prelude/, generated FIDDLE / capability "
-            "tables, language-server / record-replay / glslang, etc.). "
-            "Applied after path normalization, before merging — so it "
-            "always sees repo-relative paths regardless of input shape."
+            "Exclude Python regex (repeatable; matched anywhere in "
+            "the SF: path). Applied after path normalization, before "
+            "merging — so it always sees repo-relative paths "
+            "regardless of input shape."
         ),
     )
     p.add_argument(
@@ -302,6 +300,32 @@ def build_argparser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--auth-summary",
+        action="append",
+        default=[],
+        metavar="REPORT_TXT",
+        help=(
+            "Path to an `llvm-cov report` text dump. Repeat once per "
+            "input LCOV — order doesn't have to match. Each input is "
+            "merged into one combined summary by max(total) / "
+            "min(missed) per file. Use with --auth-summary-out to "
+            "write the merged summary to disk for the renderer's "
+            "--auth-summary flag to consume. Files dropped by "
+            "--filter-exclude-regex / --filter-include-regex are "
+            "dropped from the merged summary too."
+        ),
+    )
+    p.add_argument(
+        "--auth-summary-out",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Output path for the merged `llvm-cov report` text "
+            "synthesized from --auth-summary inputs. Required when "
+            "--auth-summary is used."
+        ),
+    )
+    p.add_argument(
         "--quiet",
         action="store_true",
         help="Suppress progress output on stderr.",
@@ -309,13 +333,38 @@ def build_argparser() -> argparse.ArgumentParser:
     return p
 
 
+def _filter_records(
+    recs: List[FileRecord],
+    inc_re: Optional["re.Pattern"],
+    exc_re: Optional["re.Pattern"],
+) -> List[FileRecord]:
+    if not inc_re and not exc_re:
+        return recs
+    out: List[FileRecord] = []
+    for r in recs:
+        if inc_re and not inc_re.search(r.path):
+            continue
+        if exc_re and exc_re.search(r.path):
+            continue
+        out.append(r)
+    return out
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_argparser().parse_args(argv)
 
-    prefixes: List[str] = []
-    if not args.no_default_prefixes:
-        prefixes.extend(DEFAULT_STRIP_PREFIXES)
-    prefixes.extend(args.strip_prefix)
+    prefixes: List[str] = list(args.strip_prefix)
+
+    inc_re = (
+        re.compile("|".join(args.filter_include_regex))
+        if args.filter_include_regex
+        else None
+    )
+    exc_re = (
+        re.compile("|".join(args.filter_exclude_regex))
+        if args.filter_exclude_regex
+        else None
+    )
 
     inputs: List[List[FileRecord]] = []
     for path in args.inputs:
@@ -326,8 +375,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 2
         recs = normalized_records(recs, tuple(prefixes))
         before = len(recs)
-        if args.slangc_filter:
-            recs = apply_slangc_filter(recs)
+        recs = _filter_records(recs, inc_re, exc_re)
         inputs.append(recs)
         if not args.quiet:
             line = (
@@ -336,9 +384,59 @@ def main(argv: Optional[List[str]] = None) -> int:
                 f"{sum(r.total_branches for r in recs)} branches / "
                 f"{sum(r.total_functions for r in recs)} functions"
             )
-            if args.slangc_filter:
-                line += f" (slangc-filter dropped {before - len(recs)})"
+            if before != len(recs):
+                line += f" (filter dropped {before - len(recs)})"
             print(line, file=sys.stderr)
+
+    # Merge per-OS llvm-cov report dumps into one if requested. Done
+    # in a separate pass so it stays independent of LCOV merging
+    # — paths in the reports are already repo-relative when CI dumps
+    # them, so no normalization is required here.
+    if args.auth_summary:
+        if not args.auth_summary_out:
+            print(
+                f"{GENERATOR_NAME}: error: --auth-summary-out is "
+                f"required when --auth-summary is given",
+                file=sys.stderr,
+            )
+            return 2
+        per_os: List[AuthSummary] = []
+        for p in args.auth_summary:
+            try:
+                per_os.append(parse_llvm_cov_report(p))
+            except LcovParseError as e:
+                print(f"{GENERATOR_NAME}: {e}", file=sys.stderr)
+                return 2
+        merged_auth = merge_auth_summaries(per_os)
+        # Apply the same include/exclude regex filters to the auth
+        # summary so the merged report matches the LCOV record set.
+        if inc_re or exc_re:
+            before = len(merged_auth.files)
+            merged_auth.files = {
+                k: v
+                for k, v in merged_auth.files.items()
+                if (not inc_re or inc_re.search(k))
+                and (not exc_re or not exc_re.search(k))
+            }
+            dropped = before - len(merged_auth.files)
+            if dropped and not args.quiet:
+                print(
+                    f"{GENERATOR_NAME}: filter dropped {dropped} "
+                    f"entr{'y' if dropped == 1 else 'ies'} from auth-summary",
+                    file=sys.stderr,
+                )
+        with open(args.auth_summary_out, "w", encoding="utf-8") as f:
+            write_llvm_cov_report(merged_auth, f)
+        if not args.quiet:
+            print(
+                f"{GENERATOR_NAME}: merged {len(args.auth_summary)} "
+                f"auth-summary input(s) into {args.auth_summary_out}: "
+                f"{len(merged_auth.files)} files / "
+                f"lines {merged_auth.total.line_hit}/{merged_auth.total.line_total} / "
+                f"functions {merged_auth.total.func_hit}/{merged_auth.total.func_total} / "
+                f"branches {merged_auth.total.branch_hit}/{merged_auth.total.branch_total}",
+                file=sys.stderr,
+            )
 
     if args.synthesize_functions:
         synth = synthesize_missing_functions(inputs)

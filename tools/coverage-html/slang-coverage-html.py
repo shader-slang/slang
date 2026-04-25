@@ -36,12 +36,13 @@ _ASSET_DIR = Path(__file__).resolve().parent
 # renderer and the merge tool import the same code.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lcov_io import (  # noqa: E402
+    AuthSummary,
     FileRecord,
     Function,
     LcovParseError,
     SourceResolver,
-    apply_slangc_filter,
     parse_lcov,
+    parse_llvm_cov_report,
 )
 
 MARKER_NAME = "slang-coverage-html.marker"
@@ -55,17 +56,29 @@ GENERATOR_URL = "https://github.com/shader-slang/slang"
 # Magic numbers and characters that affect rendering live here so a
 # style change is one edit, not a grep across the file.
 
-# Rate tier thresholds (match genhtml defaults). Used by `_tier`.
-TIER_HI = 90.0
-TIER_MED = 75.0
+# Rate tier thresholds. Aligned with the gradient watermarks below
+# so the categorical tier (Lo/Med/Hi) matches what the bar color
+# already communicates: green at 80, warm under 70, red at 0.
+TIER_HI = 80.0
+TIER_MED = 70.0
 
 # Bar fill geometry. The progress bar is a 100 px outline filled
 # proportional to the coverage percent.
 BAR_PIXEL_WIDTH = 100
 
-# HSL gradient parameters for the bar fill / rate-cell backgrounds.
-# Hue maps 0 % → 0 (red), 100 % → 120 (green) via a 1.2 multiplier.
-GRADIENT_HUE_PER_PCT = 1.2
+# HSL gradient watermarks. Piecewise-linear interpolation over hue:
+#   0 %  → 0   (red)
+#   70 % → 30  (red-orange — bottom of the "warm" band)
+#   80 % → 90  (yellow-green — bottom of the "good" band)
+#   100 %→ 120 (green)
+# Choosing watermarks instead of a single linear ramp keeps everything
+# below 70 % visually red and pushes the green into the 80+ range.
+GRADIENT_HUE_WATERMARKS: Tuple[Tuple[float, float], ...] = (
+    (0.0, 0.0),
+    (70.0, 30.0),
+    (80.0, 90.0),
+    (100.0, 120.0),
+)
 GRADIENT_BAR_SATURATION = "70%"
 GRADIENT_BAR_LIGHTNESS = "50%"
 GRADIENT_CELL_SATURATION = "60%"
@@ -249,9 +262,17 @@ def _render_page_footer(extra_body: str = "") -> str:
 
 
 def _hue_for_pct(pct: float) -> float:
-    """Map a coverage percentage to a hue in HSL space.
-    0 % → 0 (red), 100 % → 120 (green); linear in between."""
-    return max(0.0, min(100.0, pct)) * GRADIENT_HUE_PER_PCT
+    """Piecewise-linear hue from coverage percentage; see
+    `GRADIENT_HUE_WATERMARKS` for the breakpoints."""
+    p = max(0.0, min(100.0, pct))
+    for (p0, h0), (p1, h1) in zip(
+        GRADIENT_HUE_WATERMARKS, GRADIENT_HUE_WATERMARKS[1:]
+    ):
+        if p <= p1:
+            if p1 == p0:
+                return h0
+            return h0 + (p - p0) * (h1 - h0) / (p1 - p0)
+    return GRADIENT_HUE_WATERMARKS[-1][1]
 
 
 def _gradient_color(pct: float) -> str:
@@ -1074,15 +1095,35 @@ def apply_filters(
     records: List[FileRecord],
     includes: List[str],
     excludes: List[str],
+    include_regex: Optional[List[str]] = None,
+    exclude_regex: Optional[List[str]] = None,
 ) -> List[FileRecord]:
-    if not includes and not excludes:
+    """Apply include / exclude filters to records.
+
+    Globs (`includes` / `excludes`) match the full repo-relative path
+    via `fnmatch`. Regexes (`include_regex` / `exclude_regex`) match
+    anywhere in the path via `re.search`. All four flag families
+    compose as: include = glob-include AND regex-include; exclude =
+    glob-exclude OR regex-exclude.
+    """
+    inc_re = (
+        re.compile("|".join(include_regex)) if include_regex else None
+    )
+    exc_re = (
+        re.compile("|".join(exclude_regex)) if exclude_regex else None
+    )
+    if not includes and not excludes and not inc_re and not exc_re:
         return records
     out: List[FileRecord] = []
     for r in records:
         p = r.path.replace("\\", "/")
         if includes and not any(fnmatch.fnmatch(p, pat) for pat in includes):
             continue
+        if inc_re and not inc_re.search(p):
+            continue
         if excludes and any(fnmatch.fnmatch(p, pat) for pat in excludes):
+            continue
+        if exc_re and exc_re.search(p):
             continue
         out.append(r)
     return out
@@ -1113,17 +1154,21 @@ def prepare_output_dir(path: str) -> None:
 
 
 def validate_totals(records: List[FileRecord]) -> None:
+    # Compare reported LF/LH against the raw LCOV counts (independent
+    # of any auth_override that the renderer may have applied later).
     for r in records:
-        if r.reported_lf is not None and r.reported_lf != r.total_lines:
+        derived_lf = len(r.lines)
+        derived_lh = sum(1 for h in r.lines.values() if h > 0)
+        if r.reported_lf is not None and r.reported_lf != derived_lf:
             print(
                 f"slang-coverage-html: warning: {r.path}: LF reported "
-                f"{r.reported_lf} but saw {r.total_lines} DA lines",
+                f"{r.reported_lf} but saw {derived_lf} DA lines",
                 file=sys.stderr,
             )
-        if r.reported_lh is not None and r.reported_lh != r.hit_lines:
+        if r.reported_lh is not None and r.reported_lh != derived_lh:
             print(
                 f"slang-coverage-html: warning: {r.path}: LH reported "
-                f"{r.reported_lh} but saw {r.hit_lines} hit DA lines",
+                f"{r.reported_lh} but saw {derived_lh} hit DA lines",
                 file=sys.stderr,
             )
 
@@ -1177,14 +1222,38 @@ def build_argparser() -> argparse.ArgumentParser:
         help="Exclude glob (repeatable). Applied to SF: path.",
     )
     p.add_argument(
-        "--slangc-filter",
-        action="store_true",
+        "--filter-include-regex",
+        action="append",
+        default=[],
+        metavar="REGEX",
         help=(
-            "Restrict to the slangc compiler-only file set CI uses "
-            "(mirrors tools/coverage/slangc-ignore-patterns.sh: drops "
-            "external/, build/prelude/, generated FIDDLE / capability "
-            "tables, language-server / record-replay / glslang, etc.). "
-            "Applied on top of --filter-include / --filter-exclude."
+            "Include-only Python regex (repeatable; matched anywhere "
+            "in the SF: path). Composed with --filter-include via AND."
+        ),
+    )
+    p.add_argument(
+        "--filter-exclude-regex",
+        action="append",
+        default=[],
+        metavar="REGEX",
+        help=(
+            "Exclude Python regex (repeatable; matched anywhere in "
+            "the SF: path). Composed with --filter-exclude via OR."
+        ),
+    )
+    p.add_argument(
+        "--auth-summary",
+        default=None,
+        metavar="REPORT_TXT",
+        help=(
+            "Path to an `llvm-cov report` text dump. When supplied, "
+            "per-file Lines/Functions/Branches totals on the index, "
+            "directory aggregates and per-file pages are taken from "
+            "the report instead of from the LCOV — these are the "
+            "numbers CI's coverage dashboard quotes. Source-view "
+            "rendering (per-line hits, branch markers, function table) "
+            "still uses LCOV detail. Files in the LCOV but missing "
+            "from the report fall back to LCOV-derived totals."
         ),
     )
     p.add_argument(
@@ -1193,6 +1262,27 @@ def build_argparser() -> argparse.ArgumentParser:
         help="Suppress progress output",
     )
     return p
+
+
+def apply_auth_summary(
+    records: List[FileRecord], auth: AuthSummary, quiet: bool = False
+) -> Tuple[int, int]:
+    """Attach per-file auth_override to each matching record.
+
+    Returns (matched, unmatched) for caller logging. Match is by
+    exact path equality — both the records and the report use repo-
+    relative forward-slash paths in the typical CI workflow.
+    """
+    matched = 0
+    unmatched = 0
+    for r in records:
+        f = auth.get(r.path)
+        if f is None:
+            unmatched += 1
+            continue
+        r.auth_override = f
+        matched += 1
+    return matched, unmatched
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -1204,15 +1294,25 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"slang-coverage-html: {e}", file=sys.stderr)
         return 2
 
-    records = apply_filters(records, args.filter_include, args.filter_exclude)
-    if args.slangc_filter:
-        before = len(records)
-        records = apply_slangc_filter(records)
+    records = apply_filters(
+        records,
+        args.filter_include,
+        args.filter_exclude,
+        include_regex=args.filter_include_regex,
+        exclude_regex=args.filter_exclude_regex,
+    )
+    if args.auth_summary:
+        try:
+            auth = parse_llvm_cov_report(args.auth_summary)
+        except LcovParseError as e:
+            print(f"slang-coverage-html: {e}", file=sys.stderr)
+            return 2
+        matched, unmatched = apply_auth_summary(records, auth, quiet=args.quiet)
         if not args.quiet:
-            dropped = before - len(records)
             print(
-                f"slang-coverage-html: --slangc-filter dropped "
-                f"{dropped} file(s); {len(records)} kept",
+                f"slang-coverage-html: --auth-summary applied to "
+                f"{matched} of {len(records)} record(s); "
+                f"{unmatched} fell back to LCOV totals",
                 file=sys.stderr,
             )
     validate_totals(records)
