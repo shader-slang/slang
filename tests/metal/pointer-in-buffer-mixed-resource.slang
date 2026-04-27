@@ -26,7 +26,7 @@ ParameterBlock<Params> params;
 
 // The kernel body should cast ulong back to a typed pointer for `indirect`.
 // CHECK-LABEL: computeMain
-// CHECK: int device*
+// CHECK: int device* device*
 
 // METALLIB: computeMain
 
