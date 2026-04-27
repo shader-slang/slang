@@ -3359,7 +3359,7 @@ struct TypeFlowSpecializationContext
             auto func = as<IRFunc>(globalInst);
             if (!func)
                 continue;
-            for (auto block : func->getChildren())
+            for (auto block : func->getBlocks())
             {
                 for (auto inst : block->getChildren())
                 {
