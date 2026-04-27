@@ -247,9 +247,7 @@ jobs:
       test-category: smoke
       full-gpu-tests: false
 
-  # Windows GPU tests (self-hosted).
-  # gpu-api-only skips no-API / CPU / LLVM tests — the CPU-only tier
-  # covers those.
+  # Windows GPU tests (self-hosted)
   test-windows-debug-cl-x86_64-gpu:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
@@ -262,7 +260,6 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       test-category: full
       full-gpu-tests: true
-      gpu-api-only: true
 
   test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
@@ -276,7 +273,6 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       test-category: full
       full-gpu-tests: true
-      gpu-api-only: true
 
   # MaterialX Integration Tests (Windows only for initial validation)
   test-materialx-windows-release:
