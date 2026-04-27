@@ -3244,6 +3244,7 @@ public:
     enum class CheckBaseContext
     {
         Member,
+        DerefMember,
         Subscript,
     };
     Expr* checkBaseForMemberExpr(

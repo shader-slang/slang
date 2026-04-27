@@ -6790,6 +6790,11 @@ Expr* SemanticsVisitor::maybeDereference(Expr* inExpr, CheckBaseContext checkBas
             if (checkBaseContext == CheckBaseContext::Subscript)
                 return expr;
         }
+        if (as<PointerLikeType>(baseType.type))
+        {
+            if (checkBaseContext == CheckBaseContext::Member)
+                return expr;
+        }
         auto elementType = getPointedToTypeIfCanImplicitDeref(baseType);
         if (!elementType)
             return expr;
@@ -7596,8 +7601,9 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
 Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
 {
     bool needDeref = false;
-    expr->baseExpression =
-        checkBaseForMemberExpr(expr->baseExpression, CheckBaseContext::Member, needDeref);
+    auto baseContext =
+        as<DerefMemberExpr>(expr) ? CheckBaseContext::DerefMember : CheckBaseContext::Member;
+    expr->baseExpression = checkBaseForMemberExpr(expr->baseExpression, baseContext, needDeref);
 
     if (!needDeref && as<DerefMemberExpr>(expr) && !as<PtrType>(expr->baseExpression->type))
     {

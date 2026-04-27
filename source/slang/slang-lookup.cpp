@@ -573,6 +573,26 @@ static void _lookUpMembersInSuperTypeImpl(
     LookupResult& ioResult,
     BreadcrumbInfo* inBreadcrumbs)
 {
+    // For PointerLikeType (DescriptorHandle, ParameterGroup, etc.), check the
+    // type's own members and extensions before implicitly dereferencing to the
+    // element type. This ensures that e.g. DescriptorHandle<T>'s built-in
+    // members and extension methods are found before falling through to T.
+    if (as<PointerLikeType>(superType))
+    {
+        if (auto declRefType = as<DeclRefType>(superType))
+        {
+            _lookUpMembersInSuperTypeDeclImpl(
+                astBuilder,
+                name,
+                declRefType->getDeclRef(),
+                request,
+                ioResult,
+                inBreadcrumbs);
+            if (ioResult.isValid())
+                return;
+        }
+    }
+
     // If the type was pointer-like, then dereference it
     // automatically here.
     if (((uint32_t)request.options & (uint32_t)LookupOptions::NoDeref) == 0)
@@ -599,6 +619,10 @@ static void _lookUpMembersInSuperTypeImpl(
     }
 
     // Default case: no dereference needed
+    // (Skip DeclRefType for PointerLikeType since we already checked above.)
+
+    if (as<PointerLikeType>(superType))
+        return;
 
     if (auto declRefType = as<DeclRefType>(superType))
     {
