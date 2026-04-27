@@ -840,6 +840,38 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
             diagnoseOnce(Diagnostics::CannotUseInitializerListForType{
                 .type = toType,
                 .initList = fromInitializerListExpr});
+
+            // Emit a note naming the first member whose visibility mismatches the
+            // struct's. Guard against emitting it when a different isCStyleType
+            // condition is the real cause — those conditions are checked first:
+            //   - Non-interface inheritance (rule 2): guard 1.
+            //   - Explicit constructor (rule 3): guard 2.
+            bool hasNonInterfaceBase = false;
+            for (auto inheritanceDecl : structDecl->getMembersOfType<InheritanceDecl>())
+            {
+                if (!isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type))
+                {
+                    hasNonInterfaceBase = true;
+                    break;
+                }
+            }
+            if (!hasNonInterfaceBase && !_hasExplicitConstructor(structDecl, true))
+            {
+                DeclVisibility structVis = getDeclVisibility(structDecl);
+                for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+                {
+                    DeclVisibility memberVis = getDeclVisibility(varDecl);
+                    if (memberVis != structVis)
+                    {
+                        diagnoseOnce(Diagnostics::InitializerListMemberVisibilityMismatch{
+                            .memberVis = memberVis,
+                            .type = toType,
+                            .structVis = structVis,
+                            .member = varDecl});
+                        break;
+                    }
+                }
+            }
         }
 
         return false;
@@ -1956,6 +1988,21 @@ bool SemanticsVisitor::_coerce(
     // none_t can be cast into any Optional<T> type.
     if (as<NoneType>(fromType) && as<OptionalType>(toType))
     {
+        // Guard against Optional<T> where T is opaque — this catches the generic
+        // specialization case (e.g. process<SamplerState>(none)) that CoerceToUsableType
+        // misses because T was still abstract at declaration time.
+        // Only emit the diagnostic when we are constructing the final expression
+        // (outToExpr != nullptr); canCoerce() probes with outToExpr=nullptr but
+        // also passes getSink(), so we must not emit there to avoid duplicates.
+        auto optType = as<OptionalType>(toType);
+        if (typeTransitivelyContainsOpaqueHandle(this, optType->getValueType()))
+        {
+            if (sink && outToExpr)
+                sink->diagnose(Diagnostics::OptionalCannotWrapResourceType{
+                    .type = optType->getValueType(),
+                    .expr = fromExpr});
+            return false;
+        }
         if (outCost)
         {
             *outCost = kConversionCost_NoneToOptional;
@@ -2544,6 +2591,23 @@ bool SemanticsVisitor::_coerce(
                         .fromType = fromType.type,
                         .toType = toType,
                         .location = fromExpr->loc});
+
+                    if (auto fromPtrType = as<PtrType>(fromType.type))
+                    {
+                        if (auto toPtrType = as<PtrType>(toType))
+                        {
+                            auto fromVal = fromPtrType->getValueType();
+                            auto toVal = toPtrType->getValueType();
+                            if (!isInterfaceType(fromVal) && isInterfaceType(toVal) &&
+                                tryGetSubtypeWitness(fromVal, toVal))
+                            {
+                                sink->diagnose(Diagnostics::NoteConcreteToInterfacePtrUnsafe{
+                                    .from = fromVal,
+                                    .to = toVal,
+                                    .location = fromExpr->loc});
+                            }
+                        }
+                    }
                 }
             }
             // For general implicit conversions with high cost, emit a warning

@@ -2325,6 +2325,20 @@ warning(
     span { loc = "location" }  -- No span message: this diagnostic has no meaningful source location
 )
 
+warning(
+    "special-type-leaks-from-parameter-group",
+    31106,
+    "Parameter group type includes some members with types which cannot be included in the same binding. These types will be moved into another parameter binding slot.",
+    span { loc = "location" }
+)
+
+warning(
+    "special-type-member-leaks-from-parameter-group",
+    31107,
+    "This member cannot be included in the same binding as some other parts of this struct, and will be moved into another parameter binding slot.",
+    span { loc = "member:IRInst", message = "This member will leak into a separate binding slot." }
+)
+
 err(
     "invalid-attribute-target",
     31120,
@@ -2551,7 +2565,7 @@ err(
     "invalid-address-of",
     31160,
     "invalid __getAddress usage",
-    span { loc = "expr:Expr", message = "'__getAddress' only supports groupshared variables and members of groupshared/device memory." }
+    span { loc = "location", message = "'__getAddress' cannot take the address of a function-local variable on this target." }
 )
 
 err(
@@ -3042,6 +3056,14 @@ standalone_note(
     "use 'let each' to declare a variadic generic value parameter: 'let each ~paramName:Name : ~type:Type'"
 )
 
+warning(
+    "generic-param-shadows-outer-generic",
+    30515,
+    "generic parameter '~param:Decl' shadows a generic parameter from an enclosing scope",
+    span { loc = "param:Decl", message = "generic parameter '~param' shadows an outer generic parameter with the same name" },
+    span { loc = "outerParam:Decl", message = "outer generic parameter '~outerParam' declared here" }
+)
+
 err(
     "pack-param-must-be-last",
     30500,
@@ -3130,6 +3152,13 @@ err(
     span { loc = "initList:Expr", message = "cannot use initializer list for CoopVector of statically unknown size '~elementCount'" }
 )
 
+standalone_note(
+    "initializer-list-member-visibility-mismatch",
+    30516,
+    "member '~member:Decl' is ~memberVis:DeclVisibility, but '~type:Type' is ~structVis:DeclVisibility; all members must be ~structVis:DeclVisibility to use an initializer list",
+    span { loc = "member:Decl" }
+)
+
 warning(
     "interface-default-initializer",
     30506,
@@ -3207,8 +3236,15 @@ err(
 )
 
 err(
-    "parameter-without-default-after-parameter-with-default",
+    "per-primitive-semantic-in-vertex-output",
     30703,
+    "per-primitive system value semantic '~semantic' must be placed in an 'OutputPrimitives' (or 'out primitives') parameter, not in a vertex or index output",
+    span { loc = "location" }
+)
+
+err(
+    "parameter-without-default-after-parameter-with-default",
+    30704,
     "parameter '~param:Decl' does not have a default value, but follows a parameter that does",
     span { loc = "param:Decl" }
 )
@@ -3376,6 +3412,12 @@ err(
     span { loc = "location", message = "__subscript declaration must have a return type specified after '->'" }
 )
 
+err(
+    "optional-cannot-wrap-resource-type",
+    30902,
+    "'Optional<T>' cannot wrap a resource or opaque type",
+    span { loc = "expr:Expr", message = "'~type:Type' is a resource or opaque type and cannot be used as the value type of 'Optional<T>'." }
+)
 
 -- Load semantic checking diagnostics (part 8) - Accessors, Bit Fields, Integer Constants, Overloads, Switch, Generics, Ambiguity
 -- (inlined from slang-diagnostics-semantic-checking-8.lua)
@@ -3779,6 +3821,13 @@ err(
     span { loc = "param:Decl", message = "parameter '~param' direction '~actualDirection:ParamPassingMode' does not match interface requirement '~expectedDirection:ParamPassingMode'." }
 )
 
+warning(
+    "non-copyable-type-cannot-conform-to-interface",
+    38109,
+    "non-copyable interface conformance is not fully supported",
+    span { loc = "inheritance:Decl", message = "conforming non-copyable type '~type:Type' to interface '~interface:Decl' is not properly supported and may lead to compiler crashes." }
+)
+
 --
 -- 381xx: this/init/return_val
 --
@@ -3935,6 +3984,34 @@ err(
     span { loc = "location", message = "'~fromType:Type' is not convertible to '~toType:Type', not satisfying the type coerce constraint '~toType:Type(~fromType:Type)'" }
 )
 
+err(
+    "geometry-shader-missing-output-stream",
+    38045,
+    "geometry shader missing output stream parameter",
+    span { loc = "location", message = "geometry shader entry point '~entryPoint:Name' must have an output stream parameter of type PointStream<T>, LineStream<T>, or TriangleStream<T>" }
+)
+
+err(
+    "geometry-shader-missing-max-vertex-count",
+    38046,
+    "geometry shader missing [maxvertexcount] attribute",
+    span { loc = "location", message = "geometry shader entry point '~entryPoint:Name' must have a '[maxvertexcount(N)]' attribute" }
+)
+
+err(
+    "invalid-entry-point-varying-type",
+    38050,
+    "type cannot be used as entry-point varying parameter or return type",
+    span { loc = "location", message = "type '~type:Type' cannot be used as ~direction ~context of entry point '~entryPoint:Name' because ~reason" }
+)
+
+err(
+    "invalid-entry-point-varying-type-for-target",
+    38051,
+    "type cannot be used as entry-point varying for this target",
+    span { loc = "location", message = "type '~type:Type' cannot be used as ~direction ~context of entry point '~entryPoint:Name' when targeting ~target because ~reason" }
+)
+
 --
 -- 382xx: module imports
 --
@@ -3999,7 +4076,6 @@ err(
     "recursive type in structured buffer",
     span { loc = "location", message = "structured buffer element type '~type:Type' contains recursive type references" }
 )
-
 
 -- Load semantic checking diagnostics (part 11) - Type layout and parameter binding
 -- (inlined from slang-diagnostics-semantic-checking-11.lua)
@@ -4729,6 +4805,20 @@ warning(
 )
 
 err(
+    "cannot-read-from-mesh-shader-output",
+    54005,
+    "cannot read values from mesh shader outputs",
+    span { loc = "inst:IRInst", message = "Cannot read values from mesh shader outputs" }
+)
+
+err(
+    "invalid-parameter-passing-mode-for-write-only-reference",
+    54006,
+    "Parameter passing mode requires reading a write-only value.",
+    span { loc = "location", message = "Parameter passing mode requires reading this value, but it is write-only." }
+)
+
+err(
     "invalid-torch-kernel-return-type",
     55101,
     "invalid pytorch kernel return type",
@@ -5187,6 +5277,13 @@ standalone_note(
     "note-explicit-conversion-possible",
     -1,
     "explicit conversion from '~fromType:Type' to '~toType:Type' is possible",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "note-concrete-to-interface-ptr-unsafe",
+    -1,
+    "implicit conversion from '~from:Type*' to '~to:Type*' is not allowed because the pointed-to data layouts are not bit equivalent",
     span { loc = "location" }
 )
 
