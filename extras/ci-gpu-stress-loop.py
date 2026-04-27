@@ -243,8 +243,6 @@ def parse_results(log_text):
         "gpu_healthy_after": "unknown",
         "vk_pass_count": 0,
         "vk_fail_count": 0,
-        "last_pass_vk_time": "",
-        "first_fail_vk_time": "",
         "xid_codes": "",
         "dmesg_faults": "",
     }
@@ -267,32 +265,12 @@ def parse_results(log_text):
     elif "Post-test nvidia-smi" in log_text:
         result["gpu_healthy_after"] = "true"
 
-    # Count Vulkan pass/fail
-    vk_pass_lines = re.findall(r"passed test:.*\(vk\)|passed test:.*Vulkan", log_text)
-    vk_fail_lines = re.findall(r"FAILED test:.*\(vk\)|FAILED test:.*Vulkan", log_text)
+    # Count Vulkan pass/fail. Both `(vk)` (slang-test) and `Vulkan` (gfx-unit-test
+    # internal harness, e.g. `Vulkan.internal::foo`) result lines are caught here.
+    vk_pass_lines = re.findall(r"passed test:.*(?:\(vk\)|Vulkan)", log_text)
+    vk_fail_lines = re.findall(r"FAILED test:.*(?:\(vk\)|Vulkan)", log_text)
     result["vk_pass_count"] = len(vk_pass_lines)
     result["vk_fail_count"] = len(vk_fail_lines)
-
-    # Also count gfx-unit-test Vulkan results
-    gfx_vk_pass = re.findall(r"passed test:.*Vulkan\.internal", log_text)
-    gfx_vk_fail = re.findall(r"FAILED test:.*Vulkan\.internal", log_text)
-    result["vk_pass_count"] += len(gfx_vk_pass)
-    result["vk_fail_count"] += len(gfx_vk_fail)
-
-    # Timestamps — look for lines with timestamps at start
-    pass_vk_times = re.findall(
-        r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}).*passed test:.*(?:\(vk\)|Vulkan)",
-        log_text,
-    )
-    if pass_vk_times:
-        result["last_pass_vk_time"] = pass_vk_times[-1]
-
-    fail_vk_times = re.findall(
-        r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}).*FAILED test:.*(?:\(vk\)|Vulkan)",
-        log_text,
-    )
-    if fail_vk_times:
-        result["first_fail_vk_time"] = fail_vk_times[0]
 
     # XID errors
     xids = re.findall(r"Xid.*?: (\d+)", log_text)
@@ -324,7 +302,6 @@ def run_iteration(i, total, artifact_tarball, repo_tarball, cmake_config, config
         "iteration": i, "exit_code": "unknown", "duration_s": 0,
         "vm_name": vm_name, "zone": zone, "gpu_healthy_after": "unknown",
         "gpu_serial": "", "pci_device": "", "driver_version": "",
-        "last_pass_vk_time": "", "first_fail_vk_time": "",
         "vk_pass_count": 0, "vk_fail_count": 0,
         "xid_codes": "", "dmesg_faults": "",
     }
@@ -588,7 +565,6 @@ def main():
     fieldnames = [
         "iteration", "exit_code", "duration_s", "vm_name", "zone",
         "gpu_healthy_after", "gpu_serial", "pci_device", "driver_version",
-        "last_pass_vk_time", "first_fail_vk_time",
         "vk_pass_count", "vk_fail_count", "xid_codes", "dmesg_faults",
     ]
     with open(csv_path, "w", newline="") as f:
