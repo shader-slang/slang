@@ -150,22 +150,32 @@ GAS and SOLID branches uncovered. The unreachable branch stays
 uncovered regardless of the scenario, demonstrating that the tool
 spots dead code the way gcov does for CPU programs.
 
-### Sample per-line hits (CPU or Vulkan)
+### What the report shows
 
-```
- 17 |  688 |     __slang_coverage[applyGravity entry]      ← physics helper, called per particle
- 22 |  528 |     __slang_coverage[stepFluid entry]         ← FLUID branch, hit on most particles
- 33 |  504 |     __slang_coverage[simulate.slang main loop]
- 34 |  168 |     __slang_coverage[GAS branch body]
- 41 |  504 |     __slang_coverage[common path after branch]
- ...
- 55 |    0 |     __slang_coverage[unreachable "unknown type" branch]
- 58 |    0 |     __slang_coverage[unreachable write-back]
-```
+Aggregated across the 64-particle × 8-step dispatch the demo runs,
+the rendered LCOV groups source lines into three buckets:
 
-Aggregated across the 64-particle × 8-step dispatch the demo runs.
-The uncovered lines all live in the intentionally-unreachable
-"unknown type" branch — exactly what a regression-watch would flag.
+- **Hot lines, large hit counts** — `applyGravity`, the
+  per-iteration entries of `stepFluid`/`stepGas`/`stepSolid`, and
+  the kernel's main flow. Roughly proportional to how many
+  particles take that path × the number of steps.
+- **Conditional lines, hit counts that vary with input** — the
+  inelastic floor-bounce inside `stepSolid`, only entered when a
+  particle dips below `y = 0`. With the demo's default mixed
+  scenario the count is non-zero but smaller than the entry-point
+  hits.
+- **Zero-hit lines, flagged as uncovered** — the
+  intentionally-unreachable `else` branch in `simulate.slang`'s
+  particle-type dispatch. This is the dead-code detection signal:
+  a regression-watch over the LCOV report would flag any change
+  that left it un-zero, or any *previously*-non-zero line that
+  fell to zero.
+
+Exact per-line numbers are not pinned in this README on purpose —
+they shift across compiler versions as the instrumentation density
+evolves (e.g. when branch coverage lands or counter packing
+changes), and the report itself is the canonical answer. Run the
+demo and open `coverage-html/index.html` to see the current values.
 
 ## Backend status matrix
 
