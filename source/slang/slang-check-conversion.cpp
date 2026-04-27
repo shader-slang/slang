@@ -840,6 +840,38 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
             diagnoseOnce(Diagnostics::CannotUseInitializerListForType{
                 .type = toType,
                 .initList = fromInitializerListExpr});
+
+            // Emit a note naming the first member whose visibility mismatches the
+            // struct's. Guard against emitting it when a different isCStyleType
+            // condition is the real cause — those conditions are checked first:
+            //   - Non-interface inheritance (rule 2): guard 1.
+            //   - Explicit constructor (rule 3): guard 2.
+            bool hasNonInterfaceBase = false;
+            for (auto inheritanceDecl : structDecl->getMembersOfType<InheritanceDecl>())
+            {
+                if (!isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type))
+                {
+                    hasNonInterfaceBase = true;
+                    break;
+                }
+            }
+            if (!hasNonInterfaceBase && !_hasExplicitConstructor(structDecl, true))
+            {
+                DeclVisibility structVis = getDeclVisibility(structDecl);
+                for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+                {
+                    DeclVisibility memberVis = getDeclVisibility(varDecl);
+                    if (memberVis != structVis)
+                    {
+                        diagnoseOnce(Diagnostics::InitializerListMemberVisibilityMismatch{
+                            .memberVis = memberVis,
+                            .type = toType,
+                            .structVis = structVis,
+                            .member = varDecl});
+                        break;
+                    }
+                }
+            }
         }
 
         return false;
