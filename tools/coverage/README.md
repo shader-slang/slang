@@ -2,6 +2,20 @@
 
 This directory contains tools for generating and analyzing code coverage reports for the Slang compiler.
 
+For the **generic LCOV → HTML rendering and per-OS LCOV merging**
+tools — which are project-neutral and could be used outside Slang —
+see `tools/coverage-html/`. The pieces in this directory are
+Slang-specific:
+
+| File                       | Purpose                                                                |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `run-coverage.sh` etc.     | CI-side wrappers that build with `-fprofile-instr-generate`, run tests, and assemble per-OS coverage data via llvm-cov. |
+| `slangc-ignore-patterns.sh`| Shared bash definition of the slangc compiler-only file set.            |
+| `slang_filters.py`         | Python copy of the same patterns + the three Slang CI runner roots. Source of truth for the wrappers below. |
+| `slang-render.py`          | Thin wrapper around `tools/coverage-html/slang-coverage-html.py`. Pre-injects `--filter-exclude-regex` for `SLANGC_EXCLUDE_PATTERNS`. All other flags pass through. |
+| `slang-merge.py`           | Thin wrapper around `tools/coverage-html/slang-coverage-merge.py`. Pre-injects `--strip-prefix` for the three CI runners and the slangc filter. |
+| `tests/`                   | Unit + CLI tests for `slang_filters.py` and the wrapper scripts.        |
+
 ## Prerequisites
 
 - **Linux / macOS**: LLVM coverage tools (`llvm-profdata`, `llvm-cov`) installed
