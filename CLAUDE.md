@@ -329,6 +329,10 @@ When running under WSL environment, try to append `.exe` to the executables to a
 - Use `python.exe` instead of `python`,
 - Use `gh.exe` instead of `gh` and so on.
 
+### Release Process
+
+Use the `/slang-release-process` skill to push a new release. See `.claude/skills/slang-release-process/SKILL.md` for the full workflow.
+
 ## Additional Documents
 
 - User-facing documentation: `docs/user-guide/`
