@@ -801,411 +801,72 @@ void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, Di
     validateAtomicOperations(skipFuncParamValidation, sink, module->getModuleInst());
 }
 
-//
-// Cooperative matrix/vector validation.
-//
-
-static void validateCoopMatMulAdd(IRInst* inst, DiagnosticSink* sink)
+static void collectAssumeAddressInsts(IRInst* inst, List<IRInst*>& out)
 {
-    auto emitDiagnostic = [=](const char* message)
-    {
-        sink->diagnose(Diagnostics::IrValidationFailed{
-            .message = message,
-            .location = inst->sourceLoc,
-        });
-    };
-
-    if (inst->getOperandCount() != 4)
-    {
-        emitDiagnostic("Malformed CoopMatMulAdd operand list");
-        return;
-    }
-
-    auto coopMatMulAdd = as<IRCoopMatMulAdd>(inst);
-    SLANG_ASSERT(coopMatMulAdd);
-
-    auto aType = as<IRCoopMatrixType>(coopMatMulAdd->getMatA()->getDataType());
-    auto bType = as<IRCoopMatrixType>(coopMatMulAdd->getMatB()->getDataType());
-    auto cType = as<IRCoopMatrixType>(coopMatMulAdd->getMatC()->getDataType());
-    auto resultType = as<IRCoopMatrixType>(inst->getDataType());
-    if (!aType || !bType || !cType || !resultType)
-    {
-        emitDiagnostic(
-            "CoopMatMulAdd input and result operands must have cooperative matrix types");
-        return;
-    }
-
-    if (!as<IRBoolLit>(coopMatMulAdd->getSaturatingAccumulation()))
-    {
-        emitDiagnostic("CoopMatMulAdd saturatingAccumulation operand must be a bool literal");
-        return;
-    }
-
-    auto aUse = as<IRIntLit>(aType->getMatrixUse());
-    auto bUse = as<IRIntLit>(bType->getMatrixUse());
-    auto cUse = as<IRIntLit>(cType->getMatrixUse());
-    auto resultUse = as<IRIntLit>(resultType->getMatrixUse());
-    if (!aUse || !bUse || !cUse || !resultUse)
-    {
-        emitDiagnostic("CoopMatMulAdd cooperative matrix uses must be integer literals");
-        return;
-    }
-
-    if (aUse->getValue() != SLANG_COOPERATIVE_MATRIX_USE_A ||
-        bUse->getValue() != SLANG_COOPERATIVE_MATRIX_USE_B ||
-        cUse->getValue() != SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR ||
-        resultUse->getValue() != SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR)
-    {
-        emitDiagnostic("CoopMatMulAdd requires MatrixA, MatrixB, and accumulator matrix "
-                       "operands");
-        return;
-    }
-
-    auto aScope = as<IRIntLit>(aType->getScope());
-    auto bScope = as<IRIntLit>(bType->getScope());
-    auto cScope = as<IRIntLit>(cType->getScope());
-    auto resultScope = as<IRIntLit>(resultType->getScope());
-    if (!aScope || !bScope || !cScope || !resultScope)
-    {
-        emitDiagnostic("CoopMatMulAdd scopes must be integer literals");
-        return;
-    }
-
-    if (aScope->getValue() != bScope->getValue() || aScope->getValue() != cScope->getValue() ||
-        aScope->getValue() != resultScope->getValue())
-    {
-        emitDiagnostic(
-            "CoopMatMulAdd requires all cooperative matrix operands to use the same scope");
-        return;
-    }
-
-    auto aRows = as<IRIntLit>(aType->getRowCount());
-    auto aCols = as<IRIntLit>(aType->getColumnCount());
-    auto bRows = as<IRIntLit>(bType->getRowCount());
-    auto bCols = as<IRIntLit>(bType->getColumnCount());
-    auto cRows = as<IRIntLit>(cType->getRowCount());
-    auto cCols = as<IRIntLit>(cType->getColumnCount());
-    auto resultRows = as<IRIntLit>(resultType->getRowCount());
-    auto resultCols = as<IRIntLit>(resultType->getColumnCount());
-    if (!aRows || !aCols || !bRows || !bCols || !cRows || !cCols || !resultRows || !resultCols)
-    {
-        emitDiagnostic("CoopMatMulAdd row and column counts must be integer literals");
-        return;
-    }
-
-    if (aRows->getValue() != cRows->getValue() || aRows->getValue() != resultRows->getValue() ||
-        aCols->getValue() != bRows->getValue() || bCols->getValue() != cCols->getValue() ||
-        bCols->getValue() != resultCols->getValue())
-    {
-        emitDiagnostic("CoopMatMulAdd operand dimensions must satisfy A(MxK), B(KxN), and "
-                       "C/result(MxN)");
-        return;
-    }
-}
-
-static bool isValidInputInterpretation(
-    IRIntegerValue inputInterpretation,
-    IRIntegerValue packingFactor)
-{
-    switch ((int32_t)inputInterpretation)
-    {
-    case SLANG_SCALAR_TYPE_INT8:
-    case SLANG_SCALAR_TYPE_UINT8:
-        return packingFactor == 1 || packingFactor == 4;
-
-    default:
-        return packingFactor == 1;
-    }
-}
-
-static bool isValidCoopVecDataOperand(IRInst* operand)
-{
-    auto type = operand->getDataType();
-    if (auto rateQualifiedType = as<IRRateQualifiedType>(type))
-        type = rateQualifiedType->getValueType();
-
-    type = unwrapArray(type);
-    return as<IRPtrTypeBase>(type) || as<IRHLSLStructuredBufferTypeBase>(type) ||
-           as<IRByteAddressBufferTypeBase>(type);
-}
-
-static bool isValidCoopVecAccumulationOperand(IRInst* operand)
-{
-    auto type = operand->getDataType();
-    if (auto rateQualifiedType = as<IRRateQualifiedType>(type))
-        type = rateQualifiedType->getValueType();
-
-    type = unwrapArray(type);
-
-    if (as<IRPtrTypeBase>(type))
-        return true;
-
-    switch (type->getOp())
-    {
-    case kIROp_HLSLRWStructuredBufferType:
-    case kIROp_HLSLRasterizerOrderedStructuredBufferType:
-    case kIROp_HLSLRWByteAddressBufferType:
-    case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
-        return true;
-    default:
-        return false;
-    }
-}
-
-static void validateCoopVecMatMulAdd(IRInst* inst, DiagnosticSink* sink)
-{
-    auto emitDiagnostic = [=](const char* message)
-    {
-        sink->diagnose(Diagnostics::IrValidationFailed{
-            .message = message,
-            .location = inst->sourceLoc,
-        });
-    };
-
-    if (inst->getOperandCount() != 10 && inst->getOperandCount() != 13)
-    {
-        emitDiagnostic("Malformed CoopVecMatMulAdd operand list");
-        return;
-    }
-
-    auto coopVecMatMulAdd = as<IRCoopVecMatMulAdd>(inst);
-    SLANG_ASSERT(coopVecMatMulAdd);
-    const bool hasBias = inst->getOperandCount() == 13;
-
-    auto resultType = as<IRCoopVectorType>(inst->getDataType());
-    auto inputType = as<IRCoopVectorType>(coopVecMatMulAdd->getInput()->getDataType());
-    if (!resultType || !inputType)
-    {
-        emitDiagnostic(
-            "CoopVecMatMulAdd input and result operands must have cooperative vector types");
-        return;
-    }
-
-    auto inputInterpretation = as<IRIntLit>(coopVecMatMulAdd->getInputInterpretation());
-    if (!inputInterpretation)
-    {
-        emitDiagnostic("CoopVecMatMulAdd inputInterpretation operand must be an integer literal");
-        return;
-    }
-
-    if (!as<IRIntLit>(coopVecMatMulAdd->getMatrixInterpretation()))
-    {
-        emitDiagnostic("CoopVecMatMulAdd matrixInterpretation operand must be an integer literal");
-        return;
-    }
-
-    if (!isValidCoopVecDataOperand(coopVecMatMulAdd->getMatrixPtr()))
-    {
-        emitDiagnostic("CoopVecMatMulAdd matrix operand must be a pointer, ByteAddressBuffer, or "
-                       "StructuredBuffer");
-        return;
-    }
-
-    if (hasBias)
-    {
-        if (!as<IRIntLit>(coopVecMatMulAdd->getBiasInterpretation()))
-        {
-            emitDiagnostic(
-                "CoopVecMatMulAdd biasInterpretation operand must be an integer literal");
-            return;
-        }
-
-        if (!isValidCoopVecDataOperand(coopVecMatMulAdd->getBiasPtr()))
-        {
-            emitDiagnostic("CoopVecMatMulAdd bias operand must be a pointer, ByteAddressBuffer, or "
-                           "StructuredBuffer");
-            return;
-        }
-    }
-
-    if (!as<IRIntLit>(coopVecMatMulAdd->getMemoryLayout()))
-    {
-        emitDiagnostic("CoopVecMatMulAdd memoryLayout operand must be an integer literal");
-        return;
-    }
-
-    if (!as<IRBoolLit>(coopVecMatMulAdd->getTranspose()))
-    {
-        emitDiagnostic("CoopVecMatMulAdd transpose operand must be a bool literal");
-        return;
-    }
-
-    auto k = as<IRIntLit>(coopVecMatMulAdd->getK());
-    if (!k)
-    {
-        emitDiagnostic("CoopVecMatMulAdd k operand must be an integer literal");
-        return;
-    }
-
-    auto packingFactor = as<IRIntLit>(coopVecMatMulAdd->getInputInterpretationPackingFactor());
-    if (!packingFactor)
-    {
-        emitDiagnostic(
-            "CoopVecMatMulAdd inputInterpretationPackingFactor operand must be an integer literal");
-        return;
-    }
-
-    auto inputElementCount = as<IRIntLit>(inputType->getElementCount());
-    if (!inputElementCount)
-    {
-        emitDiagnostic("CoopVecMatMulAdd input element count must be known at compile time");
-        return;
-    }
-
-    if (!isValidInputInterpretation(inputInterpretation->getValue(), packingFactor->getValue()))
-    {
-        emitDiagnostic(
-            "CoopVecMatMulAdd input interpretation is invalid for the specified packing factor");
-        return;
-    }
-
-    if (packingFactor->getValue() == 1)
-    {
-        if (k->getValue() != inputElementCount->getValue())
-        {
-            emitDiagnostic("CoopVecMatMulAdd k operand must match input vector element count for "
-                           "non-packed input interpretations");
-            return;
-        }
-    }
-    else
-    {
-        if (k->getValue() > packingFactor->getValue() * inputElementCount->getValue())
-        {
-            emitDiagnostic(
-                "CoopVecMatMulAdd k operand must be less than or equal to the input vector element "
-                "count times the packing factor for packed input interpretations");
-            return;
-        }
-    }
-}
-
-static void validateCoopVecOuterProductAccumulate(IRInst* inst, DiagnosticSink* sink)
-{
-    auto emitDiagnostic = [=](const char* message)
-    {
-        sink->diagnose(Diagnostics::IrValidationFailed{
-            .message = message,
-            .location = inst->sourceLoc,
-        });
-    };
-
-    if (inst->getOperandCount() != 7)
-    {
-        emitDiagnostic("Malformed CoopVecOuterProductAccumulate operand list");
-        return;
-    }
-
-    auto outerProduct = as<IRCoopVecOuterProductAccumulate>(inst);
-    SLANG_ASSERT(outerProduct);
-
-    auto aType = as<IRCoopVectorType>(outerProduct->getA()->getDataType());
-    auto bType = as<IRCoopVectorType>(outerProduct->getB()->getDataType());
-    if (!aType || !bType)
-    {
-        emitDiagnostic(
-            "CoopVecOuterProductAccumulate a and b operands must have cooperative vector types");
-        return;
-    }
-
-    if (!as<IRIntLit>(outerProduct->getMemoryLayout()))
-    {
-        emitDiagnostic(
-            "CoopVecOuterProductAccumulate memoryLayout operand must be an integer literal");
-        return;
-    }
-
-    if (!as<IRIntLit>(outerProduct->getMatrixInterpretation()))
-    {
-        emitDiagnostic("CoopVecOuterProductAccumulate matrixInterpretation operand must be an "
-                       "integer literal");
-        return;
-    }
-
-    if (!isValidCoopVecAccumulationOperand(outerProduct->getMatrixPtr()))
-    {
-        emitDiagnostic("CoopVecOuterProductAccumulate matrix operand must be a writable pointer, "
-                       "RWByteAddressBuffer, or RWStructuredBuffer");
-        return;
-    }
-
-    if (inst->getDataType()->getOp() != kIROp_VoidType)
-    {
-        emitDiagnostic("CoopVecOuterProductAccumulate result type must be void");
-        return;
-    }
-}
-
-static void validateCoopVecReduceSumAccumulate(IRInst* inst, DiagnosticSink* sink)
-{
-    auto emitDiagnostic = [=](const char* message)
-    {
-        sink->diagnose(Diagnostics::IrValidationFailed{
-            .message = message,
-            .location = inst->sourceLoc,
-        });
-    };
-
-    if (inst->getOperandCount() != 3)
-    {
-        emitDiagnostic("Malformed CoopVecReduceSumAccumulate operand list");
-        return;
-    }
-
-    auto reduceSum = as<IRCoopVecReduceSumAccumulate>(inst);
-    SLANG_ASSERT(reduceSum);
-
-    if (!as<IRCoopVectorType>(reduceSum->getValue()->getDataType()))
-    {
-        emitDiagnostic(
-            "CoopVecReduceSumAccumulate value operand must have a cooperative vector type");
-        return;
-    }
-
-    if (!isValidCoopVecAccumulationOperand(reduceSum->getBufferPtr()))
-    {
-        emitDiagnostic("CoopVecReduceSumAccumulate buffer operand must be a writable pointer, "
-                       "RWByteAddressBuffer, or RWStructuredBuffer");
-        return;
-    }
-
-    if (inst->getDataType()->getOp() != kIROp_VoidType)
-    {
-        emitDiagnostic("CoopVecReduceSumAccumulate result type must be void");
-        return;
-    }
-}
-
-
-static void validateCooperativeOperations(DiagnosticSink* sink, IRInst* inst)
-{
-    switch (inst->getOp())
-    {
-    case kIROp_CoopMatMulAdd:
-        validateCoopMatMulAdd(inst, sink);
-        break;
-    case kIROp_CoopVecMatMulAdd:
-        validateCoopVecMatMulAdd(inst, sink);
-        break;
-    case kIROp_CoopVecOuterProductAccumulate:
-        validateCoopVecOuterProductAccumulate(inst, sink);
-        break;
-    case kIROp_CoopVecReduceSumAccumulate:
-        validateCoopVecReduceSumAccumulate(inst, sink);
-        break;
-    default:
-        break;
-    }
-
+    if (inst->getOp() == kIROp_AssumeAddress)
+        out.add(inst);
     for (auto child : inst->getModifiableChildren())
-    {
-        validateCooperativeOperations(sink, child);
-    }
+        collectAssumeAddressInsts(child, out);
 }
 
-void validateCooperativeOperations(IRModule* module, DiagnosticSink* sink)
+void validateAndRemoveAssumeAddress(IRModule* module, bool validate, DiagnosticSink* sink)
 {
-    validateCooperativeOperations(sink, module->getModuleInst());
+    List<IRInst*> assumeAddrs;
+    collectAssumeAddressInsts(module->getModuleInst(), assumeAddrs);
+
+    if (validate)
+    {
+        for (auto inst : assumeAddrs)
+        {
+            auto addr = inst->getOperand(0);
+            auto root = getRootAddr(addr);
+            bool shouldDiagnose = false;
+            if (root->getOp() == kIROp_Var)
+            {
+                // Don't diagnose vars that hold resource/buffer handles. Those
+                // always refer to device memory regardless of where the handle
+                // itself is stored (e.g. a ConstantBuffer parameter copied to a
+                // local var still points into device memory).
+                IRType* valueType = nullptr;
+                if (auto ptrType = as<IRPtrTypeBase>(root->getDataType()))
+                    valueType = ptrType->getValueType();
+                shouldDiagnose = !valueType || (!as<IRPointerLikeType>(valueType) &&
+                                                !as<IRHLSLStructuredBufferTypeBase>(valueType) &&
+                                                !as<IRByteAddressBufferTypeBase>(valueType));
+            }
+            else if (auto param = as<IRParam>(root))
+            {
+                // Also diagnose function parameters that are not of
+                // pointer/pointer-like type. Those represent function-local
+                // storage that cannot be addressed on GPU targets.
+                // (By-value params go through a kIROp_Var copy above; this
+                // catches inout/ref params where the IRParam itself is the root.)
+                auto parentBlock = as<IRBlock>(param->getParent());
+                IRGlobalValueWithCode* parentFunc = nullptr;
+                if (parentBlock)
+                    parentFunc = as<IRGlobalValueWithCode>(parentBlock->getParent());
+
+                if (parentFunc && parentBlock == parentFunc->getFirstBlock())
+                {
+                    auto type = root->getDataType();
+                    shouldDiagnose = !as<IRPtrTypeBase>(type) && !as<IRPointerLikeType>(type) &&
+                                     !as<IRHLSLStructuredBufferTypeBase>(type) &&
+                                     !as<IRByteAddressBufferTypeBase>(type);
+                }
+            }
+            if (!shouldDiagnose)
+                continue;
+            sink->diagnose(Diagnostics::InvalidAddressOf{
+                .location = inst->sourceLoc,
+            });
+        }
+    }
+
+    for (auto inst : assumeAddrs)
+    {
+        inst->replaceUsesWith(inst->getOperand(0));
+        inst->removeAndDeallocate();
+    }
 }
 
 } // namespace Slang
