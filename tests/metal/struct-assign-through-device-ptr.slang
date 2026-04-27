@@ -1,18 +1,9 @@
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
-// Repro for slangpy Metal failure: struct assignment through a device pointer
-// in a ParameterBlock generates MSL that the Metal compiler rejects with
-// "no viable overloaded '='".
-//
-// The root cause is: ParameterBlock type specialization causes Slang to emit
-// two struct definitions for the same Slang type. The method then tries to
-// assign between these structurally identical but nominally different types
-// across address spaces (device vs thread), which Metal rejects.
-//
-// Without ParameterBlock, only one struct definition is emitted and Metal
-// accepts the assignment.
-//
-// Regression between v2026.7.1 and current master.
+// Verify that struct assignment through a device pointer in a ParameterBlock
+// compiles correctly. If the resource-element lowering creates a spurious
+// _default storage type for the struct, the Metal compiler will reject the
+// cross-type assignment with "no viable overloaded '='".
 //
 // METALLIB: computeMain
 //

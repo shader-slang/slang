@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
-// Double pointer: the slangpy failure case.
+// Double pointer field in a ParameterBlock struct.
 // Metal rejects pointer-to-pointer types in buffer pointee types (regardless
 // of address space qualifiers). The pointer must be lowered to ulong.
 //

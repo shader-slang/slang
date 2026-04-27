@@ -1,6 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
-// Reproduces the slangpy test_copy_pointer failure:
 // RWStructuredBuffer<int*> inside a struct inside a ParameterBlock produces
 // a pointer-to-pointer in the argument buffer struct, which Metal rejects
 // in buffer pointee types (regardless of address space qualifiers).

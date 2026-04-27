@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry compute_main
 
-// Reproduces the exact slangpy test_copy_pointer / test_raw_buffer_of_pointers
-// failure: RWStructuredBuffer<int*> wrapped in a struct (RWValueRef), which is
+// RWStructuredBuffer<int*> wrapped in a struct (RWValueRef), which is
 // then a field of a ParameterBlock struct alongside a bare pointer field.
+// Mirrors the pattern used by slangpy's RWValueRef type.
 //
 // See: https://github.com/shader-slang/slang/issues/10841
 
