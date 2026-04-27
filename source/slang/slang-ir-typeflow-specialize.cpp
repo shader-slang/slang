@@ -7018,6 +7018,12 @@ struct TypeFlowSpecializationContext
             return false;
         auto valueType = valuePtrType->getValueType();
 
+        // typeIDOutPtr must also be a pointer; a non-pointer here would mean
+        // the caller is mis-shaped and the subsequent emitStore would emit
+        // invalid IR.  Bail out so the caller error path is exercised instead.
+        if (!as<IRPtrTypeBase>(typeIDOutPtr->getDataType()))
+            return false;
+
         auto tableSet = taggedUnionType->getWitnessTableSet();
         if (tableSet->getCount() == 0)
         {
@@ -7054,6 +7060,12 @@ struct TypeFlowSpecializationContext
         // trailing bytes undefined, defeating the serialize/deserialize pair.
         // `inst->removeAndDeallocate(); return true;` after diagnosing so we
         // don't get re-visited and emit a duplicate error.
+        //
+        // The `> 0` guards intentionally skip the diagnostic when either size
+        // is indeterminate (returns 0 from `getAnyValueSize`).  This happens
+        // for types whose layout is still being computed in earlier IR
+        // rounds; bailing out here lets a later round catch it once both
+        // sizes are known, rather than producing a false positive.
         if (auto targetReq = targetProgram ? targetProgram->getTargetReq() : nullptr)
         {
             auto anyValueSize = getAnyValueSize(packedType, targetReq);
@@ -8000,10 +8012,10 @@ struct TypeFlowSpecializationContext
 
 
     // Basic context
-    IRModule* module;
-    TargetProgram* targetProgram;
-    DiagnosticSink* sink;
-    bool shouldReportDynamicDispatchSites;
+    IRModule* module = nullptr;
+    TargetProgram* targetProgram = nullptr;
+    DiagnosticSink* sink = nullptr;
+    bool shouldReportDynamicDispatchSites = false;
 
     // Set of parameters already diagnosed for ref/constref interface issues,
     // to avoid emitting duplicate diagnostics per call edge.

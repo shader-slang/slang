@@ -3315,7 +3315,16 @@ __generic<T, U>
 __intrinsic_op($(kIROp_BitCast))
 T bit_cast(U value);
 
-// Create Existential object
+/// Builds an existential value of interface type `T` from a sequential
+/// witness-table ID and a concrete payload of type `U`.  `U` must be the
+/// same size as the interface's any-value payload.
+///
+/// Use together with `serializeDynamicObject` to round-trip interface-typed
+/// values through raw memory.  Note: plain `bit_cast` between raw memory
+/// and interface types is intentionally not supported; use this builtin
+/// for the deserialize direction and `serializeDynamicObject` for the
+/// serialize direction.
+/// @category dynamic_dispatch
 __generic<T, U>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_CreateExistentialObject))
