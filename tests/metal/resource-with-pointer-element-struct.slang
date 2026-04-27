@@ -18,16 +18,20 @@ struct Store
 
 ParameterBlock<Store> params;
 
-// The argument-buffer struct must contain ulong (lowered pointer within struct),
-// not a pointer-to-pointer type.
+// The struct element type should have its pointer lowered to ulong.
+// CHECK-LABEL: struct PtrWrapper
+// CHECK: ulong p
+// CHECK: };
+
+// The argument-buffer struct should reference the lowered element type
+// without any pointer-to-pointer.
 // CHECK-LABEL: struct Store
-// CHECK: ulong
 // CHECK-NOT: device{{.*}}device
 // CHECK: };
 
 // The kernel body should cast ulong back to a typed pointer.
 // CHECK-LABEL: computeMain
-// CHECK: (int device*)
+// CHECK: int device*
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

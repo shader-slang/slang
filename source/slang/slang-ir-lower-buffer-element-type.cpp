@@ -410,6 +410,21 @@ void maybeAddPhysicalTypeDecoration(IRBuilder& builder, IRInst* type, TypeLoweri
         builder.addPhysicalTypeDecoration(type);
 }
 
+static bool metalContainsMultiLevelPointer(IRType* type)
+{
+    if (auto ptrType = as<IRPtrType>(type))
+        return as<IRPtrType>(ptrType->getValueType()) != nullptr;
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+            if (metalContainsMultiLevelPointer(field->getFieldType()))
+                return true;
+    }
+    if (auto arrayType = as<IRArrayType>(type))
+        return metalContainsMultiLevelPointer(arrayType->getElementType());
+    return false;
+}
+
 struct LoweredElementTypeContext
 {
     static const IRIntegerValue kMaxArraySizeToUnroll = 32;
@@ -883,7 +898,13 @@ struct LoweredElementTypeContext
             if (auto builtinGeneric = as<IRBuiltinGenericType>(type))
                 elemType = builtinGeneric->getElementType();
 
-            if (elemType)
+            // Only enter resource-element lowering when the element type actually
+            // contains multi-level pointers. getLoweredTypeInfo always creates a
+            // distinct storage type for structs in non-Natural layouts, even when
+            // no fields change; using it as a guard would cause every
+            // RWStructuredBuffer<SomeStruct> to get a spurious _default variant,
+            // breaking Metal's cross-type struct assignment.
+            if (elemType && metalContainsMultiLevelPointer(elemType))
             {
                 auto loweredElemInfo = getLoweredTypeInfo(elemType, config);
                 if (loweredElemInfo.loweredType != loweredElemInfo.originalType)
