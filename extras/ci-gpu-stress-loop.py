@@ -39,6 +39,10 @@ ZONES = ["us-east1-c", "us-east1-d", "us-central1-a", "us-west1-a"]
 MACHINE_TYPE = "n1-standard-8"
 IMAGE_FAMILY = "linux-gpu-runner"
 VM_PREFIX = "gpu-stress"
+# Per-process suffix appended to every VM name and used to scope
+# cleanup_orphan_vms() to this run only — prevents Ctrl-C in one run from
+# deleting another concurrent operator's VMs in the shared GCP project.
+RUN_ID = f"{os.getpid()}-{int(time.time())}"
 CONTAINER_IMAGE = "ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1"
 def run_cmd(cmd, *, timeout=600, capture=True):
     """Run a command, return (returncode, stdout, stderr)."""
@@ -106,12 +110,14 @@ def delete_vm(vm_name, zone):
 
 
 def cleanup_orphan_vms():
-    """Find and delete any VMs matching VM_PREFIX. Used after Ctrl-C to mop
-    up workers whose `finally: delete_vm` didn't get a chance to run."""
+    """Find and delete any VMs matching this run's VM names. Used after
+    Ctrl-C to mop up workers whose `finally: delete_vm` didn't get a chance
+    to run. The filter is scoped by RUN_ID so concurrent operators' VMs
+    aren't swept."""
     cmd = [
         "gcloud", "compute", "instances", "list",
         f"--project={PROJECT}",
-        f"--filter=name~^{VM_PREFIX}-",
+        f"--filter=name~^{VM_PREFIX}-.*-{RUN_ID}$",
         "--format=value(name,zone)",
     ]
     rc, out, err = run_cmd(cmd, timeout=60)
@@ -323,7 +329,7 @@ def run_iteration(i, total, artifact_tarball, repo_tarball, cmake_config, config
                   gfx_only, ghcr_token, results_dir):
     """Run a single stress test iteration on an ephemeral VM."""
     zone = ZONES[(i - 1) % len(ZONES)]
-    vm_name = f"{VM_PREFIX}-{i}-{int(time.time())}"
+    vm_name = f"{VM_PREFIX}-{i}-{RUN_ID}"
     iter_dir = results_dir / f"iter_{i:03d}"
     iter_dir.mkdir(parents=True, exist_ok=True)
 
