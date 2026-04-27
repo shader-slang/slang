@@ -58,6 +58,10 @@ struct Options
     std::string countersFile;
     std::string outputLcov = "coverage.lcov";
     std::string testName = "shader_coverage_demo";
+    // -1 means "no `--coverage-binding` was passed; let parameter
+    // binding auto-allocate a slot the way it does without the flag".
+    int coverageBindingIndex = -1;
+    int coverageBindingSpace = -1;
 };
 
 void parseArgs(int argc, char** argv, Options& opt)
@@ -82,6 +86,46 @@ void parseArgs(int argc, char** argv, Options& opt)
             opt.outputLcov = v;
         else if (k == "--test-name")
             opt.testName = v;
+        else if (k == "--coverage-binding")
+        {
+            // Parse "<index>:<space>". Both must be non-negative.
+            auto colon = v.find(':');
+            if (colon == std::string::npos)
+            {
+                std::fprintf(
+                    stderr,
+                    "--coverage-binding expects '<index>:<space>', got '%s'\n",
+                    v.c_str());
+                std::exit(1);
+            }
+            opt.coverageBindingIndex = std::stoi(v.substr(0, colon));
+            opt.coverageBindingSpace = std::stoi(v.substr(colon + 1));
+        }
+    }
+}
+
+// Build the compile-option entries for the slang-rhi device. Always
+// includes `-trace-coverage`; when `--coverage-binding` was given,
+// also pins the synthesized buffer to the explicit slot via
+// `TraceCoverageBinding`. The caller-allocated `entries` array must
+// hold at least 2 slots.
+void buildCoverageOptions(
+    const Options& opt,
+    slang::CompilerOptionEntry* entries,
+    uint32_t& outCount)
+{
+    entries[0].name = slang::CompilerOptionName::TraceCoverage;
+    entries[0].value.kind = slang::CompilerOptionValueKind::Int;
+    entries[0].value.intValue0 = 1;
+    outCount = 1;
+
+    if (opt.coverageBindingIndex >= 0)
+    {
+        entries[1].name = slang::CompilerOptionName::TraceCoverageBinding;
+        entries[1].value.kind = slang::CompilerOptionValueKind::Int;
+        entries[1].value.intValue0 = opt.coverageBindingIndex;
+        entries[1].value.intValue1 = opt.coverageBindingSpace;
+        outCount = 2;
     }
 }
 
@@ -197,13 +241,22 @@ static std::string buildManifestJson(slang::ICoverageTracingMetadata* coverage)
 // Fetch ICoverageTracingMetadata from a linked program and serialize
 // it to `path` as a JSON manifest in the same shape slangc writes.
 // Returns the counter count on success, or 0 on failure.
+//
+// When `opt.coverageBindingIndex >= 0` (i.e. `--coverage-binding` was
+// passed), also logs whether the metadata-reported `(index, space)`
+// matches what was requested. This is the end-to-end round-trip:
+// host CLI → compile-option → AST modifier → parameter binding →
+// metadata API. Mismatch implies something on that path dropped or
+// reinterpreted the request.
 static uint32_t writeManifestFromMetadata(
     slang::IComponentType* linked,
-    const std::string& path)
+    const std::string& path,
+    const Options& opt)
 {
     ComPtr<slang::IBlob> diagnostics;
     ComPtr<slang::IMetadata> metadata;
-    if (SLANG_FAILED(linked->getEntryPointMetadata(0, 0, metadata.writeRef(), diagnostics.writeRef())))
+    if (SLANG_FAILED(
+            linked->getEntryPointMetadata(0, 0, metadata.writeRef(), diagnostics.writeRef())))
     {
         if (diagnostics)
             std::fprintf(stderr, "%s", (const char*)diagnostics->getBufferPointer());
@@ -216,6 +269,45 @@ static uint32_t writeManifestFromMetadata(
     {
         std::fprintf(stderr, "no coverage tracing metadata on the compile result\n");
         return 0;
+    }
+    if (opt.coverageBindingIndex >= 0)
+    {
+        int32_t gotIndex = coverage->getBufferBinding();
+        int32_t gotSpace = coverage->getBufferSpace();
+        if (gotIndex < 0 && gotSpace < 0)
+        {
+            // The CPU target doesn't expose buffers as (set, register)
+            // — globals get packed into a `GlobalParams` struct and
+            // accessed by uniform offset. The `register(uN, spaceM)`
+            // semantic the option synthesizes still applies on this
+            // target's IR, but parameter binding has nothing register-
+            // shaped to assign it to, so the metadata reports -1/-1.
+            // The generated shader is still correct; the option just
+            // has no observable effect on this backend.
+            std::printf(
+                "[coverage] note: backend '%s' does not use (set, register) bindings; "
+                "--coverage-binding has no effect here (use vulkan/d3d12/cuda to verify "
+                "the round-trip)\n",
+                opt.backend.c_str());
+        }
+        else if (gotIndex == opt.coverageBindingIndex && gotSpace == opt.coverageBindingSpace)
+        {
+            std::printf(
+                "[coverage] binding pinned at (index=%d, space=%d) — round-trip verified\n",
+                gotIndex,
+                gotSpace);
+        }
+        else
+        {
+            std::fprintf(
+                stderr,
+                "[coverage] requested (index=%d, space=%d) but metadata reports "
+                "(index=%d, space=%d)\n",
+                opt.coverageBindingIndex,
+                opt.coverageBindingSpace,
+                gotIndex,
+                gotSpace);
+        }
     }
     std::string json = buildManifestJson(coverage);
     FILE* f = std::fopen(path.c_str(), "wb");
@@ -237,15 +329,14 @@ static uint32_t writeManifestFromMetadata(
 // slangc would write as a sidecar.
 int runCompile(const Options& opt)
 {
-    slang::CompilerOptionEntry covOption = {};
-    covOption.name = slang::CompilerOptionName::TraceCoverage;
-    covOption.value.kind = slang::CompilerOptionValueKind::Int;
-    covOption.value.intValue0 = 1;
+    slang::CompilerOptionEntry covOptions[2] = {};
+    uint32_t covOptionCount = 0;
+    buildCoverageOptions(opt, covOptions, covOptionCount);
 
     DeviceDesc deviceDesc = {};
     deviceDesc.deviceType = pickDeviceType(opt.backend);
-    deviceDesc.slang.compilerOptionEntries = &covOption;
-    deviceDesc.slang.compilerOptionEntryCount = 1;
+    deviceDesc.slang.compilerOptionEntries = covOptions;
+    deviceDesc.slang.compilerOptionEntryCount = covOptionCount;
 
     ComPtr<IDevice> device;
     if (SLANG_FAILED(getRHI()->createDevice(deviceDesc, device.writeRef())))
@@ -288,7 +379,7 @@ int runCompile(const Options& opt)
     if (diagnostics)
         std::fprintf(stderr, "%s", (const char*)diagnostics->getBufferPointer());
 
-    uint32_t counterCount = writeManifestFromMetadata(linked, opt.manifest);
+    uint32_t counterCount = writeManifestFromMetadata(linked, opt.manifest, opt);
     if (counterCount == 0)
         return 1;
 
@@ -416,15 +507,14 @@ std::vector<Particle> makeParticles(const std::string& scenario, uint32_t count)
 
 int runDispatch(const Options& opt)
 {
-    slang::CompilerOptionEntry covOption = {};
-    covOption.name = slang::CompilerOptionName::TraceCoverage;
-    covOption.value.kind = slang::CompilerOptionValueKind::Int;
-    covOption.value.intValue0 = 1;
+    slang::CompilerOptionEntry covOptions[2] = {};
+    uint32_t covOptionCount = 0;
+    buildCoverageOptions(opt, covOptions, covOptionCount);
 
     DeviceDesc deviceDesc = {};
     deviceDesc.deviceType = pickDeviceType(opt.backend);
-    deviceDesc.slang.compilerOptionEntries = &covOption;
-    deviceDesc.slang.compilerOptionEntryCount = 1;
+    deviceDesc.slang.compilerOptionEntries = covOptions;
+    deviceDesc.slang.compilerOptionEntryCount = covOptionCount;
 
     ComPtr<IDevice> device;
     if (SLANG_FAILED(getRHI()->createDevice(deviceDesc, device.writeRef())))
@@ -493,7 +583,7 @@ int runDispatch(const Options& opt)
     // Query the freshly-compiled entry point's metadata and serialize
     // a manifest JSON file, so slang_coverage_create can ingest it the
     // same way it would a slangc-produced sidecar.
-    if (writeManifestFromMetadata(linked, opt.manifest) == 0)
+    if (writeManifestFromMetadata(linked, opt.manifest, opt) == 0)
         return 1;
 
     // Size the coverage buffer from the manifest we just wrote.

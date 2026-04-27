@@ -39,6 +39,29 @@ to HTML. Platform-specific rendering commands are in
 # Step 2: render. See "Rendering the report" below for your platform.
 ```
 
+### Pinning the coverage buffer at a specific (index, space)
+
+By default the demo lets parameter binding auto-allocate the
+`__slang_coverage` buffer's slot. Pass `--coverage-binding=<index>:<space>`
+to pin it via the new `-trace-coverage-binding` compile option —
+useful when the host needs the slot fixed before reflection runs
+(e.g. a pre-built D3D12 root signature):
+
+```bash
+./build/Debug/bin/shader-coverage-demo \
+    --mode=dispatch --backend=vulkan \
+    --coverage-binding=7:3
+# → __slang_coverage lands at DescriptorSet 3, Binding 7
+# → "[coverage] binding pinned at (index=7, space=3) — round-trip verified"
+```
+
+After the dispatch, the demo asserts via the
+`ICoverageTracingMetadata` API that the metadata-reported binding
+matches what was requested. The CPU backend uses uniform offsets
+rather than (set, register) slots, so on `--backend=cpu` the option
+silently has no effect (the demo prints a `[coverage] note: …`
+explaining this).
+
 CPU, Vulkan, D3D12 and CUDA produce **byte-identical LCOV output** —
 same hit counts per source line — which validates that instrumentation
 semantics, slot assignment, and binding work consistently across
