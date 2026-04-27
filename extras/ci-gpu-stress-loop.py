@@ -441,10 +441,16 @@ def run_iteration(i, total, artifact_tarball, repo_tarball, cmake_config, config
                 "--command=docker login ghcr.io -u token --password-stdin",
             ]
             try:
-                subprocess.run(
+                r = subprocess.run(
                     cmd, input=ghcr_token, text=True,
                     capture_output=True, timeout=30, check=False,
                 )
+                if r.returncode != 0:
+                    print(
+                        f"  {tag} WARNING: docker login returned "
+                        f"{r.returncode}: {(r.stderr or '').strip()}",
+                        file=sys.stderr,
+                    )
             except subprocess.TimeoutExpired:
                 print(f"  {tag} docker login timed out")
 
