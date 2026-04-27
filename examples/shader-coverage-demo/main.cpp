@@ -406,7 +406,7 @@ int runReport(const Options& opt)
     }
 
     SlangCoverageContext* ctx = nullptr;
-    if (slang_coverage_create(opt.manifest.c_str(), &ctx) != SLANG_COVERAGE_OK)
+    if (slang_coverage_create(opt.manifest.c_str(), &ctx) != SLANG_OK)
     {
         std::fprintf(stderr, "failed to parse manifest '%s'\n", opt.manifest.c_str());
         return 1;
@@ -442,8 +442,7 @@ int runReport(const Options& opt)
     }
 
     slang_coverage_accumulate(ctx, counters.data(), n);
-    if (slang_coverage_save_lcov(ctx, opt.outputLcov.c_str(), opt.testName.c_str()) !=
-        SLANG_COVERAGE_OK)
+    if (slang_coverage_save_lcov(ctx, opt.outputLcov.c_str(), opt.testName.c_str()) != SLANG_OK)
     {
         std::fprintf(stderr, "failed to write '%s'\n", opt.outputLcov.c_str());
         slang_coverage_destroy(ctx);
@@ -553,10 +552,8 @@ int runDispatch(const Options& opt)
     progDesc.slangGlobalScope = linked;
     ComPtr<ISlangBlob> rhiDiag;
     ComPtr<IShaderProgram> shaderProgram;
-    Result spResult = device->createShaderProgram(
-        progDesc,
-        shaderProgram.writeRef(),
-        rhiDiag.writeRef());
+    Result spResult =
+        device->createShaderProgram(progDesc, shaderProgram.writeRef(), rhiDiag.writeRef());
     if (SLANG_FAILED(spResult) || !shaderProgram)
     {
         if (rhiDiag)
@@ -602,7 +599,7 @@ int runDispatch(const Options& opt)
 
     // Size the coverage buffer from the manifest we just wrote.
     SlangCoverageContext* covCtx = nullptr;
-    if (slang_coverage_create(opt.manifest.c_str(), &covCtx) != SLANG_COVERAGE_OK)
+    if (slang_coverage_create(opt.manifest.c_str(), &covCtx) != SLANG_OK)
     {
         std::fprintf(stderr, "failed to parse manifest '%s'\n", opt.manifest.c_str());
         return 1;
@@ -664,8 +661,7 @@ int runDispatch(const Options& opt)
         static_cast<const uint32_t*>(blob->getBufferPointer()),
         counterCount);
 
-    if (slang_coverage_save_lcov(covCtx, opt.outputLcov.c_str(), opt.testName.c_str()) !=
-        SLANG_COVERAGE_OK)
+    if (slang_coverage_save_lcov(covCtx, opt.outputLcov.c_str(), opt.testName.c_str()) != SLANG_OK)
     {
         std::fprintf(stderr, "failed to write '%s'\n", opt.outputLcov.c_str());
         slang_coverage_destroy(covCtx);

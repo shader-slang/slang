@@ -32,9 +32,15 @@
 //
 //   Everything in this header is C-callable and ABI-stable so that
 //   bindings from Python, Rust, or other languages are straightforward.
+//
+//   Functions return `SlangResult` (matching the rest of the Slang C
+//   API) so that hosts already integrating Slang can use the same
+//   `SLANG_FAILED(r)` check uniformly.
 
 #ifndef SLANG_COVERAGE_H
 #define SLANG_COVERAGE_H
+
+#include "slang.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -48,23 +54,21 @@ extern "C"
     // an accumulator over counter values seen so far.
     typedef struct SlangCoverageContext SlangCoverageContext;
 
-    // Result codes. 0 is success; anything else is an error.
-    typedef enum SlangCoverageResult
-    {
-        SLANG_COVERAGE_OK = 0,
-        SLANG_COVERAGE_ERROR_INVALID_ARGUMENT = 1,
-        SLANG_COVERAGE_ERROR_FILE_NOT_FOUND = 2,
-        SLANG_COVERAGE_ERROR_PARSE_FAILED = 3,
-        SLANG_COVERAGE_ERROR_UNSUPPORTED_VERSION = 4,
-        SLANG_COVERAGE_ERROR_OUT_OF_RANGE = 5,
-        SLANG_COVERAGE_ERROR_IO_FAILED = 6,
-    } SlangCoverageResult;
-
     // Description of where the coverage buffer must be bound. Populated
     // from the manifest. Any field whose value is -1 was absent from the
     // manifest (e.g. CPU-target builds don't populate UAV registers).
+    //
+    // ABI versioning: `structSize` is set to `sizeof(SlangCoverageBindingInfo)`
+    // by `slang_coverage_binding`. Future revisions append fields and
+    // bump the on-the-wire size; consumers compiled against an older
+    // header should treat `structSize >= offsetof(BindingInfo, fieldX) +
+    // sizeof(fieldX)` as the gate for reading `fieldX`. Callers compiled
+    // against a newer header reading data produced by an older library
+    // see `structSize` smaller than `sizeof(...)`; the older fields are
+    // still valid at their original offsets.
     typedef struct SlangCoverageBindingInfo
     {
+        size_t structSize;          // = sizeof(SlangCoverageBindingInfo); for ABI version-gating
         const char* bufferName;     // e.g. "__slang_coverage"
         int32_t space;              // Vulkan descriptor set or HLSL space; -1 if absent
         int32_t binding;            // Vulkan binding index; -1 if absent
@@ -74,12 +78,11 @@ extern "C"
         int32_t synthesized;        // 1 if Slang synthesized this buffer, 0 if user-declared
     } SlangCoverageBindingInfo;
 
-    // Create a context by loading a `.slangcov` manifest produced by the
-    // compiler (via `SLANG_COVERAGE_MANIFEST_PATH`). On success, `*outCtx`
-    // receives a handle; call `slang_coverage_destroy` when done.
-    SlangCoverageResult slang_coverage_create(
-        const char* manifestPath,
-        SlangCoverageContext** outCtx);
+    // Create a context by loading a `.coverage-mapping.json` manifest
+    // produced by the compiler. On success (`SLANG_OK`), `*outCtx` receives
+    // a handle; call `slang_coverage_destroy` when done. On failure,
+    // `*outCtx` is set to `nullptr`.
+    SlangResult slang_coverage_create(const char* manifestPath, SlangCoverageContext** outCtx);
 
     // Release a context and its resources. Safe to call on a nullptr
     // context.
@@ -94,11 +97,12 @@ extern "C"
     const SlangCoverageBindingInfo* slang_coverage_binding(const SlangCoverageContext* ctx);
 
     // Merge one snapshot of counter values (just read back from the GPU)
-    // into the context's accumulator. `counters` must point to
-    // `slang_coverage_counter_count(ctx)` values. Calling this multiple
-    // times with different snapshots is the typical pattern for per-frame
-    // or per-test-case aggregation.
-    SlangCoverageResult slang_coverage_accumulate(
+    // into the context's accumulator. `counters` must point to exactly
+    // `slang_coverage_counter_count(ctx)` values; passing a different
+    // size returns `SLANG_E_INVALID_ARG`. Calling this multiple times with
+    // different snapshots is the typical pattern for per-frame or per-
+    // test-case aggregation.
+    SlangResult slang_coverage_accumulate(
         SlangCoverageContext* ctx,
         const uint32_t* counters,
         size_t count);
@@ -114,7 +118,7 @@ extern "C"
     // Write an LCOV `.info` file for the accumulated counts. `testName`
     // is placed in the LCOV `TN:` record; LCOV forbids hyphens, so this
     // function rejects names containing `-`. Pass NULL for a default.
-    SlangCoverageResult slang_coverage_save_lcov(
+    SlangResult slang_coverage_save_lcov(
         const SlangCoverageContext* ctx,
         const char* outputPath,
         const char* testName);

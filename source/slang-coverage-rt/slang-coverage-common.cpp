@@ -493,16 +493,17 @@ bool parseManifest(const std::string& text, SlangCoverageContext* ctx)
 // C API implementation.
 //
 
-extern "C" SlangCoverageResult slang_coverage_create(
+extern "C" SlangResult slang_coverage_create(
     const char* manifestPath,
     SlangCoverageContext** outCtx)
 {
     if (!manifestPath || !outCtx)
-        return SLANG_COVERAGE_ERROR_INVALID_ARGUMENT;
+        return SLANG_E_INVALID_ARG;
+    *outCtx = nullptr;
 
     FILE* f = std::fopen(manifestPath, "rb");
     if (!f)
-        return SLANG_COVERAGE_ERROR_FILE_NOT_FOUND;
+        return SLANG_E_NOT_FOUND;
     std::fseek(f, 0, SEEK_END);
     long size = std::ftell(f);
     std::fseek(f, 0, SEEK_SET);
@@ -512,19 +513,23 @@ extern "C" SlangCoverageResult slang_coverage_create(
         if (std::fread(text.data(), 1, size_t(size), f) != size_t(size))
         {
             std::fclose(f);
-            return SLANG_COVERAGE_ERROR_IO_FAILED;
+            return SLANG_E_CANNOT_OPEN;
         }
     }
     std::fclose(f);
 
     auto* ctx = new SlangCoverageContext();
+    // Stamp the binding-info struct's `structSize` so consumers can
+    // version-gate field reads. parseManifest may overwrite individual
+    // fields but won't touch this.
+    ctx->binding.structSize = sizeof(SlangCoverageBindingInfo);
     if (!parseManifest(text, ctx))
     {
         delete ctx;
-        return SLANG_COVERAGE_ERROR_PARSE_FAILED;
+        return SLANG_FAIL;
     }
     *outCtx = ctx;
-    return SLANG_COVERAGE_OK;
+    return SLANG_OK;
 }
 
 extern "C" void slang_coverage_destroy(SlangCoverageContext* ctx)
@@ -542,18 +547,22 @@ extern "C" const SlangCoverageBindingInfo* slang_coverage_binding(const SlangCov
     return ctx ? &ctx->binding : nullptr;
 }
 
-extern "C" SlangCoverageResult slang_coverage_accumulate(
+extern "C" SlangResult slang_coverage_accumulate(
     SlangCoverageContext* ctx,
     const uint32_t* counters,
     size_t count)
 {
     if (!ctx || !counters)
-        return SLANG_COVERAGE_ERROR_INVALID_ARGUMENT;
-    if (count > ctx->accumulator.size())
-        return SLANG_COVERAGE_ERROR_OUT_OF_RANGE;
+        return SLANG_E_INVALID_ARG;
+    // Tightened: we require an exact-size snapshot. A short snapshot
+    // (caller passed the wrong shader's buffer or a truncated readback)
+    // would silently produce a partial-coverage report — the strictest
+    // way to surface that as a real integration bug is to refuse it.
+    if (count != ctx->accumulator.size())
+        return SLANG_E_INVALID_ARG;
     for (size_t i = 0; i < count; ++i)
         ctx->accumulator[i] += counters[i];
-    return SLANG_COVERAGE_OK;
+    return SLANG_OK;
 }
 
 extern "C" void slang_coverage_reset_accumulator(SlangCoverageContext* ctx)
@@ -570,18 +579,18 @@ extern "C" uint64_t slang_coverage_get_hits(const SlangCoverageContext* ctx, uin
     return ctx->accumulator[index];
 }
 
-extern "C" SlangCoverageResult slang_coverage_save_lcov(
+extern "C" SlangResult slang_coverage_save_lcov(
     const SlangCoverageContext* ctx,
     const char* outputPath,
     const char* testName)
 {
     if (!ctx || !outputPath)
-        return SLANG_COVERAGE_ERROR_INVALID_ARGUMENT;
+        return SLANG_E_INVALID_ARG;
     const char* name = (testName && *testName) ? testName : "slang_coverage";
     // LCOV rejects hyphens in test names.
     for (const char* c = name; *c; ++c)
         if (*c == '-')
-            return SLANG_COVERAGE_ERROR_INVALID_ARGUMENT;
+            return SLANG_E_INVALID_ARG;
 
     // Aggregate hits by (file, line). If multiple counter entries
     // share the same (file, line) their hit counts are summed.
@@ -595,7 +604,7 @@ extern "C" SlangCoverageResult slang_coverage_save_lcov(
 
     FILE* f = std::fopen(outputPath, "w");
     if (!f)
-        return SLANG_COVERAGE_ERROR_IO_FAILED;
+        return SLANG_E_CANNOT_OPEN;
     std::fprintf(f, "TN:%s\n", name);
     for (const auto& filePair : byFile)
     {
@@ -607,5 +616,5 @@ extern "C" SlangCoverageResult slang_coverage_save_lcov(
         std::fprintf(f, "end_of_record\n");
     }
     std::fclose(f);
-    return SLANG_COVERAGE_OK;
+    return SLANG_OK;
 }

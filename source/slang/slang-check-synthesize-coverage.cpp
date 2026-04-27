@@ -106,9 +106,7 @@ static VarDecl* findExistingCoverageDeclInModule(ModuleDecl* moduleDecl)
 // explicit `register(uN, spaceM)` would collide on parameter binding
 // (which surfaces as a D3D12 root-signature failure when
 // `-trace-coverage-binding` is in use).
-static VarDecl* findExistingCoverageDecl(
-    ModuleDecl* moduleDecl,
-    HashSet<ModuleDecl*>& visited)
+static VarDecl* findExistingCoverageDecl(ModuleDecl* moduleDecl, HashSet<ModuleDecl*>& visited)
 {
     if (!visited.add(moduleDecl))
         return nullptr;

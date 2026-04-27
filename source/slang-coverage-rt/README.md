@@ -120,15 +120,17 @@ additions.
 
 ## Error codes
 
+Functions return `SlangResult` (the same type the rest of the Slang
+C API uses). Use `SLANG_FAILED(r)` for the failure check; specific
+codes are listed below for matching against expected error paths.
+
 | Code | Meaning |
 |---|---|
-| `SLANG_COVERAGE_OK` | Success. |
-| `SLANG_COVERAGE_ERROR_INVALID_ARGUMENT` | Null pointer, or `testName` contains `-` (forbidden by LCOV). |
-| `SLANG_COVERAGE_ERROR_FILE_NOT_FOUND` | Manifest path does not exist / cannot be opened. |
-| `SLANG_COVERAGE_ERROR_PARSE_FAILED` | Manifest is not well-formed v1 JSON. |
-| `SLANG_COVERAGE_ERROR_UNSUPPORTED_VERSION` | Manifest declares `version` ≠ 1. |
-| `SLANG_COVERAGE_ERROR_OUT_OF_RANGE` | `_accumulate` called with a `count` larger than the counter array. |
-| `SLANG_COVERAGE_ERROR_IO_FAILED` | Manifest read or LCOV write failed. |
+| `SLANG_OK` | Success. |
+| `SLANG_E_INVALID_ARG` | Null pointer; `testName` contains `-` (forbidden by LCOV); `_accumulate` called with `count != counter_count`. |
+| `SLANG_E_NOT_FOUND` | Manifest path does not exist. |
+| `SLANG_E_CANNOT_OPEN` | Manifest read or LCOV write failed (file existed but I/O failed). |
+| `SLANG_FAIL` | Manifest is not well-formed v1 JSON, or declares an unsupported `version`. |
 
 ---
 
@@ -145,3 +147,28 @@ target_include_directories(my-host PRIVATE
 ```
 
 No transitive runtime dependency beyond the C++ standard library.
+
+### Static vs dynamic linking
+
+The library ships as a static library by default. For most embed-in-
+test-suite use cases that's the right pick:
+
+- **ABI freedom**: each customer build re-links from source, so adding
+  fields to `SlangCoverageBindingInfo` or new functions doesn't require
+  bumping a shared-library SONAME or coordinating across a release
+  cadence.
+- **Smaller deployment footprint**: one binary to ship, no separate
+  `.so` / `.dll` to install or version-pin.
+- **Simpler symbol resolution**: no runtime loader interaction, no
+  `RPATH` / `LD_LIBRARY_PATH` games on Linux.
+
+A shared-library shape is appropriate when **the host distributes the
+library to plugin authors** — for example, an application runtime
+(Omniverse, a game engine) wanting plugins to share one coverage
+runtime so reports aggregate cleanly across plugins. In that mode the
+ABI matters across versions; the public header's `structSize`-prefixed
+structs (currently `SlangCoverageBindingInfo`) provide the version-
+gating mechanism.
+
+If you need a shared build, set `SLANG_LIB_TYPE=SHARED` and rebuild;
+the library follows that variable.
