@@ -218,8 +218,8 @@ fi
 
 # Prepare workspace
 mkdir -p workspace/slang && cd workspace/slang
-tar xzf ~/repo.tar.gz --strip-components=1 2>/dev/null || true
-tar xzf ~/artifacts.tar.gz --strip-components=1 2>/dev/null || true
+tar xzf ~/repo.tar.gz --strip-components=1
+tar xzf ~/artifacts.tar.gz --strip-components=1
 chmod +x {cmake_config}/bin/* 2>/dev/null || true
 cd ~
 
