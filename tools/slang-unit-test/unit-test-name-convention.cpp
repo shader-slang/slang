@@ -139,12 +139,30 @@ SLANG_UNIT_TEST(nameConventionConvertRoundTrips)
     };
 
     Case cases[] = {
-        {NameStyle::Kabab, "foo-bar-baz", NameConvention::LowerCamel, "fooBarBaz",
-         NameConvention::LowerSnake, "foo_bar_baz", NameConvention::LowerKabab, "foo-bar-baz"},
-        {NameStyle::Snake, "foo_bar_baz", NameConvention::LowerCamel, "fooBarBaz",
-         NameConvention::LowerSnake, "foo_bar_baz", NameConvention::LowerKabab, "foo-bar-baz"},
-        {NameStyle::Camel, "FooBarBaz", NameConvention::LowerCamel, "fooBarBaz",
-         NameConvention::LowerSnake, "foo_bar_baz", NameConvention::LowerKabab, "foo-bar-baz"},
+        {NameStyle::Kabab,
+         "foo-bar-baz",
+         NameConvention::LowerCamel,
+         "fooBarBaz",
+         NameConvention::LowerSnake,
+         "foo_bar_baz",
+         NameConvention::LowerKabab,
+         "foo-bar-baz"},
+        {NameStyle::Snake,
+         "foo_bar_baz",
+         NameConvention::LowerCamel,
+         "fooBarBaz",
+         NameConvention::LowerSnake,
+         "foo_bar_baz",
+         NameConvention::LowerKabab,
+         "foo-bar-baz"},
+        {NameStyle::Camel,
+         "FooBarBaz",
+         NameConvention::LowerCamel,
+         "fooBarBaz",
+         NameConvention::LowerSnake,
+         "foo_bar_baz",
+         NameConvention::LowerKabab,
+         "foo-bar-baz"},
     };
 
     for (const auto& c : cases)

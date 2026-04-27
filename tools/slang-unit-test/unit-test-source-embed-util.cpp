@@ -121,14 +121,14 @@ SLANG_UNIT_TEST(sourceEmbedUtilGetPathEdgeCases)
 SLANG_UNIT_TEST(sourceEmbedUtilDefaultStyleForTextIsText)
 {
     SLANG_CHECK(
-        SourceEmbedUtil::getDefaultStyle(makeDesc(ArtifactKind::Source, ArtifactPayload::HLSL))
-        == SourceEmbedUtil::Style::Text);
+        SourceEmbedUtil::getDefaultStyle(makeDesc(ArtifactKind::Source, ArtifactPayload::HLSL)) ==
+        SourceEmbedUtil::Style::Text);
     SLANG_CHECK(
-        SourceEmbedUtil::getDefaultStyle(makeDesc(ArtifactKind::Source, ArtifactPayload::GLSL))
-        == SourceEmbedUtil::Style::Text);
+        SourceEmbedUtil::getDefaultStyle(makeDesc(ArtifactKind::Source, ArtifactPayload::GLSL)) ==
+        SourceEmbedUtil::Style::Text);
     SLANG_CHECK(
-        SourceEmbedUtil::getDefaultStyle(makeDesc(ArtifactKind::Source, ArtifactPayload::WGSL))
-        == SourceEmbedUtil::Style::Text);
+        SourceEmbedUtil::getDefaultStyle(makeDesc(ArtifactKind::Source, ArtifactPayload::WGSL)) ==
+        SourceEmbedUtil::Style::Text);
 }
 
 // SPIR-V binary embed defaults to U32 because SPIR-V is a stream
@@ -150,6 +150,6 @@ SLANG_UNIT_TEST(sourceEmbedUtilOptionsDefaults)
     SLANG_CHECK(opts.style == SourceEmbedUtil::Style::Default);
     SLANG_CHECK(opts.lineLength == 120);
     SLANG_CHECK(opts.language == SLANG_SOURCE_LANGUAGE_C);
-    SLANG_CHECK(opts.indent == "    ");      // four spaces, not a tab
+    SLANG_CHECK(opts.indent == "    ");              // four spaces, not a tab
     SLANG_CHECK(opts.variableName.getLength() == 0); // caller fills in
 }
