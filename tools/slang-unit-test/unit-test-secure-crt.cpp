@@ -92,8 +92,13 @@ SLANG_UNIT_TEST(secureCrtFopenS)
     // nonexistent file
     {
         FILE* f = nullptr;
+        errno = 0;
         int result = fopen_s(&f, "/nonexistent/path/file.txt", "r");
         SLANG_CHECK(result != 0);
+        // The fallback returns errno on open failure, so the
+        // return value must equal whatever errno was set to.
+        SLANG_CHECK(errno != 0);
+        SLANG_CHECK(result == errno);
         SLANG_CHECK(f == nullptr);
     }
 }
@@ -146,6 +151,29 @@ SLANG_UNIT_TEST(secureCrtFreadS)
         SLANG_CHECK(fread_s(buf, sizeof(buf), 1, 100, stdin) == 0);
         SLANG_CHECK(errno == ERANGE);
     }
+    // elementSize > 1 — overflow check uses integer division
+    // (count > bufferSize / elementSize). 4 elements * 3 bytes
+    // exceeds 10 bytes, and 4 > 10/3 catches it.
+    {
+        char buf[10];
+        errno = 0;
+        SLANG_CHECK(fread_s(buf, sizeof(buf), 3, 4, stdin) == 0);
+        SLANG_CHECK(errno == ERANGE);
+    }
+    // Boundary: count == bufferSize / elementSize must succeed.
+    {
+        FILE* f = tmpfile();
+        SLANG_CHECK(f != nullptr);
+        if (f)
+        {
+            const char data[9] = {};
+            SLANG_CHECK(fwrite(data, 1, sizeof(data), f) == sizeof(data));
+            rewind(f);
+            char buf[10] = {};
+            SLANG_CHECK(fread_s(buf, sizeof(buf), 3, 3, f) == 3);
+            fclose(f);
+        }
+    }
 }
 
 SLANG_UNIT_TEST(secureCrtStrnlenS)
@@ -169,6 +197,10 @@ SLANG_UNIT_TEST(secureCrtStrnlenS)
     // Empty string
     {
         SLANG_CHECK(strnlen_s("", 10) == 0);
+    }
+    // numberOfElements == 0 — the scan loop must not execute.
+    {
+        SLANG_CHECK(strnlen_s("hello", 0) == 0);
     }
 }
 
@@ -195,6 +227,10 @@ SLANG_UNIT_TEST(secureCrtWcsnlenS)
     // Empty string
     {
         SLANG_CHECK(wcsnlen_s(L"", 10) == 0);
+    }
+    // numberOfElements == 0 — the scan loop must not execute.
+    {
+        SLANG_CHECK(wcsnlen_s(L"hello", 0) == 0);
     }
 }
 
@@ -477,6 +513,14 @@ SLANG_UNIT_TEST(secureCrtStrncpyS)
         SLANG_CHECK(errno == ERANGE);
         SLANG_CHECK(dst[0] == '\0');
     }
+    // count >= numberOfElements but src is short — early null
+    // terminator wins, so this is the success path (distinct from
+    // the overflow case above).
+    {
+        char dst[8];
+        SLANG_CHECK(strncpy_s(dst, sizeof(dst), "hi", 20) == 0);
+        SLANG_CHECK(strcmp(dst, "hi") == 0);
+    }
     // count < numberOfElements, src fits within count
     {
         char dst[16];
@@ -541,6 +585,14 @@ SLANG_UNIT_TEST(secureCrtWcsncpyS)
         SLANG_CHECK(wcsncpy_s(dst, 4, L"toolong", 7) == ERANGE);
         SLANG_CHECK(errno == ERANGE);
         SLANG_CHECK(dst[0] == L'\0');
+    }
+    // count >= numberOfElements but src is short — early null
+    // terminator wins, so this is the success path (distinct from
+    // the overflow case above).
+    {
+        wchar_t dst[8];
+        SLANG_CHECK(wcsncpy_s(dst, 8, L"hi", 20) == 0);
+        SLANG_CHECK(wcscmp(dst, L"hi") == 0);
     }
     // count < numberOfElements with src longer than count — limit
     // is `count`, copy stops at count chars, dest gets null-
