@@ -374,13 +374,23 @@ def run_iteration(i, total, artifact_tarball, repo_tarball, cmake_config, config
             row["exit_code"] = "transfer_failed"
             return row
 
-        # Docker auth
+        # Docker auth. Pipe the token over the SSH stdin so it never appears
+        # in argv (and thus /proc/<pid>/cmdline on either host) or in shell
+        # history on the VM, and so values containing shell-significant
+        # characters can't malform the command.
         if ghcr_token:
-            gcloud_ssh(
-                vm_name, zone,
-                f"echo '{ghcr_token}' | docker login ghcr.io -u token --password-stdin",
-                timeout=30,
-            )
+            cmd = [
+                "gcloud", "compute", "ssh", vm_name,
+                f"--zone={zone}", f"--project={PROJECT}",
+                "--command=docker login ghcr.io -u token --password-stdin",
+            ]
+            try:
+                subprocess.run(
+                    cmd, input=ghcr_token, text=True,
+                    capture_output=True, timeout=30, check=False,
+                )
+            except subprocess.TimeoutExpired:
+                print(f"  {tag} docker login timed out")
 
         # Generate and transfer the test script
         host_script = generate_test_script(cmake_config, gfx_only, config)
