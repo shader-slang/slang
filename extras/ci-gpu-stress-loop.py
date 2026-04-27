@@ -285,10 +285,14 @@ def parse_results(log_text):
         "dmesg_faults": "",
     }
 
-    # Determine exit code
+    # Determine exit code. "Failed to initialize NVML" is the failure mode
+    # this stress loop is hunting — driver builds have been observed to print
+    # it on stdout while exiting 0, so check on the string regardless of
+    # nvidia-smi's exit status.
+    nvml_init_failed = "Failed to initialize NVML" in log_text
     if "Stopped scheduling new tests after too many consecutive failures" in log_text:
         result["exit_code"] = "aborted"
-    elif "NVIDIA-SMI FAILED" in log_text:
+    elif "NVIDIA-SMI FAILED" in log_text or nvml_init_failed:
         result["exit_code"] = "gpu_crash"
     elif "Failed to create Vulkan instance" in log_text:
         result["exit_code"] = "vulkan_fail"
@@ -297,8 +301,11 @@ def parse_results(log_text):
     elif re.search(r"EXIT_CODE: \d+", log_text):
         result["exit_code"] = "test_fail"
 
-    # GPU healthy?
-    if "NVIDIA-SMI FAILED" in log_text:
+    # GPU healthy? The "Post-test nvidia-smi" banner is unconditionally
+    # echoed by the host script *before* nvidia-smi runs, so its presence
+    # alone proves nothing — only treat the GPU as healthy if no failure
+    # signal also appears.
+    if "NVIDIA-SMI FAILED" in log_text or nvml_init_failed:
         result["gpu_healthy_after"] = "false"
     elif "Post-test nvidia-smi" in log_text:
         result["gpu_healthy_after"] = "true"
@@ -456,6 +463,13 @@ def run_iteration(i, total, artifact_tarball, repo_tarball, cmake_config, config
         # Parse results
         parsed = parse_results(log_text)
         row.update(parsed)
+
+        # `run_cmd` returns `(-1, "", "timeout")` on TimeoutExpired and
+        # `(-1, "", str(e))` on any other exception. parse_results() doesn't
+        # see those return codes, so a wedged 45-minute run would otherwise
+        # land as exit_code="unknown" and disappear into the noise.
+        if rc == -1:
+            row["exit_code"] = "ssh_timeout" if test_err.strip() == "timeout" else "ssh_error"
 
         status_symbol = "PASS" if row["exit_code"] == "pass" else f"*** {row['exit_code'].upper()} ***"
         print(
