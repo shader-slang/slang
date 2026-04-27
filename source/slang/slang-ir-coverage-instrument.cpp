@@ -5,6 +5,7 @@
 #include "compiler-core/slang-source-loc.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -35,24 +36,23 @@ static IRGlobalParam* findCoverageBuffer(IRModule* module, DiagnosticSink* sink)
         auto nameHint = param->findDecoration<IRNameHintDecoration>();
         if (!nameHint || nameHint->getName() != UnownedStringSlice(kCoverageBufferName))
             continue;
+        // Diagnose either kind of type mismatch with the same registered
+        // diagnostic — the user's fix is the same in both cases (declare
+        // `__slang_coverage` as `RWStructuredBuffer<uint>`). Anchoring at
+        // the IR param's sourceLoc points the message at the user's
+        // declaration so the error is debuggable.
         auto bufferType = as<IRHLSLRWStructuredBufferType>(param->getDataType());
         if (!bufferType)
         {
             if (sink)
-                sink->diagnoseRaw(
-                    Severity::Warning,
-                    UnownedStringSlice("'__slang_coverage' must be 'RWStructuredBuffer<uint>' "
-                                       "for -trace-coverage; ignoring."));
+                sink->diagnose(Diagnostics::CoverageBufferWrongType{.location = param->sourceLoc});
             return nullptr;
         }
         auto elementType = as<IRBasicType>(bufferType->getElementType());
         if (!elementType || elementType->getBaseType() != BaseType::UInt)
         {
             if (sink)
-                sink->diagnoseRaw(
-                    Severity::Warning,
-                    UnownedStringSlice("'__slang_coverage' element type must be 'uint' for "
-                                       "-trace-coverage; ignoring."));
+                sink->diagnose(Diagnostics::CoverageBufferWrongType{.location = param->sourceLoc});
             return nullptr;
         }
         return param;
