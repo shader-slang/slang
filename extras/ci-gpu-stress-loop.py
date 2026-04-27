@@ -54,8 +54,15 @@ def run_cmd(cmd, *, timeout=600, capture=True):
             timeout=timeout,
         )
         return r.returncode, r.stdout, r.stderr
-    except subprocess.TimeoutExpired:
-        return -1, "", "timeout"
+    except subprocess.TimeoutExpired as e:
+        # Preserve any output captured before the timeout fired so wedged
+        # test runs still leave a useful test_output.log behind — the
+        # 45-min test SSH that hangs in NVML is exactly the failure mode
+        # this stress loop targets.
+        partial = e.stdout
+        if isinstance(partial, bytes):
+            partial = partial.decode(errors="replace")
+        return -1, partial or "", "timeout"
     except Exception as e:
         return -1, "", str(e)
 
