@@ -4423,6 +4423,38 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
         }
     }
 
+    // Check for generic type parameters that shadow outer generic parameters.
+    for (Index i = 0; i < genericDecl->getDirectMemberDeclCount(); ++i)
+    {
+        Decl* m = genericDecl->getDirectMemberDecl(i);
+        if (!as<GenericTypeParamDeclBase>(m))
+            continue;
+        auto paramName = m->getName();
+        if (!paramName)
+            continue;
+        bool found = false;
+        for (auto ancestor = genericDecl->parentDecl; ancestor && !found;
+             ancestor = ancestor->parentDecl)
+        {
+            auto outerGeneric = as<GenericDecl>(ancestor);
+            if (!outerGeneric)
+                continue;
+            for (auto outerMember : outerGeneric->getMembers())
+            {
+                if (!as<GenericTypeParamDeclBase>(outerMember))
+                    continue;
+                if (outerMember->getName() == paramName)
+                {
+                    getSink()->diagnose(Diagnostics::GenericParamShadowsOuterGeneric{
+                        .param = m,
+                        .outerParam = outerMember});
+                    found = true;
+                    break;
+                }
+            }
+        }
+    }
+
     // Validate that pack parameters only appear at the end of the parameter list.
     bool seenPack = false;
     for (Index i = 0; i < genericDecl->getDirectMemberDeclCount(); ++i)
@@ -6707,6 +6739,10 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
     // This will create a substitution of the synthesized parameters for the
     // original parameters.
     //
+    // We'll also need to invalidate cached default substitution args, because
+    // we've changed the generic decl after the last time
+    // getDefaultSubstitutionArgs was called.
+    synGenericDecl->_cachedArgsForDefaultSubstitution.clear();
     auto defaultArgs = getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
     DeclRef<CallableDecl> requiredFuncDeclRef =
         m_astBuilder->getGenericAppDeclRef(requiredMemberDeclRef, defaultArgs.getArrayView())
@@ -7541,7 +7577,12 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             synDeclRef.getParent().as<GenericDecl>(),
             requiredMemberDeclRef.getParent().as<GenericDecl>(),
             witnessTable);
-        SLANG_ASSERT(doesSignatureMatch);
+        if (!doesSignatureMatch)
+        {
+            if (outFailureDetails)
+                outFailureDetails->reason = WitnessSynthesisFailureReason::GenericSignatureMismatch;
+            return false;
+        }
     }
     else
     {
@@ -7550,7 +7591,10 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             synDeclRef.as<FuncDecl>(),
             requiredMemberDeclRef,
             witnessTable);
-        SLANG_ASSERT(doesSignatureMatch);
+        if (!doesSignatureMatch)
+        {
+            return false;
+        }
     }
 
     return true;
@@ -9159,9 +9203,11 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     //
     this->ensureDecl(witnessDecl, DeclCheckState::ReadyForLookup);
 
+    auto synthesizedCallableDeclRef = synthesizedWitnessDeclRef.as<CallableDecl>();
+
     // Test signature and register in witness table.
     bool doesSignatureMatch = doesSignatureMatchRequirement(
-        synthesizedWitnessDeclRef.as<CallableDecl>(),
+        synthesizedCallableDeclRef,
         requirementDeclRef.as<CallableDecl>(),
         witnessTable);
 
@@ -10003,6 +10049,16 @@ bool SemanticsVisitor::checkConformanceToType(
         auto superTypeDeclRef = supereclRefType->getDeclRef();
         if (auto superInterfaceDeclRef = superTypeDeclRef.as<InterfaceDecl>())
         {
+            if (isNonCopyableType(subType))
+            {
+                getSink()->diagnose(Diagnostics::NonCopyableTypeCannotConformToInterface{
+                    .type = subType,
+                    .interface = superInterfaceDeclRef.getDecl(),
+                    .inheritance = inheritanceDecl});
+                // Fall through — let conformance checking proceed so the witness table
+                // is populated. The warning already informed the user.
+            }
+
             // The type is stating that it conforms to an interface.
             // We need to check that it provides all of the members
             // required by that interface.
@@ -18086,7 +18142,7 @@ struct CapabilityDeclReferenceVisitor
         // __getAddress only works with certain targets
         handleProcessFunc(
             expr,
-            this->getASTBuilder()->getCapabilitySetVal(CapabilityName::cpp_cuda_metal_spirv),
+            this->getASTBuilder()->getCapabilitySetVal(CapabilityName::cpp_cuda_metal_spirv_llvm),
             expr->loc);
         this->dispatchIfNotNull(expr->arg);
     }
@@ -18808,6 +18864,59 @@ bool isOpaqueHandleType(Type* type)
     if (as<MeshOutputType>(type))
         return true;
     return false;
+}
+
+/// Returns true if `type` itself is an opaque handle type, or if it is a struct
+/// (or array of structs) that transitively contains an opaque handle field.
+/// Uses `seen` for cycle detection.
+static bool _typeTransitivelyContainsOpaqueHandleImpl(
+    SemanticsVisitor* visitor,
+    Type* type,
+    HashSet<Decl*>& seen)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+
+    if (isOpaqueHandleType(type))
+        return true;
+
+    // Recurse into array element types.
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return _typeTransitivelyContainsOpaqueHandleImpl(
+            visitor,
+            arrayType->getElementType(),
+            seen);
+
+    // Recurse into struct fields (with substitution for generic structs).
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
+        {
+            if (!seen.add(structDecl))
+                return false; // already visiting — no opaque handle found on this path
+            for (auto field : structDecl->getFields())
+            {
+                visitor->ensureDecl(field, DeclCheckState::CanUseTypeOfValueDecl);
+                auto fieldDeclRef = visitor->getASTBuilder()
+                                        ->getMemberDeclRef(declRefType->getDeclRef(), field)
+                                        .template as<VarDeclBase>();
+                auto fieldType = fieldDeclRef ? getType(visitor->getASTBuilder(), fieldDeclRef)
+                                              : field->type.type;
+                if (fieldType &&
+                    _typeTransitivelyContainsOpaqueHandleImpl(visitor, fieldType, seen))
+                    return true;
+            }
+            seen.remove(structDecl);
+        }
+    }
+
+    return false;
+}
+
+bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type)
+{
+    HashSet<Decl*> seen;
+    return _typeTransitivelyContainsOpaqueHandleImpl(visitor, type, seen);
 }
 
 bool containsRecursiveTypeImpl(SemanticsVisitor* visitor, Type* type, HashSet<Decl*>& currentPath)

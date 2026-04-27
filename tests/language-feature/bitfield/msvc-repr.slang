@@ -31,6 +31,6 @@ void computeMain()
     s.d = 0xDEF0;
 
     // Write the struct to memory and read it back as uint
-    outputBuffer[0] = *((uint*)&s);
+    outputBuffer[0] = *((uint*)__getAddress(s));
 }
 
