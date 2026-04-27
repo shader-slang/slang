@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-ci-gpu-stress-loop-v2.py — Enhanced ephemeral GCP VM stress test for GPU intermittency.
+ci-gpu-stress-loop.py — Ephemeral GCP VM stress test for GPU intermittency.
 
 Creates ephemeral VMs matching CI scaler config (n1-standard-8 + T4) and runs
 the full test suite inside the CI container to reproduce intermittent GPU
 failures ("Failed to initialize NVML: Unknown Error").
 
 Usage:
-    python3 extras/ci-gpu-stress-loop-v2.py <artifact-tarball> [options]
+    python3 extras/ci-gpu-stress-loop.py <artifact-tarball> [options]
 
     artifact-tarball: path to slang-debug.tar.gz with CI artifacts
                       (or a directory — it will be auto-tarballed)
@@ -37,7 +37,7 @@ PROJECT = "slang-runners"
 ZONES = ["us-east1-c", "us-east1-d", "us-central1-a", "us-west1-a"]
 MACHINE_TYPE = "n1-standard-8"
 IMAGE_FAMILY = "linux-gpu-runner"
-VM_PREFIX = "gpu-stress-v2"
+VM_PREFIX = "gpu-stress"
 CONTAINER_IMAGE = "ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1"
 def run_cmd(cmd, *, timeout=600, check=False, capture=True):
     """Run a command, return (returncode, stdout, stderr)."""
@@ -473,7 +473,7 @@ def ensure_tarball(artifact_path):
 def print_summary(results_dir, results):
     """Print summary statistics."""
     print("\n========================================")
-    print("  GPU Stress Test Loop v2 Complete")
+    print("  GPU Stress Test Loop Complete")
     print("========================================\n")
 
     # Print table
@@ -519,7 +519,7 @@ def print_summary(results_dir, results):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="GPU stress test loop v2")
+    parser = argparse.ArgumentParser(description="GPU stress test loop")
     parser.add_argument("artifact_tarball", help="Path to artifact tarball or directory")
     parser.add_argument("--iterations", type=int, default=40)
     parser.add_argument("--config", choices=["debug", "release"], default="debug")
@@ -545,7 +545,7 @@ def main():
     results_dir = Path(f"./gpu-stress-results/{timestamp}")
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    print("=== GPU Stress Test Loop v2 ===")
+    print("=== GPU Stress Test Loop ===")
     print(f"Artifact: {artifact_tarball}")
     print(f"Config: {args.config} ({cmake_config})")
     print(f"Iterations: {args.iterations}")
