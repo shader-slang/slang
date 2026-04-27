@@ -159,11 +159,11 @@ class WrapperCliTests(unittest.TestCase):
         self.assertIn("x.cpp", html)
         self.assertIn("y.cpp", html)
         # The external/ path should NOT appear as a file row. Match
-        # the path pattern specifically — a bare "external" substring
+        # a real substring of the SF: path — a bare "external" check
         # would false-positive on unrelated markup like
         # `rel="noopener external"` or aria-labels.
         self.assertNotIn("bar.c", html)
-        self.assertNotIn("external/bar.c", html)
+        self.assertNotIn("external/foo", html)
 
     def test_merge_wrapper_strips_runner_prefixes(self):
         a = self._write(

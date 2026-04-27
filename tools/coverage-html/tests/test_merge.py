@@ -10,6 +10,7 @@ import gzip
 import importlib.util
 import io
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -267,16 +268,17 @@ class WriteLcovRoundTripTests(unittest.TestCase):
             "bar": Function(first_line=100, hits=0),
         }
 
-        path = os.path.join(tempfile.gettempdir(), "scv-rt.lcov")
+        # Use a unique per-call tempdir so concurrent test runs
+        # (CI matrix on a shared runner, pytest-xdist) don't race on
+        # the same path.
+        tmpdir = tempfile.mkdtemp(prefix="scv-rt-")
+        path = os.path.join(tmpdir, "rt.lcov")
         try:
             with open(path, "w", encoding="utf-8") as f:
                 write_lcov([original], f)
             roundtrip = parse_lcov(path)
         finally:
-            try:
-                os.unlink(path)
-            except OSError:
-                pass
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
         self.assertEqual(len(roundtrip), 1)
         r = roundtrip[0]
