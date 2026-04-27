@@ -324,10 +324,12 @@ def parse_results(log_text):
 
     # Count Vulkan pass/fail. Both `(vk)` (slang-test) and `Vulkan` (gfx-unit-test
     # internal harness, e.g. `getBufferResourceHandleVulkan.internal`) result
-    # lines are caught here. Use `\bVulkan\b` rather than a bare substring so
-    # tests with "Vulkan" embedded inside another word can't false-positive.
-    vk_pass_lines = re.findall(r"passed test:.*(?:\(vk\)|\bVulkan\b)", log_text)
-    vk_fail_lines = re.findall(r"FAILED test:.*(?:\(vk\)|\bVulkan\b)", log_text)
+    # lines are caught here. The trailing `\b` anchors the end of the word so
+    # `CheckVulkanInterop` doesn't false-positive — but a leading `\b` would
+    # *miss* the gfx-unit-test names since they have a word char immediately
+    # before `V` (e.g. `e` in `...HandleVulkan`).
+    vk_pass_lines = re.findall(r"passed test:.*(?:\(vk\)|Vulkan\b)", log_text)
+    vk_fail_lines = re.findall(r"FAILED test:.*(?:\(vk\)|Vulkan\b)", log_text)
     result["vk_pass_count"] = len(vk_pass_lines)
     result["vk_fail_count"] = len(vk_fail_lines)
 
