@@ -3152,6 +3152,13 @@ err(
     span { loc = "initList:Expr", message = "cannot use initializer list for CoopVector of statically unknown size '~elementCount'" }
 )
 
+standalone_note(
+    "initializer-list-member-visibility-mismatch",
+    30516,
+    "member '~member:Decl' is ~memberVis:DeclVisibility, but '~type:Type' is ~structVis:DeclVisibility; all members must be ~structVis:DeclVisibility to use an initializer list",
+    span { loc = "member:Decl" }
+)
+
 warning(
     "interface-default-initializer",
     30506,
@@ -3405,6 +3412,12 @@ err(
     span { loc = "location", message = "__subscript declaration must have a return type specified after '->'" }
 )
 
+err(
+    "optional-cannot-wrap-resource-type",
+    30902,
+    "'Optional<T>' cannot wrap a resource or opaque type",
+    span { loc = "expr:Expr", message = "'~type:Type' is a resource or opaque type and cannot be used as the value type of 'Optional<T>'." }
+)
 
 -- Load semantic checking diagnostics (part 8) - Accessors, Bit Fields, Integer Constants, Overloads, Switch, Generics, Ambiguity
 -- (inlined from slang-diagnostics-semantic-checking-8.lua)
