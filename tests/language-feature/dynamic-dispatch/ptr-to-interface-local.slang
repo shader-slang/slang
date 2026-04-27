@@ -26,5 +26,6 @@ void computeMain()
     IFoo local = a;
 
     // CHECK: error[E30019]
+    // CHECK: error[E31207]
     IFoo* p = &local;
 }

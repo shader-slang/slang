@@ -36,6 +36,7 @@ void computeMain()
 {
     Foo f;
     f.val = 5;
+    // CHECK: error[E31207]
     Foo* pf = &f;
 
     // 1. Ptr<struct> -> Ptr<interface>: rejected (layout mismatch)
