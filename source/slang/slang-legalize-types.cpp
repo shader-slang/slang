@@ -168,27 +168,28 @@ bool isResourceType(IRType* type)
         type = arrayType->getElementType();
     }
 
-    if (const auto resourceTypeBase = as<IRResourceTypeBase>(type))
+    if (const auto resourceTypeBase = as<IRResourceTypeBase>(type); resourceTypeBase)
     {
         return true;
     }
-    else if (const auto builtinGenericType = as<IRBuiltinGenericType>(type))
+    else if (const auto builtinGenericType = as<IRBuiltinGenericType>(type); builtinGenericType)
     {
         return true;
     }
-    else if (const auto pointerLikeType = as<IRPointerLikeType>(type))
+    else if (const auto pointerLikeType = as<IRPointerLikeType>(type); pointerLikeType)
     {
         return true;
     }
-    else if (const auto samplerType = as<IRSamplerStateTypeBase>(type))
+    else if (const auto samplerType = as<IRSamplerStateTypeBase>(type); samplerType)
     {
         return true;
     }
-    else if (const auto subpassInputType = as<IRSubpassInputType>(type))
+    else if (const auto subpassInputType = as<IRSubpassInputType>(type); subpassInputType)
     {
         return true;
     }
-    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type);
+             untypedBufferType)
     {
         return true;
     }
