@@ -181,6 +181,7 @@ dispatch.
 | Flag | Effect |
 |---|---|
 | `-trace-coverage` | Enables the feature. Synthesizes `__slang_coverage` at AST-check time; rewrites counter ops to atomic increments; emits `<output>.coverage-mapping.json` sidecar when writing to a file. |
+| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting parameter binding auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time (e.g. for a pre-built D3D12 root signature). Ignored if the user already declares `__slang_coverage` themselves; the user declaration wins. |
 
 ---
 
@@ -226,11 +227,6 @@ coverage semantics.
 
 ## Pending work
 
-- **Configurable binding.** The binding assigned to `__slang_coverage`
-  is whatever the normal parameter-binding phase picks. A future
-  `-coverage-binding` CLI option would let integrators pin the slot
-  explicitly, which matters for engines with fixed descriptor-set
-  layouts.
 - **Branch / function coverage.** `BRDA:` and `FN:` LCOV records,
   driven by extending `ICoverageTracingMetadata` with additional
   entry types and having the IR pass insert extra counter ops at
