@@ -3221,7 +3221,7 @@ IRCompilerDictionaryEntry* IRBuilder::fetchCompilerDictionaryEntry(
 
 void IRBuilder::setCompilerDictionaryEntryValue(IRCompilerDictionaryEntry* entry, IRInst* valueInst)
 {
-    if (const auto existingVal = entry->getValue(); existingVal)
+    if (auto existingVal = entry->getValue(); existingVal)
     {
         // Invalid.
         SLANG_UNEXPECTED("Translation entry already exists");
@@ -3252,7 +3252,7 @@ void IRBuilder::addCompilerDictionaryEntry(
     }
 
     auto entry = _getCompilerDictionaryEntry(keyVals);
-    if (const auto existingVal = entry->getValue(); existingVal)
+    if (auto existingVal = entry->getValue(); existingVal)
     {
         // Invalid.
         SLANG_UNEXPECTED("Translation entry already exists");

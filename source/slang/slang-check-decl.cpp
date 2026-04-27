@@ -11492,9 +11492,9 @@ void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     }
 
     decl->body = maybeParseStmt(decl->body, newContext);
-    if (const auto body = decl->body; body)
+    if (const auto body = decl->body)
     {
-        checkStmt(decl->body, newContext);
+        checkStmt(body, newContext);
     }
 }
 

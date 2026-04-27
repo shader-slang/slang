@@ -324,7 +324,7 @@ struct ForwardDiffTranslationContext
     {
         auto primalVal = maybeCloneForPrimalInst(builder, origInst);
 
-        if (IRType* diffType = differentiateType(builder, origInst->getFullType()); diffType)
+        if (IRType* const diffType = differentiateType(builder, origInst->getFullType()); diffType)
         {
             auto dzero = getDifferentialZeroOfType(builder, origInst->getFullType());
             if (dzero)

@@ -1063,7 +1063,7 @@ private:
         {
             checkMemberDecls(namespaceDecl);
         }
-        else if (const auto varDecl = as<VarDecl>(decl); varDecl)
+        else if (auto varDecl = as<VarDecl>(decl); varDecl)
         {
             // Note: for now we aren't trying to check the type
             // or the initial-value expression of a field.

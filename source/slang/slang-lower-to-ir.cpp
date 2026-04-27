@@ -4761,7 +4761,7 @@ struct ExprLoweringContext
         // In such a case we should be careful to not statically
         // resolve things.
         //
-        if (const auto callableDecl = as<CallableDecl>(declRefExpr->declRef.getDecl());
+        if (auto callableDecl = as<CallableDecl>(declRefExpr->declRef.getDecl());
             callableDecl)
         {
             // Okay, the declaration is directly callable, so we can continue.
@@ -4819,7 +4819,7 @@ struct ExprLoweringContext
                     continue;
                 }
             }
-            else if (const auto andType = as<AndType>(e->type); andType)
+            else if (auto andType = as<AndType>(e->type); andType)
             {
                 // TODO: We might eventually need to tell the difference
                 // between conjunctions of interfaces and conjunctions
@@ -6231,7 +6231,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         type = getOriginalTypeFromModifiedType(type);
 
         auto irType = lowerType(context, type);
-        if (const auto basicType = as<BasicExpressionType>(type); basicType)
+        if (auto basicType = as<BasicExpressionType>(type); basicType)
         {
             return getSimpleDefaultVal(irType);
         }
@@ -6257,7 +6257,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
         }
-        else if (const auto ptrType = as<PtrType>(type); ptrType)
+        else if (auto ptrType = as<PtrType>(type); ptrType)
         {
             return LoweredValInfo::simple(getBuilder()->getNullPtrValue(irType));
         }
@@ -6271,7 +6271,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
         }
-        else if (const auto resourceType = as<ResourceType>(type); resourceType)
+        else if (auto resourceType = as<ResourceType>(type); resourceType)
         {
             // A resource type does not have a default value, so we defensively assign poison value.
             // In practice, we should never get here. If the value remains unassigned after all of

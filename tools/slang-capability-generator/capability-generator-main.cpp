@@ -282,7 +282,7 @@ public:
             for (auto keyAtom : sharedKeyAtomsInCanonicalSet_stage)
                 this->keyAtomsPresent.add(keyAtom);
         }
-        if (const auto base = this->getAbstractBase(); base)
+        if (auto base = this->getAbstractBase(); base)
             keyAtomsPresent.add(this);
     }
 };

@@ -1146,9 +1146,9 @@ bool SemanticsVisitor::TryUnifyVals(
         }
     }
 
-    if (const auto fstWit = as<TypeCoercionWitness>(fst); fstWit)
+    if (auto fstWit = as<TypeCoercionWitness>(fst); fstWit)
     {
-        if (const auto sndWit = as<TypeCoercionWitness>(snd); sndWit)
+        if (auto sndWit = as<TypeCoercionWitness>(snd); sndWit)
         {
             // Ignore unification for coercion constraints for now,
             // they will be checked later anyway.

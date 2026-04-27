@@ -149,8 +149,8 @@ List<Module*> const& EntryPoint::getModuleDependencies()
 
 List<SourceFile*> const& EntryPoint::getFileDependencies()
 {
-    if (const auto module = getModule(); module)
-        return getModule()->getFileDependencies();
+    if (const auto module = getModule())
+        return module->getFileDependencies();
 
     static List<SourceFile*> empty;
     return empty;

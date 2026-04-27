@@ -817,9 +817,7 @@ bool isIntrinsic(IRInst* inst)
     //
     if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(inst);
         existentialSpecializedFunc)
-    {
         return false;
-    }
 
     if (!func)
         return false;
@@ -6931,7 +6929,7 @@ struct TypeFlowSpecializationContext
 
     bool specializeMakeDifferentialPair(IRInst* context, IRMakeDifferentialPair* inst)
     {
-        if (const auto tupleType = as<IRTupleType>(tryGetInfo(context, inst)); tupleType)
+        if (auto tupleType = as<IRTupleType>(tryGetInfo(context, inst)); tupleType)
         {
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);

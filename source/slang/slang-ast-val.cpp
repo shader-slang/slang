@@ -1887,7 +1887,7 @@ IntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1)
     }
     else if (auto val0 = as<IntVal>(op0))
     {
-        if (auto poly1 = as<PolynomialIntVal>(op1); poly1)
+        if (const auto poly1 = as<PolynomialIntVal>(op1); poly1)
         {
             return mul(astBuilder, op1, op0);
         }

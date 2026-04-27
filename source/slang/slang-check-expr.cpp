@@ -2105,9 +2105,9 @@ Expr* SemanticsVisitor::_CheckTerm(Expr* term)
     {
         binding->type = type;
 
-        if (const auto body = binding->body; body)
+        if (const auto body = binding->body)
         {
-            binding = as<LetExpr>(binding->body);
+            binding = as<LetExpr>(body);
             SLANG_ASSERT(binding);
             continue;
         }
