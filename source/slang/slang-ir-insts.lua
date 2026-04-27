@@ -2739,6 +2739,12 @@ local insts = {
 			min_operands = 2,
 		},
 	},
+	{
+		DebugCompilationUnit = {
+			operands = { { "source" } },
+			hoistable = true,
+		},
+	},
 	-- Embedded Precompiled Libraries
 	{ EmbeddedDownstreamIR = { operands = { { "targetOperand", "IRIntLit" }, { "blob", "IRBlobLit" } } } },
 	-- Inline assembly

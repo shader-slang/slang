@@ -825,7 +825,8 @@ return {
 	["Type.Conditional"] = 849,
 	["getConditionalValue"] = 850,
 	["makeConditionalValue"] = 851,
-  ["SpecializeExistentialsInType"] = 852,
-  ["assumeAddress"] = 853,
-  ["IncrementCoverageCounter"] = 854
+	["SpecializeExistentialsInType"] = 852,
+	["assumeAddress"] = 853,
+	["DebugCompilationUnit"] = 854,
+	["IncrementCoverageCounter"] = 855
 }

@@ -2603,6 +2603,12 @@ struct IRDebugBuildIdentifier : IRInst
 };
 
 FIDDLE()
+struct IRDebugCompilationUnit : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
 struct IRDebugLine : IRInst
 {
     FIDDLE(leafInst())
@@ -3486,6 +3492,7 @@ $(type_info.return_type) $(type_info.method_name)(
         bool isIncludedFile);
     IRInst* emitDebugBuildIdentifier(UnownedStringSlice buildIdentifier, IRIntegerValue flags);
     IRInst* emitDebugBuildIdentifier(IRInst* debugBuildIdentifier);
+    IRInst* emitDebugCompilationUnit(IRInst* source);
     IRInst* emitDebugLine(
         IRInst* source,
         IRIntegerValue lineStart,

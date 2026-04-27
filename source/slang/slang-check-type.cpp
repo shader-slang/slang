@@ -483,6 +483,22 @@ TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
         result.type = m_astBuilder->getErrorType();
         return result;
     }
+
+    // Optional<T> cannot wrap a resource/opaque type (e.g. SamplerState, textures, buffers),
+    // nor a struct that transitively contains such a type.
+    if (auto optType = as<OptionalType>(type))
+    {
+        auto valueType = optType->getValueType();
+        if (typeTransitivelyContainsOpaqueHandle(this, valueType))
+        {
+            getSink()->diagnose(Diagnostics::OptionalCannotWrapResourceType{
+                .type = valueType,
+                .expr = typeExp.exp});
+            result.type = m_astBuilder->getErrorType();
+            return result;
+        }
+    }
+
     return result;
 }
 
