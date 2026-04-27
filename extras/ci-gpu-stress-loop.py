@@ -23,11 +23,11 @@ Requires: gcloud CLI authenticated to slang-runners project, gh CLI for GHCR tok
 
 import argparse
 import csv
+import json
 import os
 import re
 import subprocess
 import sys
-import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -412,39 +412,74 @@ def run_iteration(i, total, artifact_tarball, repo_tarball, cmake_config, config
     return row
 
 
-def create_repo_tarball(results_dir):
-    """Create a tarball of tests and expected failure lists from the repo."""
+def detect_local_repo():
+    """Find the slang repo root the script was invoked from.
+
+    Returns the absolute Path of the repo root, or None if the script is not
+    inside a git working tree.
+    """
+    script_dir = Path(__file__).resolve().parent
+    rc, out, _ = run_cmd(
+        ["git", "-C", str(script_dir), "rev-parse", "--show-toplevel"],
+        timeout=10,
+    )
+    if rc != 0:
+        return None
+    return Path(out.strip())
+
+
+def get_repo_sha(repo_dir):
+    """Return the HEAD commit SHA of repo_dir, or '' if it can't be determined."""
+    rc, out, _ = run_cmd(
+        ["git", "-C", str(repo_dir), "rev-parse", "HEAD"], timeout=10,
+    )
+    return out.strip() if rc == 0 else ""
+
+
+def create_repo_tarball(results_dir, repo_dir):
+    """Create a tarball of tests + slangc-test sources from `repo_dir`.
+
+    The tests and the expected-failure lists must match the artifact's source
+    revision, otherwise spurious failures or hidden regressions follow. The
+    caller is responsible for picking a repo_dir that matches the artifact.
+    Returns (tarball_path, sha) where sha is the HEAD of repo_dir.
+    """
     repo_tarball = results_dir / "repo.tar.gz"
-    print("Creating repo tarball (tests + expected failures)...")
-    with tempfile.TemporaryDirectory() as tmpdir:
-        clone_dir = Path(tmpdir) / "slang"
-        rc, _, err = run_cmd(
-            ["git", "clone", "--depth", "1",
-             "https://github.com/shader-slang/slang.git", str(clone_dir)],
-            timeout=120,
-        )
-        if rc != 0:
-            print(f"Failed to clone repo: {err}")
-            sys.exit(1)
-        run_cmd(
-            ["tar", "czf", str(repo_tarball), "-C", tmpdir,
-             "slang/tests", "slang/tools/slangc-test"],
-            timeout=60,
-        )
+    sha = get_repo_sha(repo_dir)
+    print(f"Creating repo tarball from {repo_dir} (HEAD: {sha[:12] or 'unknown'})...")
+    # tar with `--transform 's,^,slang/,'` would let us tar from inside the
+    # repo, but BSD tar (macOS) doesn't support --transform. Instead, tar from
+    # the parent and reference the repo by its directory name.
+    parent = repo_dir.parent
+    name = repo_dir.name
+    rc, out, err = run_cmd(
+        ["tar", "czf", str(repo_tarball), "-C", str(parent),
+         f"{name}/tests", f"{name}/tools/slangc-test"],
+        timeout=60,
+    )
+    if rc != 0 or not repo_tarball.exists():
+        print(f"Failed to create repo tarball: {err or out}", file=sys.stderr)
+        sys.exit(1)
     size_mb = repo_tarball.stat().st_size / (1024 * 1024)
     print(f"Repo tarball: {size_mb:.1f}MB")
-    return repo_tarball
+    return repo_tarball, sha
 
 
-def ensure_tarball(artifact_path):
-    """Ensure artifact_path is a tarball. If it's a directory, tar it."""
+def ensure_tarball(artifact_path, results_dir):
+    """Ensure artifact_path is a tarball. If it's a directory, tar it into
+    results_dir so existing tarballs aren't silently overwritten."""
     p = Path(artifact_path)
-    if p.is_dir():
-        tarball = p.parent / f"{p.name}.tar.gz"
-        print(f"Artifact is a directory, creating tarball: {tarball}")
-        run_cmd(["tar", "czf", str(tarball), "-C", str(p), "."], timeout=120)
-        return tarball
-    return p
+    if not p.is_dir():
+        return p
+    tarball = results_dir / f"{p.name}.tar.gz"
+    print(f"Artifact is a directory, creating tarball: {tarball}")
+    rc, out, err = run_cmd(
+        ["tar", "czf", str(tarball), "-C", str(p), "."], timeout=120,
+    )
+    if rc != 0 or not tarball.exists():
+        print(f"Failed to create artifact tarball: {err or out}", file=sys.stderr)
+        sys.exit(1)
+    return tarball
 
 
 def print_summary(results_dir, results):
@@ -502,14 +537,29 @@ def main():
     parser.add_argument("--config", choices=["debug", "release"], default="debug")
     parser.add_argument("--parallel", type=int, default=1)
     parser.add_argument("--gfx-only", action="store_true")
+    parser.add_argument(
+        "--repo-dir",
+        type=Path,
+        default=None,
+        help="Path to a slang checkout to source tests/ from (default: the "
+             "checkout this script lives in). Should match the artifact's "
+             "source revision so test inputs and expected-failure lists agree "
+             "with the binary.",
+    )
     args = parser.parse_args()
 
     cmake_config = "Release" if args.config == "release" else "Debug"
 
-    # Prepare artifact tarball
-    artifact_tarball = ensure_tarball(args.artifact_tarball)
-    if not artifact_tarball.exists():
-        print(f"Artifact not found: {artifact_tarball}")
+    # Resolve the repo to source tests from.
+    repo_dir = args.repo_dir or detect_local_repo()
+    if repo_dir is None:
+        print(
+            "Could not detect local slang checkout — pass --repo-dir explicitly.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if not (repo_dir / "tests").is_dir():
+        print(f"--repo-dir {repo_dir} has no tests/ directory.", file=sys.stderr)
         sys.exit(1)
 
     # Get GHCR token
@@ -522,8 +572,15 @@ def main():
     results_dir = Path(f"./gpu-stress-results/{timestamp}")
     results_dir.mkdir(parents=True, exist_ok=True)
 
+    # Prepare artifact tarball (after results_dir exists so we can stage there).
+    artifact_tarball = ensure_tarball(args.artifact_tarball, results_dir)
+    if not artifact_tarball.exists():
+        print(f"Artifact not found: {artifact_tarball}")
+        sys.exit(1)
+
     print("=== GPU Stress Test Loop ===")
     print(f"Artifact: {artifact_tarball}")
+    print(f"Repo: {repo_dir}")
     print(f"Config: {args.config} ({cmake_config})")
     print(f"Iterations: {args.iterations}")
     print(f"Parallel: {args.parallel}")
@@ -534,7 +591,22 @@ def main():
     print()
 
     # Create repo tarball
-    repo_tarball = create_repo_tarball(results_dir)
+    repo_tarball, repo_sha = create_repo_tarball(results_dir, repo_dir)
+
+    # Record run metadata so result interpretation isn't ambiguous later.
+    metadata = {
+        "timestamp": timestamp,
+        "artifact": str(Path(args.artifact_tarball).resolve()),
+        "repo_dir": str(repo_dir),
+        "repo_sha": repo_sha,
+        "config": args.config,
+        "iterations": args.iterations,
+        "parallel": args.parallel,
+        "gfx_only": args.gfx_only,
+        "container_image": CONTAINER_IMAGE,
+        "zones": ZONES,
+    }
+    (results_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
 
     # Run iterations
     results = []
