@@ -710,7 +710,13 @@ def main():
                 )
                 results.append(record(row))
         else:
-            with ThreadPoolExecutor(max_workers=min(args.parallel, 4)) as pool:
+            # `with ThreadPoolExecutor(...)` calls shutdown(wait=True) on
+            # exit, which on KeyboardInterrupt would block until every
+            # *queued* iteration has also been picked up — defeating the
+            # purpose of Ctrl-C. Manage the pool manually so we can drop
+            # the queue with cancel_futures=True on interrupt.
+            pool = ThreadPoolExecutor(max_workers=min(args.parallel, 4))
+            try:
                 futures = {}
                 for i in range(1, args.iterations + 1):
                     f = pool.submit(
@@ -722,6 +728,11 @@ def main():
                 for f in as_completed(futures):
                     row = f.result()
                     results.append(record(row))
+            except KeyboardInterrupt:
+                pool.shutdown(wait=False, cancel_futures=True)
+                raise
+            else:
+                pool.shutdown(wait=True)
             results.sort(key=lambda r: r["iteration"])
     except KeyboardInterrupt:
         interrupted = True
