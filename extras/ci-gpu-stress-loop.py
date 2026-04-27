@@ -39,7 +39,7 @@ MACHINE_TYPE = "n1-standard-8"
 IMAGE_FAMILY = "linux-gpu-runner"
 VM_PREFIX = "gpu-stress"
 CONTAINER_IMAGE = "ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1"
-def run_cmd(cmd, *, timeout=600, check=False, capture=True):
+def run_cmd(cmd, *, timeout=600, capture=True):
     """Run a command, return (returncode, stdout, stderr)."""
     try:
         r = subprocess.run(
@@ -91,12 +91,17 @@ def create_vm(vm_name, zone):
 
 
 def delete_vm(vm_name, zone):
-    """Delete a VM."""
+    """Delete a VM. Logs a warning on failure — orphaned VMs accrue cost."""
     cmd = [
         "gcloud", "compute", "instances", "delete", vm_name,
         f"--zone={zone}", f"--project={PROJECT}", "--quiet",
     ]
-    run_cmd(cmd, timeout=60)
+    rc, _, err = run_cmd(cmd, timeout=60)
+    if rc != 0:
+        print(
+            f"  WARNING: failed to delete VM {vm_name} in {zone}: {err.strip()}",
+            file=sys.stderr,
+        )
 
 
 def wait_for_ssh(vm_name, zone, max_attempts=18):
@@ -319,7 +324,7 @@ def run_iteration(i, total, artifact_tarball, repo_tarball, cmake_config, config
         # Wait for SSH
         print(f"  {tag} Waiting for SSH...")
         if not wait_for_ssh(vm_name, zone):
-            print(f"  {tag} SSH not ready after 3 minutes. Skipping.")
+            print(f"  {tag} SSH did not come up in time. Skipping.")
             row["exit_code"] = "ssh_failed"
             return row
 
@@ -335,6 +340,16 @@ def run_iteration(i, total, artifact_tarball, repo_tarball, cmake_config, config
             " lspci 2>/dev/null | grep -i nvidia || echo 'lspci not available'",
         )
         (iter_dir / "gpu_pre.txt").write_text(gpu_info)
+
+        # Pre-test GPU health gate. If nvidia-smi is already failing at startup,
+        # the VM is already broken — don't waste artifact-transfer time and
+        # quota on it. Match on the first line (before "---FULL---") so the
+        # nvidia-smi -q output we also capture doesn't confuse the check.
+        first_line = gpu_info.split("\n", 1)[0] if gpu_info else ""
+        if rc != 0 or "Failed to initialize NVML" in first_line or "not found" in first_line:
+            print(f"  {tag} Pre-test GPU health check failed. Bad VM.")
+            row["exit_code"] = "gpu_check_failed"
+            return row
 
         # Parse GPU info from first line
         if gpu_info:
@@ -490,7 +505,6 @@ def print_summary(results_dir, results):
 
     # Print table
     print("=== Results ===")
-    header = ("iter", "exit_code", "dur_s", "zone", "gpu_ok", "serial", "vk_pass", "vk_fail")
     print(f"{'iter':>4}  {'exit_code':<14}  {'dur_s':>5}  {'zone':<16}  {'gpu_ok':<6}  {'serial':<16}  {'vk_p':>4}  {'vk_f':>4}")
     print("-" * 80)
     for r in results:
