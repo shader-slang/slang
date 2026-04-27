@@ -28,6 +28,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -102,6 +103,32 @@ def delete_vm(vm_name, zone):
             f"  WARNING: failed to delete VM {vm_name} in {zone}: {err.strip()}",
             file=sys.stderr,
         )
+
+
+def cleanup_orphan_vms():
+    """Find and delete any VMs matching VM_PREFIX. Used after Ctrl-C to mop
+    up workers whose `finally: delete_vm` didn't get a chance to run."""
+    cmd = [
+        "gcloud", "compute", "instances", "list",
+        f"--project={PROJECT}",
+        f"--filter=name~^{VM_PREFIX}-",
+        "--format=value(name,zone)",
+    ]
+    rc, out, err = run_cmd(cmd, timeout=60)
+    if rc != 0:
+        print(
+            f"  Could not list orphan VMs: {err.strip()}", file=sys.stderr,
+        )
+        return
+    for line in out.strip().splitlines():
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        # gcloud emits zone as a fully-qualified URL or short name; take the
+        # last path component to be safe.
+        name, zone = parts[0], parts[1].rsplit("/", 1)[-1]
+        print(f"  Deleting orphan VM {name} in {zone}", file=sys.stderr)
+        delete_vm(name, zone)
 
 
 def wait_for_ssh(vm_name, zone, max_attempts=18):
@@ -632,43 +659,62 @@ def main():
     }
     (results_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
 
-    # Run iterations
-    results = []
-    if args.parallel <= 1:
-        for i in range(1, args.iterations + 1):
-            row = run_iteration(
-                i, args.iterations, artifact_tarball, repo_tarball,
-                cmake_config, args.config, args.gfx_only, ghcr_token, results_dir,
-            )
-            results.append(row)
-    else:
-        with ThreadPoolExecutor(max_workers=min(args.parallel, 4)) as pool:
-            futures = {}
-            for i in range(1, args.iterations + 1):
-                f = pool.submit(
-                    run_iteration,
-                    i, args.iterations, artifact_tarball, repo_tarball,
-                    cmake_config, args.config, args.gfx_only, ghcr_token, results_dir,
-                )
-                futures[f] = i
-            for f in as_completed(futures):
-                row = f.result()
-                results.append(row)
-        results.sort(key=lambda r: r["iteration"])
-
-    # Write CSV
+    # Run iterations. Stream rows into results.csv as soon as they complete so
+    # an aborted run still leaves a machine-readable artifact behind.
     csv_path = results_dir / "results.csv"
     fieldnames = [
         "iteration", "exit_code", "duration_s", "vm_name", "zone",
         "gpu_healthy_after", "gpu_serial", "pci_device", "driver_version",
         "vk_pass_count", "vk_fail_count", "xid_codes", "dmesg_faults",
     ]
-    with open(csv_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(results)
+    csv_file = open(csv_path, "w", newline="")
+    csv_lock = threading.Lock()
+    writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+    writer.writeheader()
+    csv_file.flush()
 
+    def record(row):
+        with csv_lock:
+            writer.writerow(row)
+            csv_file.flush()
+        return row
+
+    results = []
+    interrupted = False
+    try:
+        if args.parallel <= 1:
+            for i in range(1, args.iterations + 1):
+                row = run_iteration(
+                    i, args.iterations, artifact_tarball, repo_tarball,
+                    cmake_config, args.config, args.gfx_only, ghcr_token, results_dir,
+                )
+                results.append(record(row))
+        else:
+            with ThreadPoolExecutor(max_workers=min(args.parallel, 4)) as pool:
+                futures = {}
+                for i in range(1, args.iterations + 1):
+                    f = pool.submit(
+                        run_iteration,
+                        i, args.iterations, artifact_tarball, repo_tarball,
+                        cmake_config, args.config, args.gfx_only, ghcr_token, results_dir,
+                    )
+                    futures[f] = i
+                for f in as_completed(futures):
+                    row = f.result()
+                    results.append(record(row))
+            results.sort(key=lambda r: r["iteration"])
+    except KeyboardInterrupt:
+        interrupted = True
+        print("\nInterrupted — sweeping for orphan VMs...", file=sys.stderr)
+        cleanup_orphan_vms()
+    finally:
+        csv_file.close()
+
+    if interrupted:
+        print("\n*** Run was interrupted; partial results below ***\n", file=sys.stderr)
     print_summary(results_dir, results)
+    if interrupted:
+        sys.exit(130)  # conventional exit code for SIGINT
 
 
 if __name__ == "__main__":
