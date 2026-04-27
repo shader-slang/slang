@@ -57,10 +57,19 @@ useful when the host needs the slot fixed before reflection runs
 
 After the dispatch, the demo asserts via the
 `ICoverageTracingMetadata` API that the metadata-reported binding
-matches what was requested. The CPU backend uses uniform offsets
-rather than (set, register) slots, so on `--backend=cpu` the option
+matches what was requested. The CPU and CUDA backends pack globals
+into a uniform-offset struct rather than exposing them at
+(set, register) slots, so on `--backend=cpu`/`cuda` the option
 silently has no effect (the demo prints a `[coverage] note: …`
 explaining this).
+
+> **D3D12 caveat:** with `--coverage-binding=N:M`, only `M=0`
+> currently completes end-to-end. Non-zero descriptor space
+> (`M != 0`) hits a pre-existing slang-rhi root-signature builder
+> limitation around how it accounts for `BaseShaderRegister` across
+> distinct spaces — unrelated to coverage but blocking on D3D12.
+> Vulkan handles non-zero space correctly. To be filed against
+> slang-rhi.
 
 CPU, Vulkan, D3D12 and CUDA produce **byte-identical LCOV output** —
 same hit counts per source line — which validates that instrumentation
@@ -183,7 +192,7 @@ demo and open `coverage-html/index.html` to see the current values.
 |---|---|---|
 | `cpu` | ✅ Works | ✅ **Fully working** — clean non-zero counter values, complete LCOV report, dead-code detection verified |
 | `vulkan` (incl. SPIR-V) | ✅ Works | ✅ **Fully working** — validated on macOS (MoltenVK) and desktop Windows with NVIDIA drivers; byte-identical LCOV to CPU |
-| `d3d12` | ✅ Works | ✅ **Fully working** — validated on desktop Windows; byte-identical LCOV to CPU/Vulkan |
+| `d3d12` | ✅ Works | ✅ **Fully working** for default and `--coverage-binding=N:0` — validated on desktop Windows; byte-identical LCOV to CPU/Vulkan. **Caveat:** `--coverage-binding=N:M` with `M != 0` hits a pre-existing slang-rhi root-signature limitation around non-zero descriptor spaces. Tracked separately. |
 | `cuda` | ✅ Works | ✅ **Fully working** — validated on desktop Windows with NVIDIA CUDA runtime; byte-identical LCOV to CPU/Vulkan/D3D12 |
 | `metal` | ✅ Works (with benign unused-variable warnings from Metal's compiler) | ⚠️ Pipeline builds; dispatch runs; but counter values are unreliable — most slots are zero while others show overflow-like values. **Not a coverage-feature issue** — a pre-existing slang-rhi Metal binding / initialization quirk. To be filed against slang-rhi. |
 
@@ -293,6 +302,18 @@ session sharing a single ref; the resulting double-release surfaced
 as heap corruption on Windows D3D12/CUDA/CPU device teardown while
 going silently unnoticed on macOS. Every other Slang example uses
 the `=` form; reuse that pattern.
+
+A second compiler-side issue surfaced when adding
+`--coverage-binding`: `__slang_coverage` was synthesized once per
+module being checked, so a multi-file shader (`simulate.slang`
+imports `physics.slang`) ended up with two synthesized buffers, both
+pinned to the same explicit `(register, space)`. HLSL emit
+deduplicated by name but parameter binding kept both entries; D3D12
+root-signature creation rejected the duplicate slot. The synthesizer
+now walks transitively imported modules and reuses an existing
+`__slang_coverage` rather than adding a duplicate. Vulkan + macOS
+allocators tolerated the duplicate, which is why the bug only
+surfaced when D3D12 + explicit binding was first exercised.
 
 ## Scenarios (future expansion)
 

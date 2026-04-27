@@ -551,9 +551,23 @@ int runDispatch(const Options& opt)
 
     ShaderProgramDesc progDesc = {};
     progDesc.slangGlobalScope = linked;
-    ComPtr<IShaderProgram> shaderProgram = device->createShaderProgram(progDesc);
-    if (!shaderProgram)
+    ComPtr<ISlangBlob> rhiDiag;
+    ComPtr<IShaderProgram> shaderProgram;
+    Result spResult = device->createShaderProgram(
+        progDesc,
+        shaderProgram.writeRef(),
+        rhiDiag.writeRef());
+    if (SLANG_FAILED(spResult) || !shaderProgram)
+    {
+        if (rhiDiag)
+            std::fprintf(stderr, "%s", (const char*)rhiDiag->getBufferPointer());
+        std::fprintf(
+            stderr,
+            "failed to create shader program on backend '%s' (0x%08x)\n",
+            opt.backend.c_str(),
+            (unsigned)spResult);
         return 1;
+    }
 
     ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram;
