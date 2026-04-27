@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Standalone RWStructuredBuffer<int*> (not inside a ParameterBlock).
 // The late buffer element lowering pass handles this: pointers as data inside
@@ -15,6 +16,8 @@ RWStructuredBuffer<int> output;
 // CHECK-NOT: device{{.*}}device
 
 // CHECK-LABEL: computeMain
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

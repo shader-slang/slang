@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Verify that a ConstantBuffer with ONLY single-level pointers does not
 // trigger any pointer-to-ulong lowering. Single-level pointers must stay
@@ -24,6 +25,8 @@ RWStructuredBuffer<int> output;
 // CHECK: int count
 // CHECK-NOT: ulong
 // CHECK: };
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

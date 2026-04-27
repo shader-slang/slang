@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Verify that pointers used in non-buffer contexts (function-local, passed
 // between functions) are not lowered to ulong. Only pointers stored as data
@@ -28,6 +29,8 @@ RWStructuredBuffer<int> output;
 // CHECK-NOT: ulong
 
 // CHECK-LABEL: computeMain
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

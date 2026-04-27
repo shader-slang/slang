@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Verify that multi-level pointers (int**) inside a ConstantBuffer are lowered
 // to ulong because Metal rejects pointer-to-pointer types in buffer pointee
@@ -23,6 +24,8 @@ RWStructuredBuffer<int> output;
 // The kernel body should cast ulong back to a typed pointer for `multi`.
 // CHECK-LABEL: computeMain
 // CHECK: int device*
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

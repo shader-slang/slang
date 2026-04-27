@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Mixed fields: single-level pointer, multi-level pointer, and scalar fields
 // in the same ParameterBlock struct. Single-level pointers are preserved as
@@ -27,6 +28,8 @@ ParameterBlock<MixedParams> params;
 // The kernel body should cast ulong back to a typed pointer for `indirect`.
 // CHECK-LABEL: computeMain
 // CHECK: int device*
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

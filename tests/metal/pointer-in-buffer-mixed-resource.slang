@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Cross-feature test: a ParameterBlock struct containing both a multi-level
 // pointer field (lowered to ulong via the leaf pointer policy) and a
@@ -26,6 +27,8 @@ ParameterBlock<Params> params;
 // The kernel body should cast ulong back to a typed pointer for `indirect`.
 // CHECK-LABEL: computeMain
 // CHECK: int device*
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

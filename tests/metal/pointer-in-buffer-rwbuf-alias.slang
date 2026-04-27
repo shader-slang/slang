@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Verify that RWStructuredBuffer<uint64_t> and RWStructuredBuffer<int**>
 // coexist correctly when lowering produces the same storage type (ulong).
@@ -25,6 +26,8 @@ RWStructuredBuffer<int> output;
 
 // The ptrs access must cast through a pointer type; addrs must not.
 // CHECK-LABEL: computeMain
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

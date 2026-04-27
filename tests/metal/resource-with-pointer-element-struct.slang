@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Struct element type containing pointers inside a resource inside a ParameterBlock.
 // RWStructuredBuffer<PtrWrapper> where PtrWrapper has an int* field.
@@ -32,6 +33,8 @@ ParameterBlock<Store> params;
 // The kernel body should cast ulong back to a typed pointer.
 // CHECK-LABEL: computeMain
 // CHECK: int device*
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

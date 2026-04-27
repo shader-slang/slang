@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Verify that a struct with a pre-existing uint64_t (ulong) field alongside
 // pointer fields that get lowered to ulong does not cause field conflicts
@@ -27,6 +28,8 @@ ParameterBlock<MyParams> params;
 // The kernel body should cast ulong back to a typed pointer for `ptrs`.
 // CHECK-LABEL: computeMain
 // CHECK: int device*
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
