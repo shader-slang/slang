@@ -827,5 +827,5 @@ return {
 	["makeConditionalValue"] = 851,
   ["SpecializeExistentialsInType"] = 852,
   ["assumeAddress"] = 853,
-  ["extractDynamicObject"] = 854
+  ["extractDynamicObject"] = 855
 }
