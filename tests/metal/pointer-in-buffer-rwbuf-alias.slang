@@ -18,13 +18,13 @@ ParameterBlock<Params> params;
 RWStructuredBuffer<int> output;
 
 // Both resources lower to ulong device* but must remain distinct fields.
-// CHECK: struct Params
+// CHECK-LABEL: struct Params
 // CHECK: ulong device* addrs
 // CHECK: ulong device* ptrs
 // CHECK: };
 
 // The ptrs access must cast through a pointer type; addrs must not.
-// CHECK: computeMain
+// CHECK-LABEL: computeMain
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

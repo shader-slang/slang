@@ -14,14 +14,14 @@ struct DeepPointer
 ParameterBlock<DeepPointer> params;
 
 // The struct field type must not contain any pointer chain.
-// CHECK: struct DeepPointer
+// CHECK-LABEL: struct DeepPointer
 // CHECK: ulong
 // CHECK-NOT: device*
 // CHECK: };
 
 // The kernel body should cast ulong back and dereference through
 // the full pointer chain.
-// CHECK: computeMain
+// CHECK-LABEL: computeMain
 // CHECK: int device*
 
 [shader("compute")]

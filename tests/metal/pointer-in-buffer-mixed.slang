@@ -17,7 +17,7 @@ struct MixedParams
 ParameterBlock<MixedParams> params;
 
 // Single-level pointer preserved, multi-level lowered to ulong.
-// CHECK: struct MixedParams
+// CHECK-LABEL: struct MixedParams
 // CHECK: int device* data
 // CHECK: ulong indirect
 // CHECK: float
@@ -25,7 +25,7 @@ ParameterBlock<MixedParams> params;
 // CHECK: };
 
 // The kernel body accesses the single ptr directly and casts the multi ptr.
-// CHECK: computeMain
+// CHECK-LABEL: computeMain
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

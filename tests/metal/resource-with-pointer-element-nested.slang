@@ -24,12 +24,12 @@ ParameterBlock<CallData> call_data;
 // Single-level pointer (ptr) stays as a typed device pointer.
 // Resource pointers (RWStructuredBuffer<int*>) are lowered via the resource-element
 // path, so their inner pointers become ulong.
-// CHECK: struct CallData
+// CHECK-LABEL: struct CallData
 // CHECK: int device* ptr
 // CHECK-NOT: device{{.*}}device
 // CHECK: };
 
-// CHECK: compute_main
+// CHECK-LABEL: compute_main
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

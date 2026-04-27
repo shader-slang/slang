@@ -14,7 +14,7 @@ RWStructuredBuffer<int> output;
 // CHECK: ulong
 // CHECK-NOT: device{{.*}}device
 
-// CHECK: computeMain
+// CHECK-LABEL: computeMain
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

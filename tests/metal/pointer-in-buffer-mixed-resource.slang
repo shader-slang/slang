@@ -18,12 +18,12 @@ ParameterBlock<Params> params;
 // Multi-level pointer lowered to ulong; resource element pointers also
 // lowered to ulong (via descriptor handle wrapping). No pointer-to-pointer
 // types should remain in the buffer pointee struct.
-// CHECK: struct Params
+// CHECK-LABEL: struct Params
 // CHECK: ulong indirect
 // CHECK-NOT: device{{.*}}device
 // CHECK: };
 
-// CHECK: computeMain
+// CHECK-LABEL: computeMain
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

@@ -900,6 +900,14 @@ struct LoweredElementTypeContext
                     auto leafInfo = leafTypeLoweringPolicy->lowerLeafLogicalType(
                         resourceTypeForDescriptor,
                         config);
+                    // Override originalType to the logical (user-facing) resource type
+                    // (e.g. RWStructuredBuffer<int*>), not the rebuilt type with lowered
+                    // elements (RWStructuredBuffer<ulong>). This is safe because:
+                    //  - ConversionMethod::apply takes an explicit resultType from the
+                    //    caller, not from this field.
+                    //  - Struct unpack uses field->getFieldType() as the cast result type.
+                    //  - CastDescriptorHandleToResource is a no-op in the Metal emitter.
+                    //  - Cache lookups need the logical type as the key for consistency.
                     leafInfo.originalType = type;
                     return leafInfo;
                 }
@@ -938,6 +946,13 @@ struct LoweredElementTypeContext
         // Pre-populate cache with identity mapping as a sentinel to break cycles
         // from buffer-indirected recursive types (e.g. struct A { RWStructuredBuffer<B> }
         // + struct B { A a; }). Re-entrant calls hit this sentinel and return "no change".
+        //
+        // Note: if mutual recursion with non-trivial lowering were reachable, the
+        // identity sentinel could leak stale (un-lowered) types into dependent structs.
+        // This is safe in practice because the front-end rejects recursive structured
+        // buffer element types (validateStructuredBufferElementType calls
+        // containsRecursiveType, which unwraps resource types to detect cycles).
+        // See tests/diagnostics/structuredbuffer-resource-struct-recursive*.slang.
         info.originalType = type;
         info.loweredType = type;
         loweredTypeInfo.set(type, info);
@@ -1689,6 +1704,16 @@ struct LoweredElementTypeContext
         return clonedFunc;
     }
 
+    bool needsBufferElementLowering(IRType* elementType)
+    {
+        if (as<IRStructType>(elementType) || as<IRMatrixType>(elementType) ||
+            as<IRArrayType>(elementType) || as<IRBoolType>(elementType))
+            return true;
+        if (isMetalTarget(target->getTargetReq()) && as<IRPtrType>(elementType))
+            return true;
+        return false;
+    }
+
     void processModule(IRModule* module)
     {
         IRBuilder builder(module);
@@ -1742,15 +1767,8 @@ struct LoweredElementTypeContext
 
             if (as<IRTextureBufferType>(globalInst))
                 continue;
-            {
-                bool needsElementLowering =
-                    as<IRStructType>(elementType) || as<IRMatrixType>(elementType) ||
-                    as<IRArrayType>(elementType) || as<IRBoolType>(elementType);
-                if (!needsElementLowering && isMetalTarget(target->getTargetReq()))
-                    needsElementLowering = as<IRPtrType>(elementType) != nullptr;
-                if (!needsElementLowering)
-                    continue;
-            }
+            if (!needsBufferElementLowering(elementType))
+                continue;
             bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
         }
 
@@ -2918,6 +2936,9 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
     }
 };
 
+// Late-pass policy for Metal buffer element types (StorageBuffer, ConstantBuffer).
+// See also: MetalParameterBlockElementTypeLoweringPolicy::lowerLeafLogicalType,
+// which handles the early-pass equivalent for ParameterBlock (argument buffer) structs.
 struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
 {
     MetalBufferElementTypeLoweringPolicy(

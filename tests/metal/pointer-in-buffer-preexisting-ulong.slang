@@ -18,13 +18,13 @@ ParameterBlock<MyParams> params;
 
 // Pre-existing uint64_t stays as ulong, int** lowered to ulong,
 // int* preserved as typed device pointer. All three should be distinct fields.
-// CHECK: struct MyParams
+// CHECK-LABEL: struct MyParams
 // CHECK: ulong addr
 // CHECK: ulong ptrs
 // CHECK: int device* direct
 // CHECK: };
 
-// CHECK: computeMain
+// CHECK-LABEL: computeMain
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

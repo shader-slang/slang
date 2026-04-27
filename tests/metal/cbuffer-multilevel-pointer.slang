@@ -15,7 +15,7 @@ ConstantBuffer<MyParams> params;
 RWStructuredBuffer<int> output;
 
 // The struct should have single-level pointer intact, but multi-level lowered to ulong.
-// CHECK: struct MyParams
+// CHECK-LABEL: struct MyParams
 // CHECK: int device* single
 // CHECK: ulong multi
 // CHECK: };

@@ -20,13 +20,13 @@ struct CopyParams
 ParameterBlock<CopyParams> params;
 
 // Single-level pointers stay as typed device pointers.
-// CHECK: struct CopyParams
+// CHECK-LABEL: struct CopyParams
 // CHECK: int device* src
 // CHECK: int device* dst
 // CHECK: };
 
 // The kernel body accesses pointers directly (no ulong cast needed).
-// CHECK: computeMain
+// CHECK-LABEL: computeMain
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

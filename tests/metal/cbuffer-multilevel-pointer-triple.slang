@@ -13,7 +13,7 @@ ConstantBuffer<MyParams> params;
 RWStructuredBuffer<int> output;
 
 // The struct should have the triple pointer lowered to ulong.
-// CHECK: struct MyParams
+// CHECK-LABEL: struct MyParams
 // CHECK: ulong deep
 // CHECK: };
 

@@ -14,13 +14,13 @@ struct PointerArray
 ParameterBlock<PointerArray> params;
 
 // The struct field type must not contain pointer-to-pointer.
-// CHECK: struct PointerArray
+// CHECK-LABEL: struct PointerArray
 // CHECK: ulong
 // CHECK-NOT: device*
 // CHECK: };
 
 // The kernel body should cast ulong back to the appropriate pointer type.
-// CHECK: computeMain
+// CHECK-LABEL: computeMain
 // CHECK: int device*
 
 [shader("compute")]

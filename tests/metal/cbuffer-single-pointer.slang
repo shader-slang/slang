@@ -18,7 +18,7 @@ ConstantBuffer<MyParams> params;
 RWStructuredBuffer<int> output;
 
 // All pointer fields must remain as typed device pointers (no ulong).
-// CHECK: struct MyParams
+// CHECK-LABEL: struct MyParams
 // CHECK: int device* data
 // CHECK: float device* weights
 // CHECK: int count

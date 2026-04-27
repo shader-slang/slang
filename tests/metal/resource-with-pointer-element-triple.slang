@@ -16,13 +16,13 @@ ParameterBlock<IndirectStore> params;
 
 // The argument-buffer struct must contain ulong (lowered pointer element),
 // not a pointer-to-pointer type.
-// CHECK: struct IndirectStore
+// CHECK-LABEL: struct IndirectStore
 // CHECK: ulong
 // CHECK-NOT: device{{.*}}device
 // CHECK: };
 
 // The kernel body should cast ulong back to a typed pointer.
-// CHECK: computeMain
+// CHECK-LABEL: computeMain
 // CHECK: int device*
 
 [shader("compute")]

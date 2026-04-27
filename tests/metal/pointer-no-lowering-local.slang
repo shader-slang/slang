@@ -19,15 +19,15 @@ void writeThrough(int* p, int val)
 RWStructuredBuffer<int> output;
 
 // Function signatures must use typed device pointers, not ulong.
-// CHECK: readThrough
+// CHECK-LABEL: readThrough
 // CHECK: int device*
 // CHECK-NOT: ulong
 
-// CHECK: writeThrough
+// CHECK-LABEL: writeThrough
 // CHECK: int device*
 // CHECK-NOT: ulong
 
-// CHECK: computeMain
+// CHECK-LABEL: computeMain
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
