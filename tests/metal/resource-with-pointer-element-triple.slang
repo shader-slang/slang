@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
 // Triple pointer variant: RWStructuredBuffer<int**> inside a ParameterBlock.
-// When Metal emits this, the element type `int**` produces a triple pointer
-// `device (device int* device*)*` which Metal rejects.
+// The element type `int**` is a pointer-to-pointer, which Metal rejects in
+// buffer pointee types (regardless of address space qualifiers).
 // The fix must handle arbitrary depth, not just double pointers.
 //
 // See: https://github.com/shader-slang/slang/issues/10841
@@ -15,7 +15,7 @@ struct IndirectStore
 ParameterBlock<IndirectStore> params;
 
 // The argument-buffer struct must contain ulong (lowered pointer element),
-// not a multi-level device pointer.
+// not a pointer-to-pointer type.
 // CHECK: struct IndirectStore
 // CHECK: ulong
 // CHECK-NOT: device{{.*}}device

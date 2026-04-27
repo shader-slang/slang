@@ -20,9 +20,12 @@ struct CallData
 
 ParameterBlock<CallData> call_data;
 
-// The argument-buffer struct must not contain any multi-level device pointers.
+// The argument-buffer struct must not contain any pointer-to-pointer types.
+// Single-level pointer (ptr) stays as a typed device pointer.
+// Resource pointers (RWStructuredBuffer<int*>) are lowered via the resource-element
+// path, so their inner pointers become ulong.
 // CHECK: struct CallData
-// CHECK: ulong
+// CHECK: int device* ptr
 // CHECK-NOT: device{{.*}}device
 // CHECK: };
 

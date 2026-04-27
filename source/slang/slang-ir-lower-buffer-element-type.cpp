@@ -873,8 +873,9 @@ struct LoweredElementTypeContext
 
         // Metal ParameterBlock: lower element types inside resource types so that e.g.
         // RWStructuredBuffer<int*> becomes DescriptorHandle(RWStructuredBuffer<ulong>)
-        // instead of DescriptorHandle(RWStructuredBuffer<int*>) which emits the
-        // rejected `device int* device*` in the argument buffer struct.
+        // instead of DescriptorHandle(RWStructuredBuffer<int*>) which would produce a
+        // pointer-to-pointer in the argument buffer struct. Metal rejects pointer-to-
+        // pointer types in buffer pointee types regardless of address space qualifiers.
         if (config.layoutRuleName == IRTypeLayoutRuleName::MetalParameterBlock &&
             isResourceType(type))
         {
@@ -2893,16 +2894,24 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
                 info.convertOriginalToLowered = kIROp_CastResourceToDescriptorHandle;
                 return info;
             }
-            if (as<IRPtrType>(type))
+            // Only lower multi-level pointers (e.g. int**, int***) to ulong.
+            // Single-level pointers (e.g. int*) are valid as `device int*` in Metal
+            // argument buffer structs and are preserved as typed pointers, matching
+            // the behavior in MetalBufferElementTypeLoweringPolicy for constant buffers.
+            // See also: MetalBufferElementTypeLoweringPolicy::lowerLeafLogicalType.
+            if (auto ptrType = as<IRPtrType>(type))
             {
-                IRBuilder builder(type);
-                builder.setInsertBefore(type);
-                LoweredElementTypeInfo info = {};
-                info.originalType = type;
-                info.loweredType = builder.getUInt64Type();
-                info.convertLoweredToOriginal = kIROp_CastIntToPtr;
-                info.convertOriginalToLowered = kIROp_CastPtrToInt;
-                return info;
+                if (as<IRPtrType>(ptrType->getValueType()))
+                {
+                    IRBuilder builder(type);
+                    builder.setInsertBefore(type);
+                    LoweredElementTypeInfo info = {};
+                    info.originalType = type;
+                    info.loweredType = builder.getUInt64Type();
+                    info.convertLoweredToOriginal = kIROp_CastIntToPtr;
+                    info.convertOriginalToLowered = kIROp_CastPtrToInt;
+                    return info;
+                }
             }
         }
         return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
@@ -2930,7 +2939,8 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
                 needsLowering = true;
 
             // Multi-level pointers (e.g. int**) in any buffer context need lowering
-            // to avoid `device T* device*` in Metal structs bound via [[buffer(N)]].
+            // because Metal rejects pointer-to-pointer types in buffer pointee types
+            // (regardless of address space qualifiers).
             // Single-level pointers (e.g. int*) in constant buffers are runtime-set
             // device handles and must stay as typed pointers.
             if (as<IRPtrType>(ptrType->getValueType()))

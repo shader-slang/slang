@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
 // Double pointer: the slangpy failure case.
-// Slang emits `device int *device *` which Metal rejects in [[buffer(N)]]
-// parameter types. The outermost pointer must be lowered to ulong.
+// Metal rejects pointer-to-pointer types in buffer pointee types (regardless
+// of address space qualifiers). The pointer must be lowered to ulong.
 //
 // See: https://github.com/shader-slang/slang/issues/10841
 

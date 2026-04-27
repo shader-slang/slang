@@ -1,14 +1,12 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
-// Metal's [[buffer(N)]] validation rejects pointer-to-pointer types
-// (e.g. `device int *device *`) in buffer pointee types, regardless of
-// nesting depth. The type itself is valid MSL — the restriction is only
-// on buffer-bound parameters. The fix lowers pointer fields in
-// buffer-backed structs to ulong, with casts at point of use.
+// Metal rejects pointer-to-pointer types in buffer pointee types,
+// regardless of address space qualifiers or nesting depth. The type
+// itself is valid MSL — the restriction is only on buffer-bound parameters.
 //
-// This test covers single-pointer fields (which MSL already accepts in
-// buffer structs, but which we lower uniformly for consistency) and
-// verifies the lowered output for the basic case.
+// Single-level pointer fields (int*) are preserved as typed device
+// pointers since MSL accepts `device int*` in buffer-bound structs.
+// Only multi-level pointers (int**, int***) need lowering to ulong.
 //
 // See also: pointer-in-buffer-double.slang, pointer-in-buffer-triple.slang
 // See: https://github.com/shader-slang/slang/issues/10841
@@ -21,15 +19,14 @@ struct CopyParams
 
 ParameterBlock<CopyParams> params;
 
-// Verify struct fields are lowered to ulong, not device pointers.
+// Single-level pointers stay as typed device pointers.
 // CHECK: struct CopyParams
-// CHECK: ulong
-// CHECK-NOT: device*
+// CHECK: int device* src
+// CHECK: int device* dst
 // CHECK: };
 
-// Verify the kernel body contains casts back to typed pointers.
+// The kernel body accesses pointers directly (no ulong cast needed).
 // CHECK: computeMain
-// CHECK: (int device*)
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

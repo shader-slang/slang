@@ -1,9 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
 // Reproduces the slangpy test_copy_pointer failure:
-// RWStructuredBuffer<int*> inside a struct inside a ParameterBlock generates
-// `device int *device *` in the argument buffer struct, which Metal rejects
-// for [[buffer(N)]]-bound parameters.
+// RWStructuredBuffer<int*> inside a struct inside a ParameterBlock produces
+// a pointer-to-pointer in the argument buffer struct, which Metal rejects
+// in buffer pointee types (regardless of address space qualifiers).
 //
 // This is distinct from pointer-in-buffer-{struct,double}.slang which test
 // bare pointer fields. Here the pointer is the *element type* of a resource
@@ -19,7 +19,7 @@ struct ValueStore
 ParameterBlock<ValueStore> params;
 
 // The argument-buffer struct must contain ulong (lowered pointer element),
-// not a multi-level device pointer.
+// not a pointer-to-pointer type.
 // CHECK: struct ValueStore
 // CHECK: ulong
 // CHECK-NOT: device{{.*}}device

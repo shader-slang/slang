@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
 // Verify that multi-level pointers (int**) inside a ConstantBuffer are lowered
-// to ulong to avoid `device T* device*` in Metal struct definitions bound via
-// [[buffer(N)]]. Single-level pointers (int*) should stay as typed device pointers.
+// to ulong because Metal rejects pointer-to-pointer types in buffer pointee
+// types. Single-level pointers (int*) should stay as typed device pointers.
 
 struct MyParams
 {

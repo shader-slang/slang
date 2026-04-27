@@ -19,7 +19,7 @@ struct Store
 ParameterBlock<Store> params;
 
 // The argument-buffer struct must contain ulong (lowered pointer within struct),
-// not a multi-level device pointer.
+// not a pointer-to-pointer type.
 // CHECK: struct Store
 // CHECK: ulong
 // CHECK-NOT: device{{.*}}device
