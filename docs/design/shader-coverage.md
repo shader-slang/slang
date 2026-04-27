@@ -28,7 +28,11 @@ Current pipeline
 
 1. During semantic checking, if `-trace-coverage` is enabled, Slang
    synthesizes a module-scope `RWStructuredBuffer<uint> __slang_coverage`
-   declaration unless the user already declared one.
+   declaration unless the user already declared one. When
+   `-trace-coverage-binding <index> <space>` is also specified, the
+   synthesized declaration carries an explicit `register(uN, spaceM)`
+   semantic so that parameter binding pins it to the requested slot
+   rather than auto-allocating one.
 2. That declaration participates in the normal parameter-binding and
    reflection pipeline, the same way as any other global parameter.
 3. During AST lowering, Slang emits an `IncrementCoverageCounter` IR op

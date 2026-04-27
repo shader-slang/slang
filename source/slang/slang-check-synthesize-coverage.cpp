@@ -17,6 +17,7 @@
 #include "slang-check-synthesize-coverage.h"
 
 #include "compiler-core/slang-name.h"
+#include "compiler-core/slang-token.h"
 #include "slang-ast-builder.h"
 #include "slang-ast-decl.h"
 #include "slang-ast-modifier.h"
@@ -31,6 +32,52 @@ namespace Slang
 // IncrementCoverageCounter ops and the coverage metadata / sidecar
 // output that describes the buffer to hosts.
 static const char* kCoverageBufferName = "__slang_coverage";
+
+// Attach explicit binding modifiers to the synthesized coverage
+// VarDecl so that parameter binding pins it to (uN, spaceM) on every
+// target instead of auto-allocating. We attach both:
+//   - HLSLRegisterSemantic — drives HLSL emit (`register(uN, spaceM)`)
+//     and is also picked up by GLSL/SPIR-V parameter binding.
+//   - GLSLBindingAttribute — equivalent of `[[vk::binding(N, M)]]`;
+//     having it suppresses the "D3D register without Vulkan binding
+//     or shift" diagnostic when emitting GLSL/SPIR-V.
+// Both encode the same (index, space) pair, so neither target sees
+// a conflict.
+static void attachExplicitBindingSemantic(
+    ASTBuilder* astBuilder,
+    NamePool* namePool,
+    VarDecl* varDecl,
+    int bindingIndex,
+    int bindingSpace,
+    SourceLoc loc)
+{
+    auto reg = astBuilder->create<HLSLRegisterSemantic>();
+    reg->loc = loc;
+
+    // The Token consumer (extractHLSLLayoutSemanticInfo) splits text
+    // like "u7" / "space3" into a class name and digit suffix. UAV
+    // class is `u`; RWStructuredBuffer always lands there.
+    StringBuilder regName;
+    regName << "u" << bindingIndex;
+    StringBuilder spaceName;
+    spaceName << "space" << bindingSpace;
+
+    // Anchor the Token text in the NamePool so its memory outlives
+    // the StringBuilder.
+    auto regNameObj = namePool->getName(regName.toString());
+    auto spaceNameObj = namePool->getName(spaceName.toString());
+
+    reg->registerName = Token(TokenType::Identifier, regNameObj, loc);
+    reg->spaceName = Token(TokenType::Identifier, spaceNameObj, loc);
+
+    addModifier(varDecl, reg);
+
+    auto vkBinding = astBuilder->create<GLSLBindingAttribute>();
+    vkBinding->loc = loc;
+    vkBinding->binding = bindingIndex;
+    vkBinding->set = bindingSpace;
+    addModifier(varDecl, vkBinding);
+}
 
 // Find an existing module-scope decl named `__slang_coverage`. If
 // present, callers reuse it instead of synthesizing. Returns null if
@@ -88,6 +135,29 @@ void maybeSynthesizeCoverageBufferDecl(SemanticsVisitor* visitor, ModuleDecl* mo
 
     auto synthModifier = astBuilder->create<SynthesizedModifier>();
     addModifier(varDecl, synthModifier);
+
+    // Apply user-specified explicit binding (`-trace-coverage-binding
+    // <index> <space>`) if requested. Without this the parameter
+    // binding pass auto-allocates a slot, which is fine for hosts
+    // that read the assignment back from the metadata but awkward
+    // when the host needs the slot fixed at compile time (e.g. for a
+    // pre-built D3D12 root signature).
+    auto& opts = visitor->getLinkage()->m_optionSet;
+    if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
+    {
+        if (values->getCount() > 0)
+        {
+            int bindingIndex = (*values)[0].intValue;
+            int bindingSpace = (*values)[0].intValue2;
+            attachExplicitBindingSemantic(
+                astBuilder,
+                visitor->getNamePool(),
+                varDecl,
+                bindingIndex,
+                bindingSpace,
+                moduleDecl->loc);
+        }
+    }
 
     // Attach the decl to the module. `addDirectMemberDecl` updates
     // the internal name-lookup table so subsequent phases find it

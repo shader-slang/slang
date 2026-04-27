@@ -20,6 +20,23 @@ of the Slang compiler itself.
 
 Enable with `-trace-coverage` on the `slangc` CLI.
 
+To pin the coverage buffer at a specific binding slot instead of
+letting parameter binding auto-allocate one, add
+`-trace-coverage-binding <index> <space>`:
+
+```bash
+slangc shader.slang -target spirv -stage compute -entry main \
+    -trace-coverage-binding 7 3 -o shader.spv
+# __slang_coverage lands at register(u7, space3) on HLSL,
+# DescriptorSet 3 / Binding 7 on SPIR-V.
+```
+
+`-trace-coverage-binding` implies `-trace-coverage`. The override is
+ignored (with the user's declaration winning) when the user has
+already declared a `__slang_coverage` themselves. Use this when the
+host needs the slot fixed at compile time — for example when
+pre-building a D3D12 root signature before reflection runs.
+
 1. **AST-check time** (`source/slang/slang-check-synthesize-coverage.{h,cpp}`).
    A `RWStructuredBuffer<uint> __slang_coverage` `VarDecl` is synthesized
    in the module scope before parameter binding runs. This lets the

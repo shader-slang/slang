@@ -548,6 +548,16 @@ void initCommandOptions(CommandOptions& options)
          "`RWStructuredBuffer<uint> __slang_coverage` parameter. "
          "When writing compiled output to a file, slangc also emits "
          "`<output>.coverage-mapping.json` to map counters back to source positions."},
+        {OptionKind::TraceCoverageBinding,
+         "-trace-coverage-binding",
+         "-trace-coverage-binding <index> <space>",
+         "Bind the synthesized `__slang_coverage` buffer at an explicit "
+         "(register index, space) instead of letting parameter binding "
+         "auto-allocate a slot. Useful when the host needs the binding "
+         "fixed at compile time (for example to pre-build a D3D12 root "
+         "signature). Implies `-trace-coverage`. Ignored if the user "
+         "declares `__slang_coverage` themselves; the user declaration "
+         "wins."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -2797,6 +2807,20 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     OptionKind::VulkanBindGlobals,
                     (int)binding,
                     (int)bindingSet);
+                break;
+            }
+        case OptionKind::TraceCoverageBinding:
+            {
+                // -trace-coverage-binding <index> <space>
+                Int bindingIndex, bindingSpace;
+                SLANG_RETURN_ON_FAIL(_expectInt(arg, bindingIndex));
+                SLANG_RETURN_ON_FAIL(_expectInt(arg, bindingSpace));
+                linkage->m_optionSet.set(
+                    OptionKind::TraceCoverageBinding,
+                    (int)bindingIndex,
+                    (int)bindingSpace);
+                // Implies -trace-coverage so users don't have to spell both.
+                linkage->m_optionSet.set(OptionKind::TraceCoverage, true);
                 break;
             }
         case OptionKind::Profile:
