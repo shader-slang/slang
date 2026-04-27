@@ -23,8 +23,11 @@ Aggregation rules (max-across-inputs):
 
 Path normalization:
 - Backslashes → forward slashes (Windows artifacts).
-- Built-in default prefixes for the three Slang CI runners are
-  stripped; `--strip-prefix` extends the list.
+- Each `--strip-prefix` (repeatable) is removed from the start of
+  every record path. No project-specific prefixes are baked in;
+  callers that want runner-root stripping inject the relevant
+  prefixes themselves (the `tools/coverage/slang-merge.py`
+  wrapper does this for the three Slang CI runners).
 
 Standard library only; no pip deps.
 """
@@ -41,6 +44,7 @@ from typing import Dict, List, Optional, Tuple
 # Shared parser / writer / data model.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lcov_io import (  # noqa: E402
+    AuthFileSummary,
     AuthSummary,
     FileRecord,
     Function,
@@ -454,6 +458,19 @@ def main(argv: Optional[List[str]] = None) -> int:
                 if (not inc_re or inc_re.search(k))
                 and (not exc_re or not exc_re.search(k))
             }
+            # `merged_auth.total` was summed across the unfiltered
+            # files; recompute it from the surviving rows so the
+            # written TOTAL line and the stderr summary match the
+            # filtered set.
+            recomputed = AuthFileSummary()
+            for fs in merged_auth.files.values():
+                recomputed.line_total += fs.line_total
+                recomputed.line_missed += fs.line_missed
+                recomputed.func_total += fs.func_total
+                recomputed.func_missed += fs.func_missed
+                recomputed.branch_total += fs.branch_total
+                recomputed.branch_missed += fs.branch_missed
+            merged_auth.total = recomputed
             dropped = before - len(merged_auth.files)
             if dropped and not args.quiet:
                 print(

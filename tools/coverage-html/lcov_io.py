@@ -277,12 +277,21 @@ class FileRecord:
             key=lambda kv: kv[1].first_line,
         )
         sorted_lines = sorted(self.lines.items())
+        n = len(items)
         for i, (name, fn) in enumerate(items):
             if fn.hits > 0:
                 result[name] = True
                 continue
+            # When several mangled names share the same first_line
+            # (templated or inlined siblings, lambda + parent), they
+            # form a single function-range partition; otherwise the
+            # earlier ones would get an empty [start, end) interval
+            # and miss every DA line in their actual source range.
             start = fn.first_line
-            end = items[i + 1][1].first_line if i + 1 < len(items) else 10**9
+            j = i + 1
+            while j < n and items[j][1].first_line == start:
+                j += 1
+            end = items[j][1].first_line if j < n else 10**9
             any_hit = False
             for ln, hits in sorted_lines:
                 if ln < start:
@@ -360,9 +369,15 @@ def function_branch_coverage(record: FileRecord) -> Dict[str, Tuple[int, int]]:
     # Sort BRDA keys once so we can range-scan each function.
     sorted_branches = sorted(record.branches.items())  # [((line, blk, br), taken), ...]
 
+    n = len(items)
     for i, (name, fn) in enumerate(items):
         start = fn.first_line
-        end = items[i + 1][1].first_line if i + 1 < len(items) else 10**9
+        # Treat all functions sharing first_line as one partition;
+        # otherwise the earlier ones would get an empty [start, end).
+        j = i + 1
+        while j < n and items[j][1].first_line == start:
+            j += 1
+        end = items[j][1].first_line if j < n else 10**9
         total = 0
         hit = 0
         for (br_line, _block, _branch_id), taken in sorted_branches:
@@ -406,9 +421,15 @@ def function_line_coverage(record: FileRecord) -> Dict[str, Tuple[int, int]]:
 
     sorted_lines = sorted(record.lines.items())  # [(line, hits), ...]
 
+    n = len(items)
     for i, (name, fn) in enumerate(items):
         start = fn.first_line
-        end = items[i + 1][1].first_line if i + 1 < len(items) else 10**9
+        # Treat all functions sharing first_line as one partition;
+        # otherwise the earlier ones would get an empty [start, end).
+        j = i + 1
+        while j < n and items[j][1].first_line == start:
+            j += 1
+        end = items[j][1].first_line if j < n else 10**9
         total = 0
         hit = 0
         for ln, hits in sorted_lines:

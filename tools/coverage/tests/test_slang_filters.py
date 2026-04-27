@@ -204,5 +204,44 @@ class WrapperCliTests(unittest.TestCase):
         self.assertIn("source/slang/x.cpp", res.stdout)
 
 
+SHELL_PATTERNS_PATH = os.path.join(SLANG_TOOL_DIR, "slangc-ignore-patterns.sh")
+
+
+def _shell_patterns() -> set:
+    """Extract the regexes from `-ignore-filename-regex='...'` lines."""
+    pat = re.compile(r"-ignore-filename-regex='([^']+)'")
+    out = set()
+    with open(SHELL_PATTERNS_PATH, encoding="utf-8") as f:
+        for m in pat.finditer(f.read()):
+            out.add(m.group(1))
+    return out
+
+
+class BashPythonPatternSyncTests(unittest.TestCase):
+    """Verify slang_filters.py and slangc-ignore-patterns.sh stay in
+    sync. The Python copy anchors each top-level segment with `^`
+    (because `re.search` is unanchored); the bash copy is fed to
+    `llvm-cov -ignore-filename-regex` which anchors implicitly.
+    Strip the leading `^` from the Python set before comparing.
+    """
+
+    def test_pattern_sets_match(self):
+        bash_set = _shell_patterns()
+        python_set = {
+            p[1:] if p.startswith("^") else p
+            for p in slang_filters.SLANGC_EXCLUDE_PATTERNS
+        }
+        self.assertEqual(
+            bash_set,
+            python_set,
+            msg=(
+                "slangc-ignore-patterns.sh and slang_filters.py have "
+                "drifted; update both. Only-in-bash="
+                f"{bash_set - python_set!r}; only-in-python="
+                f"{python_set - bash_set!r}"
+            ),
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

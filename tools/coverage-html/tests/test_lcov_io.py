@@ -378,6 +378,41 @@ class FunctionLineCoverageTests(unittest.TestCase):
         )
         self.assertEqual(function_line_coverage(r)["only_one"], (3, 2))
 
+    def test_same_first_line_siblings_share_partition(self):
+        # Regression: when two FN entries share the same first_line
+        # (templated/inlined siblings, lambda + parent), the earlier
+        # one previously got an empty [start, end) interval and
+        # reported (0, 0) regardless of actual line execution.
+        from lcov_io import function_line_coverage
+
+        r = self._build(
+            lines={5: 1, 6: 1, 7: 0, 8: 1, 12: 1},
+            # Two siblings at line 5; next function at 12.
+            fns={"sibling_a": (5, 1), "sibling_b": (5, 0), "next_fn": (12, 1)},
+        )
+        cov = function_line_coverage(r)
+        # Both siblings share lines 5-11: 4 DA records (5, 6, 7, 8),
+        # 3 hit.
+        self.assertEqual(cov["sibling_a"], (4, 3))
+        self.assertEqual(cov["sibling_b"], (4, 3))
+        self.assertEqual(cov["next_fn"], (1, 1))
+
+    def test_same_first_line_branch_partition(self):
+        from lcov_io import FileRecord, Function, function_branch_coverage
+
+        r = FileRecord(path="x.c")
+        r.branches = {(5, 0, 0): 1, (5, 0, 1): 0, (8, 0, 0): 1}
+        r.functions = {
+            "sibling_a": Function(first_line=5, hits=1),
+            "sibling_b": Function(first_line=5, hits=0),
+            "next_fn": Function(first_line=12, hits=1),
+        }
+        cov = function_branch_coverage(r)
+        # Branches at 5 and 8 fall in the [5, 12) shared partition.
+        self.assertEqual(cov["sibling_a"], (3, 2))
+        self.assertEqual(cov["sibling_b"], (3, 2))
+        self.assertEqual(cov["next_fn"], (0, 0))
+
 
 
 

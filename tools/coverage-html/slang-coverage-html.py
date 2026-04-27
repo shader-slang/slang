@@ -5,7 +5,7 @@ slang-coverage-html — render LCOV .info files to static HTML.
 Zero-dependency replacement for `genhtml` for Slang-ecosystem
 coverage workflows. Consumes standard LCOV `.info`, emits a
 self-contained directory of static HTML (no JS framework, no CDN,
-no external CSS). Python 3.8+ standard library only.
+no external CSS). Python 3.9+ standard library only.
 
 Usage:
     slang-coverage-html input.info
