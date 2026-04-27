@@ -297,11 +297,6 @@ SLANG_UNIT_TEST(mathBFloatRoundTripExactValues)
     }
 }
 
-// `Math::Pi` is declared in slang-math.h as `static const float Pi`
-// but has no out-of-line definition (no `Slang::Math::Pi` in any
-// `.cpp`). Any test that ODR-uses it would fail to link. Tracked
-// as shader-slang/slang#10952; no test is added here.
-
 // -- E4M3 / E5M2 8-bit float formats -----------------------------
 
 SLANG_UNIT_TEST(mathFloatE4M3RoundTripExactValues)
