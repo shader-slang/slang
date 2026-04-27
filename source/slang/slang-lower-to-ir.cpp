@@ -9016,7 +9016,13 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
         // follows a `break` / `return` could get its coverage counter
         // inserted into the already-terminated predecessor block,
         // corrupting the IR.
-        if (context->traceCoverage && stmt->loc.isValid() && !as<EmptyStmt>(stmt))
+        // Skip purely structural compound statements: BlockStmt and
+        // SeqStmt only wrap their children, so instrumenting them too
+        // would inflate the counter buffer ~30-50% on deeply nested
+        // shaders without adding any per-line signal that the wrapped
+        // children don't already provide.
+        if (context->traceCoverage && stmt->loc.isValid() && !as<EmptyStmt>(stmt) &&
+            !as<BlockStmt>(stmt) && !as<SeqStmt>(stmt))
         {
             visitor.startBlockIfNeeded(stmt);
             context->irBuilder->emitIncrementCoverageCounter();
