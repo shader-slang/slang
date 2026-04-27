@@ -64,7 +64,6 @@ class ParserTests(unittest.TestCase):
         # that stub rather than be silently ignored. Otherwise the
         # function is mis-classified as an orphan FNDA and per-
         # function range queries return (0, 0).
-        import tempfile
         content = (
             "TN:\n"
             "SF:foo.c\n"
@@ -123,8 +122,6 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(r.hit_functions, 2)
 
     def test_corrupt_brda_raises(self):
-        import tempfile
-
         with tempfile.NamedTemporaryFile(
             "w", suffix=".info", delete=False
         ) as tmp:

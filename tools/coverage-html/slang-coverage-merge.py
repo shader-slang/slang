@@ -132,7 +132,7 @@ def _gunzip_to_temp(gz_path: str) -> str:
 
 def load(path: str) -> List[FileRecord]:
     """Parse a possibly-gzipped LCOV file into FileRecords."""
-    if path.endswith(".gz"):
+    if path.lower().endswith(".gz"):
         path = _gunzip_to_temp(path)
     return parse_lcov(path, warn_prefix=GENERATOR_NAME)
 
@@ -383,16 +383,24 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     prefixes: List[str] = list(args.strip_prefix)
 
-    inc_re = (
-        re.compile("|".join(args.filter_include_regex))
-        if args.filter_include_regex
-        else None
-    )
-    exc_re = (
-        re.compile("|".join(args.filter_exclude_regex))
-        if args.filter_exclude_regex
-        else None
-    )
+    try:
+        inc_re = (
+            re.compile("|".join(args.filter_include_regex))
+            if args.filter_include_regex
+            else None
+        )
+        exc_re = (
+            re.compile("|".join(args.filter_exclude_regex))
+            if args.filter_exclude_regex
+            else None
+        )
+    except re.error as e:
+        print(
+            f"{GENERATOR_NAME}: invalid --filter-include-regex / "
+            f"--filter-exclude-regex: {e}",
+            file=sys.stderr,
+        )
+        return 2
 
     inputs: List[List[FileRecord]] = []
     for path in args.inputs:

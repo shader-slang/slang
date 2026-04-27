@@ -665,7 +665,11 @@ class CliIntegrationTests(unittest.TestCase):
         # starts hidden.
         self.assertRegex(idx, r'class="fileFunctions"[^>]*\bhidden\b')
         self.assertIn('<table class="fnInner"', idx)
-        self.assertIn("addEventListener('click'", idx)
+        # Click behavior is wired up either via inlined script.js or via
+        # an external <script src="script.js">; tolerate both.
+        self.assertRegex(
+            idx, r"addEventListener\('click'|<script[^>]*\bsrc=\"script\.js\""
+        )
         self.assertIn("_Z3addii", idx)
         # Line column links to per-file anchor.
         self.assertIn("#L4", idx)

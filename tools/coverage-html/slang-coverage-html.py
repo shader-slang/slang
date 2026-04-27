@@ -102,7 +102,9 @@ def _escape_path_for_filename(relpath: str) -> str:
     short sha1 suffix.
     """
     safe = re.sub(r"[^A-Za-z0-9._-]+", "_", relpath).strip("_") or "file"
-    suffix = hashlib.sha1(relpath.encode("utf-8")).hexdigest()[:6]
+    suffix = hashlib.sha1(relpath.encode("utf-8"), usedforsecurity=False).hexdigest()[
+        :6
+    ]
     return f"{safe}.{suffix}.html"
 
 
@@ -585,7 +587,10 @@ def _render_file_functions_row(
     """Returns (template_id, template_html, hidden_row_html). The
     template carries the fnInner table; the hidden row references it
     via `data-fn-tmpl` and gets cloned in on first chevron click."""
-    tmpl_id = "fn_" + hashlib.sha1(rec.path.encode("utf-8")).hexdigest()[:10]
+    tmpl_id = (
+        "fn_"
+        + hashlib.sha1(rec.path.encode("utf-8"), usedforsecurity=False).hexdigest()[:10]
+    )
     template_html = _render_inline_functions_table(
         rec, file_href, show_fns=show_fns, show_br=show_br
     )
@@ -788,7 +793,7 @@ def _fn_line_coverage_cells(l_total: int, l_hit: int) -> str:
 
 def _fn_function_coverage_cells(is_hit: bool) -> str:
     """Per-function function-coverage cells (Rate / Total / Hit).
-    "Effective" hit semantics — see FileRecord._effective_fn_hit."""
+    "Effective" hit semantics — see FileRecord.effective_fn_hit."""
     pct = 100.0 if is_hit else 0.0
     return (
         _rate_cell(pct, 1)
@@ -881,7 +886,7 @@ def _render_inline_functions_table(
     )
     line_cov = function_line_coverage(record)
     br_cov = function_branch_coverage(record)
-    eff_hit = record._effective_fn_hit()
+    eff_hit = record.effective_fn_hit()
 
     rows: List[str] = []
     for name, fn in items:
@@ -1261,7 +1266,7 @@ def build_argparser() -> argparse.ArgumentParser:
 
 
 def apply_auth_summary(
-    records: List[FileRecord], auth: AuthSummary, quiet: bool = False
+    records: List[FileRecord], auth: AuthSummary
 ) -> Tuple[int, int]:
     """Attach per-file auth_override to each matching record.
 
@@ -1290,6 +1295,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"slang-coverage-html: {e}", file=sys.stderr)
         return 2
 
+    try:
+        if args.filter_include_regex:
+            re.compile("|".join(args.filter_include_regex))
+        if args.filter_exclude_regex:
+            re.compile("|".join(args.filter_exclude_regex))
+    except re.error as e:
+        print(
+            f"slang-coverage-html: invalid --filter-include-regex / "
+            f"--filter-exclude-regex: {e}",
+            file=sys.stderr,
+        )
+        return 2
+
     records = apply_filters(
         records,
         args.filter_include,
@@ -1303,7 +1321,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         except LcovParseError as e:
             print(f"slang-coverage-html: {e}", file=sys.stderr)
             return 2
-        matched, unmatched = apply_auth_summary(records, auth, quiet=args.quiet)
+        matched, unmatched = apply_auth_summary(records, auth)
         if not args.quiet:
             print(
                 f"slang-coverage-html: --auth-summary applied to "

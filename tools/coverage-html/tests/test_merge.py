@@ -607,10 +607,11 @@ class RendererAuthSummaryCliTests(unittest.TestCase):
             html = f.read()
         # Expected per-file row totals come from the auth summary, not
         # from LCOV's "1 line, 1 hit".
-        self.assertIn(">200<", html)        # line total
-        self.assertIn(">150<", html)        # line hit
-        self.assertNotIn(">1<", html.split("<tbody>", 1)[1].split("</tbody>", 1)[0]
-                         .replace("colspan=\"1\"", ""))  # rough sanity
+        self.assertIn(">200<", html)  # line total
+        self.assertIn(">150<", html)  # line hit
+        # LCOV's pre-auth 1/1 values must not leak into any rendered cell.
+        body = html.split("<tbody>", 1)[1].split("</tbody>", 1)[0]
+        self.assertNotRegex(body, r">\s*1\s*</(td|span)>")
 
 
 if __name__ == "__main__":

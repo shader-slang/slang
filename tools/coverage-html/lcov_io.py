@@ -257,7 +257,7 @@ class FileRecord:
     # but rare from llvm-cov export) can't be deduped by line, so they
     # each count as their own entry by mangled name.
 
-    def _effective_fn_hit(self) -> Dict[str, bool]:
+    def effective_fn_hit(self) -> Dict[str, bool]:
         """For each function, return True if it should be treated as
         covered for reporting purposes — either FNDA reports calls
         OR any DA line inside the function's source range was hit.
@@ -301,12 +301,12 @@ class FileRecord:
 
     def _function_buckets(self) -> Tuple[set, set, int, int]:
         """Return (all_first_lines, hit_first_lines, orphan_total,
-        orphan_hit). Hit status uses `_effective_fn_hit`."""
+        orphan_hit). Hit status uses `effective_fn_hit`."""
         line_set: set = set()
         hit_line_set: set = set()
         orphan_total = 0
         orphan_hit = 0
-        eff = self._effective_fn_hit()
+        eff = self.effective_fn_hit()
         for name, fn in self.functions.items():
             if fn.first_line > 0:
                 line_set.add(fn.first_line)
@@ -871,9 +871,9 @@ def write_llvm_cov_report(summary: AuthSummary, out: IO[str]) -> None:
         f" {'Branches':>11} {'Missed Branches':>17} {'Cover':>9}\n"
     )
     out.write(header)
-    out.write("-" * 269 + "\n")
+    out.write("-" * 259 + "\n")
     for name, fs in sorted(summary.files.items()):
         out.write(_row(name, fs))
     if has_total:
-        out.write("-" * 269 + "\n")
+        out.write("-" * 259 + "\n")
         out.write(_row("TOTAL", summary.total))
