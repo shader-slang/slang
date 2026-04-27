@@ -33,6 +33,17 @@ public struct VisibilityCase
         return diffPair(x.p * x.p, 5.0 * x.p * x.d);
     }
 
+    [ForwardDerivative(diffInternalCustom)]
+    public static float publicCustomSquareWithInternalDerivative(float x)
+    {
+        return x * x;
+    }
+
+    internal static DifferentialPair<float> diffInternalCustom(DifferentialPair<float> x)
+    {
+        return diffPair(x.p * x.p, 9.0 * x.p * x.d);
+    }
+
     [BackwardDifferentiable]
     public static float publicCube(float x)
     {
@@ -82,6 +93,12 @@ public struct VisibilityCase
     public static float callPrivateCustomFwd(float x)
     {
         return fwd_diff(VisibilityCase.privateCustomSquare)(diffPair(x, 1.0)).d;
+    }
+
+    public static float callPublicCustomInternalFwd(float x)
+    {
+        return fwd_diff(VisibilityCase.publicCustomSquareWithInternalDerivative)(diffPair(x, 1.0))
+            .d;
     }
 
     public static float callPublicBwd(float x)

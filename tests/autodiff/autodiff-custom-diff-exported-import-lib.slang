@@ -12,3 +12,9 @@ public float exportedSquare(float x)
 {
     return x * x;
 }
+
+[BackwardDerivative(helper_bwd)]
+public float exportedCube(float x)
+{
+    return x * x * x;
+}

@@ -3709,17 +3709,25 @@ static Expr* convertHigherOrderExprToLookup(
             visitor->getOuterScope(),
             LookupMask::Default,
             LookupOptions::NoDeref);
+        bool diagnosed = false;
+        result =
+            visitor->filterLookupResultByVisibilityAndDiagnose(result, resultExpr->loc, diagnosed);
+        result = visitor->filterLookupResultByCheckedOptionalAndDiagnose(
+            result,
+            resultExpr->loc,
+            diagnosed);
         result = visitor->resolveOverloadedLookup(result);
 
         if (result.isValid() && !result.isOverloaded())
         {
             if (auto funcAliasDeclRef = result.item.declRef.as<FuncAliasDecl>())
             {
-                result.item.declRef = substituteDeclRef(
-                                          SubstitutionSet(result.item.declRef),
-                                          getCurrentASTBuilder(),
-                                          funcAliasDeclRef.getDecl()->targetDeclRef)
-                                          .as<CallableDecl>();
+                result.item.declRef =
+                    substituteDeclRef(
+                        SubstitutionSet(result.item.declRef),
+                        getCurrentASTBuilder(),
+                        funcAliasDeclRef.getDecl()->targetDeclRef)
+                        .as<CallableDecl>();
             }
 
             // Return the lookup result.
@@ -3732,11 +3740,23 @@ static Expr* convertHigherOrderExprToLookup(
 
             return lookupResultExpr;
         }
+        else if (result.isOverloaded())
+        {
+            auto overloadedExpr = visitor->getASTBuilder()->create<OverloadedExpr>();
+            overloadedExpr->loc = resultExpr->loc;
+            visitor->diagnoseAmbiguousReference(overloadedExpr, result);
+            return visitor->CreateErrorExpr(resultExpr);
+        }
         else
         {
-            visitor->getSink()->diagnose(
-                Diagnostics::InternalCompilerError{.location = resultExpr->loc});
-            return resultExpr;
+            if (!diagnosed && !visitor->IsErrorExpr(resultExpr->baseFunction))
+            {
+                visitor->getSink()->diagnose(Diagnostics::NoMemberOfNameInType{
+                    .name = lookupName,
+                    .type = funcAsType,
+                    .expr = resultExpr});
+            }
+            return visitor->CreateErrorExpr(resultExpr);
         }
     }
     else

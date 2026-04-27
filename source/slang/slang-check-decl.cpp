@@ -8561,6 +8561,39 @@ struct SynthesizedExtensionVisibility
     DeclVisibility memberVisibility = DeclVisibility::Default;
 };
 
+static DeclVisibility getMoreRestrictiveVisibility(
+    DeclVisibility leftVisibility,
+    DeclVisibility rightVisibility)
+{
+    auto normalizeVisibility = [](DeclVisibility visibility)
+    {
+        if (visibility == DeclVisibility::Default)
+            return DeclVisibility::Internal;
+
+        switch (visibility)
+        {
+        case DeclVisibility::Private:
+        case DeclVisibility::Internal:
+        case DeclVisibility::Public:
+            return visibility;
+        default:
+            SLANG_UNEXPECTED("unexpected visibility type");
+            return DeclVisibility::Internal;
+        }
+    };
+
+    leftVisibility = normalizeVisibility(leftVisibility);
+    rightVisibility = normalizeVisibility(rightVisibility);
+
+    if (leftVisibility == DeclVisibility::Private || rightVisibility == DeclVisibility::Private)
+        return DeclVisibility::Private;
+
+    if (leftVisibility == DeclVisibility::Internal || rightVisibility == DeclVisibility::Internal)
+        return DeclVisibility::Internal;
+
+    return DeclVisibility::Public;
+}
+
 static SynthesizedExtensionVisibility getSynthesizedExtensionVisibility(
     DeclVisibility targetVisibility)
 {
@@ -8573,9 +8606,12 @@ static SynthesizedExtensionVisibility getSynthesizedExtensionVisibility(
         break;
     case DeclVisibility::Internal:
         result.extensionVisibility = DeclVisibility::Internal;
-        result.memberVisibility = DeclVisibility::Default;
+        result.memberVisibility = DeclVisibility::Internal;
         break;
     case DeclVisibility::Private:
+        // Extensions are hoisted to module scope, where `private` is not legal.
+        // Keep the extension module-visible so synthesis can attach to it, while
+        // the synthesized members stay private to preserve the callable's API.
         result.extensionVisibility = DeclVisibility::Internal;
         result.memberVisibility = DeclVisibility::Private;
         break;
@@ -8676,6 +8712,7 @@ static bool validatePublicCallableOperandVisibility(SemanticsVisitor* visitor, C
     if (!synthesizedFuncDecl)
         return true;
 
+    bool hasViolation = false;
     HashSet<Decl*> seenDecls;
     for (auto operand : synthesizedFuncDecl->operands)
     {
@@ -8684,13 +8721,20 @@ static bool validatePublicCallableOperandVisibility(SemanticsVisitor* visitor, C
             continue;
 
         if (getDeclVisibility(operandDecl) != DeclVisibility::Public)
-            return diagnoseHiddenOperand(operandDecl);
+        {
+            diagnoseHiddenOperand(operandDecl);
+            hasViolation = true;
+            continue;
+        }
 
         if (!isDeclReachableViaExportedImports(visitor, decl, operandDecl))
-            return diagnoseHiddenOperand(operandDecl);
+        {
+            diagnoseHiddenOperand(operandDecl);
+            hasViolation = true;
+        }
     }
 
-    return true;
+    return !hasViolation;
 }
 
 bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
@@ -8936,6 +8980,9 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
 
     if (kind == BuiltinRequirementKind::ForwardDerivativeFunc)
     {
+        auto higherOrderVisibility =
+            getSynthesizedExtensionVisibility(getDeclVisibility(context->parentDecl));
+
         // Add in a conformance for "fwdDiffFunc : IForwardDifferentiable<fwdDiffFunc>"
         // for higher-order differentiation.
         //
@@ -8949,7 +8996,7 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
                 synFunc,
                 fwdDiffFuncAsType,
                 substSet,
-                getDeclVisibility(context->parentDecl),
+                higherOrderVisibility.extensionVisibility,
                 SourceLoc(),
                 kIROp_SynthesizedForwardDerivativeWitnessTable);
             this->ensureDecl(higherOrderFwdDiffExtension, DeclCheckState::ReadyForLookup);
@@ -8967,7 +9014,7 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
                 synFunc,
                 fwdDiffFuncAsType,
                 substSet,
-                getDeclVisibility(context->parentDecl),
+                higherOrderVisibility.extensionVisibility,
                 SourceLoc(),
                 kIROp_SynthesizedBackwardDerivativeWitnessTable);
             this->ensureDecl(higherOrderBwdDiffExtension, DeclCheckState::ReadyForLookup);
@@ -17132,8 +17179,9 @@ static void translateFwdDerivativeAttributeToAD2(
     funcDeclRef = createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), visitor, funcDeclRef);
     auto funcAsType = DeclRefType::create(astBuilder, funcDeclRef);
     auto userDefinedFwdDiffFunc = as<DeclRefExpr>(attr->funcExpr)->declRef.as<CallableDecl>();
-    auto visibility =
-        Math::Min(getDeclVisibility(funcDecl), getDeclVisibility(userDefinedFwdDiffFunc.getDecl()));
+    auto visibility = getMoreRestrictiveVisibility(
+        getDeclVisibility(funcDecl),
+        getDeclVisibility(userDefinedFwdDiffFunc.getDecl()));
     auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
 
     fwdDiffExtension->parentDecl = funcDecl;
@@ -17196,8 +17244,9 @@ static void translateBwdDerivativeAttributeToAD2(
     SubstitutionSet substSet;
     DeclRef<Decl> bwdDiffFunc = as<DeclRefExpr>(attr->funcExpr)->declRef;
 
-    auto visibility =
-        Math::Min(getDeclVisibility(targetFuncDecl), getDeclVisibility(bwdDiffFunc.getDecl()));
+    auto visibility = getMoreRestrictiveVisibility(
+        getDeclVisibility(targetFuncDecl),
+        getDeclVisibility(bwdDiffFunc.getDecl()));
     auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
     auto bwdDiffExtension = extendContainerDecl(
         visitor,
