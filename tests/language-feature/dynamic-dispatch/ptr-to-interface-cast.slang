@@ -55,7 +55,7 @@ void computeMain()
     // Not dispatched at runtime because the memory layout doesn't match.
     Foo f;
     f.val = 99;
-    Foo* pf = &f;
+    Foo* pf = __getAddress(f);
     IFoo* ip = (IFoo*)pf;
     let _ = ip;
 

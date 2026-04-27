@@ -3578,6 +3578,10 @@ VarDeclBase* getTrailingUnsizedArrayElement(
 // texture, buffer, sampler, acceleration structure, etc.
 bool isOpaqueHandleType(Type* type);
 
+// Returns true if `type` itself is an opaque handle type, or if it is a struct
+// (or array thereof) that transitively contains an opaque handle field.
+bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type);
+
 void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,
