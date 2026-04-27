@@ -20,6 +20,10 @@ RWStructuredBuffer<int> output;
 // CHECK: ulong multi
 // CHECK: };
 
+// The kernel body should cast ulong back to a typed pointer for `multi`.
+// CHECK-LABEL: computeMain
+// CHECK: int device*
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()

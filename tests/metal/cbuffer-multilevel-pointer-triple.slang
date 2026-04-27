@@ -17,6 +17,10 @@ RWStructuredBuffer<int> output;
 // CHECK: ulong deep
 // CHECK: };
 
+// The kernel body should cast ulong back to a typed pointer for `deep`.
+// CHECK-LABEL: computeMain
+// CHECK: int device* device*
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()

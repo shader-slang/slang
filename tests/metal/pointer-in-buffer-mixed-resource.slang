@@ -23,7 +23,9 @@ ParameterBlock<Params> params;
 // CHECK-NOT: device{{.*}}device
 // CHECK: };
 
+// The kernel body should cast ulong back to a typed pointer for `indirect`.
 // CHECK-LABEL: computeMain
+// CHECK: int device*
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

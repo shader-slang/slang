@@ -24,8 +24,9 @@ ParameterBlock<MixedParams> params;
 // CHECK: int
 // CHECK: };
 
-// The kernel body accesses the single ptr directly and casts the multi ptr.
+// The kernel body should cast ulong back to a typed pointer for `indirect`.
 // CHECK-LABEL: computeMain
+// CHECK: int device*
 
 [shader("compute")]
 [numthreads(32, 1, 1)]
