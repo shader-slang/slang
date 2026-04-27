@@ -289,11 +289,16 @@ def parse_results(log_text):
     # this stress loop is hunting — driver builds have been observed to print
     # it on stdout while exiting 0, so check on the string regardless of
     # nvidia-smi's exit status.
+    #
+    # Order matters: a GPU crash mid-test typically also produces the
+    # consecutive-failures abort message, so check the GPU signal first.
+    # The abort branch then catches the "tests gave up but the GPU is
+    # still alive" case.
     nvml_init_failed = "Failed to initialize NVML" in log_text
-    if "Stopped scheduling new tests after too many consecutive failures" in log_text:
-        result["exit_code"] = "aborted"
-    elif "NVIDIA-SMI FAILED" in log_text or nvml_init_failed:
+    if "NVIDIA-SMI FAILED" in log_text or nvml_init_failed:
         result["exit_code"] = "gpu_crash"
+    elif "Stopped scheduling new tests after too many consecutive failures" in log_text:
+        result["exit_code"] = "aborted"
     elif "Failed to create Vulkan instance" in log_text:
         result["exit_code"] = "vulkan_fail"
     elif "EXIT_CODE: 0" in log_text:
@@ -311,9 +316,11 @@ def parse_results(log_text):
         result["gpu_healthy_after"] = "true"
 
     # Count Vulkan pass/fail. Both `(vk)` (slang-test) and `Vulkan` (gfx-unit-test
-    # internal harness, e.g. `Vulkan.internal::foo`) result lines are caught here.
-    vk_pass_lines = re.findall(r"passed test:.*(?:\(vk\)|Vulkan)", log_text)
-    vk_fail_lines = re.findall(r"FAILED test:.*(?:\(vk\)|Vulkan)", log_text)
+    # internal harness, e.g. `getBufferResourceHandleVulkan.internal`) result
+    # lines are caught here. Use `\bVulkan\b` rather than a bare substring so
+    # tests with "Vulkan" embedded inside another word can't false-positive.
+    vk_pass_lines = re.findall(r"passed test:.*(?:\(vk\)|\bVulkan\b)", log_text)
+    vk_fail_lines = re.findall(r"FAILED test:.*(?:\(vk\)|\bVulkan\b)", log_text)
     result["vk_pass_count"] = len(vk_pass_lines)
     result["vk_fail_count"] = len(vk_fail_lines)
 
@@ -585,14 +592,15 @@ def print_summary(results_dir, results):
         print(f"  {code}: {by_code[code]}")
     print()
 
-    # Per-zone
+    # Per-zone. Count anything that isn't `pass` so infrastructure failures
+    # (ssh_timeout, ssh_error, transfer_failed, gpu_check_failed,
+    # create_failed, ssh_failed) are visible alongside GPU/test failures —
+    # a regional GCP SSH outage is exactly the kind of zone-correlated
+    # signal this breakdown is supposed to surface.
     print("=== Per-Zone Breakdown ===")
     for zone in ZONES:
         zone_results = [r for r in results if r["zone"] == zone]
-        zone_fail = sum(
-            1 for r in zone_results
-            if r["exit_code"] in ("gpu_crash", "vulkan_fail", "aborted")
-        )
+        zone_fail = sum(1 for r in zone_results if r["exit_code"] != "pass")
         if zone_results:
             print(f"  {zone}: {zone_fail} failures / {len(zone_results)} runs")
     print()
