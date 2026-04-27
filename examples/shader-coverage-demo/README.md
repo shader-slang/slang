@@ -63,13 +63,20 @@ into a uniform-offset struct rather than exposing them at
 silently has no effect (the demo prints a `[coverage] note: …`
 explaining this).
 
-> **D3D12 caveat:** with `--coverage-binding=N:M`, only `M=0`
-> currently completes end-to-end. Non-zero descriptor space
-> (`M != 0`) hits a pre-existing slang-rhi root-signature builder
-> limitation around how it accounts for `BaseShaderRegister` across
-> distinct spaces — unrelated to coverage but blocking on D3D12.
-> Vulkan handles non-zero space correctly. To be filed against
-> slang-rhi.
+> **Non-zero descriptor space caveat:** `--coverage-binding=N:M`
+> with `M != 0` currently doesn't work end-to-end on D3D12 *or*
+> Vulkan. Root cause is a Slang reflection bug —
+> `DescriptorSetInfo::spaceOffset` is never assigned, so every
+> set reports `space=0` regardless of the user's actual `space=N`
+> declaration. Slang-rhi's D3D12 path then fails fast at
+> root-signature creation. Vulkan's path silently mis-binds the
+> buffer at the wrong descriptor set; the dispatched shader writes
+> are dropped and counters come back zero. The demo's
+> post-dispatch `hitSum > 0` sanity check surfaces this — you
+> won't get an LCOV file written. CPU and CUDA are unaffected
+> because they don't use (set, register). Fix is one line in
+> Slang's reflection plus multi-descriptor-set support in
+> slang-rhi's Vulkan/WebGPU paths; tracked separately.
 
 CPU, Vulkan, D3D12 and CUDA produce **byte-identical LCOV output** —
 same hit counts per source line — which validates that instrumentation
@@ -191,8 +198,8 @@ demo and open `coverage-html/index.html` to see the current values.
 | Backend | `--mode=compile` | `--mode=dispatch` |
 |---|---|---|
 | `cpu` | ✅ Works | ✅ **Fully working** — clean non-zero counter values, complete LCOV report, dead-code detection verified |
-| `vulkan` (incl. SPIR-V) | ✅ Works | ✅ **Fully working** — validated on macOS (MoltenVK) and desktop Windows with NVIDIA drivers; byte-identical LCOV to CPU |
-| `d3d12` | ✅ Works | ✅ **Fully working** for default and `--coverage-binding=N:0` — validated on desktop Windows; byte-identical LCOV to CPU/Vulkan. **Caveat:** `--coverage-binding=N:M` with `M != 0` hits a pre-existing slang-rhi root-signature limitation around non-zero descriptor spaces. Tracked separately. |
+| `vulkan` (incl. SPIR-V) | ✅ Works | ✅ **Fully working** for default and `--coverage-binding=N:0` — validated on macOS (MoltenVK) and desktop Windows with NVIDIA drivers; byte-identical LCOV to CPU. **Caveat:** `--coverage-binding=N:M` with `M != 0` is silently mis-bound by slang-rhi (counters come back zero); demo's post-dispatch sanity check fails fast on this rather than producing a misleading LCOV. Tracked separately. |
+| `d3d12` | ✅ Works | ✅ **Fully working** for default and `--coverage-binding=N:0` — validated on desktop Windows; byte-identical LCOV to CPU/Vulkan. **Caveat:** `--coverage-binding=N:M` with `M != 0` is rejected at root-signature creation (same root cause as the Vulkan caveat: Slang reflection's `DescriptorSetInfo::spaceOffset` is never set). Tracked separately. |
 | `cuda` | ✅ Works | ✅ **Fully working** — validated on desktop Windows with NVIDIA CUDA runtime; byte-identical LCOV to CPU/Vulkan/D3D12 |
 | `metal` | ✅ Works (with benign unused-variable warnings from Metal's compiler) | ⚠️ Pipeline builds; dispatch runs; but counter values are unreliable — most slots are zero while others show overflow-like values. **Not a coverage-feature issue** — a pre-existing slang-rhi Metal binding / initialization quirk. To be filed against slang-rhi. |
 
@@ -314,6 +321,25 @@ now walks transitively imported modules and reuses an existing
 `__slang_coverage` rather than adding a duplicate. Vulkan + macOS
 allocators tolerated the duplicate, which is why the bug only
 surfaced when D3D12 + explicit binding was first exercised.
+
+A third issue, found while validating the multi-module fix on
+Windows D3D12, turned out to be unrelated to coverage: any HLSL
+`register(_, spaceN)` or Vulkan `[[vk::binding(_, N)]]` with
+`N != 0` mis-binds through slang-rhi because Slang's
+`_findOrAddDescriptorSet` allocates `DescriptorSetInfo` instances
+without ever assigning their `spaceOffset` field. Reflection's
+high-level per-parameter `binding.space` JSON output is correct
+(it goes through a different code path), but
+`getDescriptorSetSpaceOffset(setIndex)` always returns 0 — which
+is what slang-rhi backends use to lay out their descriptor tables.
+On D3D12 this produces a root-signature collision; on Vulkan it
+silently mis-binds the buffer to a different descriptor set than
+the SPIR-V was decorated with, and the shader's writes never
+reach our buffer (counters come back zero). The demo's post-
+dispatch sum check refuses to write a misleading "verified" + zero-
+counter LCOV. End-to-end fix is a one-line change in Slang's
+reflection plus multi-descriptor-set support in slang-rhi's
+Vulkan/WebGPU paths; tracked separately as a follow-up.
 
 ## Scenarios (future expansion)
 

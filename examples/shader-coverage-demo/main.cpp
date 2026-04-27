@@ -656,10 +656,39 @@ int runDispatch(const Options& opt)
     // Read the coverage buffer back and accumulate into the context.
     ComPtr<ISlangBlob> blob;
     device->readBuffer(covBuf, 0, covDesc.size, blob.writeRef());
-    slang_coverage_accumulate(
-        covCtx,
-        static_cast<const uint32_t*>(blob->getBufferPointer()),
-        counterCount);
+    auto* readback = static_cast<const uint32_t*>(blob->getBufferPointer());
+
+    // Sanity check: the mixed scenario hits `applyGravity` once per
+    // particle per step (64 × 8 = 512 hits at minimum), plus several
+    // other lines per branch. A zero-sum readback means the shader
+    // dispatched but writes didn't reach the buffer we bound — so the
+    // resulting LCOV would be a sea of 0s and worthless. Fail loudly
+    // rather than write a misleading report. Most likely cause:
+    // slang-rhi placed the coverage buffer at a different (set,
+    // register) than the compiled shader's descriptor decoration —
+    // see the README's "Non-zero descriptor space caveat".
+    uint64_t hitSum = 0;
+    for (uint32_t i = 0; i < counterCount; ++i)
+        hitSum += readback[i];
+    if (hitSum == 0)
+    {
+        std::fprintf(
+            stderr,
+            "[dispatch] ERROR: 0 counter hits after %u dispatches × %u "
+            "particles on backend '%s'.\n"
+            "[dispatch] Shader executed but coverage writes didn't reach "
+            "the bound buffer — likely slang-rhi binding the buffer at a "
+            "different (set, register) than the compiled shader's "
+            "descriptor decoration. See the README's non-zero-space "
+            "caveat. No LCOV written.\n",
+            steps,
+            particleCount,
+            opt.backend.c_str());
+        slang_coverage_destroy(covCtx);
+        return 1;
+    }
+
+    slang_coverage_accumulate(covCtx, readback, counterCount);
 
     if (slang_coverage_save_lcov(covCtx, opt.outputLcov.c_str(), opt.testName.c_str()) != SLANG_OK)
     {
