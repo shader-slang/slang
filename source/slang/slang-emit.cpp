@@ -81,6 +81,7 @@
 #include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-conditional-type.h"
 #include "slang-ir-lower-coopvec.h"
+#include "slang-ir-lower-cpu-resource-types.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
 #include "slang-ir-lower-enum-type.h"
@@ -2024,6 +2025,14 @@ Result linkAndOptimizeIR(
         break;
     default:
         break;
+    }
+
+    if (isCPUTargetViaLLVM(targetRequest))
+    {
+        // On CPU LLVM targets, the target itself has no concept of resource
+        // types (CPUs have no opinions on what a texture is), so we can lower
+        // those to concrete types here.
+        SLANG_PASS(lowerCPUResourceTypes, codeGenContext);
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
