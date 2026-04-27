@@ -118,6 +118,7 @@ SLANG_UNIT_TEST(sliceAllocatorEmptyInputs)
 
     TerminatedCharSlice empty2 = alloc.allocate(toSlice(""));
     SLANG_CHECK(empty2.count == 0);
+    SLANG_CHECK(empty2.begin()[0] == '\0');
 }
 
 SLANG_UNIT_TEST(sliceAllocatorMultipleAllocations)
@@ -143,8 +144,8 @@ SLANG_UNIT_TEST(sliceAllocatorMultipleAllocations)
 SLANG_UNIT_TEST(sliceAllocatorDeallocateAllClearsArena)
 {
     SliceAllocator alloc;
-    alloc.allocate("first");
-    alloc.allocate("second");
+    (void)alloc.allocate("first");
+    (void)alloc.allocate("second");
 
     // Reset the arena and re-allocate. We can't safely deref the
     // earlier slices after deallocateAll, so just check that the
@@ -179,9 +180,10 @@ SLANG_UNIT_TEST(sliceAllocatorArenaIsTheSameArena)
 {
     // The arena exposed via getArena() must be the *same* arena
     // that allocate(...) uses, so callers can safely co-allocate
-    // string slices and ad-hoc structures together. We verify by
-    // allocating a string, then checking that a subsequent direct
-    // arena allocation produces a pointer in the same arena.
+    // string slices and ad-hoc structures together. Verify identity
+    // by checking that the slice and a direct arena allocation are
+    // both reported as valid by the same arena (`isValid` walks the
+    // arena's block list).
     SliceAllocator alloc;
     TerminatedCharSlice s = alloc.allocate("test-string");
     SLANG_CHECK(s.count == 11);
@@ -189,12 +191,14 @@ SLANG_UNIT_TEST(sliceAllocatorArenaIsTheSameArena)
     MemoryArena& arena = alloc.getArena();
     char* p = static_cast<char*>(arena.allocate(64));
     SLANG_CHECK(p != nullptr);
+    SLANG_CHECK(arena.isValid(s.begin(), s.count));
+    SLANG_CHECK(arena.isValid(p, 64));
 
     // Both allocations must survive a subsequent allocate() call —
-    // the arena doesn't move existing pointers.
+    // the arena doesn't relocate existing pointers.
     TerminatedCharSlice s2 = alloc.allocate("another");
-    SLANG_CHECK(strcmp(s.begin(), "test-string") == 0); // s still valid
+    SLANG_CHECK(strcmp(s.begin(), "test-string") == 0);
     SLANG_CHECK(strcmp(s2.begin(), "another") == 0);
-    p[0] = 'X'; // p still writable; arena didn't reuse the storage
+    p[0] = 'X';
     SLANG_CHECK(p[0] == 'X');
 }

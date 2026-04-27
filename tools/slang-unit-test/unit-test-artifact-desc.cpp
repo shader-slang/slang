@@ -101,8 +101,11 @@ SLANG_UNIT_TEST(artifactPayloadNamesAreDistinct)
     SLANG_CHECK(spirv.getLength() > 0);
     SLANG_CHECK(dxil.getLength() > 0);
     SLANG_CHECK(hlsl != glsl);
-    SLANG_CHECK(spirv != dxil);
     SLANG_CHECK(hlsl != spirv);
+    SLANG_CHECK(hlsl != dxil);
+    SLANG_CHECK(glsl != spirv);
+    SLANG_CHECK(glsl != dxil);
+    SLANG_CHECK(spirv != dxil);
 }
 
 SLANG_UNIT_TEST(artifactDescIsCpuTarget)
@@ -179,10 +182,10 @@ SLANG_UNIT_TEST(artifactDescGetDescFromPath)
 // for distinguishing artifacts).
 SLANG_UNIT_TEST(artifactDescGetTextMentionsPayload)
 {
-    String hlslText = ArtifactDescUtil::getText(
-        makeDesc(ArtifactKind::Source, ArtifactPayload::HLSL));
-    String spirvText = ArtifactDescUtil::getText(
-        makeDesc(ArtifactKind::Executable, ArtifactPayload::SPIRV));
+    String hlslText =
+        ArtifactDescUtil::getText(makeDesc(ArtifactKind::Source, ArtifactPayload::HLSL));
+    String spirvText =
+        ArtifactDescUtil::getText(makeDesc(ArtifactKind::Executable, ArtifactPayload::SPIRV));
 
     SLANG_CHECK(hlslText.getLength() > 0);
     SLANG_CHECK(spirvText.getLength() > 0);
@@ -198,8 +201,7 @@ SLANG_UNIT_TEST(artifactDescAppendDefaultExtensionRoundTrips)
 {
     auto hlslSource = makeDesc(ArtifactKind::Source, ArtifactPayload::HLSL);
     StringBuilder hlslBuf;
-    SLANG_CHECK(SLANG_SUCCEEDED(
-        ArtifactDescUtil::appendDefaultExtension(hlslSource, hlslBuf)));
+    SLANG_CHECK(SLANG_SUCCEEDED(ArtifactDescUtil::appendDefaultExtension(hlslSource, hlslBuf)));
     SLANG_CHECK(hlslBuf.getLength() > 0);
     // Round-trip: ext → desc.
     auto recovered = ArtifactDescUtil::getDescFromExtension(hlslBuf.getUnownedSlice());
@@ -207,8 +209,7 @@ SLANG_UNIT_TEST(artifactDescAppendDefaultExtensionRoundTrips)
 
     auto glslSource = makeDesc(ArtifactKind::Source, ArtifactPayload::GLSL);
     StringBuilder glslBuf;
-    SLANG_CHECK(SLANG_SUCCEEDED(
-        ArtifactDescUtil::appendDefaultExtension(glslSource, glslBuf)));
+    SLANG_CHECK(SLANG_SUCCEEDED(ArtifactDescUtil::appendDefaultExtension(glslSource, glslBuf)));
     auto recoveredGlsl = ArtifactDescUtil::getDescFromExtension(glslBuf.getUnownedSlice());
     SLANG_CHECK(isDerivedFrom(recoveredGlsl.payload, ArtifactPayload::GLSL));
 }

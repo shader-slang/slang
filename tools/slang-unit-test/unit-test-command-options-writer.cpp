@@ -39,18 +39,15 @@ namespace
 
 void fillSampleOptions(CommandOptions& opts)
 {
-    opts.addCategory(
-        CommandOptions::CategoryKind::Option, "general", "General options");
+    opts.addCategory(CommandOptions::CategoryKind::Option, "general", "General options");
     opts.add("-help,-h", "", "Show this help message");
     opts.add("-version", "", "Print the version");
     opts.add("-output,-o", "<path>", "Output path");
 
-    opts.addCategory(
-        CommandOptions::CategoryKind::Option, "compile", "Compilation options");
+    opts.addCategory(CommandOptions::CategoryKind::Option, "compile", "Compilation options");
     opts.add("-target", "<format>", "Target format");
 
-    opts.addCategory(
-        CommandOptions::CategoryKind::Value, "format", "Supported formats");
+    opts.addCategory(CommandOptions::CategoryKind::Value, "format", "Supported formats");
     opts.addValue("spirv", "Vulkan SPIR-V");
     opts.addValue("hlsl", "Direct3D HLSL");
 }
@@ -71,7 +68,8 @@ bool contains(const String& s, const char* needle)
 // interchangeably. The first alias is the canonical one.
 SLANG_UNIT_TEST(commandOptionsAliasesShareIndex)
 {
-    CommandOptions opts; fillSampleOptions(opts);
+    CommandOptions opts;
+    fillSampleOptions(opts);
     Index helpByLong = opts.findOptionByName(toSlice("-help"));
     Index helpByShort = opts.findOptionByName(toSlice("-h"));
     SLANG_CHECK(helpByLong >= 0);
@@ -94,7 +92,8 @@ SLANG_UNIT_TEST(commandOptionsAliasesShareIndex)
 // argv parsers). Both option and category lookups share this rule.
 SLANG_UNIT_TEST(commandOptionsUnknownNameReturnsNegativeOne)
 {
-    CommandOptions opts; fillSampleOptions(opts);
+    CommandOptions opts;
+    fillSampleOptions(opts);
     SLANG_CHECK(opts.findOptionByName(toSlice("-not-a-thing")) == -1);
     SLANG_CHECK(opts.findCategoryByName(toSlice("nonexistent")) == -1);
 
@@ -107,7 +106,8 @@ SLANG_UNIT_TEST(commandOptionsUnknownNameReturnsNegativeOne)
 // different categories doesn't conflict (and -1 for "wrong category").
 SLANG_UNIT_TEST(commandOptionsValueScopedToCategory)
 {
-    CommandOptions opts; fillSampleOptions(opts);
+    CommandOptions opts;
+    fillSampleOptions(opts);
     Index formatCat = opts.findCategoryByName(toSlice("format"));
     Index generalCat = opts.findCategoryByName(toSlice("general"));
 
@@ -122,8 +122,7 @@ SLANG_UNIT_TEST(commandOptionsValueScopedToCategory)
 SLANG_UNIT_TEST(commandOptionsAddValuesViaPairs)
 {
     CommandOptions opts;
-    opts.addCategory(
-        CommandOptions::CategoryKind::Value, "level", "Verbosity levels");
+    opts.addCategory(CommandOptions::CategoryKind::Value, "level", "Verbosity levels");
     CommandOptions::ValuePair pairs[] = {
         {"silent", "No output"},
         {"normal", "Standard output"},
@@ -155,7 +154,8 @@ SLANG_UNIT_TEST(commandOptionsAddValuesViaPairs)
 //     <category>` separately. This keeps the default help short.
 SLANG_UNIT_TEST(writerTextRendersOptionCategories)
 {
-    CommandOptions opts; fillSampleOptions(opts);
+    CommandOptions opts;
+    fillSampleOptions(opts);
     CommandOptionsWriter::Options writerOptions;
     writerOptions.style = CommandOptionsWriter::Style::Text;
     auto writer = CommandOptionsWriter::create(writerOptions);
@@ -184,12 +184,16 @@ SLANG_UNIT_TEST(writerTextRendersOptionCategories)
     SLANG_CHECK(contains(text, ": Target format"));
 
     // The "Getting Help" footer lists all category names so the
-    // user can drill in.
+    // user can drill in. Anchor the lookups to the position of the
+    // "<help-category> can be:" marker — `contains(text, "general")`
+    // alone is satisfied by the heading checks above, so a regression
+    // that dropped the footer enumeration would slip through.
     SLANG_CHECK(contains(text, "Getting Help"));
-    SLANG_CHECK(contains(text, "<help-category> can be:"));
-    SLANG_CHECK(contains(text, "general"));
-    SLANG_CHECK(contains(text, "compile"));
-    SLANG_CHECK(contains(text, "format"));
+    Index footerIdx = text.indexOf(UnownedStringSlice("<help-category> can be:"));
+    SLANG_CHECK(footerIdx >= 0);
+    SLANG_CHECK(text.indexOf("general", footerIdx) > footerIdx);
+    SLANG_CHECK(text.indexOf("compile", footerIdx) > footerIdx);
+    SLANG_CHECK(text.indexOf("format", footerIdx) > footerIdx);
 
     // TEXT mode must NOT use markdown headings or link syntax.
     SLANG_CHECK(!contains(text, "##"));
@@ -203,7 +207,8 @@ SLANG_UNIT_TEST(writerTextRendersOptionCategories)
 // `slangc -h format` to see the value list.
 SLANG_UNIT_TEST(writerTextSkipsValueListInline)
 {
-    CommandOptions opts; fillSampleOptions(opts);
+    CommandOptions opts;
+    fillSampleOptions(opts);
     CommandOptionsWriter::Options writerOptions;
     writerOptions.style = CommandOptionsWriter::Style::Text;
     auto writer = CommandOptionsWriter::create(writerOptions);
@@ -234,7 +239,8 @@ SLANG_UNIT_TEST(writerTextSkipsValueListInline)
 // `### option` heading levels.
 SLANG_UNIT_TEST(writerMarkdownEmitsAnchorsAndHeadings)
 {
-    CommandOptions opts; fillSampleOptions(opts);
+    CommandOptions opts;
+    fillSampleOptions(opts);
     CommandOptionsWriter::Options writerOptions;
     writerOptions.style = CommandOptionsWriter::Style::Markdown;
     auto writer = CommandOptionsWriter::create(writerOptions);
@@ -275,7 +281,8 @@ SLANG_UNIT_TEST(writerMarkdownEmitsAnchorsAndHeadings)
 // docs that don't want intra-page navigation links.
 SLANG_UNIT_TEST(writerNoLinkMarkdownStripsLinks)
 {
-    CommandOptions opts; fillSampleOptions(opts);
+    CommandOptions opts;
+    fillSampleOptions(opts);
     CommandOptionsWriter::Options writerOptions;
     writerOptions.style = CommandOptionsWriter::Style::NoLinkMarkdown;
     auto writer = CommandOptionsWriter::create(writerOptions);
@@ -300,7 +307,8 @@ SLANG_UNIT_TEST(writerNoLinkMarkdownStripsLinks)
 // Other categories' option names must not leak into the output.
 SLANG_UNIT_TEST(writerSingleCategoryDoesNotLeakOthers)
 {
-    CommandOptions opts; fillSampleOptions(opts);
+    CommandOptions opts;
+    fillSampleOptions(opts);
     Index compileIdx = opts.findCategoryByName(toSlice("compile"));
     SLANG_CHECK_ABORT(compileIdx >= 0);
 
@@ -362,7 +370,8 @@ SLANG_UNIT_TEST(writerInstancesAreIndependent)
     SLANG_CHECK(a->getBuilder().getLength() == 0);
     SLANG_CHECK(b->getBuilder().getLength() == 0);
 
-    CommandOptions opts; fillSampleOptions(opts);
+    CommandOptions opts;
+    fillSampleOptions(opts);
     a->appendDescription(&opts);
     SLANG_CHECK(a->getBuilder().getLength() > 0);
     // b's builder must still be empty — no shared state.

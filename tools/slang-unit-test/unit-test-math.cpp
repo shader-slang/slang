@@ -197,19 +197,34 @@ SLANG_UNIT_TEST(mathAreNearlyEqualRelative)
     SLANG_CHECK(Math::AreNearlyEqual(1.0, 1.0 + 1e-12, eps));
     SLANG_CHECK(!Math::AreNearlyEqual(1.0, 1.001, eps));
 
-    // Large magnitudes — relative tolerance applies.
-    SLANG_CHECK(Math::AreNearlyEqual(1e20, 1e20 + 100, eps));
-    // But not when the gap exceeds eps * (|a|+|b|).
+    // Large magnitudes — relative tolerance applies. The delta
+    // must be larger than the local ULP (~2^14 at 1e20) so it
+    // actually changes the bit pattern, but small relative to
+    // |a|+|b| so the relative-tolerance branch returns true.
+    SLANG_CHECK(Math::AreNearlyEqual(1e20, 1e20 + 1e6, eps));
+    // And a delta that exceeds eps * (|a|+|b|) must NOT compare equal.
+    SLANG_CHECK(!Math::AreNearlyEqual(1e20, 1e20 + 1e15, eps));
+    // Small magnitude: gap larger than eps*(|a|+|b|) is not equal.
     SLANG_CHECK(!Math::AreNearlyEqual(1.0, 2.0, eps));
 }
 
 SLANG_UNIT_TEST(mathAreNearlyEqualNearZero)
 {
     // Near-zero values use absolute tolerance to avoid the
-    // relative-comparison singularity.
+    // relative-comparison singularity. The implementation switches
+    // to the absolute branch when a==0, b==0, or |a|+|b| < minNormal
+    // (~2.2e-308); the threshold there is `eps * minNormal`.
     SLANG_CHECK(Math::AreNearlyEqual(0.0, 0.0, 1e-9));
-    // Different signs but tiny magnitudes — still equal-ish.
+    // Subnormal magnitudes on opposite sides of zero: hits the
+    // absolute branch via the |a|+|b| < minNormal predicate. A
+    // hypothetical impl that took the relative branch would return
+    // false (diff == eps*(|a|+|b|), not strictly less), so this
+    // also discriminates between the two branches.
     SLANG_CHECK(Math::AreNearlyEqual(1e-310, -1e-310, 1.0));
+    // Negative case: absolute branch must NOT report equal when
+    // diff exceeds eps*minNormal. With a=0 and b=1e-200, the
+    // threshold (1.0 * 2.2e-308) is far smaller than the diff.
+    SLANG_CHECK(!Math::AreNearlyEqual(0.0, 1e-200, 1.0));
 }
 
 // -- Type-pun helpers --------------------------------------------
@@ -263,10 +278,10 @@ SLANG_UNIT_TEST(mathHalfSaturatesAtMax)
     float back = HalfToFloat(h);
     SLANG_CHECK(back == SLANG_HALF_MAX);
 
-    // Values exceeding fp16 max produce infinity (or saturate).
+    // Values exceeding fp16 max overflow to infinity (the
+    // implementation sets bits 0x7C00 unconditionally for e > 142).
     unsigned short hInf = FloatToHalf(1e30f);
-    float backInf = HalfToFloat(hInf);
-    SLANG_CHECK(Math::IsInf(backInf) || backInf == SLANG_HALF_MAX);
+    SLANG_CHECK(Math::IsInf(HalfToFloat(hInf)));
 }
 
 SLANG_UNIT_TEST(mathBFloatRoundTripExactValues)
@@ -303,12 +318,14 @@ SLANG_UNIT_TEST(mathFloatE4M3RoundTripExactValues)
 
 SLANG_UNIT_TEST(mathFloatE4M3SaturatesAtMax)
 {
-    // E4M3 max is 448; values above the format's range either
-    // saturate or produce NaN. Either way the value must NOT
-    // round-trip back to the original 1e10.
+    // E4M3 max finite is 448; the boundary value itself must
+    // round-trip exactly.
+    SLANG_CHECK(FloatE4M3ToFloat(FloatToFloatE4M3(448.0f)) == 448.0f);
+    // |val| above the representable range encodes as the NaN
+    // pattern (0x7F / 0xFF), per the implementation.
     unsigned int e = FloatToFloatE4M3(1e10f);
-    float back = FloatE4M3ToFloat(e);
-    SLANG_CHECK(back != 1e10f);
+    SLANG_CHECK((e & 0x7F) == 0x7F);
+    SLANG_CHECK(Math::IsNaN(FloatE4M3ToFloat(e)));
 }
 
 SLANG_UNIT_TEST(mathFloatE5M2RoundTripExactValues)
@@ -325,8 +342,12 @@ SLANG_UNIT_TEST(mathFloatE5M2RoundTripExactValues)
 
 SLANG_UNIT_TEST(mathFloatE5M2SaturatesAtMax)
 {
-    // E5M2 max is ~57344 (2^15 * 1.75). 1e10 exceeds that.
+    // E5M2 max finite is 57344 (2^15 * 1.75); the boundary value
+    // round-trips exactly.
+    SLANG_CHECK(FloatE5M2ToFloat(FloatToFloatE5M2(57344.0f)) == 57344.0f);
+    // |val| above the representable range overflows to infinity,
+    // per the implementation (e8 >= 31 → encoded as 0x7C).
     unsigned int e = FloatToFloatE5M2(1e10f);
-    float back = FloatE5M2ToFloat(e);
-    SLANG_CHECK(back != 1e10f);
+    SLANG_CHECK((e & 0x7F) == 0x7C);
+    SLANG_CHECK(Math::IsInf(FloatE5M2ToFloat(e)));
 }

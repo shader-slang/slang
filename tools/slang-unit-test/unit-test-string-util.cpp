@@ -251,11 +251,31 @@ SLANG_UNIT_TEST(stringUtilExtractLine)
     SLANG_CHECK(line == "first");
     SLANG_CHECK(StringUtil::extractLine(text, line));
     SLANG_CHECK(line == "second");
+    // Terminator-less final segment: the call that consumes it
+    // returns true with the segment as the line, then resets the
+    // in/out text to (nullptr, nullptr) to mark completion.
     SLANG_CHECK(StringUtil::extractLine(text, line));
     SLANG_CHECK(line == "third");
-    // The walking pattern terminates the iteration after the last
-    // line; the implementation marks completion via the returned
-    // bool / in-out slice. Either keeps "third" or signals end.
+    SLANG_CHECK(text.begin() == nullptr);
+    // Subsequent calls return false to signal end-of-input.
+    SLANG_CHECK(!StringUtil::extractLine(text, line));
+}
+
+SLANG_UNIT_TEST(stringUtilExtractLineCrlf)
+{
+    // CRLF and bare-CR terminators are both consumed correctly.
+    UnownedStringSlice text = toSlice("a\r\nb\rc\n");
+    UnownedStringSlice line;
+    SLANG_CHECK(StringUtil::extractLine(text, line));
+    SLANG_CHECK(line == "a");
+    SLANG_CHECK(StringUtil::extractLine(text, line));
+    SLANG_CHECK(line == "b");
+    SLANG_CHECK(StringUtil::extractLine(text, line));
+    SLANG_CHECK(line == "c");
+    // A trailing terminator yields one final empty line, then end.
+    SLANG_CHECK(StringUtil::extractLine(text, line));
+    SLANG_CHECK(line == "");
+    SLANG_CHECK(!StringUtil::extractLine(text, line));
 }
 
 // -- printf-style formatting ------------------------------------------

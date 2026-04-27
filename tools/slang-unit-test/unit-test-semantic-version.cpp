@@ -43,7 +43,9 @@ SemanticVersion parseOrFail(const char* text)
 {
     SemanticVersion v;
     SlangResult r = SemanticVersion::parse(UnownedStringSlice(text), v);
-    SLANG_ASSERT(SLANG_SUCCEEDED(r));
+    // SLANG_ASSERT would expand to SLANG_ASSUME in release builds and
+    // hand us garbage on a malformed input instead of failing loudly.
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(r));
     return v;
 }
 
@@ -174,7 +176,7 @@ SLANG_UNIT_TEST(semanticVersionBackwardsCompat)
     SLANG_CHECK(v1_2_5.isBackwardsCompatibleWith(SemanticVersion(1, 2, 5)));
     SLANG_CHECK(v1_2_5.isBackwardsCompatibleWith(SemanticVersion(1, 2, 4)));
     SLANG_CHECK(v1_2_5.isBackwardsCompatibleWith(SemanticVersion(1, 1, 99)));
-    SLANG_CHECK(v1_2_5.isBackwardsCompatibleWith(SemanticVersion(1, 2, 6))); // patch ignored
+    SLANG_CHECK(v1_2_5.isBackwardsCompatibleWith(SemanticVersion(1, 2, 6)));  // patch ignored
     SLANG_CHECK(!v1_2_5.isBackwardsCompatibleWith(SemanticVersion(1, 3, 0))); // newer minor
     SLANG_CHECK(!v1_2_5.isBackwardsCompatibleWith(SemanticVersion(2, 0, 0))); // diff major
     SLANG_CHECK(!v1_2_5.isBackwardsCompatibleWith(SemanticVersion(0, 9, 9))); // older major
@@ -201,11 +203,11 @@ SLANG_UNIT_TEST(semanticVersionEarliestLatest)
 
 SLANG_UNIT_TEST(semanticVersionHashCode)
 {
-    // Same version → same hash; different version → different hash.
+    // The contract is one-directional: equal versions must hash the
+    // same. Different versions producing different hashes is
+    // desirable (good distribution) but not required — collisions
+    // are allowed by definition. We only assert the contract.
     SemanticVersion a(1, 2, 3);
     SemanticVersion b(1, 2, 3);
-    SemanticVersion c(1, 2, 4);
-
     SLANG_CHECK(a.getHashCode() == b.getHashCode());
-    SLANG_CHECK(a.getHashCode() != c.getHashCode());
 }

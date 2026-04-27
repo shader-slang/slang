@@ -69,7 +69,12 @@ SLANG_UNIT_TEST(rttiUtilIntRoundTrip)
     uint32_t u32 = 0;
     SLANG_CHECK(SLANG_SUCCEEDED(RttiUtil::setInt(0xFFFFFFFFu, rtti<uint32_t>(), &u32)));
     SLANG_CHECK(u32 == 0xFFFFFFFFu);
-    SLANG_CHECK(uint32_t(RttiUtil::getInt64(rtti<uint32_t>(), &u32)) == 0xFFFFFFFFu);
+    // 32→64 widening for unsigned types must zero-extend, not
+    // sign-extend. Truncating back through uint32_t would mask a
+    // sign-extension bug, so check the raw int64_t value first.
+    int64_t raw = RttiUtil::getInt64(rtti<uint32_t>(), &u32);
+    SLANG_CHECK(raw == (int64_t)0xFFFFFFFFLL);
+    SLANG_CHECK(uint32_t(raw) == 0xFFFFFFFFu);
 }
 
 // Negative values round-trip through signed types.
@@ -231,7 +236,7 @@ SLANG_UNIT_TEST(rttiUtilDefaultTypeFuncsAreInvokable)
     SLANG_CHECK(arr[0] == 1 && arr[1] == 2 && arr[2] == 3);
 
     funcs.dtorArray(&typeMap, rtti<int32_t>(), arr, SLANG_COUNT_OF(arr)); // no-op on POD
-    SLANG_CHECK(arr[0] == 1); // memory still readable
+    SLANG_CHECK(arr[0] == 1);                                             // memory still readable
 }
 
 // RttiUtil::copyArray on POD types performs bit-copy via the
@@ -241,8 +246,7 @@ SLANG_UNIT_TEST(rttiUtilCopyArrayPodIsBitwiseCopy)
     int32_t src[5] = {1, 2, 3, 4, 5};
     int32_t dst[5] = {0, 0, 0, 0, 0};
     RttiTypeFuncsMap typeMap;
-    RttiUtil::copyArray(
-        &typeMap, rtti<int32_t>(), dst, src, sizeof(int32_t), SLANG_COUNT_OF(src));
+    RttiUtil::copyArray(&typeMap, rtti<int32_t>(), dst, src, sizeof(int32_t), SLANG_COUNT_OF(src));
     for (Index i = 0; i < SLANG_COUNT_OF(dst); ++i)
     {
         SLANG_CHECK(dst[i] == src[i]);
