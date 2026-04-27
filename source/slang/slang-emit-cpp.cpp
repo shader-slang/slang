@@ -7,7 +7,6 @@
 #include "slang-emit-source-writer.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-util.h"
-#include "slang-mangled-lexer.h"
 
 #include <assert.h>
 

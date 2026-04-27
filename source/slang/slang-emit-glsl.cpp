@@ -8,7 +8,6 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-legalize-types.h"
-#include "slang-mangled-lexer.h"
 #include "slang-rich-diagnostics.h"
 #include "slang/slang-ir.h"
 

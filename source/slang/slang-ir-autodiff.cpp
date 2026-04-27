@@ -1,7 +1,6 @@
 #include "slang-ir-autodiff.h"
 
 #include "../core/slang-performance-profiler.h"
-#include "slang-ir-address-analysis.h"
 #include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-pairs.h"
 #include "slang-ir-autodiff-rev.h"
