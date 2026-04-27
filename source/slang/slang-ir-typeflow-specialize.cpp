@@ -7555,7 +7555,17 @@ struct TypeFlowSpecializationContext
         SLANG_UNUSED(context);
         SLANG_ASSERT(inst->getVal()->getOp() == kIROp_DefaultConstruct);
         auto ptr = inst->getPtr();
-        auto destInfo = as<IRPtrTypeBase>(ptr->getDataType())->getValueType();
+        // Mirror specializeLoad's element-type extraction: the pointer
+        // can be either an IRPtrTypeBase or an IRPointerLikeType
+        // (ConstantBuffer / ParameterBlock). Both store the element
+        // type as operand 0.
+        auto destPtrType = as<IRPtrTypeBase>(ptr->getDataType());
+        auto destPointerLikeType = as<IRPointerLikeType>(ptr->getDataType());
+        IRType* destInfo = destPtrType           ? destPtrType->getValueType()
+                           : destPointerLikeType ? destPointerLikeType->getElementType()
+                                                 : nullptr;
+        if (!destInfo)
+            return false;
         auto valInfo = inst->getVal()->getDataType();
 
         // "Legalize" the store type.
@@ -7576,7 +7586,16 @@ struct TypeFlowSpecializationContext
         //
 
         auto ptr = inst->getPtr();
-        auto ptrInfo = as<IRPtrTypeBase>(ptr->getDataType())->getValueType();
+        // Mirror specializeLoad's element-type extraction: ConstantBuffer
+        // and other PointerLikeTypes are not IRPtrTypeBase but expose the
+        // element type via getElementType().
+        auto storePtrType = as<IRPtrTypeBase>(ptr->getDataType());
+        auto storePointerLikeType = as<IRPointerLikeType>(ptr->getDataType());
+        IRType* ptrInfo = storePtrType           ? storePtrType->getValueType()
+                          : storePointerLikeType ? storePointerLikeType->getElementType()
+                                                 : nullptr;
+        if (!ptrInfo)
+            return false;
 
         // Special case for default initialization:
         //
@@ -7598,10 +7617,15 @@ struct TypeFlowSpecializationContext
                 ptr,
                 taggedUnionType->getWitnessTableSet(),
                 taggedUnionType->getTypeSet()};
+            // Mirror specializeLoad: preserve address space for plain Ptrs;
+            // use a plain Ptr when the source is a PointerLikeType.
+            auto castPtrType = storePtrType
+                                   ? (IRType*)builder.getPtrTypeWithAddressSpace(
+                                         inst->getVal()->getDataType(),
+                                         storePtrType)
+                                   : (IRType*)builder.getPtrType(inst->getVal()->getDataType());
             auto newPtr = builder.emitIntrinsicInst(
-                builder.getPtrTypeWithAddressSpace(
-                    inst->getVal()->getDataType(),
-                    as<IRPtrTypeBase>(ptr->getDataType())),
+                castPtrType,
                 kIROp_CastInterfaceToTaggedUnionPtr,
                 3,
                 castArgs);

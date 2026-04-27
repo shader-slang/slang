@@ -66,6 +66,10 @@ void computeMain()
 // CPP: void computeMain
 
 // Single-conformance path: compiler monomorphizes so no dispatch switch,
-// but the concrete impl must still be invoked through the global.
+// but the concrete impl must still be invoked through the global. The
+// NOT lines pin the monomorphization claim: no dispatch shim and no
+// switch table should be emitted when only one conformance is registered.
 // SINGLE: ImplA_getValue
+// SINGLE-NOT: s_dispatch_IFoo_getValue
+// SINGLE-NOT: switch(
 // SINGLE: void computeMain

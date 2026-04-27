@@ -1,5 +1,5 @@
 // Two global interface parameters of different interface types exercise the
-// ordering and interaction in `preProcessGlobalScope` / `specializeGlobalInsts`
+// ordering and interaction in `seedGlobalScope` / `specializeGlobalInsts`
 // (both iterate over all module-scope instructions).  With a single global the
 // ordering is trivial; with two independent interfaces any cross-contamination
 // would surface here.
