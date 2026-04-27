@@ -4761,8 +4761,7 @@ struct ExprLoweringContext
         // In such a case we should be careful to not statically
         // resolve things.
         //
-        if (auto callableDecl = as<CallableDecl>(declRefExpr->declRef.getDecl());
-            callableDecl)
+        if (auto callableDecl = as<CallableDecl>(declRefExpr->declRef.getDecl()); callableDecl)
         {
             // Okay, the declaration is directly callable, so we can continue.
 
