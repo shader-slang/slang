@@ -79,10 +79,9 @@ static void attachExplicitBindingSemantic(
     addModifier(varDecl, vkBinding);
 }
 
-// Find an existing module-scope decl named `__slang_coverage`. If
-// present, callers reuse it instead of synthesizing. Returns null if
-// not found.
-static VarDecl* findExistingCoverageDecl(ModuleDecl* moduleDecl)
+// Find an existing module-scope decl named `__slang_coverage` in just
+// this module's direct members.
+static VarDecl* findExistingCoverageDeclInModule(ModuleDecl* moduleDecl)
 {
     for (auto member : moduleDecl->getDirectMemberDecls())
     {
@@ -94,6 +93,34 @@ static VarDecl* findExistingCoverageDecl(ModuleDecl* moduleDecl)
             continue;
         if (name->text == kCoverageBufferName)
             return varDecl;
+    }
+    return nullptr;
+}
+
+// Walk this module + all transitively imported modules, looking for an
+// existing `__slang_coverage` decl (user-declared or synthesized into
+// an earlier-checked module). Imports are checked first so that when
+// `import physics; import …` causes `physics.slang` to be checked
+// before `simulate.slang`'s synthesizer runs, simulate.slang reuses
+// physics's `__slang_coverage` instead of adding a second one whose
+// explicit `register(uN, spaceM)` would collide on parameter binding
+// (which surfaces as a D3D12 root-signature failure when
+// `-trace-coverage-binding` is in use).
+static VarDecl* findExistingCoverageDecl(
+    ModuleDecl* moduleDecl,
+    HashSet<ModuleDecl*>& visited)
+{
+    if (!visited.add(moduleDecl))
+        return nullptr;
+    if (auto existing = findExistingCoverageDeclInModule(moduleDecl))
+        return existing;
+    for (auto importDecl : moduleDecl->getMembersOfType<ImportDecl>())
+    {
+        if (auto imported = importDecl->importedModuleDecl)
+        {
+            if (auto existing = findExistingCoverageDecl(imported, visited))
+                return existing;
+        }
     }
     return nullptr;
 }
@@ -112,9 +139,14 @@ void maybeSynthesizeCoverageBufferDecl(SemanticsVisitor* visitor, ModuleDecl* mo
         return;
 
     // If the user already declared `__slang_coverage` themselves (or
-    // a previous compile phase already synthesized it for this
-    // module), don't duplicate.
-    if (findExistingCoverageDecl(moduleDecl))
+    // a previous compile phase already synthesized it for this module
+    // or any transitively-imported module), don't duplicate. Imports
+    // are processed before this hook (see `checkModule` in
+    // slang-check-decl.cpp), so a leaf module like `physics.slang` will
+    // already carry its synthesized `__slang_coverage` by the time the
+    // importing module's synthesizer runs.
+    HashSet<ModuleDecl*> visited;
+    if (findExistingCoverageDecl(moduleDecl, visited))
         return;
 
     auto astBuilder = getCurrentASTBuilder();

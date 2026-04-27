@@ -73,15 +73,34 @@ static void readBufferBinding(IRGlobalParam* coverageBuffer, int32_t& outSpace, 
     auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
     if (!varLayout)
         return;
-    if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
-        outSpace = (int32_t)a->getOffset();
-    if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::DescriptorTableSlot))
-        outBinding = (int32_t)a->getOffset();
-    // For HLSL/D3D-style targets the binding comes in as UAV register.
-    if (outBinding < 0)
+
+    // Each binding offset attr carries both an offset (binding /
+    // register index) and a `space` (descriptor set on Vulkan, HLSL
+    // `space` on D3D) on the same attr. The SPIR-V emitter reads both
+    // from the same attr — see slang-emit-spirv.cpp around line 3231.
+    // Prefer `DescriptorTableSlot` (Vulkan / SPIR-V) and fall back to
+    // `UnorderedAccess` (HLSL UAV register) for D3D-style targets.
+    auto takeBinding = [&](LayoutResourceKind kind) -> bool
     {
-        if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::UnorderedAccess))
+        if (auto a = varLayout->findOffsetAttr(kind))
+        {
             outBinding = (int32_t)a->getOffset();
+            outSpace = (int32_t)a->getSpace();
+            return true;
+        }
+        return false;
+    };
+    if (!takeBinding(LayoutResourceKind::DescriptorTableSlot))
+        takeBinding(LayoutResourceKind::UnorderedAccess);
+
+    // Some HLSL layout shapes encode `space` as a separate
+    // `RegisterSpace` offset attr rather than on the binding attr; use
+    // it as a fallback when the binding attr didn't surface a non-zero
+    // space.
+    if (outSpace <= 0)
+    {
+        if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+            outSpace = (int32_t)a->getOffset();
     }
 }
 
