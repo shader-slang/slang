@@ -467,6 +467,14 @@ TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
         }
     }
 
+    // Matrix row/column dimension validation is intentionally *not* done at
+    // type-construction time. Rejecting a matrix here would also reject uses
+    // that may be valid on specific targets (e.g. the CPU target, or
+    // capability-gated code paths). Instead, matrices with out-of-range
+    // dimensions are caught at entry-point varying sites by a rule in
+    // `validateEntryPoint`, and downstream codegen for other contexts is
+    // responsible for its own diagnostics.
+
     // A type pack is not a usable type other than for defining parameters.
     if (!as<ParamDecl>(decl) && isTypePack(type))
     {

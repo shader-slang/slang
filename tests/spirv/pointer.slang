@@ -18,7 +18,7 @@ void funcThatTakesPointer(PP* p)
 }
 int* funcThatReturnsPointer(PP* p)
 {
-    return &p.data;
+    return __getAddress(p.data);
 }
 
 void funcWithInOutParam(inout PP p)

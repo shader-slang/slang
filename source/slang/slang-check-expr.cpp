@@ -6018,6 +6018,25 @@ static PtrType* getValidTypeForAddressOf(
                     AddressSpace::GroupShared,
                     m_astBuilder->getDefaultLayoutType());
             }
+            else
+            {
+                // UserPointer is correct here even though this covers all
+                // remaining variables (including function-locals):
+                // - On GPU targets, the IR validation pass
+                //   (validateAndRemoveAssumeAddress) rejects function-local
+                //   addresses before they reach codegen, so only device-memory
+                //   variables survive, for which UserPointer is semantically
+                //   right.
+                // - On CPU/CUDA targets, address spaces are irrelevant (flat
+                //   memory), and downstream passes that special-case
+                //   UserPointer (addr-inst elimination, redundancy removal,
+                //   etc.) handle it conservatively/correctly.
+                return m_astBuilder->getPtrType(
+                    variableType,
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::UserPointer,
+                    m_astBuilder->getDefaultLayoutType());
+            }
         }
     }
 
@@ -6124,7 +6143,7 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
         getValidTypeForAddressOf(this, m_astBuilder, expr->arg, getType(m_astBuilder, expr->arg));
     if (!expr->type)
     {
-        getSink()->diagnose(Diagnostics::InvalidAddressOf{.expr = expr});
+        getSink()->diagnose(Diagnostics::InvalidAddressOf{.location = expr->loc});
         expr->type = m_astBuilder->getErrorType();
     }
     return expr;

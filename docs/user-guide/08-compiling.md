@@ -591,6 +591,59 @@ When building Slang from source, the DXC headers are automatically copied to
 `build/dxc/include/` during the build, so you can use `-Xdxc -Ibuild/dxc/include`
 for local development and testing.
 
+#### Querying Cooperative Type Metadata Used by a Shader
+
+Before dispatching a shader that uses cooperative vector or matrix operations,
+applications may need to verify that the driver supports the specific types and
+combinations the shader uses.
+
+Slang exposes this information via the `slang::ICooperativeTypesMetadata`
+interface, obtained from the `slang::IMetadata` pointer returned by
+`getTargetMetadata()` or `getEntryPointMetadata()`.
+
+The interface reports the distinct cooperative matrix types, cooperative vector
+type-usage records, and supported operation-specific combinations that survive
+in the final target output. Targets that lower cooperative types to ordinary
+arrays report empty lists.
+
+```c++
+slang::IComponentType* program = ...;
+slang::IMetadata* metadata = nullptr;
+program->getTargetMetadata(targetIndex, &metadata);
+
+auto* coopMeta = static_cast<slang::ICooperativeTypesMetadata*>(
+    metadata ? metadata->castAs(slang::ICooperativeTypesMetadata::getTypeGuid()) : nullptr);
+
+if (coopMeta)
+{
+    SlangUInt vecTypeCount = coopMeta->getCooperativeVectorTypeCount();
+    for (SlangUInt i = 0; i < vecTypeCount; ++i)
+    {
+        slang::CooperativeVectorTypeUsageInfo typeInfo = {};
+        coopMeta->getCooperativeVectorTypeByIndex(i, &typeInfo);
+        // typeInfo.componentType, typeInfo.maxSize, typeInfo.usedForTrainingOp
+    }
+
+    SlangUInt vecCombCount = coopMeta->getCooperativeVectorCombinationCount();
+    for (SlangUInt i = 0; i < vecCombCount; ++i)
+    {
+        slang::CooperativeVectorCombination comb = {};
+        coopMeta->getCooperativeVectorCombinationByIndex(i, &comb);
+        // comb.inputType, comb.inputInterpretation, comb.matrixInterpretation,
+        // comb.biasInterpretation, comb.resultType, comb.transpose
+    }
+
+    SlangUInt matCombCount = coopMeta->getCooperativeMatrixCombinationCount();
+    for (SlangUInt i = 0; i < matCombCount; ++i)
+    {
+        slang::CooperativeMatrixCombination comb = {};
+        coopMeta->getCooperativeMatrixCombinationByIndex(i, &comb);
+        // comb.m, comb.n, comb.k, comb.componentTypeA/B/C/Result,
+        // comb.scope, comb.saturate
+    }
+}
+```
+
 ## Using the Compilation API
 
 The C++ API provided by Slang is meant to provide more complete control over compilation for applications that need it.
