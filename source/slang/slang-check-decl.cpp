@@ -7855,6 +7855,25 @@ bool SemanticsVisitor::trySynthesizePropertyRequirementWitness(
         nullptr);
     synMemberRef->loc = requiredMemberDeclRef.getLoc();
 
+    // Special-case field-backed storage here: `visitVarDecl()` currently strips
+    // `no_diff` off a field's type and records it on the `VarDecl` instead, so
+    // a plain lookup expression would otherwise expose the field's base type.
+    //
+    // TODO: Remove this special-case once modified types can be treated
+    // uniformly and `no_diff` no longer needs to be normalized onto `VarDecl`s.
+    if (lookupResult.isValid() && !lookupResult.isOverloaded())
+    {
+        if (auto storageDeclRef = lookupResult.item.declRef.as<VarDeclBase>())
+        {
+            if (storageDeclRef.getDecl()->findModifier<NoDiffModifier>())
+            {
+                synMemberRef->type.type = getTypeWithModifier(
+                    synMemberRef->type.type,
+                    m_astBuilder->getNoDiffModifierVal());
+            }
+        }
+    }
+
     bool canSynAccessors = synthesizeAccessorRequirements(
         context,
         requiredMemberDeclRef,
@@ -7912,14 +7931,25 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
         List<Expr*> synArgs;
         for (auto requiredParamDeclRef : getParameters(m_astBuilder, requiredAccessorDeclRef))
         {
-            auto paramType = getType(m_astBuilder, requiredParamDeclRef);
+            auto paramType = getParamValueType(m_astBuilder, requiredParamDeclRef);
 
-            // The synthesized parameter will ahve the same name and
-            // type as the parameter of the requirement.
-            //
             auto synParamDecl = m_astBuilder->create<ParamDecl>();
             synParamDecl->nameAndLoc = requiredParamDeclRef.getDecl()->nameAndLoc;
-            synParamDecl->type.type = paramType;
+
+            // The synthesized parameter will have the same name and raw stored
+            // type as the requirement. Parameter checking normalizes `no_diff`
+            // onto the `ParamDecl` itself, but references to that parameter in
+            // the synthesized accessor body still need the value type that
+            // callers observe. This applies to synthesized property and
+            // subscript setters alike.
+            synParamDecl->type.type = getType(m_astBuilder, requiredParamDeclRef);
+
+            if (requiredParamDeclRef.getDecl()->findModifier<NoDiffModifier>())
+            {
+                auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
+                noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
+                addModifier(synParamDecl, noDiffModifier);
+            }
 
             // We need to add the parameter as a child declaration of
             // the accessor we are building.
