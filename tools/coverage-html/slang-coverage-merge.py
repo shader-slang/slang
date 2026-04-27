@@ -109,12 +109,13 @@ def _cleanup_temp_files() -> None:
             pass
 
 
-def _gunzip_to_temp(gz_path: str) -> str:
-    """Decompress a .gz LCOV to a temp file and return the temp path.
+def _gunzip_to_temp(gz_path: str, suffix: str = ".lcov") -> str:
+    """Decompress a .gz file to a temp file and return the temp path.
 
-    `parse_lcov` takes a path, not a stream, so we materialize the
-    decompressed text on disk. The temp file is registered for
-    cleanup via `atexit` (see `_cleanup_temp_files`).
+    `parse_lcov` and `parse_llvm_cov_report` both take a path, not a
+    stream, so we materialize the decompressed text on disk. The
+    temp file is registered for cleanup via `atexit` (see
+    `_cleanup_temp_files`).
 
     No upper bound on decompressed size — inputs are expected to be
     trusted CI artifacts. A crafted gzip bomb could exhaust /tmp;
@@ -123,7 +124,7 @@ def _gunzip_to_temp(gz_path: str) -> str:
     """
     import tempfile
 
-    fd, tmp = tempfile.mkstemp(suffix=".lcov", prefix="scv-merge-")
+    fd, tmp = tempfile.mkstemp(suffix=suffix, prefix="scv-merge-")
     _temp_files.append(tmp)
     with os.fdopen(fd, "wb") as out, gzip.open(gz_path, "rb") as gz:
         while True:
@@ -139,6 +140,13 @@ def load(path: str) -> List[FileRecord]:
     if path.lower().endswith(".gz"):
         path = _gunzip_to_temp(path)
     return parse_lcov(path, warn_prefix=GENERATOR_NAME)
+
+
+def load_auth_summary(path: str) -> AuthSummary:
+    """Parse a possibly-gzipped `llvm-cov report` text dump."""
+    if path.lower().endswith(".gz"):
+        path = _gunzip_to_temp(path, suffix=".txt")
+    return parse_llvm_cov_report(path)
 
 
 # ---------------------------------------------------------------------------
@@ -443,13 +451,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         per_os: List[AuthSummary] = []
         for p in args.auth_summary:
             try:
-                per_os.append(parse_llvm_cov_report(p))
+                per_os.append(load_auth_summary(p))
             except LcovParseError as e:
                 print(f"{GENERATOR_NAME}: {e}", file=sys.stderr)
                 return 2
         merged_auth = merge_auth_summaries(per_os)
         # Apply the same include/exclude regex filters to the auth
         # summary so the merged report matches the LCOV record set.
+        dropped = 0
         if inc_re or exc_re:
             before = len(merged_auth.files)
             merged_auth.files = {
@@ -458,26 +467,28 @@ def main(argv: Optional[List[str]] = None) -> int:
                 if (not inc_re or inc_re.search(k))
                 and (not exc_re or not exc_re.search(k))
             }
-            # `merged_auth.total` was summed across the unfiltered
-            # files; recompute it from the surviving rows so the
-            # written TOTAL line and the stderr summary match the
-            # filtered set.
-            recomputed = AuthFileSummary()
-            for fs in merged_auth.files.values():
-                recomputed.line_total += fs.line_total
-                recomputed.line_missed += fs.line_missed
-                recomputed.func_total += fs.func_total
-                recomputed.func_missed += fs.func_missed
-                recomputed.branch_total += fs.branch_total
-                recomputed.branch_missed += fs.branch_missed
-            merged_auth.total = recomputed
             dropped = before - len(merged_auth.files)
-            if dropped and not args.quiet:
-                print(
-                    f"{GENERATOR_NAME}: filter dropped {dropped} "
-                    f"entr{'y' if dropped == 1 else 'ies'} from auth-summary",
-                    file=sys.stderr,
-                )
+        # Recompute `merged_auth.total` from the per-file rows so
+        # the TOTAL row and the stderr summary always match
+        # `sum(merged_auth.files.values())`. `merge_auth_summaries`
+        # reduces per-OS totals via max/min for cross-OS robustness;
+        # for the merged-output TOTAL, the cross-file sum of the
+        # already-reduced per-file rows is the consistent answer.
+        recomputed = AuthFileSummary()
+        for fs in merged_auth.files.values():
+            recomputed.line_total += fs.line_total
+            recomputed.line_missed += fs.line_missed
+            recomputed.func_total += fs.func_total
+            recomputed.func_missed += fs.func_missed
+            recomputed.branch_total += fs.branch_total
+            recomputed.branch_missed += fs.branch_missed
+        merged_auth.total = recomputed
+        if dropped and not args.quiet:
+            print(
+                f"{GENERATOR_NAME}: filter dropped {dropped} "
+                f"entr{'y' if dropped == 1 else 'ies'} from auth-summary",
+                file=sys.stderr,
+            )
         with open(args.auth_summary_out, "w", encoding="utf-8") as f:
             write_llvm_cov_report(merged_auth, f)
         if not args.quiet:

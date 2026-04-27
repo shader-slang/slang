@@ -533,6 +533,93 @@ class AuthSummaryCliTests(unittest.TestCase):
         self.assertEqual(merged.total.line_total, 110)
         self.assertEqual(merged.total.line_missed, 15)
 
+    def test_auth_total_recomputed_from_files_no_filter(self):
+        # Regression: when no filter is passed, the auth-summary
+        # TOTAL row used to fall back to merge_auth_summaries' max/min
+        # reduction, which can disagree with sum(merged_auth.files).
+        # The merger now always recomputes TOTAL from the per-file
+        # rows, which is the consistent answer for the merged output.
+        a_lcov = self._write(
+            "a.info",
+            "TN:\nSF:source/foo.c\nDA:1,1\nLF:1\nLH:1\nend_of_record\n"
+            "TN:\nSF:source/bar.c\nDA:1,1\nLF:1\nLH:1\nend_of_record\n",
+        )
+        a_rep = self._report(
+            "a-report.txt",
+            [
+                "source/foo.c"
+                "                                                                                         "
+                "      100                20    80.00%          10                 2    80.00%         "
+                "100                20    80.00%          50                10    80.00%\n",
+                "source/bar.c"
+                "                                                                                         "
+                "       50                 5    90.00%           4                 0   100.00%          "
+                "50                 5    90.00%          20                 2    90.00%\n",
+            ],
+            "TOTAL                                                                                                "
+            "      150                25    83.33%          14                 2    85.71%         "
+            "150                25    83.33%          70                12    82.86%\n",
+        )
+        out_lcov = os.path.join(self.tmp, "merged.lcov")
+        out_auth = os.path.join(self.tmp, "merged-auth.txt")
+        res = subprocess.run(
+            [sys.executable, MERGE_SCRIPT, a_lcov,
+             "-o", out_lcov,
+             "--auth-summary", a_rep,
+             "--auth-summary-out", out_auth,
+             "--quiet"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(res.returncode, 0, msg=res.stderr)
+        import lcov_io
+        merged = lcov_io.parse_llvm_cov_report(out_auth)
+        # TOTAL must equal sum of foo + bar (150 lines, 25 missed).
+        self.assertEqual(merged.total.line_total, 150)
+        self.assertEqual(merged.total.line_missed, 25)
+        self.assertEqual(merged.total.func_total, 14)
+        self.assertEqual(merged.total.func_missed, 2)
+        self.assertEqual(merged.total.branch_total, 70)
+        self.assertEqual(merged.total.branch_missed, 12)
+
+    def test_auth_summary_gz_input(self):
+        # Auth-summary inputs are auto-decompressed the same way LCOV
+        # inputs are.
+        import gzip
+        a_lcov = self._write(
+            "a.info",
+            "TN:\nSF:source/foo.c\nDA:1,1\nLF:1\nLH:1\nend_of_record\n",
+        )
+        report_text = (
+            "Filename                                                                                             "
+            "Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      "
+            "Missed Lines     Cover    Branches   Missed Branches     Cover\n"
+            + "-" * 200 + "\n"
+            "source/foo.c"
+            "                                                                                         "
+            "      100                20    80.00%          10                 2    80.00%         "
+            "100                20    80.00%          50                10    80.00%\n"
+            + "-" * 200 + "\n"
+            "TOTAL                                                                                                "
+            "      100                20    80.00%          10                 2    80.00%         "
+            "100                20    80.00%          50                10    80.00%\n"
+        )
+        gz_path = os.path.join(self.tmp, "report.txt.gz")
+        with gzip.open(gz_path, "wt", encoding="utf-8") as f:
+            f.write(report_text)
+        out_auth = os.path.join(self.tmp, "merged-auth.txt")
+        res = subprocess.run(
+            [sys.executable, MERGE_SCRIPT, a_lcov,
+             "--auth-summary", gz_path,
+             "--auth-summary-out", out_auth,
+             "--quiet"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(res.returncode, 0, msg=res.stderr)
+        import lcov_io
+        merged = lcov_io.parse_llvm_cov_report(out_auth)
+        self.assertIn("source/foo.c", merged.files)
+        self.assertEqual(merged.files["source/foo.c"].line_total, 100)
+
     def test_auth_summary_requires_out_path(self):
         a_lcov = self._write(
             "a.info",

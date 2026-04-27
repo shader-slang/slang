@@ -123,7 +123,7 @@ class ParserTests(unittest.TestCase):
 
     def test_corrupt_brda_raises(self):
         with tempfile.NamedTemporaryFile(
-            "w", suffix=".info", delete=False
+            "w", suffix=".info", delete=False, encoding="utf-8"
         ) as tmp:
             tmp.write("TN:test\nSF:x.c\nBRDA:5,0,0,not-an-int\nend_of_record\n")
             path = tmp.name
@@ -568,7 +568,11 @@ class MergeAuthSummariesTests(unittest.TestCase):
         self.assertEqual(merged.files["foo.cpp"].line_missed, 15)
         self.assertEqual(merged.files["foo.cpp"].line_hit, 95)
 
-    def test_total_aggregates_across_inputs(self):
+    def test_total_uses_per_os_max_total_min_missed(self):
+        # `merge_auth_summaries` reduces per-OS totals via the same
+        # max(total) / min(missed) rule as the per-file rows; the
+        # values come from the most-favourable OS, not from a sum
+        # across inputs.
         a = self._summary(100, 20)
         b = self._summary(110, 30)
         merged = renderer.merge_auth_summaries([a, b])

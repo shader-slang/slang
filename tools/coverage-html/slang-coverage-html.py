@@ -1356,6 +1356,22 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     resolver = SourceResolver(args.source_root, cwd=os.path.dirname(os.path.abspath(args.input)))
 
+    # Safety check: when --source-root is unset, the resolver will
+    # follow absolute SF: paths anywhere on the filesystem. That's
+    # fine for trusted CI artifacts but worth surfacing for ad-hoc
+    # use against unknown LCOVs.
+    if not args.source_root and not args.quiet:
+        abs_sf_paths = sum(1 for r in records if os.path.isabs(r.path))
+        if abs_sf_paths:
+            print(
+                f"slang-coverage-html: warning: {abs_sf_paths} record(s) "
+                f"contain absolute SF: paths and --source-root is unset; "
+                f"the resolver will read whichever files those paths point "
+                f"at on this host. Pass --source-root <repo> to constrain "
+                f"resolution to a specific tree.",
+                file=sys.stderr,
+            )
+
     render_index(
         records=records,
         output_dir=args.output_dir,
