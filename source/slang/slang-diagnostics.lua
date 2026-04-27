@@ -2325,6 +2325,20 @@ warning(
     span { loc = "location" }  -- No span message: this diagnostic has no meaningful source location
 )
 
+warning(
+    "special-type-leaks-from-parameter-group",
+    31106,
+    "Parameter group type includes some members with types which cannot be included in the same binding. These types will be moved into another parameter binding slot.",
+    span { loc = "location" }
+)
+
+warning(
+    "special-type-member-leaks-from-parameter-group",
+    31107,
+    "This member cannot be included in the same binding as some other parts of this struct, and will be moved into another parameter binding slot.",
+    span { loc = "member:IRInst", message = "This member will leak into a separate binding slot." }
+)
+
 err(
     "invalid-attribute-target",
     31120,
@@ -2551,7 +2565,7 @@ err(
     "invalid-address-of",
     31160,
     "invalid __getAddress usage",
-    span { loc = "expr:Expr", message = "'__getAddress' only supports groupshared variables and members of groupshared/device memory." }
+    span { loc = "location", message = "'__getAddress' cannot take the address of a function-local variable on this target." }
 )
 
 err(
@@ -3971,6 +3985,20 @@ err(
     span { loc = "location", message = "geometry shader entry point '~entryPoint:Name' must have a '[maxvertexcount(N)]' attribute" }
 )
 
+err(
+    "invalid-entry-point-varying-type",
+    38050,
+    "type cannot be used as entry-point varying parameter or return type",
+    span { loc = "location", message = "type '~type:Type' cannot be used as ~direction ~context of entry point '~entryPoint:Name' because ~reason" }
+)
+
+err(
+    "invalid-entry-point-varying-type-for-target",
+    38051,
+    "type cannot be used as entry-point varying for this target",
+    span { loc = "location", message = "type '~type:Type' cannot be used as ~direction ~context of entry point '~entryPoint:Name' when targeting ~target because ~reason" }
+)
+
 --
 -- 382xx: module imports
 --
@@ -4035,7 +4063,6 @@ err(
     "recursive type in structured buffer",
     span { loc = "location", message = "structured buffer element type '~type:Type' contains recursive type references" }
 )
-
 
 -- Load semantic checking diagnostics (part 11) - Type layout and parameter binding
 -- (inlined from slang-diagnostics-semantic-checking-11.lua)
@@ -4762,6 +4789,20 @@ warning(
     54004,
     "unnecessary mesh output modifier",
     span { loc = "location", message = "Unnecessary HLSL style mesh shader output modifier" }
+)
+
+err(
+    "cannot-read-from-mesh-shader-output",
+    54005,
+    "cannot read values from mesh shader outputs",
+    span { loc = "inst:IRInst", message = "Cannot read values from mesh shader outputs" }
+)
+
+err(
+    "invalid-parameter-passing-mode-for-write-only-reference",
+    54006,
+    "Parameter passing mode requires reading a write-only value.",
+    span { loc = "location", message = "Parameter passing mode requires reading this value, but it is write-only." }
 )
 
 err(
