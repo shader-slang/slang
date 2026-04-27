@@ -14239,6 +14239,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                                                                       : UnownedStringSlice(),
                 source->isIncludedFile());
             context->shared->mapSourceFileToDebugSourceInst[source] = debugSource;
+
+            // For Standard and Maximal debug info, emit a DebugCompilationUnit for each
+            // non-included source file. This makes the IR the source of truth for which
+            // source files are compilation units, removing the need for heuristics during
+            // SPIR-V emission.
+            if (context->debugInfoLevel >= DebugInfoLevel::Standard && !source->isIncludedFile())
+            {
+                builder->emitDebugCompilationUnit(debugSource);
+            }
         }
     }
 
