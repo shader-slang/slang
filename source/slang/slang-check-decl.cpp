@@ -8578,7 +8578,6 @@ static DeclVisibility getMoreRestrictiveVisibility(
             return visibility;
         default:
             SLANG_UNEXPECTED("unexpected visibility type");
-            return DeclVisibility::Internal;
         }
     };
 
@@ -8617,7 +8616,6 @@ static SynthesizedExtensionVisibility getSynthesizedExtensionVisibility(
         break;
     default:
         SLANG_UNEXPECTED("unexpected visibility type");
-        break;
     }
     return result;
 }
