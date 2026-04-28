@@ -719,6 +719,20 @@ IROp getSetOpFromType(IRType* type)
     case kIROp_TypeType: // Can be refined into set of concrete types
         return kIROp_TypeSet;
 
+    // Plain value types — int / bool are the only `static const`
+    // requirement types the front-end currently permits (E30302),
+    // but the set machinery treats any constant IR value uniformly.
+    case kIROp_IntType:
+    case kIROp_Int8Type:
+    case kIROp_Int16Type:
+    case kIROp_Int64Type:
+    case kIROp_UIntType:
+    case kIROp_UInt8Type:
+    case kIROp_UInt16Type:
+    case kIROp_UInt64Type:
+    case kIROp_BoolType:
+        return kIROp_ValueSet;
+
     // Translatable function types (all equivalent to FuncType for our purposes)
     case kIROp_FuncTypeOf:
     case kIROp_ForwardDiffFuncType:
@@ -3226,10 +3240,10 @@ struct TypeFlowSpecializationContext
             auto setOp = getSetOpFromType(inst->getDataType());
             if (setOp == kIROp_Invalid)
             {
-                // The lookupWitness returns a plain value type (e.g. Int from
-                // `static const int`). The typeflow pass only handles function,
-                // type, generic, and witness-table results; value-type lookups
-                // are handled later by lowerTagInsts.
+                // Result type is not refinable by the set machinery (rare:
+                // pointer/handle/aggregate types that don't yet have a set
+                // representation). Leave the lookup intact for downstream
+                // passes to handle.
                 module->getContainerPool().free(&results);
                 return none();
             }

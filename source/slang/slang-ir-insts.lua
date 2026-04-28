@@ -2871,7 +2871,14 @@ local insts = {
 			{ TypeSet = {} },
 			{ FuncSet = {} },
 			{ WitnessTableSet = {} },
-			{ GenericSet = {} }
+			{ GenericSet = {} },
+			{ ValueSet = {} },
+			-- A set of plain constant IR values (e.g. IRIntLit, IRBoolLit).
+			-- Used by the typeflow pass to refine `lookupWitness` instructions
+			-- whose result type is a value type rather than a func / type /
+			-- generic / witness-table.  Treated symmetrically with the other
+			-- set kinds so value-typed lookups participate in union /
+			-- element-of / tag operations the same way.
 		},
 	},
 	{ CastInterfaceToTaggedUnionPtr = {

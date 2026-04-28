@@ -554,17 +554,23 @@ struct TagOpsLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
-    // Lower a `lookupWitness` whose result is a plain value type (e.g. `Int`
-    // from `static const int`, `bool` from `static const bool`). The
-    // typeflow specialization pass handles function/type/generic/witness-table
-    // results; value-type lookups reach this pass still carrying the
-    // `SetTagType(WitnessTableSet)` on their operand, so we emit a dispatch
-    // function that returns the correct witness-table entry for the runtime
-    // tag. Since every entry is already a constant IR value, we can return it
-    // directly — no restriction on the entry kind. The language front-end
-    // currently only permits `int` and `bool` for static const requirements
-    // (error 30302), but this lowering is agnostic and handles any value-typed
-    // entry the front-end ever allows.
+    // Lower a `lookupWitness` whose result is a plain value type (e.g.
+    // `Int` from `static const int`, `bool` from `static const bool`).
+    //
+    // Background: the typeflow pass refines value-typed lookups using
+    // `ValueSet` (the peer of `WitnessTableSet` / `FuncSet` / `TypeSet`
+    // / `GenericSet`), so they participate in the set machinery the
+    // same way every other lookup kind does.  Singleton / empty /
+    // unbounded cases are folded by the typeflow specialization pass
+    // directly; the multi-conformance dispatch case reaches this pass
+    // still carrying a runtime witness-table tag and needs a per-call
+    // dispatch function synthesized.  This routine handles that case.
+    //
+    // Every entry is a constant IR value, so we emit a switch over the
+    // witness-table tag that returns the correct entry directly.  The
+    // front-end currently restricts static-const requirements to `int`
+    // and `bool` (E30302), but this lowering is type-agnostic and any
+    // value-typed entry the front-end ever allows works the same way.
     void lowerLookupWitnessForValue(IRLookupWitnessMethod* inst)
     {
         auto witnessTableOp = inst->getWitnessTable();
