@@ -6,6 +6,7 @@
 
 // Functional test requires GPU (barriers not available on CPU target)
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
 // Emission test verifiable without GPU
 //TEST:SIMPLE(filecheck=EMIT): -target hlsl -stage compute -entry computeMain
 
