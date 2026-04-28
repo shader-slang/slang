@@ -5839,6 +5839,16 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
             return _updateLayout(context, type, typeLayoutBuilder.getTypeLayoutResult());
         }
+        else if (auto classDeclRef = declRef.as<ClassDecl>())
+        {
+            if (context.sink)
+            {
+                context.sink->diagnose(Diagnostics::ClassTypeNotSupported{
+                    .name = String(classDeclRef.getName()->text),
+                    .location = classDeclRef.getLoc()});
+            }
+            return createSimpleTypeLayout(SimpleLayoutInfo(), type, rules);
+        }
         else if (auto globalGenericParamDecl = declRef.as<GlobalGenericParamDecl>())
         {
             if (auto concreteType =
