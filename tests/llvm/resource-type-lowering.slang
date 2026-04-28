@@ -13,6 +13,7 @@ struct Foo
     Texture2D<float4> tex = __default<Texture2D<float4>>();
     ByteAddressBuffer buf = __default<ByteAddressBuffer>();
     RaytracingAccelerationStructure as = __default<RaytracingAccelerationStructure>();
+    SamplerState sam = __default<SamplerState>();
 };
 
 [numthreads(1,1,1)]
@@ -26,7 +27,7 @@ void computeMain()
     outputBuffer[2] = sizeof(RWStructuredBuffer<float2>);
 
     Foo f = {};
-    // CHECK: 20
+    // CHECK: 28
     outputBuffer[3] = sizeof(f);
 
     // Let's make the texture read-write now.

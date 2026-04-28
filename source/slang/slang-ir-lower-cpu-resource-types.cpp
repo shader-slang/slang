@@ -156,6 +156,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                 loweredInst = builder.emitGetOffsetPtr(ptr, index);
             }
             break;
+
         case kIROp_StructuredBufferLoad:
         case kIROp_RWStructuredBufferLoad:
             {
@@ -166,6 +167,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                 loweredInst = builder.emitLoad(offsetPtr);
             }
             break;
+
         case kIROp_RWStructuredBufferStore:
             {
                 auto base = inst->getOperand(0);
@@ -176,25 +178,38 @@ struct ResourceTypeLoweringContext : InstPassBase
                 loweredInst = builder.emitStore(offsetPtr, val);
             }
             break;
+
         case kIROp_ByteAddressBufferLoad:
             {
                 auto base = inst->getOperand(0);
                 auto index = inst->getOperand(1);
                 auto ptr = getBufferPtr(builder, base);
+                auto untypedPtrType = as<IRPtrTypeBase>(ptr->getDataType());
                 auto offsetPtr = builder.emitGetOffsetPtr(ptr, index);
+                auto ptrType = builder.getPtrTypeWithAddressSpace(inst->getDataType(), untypedPtrType);
+
+                // This may seem risky in terms of alignment. However, with the
+                // LLVM CPU targets, we rely on the `legalizeByteAddressBufferOps`
+                // pass to scalarize the load/stores such that the load and store
+                // ops we see in this pass only occur on 4-byte aligned types.
+                // Conveniently, they can't be misaligned due to ByteAddressBuffers
+                // imposing an alignment of 4 on all accesses.
                 auto typedPtr =
-                    builder.emitCast(builder.getPtrType(inst->getDataType()), offsetPtr);
+                    builder.emitCast(ptrType, offsetPtr);
                 loweredInst = builder.emitLoad(inst->getDataType(), typedPtr);
             }
             break;
+
         case kIROp_ByteAddressBufferStore:
             {
                 auto base = inst->getOperand(0);
                 auto index = inst->getOperand(1);
                 auto val = inst->getOperand(inst->getOperandCount() - 1);
                 auto ptr = getBufferPtr(builder, base);
+                auto untypedPtrType = as<IRPtrTypeBase>(ptr->getDataType());
                 auto offsetPtr = builder.emitGetOffsetPtr(ptr, index);
-                auto typedPtr = builder.emitCast(builder.getPtrType(val->getDataType()), offsetPtr);
+                auto ptrType = builder.getPtrTypeWithAddressSpace(val->getDataType(), untypedPtrType);
+                auto typedPtr = builder.emitCast(ptrType, offsetPtr);
                 loweredInst = builder.emitStore(typedPtr, val);
             }
             break;
@@ -205,8 +220,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto buffer = getDimensionsInst->getBuffer();
                 auto ptr = getBufferPtr(builder, buffer);
                 auto size = getBufferSize(builder, buffer);
-                auto intType = builder.getIntType();
-                auto vecType = builder.getVectorType(intType, 2);
+                auto uintType = builder.getUIntType();
 
                 auto rules = getTypeLayoutRuleForBuffer(
                     codeGenContext->getTargetProgram(),
@@ -219,8 +233,8 @@ struct ResourceTypeLoweringContext : InstPassBase
                     &sizeAlignment);
 
                 loweredInst = builder.emitMakeVector(
-                    vecType,
-                    {builder.emitCast(intType, size),
+                    inst->getDataType(),
+                    {builder.emitCast(uintType, size),
                      builder.getIntValue(sizeAlignment.getStride())});
             }
             break;
