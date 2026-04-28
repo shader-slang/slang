@@ -3309,6 +3309,13 @@ $}
 
 /// Bit cast between types. `T` and `U` must have the same size.
 /// They can be any scalar, vector, matrix, struct or array types.
+///
+/// Interface types (and types transitively containing interface
+/// fields) are rejected with E41205, because the in-memory layout
+/// of an existential value is implementation-defined and not safe
+/// to reinterpret. Use `createDynamicObject` and
+/// `serializeDynamicObject` instead for the typed serialize /
+/// deserialize round-trip between raw memory and interface values.
 /// @category conversion
 __generic<T, U>
 [__unsafeForceInlineEarly]
