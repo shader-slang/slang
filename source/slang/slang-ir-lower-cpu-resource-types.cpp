@@ -62,7 +62,8 @@ struct ResourceTypeLoweringContext : InstPassBase
 
         IRType* loweredType = nullptr;
         AccessQualifier access = AccessQualifier::Read;
-        if (type->getOp() == kIROp_HLSLRWByteAddressBufferType || type->getOp() == kIROp_HLSLRWStructuredBufferType)
+        if (type->getOp() == kIROp_HLSLRWByteAddressBufferType ||
+            type->getOp() == kIROp_HLSLRWStructuredBufferType)
             access = AccessQualifier::ReadWrite;
 
         switch (type->getOp())
