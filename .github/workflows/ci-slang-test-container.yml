@@ -61,40 +61,6 @@ jobs:
           fi
           echo "GPU: $output"
 
-      - name: Setup Vulkan ICD
-        run: |
-          # See job-level comment for why we override the Vulkan ICD.
-          # Read the existing NVIDIA ICD JSON (injected by the container toolkit)
-          # and swap only the library_path, preserving api_version and formatting.
-          source_icd=""
-          for candidate in \
-            /etc/vulkan/icd.d/nvidia_icd.json \
-            /usr/share/vulkan/icd.d/nvidia_icd.json; do
-            if [ -f "$candidate" ]; then
-              source_icd="$candidate"
-              break
-            fi
-          done
-          if [ -z "$source_icd" ]; then
-            echo "::warning::No existing NVIDIA ICD JSON found, using defaults"
-            source_icd=""
-          fi
-          mkdir -p /etc/vulkan/icd.d
-          python3 -c "
-          import json, sys
-          if '$source_icd':
-              with open('$source_icd') as f:
-                  icd = json.load(f)
-          else:
-              icd = {'file_format_version': '1.0.1', 'ICD': {'api_version': '1.4.312'}}
-          icd['ICD']['library_path'] = 'libEGL_nvidia.so.0'
-          with open('/etc/vulkan/icd.d/nvidia_icd.json', 'w') as f:
-              json.dump(icd, f, indent=4)
-              f.write('\n')
-          print(f\"Vulkan ICD configured: libEGL_nvidia.so.0 (api_version={icd['ICD'].get('api_version', 'unknown')})\")
-          "
-          rm -f /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null || true
-
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
@@ -102,6 +68,9 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "1"
+
+      - name: Setup Vulkan ICD
+        uses: ./.github/actions/setup-vulkan-icd
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -132,8 +101,14 @@ jobs:
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
 
+          # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped — the
+          # CPU-only tier covers those. Intentionally NOT using -api-only:
+          # no-API tests (COMPILE directives in multi-step compile→dispatch
+          # sequences, SIMPLE/DIAGNOSTIC tests that validate SPIR-V emission)
+          # still need to run on the GPU tier for correctness.
           slang_test_args=(
             "-category" "full"
+            "-api" "vk+cuda+dx11+dx12+mtl+wgpu"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-linux.txt"
             "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"
@@ -238,38 +213,6 @@ jobs:
           fi
           echo "GPU: $output"
 
-      - name: Setup Vulkan ICD
-        run: |
-          # See test-slang job comment for why we override the Vulkan ICD.
-          source_icd=""
-          for candidate in \
-            /etc/vulkan/icd.d/nvidia_icd.json \
-            /usr/share/vulkan/icd.d/nvidia_icd.json; do
-            if [ -f "$candidate" ]; then
-              source_icd="$candidate"
-              break
-            fi
-          done
-          if [ -z "$source_icd" ]; then
-            echo "::warning::No existing NVIDIA ICD JSON found, using defaults"
-            source_icd=""
-          fi
-          mkdir -p /etc/vulkan/icd.d
-          python3 -c "
-          import json, sys
-          if '$source_icd':
-              with open('$source_icd') as f:
-                  icd = json.load(f)
-          else:
-              icd = {'file_format_version': '1.0.1', 'ICD': {'api_version': '1.4.312'}}
-          icd['ICD']['library_path'] = 'libEGL_nvidia.so.0'
-          with open('/etc/vulkan/icd.d/nvidia_icd.json', 'w') as f:
-              json.dump(icd, f, indent=4)
-              f.write('\n')
-          print(f\"Vulkan ICD configured: libEGL_nvidia.so.0 (api_version={icd['ICD'].get('api_version', 'unknown')})\")
-          "
-          rm -f /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null || true
-
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
@@ -277,6 +220,9 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "1"
+
+      - name: Setup Vulkan ICD
+        uses: ./.github/actions/setup-vulkan-icd
 
       - name: Download artifacts
         uses: actions/download-artifact@v4

@@ -1061,7 +1061,7 @@ struct PeepholeContext : InstPassBase
                         }
                     }
                 }
-                else if (const auto structKey = as<IRStructKey>(key))
+                else if (const auto structKey = as<IRStructKey>(key); structKey)
                 {
                     auto oldVal = inst->getOperand(0);
                     if (oldVal->getOp() == kIROp_MakeStruct)

@@ -825,6 +825,8 @@ return {
 	["Type.Conditional"] = 849,
 	["getConditionalValue"] = 850,
 	["makeConditionalValue"] = 851,
-  ["SpecializeExistentialsInType"] = 852,
-  ["SetBase.ValueSet"] = 856
+	["SpecializeExistentialsInType"] = 852,
+	["assumeAddress"] = 853,
+	["DebugCompilationUnit"] = 854,
+	["SetBase.ValueSet"] = 856
 }
