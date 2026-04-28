@@ -1,7 +1,7 @@
 {
   "label_groups": [
     {
-      "labels": ["Linux", "self-hosted", "GPU", "SM80Plus"],
+      "labels": ["Linux", "self-hosted", "SM80Plus"],
       "name": "Linux SM80Plus GPU (GCP)",
       "self_hosted": true
     },

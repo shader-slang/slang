@@ -178,7 +178,7 @@ jobs:
     uses: ./.github/workflows/ci-slang-test-container.yml
     with:
       config: release
-      runs-on: '["Linux", "self-hosted", "GPU", "SM80Plus"]'
+      runs-on: '["Linux", "self-hosted", "SM80Plus"]'
       gpu-tier: sm80plus
       run-rhi-tests: false
       server-count: 4

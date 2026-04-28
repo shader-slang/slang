@@ -210,7 +210,7 @@ jobs:
           fi
 
   test-slang-rhi:
-    if: inputs.run-rhi-tests
+    if: inputs.run-rhi-tests && inputs.gpu-tier == 't4'
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 30
 
