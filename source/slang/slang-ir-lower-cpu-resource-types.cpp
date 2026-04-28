@@ -3,7 +3,6 @@
 #include "slang-ir-lower-cpu-resource-types.h"
 
 #include "slang-ir-inst-pass-base.h"
-//#include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir.h"
@@ -67,7 +66,8 @@ struct ResourceTypeLoweringContext : InstPassBase
         case kIROp_ConstantBufferType:
         case kIROp_ParameterBlockType:
             {
-                auto layoutType = getTypeLayoutTypeForBuffer(codeGenContext->getTargetProgram(), builder, type);
+                auto layoutType =
+                    getTypeLayoutTypeForBuffer(codeGenContext->getTargetProgram(), builder, type);
                 loweredType = builder.getPtrType(
                     as<IRType>(type->getOperand(0)),
                     AccessQualifier::ReadWrite,
@@ -79,7 +79,8 @@ struct ResourceTypeLoweringContext : InstPassBase
         case kIROp_HLSLRWStructuredBufferType:
             {
                 auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type);
-                auto layoutType = getTypeLayoutTypeForBuffer(codeGenContext->getTargetProgram(), builder, type);
+                auto layoutType =
+                    getTypeLayoutTypeForBuffer(codeGenContext->getTargetProgram(), builder, type);
 
                 IRStructType* s = builder.createStructType();
                 auto ptrKey = builder.createStructKey();
@@ -97,7 +98,8 @@ struct ResourceTypeLoweringContext : InstPassBase
         case kIROp_HLSLByteAddressBufferType:
         case kIROp_HLSLRWByteAddressBufferType:
             {
-                auto layoutType = getTypeLayoutTypeForBuffer(codeGenContext->getTargetProgram(), builder, type);
+                auto layoutType =
+                    getTypeLayoutTypeForBuffer(codeGenContext->getTargetProgram(), builder, type);
 
                 IRStructType* s = builder.createStructType();
                 auto ptrKey = builder.createStructKey();
@@ -131,17 +133,13 @@ struct ResourceTypeLoweringContext : InstPassBase
     IRInst* getBufferPtr(IRBuilder& builder, IRInst* buffer)
     {
         auto structType = cast<IRStructType>(buffer->getDataType());
-        return builder.emitFieldExtract(
-            buffer,
-            structType->getFields().getFirst()->getKey());
+        return builder.emitFieldExtract(buffer, structType->getFields().getFirst()->getKey());
     }
 
     IRInst* getBufferSize(IRBuilder& builder, IRInst* buffer)
     {
         auto structType = cast<IRStructType>(buffer->getDataType());
-        return builder.emitFieldExtract(
-            buffer,
-            structType->getFields().getLast()->getKey());
+        return builder.emitFieldExtract(buffer, structType->getFields().getLast()->getKey());
     }
 
     void processInst(IRBuilder& builder, IRInst* inst)
@@ -184,7 +182,8 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto index = inst->getOperand(1);
                 auto ptr = getBufferPtr(builder, base);
                 auto offsetPtr = builder.emitGetOffsetPtr(ptr, index);
-                auto typedPtr = builder.emitCast(builder.getPtrType(inst->getDataType()), offsetPtr);
+                auto typedPtr =
+                    builder.emitCast(builder.getPtrType(inst->getDataType()), offsetPtr);
                 loweredInst = builder.emitLoad(inst->getDataType(), typedPtr);
             }
             break;
@@ -209,7 +208,9 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto intType = builder.getIntType();
                 auto vecType = builder.getVectorType(intType, 2);
 
-                auto rules = getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), ptr->getDataType());
+                auto rules = getTypeLayoutRuleForBuffer(
+                    codeGenContext->getTargetProgram(),
+                    ptr->getDataType());
                 IRSizeAndAlignment sizeAlignment;
                 Slang::getSizeAndAlignment(
                     codeGenContext->getTargetReq(),
@@ -217,10 +218,10 @@ struct ResourceTypeLoweringContext : InstPassBase
                     cast<IRPtrType>(ptr->getDataType())->getValueType(),
                     &sizeAlignment);
 
-                loweredInst = builder.emitMakeVector(vecType, {
-                    builder.emitCast(intType, size),
-                    builder.getIntValue(sizeAlignment.getStride())
-                });
+                loweredInst = builder.emitMakeVector(
+                    vecType,
+                    {builder.emitCast(intType, size),
+                     builder.getIntValue(sizeAlignment.getStride())});
             }
             break;
 
@@ -231,7 +232,8 @@ struct ResourceTypeLoweringContext : InstPassBase
 
                 auto structType = cast<IRStructType>(bufferType);
                 auto ptrType = as<IRPtrType>(structType->getFields().getFirst()->getFieldType());
-                auto rules = getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), ptrType);
+                auto rules =
+                    getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), ptrType);
                 auto elementType = ptrType->getValueType();
 
                 IRSizeAndAlignment sizeAlignment;
@@ -249,10 +251,8 @@ struct ResourceTypeLoweringContext : InstPassBase
                     bytes,
                     builder.getIntValue(builder.getIntPtrType(), sizeAlignment.getStride()));
 
-                loweredInst = builder.emitMakeStruct(structType, {
-                    builder.emitCast(ptrType, ptr),
-                    size
-                });
+                loweredInst =
+                    builder.emitMakeStruct(structType, {builder.emitCast(ptrType, ptr), size});
             }
             break;
         }
@@ -268,19 +268,21 @@ struct ResourceTypeLoweringContext : InstPassBase
     {
         IRBuilder builder(module);
 
-        processAllInsts([&](IRInst* inst){
-            if (IRType* type = as<IRType>(inst))
-                lowerType(builder, type);
-        });
+        processAllInsts(
+            [&](IRInst* inst)
+            {
+                if (IRType* type = as<IRType>(inst))
+                    lowerType(builder, type);
+            });
 
         // Replace all resource types with lowered types.
         for (const auto& [type, loweredType] : loweredResourceTypes)
             type->replaceUsesWith(loweredType);
 
-        processAllInsts([&](IRInst* inst){ processInst(builder, inst); });
+        processAllInsts([&](IRInst* inst) { processInst(builder, inst); });
     }
 };
-    
+
 void lowerCPUResourceTypes(IRModule* module, CodeGenContext* codeGenContext)
 {
     ResourceTypeLoweringContext context(codeGenContext, module);
@@ -288,4 +290,4 @@ void lowerCPUResourceTypes(IRModule* module, CodeGenContext* codeGenContext)
     context.processModule();
 }
 
-}
+} // namespace Slang
