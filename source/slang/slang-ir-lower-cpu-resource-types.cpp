@@ -105,7 +105,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                     AccessQualifier::ReadWrite,
                     AddressSpace::Generic,
                     layoutType);
-                builder.createStructField(s, ptrKey, ptrType); 
+                builder.createStructField(s, ptrKey, ptrType);
                 builder.createStructField(s, sizeKey, builder.getType(kIROp_UIntPtrType));
                 loweredType = s;
             }

@@ -212,7 +212,6 @@ public:
     SLANG_NO_THROW LLVMType* SLANG_MCALL getPointerType() override;
     SLANG_NO_THROW LLVMType* SLANG_MCALL
     getVectorType(int elementCount, LLVMType* elementType) override;
-    // TODO: REMOVE function on next ABI break, it's unused
     SLANG_NO_THROW LLVMType* SLANG_MCALL getBufferType() override;
     SLANG_NO_THROW LLVMType* SLANG_MCALL
     getFunctionType(LLVMType* returnType, Slice<LLVMType*> paramTypes, bool variadic) override;
@@ -306,11 +305,8 @@ public:
 
     SLANG_NO_THROW LLVMInst* SLANG_MCALL
     emitPrintf(LLVMInst* format, Slice<LLVMInst*> args, Slice<bool> argIsSigned) override;
-    // TODO: REMOVE function on next ABI break, it's unused
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitGetBufferPtr(LLVMInst* buffer) override;
-    // TODO: REMOVE function on next ABI break, it's unused
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitGetBufferSize(LLVMInst* buffer) override;
-    // TODO: REMOVE function on next ABI break, it's unused
     SLANG_NO_THROW LLVMInst* SLANG_MCALL
     emitChangeBufferStride(LLVMInst* buffer, int64_t prevStride, int64_t newStride) override;
 
