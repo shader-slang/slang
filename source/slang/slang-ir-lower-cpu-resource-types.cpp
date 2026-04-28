@@ -32,11 +32,13 @@
 //
 //     typealias LoweredType = void*;
 //
-//     `LoweredType` is an opaque pointer handle. Instructions that access
-//     `LoweredType` are turned into function calls that are forward-declared
-//     but not defined. They must be externally defined. This allows the user to
-//     implement e.g. ray tracing or texture sampling with whatever library they
-//     desire.
+//     These types are generally accessed only via functions defined in the
+//     core module using inline assembly. Once support for these operations on
+//     the LLVM target is added, the inline assembly should expect these types
+//     to be pointers in the LLVM IR.
+//
+//     This pass itself doesn't deal with such function calls, they should
+//     eventually be fully handled in the core module and the LLVM emitter.
 
 namespace Slang
 {
