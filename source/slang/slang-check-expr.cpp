@@ -4082,8 +4082,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             {
                 if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
                 {
-                    invoke->functionExpr =
-                        convertHigherOrderExprToLookup(this, higherOrderInvoke);
+                    invoke->functionExpr = convertHigherOrderExprToLookup(this, higherOrderInvoke);
                 }
             }
         }
