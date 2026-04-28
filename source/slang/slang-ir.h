@@ -1623,12 +1623,24 @@ FIDDLE()
 struct IRFuncType : IRType
 {
     FIDDLE(leafInst())
-    UInt getParamCount() { return getOperandCount() - 1; }
-    IRType* getParamType(UInt index) { return (IRType*)getOperand(1 + index); }
-    IROperandList<IRType> getParamTypes()
-    {
-        return IROperandList<IRType>(getOperands() + 1, getOperands() + getOperandCount());
-    }
+    // Operand layout:
+    //   [0]                   : result type
+    //   [1 .. paramEnd)       : parameter types
+    //   [paramEnd]            : optional trailing attribute (e.g.
+    //                           `IRFuncThrowTypeAttr`), distinguished
+    //                           from a parameter type by deriving from
+    //                           `IRAttr` rather than `IRType`.
+    //
+    // The accessors below skip the trailing attribute (if any) so that
+    // `getParamCount()` / `getParamType()` / `getParamTypes()` only
+    // expose actual parameter types. They are defined out-of-line in
+    // slang-ir.cpp because they need the full `IRAttr` definition.
+    UInt getParamCount();
+    IRType* getParamType(UInt index);
+    IROperandList<IRType> getParamTypes();
+    // Returns the trailing attribute (e.g. an `IRFuncThrowTypeAttr`) if
+    // one was attached when the type was created, or null otherwise.
+    IRAttr* getAttr();
 };
 
 FIDDLE()
