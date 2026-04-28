@@ -302,6 +302,10 @@ alias cpp_cuda_metal_spirv_llvm = cpp | cuda | metal | spirv | llvm;
 /// [Compound]
 alias cuda_spirv = cuda | spirv;
 
+/// CUDA, Metal and SPIRV code-gen targets
+/// [Compound]
+alias cuda_metal_spirv = cuda | metal | spirv;
+
 /// CPP, CUDA, GLSL and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_spirv = cpp | cuda | glsl | spirv;
@@ -1376,7 +1380,7 @@ alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV
 alias cooperative_vector_training = spvCooperativeVectorTrainingNV | _GL_NV_cooperative_vector;
 /// Capabilities needed to use cooperative matrices
 /// [Compound]
-alias cooperative_matrix = spvCooperativeMatrixKHR | cuda | _sm_6_10;
+alias cooperative_matrix = spvCooperativeMatrixKHR | cuda | _sm_6_10 | metal;
 /// Capabilities needed to use reduction operations with cooperative matrix
 /// [Compound]
 alias cooperative_matrix_spirv = spvCooperativeMatrixKHR;
