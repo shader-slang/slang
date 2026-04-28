@@ -8,6 +8,8 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-target-program.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -247,10 +249,10 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
     }
 }
 
-static bool isSubpassLoadIntrinsicCall(IRCall* call)
+static bool isSubpassLoadIntrinsicCall(IRCall* call, CapabilitySet const& targetCaps)
 {
     auto callee = call->getOperand(0);
-    if (auto decor = callee->findDecoration<IRTargetIntrinsicDecoration>())
+    if (auto decor = findBestTargetIntrinsicDecoration(callee, targetCaps))
     {
         return decor->getDefinition() == toSlice("$0");
     }
@@ -259,6 +261,7 @@ static bool isSubpassLoadIntrinsicCall(IRCall* call)
 
 static void legalizeSubpassInputsForMetal(
     IRModule* module,
+    TargetProgram* targetProgram,
     DiagnosticSink* sink,
     List<EntryPointInfo>& entryPoints)
 {
@@ -341,20 +344,30 @@ static void legalizeSubpassInputsForMetal(
 
         StringBuilder colorStr;
         colorStr << "color(" << Int(attachmentIndex) << ")";
-        builder.addTargetSystemValueDecoration(newParam, colorStr.produceString().getUnownedSlice());
+        String colorString = colorStr.produceString();
+        builder.addTargetSystemValueDecoration(newParam, colorString.getUnownedSlice());
 
         if (auto nameHint = globalParam->findDecoration<IRNameHintDecoration>())
             builder.addNameHintDecoration(newParam, nameHint->getName());
 
+        auto targetCaps = targetProgram->getTargetReq()->getTargetCaps();
         IRUse* nextUse = nullptr;
         for (IRUse* use = globalParam->firstUse; use; use = nextUse)
         {
             nextUse = use->nextUse;
             auto user = use->getUser();
 
+            if (getParentFunc(user) != entryPointFunc)
+            {
+                sink->diagnose(
+                    Diagnostics::SubpassInputUsedOutsideEntryPoint{
+                        .location = getDiagnosticPos(user)});
+                continue;
+            }
+
             if (auto call = as<IRCall>(user))
             {
-                if (isSubpassLoadIntrinsicCall(call))
+                if (isSubpassLoadIntrinsicCall(call, targetCaps))
                 {
                     call->replaceUsesWith(newParam);
                     call->removeAndDeallocate();
@@ -387,7 +400,7 @@ void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, Diagnost
         }
     }
 
-    legalizeSubpassInputsForMetal(module, sink, entryPoints);
+    legalizeSubpassInputsForMetal(module, targetProgram, sink, entryPoints);
 
     legalizeEntryPointVaryingParamsForMetal(module, sink, entryPoints);
 
