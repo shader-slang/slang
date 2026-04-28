@@ -506,6 +506,28 @@ std::vector<Particle> makeParticles(const std::string& scenario, uint32_t count)
 
 int runDispatch(const Options& opt)
 {
+    // Pre-flight skip: slang-rhi's Vulkan/WebGPU binding-data builders
+    // currently assume ≤ 1 descriptor set per shader object, which is
+    // incompatible with non-zero `space=N` declarations. Refuse fast
+    // with a clear message rather than letting the SLANG_RHI_ASSERT
+    // fire mid-dispatch. D3D12 is now multi-space-correct after the
+    // companion compiler fix, so it is *not* skipped here. Tracked in
+    // shader-slang/slang#10959.
+    if (opt.coverageBindingSpace > 0 &&
+        (opt.backend == "vulkan" || opt.backend == "vk" || opt.backend == "wgpu"))
+    {
+        std::printf(
+            "[coverage] skip: --coverage-binding=N:%d on backend '%s' "
+            "is blocked on a slang-rhi limitation around multi-descriptor-set "
+            "shader objects (see shader-slang/slang#10959). The compiler emits "
+            "a correct (set, binding) decoration; slang-rhi's Vulkan/WebGPU "
+            "binding-data builder needs follow-up work to actually place the "
+            "buffer at non-zero descriptor sets.\n",
+            opt.coverageBindingSpace,
+            opt.backend.c_str());
+        return 0;
+    }
+
     slang::CompilerOptionEntry covOptions[2] = {};
     uint32_t covOptionCount = 0;
     buildCoverageOptions(opt, covOptions, covOptionCount);
