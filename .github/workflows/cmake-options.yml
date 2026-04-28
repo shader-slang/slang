@@ -1,0 +1,149 @@
+name: CMake Options
+
+# Verifies that each CMake option compiles successfully when set to its
+# non-default value (one option changed at a time, all others at their
+# defaults). This is "depth-1" coverage: no multi-option combinations are
+# tested.
+#
+# The option matrix lives in cmake-options-build.yml (reusable workflow).
+# This file calls it once per platform / config combination.
+
+on:
+  workflow_dispatch:
+  merge_group:
+    types: [checks_requested]
+  schedule:
+    - cron: "0 8 * * 6" # Saturday 12:00 AM PST (UTC-8)
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+jobs:
+  linux-debug:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: x86_64
+      config: debug
+      runs-on: '["ubuntu-22.04"]'
+
+  linux-release:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: x86_64
+      config: release
+      runs-on: '["ubuntu-22.04"]'
+
+  linux-aarch64-debug:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: debug
+      runs-on: '["ubuntu-24.04-arm"]'
+
+  linux-aarch64-release:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: release
+      runs-on: '["ubuntu-24.04-arm"]'
+
+  macos-debug:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
+
+  macos-release:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
+
+  windows-aarch64-debug:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: aarch64
+      config: debug
+      runs-on: '["windows-latest"]'
+      arch: "amd64_arm64"
+
+  windows-aarch64-release:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: aarch64
+      config: release
+      runs-on: '["windows-latest"]'
+      arch: "amd64_arm64"
+
+  # windows-vs2019-debug: disabled — windows-2019 runner is being retired (June 2025)
+  # windows-vs2019-release: disabled — windows-2019 runner is being retired (June 2025)
+
+  windows-vs2022-debug:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["windows-2022"]'
+      buildtool: "Visual Studio 17 2022"
+
+  windows-vs2022-release:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["windows-2022"]'
+      buildtool: "Visual Studio 17 2022"
+
+  # windows-vs2026-debug: disabled — VS 2026 not yet available on GitHub-hosted runners
+  # windows-vs2026-release: disabled — VS 2026 not yet available on GitHub-hosted runners
+
+  check-cmake:
+    needs:
+      [
+        linux-debug,
+        linux-release,
+        linux-aarch64-debug,
+        linux-aarch64-release,
+        macos-debug,
+        macos-release,
+        windows-aarch64-debug,
+        windows-aarch64-release,
+        windows-vs2022-debug,
+        windows-vs2022-release,
+      ]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check CI Results
+        run: |
+          results='${{ toJSON(needs.*.result) }}'
+          echo "=== CMake Options CI Results ==="
+          echo "$results"
+          if echo "$results" | grep -qE '"(failure|cancelled)"'; then
+            echo "One or more CMake option builds failed or were cancelled"
+            exit 1
+          fi
+          echo "All CMake option builds completed successfully!"

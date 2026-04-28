@@ -63,10 +63,12 @@ elseif(SLANG_ENABLE_SLANGC)
     )
     set(SLANG_COMPILER_EXTRA_DEPS)
 else()
-    # As a fallback, use the system-installed `slangc` compiler
-    set(SLANG_COMPILER slangc)
-    set(SLANG_COMPILER_DEPENDENCY)
-    set(SLANG_COMPILER_EXTRA_DEPS)
+    # When SLANG_ENABLE_SLANGC is OFF, slangc is not built as a target. Fall back
+    # to slang-bootstrap (a generator always built regardless of SLANG_ENABLE_SLANGC)
+    # rather than a system-installed slangc that may not be present.
+    set(SLANG_COMPILER slang-bootstrap)
+    set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
+    set(SLANG_COMPILER_EXTRA_DEPS generate_core_module_headers)
 endif()
 
 # Determine compiler flags based on build type
