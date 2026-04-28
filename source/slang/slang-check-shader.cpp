@@ -1292,6 +1292,37 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 .location = entryPointFuncDecl->loc});
         }
     }
+    else if (stage == Stage::Mesh)
+    {
+        // A mesh shader must declare both an output topology and the
+        // pair of mesh outputs (vertices + indices); otherwise the
+        // generated SPIR-V is invalid (issue #9444). The geometry-shader
+        // checks above are the equivalent precedent.
+        if (!entryPointFuncDecl->findModifier<OutputTopologyAttribute>())
+        {
+            sink->diagnose(Diagnostics::MeshShaderMissingOutputTopology{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+        bool hasVerticesOutput = false;
+        bool hasIndicesOutput = false;
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            auto meshOutputType = as<MeshOutputType>(param->getType());
+            if (!meshOutputType)
+                continue;
+            if (as<VerticesType>(meshOutputType))
+                hasVerticesOutput = true;
+            else if (as<IndicesType>(meshOutputType))
+                hasIndicesOutput = true;
+        }
+        if (!hasVerticesOutput || !hasIndicesOutput)
+        {
+            sink->diagnose(Diagnostics::MeshShaderMissingOutputs{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+    }
     else if (stage == Stage::Compute)
     {
         for (const auto& param : entryPointFuncDecl->getParameters())
