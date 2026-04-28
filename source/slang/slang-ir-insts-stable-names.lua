@@ -843,5 +843,9 @@ return {
 	["nodeOutputRecordGetElementPtr"] = 867,
 	["getEnumBarrierMemoryTypeFlags"] = 868,
 	["getEnumBarrierSemanticFlags"] = 869,
-	["Decoration.workGraphRecordType"] = 870
+	["Decoration.workGraphRecordType"] = 870,
+	["Decoration.nodeID"] = 871,
+	["Decoration.nodeIsProgramEntry"] = 872,
+	["Decoration.nodeArraySize"] = 873,
+	["Decoration.allowSparseNodes"] = 874
 }
