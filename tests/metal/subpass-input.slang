@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage fragment -entry main
 
-// Test basic SubpassInput with two float4 inputs at different attachment indices.
+// Test basic SubpassInput with three float4 inputs at different attachment indices.
 
 // METAL-DAG: color(0)
 // METAL-DAG: color(1)
