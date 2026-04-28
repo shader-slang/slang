@@ -22008,7 +22008,7 @@ $}
 /// @category stage_io
 __magic_type(SubpassInputType)
 __intrinsic_type($(kIROp_SubpassInputType))
-[require(glsl_hlsl_spirv, subpass)]
+[require(glsl_hlsl_metal_spirv, subpass)]
 struct __SubpassImpl<T, let isMS:int>
 {
 }
@@ -22021,7 +22021,7 @@ __generic<T>
 extension __SubpassImpl<T, 0>
 {
     [ForceInline]
-    [require(glsl_hlsl_spirv, subpass)]
+    [require(glsl_hlsl_metal_spirv, subpass)]
     T SubpassLoad()
     {
         __target_switch
@@ -22037,6 +22037,7 @@ extension __SubpassImpl<T, 0>
                 result:$$T = OpImageRead $this $zeroVec
             };
         }
+        case metal: __intrinsic_asm "$0";
         }
     }
 }
@@ -22049,7 +22050,7 @@ __generic<T>
 extension __SubpassImpl<T, 1>
 {
     [ForceInline]
-    [require(glsl_hlsl_spirv, subpass)]
+    [require(glsl_hlsl_metal_spirv, subpass)]
     T SubpassLoad(int sample)
     {
         __target_switch
@@ -22065,6 +22066,7 @@ extension __SubpassImpl<T, 1>
                 result:$$T = OpImageRead $this $zeroVec Sample $sample
             };
         }
+        case metal: __intrinsic_asm "$0";
         }
     }
 }

@@ -2581,6 +2581,9 @@ struct MetalObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::Texture:
             return SimpleLayoutInfo(LayoutResourceKind::MetalTexture, 1);
 
+        case ShaderParameterKind::SubpassInput:
+            return SimpleLayoutInfo(LayoutResourceKind::InputAttachmentIndex, 1);
+
         case ShaderParameterKind::SamplerState:
             return SimpleLayoutInfo(LayoutResourceKind::SamplerState, 1);
 
@@ -2650,6 +2653,8 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
             {
                 return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 2);
             }
+        case ShaderParameterKind::SubpassInput:
+            return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1);
         default:
             SLANG_UNEXPECTED("unhandled shader parameter kind");
             UNREACHABLE_RETURN(SimpleLayoutInfo());
@@ -2685,6 +2690,8 @@ struct MetalTier2ObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::TextureSampler:
         case ShaderParameterKind::MutableTextureSampler:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 16, 8);
+        case ShaderParameterKind::SubpassInput:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
         default:
             SLANG_UNEXPECTED("unhandled shader parameter kind");
             UNREACHABLE_RETURN(SimpleLayoutInfo());

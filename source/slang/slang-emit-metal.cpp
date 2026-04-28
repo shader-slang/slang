@@ -1347,6 +1347,12 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             ensurePrelude(kMetalBuiltinPreludeSimdgroupMatrixOps);
             return;
         }
+    case kIROp_SubpassInputType:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            SourceLoc(),
+            "SubpassInputType should have been lowered before Metal emission");
+        return;
     default:
         break;
     }

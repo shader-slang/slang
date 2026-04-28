@@ -10591,7 +10591,7 @@ $}
     __generic<T>
     [__NoSideEffect]
     [ForceInline]
-    [require(glsl_hlsl_spirv, subpass)]
+    [require(glsl_hlsl_metal_spirv, subpass)]
     public T subpassLoad(__SubpassImpl<T,0> subpass)
     {
         return subpass.SubpassLoad();
@@ -10599,7 +10599,7 @@ $}
     __generic<T>
     [__NoSideEffect]
     [ForceInline]
-    [require(glsl_hlsl_spirv, subpass)]
+    [require(glsl_hlsl_metal_spirv, subpass)]
     public T subpassLoad(__SubpassImpl<T,1> subpass, int sample)
     {
         return subpass.SubpassLoad(sample);
