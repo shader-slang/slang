@@ -16,6 +16,10 @@
 //     naming changes.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=COMPUTE):-cpu -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=COMPUTE):-vk -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=COMPUTE):-dx12 -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=COMPUTE):-mtl -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=COMPUTE):-cuda -output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -report-dynamic-dispatch-sites
 
 [anyValueSize(16)]
