@@ -44,7 +44,6 @@ namespace Slang
 
 struct ResourceTypeLoweringContext : InstPassBase
 {
-    DiagnosticSink* diagnosticSink;
     CodeGenContext* codeGenContext;
     Dictionary<IRType*, IRType*> loweredResourceTypes;
 
@@ -57,8 +56,6 @@ struct ResourceTypeLoweringContext : InstPassBase
     {
         if (loweredResourceTypes.containsKey(type))
             return;
-
-        codeGenContext->getTargetProgram();
 
         IRType* loweredType = nullptr;
         AccessQualifier access = AccessQualifier::Read;
@@ -121,6 +118,7 @@ struct ResourceTypeLoweringContext : InstPassBase
             break;
         case kIROp_TextureType:
         case kIROp_SamplerStateType:
+        case kIROp_SamplerComparisonStateType:
         case kIROp_RaytracingAccelerationStructureType:
         case kIROp_RayQueryType:
             {
@@ -306,7 +304,6 @@ struct ResourceTypeLoweringContext : InstPassBase
 void lowerCPUResourceTypes(IRModule* module, CodeGenContext* codeGenContext)
 {
     ResourceTypeLoweringContext context(codeGenContext, module);
-    context.diagnosticSink = codeGenContext->getSink();
     context.processModule();
 }
 
