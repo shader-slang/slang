@@ -1,8 +1,8 @@
 // Test that array-typed varying parameters legalize correctly.
 // Exercises the array-recursion path in `_createLegalVaryingVal`
-// (slang-ir-legalize-varying-params.cpp around L744-L828) which
-// handles the "outer array brackets" tracking when decomposing a
-// varying parameter type into per-element registers.
+// (`slang-ir-legalize-varying-params.cpp`) which handles the "outer
+// array brackets" tracking when decomposing a varying parameter type
+// into per-element registers.
 //
 // The PR's other vertex/fragment tests use scalar / vector / struct
 // varyings only; array-typed varyings hit a separate recursion path.

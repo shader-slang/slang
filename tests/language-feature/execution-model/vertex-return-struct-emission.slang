@@ -1,9 +1,9 @@
 // Test that a vertex shader returning a struct (with multiple
 // varying outputs + SV_Position) lowers correctly across SPIRV and
 // GLSL. Exercises the entry-point-result-type → varying-out
-// translation in slang-ir-legalize-varying-params.cpp around
-// L453-L516, where `entryPointFunc->getResultType()` is decomposed
-// into one or more varying parameters.
+// translation in `slang-ir-legalize-varying-params.cpp`, where
+// `entryPointFunc->getResultType()` is decomposed into one or more
+// varying parameters.
 //
 // The PR's existing `cross-stage-vertex-fragment-emission.slang`
 // covers the HLSL emission path; this test extends to the SPIRV

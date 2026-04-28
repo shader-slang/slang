@@ -2,9 +2,8 @@
 // function lowers correctly. Slang's frontend implicitly
 // specializes the helper against the inferred type. This exercises
 // the specialization-argument expansion machinery in
-// slang-check-shader.cpp (around L2389-L2489) and the surrounding
-// generic-resolution paths that the PR's other entry-point tests
-// don't reach.
+// `slang-check-shader.cpp` and the surrounding generic-resolution
+// paths that the PR's other entry-point tests don't reach.
 //
 // The PR's other tests use only concrete-typed call chains; this
 // test pins the implicit-specialization path through compute.
