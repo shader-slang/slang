@@ -101,8 +101,14 @@ jobs:
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
 
+          # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped — the
+          # CPU-only tier covers those. Intentionally NOT using -api-only:
+          # no-API tests (COMPILE directives in multi-step compile→dispatch
+          # sequences, SIMPLE/DIAGNOSTIC tests that validate SPIR-V emission)
+          # still need to run on the GPU tier for correctness.
           slang_test_args=(
             "-category" "full"
+            "-api" "vk+cuda+dx11+dx12+mtl+wgpu"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-linux.txt"
             "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"

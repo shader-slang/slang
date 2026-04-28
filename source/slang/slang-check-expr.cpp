@@ -2107,7 +2107,7 @@ Expr* SemanticsVisitor::_CheckTerm(Expr* term)
 
         if (const auto body = binding->body)
         {
-            binding = as<LetExpr>(binding->body);
+            binding = as<LetExpr>(body);
             SLANG_ASSERT(binding);
             continue;
         }
@@ -2135,7 +2135,7 @@ bool SemanticsVisitor::IsErrorExpr(Expr* expr)
 {
     // TODO: we may want other cases here...
 
-    if (const auto errorType = as<ErrorType>(expr->type))
+    if (const auto errorType = as<ErrorType>(expr->type); errorType)
         return true;
 
     return false;
@@ -7660,7 +7660,7 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     {
         return _lookupStaticMember(expr, expr->baseExpression);
     }
-    else if (const auto typeType = as<TypeType>(baseType))
+    else if (const auto typeType = as<TypeType>(baseType); typeType)
     {
         return _lookupStaticMember(expr, expr->baseExpression);
     }
@@ -7740,11 +7740,11 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
     {
         auto containerDecl = scope->containerDecl;
 
-        if (const auto ctorDecl = as<ConstructorDecl>(containerDecl))
+        if (const auto ctorDecl = as<ConstructorDecl>(containerDecl); ctorDecl)
         {
             expr->type.isLeftValue = true;
         }
-        else if (const auto setterDecl = as<SetterDecl>(containerDecl))
+        else if (const auto setterDecl = as<SetterDecl>(containerDecl); setterDecl)
         {
             expr->type.isLeftValue = true;
         }
@@ -8010,17 +8010,17 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
 {
     SLANG_UNUSED(type);
 
-    if (const auto unormModifier = as<UNormModifier>(modifier))
+    if (const auto unormModifier = as<UNormModifier>(modifier); unormModifier)
     {
         // TODO: validate that `type` is either `float` or a vector of `float`s
         return m_astBuilder->getUNormModifierVal();
     }
-    else if (const auto snormModifier = as<SNormModifier>(modifier))
+    else if (const auto snormModifier = as<SNormModifier>(modifier); snormModifier)
     {
         // TODO: validate that `type` is either `float` or a vector of `float`s
         return m_astBuilder->getSNormModifierVal();
     }
-    else if (const auto noDiffModifier = as<NoDiffModifier>(modifier))
+    else if (const auto noDiffModifier = as<NoDiffModifier>(modifier); noDiffModifier)
     {
         return m_astBuilder->getNoDiffModifierVal();
     }
