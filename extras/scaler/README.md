@@ -78,7 +78,7 @@ GOOS=linux GOARCH=amd64 go build -o scaler-linux ./cmd/scaler
   --token=ghp_... \
   --labels=Linux,self-hosted,GPU,SM80Plus \
   --platform=linux \
-  --gcp-zones=us-east1-c,us-east1-d,us-central1-a,us-west1-a \
+  --gcp-zones=us-east1-d,us-east1-b,us-east1-c,us-central1-a,us-west1-a \
   --gcp-instance-template=linux-gpu-runner-sm80plus-l4 \
   --gcp-gpu-type=nvidia-l4 \
   --vm-prefix=linux-sm80plus \
