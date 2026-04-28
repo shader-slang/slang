@@ -59,12 +59,14 @@ jobs:
 
   merge-and-deploy:
     needs: [coverage-linux, coverage-macos, coverage-windows]
-    # Deploy as long as Linux and macOS succeed; Windows is newly added and
-    # still stabilizing, and the Organize Coverage Data step below guards
-    # the Windows artifact copy with `if [ -d ... ]`, so a missing Windows
-    # artifact is harmless for the combined report.
+    # The merge / render work runs on any branch so dispatches off feature
+    # branches can validate the rendering pipeline (an artifact upload at
+    # the end exposes the output for inspection); the deploy-to-
+    # slang-coverage-reports steps below are still gated to master only.
+    # Linux + macOS success is required because the Organize Coverage Data
+    # step assumes their artifacts are present; Windows is allowed to fail
+    # (its block is guarded by `if [ -d ... ]`).
     if: |
-      github.ref == 'refs/heads/master' &&
       !cancelled() &&
       needs.coverage-linux.result == 'success' &&
       needs.coverage-macos.result == 'success'
@@ -276,7 +278,18 @@ jobs:
           echo "Combined summary:"
           cat coverage-reports/combined-summary.json
 
+      - name: Upload Merged Coverage Reports
+        # Lets feature-branch dispatches inspect the merged + new-renderer
+        # output without writing to slang-coverage-reports. Always uploads
+        # so we can compare the new and existing renderers across runs.
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports-merged
+          path: coverage-reports/
+          retention-days: 7
+
       - name: Checkout Coverage Reports Repository
+        if: github.ref == 'refs/heads/master'
         uses: actions/checkout@v4
         with:
           repository: "shader-slang/slang-coverage-reports"
@@ -284,6 +297,7 @@ jobs:
           token: ${{ secrets.SLANG_COVERAGE_REPORTS_PAT }}
 
       - name: Deploy Multi-Platform Coverage
+        if: github.ref == 'refs/heads/master'
         run: |
           REPORT_DATE=$(date -u +"%Y-%m-%d")
           COMMIT_SHORT=$(git rev-parse --short HEAD)
