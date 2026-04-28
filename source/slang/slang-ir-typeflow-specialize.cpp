@@ -7067,6 +7067,16 @@ struct TypeFlowSpecializationContext
         // for types whose layout is still being computed in earlier IR
         // rounds; bailing out here lets a later round catch it once both
         // sizes are known, rather than producing a false positive.
+        //
+        // A side-effect is that legitimately zero-sized types (e.g. an empty
+        // struct) also bypass the diagnostic. That is acceptable: a zero-sized
+        // type cannot meaningfully serialize an interface payload anyway, and
+        // any downstream use of the resulting bytes is governed by the
+        // payload-encoding rules of the target. The narrow risk is a silent
+        // mismatch where one side is a zero-sized type and the other side has
+        // a known non-zero size, which is not currently expressible in source
+        // (the front-end rejects empty-struct payloads at semantic-check
+        // time). Revisit if the front-end starts permitting empty payloads.
         if (auto targetReq = targetProgram ? targetProgram->getTargetReq() : nullptr)
         {
             auto anyValueSize = getAnyValueSize(packedType, targetReq);
@@ -7079,6 +7089,20 @@ struct TypeFlowSpecializationContext
                     .interfaceType = interfaceType,
                     .anyValueSize = anyValueSize,
                     .location = inst->sourceLoc});
+                // Operands 1 and 2 are classified as `Store` by the
+                // uninit-value analysis. If we just removed the inst,
+                // downstream passes wouldn't re-classify and any later
+                // load from these pointers would silently see
+                // uninitialized memory in error-recovery mode. Emit
+                // well-defined poison values (0 typeID, default-
+                // constructed payload) so subsequent uses are at
+                // least defined.
+                IRBuilder bailBuilder(inst);
+                bailBuilder.setInsertBefore(inst);
+                bailBuilder.emitStore(
+                    typeIDOutPtr,
+                    bailBuilder.getIntValue(bailBuilder.getUIntType(), 0));
+                bailBuilder.emitStore(valueOutPtr, bailBuilder.emitDefaultConstruct(valueType));
                 inst->removeAndDeallocate();
                 return true;
             }
