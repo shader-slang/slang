@@ -250,7 +250,11 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
 static bool isSubpassLoadIntrinsicCall(IRCall* call)
 {
     auto callee = call->getOperand(0);
-    return callee->findDecoration<IRTargetIntrinsicDecoration>() != nullptr;
+    if (auto decor = callee->findDecoration<IRTargetIntrinsicDecoration>())
+    {
+        return decor->getDefinition() == toSlice("$0");
+    }
+    return false;
 }
 
 static void legalizeSubpassInputsForMetal(
@@ -288,13 +292,22 @@ static void legalizeSubpassInputsForMetal(
 
         if (!entryPointFunc)
         {
-            for (auto& ep : entryPoints)
+            for (auto use = globalParam->firstUse; use; use = use->nextUse)
             {
-                if (ep.entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                auto parentFunc = getParentFunc(use->getUser());
+                if (!parentFunc)
+                    continue;
+                for (auto& ep : entryPoints)
                 {
-                    entryPointFunc = ep.entryPointFunc;
-                    break;
+                    if (ep.entryPointFunc == parentFunc &&
+                        ep.entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                    {
+                        entryPointFunc = ep.entryPointFunc;
+                        break;
+                    }
                 }
+                if (entryPointFunc)
+                    break;
             }
         }
         if (!entryPointFunc)
