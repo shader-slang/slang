@@ -1,0 +1,58 @@
+name: CI CPU Stress
+
+on:
+  workflow_dispatch:
+    inputs:
+      config:
+        description: "Build/test configuration"
+        required: true
+        type: choice
+        default: release
+        options:
+          - release
+          - debug
+      test-category:
+        description: "slang-test category"
+        required: true
+        type: choice
+        default: full
+        options:
+          - full
+          - smoke
+      server-count:
+        description: "test-server process count; 4 matches the current ubuntu-24.04 CPU CI tier"
+        required: true
+        type: number
+        default: 4
+      iterations:
+        description: "JSON array of iteration labels; each entry runs on a fresh GitHub-hosted ubuntu-24.04 runner"
+        required: true
+        type: string
+        default: '["01","02","03","04"]'
+
+jobs:
+  build-linux-gcc-x86_64:
+    uses: ./.github/workflows/ci-slang-build-container.yml
+    with:
+      config: ${{ inputs.config }}
+      runs-on: '["ubuntu-22.04"]'
+
+  stress-linux-gcc-x86_64-cpu:
+    needs: [build-linux-gcc-x86_64]
+    name: cpu stress ${{ matrix.iteration }} / ${{ inputs.config }} / server-count ${{ inputs.server-count }}
+    strategy:
+      fail-fast: false
+      matrix:
+        iteration: ${{ fromJSON(inputs.iterations) }}
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: x86_64
+      config: ${{ inputs.config }}
+      runs-on: '["ubuntu-24.04"]'
+      test-category: ${{ inputs.test-category }}
+      full-gpu-tests: false
+      cpu-only: true
+      server-count: ${{ inputs.server-count }}
+      test-log-artifact: cpu-stress-${{ inputs.config }}-server${{ inputs.server-count }}-${{ matrix.iteration }}

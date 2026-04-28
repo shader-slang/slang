@@ -49,6 +49,11 @@ on:
         type: boolean
         default: false
         description: "Restrict slang-test to GPU APIs (vk+cuda+dx11+dx12+mtl+wgpu) while retaining no-API tests needed by multi-step workflows"
+      test-log-artifact:
+        required: false
+        type: string
+        default: ""
+        description: "Optional artifact name for captured slang-test output and summary"
 
 jobs:
   test-slang:
@@ -69,6 +74,20 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
+
+      - name: Configure core dumps
+        if: ${{ inputs.test-log-artifact != '' && inputs.os == 'linux' }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/cores"
+          chmod 700 "${RUNNER_TEMP}/cores"
+
+          # Best effort: GitHub-hosted Linux runners allow sudo here, but keep
+          # diagnostics non-fatal if the host image changes its policy.
+          sudo sysctl -w "kernel.core_pattern=${RUNNER_TEMP}/cores/core.%e.%p.%t" || true
+          sudo sysctl -w "fs.suid_dumpable=2" || true
+
+          echo "core_pattern=$(cat /proc/sys/kernel/core_pattern 2>/dev/null || true)"
+          echo "core_ulimit_before_test=$(ulimit -c || true)"
 
       - name: Test Slang
         run: |
@@ -135,8 +154,90 @@ jobs:
             slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")
           fi
 
-          # Execute slang-test with all arguments
-          "$bin_dir/slang-test" "${slang_test_args[@]}"
+          # Execute slang-test with all arguments. Stress workflows can ask
+          # this reusable workflow to capture the output without changing the
+          # command line that normal CI runs.
+          if [[ -n "${{ inputs.test-log-artifact }}" ]]; then
+            if [[ "${{ inputs.os }}" == "linux" ]]; then
+              ulimit -c unlimited || true
+              echo "core_ulimit_for_test=$(ulimit -c || true)"
+            fi
+            set +e
+            "$bin_dir/slang-test" "${slang_test_args[@]}" 2>&1 | tee "${RUNNER_TEMP}/slang-test.log"
+            slang_test_exit=${PIPESTATUS[0]}
+            set -e
+            exit "$slang_test_exit"
+          else
+            "$bin_dir/slang-test" "${slang_test_args[@]}"
+          fi
+
+      - name: Summarize slang-test log
+        if: ${{ always() && inputs.test-log-artifact != '' }}
+        run: |
+          python3 extras/ci/summarize-slang-test-log.py \
+            "${RUNNER_TEMP}/slang-test.log" \
+            --json "${RUNNER_TEMP}/slang-test-summary.json" \
+            --markdown "${GITHUB_STEP_SUMMARY}"
+
+      - name: Collect slang-test artifacts
+        if: ${{ always() && inputs.test-log-artifact != '' }}
+        run: |
+          artifact_dir="${RUNNER_TEMP}/slang-test-artifacts"
+          mkdir -p "$artifact_dir"
+
+          cp "${RUNNER_TEMP}/slang-test.log" "$artifact_dir/" 2>/dev/null || true
+          cp "${RUNNER_TEMP}/slang-test-summary.json" "$artifact_dir/" 2>/dev/null || true
+
+          {
+            echo "runner_name=${RUNNER_NAME:-unknown}"
+            echo "runner_os=${RUNNER_OS:-unknown}"
+            echo "runner_arch=${RUNNER_ARCH:-unknown}"
+            echo "core_pattern=$(cat /proc/sys/kernel/core_pattern 2>/dev/null || true)"
+            echo "core_ulimit_after_test=$(ulimit -c || true)"
+          } > "$artifact_dir/core-dump-environment.txt"
+
+          core_list="$artifact_dir/core-files.txt"
+          : > "$core_list"
+
+          if [[ "${{ inputs.os }}" == "linux" ]]; then
+            for core_dir in "${RUNNER_TEMP}/cores" "$PWD" /var/lib/systemd/coredump; do
+              if [[ ! -d "$core_dir" ]]; then
+                continue
+              fi
+              if [[ "$core_dir" == "/var/lib/systemd/coredump" ]]; then
+                sudo find "$core_dir" -maxdepth 1 -type f -size +0c -print >> "$core_list" 2>/dev/null || true
+              else
+                find "$core_dir" -maxdepth 3 -type f \( -name 'core' -o -name 'core.*' -o -name '*.core' \) -size +0c -print >> "$core_list" 2>/dev/null || true
+              fi
+            done
+            sort -u "$core_list" -o "$core_list"
+
+            if [[ -s "$core_list" ]]; then
+              core_stage="$artifact_dir/cores"
+              mkdir -p "$core_stage"
+              while IFS= read -r core_file; do
+                core_name="$(basename "$core_file")"
+                cp "$core_file" "$core_stage/$core_name" 2>/dev/null || sudo cp "$core_file" "$core_stage/$core_name" || true
+                sudo chown "$USER" "$core_stage/$core_name" 2>/dev/null || true
+              done < "$core_list"
+
+              if find "$core_stage" -type f -size +0c -print -quit | grep -q .; then
+                tar -czf "$artifact_dir/core-files.tar.gz" -C "$core_stage" .
+                rm -rf "$core_stage"
+              fi
+            fi
+          fi
+
+          find "$artifact_dir" -maxdepth 2 -type f -print | sort
+
+      - name: Upload slang-test artifacts
+        if: ${{ always() && inputs.test-log-artifact != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.test-log-artifact }}
+          path: ${{ runner.temp }}/slang-test-artifacts
+          retention-days: 7
+          if-no-files-found: warn
       - name: Run Slang examples
         # Run examples on release for pull requests, and not on merge_group, to reduce CI load.
         if: inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
