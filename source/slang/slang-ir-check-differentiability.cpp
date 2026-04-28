@@ -315,6 +315,9 @@ public:
                 hasDiffValueType = true;
         }
 
+        // TODO: PR #9808 (Sai Praveen Bangaru) - hasDiffValueType is computed but never used
+        // to gate the diagnostic. The comment above suggests it should be part of the condition.
+        SLANG_UNUSED(hasDiffValueType);
         return hasDiffPtrOutput;
     }
 
