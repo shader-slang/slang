@@ -2010,6 +2010,16 @@ struct ExtendedTypeLayoutContext
 
         RefPtr<TypeLayout::ExtendedInfo::DescriptorSetInfo> descriptorSet =
             new TypeLayout::ExtendedInfo::DescriptorSetInfo();
+        // Record the (HLSL `space` / Vulkan descriptor set) that this
+        // descriptor set was constructed for. Without this,
+        // `getDescriptorSetSpaceOffset` always returns 0, which causes
+        // slang-rhi backends (D3D12 root-signature builder, Vulkan
+        // descriptor-set allocator, WebGPU bind-group builder) to
+        // place all parameters at space=0 — resulting in
+        // root-signature rejections on D3D12 and silent wrong-binding
+        // on Vulkan/WebGPU when a user has `register(_, spaceN)` or
+        // `[[vk::binding(_, N)]]` with `N != 0`.
+        descriptorSet->spaceOffset = space;
         m_extendedInfo->m_descriptorSets.add(descriptorSet);
 
         return index;
