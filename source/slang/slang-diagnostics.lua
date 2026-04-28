@@ -4957,6 +4957,13 @@ err(
     span { loc = "location", message = "whole struct must be assiged to mesh output at once for Metal target." }
 )
 
+warning(
+    "multisampled-subpass-input-not-supported-on-metal",
+    56105,
+    "SubpassInputMS is not fully supported on Metal; the sample index argument to SubpassLoad will be ignored",
+    span { loc = "location", message = "Metal framebuffer fetch does not support per-sample reads. The sample index is ignored and the resolved value is returned." }
+)
+
 err(
     "storage-texture-access-mode-not-supported-in-wgsl",
     56106,

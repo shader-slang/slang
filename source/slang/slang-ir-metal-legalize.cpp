@@ -247,6 +247,115 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
     }
 }
 
+static bool isSubpassLoadIntrinsicCall(IRCall* call)
+{
+    auto callee = call->getOperand(0);
+    return callee->findDecoration<IRTargetIntrinsicDecoration>() != nullptr;
+}
+
+static void legalizeSubpassInputsForMetal(
+    IRModule* module,
+    DiagnosticSink* sink,
+    List<EntryPointInfo>& entryPoints)
+{
+    List<IRGlobalParam*> subpassGlobals;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto globalParam = as<IRGlobalParam>(inst))
+        {
+            if (as<IRSubpassInputType>(globalParam->getDataType()))
+                subpassGlobals.add(globalParam);
+        }
+    }
+
+    for (auto globalParam : subpassGlobals)
+    {
+        auto subpassType = as<IRSubpassInputType>(globalParam->getDataType());
+        auto elementType = subpassType->getElementType();
+
+        if (subpassType->isMultisample())
+        {
+            sink->diagnose(
+                Diagnostics::MultisampledSubpassInputNotSupportedOnMetal{
+                    .location = getDiagnosticPos(globalParam)});
+        }
+
+        auto entryPointParamDecor =
+            globalParam->findDecoration<IREntryPointParamDecoration>();
+        IRFunc* entryPointFunc = nullptr;
+        if (entryPointParamDecor)
+            entryPointFunc = as<IRFunc>(entryPointParamDecor->getEntryPoint());
+
+        if (!entryPointFunc)
+        {
+            for (auto& ep : entryPoints)
+            {
+                if (ep.entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                {
+                    entryPointFunc = ep.entryPointFunc;
+                    break;
+                }
+            }
+        }
+        if (!entryPointFunc)
+            continue;
+
+        IRIntegerValue attachmentIndex = 0;
+        if (auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>())
+        {
+            if (auto varLayout = as<IRVarLayout>(layoutDecor->getLayout()))
+            {
+                if (auto offsetAttr =
+                        varLayout->findOffsetAttr(LayoutResourceKind::InputAttachmentIndex))
+                {
+                    attachmentIndex = offsetAttr->getOffset();
+                }
+            }
+        }
+
+        IRBuilder builder(module);
+        auto firstBlock = entryPointFunc->getFirstBlock();
+        if (!firstBlock)
+            continue;
+
+        auto newParam = builder.createParam(elementType);
+
+        auto firstOrdinary = firstBlock->getFirstOrdinaryInst();
+        if (firstOrdinary)
+            newParam->insertBefore(firstOrdinary);
+        else
+            newParam->insertAtEnd(firstBlock);
+
+        StringBuilder colorStr;
+        colorStr << "color(" << Int(attachmentIndex) << ")";
+        builder.addTargetSystemValueDecoration(newParam, colorStr.produceString().getUnownedSlice());
+
+        if (auto nameHint = globalParam->findDecoration<IRNameHintDecoration>())
+            builder.addNameHintDecoration(newParam, nameHint->getName());
+
+        IRUse* nextUse = nullptr;
+        for (IRUse* use = globalParam->firstUse; use; use = nextUse)
+        {
+            nextUse = use->nextUse;
+            auto user = use->getUser();
+
+            if (auto call = as<IRCall>(user))
+            {
+                if (isSubpassLoadIntrinsicCall(call))
+                {
+                    call->replaceUsesWith(newParam);
+                    call->removeAndDeallocate();
+                    continue;
+                }
+            }
+            use->set(newParam);
+        }
+
+        globalParam->removeAndDeallocate();
+        fixUpFuncType(entryPointFunc);
+    }
+}
+
 void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     List<EntryPointInfo> entryPoints;
@@ -264,6 +373,8 @@ void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, Diagnost
             legalizeFuncBody(func);
         }
     }
+
+    legalizeSubpassInputsForMetal(module, sink, entryPoints);
 
     legalizeEntryPointVaryingParamsForMetal(module, sink, entryPoints);
 
