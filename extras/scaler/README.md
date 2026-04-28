@@ -17,6 +17,10 @@ queue depth. Uses the [GitHub Actions Scale Set Client](https://github.com/actio
 │  scaler (Linux)                          │
 │   --labels=Linux,self-hosted,GPU         │
 │   --platform=linux                       │
+│       │                                  │
+│  scaler (Linux SM80Plus)                 │
+│   --labels=Linux,self-hosted,GPU,SM80Plus│
+│   --platform=linux                       │
 └────┬─────────────────────────┬───────────┘
      │                         │
      ▼                         ▼
@@ -66,6 +70,19 @@ GOOS=linux GOARCH=amd64 go build -o scaler-linux ./cmd/scaler
   --gcp-zones=us-east1-c,us-east1-d,us-central1-a,us-west1-a \
   --gcp-instance-template=linux-gpu-runner \
   --max-runners=10
+
+# Linux SM80Plus GPU runners (L4 initially)
+./scaler \
+  --url=https://github.com/shader-slang/slang \
+  --name=linux-gpu-sm80plus-runners \
+  --token=ghp_... \
+  --labels=Linux,self-hosted,GPU,SM80Plus \
+  --platform=linux \
+  --gcp-zones=us-east1-c,us-east1-d,us-central1-a,us-west1-a \
+  --gcp-instance-template=linux-gpu-runner-sm80plus-l4 \
+  --gcp-gpu-type=nvidia-l4 \
+  --vm-prefix=linux-sm80plus \
+  --max-runners=1
 ```
 
 ## Configuration
@@ -197,6 +214,7 @@ runner registration via JIT config on each boot.
 - Control VM: e2-small (24/7)
 - Windows GPU test runners: n1-standard-8 + T4 (on-demand)
 - Linux GPU test runners: n1-standard-8 + T4 (on-demand)
+- Linux SM80Plus test runners: g2-standard-8 + L4 (on-demand, narrow capability job only)
 - Windows build runners: n1-standard-8, no GPU (on-demand)
 
 See [GCP pricing](https://cloud.google.com/compute/vm-instance-pricing) for current rates.

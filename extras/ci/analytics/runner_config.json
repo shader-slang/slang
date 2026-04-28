@@ -1,6 +1,11 @@
 {
   "label_groups": [
     {
+      "labels": ["Linux", "self-hosted", "GPU", "SM80Plus"],
+      "name": "Linux SM80Plus GPU (GCP)",
+      "self_hosted": true
+    },
+    {
       "labels": ["Linux", "self-hosted", "GPU"],
       "name": "Linux GPU (GCP)",
       "self_hosted": true
@@ -92,6 +97,11 @@
     }
   ],
   "runner_name_prefixes": [
+    {
+      "prefix": "linux-sm80plus-",
+      "name": "Linux SM80Plus GPU (GCP)",
+      "self_hosted": true
+    },
     {
       "prefix": "linux-runner-",
       "name": "Linux GPU (GCP)",

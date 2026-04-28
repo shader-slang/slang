@@ -24,6 +24,7 @@ class TestRunnerTypeCoverage(unittest.TestCase):
         config = {
             "label_groups": [],
             "runner_name_prefixes": [
+                {"prefix": "linux-sm80plus-", "name": "Linux SM80Plus GPU (GCP)", "self_hosted": True},
                 {"prefix": "linux-runner-", "name": "Linux GPU (GCP)", "self_hosted": True},
                 {"prefix": "win-build-", "name": "Windows Build (GCP)", "self_hosted": True},
                 {"prefix": "win-runner-", "name": "Windows GPU (GCP)", "self_hosted": True},
@@ -31,16 +32,41 @@ class TestRunnerTypeCoverage(unittest.TestCase):
             "non_production_periods": {"runners": {}},
         }
 
+        sm80_group, sm80_self_hosted = ci_visualization.classify_group([], config, "linux-sm80plus-1")
         linux_group, linux_self_hosted = ci_visualization.classify_group([], config, "linux-runner-1")
         build_group, build_self_hosted = ci_visualization.classify_group([], config, "win-build-5")
         gpu_group, gpu_self_hosted = ci_visualization.classify_group([], config, "win-runner-3")
 
+        self.assertEqual(sm80_group, "Linux SM80Plus GPU (GCP)")
+        self.assertTrue(sm80_self_hosted)
         self.assertEqual(linux_group, "Linux GPU (GCP)")
         self.assertTrue(linux_self_hosted)
         self.assertEqual(build_group, "Windows Build (GCP)")
         self.assertTrue(build_self_hosted)
         self.assertEqual(gpu_group, "Windows GPU (GCP)")
         self.assertTrue(gpu_self_hosted)
+
+    def test_classify_group_prefers_sm80plus_over_generic_linux_gpu(self):
+        config = {
+            "label_groups": [
+                {
+                    "labels": ["Linux", "self-hosted", "GPU", "SM80Plus"],
+                    "name": "Linux SM80Plus GPU (GCP)",
+                    "self_hosted": True,
+                },
+                {"labels": ["Linux", "self-hosted", "GPU"], "name": "Linux GPU (GCP)", "self_hosted": True},
+            ],
+            "runner_name_prefixes": [],
+            "non_production_periods": {"runners": {}},
+        }
+
+        group, self_hosted = ci_visualization.classify_group(
+            ["Linux", "self-hosted", "GPU", "SM80Plus"],
+            config,
+        )
+
+        self.assertEqual(group, "Linux SM80Plus GPU (GCP)")
+        self.assertTrue(self_hosted)
 
     def test_record_snapshot_counts_all_three_gcp_runner_types(self):
         queue_data = {
