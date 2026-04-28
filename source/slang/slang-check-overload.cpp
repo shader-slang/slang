@@ -230,7 +230,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateFixity(
 
     auto decl = candidate.item.declRef.getDecl();
 
-    if (const auto prefixExpr = as<PrefixExpr>(expr))
+    if (const auto prefixExpr = as<PrefixExpr>(expr); prefixExpr)
     {
         if (decl->hasModifier<PrefixModifier>())
             return true;
@@ -243,7 +243,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateFixity(
 
         return false;
     }
-    else if (const auto postfixExpr = as<PostfixExpr>(expr))
+    else if (const auto postfixExpr = as<PostfixExpr>(expr); postfixExpr)
     {
         if (decl->hasModifier<PostfixModifier>())
             return true;

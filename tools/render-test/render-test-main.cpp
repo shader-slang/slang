@@ -1308,6 +1308,8 @@ void RenderTestApp::setProjectionMatrix(IShaderObject* rootObject)
     float kIdentity[16] =
         {1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f};
     auto info = m_device->getInfo();
+    // TODO: PR #7303 (Simon Kallweit) - info is set but never used.
+    SLANG_UNUSED(info);
     ShaderCursor(rootObject)
         .getField("Uniforms")
         .getDereferenced()

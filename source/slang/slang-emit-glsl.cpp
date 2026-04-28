@@ -1062,6 +1062,11 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(
     if (type->isArray())
     {
         m_writer->emit("Array");
+        if (type->GetBaseShape() == SLANG_TEXTURE_CUBE)
+        {
+            // samplerCubeArray requires GL_ARB_texture_cube_map_array on GLSL < 4.00
+            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_texture_cube_map_array"));
+        }
     }
 
     // Note: we're adding 'Shadow' only for combined texture/sampler types. Plain texture
@@ -2438,7 +2443,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_Not:
         {
             IRInst* operand = inst->getOperand(0);
-            if (const auto vectorType = as<IRVectorType>(operand->getDataType()))
+            if (const auto vectorType = as<IRVectorType>(operand->getDataType()); vectorType)
             {
                 EmitOpInfo outerPrec = inOuterPrec;
                 bool needClose = false;
@@ -3557,7 +3562,8 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         _emitGLSLSubpassInputType(subpassType);
         return;
     }
-    else if (const auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+    else if (const auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
+             structuredBufferType)
     {
         // TODO: We desugar global variables with structured-buffer type into GLSL
         // `buffer` declarations, but we don't currently handle structured-buffer types

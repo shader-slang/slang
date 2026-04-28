@@ -43,6 +43,9 @@
 #include "slang-tag-version.h"
 #include "slang-type-layout.h"
 
+#include <cinttypes>
+#include <cstdio>
+#include <mutex>
 #include <sys/stat.h>
 
 // Used to print exception type names in internal-compiler-error messages
@@ -58,9 +61,19 @@ const char* getBuildTagString()
         // If the tag is unknown, then we will try to get the timestamp of the shared library
         // and use that as the version string, so that we can at least return something
         // that uniquely identifies the build.
-        static String timeStampString =
-            String(SharedLibraryUtils::getSharedLibraryTimestamp((void*)spCreateSession));
-        return timeStampString.getBuffer();
+        //
+        // Use a static char buffer (BSS) instead of a heap String so MSVC
+        // _CrtDumpMemoryLeaks() at exit does not false-report that allocation.
+        static char timeStampBuffer[32] = {};
+        static std::once_flag initFlag;
+        std::call_once(
+            initFlag,
+            []()
+            {
+                uint64_t ts = SharedLibraryUtils::getSharedLibraryTimestamp((void*)spCreateSession);
+                snprintf(timeStampBuffer, sizeof(timeStampBuffer), "%" PRIu64, ts);
+            });
+        return timeStampBuffer;
     }
     return SLANG_TAG_VERSION;
 }
