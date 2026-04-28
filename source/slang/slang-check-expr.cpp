@@ -324,11 +324,24 @@ ContainerDecl* isStaticScopeDecl(Decl* decl)
     return nullptr;
 }
 
-void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
+void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     DeclRef<Decl> declRef,
     SourceLoc loc,
     Expr* originalExpr)
 {
+    // Resolve the module for the context
+    ModuleDecl* moduleDecl = getModuleDecl(getOuterScope());
+
+    // If we don't get the module declaration from the outer scope, we'll
+    // try the visitor context
+    if (!moduleDecl && getShared() && getShared()->getModule())
+        moduleDecl = getShared()->getModule()->getModuleDecl();
+
+    // And if we can't figure out a module, we're called in a context where we
+    // don't care about the deprecation attributes
+    if (!moduleDecl)
+        return;
+
     // This is slightly subtle, because we don't want to warn more than
     // once for the same occurrence, however in some cases this function is
     // called more than once for the same declref (specifically in the case
@@ -350,6 +363,31 @@ void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
     {
         return;
     }
+
+    // If the expression location is the same as the declaration location, don't
+    // diagnose. This avoids diagnosing struct member fields which get
+    // referenced by synthesized constructors etc.
+    if (declRef.getDecl() && originalExpr && (declRef.getDecl()->getNameLoc() == originalExpr->loc))
+    {
+        return;
+    }
+
+    // Check whether we're using a removed declaration
+    if (auto removedSinceAttr = declRef.getDecl()->findModifier<RemovedSinceAttribute>())
+    {
+        if (moduleDecl->languageVersion >= removedSinceAttr->sinceVersion)
+        {
+            getSink()->diagnose(Diagnostics::RemovedUsage{
+                .declName = declRef.getName(),
+                .sinceVersion = removedSinceAttr->sinceVersion,
+                .message = removedSinceAttr->message,
+                .location = loc});
+
+            return;
+        }
+    }
+
+    // Check whether we're using a deprecated declaration
     if (auto deprecatedAttr = declRef.getDecl()->findModifier<DeprecatedAttribute>())
     {
         getSink()->diagnose(Diagnostics::DeprecatedUsage{
@@ -403,7 +441,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     // This is the bottleneck for using declarations which might be
     // deprecated, diagnose here.
     if (getSink())
-        diagnoseDeprecatedDeclRefUsage(declRef, loc, originalExpr);
+        diagnoseDeprecatedAndRemovedDeclRefUsage(declRef, loc, originalExpr);
 
     // Construct an appropriate expression based on the structured of
     // the declaration reference.
@@ -2094,7 +2132,7 @@ Expr* SemanticsVisitor::_CheckTerm(Expr* term)
 
         if (const auto body = binding->body)
         {
-            binding = as<LetExpr>(binding->body);
+            binding = as<LetExpr>(body);
             SLANG_ASSERT(binding);
             continue;
         }
@@ -2122,7 +2160,7 @@ bool SemanticsVisitor::IsErrorExpr(Expr* expr)
 {
     // TODO: we may want other cases here...
 
-    if (const auto errorType = as<ErrorType>(expr->type))
+    if (const auto errorType = as<ErrorType>(expr->type); errorType)
         return true;
 
     return false;
@@ -6023,6 +6061,25 @@ static PtrType* getValidTypeForAddressOf(
                     AddressSpace::GroupShared,
                     m_astBuilder->getDefaultLayoutType());
             }
+            else
+            {
+                // UserPointer is correct here even though this covers all
+                // remaining variables (including function-locals):
+                // - On GPU targets, the IR validation pass
+                //   (validateAndRemoveAssumeAddress) rejects function-local
+                //   addresses before they reach codegen, so only device-memory
+                //   variables survive, for which UserPointer is semantically
+                //   right.
+                // - On CPU/CUDA targets, address spaces are irrelevant (flat
+                //   memory), and downstream passes that special-case
+                //   UserPointer (addr-inst elimination, redundancy removal,
+                //   etc.) handle it conservatively/correctly.
+                return m_astBuilder->getPtrType(
+                    variableType,
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::UserPointer,
+                    m_astBuilder->getDefaultLayoutType());
+            }
         }
     }
 
@@ -6129,7 +6186,7 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
         getValidTypeForAddressOf(this, m_astBuilder, expr->arg, getType(m_astBuilder, expr->arg));
     if (!expr->type)
     {
-        getSink()->diagnose(Diagnostics::InvalidAddressOf{.expr = expr});
+        getSink()->diagnose(Diagnostics::InvalidAddressOf{.location = expr->loc});
         expr->type = m_astBuilder->getErrorType();
     }
     return expr;
@@ -6445,6 +6502,17 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     }
 
     expr->value = CheckTerm(expr->value);
+
+    // Reject `expr as OpaqueType` (and structs containing opaque fields) because
+    // Optional<T> cannot wrap resource/opaque types.
+    if (typeTransitivelyContainsOpaqueHandle(this, typeExpr.type))
+    {
+        getSink()->diagnose(
+            Diagnostics::OptionalCannotWrapResourceType{.type = typeExpr.type, .expr = expr});
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
     auto optType = m_astBuilder->getOptionalType(typeExpr.type);
     expr->type = optType;
 
@@ -7635,7 +7703,7 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     {
         return _lookupStaticMember(expr, expr->baseExpression);
     }
-    else if (const auto typeType = as<TypeType>(baseType))
+    else if (const auto typeType = as<TypeType>(baseType); typeType)
     {
         return _lookupStaticMember(expr, expr->baseExpression);
     }
@@ -7715,11 +7783,11 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
     {
         auto containerDecl = scope->containerDecl;
 
-        if (const auto ctorDecl = as<ConstructorDecl>(containerDecl))
+        if (const auto ctorDecl = as<ConstructorDecl>(containerDecl); ctorDecl)
         {
             expr->type.isLeftValue = true;
         }
-        else if (const auto setterDecl = as<SetterDecl>(containerDecl))
+        else if (const auto setterDecl = as<SetterDecl>(containerDecl); setterDecl)
         {
             expr->type.isLeftValue = true;
         }
@@ -7969,6 +8037,15 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
         auto modifiedType = m_astBuilder->getModifiedType(baseType, modifierVals);
         expr->type = m_astBuilder->getTypeType(modifiedType);
     }
+    else if (expr->type == nullptr)
+    {
+        // It is possible that all modifiers were pruned in case the modifier
+        // list contained only modifiers that triggered diagnostics (e.g.,
+        // ConstModifier, HLSLVolatileModifier). We'll set the type here to
+        // avoid further diagnostics later in the pipeline.
+        expr->type = m_astBuilder->getTypeType(baseType);
+    }
+
     return expr;
 }
 
@@ -7976,23 +8053,34 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
 {
     SLANG_UNUSED(type);
 
-    if (const auto unormModifier = as<UNormModifier>(modifier))
+    if (const auto unormModifier = as<UNormModifier>(modifier); unormModifier)
     {
         // TODO: validate that `type` is either `float` or a vector of `float`s
         return m_astBuilder->getUNormModifierVal();
     }
-    else if (const auto snormModifier = as<SNormModifier>(modifier))
+    else if (const auto snormModifier = as<SNormModifier>(modifier); snormModifier)
     {
         // TODO: validate that `type` is either `float` or a vector of `float`s
         return m_astBuilder->getSNormModifierVal();
     }
-    else if (const auto noDiffModifier = as<NoDiffModifier>(modifier))
+    else if (const auto noDiffModifier = as<NoDiffModifier>(modifier); noDiffModifier)
     {
         return m_astBuilder->getNoDiffModifierVal();
     }
     else if (as<ConstModifier>(modifier))
     {
         getSink()->diagnose(Diagnostics::ConstNotAllowedOnType{.location = modifier->loc});
+        return nullptr;
+    }
+    else if (as<HLSLVolatileModifier>(modifier))
+    {
+        getSink()->diagnose(Diagnostics::VolatileNotAllowedOnType{.location = modifier->loc});
+        return nullptr;
+    }
+    else if (as<GLSLVolatileModifier>(modifier))
+    {
+        // Note: 'volatile' adds both HLSLVolatileModifier and GLSLVolatileModifier.
+        // We're already diagnosing on HLSLVolatileModifier.
         return nullptr;
     }
     else

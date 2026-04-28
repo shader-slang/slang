@@ -1518,7 +1518,10 @@ public:
 
     Scope* getScope(SyntaxNode* node);
 
-    void diagnoseDeprecatedDeclRefUsage(DeclRef<Decl> declRef, SourceLoc loc, Expr* originalExpr);
+    void diagnoseDeprecatedAndRemovedDeclRefUsage(
+        DeclRef<Decl> declRef,
+        SourceLoc loc,
+        Expr* originalExpr);
 
     DeclRef<Decl> getDefaultDeclRef(Decl* decl)
     {
@@ -3574,6 +3577,10 @@ VarDeclBase* getTrailingUnsizedArrayElement(
 // Test if `type` can be an opaque handle on certain targets, this includes
 // texture, buffer, sampler, acceleration structure, etc.
 bool isOpaqueHandleType(Type* type);
+
+// Returns true if `type` itself is an opaque handle type, or if it is a struct
+// (or array thereof) that transitively contains an opaque handle field.
+bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type);
 
 void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
