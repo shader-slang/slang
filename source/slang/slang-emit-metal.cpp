@@ -136,7 +136,10 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
     if (!layoutDecoration)
+    {
+        maybeEmitSystemSemantic(param);
         return;
+    }
     auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
     if (!layout)
         return;
