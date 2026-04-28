@@ -874,6 +874,49 @@ static bool _isNonMeshStage(Stage stage)
     return stage != Stage::Mesh && stage != Stage::Unknown;
 }
 
+// Returns true if `type` is `OutputIndices<T, N>` (`IndicesType`) whose
+// element type `T` is anything other than the three valid mesh-output
+// index shapes: `uint` for point indices, `uint2` for line indices, or
+// `uint3` for triangle indices. Any other element type makes downstream
+// codegen crash: non-integral scalars (e.g. `float`) cause a null
+// `IRIntLit` dereference in GLSL legalization, while wrong-width vectors
+// (e.g. `uint4`) and struct types hit `SLANG_UNREACHABLE` (issue #9435).
+static bool _matchInvalidIndicesElementType(Type* type)
+{
+    auto indicesType = as<IndicesType>(type);
+    if (!indicesType)
+        return false;
+    auto elementType = indicesType->getElementType();
+
+    // If the element type is an error (unresolved name, failed generic, etc.)
+    // a diagnostic has already been emitted — don't pile on a second one.
+    if (!elementType || as<ErrorType>(elementType))
+        return false;
+
+    // Unwrap typedef / type-alias sugar so that e.g.
+    // `typedef uint3 Triangle; OutputIndices<Triangle, N>` is accepted.
+    elementType = elementType->getCanonicalType();
+
+    if (auto basicType = as<BasicExpressionType>(elementType))
+    {
+        // Point indices: scalar `uint`.
+        return basicType->getBaseType() != BaseType::UInt;
+    }
+    if (auto vectorType = as<VectorExpressionType>(elementType))
+    {
+        // Line/triangle indices: `uint2`/`uint3`.
+        auto basicElem = as<BasicExpressionType>(vectorType->getElementType());
+        if (!basicElem || basicElem->getBaseType() != BaseType::UInt)
+            return true;
+        auto count = as<ConstantIntVal>(vectorType->getElementCount());
+        if (!count)
+            return true;
+        auto n = count->getValue();
+        return n != 2 && n != 3;
+    }
+    return true;
+}
+
 static bool _matchMatrixWithOutOfRangeDimensions(Type* type)
 {
     // Row and column counts outside the 1..4 range break downstream codegen
@@ -979,6 +1022,13 @@ static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
      "mesh output types are only valid on a mesh shader entry point",
      nullptr,
      _isNonMeshStage},
+
+    // `OutputIndices<T, N>` requires `T` to be `uint`/`uint2`/`uint3`.
+    // Other element types crash downstream codegen (issue #9435).
+    {_matchInvalidIndicesElementType,
+     "OutputIndices element type must be uint, uint2, or uint3",
+     nullptr,
+     _isInterfaceBlockVaryingStage},
 };
 
 struct VaryingTypeValidationContext
