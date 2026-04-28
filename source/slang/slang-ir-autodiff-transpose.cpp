@@ -2464,11 +2464,8 @@ struct DiffTransposePass
                         builder->emitMul(operandType, fwdInst->getOperand(0), revValue),
                         fwdInst)));
                 }
-                else
-                {
-                    SLANG_ASSERT_FAILURE(
-                        "Neither operand of a mul instruction is a differential inst");
-                }
+                SLANG_ASSERT_FAILURE("Neither operand of a mul instruction is a differential inst");
+                break;
             }
         case kIROp_Div:
             {
@@ -2482,10 +2479,8 @@ struct DiffTransposePass
                         builder->emitDiv(operandType, revValue, fwdInst->getOperand(1)),
                         fwdInst)));
                 }
-                {
-                    SLANG_ASSERT_FAILURE(
-                        "The first operand of a div inst must be a differential inst");
-                }
+                SLANG_ASSERT_FAILURE("The first operand of a div inst must be a differential inst");
+                break;
             }
         case kIROp_Neg:
             {
@@ -2497,15 +2492,13 @@ struct DiffTransposePass
                         builder->emitNeg(operandType, revValue),
                         fwdInst)));
                 }
-                else
-                {
-                    SLANG_UNEXPECTED("Cannot transpose neg of a non-differentiable inst");
-                }
+                SLANG_UNEXPECTED("Cannot transpose neg of a non-differentiable inst");
             }
 
         default:
             SLANG_UNEXPECTED("Unhandled arithmetic");
         }
+        SLANG_UNREACHABLE("Unhandled arithmetic");
     }
 
     RevGradient materializeSwizzleGradients(

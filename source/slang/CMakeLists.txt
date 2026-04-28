@@ -396,7 +396,15 @@ include(\"${slang_SOURCE_DIR}/cmake/RegenerateDllExports.cmake\")
         RUNTIME_OUTPUT_DIRECTORY "${slang_runtime_dir}"
         ARCHIVE_OUTPUT_DIRECTORY "${slang_archive_dir}"
     )
-    target_link_options(slang-proxy PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/INCREMENTAL:NO>")
+    # slang-proxy outputs as "slang.dll", which makes MSVC name its incremental
+    # link file "slang.ilk" — colliding with slang-dispatcher ("slang.exe" →
+    # "slang.ilk") when Ninja links both in parallel. Redirect the .ilk to a
+    # unique filename so both targets can use incremental linking without racing.
+    target_link_options(
+        slang-proxy
+        PRIVATE
+        "$<$<CXX_COMPILER_ID:MSVC>:/ILK:$<TARGET_FILE_DIR:slang-proxy>/slang-proxy.ilk>"
+    )
 
     # Install the proxy DLL alongside slang-compiler.dll
     install(

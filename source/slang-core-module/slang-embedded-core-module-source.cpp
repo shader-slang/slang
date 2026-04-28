@@ -70,6 +70,9 @@ struct BaseTypeConversionInfo
     BaseTypeConversionKind conversionKind;
     BaseTypeConversionRank conversionRank;
 };
+// kBaseTypes is only referenced from within the generated *.meta.slang.h includes,
+// which are guarded by SLANG_EMBED_CORE_MODULE_SOURCE.
+#if SLANG_EMBED_CORE_MODULE_SOURCE
 static const BaseTypeConversionInfo kBaseTypes[] = {
     // TODO: `void` really shouldn't be in the `BaseType` enumeration, since it behaves so
     // differently across the board
@@ -150,6 +153,7 @@ static const BaseTypeConversionInfo kBaseTypes[] = {
      kBaseTypeConversionKind_Unsigned,
      kBaseTypeConversionRank_IntPtr},
 };
+#endif // SLANG_EMBED_CORE_MODULE_SOURCE
 
 // Given two base types, we need to be able to compute the cost of converting between them.
 ConversionCost getBaseTypeConversionCost(
