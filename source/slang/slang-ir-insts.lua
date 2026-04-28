@@ -1839,6 +1839,28 @@ local insts = {
 				},
 			},
 			{
+				nodeID = {
+					struct_name = "NodeIDDecoration",
+					operands = { { "name", "IRStringLit" }, { "arrayIndex", "IRIntLit" } },
+				},
+			},
+			{
+				nodeIsProgramEntry = {
+					struct_name = "NodeIsProgramEntryDecoration",
+				},
+			},
+			{
+				nodeArraySize = {
+					struct_name = "NodeArraySizeDecoration",
+					operands = { { "count", "IRIntLit" } },
+				},
+			},
+			{
+				allowSparseNodes = {
+					struct_name = "AllowSparseNodesDecoration",
+				},
+			},
+			{
 				workGraphRecordType = {
 					struct_name = "WorkGraphRecordTypeDecoration",
 				},

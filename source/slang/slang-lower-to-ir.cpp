@@ -3015,6 +3015,25 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
             IRInst* val = getSimpleVal(context, lowerVal(context, maxRecAttr->value));
             builder->addDecoration(inst, kIROp_MaxRecordsDecoration, val);
         }
+        else if (auto nodeIDAttr = as<NodeIDAttribute>(mod))
+        {
+            IRStringLit* nameLit =
+                builder->getStringValue(nodeIDAttr->name.getUnownedSlice());
+            IRInst* indexVal = nodeIDAttr->arrayIndex
+                ? getSimpleVal(context, lowerVal(context, nodeIDAttr->arrayIndex))
+                : builder->getIntValue(builder->getIntType(), 0);
+            IRInst* ops[2] = {nameLit, indexVal};
+            builder->addDecoration(inst, kIROp_NodeIDDecoration, ops, 2);
+        }
+        else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(mod))
+        {
+            IRInst* val = getSimpleVal(context, lowerVal(context, nodeArraySizeAttr->count));
+            builder->addDecoration(inst, kIROp_NodeArraySizeDecoration, val);
+        }
+        else if (as<AllowSparseNodesAttribute>(mod))
+        {
+            builder->addSimpleDecoration<IRAllowSparseNodesDecoration>(inst);
+        }
         // TODO: what are other modifiers we need to propagate through?
     }
     if (auto t = composeGetters<IRMeshOutputType>(
@@ -13393,6 +13412,20 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 IRStringLit* lit =
                     getBuilder()->getStringValue(nodeLaunchAttr->mode.getUnownedSlice());
                 getBuilder()->addDecoration(irFunc, kIROp_NodeLaunchDecoration, lit);
+            }
+            else if (auto nodeIDAttr = as<NodeIDAttribute>(modifier))
+            {
+                IRStringLit* nameLit =
+                    getBuilder()->getStringValue(nodeIDAttr->name.getUnownedSlice());
+                IRInst* indexVal = nodeIDAttr->arrayIndex
+                    ? getSimpleVal(subContext, lowerVal(subContext, nodeIDAttr->arrayIndex))
+                    : getBuilder()->getIntValue(getBuilder()->getIntType(), 0);
+                IRInst* ops[2] = {nameLit, indexVal};
+                getBuilder()->addDecoration(irFunc, kIROp_NodeIDDecoration, ops, 2);
+            }
+            else if (as<NodeIsProgramEntryAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRNodeIsProgramEntryDecoration>(irFunc);
             }
             else if (auto gridAttr = as<NodeMaxDispatchGridAttribute>(modifier))
             {

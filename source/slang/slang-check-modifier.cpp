@@ -526,6 +526,28 @@ Modifier* SemanticsVisitor::validateAttribute(
         if (!maxRecAttr->value)
             return nullptr;
     }
+    else if (auto nodeIDAttr = as<NodeIDAttribute>(attr))
+    {
+        auto count = attr->args.getCount();
+        SLANG_ASSERT(count == 1 || count == 2);
+        String name;
+        if (!checkLiteralStringVal(attr->args[0], &name))
+            return nullptr;
+        nodeIDAttr->name = name;
+        if (count == 2)
+        {
+            nodeIDAttr->arrayIndex = checkConstantIntVal(attr->args[1]);
+            if (!nodeIDAttr->arrayIndex)
+                return nullptr;
+        }
+    }
+    else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 1);
+        nodeArraySizeAttr->count = checkConstantIntVal(attr->args[0]);
+        if (!nodeArraySizeAttr->count)
+            return nullptr;
+    }
     else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
     {
         // This case handles GLSL-oriented layout attributes

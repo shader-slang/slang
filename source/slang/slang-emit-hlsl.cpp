@@ -600,6 +600,18 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
                 m_writer->emit(getIntVal(decor->getZ()));
                 m_writer->emit(")]\n");
             }
+            if (auto decor = irFunc->findDecoration<IRNodeIDDecoration>())
+            {
+                m_writer->emit("[NodeID(\"");
+                m_writer->emit(decor->getName()->getStringSlice());
+                m_writer->emit("\", ");
+                m_writer->emit(getIntVal(decor->getArrayIndex()));
+                m_writer->emit(")]\n");
+            }
+            if (irFunc->findDecoration<IRNodeIsProgramEntryDecoration>())
+            {
+                m_writer->emit("[NodeIsProgramEntry]\n");
+            }
             if (!launchDecor || launchDecor->getMode()->getStringSlice() != toSlice("thread"))
                 emitNumThreadsAttribute();
             break;
@@ -2325,6 +2337,24 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
         m_writer->emit("[MaxRecords(");
         m_writer->emit(getIntVal(decor->getCount()));
         m_writer->emit(")] ");
+    }
+    if (auto decor = param->findDecoration<IRNodeIDDecoration>())
+    {
+        m_writer->emit("[NodeID(\"");
+        m_writer->emit(decor->getName()->getStringSlice());
+        m_writer->emit("\", ");
+        m_writer->emit(getIntVal(decor->getArrayIndex()));
+        m_writer->emit(")] ");
+    }
+    if (auto decor = param->findDecoration<IRNodeArraySizeDecoration>())
+    {
+        m_writer->emit("[NodeArraySize(");
+        m_writer->emit(getIntVal(decor->getCount()));
+        m_writer->emit(")] ");
+    }
+    if (param->findDecoration<IRAllowSparseNodesDecoration>())
+    {
+        m_writer->emit("[AllowSparseNodes] ");
     }
 
     if (auto decor = param->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())

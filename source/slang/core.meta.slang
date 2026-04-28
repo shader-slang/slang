@@ -4447,6 +4447,24 @@ __attributeTarget(FuncDecl)
 __attributeTarget(ParamDecl)
 attribute_syntax [MaxRecords(count: int)] : MaxRecordsAttribute;
 
+/// Overrides the node identifier (name and optional array index) used in the work graph.
+/// The second argument (array index) is optional and defaults to 0.
+__attributeTarget(FuncDecl)
+__attributeTarget(ParamDecl)
+attribute_syntax [NodeID(name: String)] : NodeIDAttribute;
+
+/// Marks this node shader as a program entry point in the work graph.
+__attributeTarget(FuncDecl)
+attribute_syntax [NodeIsProgramEntry] : NodeIsProgramEntryAttribute;
+
+/// Specifies the number of nodes in a node output array.
+__attributeTarget(ParamDecl)
+attribute_syntax [NodeArraySize(count: int)] : NodeArraySizeAttribute;
+
+/// Allows a node output array to contain unresolved (sparse) entries.
+__attributeTarget(ParamDecl)
+attribute_syntax [AllowSparseNodes] : AllowSparseNodesAttribute;
+
 //@hidden:
 __attributeTarget(StructDecl)
 attribute_syntax [__workGraphRecordType] : WorkGraphRecordTypeAttribute;

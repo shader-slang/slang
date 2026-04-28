@@ -1300,6 +1300,33 @@ class MaxRecordsAttribute : public Attribute
 };
 
 FIDDLE()
+class NodeIDAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() String name;
+    FIDDLE() IntVal* arrayIndex; // nullptr when the second argument is omitted (implies 0)
+};
+
+FIDDLE()
+class NodeIsProgramEntryAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class AllowSparseNodesAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class NodeArraySizeAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* count;
+};
+
+FIDDLE()
 class WorkGraphRecordTypeAttribute : public Attribute
 {
     FIDDLE(...)

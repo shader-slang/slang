@@ -817,7 +817,9 @@ bool isIntrinsic(IRInst* inst)
     //
     if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(inst);
         existentialSpecializedFunc)
+    {
         return false;
+    }
 
     if (!func)
         return false;
