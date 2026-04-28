@@ -886,11 +886,14 @@ struct LoweredElementTypeContext
             return info;
         }
 
-        // Metal ParameterBlock: lower element types inside resource types so that e.g.
-        // RWStructuredBuffer<int*> becomes DescriptorHandle(RWStructuredBuffer<ulong>)
-        // instead of DescriptorHandle(RWStructuredBuffer<int*>) which would produce a
-        // pointer-to-pointer in the argument buffer struct. Metal rejects pointer-to-
-        // pointer types in buffer pointee types regardless of address space qualifiers.
+        // Metal ParameterBlock: for resource types whose element contains multi-level
+        // pointers, lower those elements before the existing DescriptorHandle wrapping.
+        // E.g. RWStructuredBuffer<int**> has its element rewritten to ulong so the
+        // wrapped result is DescriptorHandle(RWStructuredBuffer<ulong>) instead of
+        // DescriptorHandle(RWStructuredBuffer<int**>). Single-level pointer elements
+        // (e.g. RWStructuredBuffer<int*>) are left to the late pass
+        // (MetalBufferElementTypeLoweringPolicy) since the buffer is in StorageBuffer
+        // address space.
         if (config.layoutRuleName == IRTypeLayoutRuleName::MetalParameterBlock &&
             isResourceType(type))
         {
