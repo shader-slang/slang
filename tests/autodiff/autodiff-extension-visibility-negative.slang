@@ -12,6 +12,10 @@ void test()
     //CHECK: declaration not accessible
     //CHECK: 'privatePow4' is not accessible from the current context.
 
+    fwd_diff(VisibilityCase.publicCustomSquareWithInternalDerivative)(diffPair(2.0, 1.0));
+    //CHECK: declaration not accessible
+    //CHECK: 'fwd_diff' is not accessible from the current context.
+
     var dx = diffPair(2.0);
     bwd_diff(VisibilityCase.internalPow4)(dx, 1.0);
     //CHECK: declaration not accessible

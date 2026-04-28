@@ -1080,6 +1080,92 @@ bool SemanticsVisitor::isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scop
             if (s->containerDecl == parentContainer)
                 return true;
         }
+
+        auto parentAggTypeDecl = as<AggTypeDeclBase>(parentContainer);
+        if (!parentAggTypeDecl)
+            return false;
+
+        // If the decl isn't in the same syntactic container as the scope, we still need to
+        // consider extensions that apply to the same type.
+        //
+        // An `ExtensionDecl` is represented as its own `AggTypeDeclBase`, but extension members
+        // are semantically members of the type being extended. For private access, that means
+        // `extension S { private ... }` should be visible from `S` and from other extensions that
+        // apply to `S`, even though the declaration's parent is the extension node rather than the
+        // original `S` declaration.
+        //
+        auto getTargetTypeForContainer = [&](AggTypeDeclBase* containerDecl) -> Type*
+        {
+            if (auto extensionDecl = as<ExtensionDecl>(containerDecl))
+            {
+                auto extensionDeclRef = getDefaultDeclRef(extensionDecl).as<ExtensionDecl>();
+                if (!extensionDeclRef)
+                    return nullptr;
+
+                auto targetType = getTargetType(m_astBuilder, extensionDeclRef);
+                if (auto targetDeclRefType = as<DeclRefType>(targetType))
+                {
+                    if (auto targetCallableDeclRef =
+                            targetDeclRefType->getDeclRef().as<CallableDecl>())
+                    {
+                        // Auto-diff synthesizes derivative members as extensions on a
+                        // function-as-type. When that function is a member of an aggregate,
+                        // private access should still be governed by the member function's
+                        // owning aggregate, not by the synthetic function type itself.
+                        for (auto parent = targetCallableDeclRef.getDecl()->parentDecl; parent;
+                             parent = parent->parentDecl)
+                        {
+                            if (auto parentAggTypeDecl = as<AggTypeDeclBase>(parent))
+                                return DeclRefType::create(
+                                    m_astBuilder,
+                                    getDefaultDeclRef(parentAggTypeDecl));
+                            if (as<NamespaceDeclBase>(parent))
+                                break;
+                        }
+                    }
+                }
+
+                return targetType;
+            }
+
+            return DeclRefType::create(m_astBuilder, getDefaultDeclRef(containerDecl));
+        };
+
+        auto privateDeclContainerType = getTargetTypeForContainer(parentAggTypeDecl);
+        if (!privateDeclContainerType)
+            return false;
+
+        auto doesContainerTargetTypeMatch = [&](AggTypeDeclBase* scopeAggTypeDecl) -> bool
+        {
+            auto scopeContainerType = getTargetTypeForContainer(scopeAggTypeDecl);
+            if (!scopeContainerType)
+                return false;
+
+            if (privateDeclContainerType->equals(scopeContainerType))
+                return true;
+
+            if (auto parentExtensionDecl = as<ExtensionDecl>(parentAggTypeDecl))
+            {
+                if (applyExtensionToType(parentExtensionDecl, scopeContainerType))
+                    return true;
+            }
+
+            return false;
+        };
+
+        // Walk the lexical scope chain looking for an enclosing aggregate/extension and compare
+        // its semantic type with the declaration's semantic type.
+        // `applyExtensionToType` handles generic extensions whose target can be specialized to the
+        // current scope's aggregate type.
+        //
+        for (auto s = scope; s; s = s->parent)
+        {
+            if (auto scopeAggTypeDecl = as<AggTypeDeclBase>(s->containerDecl))
+            {
+                if (doesContainerTargetTypeMatch(scopeAggTypeDecl))
+                    return true;
+            }
+        }
         return false;
     }
     return false;
@@ -3693,6 +3779,9 @@ static Expr* convertHigherOrderExprToLookup(
         resultExpr->baseFunction = convertHigherOrderExprToLookup(visitor, hofExpr);
     }
 
+    if (visitor->IsErrorExpr(resultExpr->baseFunction))
+        return visitor->CreateErrorExpr(resultExpr);
+
     if (auto declRefExpr = as<DeclRefExpr>(resultExpr->baseFunction))
     {
         auto callableDeclRef = declRefExpr->declRef.as<CallableDecl>()
@@ -3709,6 +3798,7 @@ static Expr* convertHigherOrderExprToLookup(
             visitor->getOuterScope(),
             LookupMask::Default,
             LookupOptions::NoDeref);
+        result = visitor->resolveOverloadedLookup(result);
         bool diagnosed = false;
         result =
             visitor->filterLookupResultByVisibilityAndDiagnose(result, resultExpr->loc, diagnosed);
@@ -3716,18 +3806,16 @@ static Expr* convertHigherOrderExprToLookup(
             result,
             resultExpr->loc,
             diagnosed);
-        result = visitor->resolveOverloadedLookup(result);
 
         if (result.isValid() && !result.isOverloaded())
         {
             if (auto funcAliasDeclRef = result.item.declRef.as<FuncAliasDecl>())
             {
-                result.item.declRef =
-                    substituteDeclRef(
-                        SubstitutionSet(result.item.declRef),
-                        getCurrentASTBuilder(),
-                        funcAliasDeclRef.getDecl()->targetDeclRef)
-                        .as<CallableDecl>();
+                result.item.declRef = substituteDeclRef(
+                                          SubstitutionSet(result.item.declRef),
+                                          getCurrentASTBuilder(),
+                                          funcAliasDeclRef.getDecl()->targetDeclRef)
+                                          .as<CallableDecl>();
             }
 
             // Return the lookup result.
@@ -3990,9 +4078,13 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
-            if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
+            if (!IsErrorExpr(invoke))
             {
-                invoke->functionExpr = convertHigherOrderExprToLookup(this, higherOrderInvoke);
+                if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
+                {
+                    invoke->functionExpr =
+                        convertHigherOrderExprToLookup(this, higherOrderInvoke);
+                }
             }
         }
     }
@@ -4842,6 +4934,9 @@ static Expr* _checkHigherOrderInvokeExpr(
     expr->baseFunction = subVisitor.dispatchExpr(expr->baseFunction, subVisitor);
     expr->baseFunction =
         subVisitor.maybeResolveOverloadedExpr(expr->baseFunction, LookupMask::Function, nullptr);
+
+    if (semantics->IsErrorExpr(expr->baseFunction))
+        return semantics->CreateErrorExpr(expr);
 
     auto astBuilder = semantics->getASTBuilder();
 
