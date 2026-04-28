@@ -3,6 +3,9 @@ name: CMake Options Build (reusable)
 # Reusable workflow: builds Slang once per matrix entry (each option set to
 # its non-default value) for a given platform / compiler / config combination.
 # Called from cmake-options.yml.
+#
+# The option list lives in .github/cmake-options-matrix.json (single source of
+# truth shared with cmake-options-build-container.yml).
 
 on:
   workflow_call:
@@ -41,7 +44,26 @@ on:
         default: ""
 
 jobs:
+  # Read the shared option list once; downstream jobs use fromJSON on the output.
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/cmake-options-matrix.json
+          sparse-checkout-cone-mode: false
+      - id: set-matrix
+        run: |
+          {
+            echo "matrix<<MATRIX_EOF"
+            cat .github/cmake-options-matrix.json
+            echo "MATRIX_EOF"
+          } >> $GITHUB_OUTPUT
+
   build:
+    needs: setup
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 120
     defaults:
@@ -49,81 +71,7 @@ jobs:
         shell: bash
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          # The non-default value for each boolean option is determined at
-          # configure time by querying cmake -LA (see Configure CMake step).
-          # SLANG_LIB_TYPE is non-boolean and needs an explicit value.
-
-          - option: SLANG_EMBED_CORE_MODULE_SOURCE
-          - option: SLANG_EMBED_CORE_MODULE
-          - option: SLANG_ENABLE_DXIL
-          - option: SLANG_ENABLE_PCH
-          - option: SLANG_STANDARD_MODULE_DEVELOP_BUILD
-          - option: SLANG_ENABLE_SLANGD
-            # slang-test hard-depends on slangd; examples include platform/window.h
-            # which only exists under the tests target; disable both when slangd is off.
-            extra_cmake_flags: "-DSLANG_ENABLE_TESTS=OFF -DSLANG_ENABLE_EXAMPLES=OFF"
-          - option: SLANG_ENABLE_SLANGC
-            # GFX references $<TARGET_FILE_DIR:slangc>; disable GFX when slangc is off.
-            extra_cmake_flags: "-DSLANG_ENABLE_GFX=OFF"
-          - option: SLANG_ENABLE_SLANGI
-          - option: SLANG_ENABLE_SLANGRT
-          - option: SLANG_ENABLE_SLANG_GLSLANG
-          - option: SLANG_ENABLE_TESTS
-            # example-base references headers from the platform/test target.
-            extra_cmake_flags: "-DSLANG_ENABLE_EXAMPLES=OFF"
-          - option: SLANG_ENABLE_EXAMPLES
-          - option: SLANG_ENABLE_REPLAYER
-          - option: SLANG_ENABLE_RELEASE_DEBUG_INFO
-          - option: SLANG_ENABLE_SPLIT_DEBUG_INFO
-          - option: SLANG_ENABLE_FULL_IR_VALIDATION
-          # SLANG_ENABLE_IR_BREAK_ALLOC: the default preset overrides this with a
-          # generator expression (ON for Debug, OFF for Release), which cmake -LA
-          # cannot resolve at configure time. Use value_debug/value_release to
-          # test the non-default value for each config.
-          - option: SLANG_ENABLE_IR_BREAK_ALLOC
-            value_debug: "OFF"
-            value_release: "ON"
-          - option: SLANG_EXCLUDE_DAWN
-          - option: SLANG_EXCLUDE_TINT
-          - option: SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
-          - option: SLANG_ENABLE_RELEASE_LTO
-          - option: SLANG_IGNORE_ABORT_MSG
-          - option: SLANG_ENABLE_TIME_TRACE
-          # SLANG_ENABLE_XLIB: defined as a STRING option (AUTO/ON/OFF) via auto_option,
-          # so cmake -LA shows :STRING= not :BOOL=; an explicit value is required.
-          - option: SLANG_ENABLE_XLIB
-            value: "ON"
-            linux_only: "true"
-          - option: SLANG_ENABLE_SLANG_RHI
-            # GFX, examples, and tests all require slang-rhi; disable them when off.
-            extra_cmake_flags: >-
-              -DSLANG_ENABLE_GFX=OFF
-              -DSLANG_ENABLE_EXAMPLES=OFF
-              -DSLANG_ENABLE_TESTS=OFF
-
-          # Non-boolean: default is SHARED, always test STATIC.
-          - option: SLANG_LIB_TYPE
-            value: "STATIC"
-
-          # System library options are linux_only because they require apt packages.
-          # TODO: these currently fail because the Ubuntu apt packages for lz4, vulkan-headers,
-          # spirv-headers, and glslang do not ship cmake config files, so find_package()
-          # (config mode) cannot locate them. Re-enable once CMakeLists.txt adds a
-          # pkg-config / find_library fallback for each of these options.
-          # - option: SLANG_USE_SYSTEM_LZ4
-          #   apt_packages: "liblz4-dev"
-          #   linux_only: "true"
-          # - option: SLANG_USE_SYSTEM_VULKAN_HEADERS
-          #   apt_packages: "libvulkan-dev"
-          #   linux_only: "true"
-          # - option: SLANG_USE_SYSTEM_SPIRV_HEADERS
-          #   apt_packages: "spirv-headers"
-          #   linux_only: "true"
-          # - option: SLANG_USE_SYSTEM_GLSLANG
-          #   apt_packages: "glslang-dev"
-          #   linux_only: "true"
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@v4

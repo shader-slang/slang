@@ -1,0 +1,126 @@
+name: CMake Options Build - Container (reusable)
+
+# Container-based variant of cmake-options-build.yml for Linux x86_64.
+# Uses the same GPU CI container as the main CI to keep tooling versions
+# (GCC, CMake, Ninja) consistent. Called from cmake-options.yml for the
+# linux-debug and linux-release jobs.
+#
+# The option list lives in .github/cmake-options-matrix.json (single source of
+# truth shared with cmake-options-build.yml).
+#
+# Linux-only by design: the container image is x86_64 Linux only.
+# macOS, Windows, and Linux aarch64 continue to use cmake-options-build.yml.
+
+on:
+  workflow_call:
+    inputs:
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+
+jobs:
+  # Read the shared option list once; downstream jobs use fromJSON on the output.
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/cmake-options-matrix.json
+          sparse-checkout-cone-mode: false
+      - id: set-matrix
+        run: |
+          {
+            echo "matrix<<MATRIX_EOF"
+            cat .github/cmake-options-matrix.json
+            echo "MATRIX_EOF"
+          } >> $GITHUB_OUTPUT
+
+  build:
+    needs: setup
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: read # Required to pull container from ghcr.io
+    container:
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
+      options: --user root -v /:/host_root
+
+    defaults:
+      run:
+        shell: bash
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+
+    steps:
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+
+      - name: Set environment variables
+        run: |
+          echo "CC=gcc" >> $GITHUB_ENV
+          echo "CXX=g++" >> $GITHUB_ENV
+          if [[ "${{ inputs.config }}" == "release" ]]; then
+            echo "cmake_config=Release" >> $GITHUB_ENV
+          else
+            echo "cmake_config=Debug" >> $GITHUB_ENV
+          fi
+
+      - name: Configure CMake (${{ matrix.option }})
+        run: |
+          option="${{ matrix.option }}"
+          value="${{ matrix.value }}"
+
+          # Options whose preset default varies by config use value_debug /
+          # value_release instead of a single value field.
+          if [[ -z "$value" && "${{ inputs.config }}" == "debug" && -n "${{ matrix.value_debug }}" ]]; then
+            value="${{ matrix.value_debug }}"
+          elif [[ -z "$value" && "${{ inputs.config }}" != "debug" && -n "${{ matrix.value_release }}" ]]; then
+            value="${{ matrix.value_release }}"
+          fi
+
+          # For boolean options (no explicit value in the matrix), query the
+          # current cmake default and test the opposite so the matrix stays
+          # in sync automatically when defaults change.
+          if [[ -z "$value" ]]; then
+            defaultVal=$(
+              cmake --preset default --fresh \
+                -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+                -DSLANG_USE_SCCACHE=OFF \
+                -LA 2>/dev/null \
+              | grep -E "^${option}:BOOL=" \
+              | sed 's/.*=//'
+            )
+            case "$defaultVal" in
+              ON) value=OFF ;;
+              OFF) value=ON ;;
+              *) echo "ERROR: could not detect boolean default for ${option} (got '${defaultVal}')"; exit 1 ;;
+            esac
+            echo "Detected default=${defaultVal}, testing ${option}=${value}"
+            rm -fr build
+          fi
+
+          # SLANG_USE_SCCACHE=OFF prevents the env-var auto-activation path in
+          # CMakeLists.txt from silently enabling sccache and polluting the
+          # shared cache with objects built under non-default CMake options.
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DSLANG_USE_SCCACHE=OFF \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+            "-D${option}=${value}" \
+            ${{ matrix.extra_cmake_flags || '' }}
+
+      - name: Build Slang (${{ matrix.option }})
+        run: cmake --build build --config "$cmake_config"
