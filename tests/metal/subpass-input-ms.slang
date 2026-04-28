@@ -3,7 +3,7 @@
 // Test that SubpassInputMS emits a warning on Metal and still compiles.
 
 // METAL-DAG: color(0)
-// METAL-DAG: warning 56105
+// METAL-DAG: warning[E56105]
 
 [[vk::input_attachment_index(0)]] SubpassInputMS<float4> inputMS;
 
