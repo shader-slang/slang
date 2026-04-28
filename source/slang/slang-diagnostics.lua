@@ -4965,6 +4965,13 @@ warning(
 )
 
 err(
+    "subpass-input-used-outside-entry-point",
+    56107,
+    "SubpassInput used outside of the fragment entry point function",
+    span { loc = "location", message = "SubpassInput globals must only be referenced from within the fragment entry point after inlining." }
+)
+
+err(
     "storage-texture-access-mode-not-supported-in-wgsl",
     56106,
     "texture format '~format' does not support '~accessMode' access for storage textures in WGSL",
