@@ -4012,6 +4012,13 @@ err(
     span { loc = "location", message = "type '~type:Type' cannot be used as ~direction ~context of entry point '~entryPoint:Name' when targeting ~target because ~reason" }
 )
 
+warning(
+    "vertex-shader-missing-sv-position",
+    38052,
+    "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic",
+    span { loc = "location", message = "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic; the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output, or suppress with -warnings-disable 38052)" }
+)
+
 --
 -- 382xx: module imports
 --
