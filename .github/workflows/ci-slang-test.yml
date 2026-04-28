@@ -54,6 +54,11 @@ on:
         type: string
         default: ""
         description: "Optional artifact name for captured slang-test output and summary"
+      collect-core-dumps:
+        required: false
+        type: boolean
+        default: false
+        description: "Collect Linux core dumps into the test artifact; intended for explicit stress/debug workflows"
 
 jobs:
   test-slang:
@@ -76,7 +81,7 @@ jobs:
           artifact-suffix: ${{ inputs.artifact-suffix }}
 
       - name: Configure core dumps
-        if: ${{ inputs.test-log-artifact != '' && inputs.os == 'linux' }}
+        if: ${{ inputs.test-log-artifact != '' && inputs.collect-core-dumps && inputs.os == 'linux' }}
         run: |
           mkdir -p "${RUNNER_TEMP}/cores"
           chmod 700 "${RUNNER_TEMP}/cores"
@@ -158,12 +163,17 @@ jobs:
           # this reusable workflow to capture the output without changing the
           # command line that normal CI runs.
           if [[ -n "${{ inputs.test-log-artifact }}" ]]; then
-            if [[ "${{ inputs.os }}" == "linux" ]]; then
+            if [[ "${{ inputs.collect-core-dumps }}" == "true" && "${{ inputs.os }}" == "linux" ]]; then
               ulimit -c unlimited || true
               echo "core_ulimit_for_test=$(ulimit -c || true)"
             fi
             set +e
-            "$bin_dir/slang-test" "${slang_test_args[@]}" 2>&1 | tee "${RUNNER_TEMP}/slang-test.log"
+            env \
+              -u ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+              -u ACTIONS_RUNTIME_TOKEN \
+              -u GH_TOKEN \
+              -u GITHUB_TOKEN \
+              "$bin_dir/slang-test" "${slang_test_args[@]}" 2>&1 | tee "${RUNNER_TEMP}/slang-test.log"
             slang_test_exit=${PIPESTATUS[0]}
             set -e
             exit "$slang_test_exit"
@@ -188,28 +198,22 @@ jobs:
           cp "${RUNNER_TEMP}/slang-test.log" "$artifact_dir/" 2>/dev/null || true
           cp "${RUNNER_TEMP}/slang-test-summary.json" "$artifact_dir/" 2>/dev/null || true
 
-          {
-            echo "runner_name=${RUNNER_NAME:-unknown}"
-            echo "runner_os=${RUNNER_OS:-unknown}"
-            echo "runner_arch=${RUNNER_ARCH:-unknown}"
-            echo "core_pattern=$(cat /proc/sys/kernel/core_pattern 2>/dev/null || true)"
-            echo "core_ulimit_after_test=$(ulimit -c || true)"
-          } > "$artifact_dir/core-dump-environment.txt"
+          if [[ "${{ inputs.collect-core-dumps }}" == "true" && "${{ inputs.os }}" == "linux" ]]; then
+            {
+              echo "runner_name=${RUNNER_NAME:-unknown}"
+              echo "runner_os=${RUNNER_OS:-unknown}"
+              echo "runner_arch=${RUNNER_ARCH:-unknown}"
+              echo "core_pattern=$(cat /proc/sys/kernel/core_pattern 2>/dev/null || true)"
+              echo "core_ulimit_after_test=$(ulimit -c || true)"
+            } > "$artifact_dir/core-dump-environment.txt"
 
-          core_list="$artifact_dir/core-files.txt"
-          : > "$core_list"
+            core_list="$artifact_dir/core-files.txt"
+            : > "$core_list"
 
-          if [[ "${{ inputs.os }}" == "linux" ]]; then
-            for core_dir in "${RUNNER_TEMP}/cores" "$PWD" /var/lib/systemd/coredump; do
-              if [[ ! -d "$core_dir" ]]; then
-                continue
-              fi
-              if [[ "$core_dir" == "/var/lib/systemd/coredump" ]]; then
-                sudo find "$core_dir" -maxdepth 1 -type f -size +0c -print >> "$core_list" 2>/dev/null || true
-              else
-                find "$core_dir" -maxdepth 3 -type f \( -name 'core' -o -name 'core.*' -o -name '*.core' \) -size +0c -print >> "$core_list" 2>/dev/null || true
-              fi
-            done
+            core_dir="${RUNNER_TEMP}/cores"
+            if [[ -d "$core_dir" ]]; then
+              find "$core_dir" -maxdepth 3 -type f \( -name 'core' -o -name 'core.*' -o -name '*.core' \) -size +0c -print >> "$core_list" 2>/dev/null || true
+            fi
             sort -u "$core_list" -o "$core_list"
 
             if [[ -s "$core_list" ]]; then
@@ -217,11 +221,13 @@ jobs:
               mkdir -p "$core_stage"
               while IFS= read -r core_file; do
                 core_name="$(basename "$core_file")"
-                cp "$core_file" "$core_stage/$core_name" 2>/dev/null || sudo cp "$core_file" "$core_stage/$core_name" || true
-                sudo chown "$USER" "$core_stage/$core_name" 2>/dev/null || true
+                core_hash="$(printf '%s' "$core_file" | sha256sum | cut -d' ' -f1)"
+                staged_core="$core_stage/${core_hash}-${core_name}"
+                cp "$core_file" "$staged_core" 2>/dev/null || sudo cp "$core_file" "$staged_core" || true
+                sudo chown "$USER" "$staged_core" 2>/dev/null || true
               done < "$core_list"
 
-              if find "$core_stage" -type f -size +0c -print -quit | grep -q .; then
+              if [[ -n "$(find "$core_stage" -type f -size +0c -print -quit)" ]]; then
                 tar -czf "$artifact_dir/core-files.tar.gz" -C "$core_stage" .
                 rm -rf "$core_stage"
               fi

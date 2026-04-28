@@ -56,3 +56,4 @@ jobs:
       cpu-only: true
       server-count: ${{ inputs.server-count }}
       test-log-artifact: cpu-stress-${{ inputs.config }}-server${{ inputs.server-count }}-${{ matrix.iteration }}
+      collect-core-dumps: true
