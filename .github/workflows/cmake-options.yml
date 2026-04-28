@@ -21,20 +21,14 @@ concurrency:
 
 jobs:
   linux-debug:
-    uses: ./.github/workflows/cmake-options-build.yml
+    uses: ./.github/workflows/cmake-options-build-container.yml
     with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
       config: debug
       runs-on: '["ubuntu-22.04"]'
 
   linux-release:
-    uses: ./.github/workflows/cmake-options-build.yml
+    uses: ./.github/workflows/cmake-options-build-container.yml
     with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
       config: release
       runs-on: '["ubuntu-22.04"]'
 
