@@ -61,6 +61,10 @@ struct ResourceTypeLoweringContext : InstPassBase
         codeGenContext->getTargetProgram();
 
         IRType* loweredType = nullptr;
+        AccessQualifier access = AccessQualifier::Read;
+        if (type->getOp() == kIROp_HLSLRWByteAddressBufferType || type->getOp() == kIROp_HLSLRWStructuredBufferType)
+            access = AccessQualifier::ReadWrite;
+
         switch (type->getOp())
         {
         case kIROp_ConstantBufferType:
@@ -70,7 +74,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                     getTypeLayoutTypeForBuffer(codeGenContext->getTargetProgram(), builder, type);
                 loweredType = builder.getPtrType(
                     as<IRType>(type->getOperand(0)),
-                    AccessQualifier::ReadWrite,
+                    access,
                     AddressSpace::Generic,
                     layoutType);
             }
@@ -87,7 +91,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto sizeKey = builder.createStructKey();
                 auto ptrType = builder.getPtrType(
                     bufferType->getElementType(),
-                    AccessQualifier::ReadWrite,
+                    access,
                     AddressSpace::Generic,
                     layoutType);
                 builder.createStructField(s, ptrKey, ptrType);
@@ -106,7 +110,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto sizeKey = builder.createStructKey();
                 auto ptrType = builder.getPtrType(
                     builder.getUInt8Type(),
-                    AccessQualifier::ReadWrite,
+                    access,
                     AddressSpace::Generic,
                     layoutType);
                 builder.createStructField(s, ptrKey, ptrType);
@@ -186,7 +190,8 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto ptr = getBufferPtr(builder, base);
                 auto untypedPtrType = as<IRPtrTypeBase>(ptr->getDataType());
                 auto offsetPtr = builder.emitGetOffsetPtr(ptr, index);
-                auto ptrType = builder.getPtrTypeWithAddressSpace(inst->getDataType(), untypedPtrType);
+                auto ptrType =
+                    builder.getPtrTypeWithAddressSpace(inst->getDataType(), untypedPtrType);
 
                 // This may seem risky in terms of alignment. However, with the
                 // LLVM CPU targets, we rely on the `legalizeByteAddressBufferOps`
@@ -194,8 +199,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                 // ops we see in this pass only occur on 4-byte aligned types.
                 // Conveniently, they can't be misaligned due to ByteAddressBuffers
                 // imposing an alignment of 4 on all accesses.
-                auto typedPtr =
-                    builder.emitCast(ptrType, offsetPtr);
+                auto typedPtr = builder.emitCast(ptrType, offsetPtr);
                 loweredInst = builder.emitLoad(inst->getDataType(), typedPtr);
             }
             break;
@@ -208,7 +212,8 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto ptr = getBufferPtr(builder, base);
                 auto untypedPtrType = as<IRPtrTypeBase>(ptr->getDataType());
                 auto offsetPtr = builder.emitGetOffsetPtr(ptr, index);
-                auto ptrType = builder.getPtrTypeWithAddressSpace(val->getDataType(), untypedPtrType);
+                auto ptrType =
+                    builder.getPtrTypeWithAddressSpace(val->getDataType(), untypedPtrType);
                 auto typedPtr = builder.emitCast(ptrType, offsetPtr);
                 loweredInst = builder.emitStore(typedPtr, val);
             }
@@ -235,7 +240,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                 loweredInst = builder.emitMakeVector(
                     inst->getDataType(),
                     {builder.emitCast(uintType, size),
-                     builder.getIntValue(sizeAlignment.getStride())});
+                     builder.getIntValue(uintType, sizeAlignment.getStride())});
             }
             break;
 
@@ -261,9 +266,9 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto bytes = getBufferSize(builder, byteBuffer);
 
                 auto size = builder.emitDiv(
-                    builder.getIntPtrType(),
+                    bytes->getDataType(),
                     bytes,
-                    builder.getIntValue(builder.getIntPtrType(), sizeAlignment.getStride()));
+                    builder.getIntValue(bytes->getDataType(), sizeAlignment.getStride()));
 
                 loweredInst =
                     builder.emitMakeStruct(structType, {builder.emitCast(ptrType, ptr), size});
