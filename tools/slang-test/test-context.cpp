@@ -322,7 +322,10 @@ void TestContext::drainTestServerStderr(Index threadIndex)
     List<uint8_t> buffer;
     buffer.setCount(4096);
 
-    while (!stderrStream->isEnd())
+    static const size_t kMaxDrainBytes = 16 * 1024 * 1024;
+    size_t totalDrained = 0;
+
+    while (!stderrStream->isEnd() && totalDrained < kMaxDrainBytes)
     {
         size_t bytesRead = 0;
         SlangResult res = stderrStream->read(buffer.getBuffer(), buffer.getCount(), bytesRead);
@@ -332,6 +335,16 @@ void TestContext::drainTestServerStderr(Index threadIndex)
 
         // Write to our stderr
         fwrite(buffer.getBuffer(), 1, bytesRead, stderr);
+        totalDrained += bytesRead;
+    }
+
+    if (totalDrained >= kMaxDrainBytes)
+    {
+        fprintf(
+            stderr,
+            "[TEST-SERVER] stderr drain limit reached after %zu bytes; remaining diagnostics may "
+            "be forwarded on a later drain\n",
+            totalDrained);
     }
     fflush(stderr);
 }

@@ -4,6 +4,7 @@
 #include "../../source/compiler-core/slang-json-parser.h"
 #include "../../source/compiler-core/slang-test-server-protocol.h"
 #include "../../source/core/slang-rtti-info.h"
+#include "../../source/core/slang-test-diagnostics.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -239,6 +240,14 @@ static SlangResult _checkStructFields(
 // break protocol compatibility.
 static SlangResult _checkProtocolCompatibility()
 {
+    struct ExpectedExecuteUnitTestArgsLayout
+    {
+        String moduleName;
+        String testName;
+        uint32_t enabledApis;
+        bool enableDebugLayers;
+    };
+
     struct ExpectedExecuteToolTestArgsLayout
     {
         String toolName;
@@ -254,6 +263,16 @@ static SlangResult _checkProtocolCompatibility()
         int32_t returnCode;
     };
 
+    struct ExpectedQuitArgsLayout
+    {
+    };
+
+    SLANG_CHECK(
+        sizeof(TestServerProtocol::ExecuteUnitTestArgs) ==
+        sizeof(ExpectedExecuteUnitTestArgsLayout));
+    SLANG_CHECK(
+        alignof(TestServerProtocol::ExecuteUnitTestArgs) ==
+        alignof(ExpectedExecuteUnitTestArgsLayout));
     SLANG_CHECK(
         sizeof(TestServerProtocol::ExecuteToolTestArgs) ==
         sizeof(ExpectedExecuteToolTestArgsLayout));
@@ -264,6 +283,25 @@ static SlangResult _checkProtocolCompatibility()
         sizeof(TestServerProtocol::ExecutionResult) == sizeof(ExpectedExecutionResultLayout));
     SLANG_CHECK(
         alignof(TestServerProtocol::ExecutionResult) == alignof(ExpectedExecutionResultLayout));
+    SLANG_CHECK(sizeof(TestServerProtocol::QuitArgs) == sizeof(ExpectedQuitArgsLayout));
+    SLANG_CHECK(alignof(TestServerProtocol::QuitArgs) == alignof(ExpectedQuitArgsLayout));
+
+    SLANG_CHECK(String(TestServerProtocol::ExecuteUnitTestArgs::g_methodName) == "unitTest");
+    SLANG_CHECK(String(TestServerProtocol::ExecuteToolTestArgs::g_methodName) == "tool");
+    SLANG_CHECK(String(TestServerProtocol::QuitArgs::g_methodName) == "quit");
+
+    static const ExpectedStructField executeUnitFields[] = {
+        {"moduleName", uint32_t(offsetof(ExpectedExecuteUnitTestArgsLayout, moduleName)), 0},
+        {"testName", uint32_t(offsetof(ExpectedExecuteUnitTestArgsLayout, testName)), 0},
+        {"enabledApis", uint32_t(offsetof(ExpectedExecuteUnitTestArgsLayout, enabledApis)), 0},
+        {"enableDebugLayers",
+         uint32_t(offsetof(ExpectedExecuteUnitTestArgsLayout, enableDebugLayers)),
+         0},
+    };
+    SLANG_RETURN_ON_FAIL(_checkStructFields(
+        TestServerProtocol::ExecuteUnitTestArgs::g_rttiInfo,
+        executeUnitFields,
+        SLANG_COUNT_OF(executeUnitFields)));
 
     static const ExpectedStructField executeToolFields[] = {
         {"toolName", uint32_t(offsetof(ExpectedExecuteToolTestArgsLayout, toolName)), 0},
@@ -292,6 +330,42 @@ static SlangResult _checkProtocolCompatibility()
 SLANG_UNIT_TEST(TestServerProtocolCompatibility)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_checkProtocolCompatibility()));
+}
+
+SLANG_UNIT_TEST(TestDiagnosticConfigParsing)
+{
+    {
+        const TestDiagnosticConfig config =
+            parseTestDiagnosticConfig(UnownedStringSlice::fromLiteral(""));
+        SLANG_CHECK(!config.all);
+        SLANG_CHECK(!config.timing);
+        SLANG_CHECK(!config.timingPhases);
+        SLANG_CHECK(!config.rpc);
+        SLANG_CHECK(!config.fd);
+        SLANG_CHECK(!config.pipe);
+    }
+
+    {
+        const TestDiagnosticConfig config =
+            parseTestDiagnosticConfig(UnownedStringSlice::fromLiteral(" timing-phases, RPC ,fd "));
+        SLANG_CHECK(!config.all);
+        SLANG_CHECK(config.timing);
+        SLANG_CHECK(config.timingPhases);
+        SLANG_CHECK(config.rpc);
+        SLANG_CHECK(config.fd);
+        SLANG_CHECK(!config.pipe);
+    }
+
+    {
+        const TestDiagnosticConfig config =
+            parseTestDiagnosticConfig(UnownedStringSlice::fromLiteral("pipe,unknown,1"));
+        SLANG_CHECK(config.all);
+        SLANG_CHECK(!config.timing);
+        SLANG_CHECK(!config.timingPhases);
+        SLANG_CHECK(!config.rpc);
+        SLANG_CHECK(!config.fd);
+        SLANG_CHECK(config.pipe);
+    }
 }
 
 // Test that array-style JSON-RPC works with Optional fields (backward compatibility).

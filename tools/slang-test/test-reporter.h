@@ -150,6 +150,7 @@ public:
 
 protected:
     void _addResult(TestInfo info);
+    void _outputTimingSummary();
 
     Slang::StringBuilder m_currentMessage;
     TestInfo m_currentInfo;

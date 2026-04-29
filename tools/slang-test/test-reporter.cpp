@@ -196,6 +196,92 @@ void TestReporter::addExecutionTime(double time)
     m_currentInfo.executionTime = time;
 }
 
+void TestReporter::_outputTimingSummary()
+{
+    if (!m_totalTestCount)
+        return;
+
+    double totalTimeMs = 0.0;
+    double passedTimeMs = 0.0;
+    double failedTimeMs = 0.0;
+    double ignoredTimeMs = 0.0;
+    double expectedFailTimeMs = 0.0;
+    int executedTestCount = 0;
+
+    for (const auto& testInfo : m_testInfos)
+    {
+        double timeMs = testInfo.executionTime * 1000.0;
+        totalTimeMs += timeMs;
+        if (testInfo.testResult != TestResult::Ignored)
+        {
+            executedTestCount++;
+        }
+        switch (testInfo.testResult)
+        {
+        case TestResult::Pass:
+            passedTimeMs += timeMs;
+            break;
+        case TestResult::Fail:
+            failedTimeMs += timeMs;
+            break;
+        case TestResult::Ignored:
+            ignoredTimeMs += timeMs;
+            break;
+        case TestResult::ExpectedFail:
+            expectedFailTimeMs += timeMs;
+            break;
+        default:
+            break;
+        }
+    }
+
+    fprintf(stderr, "\n[TIMING-SUMMARY] Test Execution Timing\n");
+    fprintf(stderr, "%-20s %8s %12s %12s\n", "Category", "Count", "Total(ms)", "Avg(ms)");
+    fprintf(stderr, "--------------------------------------------------------\n");
+    fprintf(
+        stderr,
+        "%-20s %8d %12.3f %12.3f\n",
+        "Executed tests",
+        executedTestCount,
+        totalTimeMs,
+        executedTestCount > 0 ? totalTimeMs / executedTestCount : 0.0);
+    fprintf(
+        stderr,
+        "%-20s %8d %12.3f %12.3f\n",
+        "Passed",
+        m_passedTestCount,
+        passedTimeMs,
+        m_passedTestCount > 0 ? passedTimeMs / m_passedTestCount : 0.0);
+    fprintf(
+        stderr,
+        "%-20s %8d %12.3f %12.3f\n",
+        "Failed",
+        m_failedTestCount,
+        failedTimeMs,
+        m_failedTestCount > 0 ? failedTimeMs / m_failedTestCount : 0.0);
+    if (m_expectedFailedTestCount > 0)
+    {
+        fprintf(
+            stderr,
+            "%-20s %8d %12.3f %12.3f\n",
+            "Expected failures",
+            m_expectedFailedTestCount,
+            expectedFailTimeMs,
+            m_expectedFailedTestCount > 0 ? expectedFailTimeMs / m_expectedFailedTestCount : 0.0);
+    }
+    if (m_ignoredTestCount > 0)
+    {
+        fprintf(
+            stderr,
+            "%-20s %8d %12.3f %12.3f\n",
+            "Ignored",
+            m_ignoredTestCount,
+            ignoredTimeMs,
+            m_ignoredTestCount > 0 ? ignoredTimeMs / m_ignoredTestCount : 0.0);
+    }
+    fprintf(stderr, "\n");
+}
+
 void TestReporter::addResultWithLocation(
     TestResult result,
     const char* testText,
@@ -748,87 +834,6 @@ void TestReporter::outputSummary()
                 printf("---\n");
             }
 
-            // Print timing summary if timing diagnostics are enabled
-            if (isDiagnosticEnabled("timing"))
-            {
-                double totalTimeMs = 0.0;
-                double passedTimeMs = 0.0;
-                double failedTimeMs = 0.0;
-                double ignoredTimeMs = 0.0;
-                double expectedFailTimeMs = 0.0;
-                int executedTestCount = 0;
-
-                for (const auto& testInfo : m_testInfos)
-                {
-                    double timeMs = testInfo.executionTime * 1000.0;
-                    totalTimeMs += timeMs;
-                    if (testInfo.testResult != TestResult::Ignored)
-                    {
-                        executedTestCount++;
-                    }
-                    switch (testInfo.testResult)
-                    {
-                    case TestResult::Pass:
-                        passedTimeMs += timeMs;
-                        break;
-                    case TestResult::Fail:
-                        failedTimeMs += timeMs;
-                        break;
-                    case TestResult::Ignored:
-                        ignoredTimeMs += timeMs;
-                        break;
-                    case TestResult::ExpectedFail:
-                        expectedFailTimeMs += timeMs;
-                        break;
-                    default:
-                        break;
-                    }
-                }
-
-                printf("\n[TIMING-SUMMARY] Test Execution Timing\n");
-                printf("%-20s %8s %12s %12s\n", "Category", "Count", "Total(ms)", "Avg(ms)");
-                printf("--------------------------------------------------------\n");
-                printf(
-                    "%-20s %8d %12.3f %12.3f\n",
-                    "Executed tests",
-                    executedTestCount,
-                    totalTimeMs,
-                    executedTestCount > 0 ? totalTimeMs / executedTestCount : 0.0);
-                printf(
-                    "%-20s %8d %12.3f %12.3f\n",
-                    "Passed",
-                    m_passedTestCount,
-                    passedTimeMs,
-                    m_passedTestCount > 0 ? passedTimeMs / m_passedTestCount : 0.0);
-                printf(
-                    "%-20s %8d %12.3f %12.3f\n",
-                    "Failed",
-                    m_failedTestCount,
-                    failedTimeMs,
-                    m_failedTestCount > 0 ? failedTimeMs / m_failedTestCount : 0.0);
-                if (m_expectedFailedTestCount > 0)
-                {
-                    printf(
-                        "%-20s %8d %12.3f %12.3f\n",
-                        "Expected failures",
-                        m_expectedFailedTestCount,
-                        expectedFailTimeMs,
-                        m_expectedFailedTestCount > 0
-                            ? expectedFailTimeMs / m_expectedFailedTestCount
-                            : 0.0);
-                }
-                if (m_ignoredTestCount > 0)
-                {
-                    printf(
-                        "%-20s %8d %12.3f %12.3f\n",
-                        "Ignored",
-                        m_ignoredTestCount,
-                        ignoredTimeMs,
-                        m_ignoredTestCount > 0 ? ignoredTimeMs / m_ignoredTestCount : 0.0);
-                }
-                printf("\n");
-            }
-
             break;
         }
 
@@ -906,6 +911,11 @@ void TestReporter::outputSummary()
             // Don't output a summary
             break;
         }
+    }
+
+    if (isDiagnosticEnabled("timing"))
+    {
+        _outputTimingSummary();
     }
 }
 

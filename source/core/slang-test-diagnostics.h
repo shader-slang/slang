@@ -26,55 +26,61 @@ struct TestDiagnosticConfig
     bool pipe = false;
 };
 
+inline TestDiagnosticConfig parseTestDiagnosticConfig(UnownedStringSlice diagnostics)
+{
+    TestDiagnosticConfig result;
+
+    List<UnownedStringSlice> categories;
+    StringUtil::split(diagnostics, ',', categories);
+
+    for (const auto& rawCategory : categories)
+    {
+        const UnownedStringSlice category = rawCategory.trim();
+        if (category.caseInsensitiveEquals(UnownedStringSlice("all")) ||
+            category.caseInsensitiveEquals(UnownedStringSlice("1")))
+        {
+            result.all = true;
+        }
+        else if (category.caseInsensitiveEquals(UnownedStringSlice("timing")))
+        {
+            result.timing = true;
+        }
+        else if (category.caseInsensitiveEquals(UnownedStringSlice("timing-phases")))
+        {
+            result.timing = true;
+            result.timingPhases = true;
+        }
+        else if (category.caseInsensitiveEquals(UnownedStringSlice("rpc")))
+        {
+            result.rpc = true;
+        }
+        else if (category.caseInsensitiveEquals(UnownedStringSlice("fd")))
+        {
+            result.fd = true;
+        }
+        else if (category.caseInsensitiveEquals(UnownedStringSlice("pipe")))
+        {
+            result.pipe = true;
+        }
+    }
+
+    return result;
+}
+
 inline const TestDiagnosticConfig& getTestDiagnosticConfig()
 {
     static TestDiagnosticConfig config = []() -> TestDiagnosticConfig
     {
-        TestDiagnosticConfig result;
         StringBuilder envValue;
         if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
                 UnownedStringSlice("SLANG_TEST_DIAGNOSTICS"),
                 envValue)))
         {
-            return result;
+            return TestDiagnosticConfig();
         }
 
         const String diagnostics = envValue.toString();
-        List<UnownedStringSlice> categories;
-        StringUtil::split(diagnostics.getUnownedSlice(), ',', categories);
-
-        for (const auto& rawCategory : categories)
-        {
-            const UnownedStringSlice category = rawCategory.trim();
-            if (category.caseInsensitiveEquals(UnownedStringSlice("all")) ||
-                category.caseInsensitiveEquals(UnownedStringSlice("1")))
-            {
-                result.all = true;
-            }
-            else if (category.caseInsensitiveEquals(UnownedStringSlice("timing")))
-            {
-                result.timing = true;
-            }
-            else if (category.caseInsensitiveEquals(UnownedStringSlice("timing-phases")))
-            {
-                result.timing = true;
-                result.timingPhases = true;
-            }
-            else if (category.caseInsensitiveEquals(UnownedStringSlice("rpc")))
-            {
-                result.rpc = true;
-            }
-            else if (category.caseInsensitiveEquals(UnownedStringSlice("fd")))
-            {
-                result.fd = true;
-            }
-            else if (category.caseInsensitiveEquals(UnownedStringSlice("pipe")))
-            {
-                result.pipe = true;
-            }
-        }
-
-        return result;
+        return parseTestDiagnosticConfig(diagnostics.getUnownedSlice());
     }();
     return config;
 }
