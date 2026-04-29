@@ -48,10 +48,20 @@ useful when the host needs the slot fixed before reflection runs
 (e.g. a pre-built D3D12 root signature):
 
 ```bash
+# Works end-to-end on every supported runtime backend (cpu/vulkan/d3d12/cuda).
 ./build/Debug/bin/shader-coverage-demo \
     --mode=dispatch --backend=vulkan \
+    --coverage-binding=7:0
+# → __slang_coverage lands at DescriptorSet 0, Binding 7
+# → "[coverage] binding pinned at (index=7, space=0) — round-trip verified"
+
+# Non-zero descriptor space (M ≠ 0) currently works on D3D12 only;
+# Vulkan and WebGPU skip cleanly until a slang-rhi follow-up lands
+# (see the "Non-zero descriptor space" caveat below).
+./build/Debug/bin/shader-coverage-demo \
+    --mode=dispatch --backend=d3d12 \
     --coverage-binding=7:3
-# → __slang_coverage lands at DescriptorSet 3, Binding 7
+# → __slang_coverage lands at register(u7, space3) in the D3D12 root signature
 # → "[coverage] binding pinned at (index=7, space=3) — round-trip verified"
 ```
 
@@ -149,9 +159,11 @@ start coverage-html\index.html
 `index.html` lists every source file with its per-file coverage
 percentage (sortable). Click through to a file to see each line
 color-coded: green for covered, red for uncovered, gray for
-non-executable. The demo's `simulate.slang` + `physics.slang`
-should show ~84.6% coverage with the unreachable "unknown type"
-branch flagged red — that's the dead-code-detection signal.
+non-executable. The unreachable "unknown type" branch in
+`simulate.slang` will be flagged red — that's the
+dead-code-detection signal the feature exists to surface; see
+[What the report shows](#what-the-report-shows-1) further down for
+how to read the per-line counts the demo produces.
 
 ## What the shader exercises
 
@@ -195,11 +207,11 @@ demo and open `coverage-html/index.html` to see the current values.
 
 | Backend | `--mode=compile` | `--mode=dispatch` |
 |---|---|---|
-| `cpu` | ✅ Works | ✅ **Fully working** — clean non-zero counter values, complete LCOV report, dead-code detection verified |
-| `vulkan` (incl. SPIR-V) | ✅ Works | ✅ **Fully working** for default and `--coverage-binding=N:0` — validated on macOS (MoltenVK) and desktop Windows with NVIDIA drivers; byte-identical LCOV to CPU. **Caveat:** `--coverage-binding=N:M` with `M != 0` is gated by a slang-rhi limitation (≤1 descriptor set per shader object); the demo refuses to dispatch in this case with a clear skip message. Tracked in shader-slang/slang#10959. |
-| `d3d12` | ✅ Works | ✅ **Fully working** including `--coverage-binding=N:M` with non-zero `M` — validated on desktop Windows. The Slang reflection fix on this branch unblocks the multi-space root-signature path; round-trip metadata + non-zero counter readback confirm end-to-end correctness. |
-| `cuda` | ✅ Works | ✅ **Fully working** — validated on desktop Windows with NVIDIA CUDA runtime; byte-identical LCOV to CPU/Vulkan/D3D12 |
-| `metal` | ✅ Works (with benign unused-variable warnings from Metal's compiler) | ⚠️ Pipeline builds; dispatch runs; but counter values are unreliable — most slots are zero while others show overflow-like values. **Not a coverage-feature issue** — a pre-existing slang-rhi Metal binding / initialization quirk. To be filed against slang-rhi. |
+| `cpu` | Supported | **Fully supported** — clean non-zero counter values, complete LCOV report, dead-code detection verified |
+| `vulkan` (incl. SPIR-V) | Supported | **Fully supported** for default and `--coverage-binding=N:0` — validated on macOS (MoltenVK) and desktop Windows with NVIDIA drivers; byte-identical LCOV to CPU. **Caveat:** `--coverage-binding=N:M` with `M != 0` is gated by a slang-rhi limitation (≤1 descriptor set per shader object); the demo refuses to dispatch in this case with a clear skip message. Tracked in shader-slang/slang#10959. |
+| `d3d12` | Supported | **Fully supported** including `--coverage-binding=N:M` with non-zero `M` — validated on desktop Windows. The Slang reflection fix on this branch unblocks the multi-space root-signature path; round-trip metadata + non-zero counter readback confirm end-to-end correctness. |
+| `cuda` | Supported | **Fully supported** — validated on desktop Windows with NVIDIA CUDA runtime; byte-identical LCOV to CPU/Vulkan/D3D12 |
+| `metal` | Supported (with benign unused-variable warnings from Metal's compiler) | Pipeline builds; dispatch runs; but counter values are unreliable — most slots are zero while others show overflow-like values. **Not a coverage-feature issue** — a pre-existing slang-rhi Metal binding / initialization quirk. Tracked at [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724). |
 
 ## SPIR-V integration (Vulkan, custom engines)
 
@@ -210,11 +222,11 @@ properties a Vulkan host needs:
 
 | Property | Verified in the generated SPIR-V |
 |---|---|
-| `spirv-val` spec compliance | ✅ Passes cleanly |
-| Native atomic instructions for counters | ✅ One `OpAtomicIAdd` per counter op |
-| Coverage buffer exposed in entry-point interface | ✅ `OpEntryPoint GLCompute %computeMain "main" %Params %particles %...InvocationID %__slang_coverage` |
-| Source-level debug info | ✅ `OpSource Slang 1` preserved (for debug tooling) |
-| Reflection visibility | ✅ `__slang_coverage` appears in `slangc -reflection-json` and resolves via standard `ShaderCursor["__slang_coverage"]` |
+| `spirv-val` spec compliance | Passes cleanly |
+| Native atomic instructions for counters | One `OpAtomicIAdd` per counter op |
+| Coverage buffer exposed in entry-point interface | `OpEntryPoint GLCompute %computeMain "main" %Params %particles %...InvocationID %__slang_coverage` |
+| Source-level debug info | `OpSource Slang 1` preserved (for debug tooling) |
+| Reflection visibility | `__slang_coverage` appears in `slangc -reflection-json` and resolves via standard `ShaderCursor["__slang_coverage"]` |
 
 ### For engines that don't use slang-rhi
 

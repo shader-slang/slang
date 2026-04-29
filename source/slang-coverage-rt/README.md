@@ -116,6 +116,18 @@ be reserved for future use. Unknown keys are ignored, so forward
 compatibility with v1 consumers is preserved across manifest
 additions.
 
+**Runtime status of non-zero `space`.** The compiler writes the
+user-requested `space` value into the JSON correctly regardless of
+its value, so the manifest itself is always accurate. At dispatch
+time, however, only D3D12 currently honors non-zero `space` values
+end-to-end via slang-rhi; Vulkan and WebGPU remain pending a
+slang-rhi follow-up that adds multi-descriptor-set support to the
+binding-data builder. Tracked at
+[shader-slang/slang#10959](https://github.com/shader-slang/slang/issues/10959).
+For consumers that read the sidecar without dispatching themselves
+(LCOV converters, CI scripts), the `space` field is reliable
+unconditionally.
+
 ---
 
 ## Error codes
@@ -131,6 +143,36 @@ codes are listed below for matching against expected error paths.
 | `SLANG_E_NOT_FOUND` | Manifest path does not exist. |
 | `SLANG_E_CANNOT_OPEN` | Manifest read or LCOV write failed (file existed but I/O failed). |
 | `SLANG_FAIL` | Manifest is not well-formed v1 JSON, or declares an unsupported `version`. |
+
+### Migration from the 2026-04-24 preview
+
+The previous preview's API used a custom `SlangCoverageResult`
+enum with codes like `SLANG_COVERAGE_OK`. As of this preview, all
+functions return `SlangResult` (matching the rest of the Slang C
+API), error codes map to existing `SLANG_E_*` constants, and
+`SlangCoverageBindingInfo` gained a leading `size_t structSize`
+field for ABI-versioned struct growth (populated by
+`slang_coverage_binding`).
+
+If your existing host code compiles against the new headers and
+fails with errors like `'SLANG_COVERAGE_OK' was not declared`,
+replace per the table below — or switch to `SLANG_FAILED(r)` for a
+uniform failure check.
+
+| Old code                                   | New code              |
+|---|---|
+| `SLANG_COVERAGE_OK`                        | `SLANG_OK`            |
+| `SLANG_COVERAGE_ERROR_INVALID_ARGUMENT`    | `SLANG_E_INVALID_ARG` |
+| `SLANG_COVERAGE_ERROR_FILE_NOT_FOUND`      | `SLANG_E_NOT_FOUND`   |
+| `SLANG_COVERAGE_ERROR_IO_FAILED`           | `SLANG_E_CANNOT_OPEN` |
+| `SLANG_COVERAGE_ERROR_PARSE_FAILED`        | `SLANG_FAIL`          |
+| `SLANG_COVERAGE_ERROR_UNSUPPORTED_VERSION` | `SLANG_FAIL`          |
+| `SLANG_COVERAGE_ERROR_OUT_OF_RANGE`        | `SLANG_E_INVALID_ARG` |
+
+`slang_coverage_accumulate` also tightened its `count` check: it
+now requires exactly `slang_coverage_counter_count(ctx)` values
+(previously a short snapshot was silently accepted). Pass-through
+callers that always passed the correct size aren't affected.
 
 ---
 
