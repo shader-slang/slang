@@ -1425,7 +1425,6 @@ static SlangResult _extractRenderTestRequirements(
     }
 
     // The native language for the API
-    SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
     SlangCompileTarget target = SLANG_TARGET_NONE;
     SlangPassThrough passThru = SLANG_PASS_THROUGH_NONE;
 
@@ -1433,12 +1432,10 @@ static SlangResult _extractRenderTestRequirements(
     {
     case RenderApiType::D3D11:
         target = SLANG_DXBC;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
         passThru = SLANG_PASS_THROUGH_FXC;
         break;
     case RenderApiType::D3D12:
         target = SLANG_DXIL;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
         passThru = SLANG_PASS_THROUGH_DXC;
         if (useDxbc)
         {
@@ -1448,40 +1445,32 @@ static SlangResult _extractRenderTestRequirements(
         break;
     case RenderApiType::Vulkan:
         target = SLANG_SPIRV;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
         passThru = SLANG_PASS_THROUGH_GLSLANG;
         break;
     case RenderApiType::Metal:
         target = SLANG_METAL_LIB;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_METAL;
         passThru = SLANG_PASS_THROUGH_METAL;
         break;
     case RenderApiType::CPU:
         target = SLANG_SHADER_HOST_CALLABLE;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
         passThru = SLANG_PASS_THROUGH_GENERIC_C_CPP;
         break;
     case RenderApiType::CUDA:
         target = SLANG_PTX;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_CUDA;
         passThru = SLANG_PASS_THROUGH_NVRTC;
         break;
     case RenderApiType::WebGPU:
         target = SLANG_WGSL;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_WGSL;
         passThru = SLANG_PASS_THROUGH_TINT;
         break;
     case RenderApiType::LLVM:
         target = SLANG_SHADER_HOST_CALLABLE;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_LLVM;
         passThru = SLANG_PASS_THROUGH_NONE;
         break;
     }
 
-    SlangSourceLanguage sourceLanguage = nativeLanguage;
     if (!usePassthru)
     {
-        sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
         passThru = SLANG_PASS_THROUGH_NONE;
     }
 

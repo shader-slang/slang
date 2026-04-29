@@ -69,6 +69,26 @@ cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
 
 **Run `./extras/formatting.sh` before committing changes.** PRs must conform to the project's coding style. Use `./extras/formatting.sh --check-only` to verify without modifying files.
 
+### Suppressing Unused Variable Warnings
+
+When a variable declared in an `if` condition is unused inside the body (the condition exists only for its type-check side-effect), use the **C++17 if-init-statement** pattern instead of `SLANG_UNUSED`:
+
+```cpp
+// Preferred: C++17 if-init pattern
+if (auto foo = as<IRFoo>(inst); foo)
+{
+    // foo not needed in body — the type check is the point
+}
+
+// Avoid: SLANG_UNUSED inside the body
+if (auto foo = as<IRFoo>(inst))
+{
+    SLANG_UNUSED(foo);
+}
+```
+
+For variables that are set but never read outside an `if` (e.g., a plain local variable), use `SLANG_UNUSED(var)` with a comment explaining why.
+
 ### PR Workflow
 
 1. **Format your code**: Run `./extras/formatting.sh` before committing

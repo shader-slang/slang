@@ -1312,7 +1312,7 @@ IRBlock* IRInsertLoc::getBlock() const
 IRInst* IRInsertLoc::getFunc() const
 {
     auto pp = getParent();
-    if (const auto block = as<IRBlock>(pp))
+    if (const auto block = as<IRBlock>(pp); block)
     {
         pp = pp->getParent();
     }
