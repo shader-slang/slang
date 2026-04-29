@@ -17,11 +17,26 @@ inline void* alignedAllocate(size_t size, size_t alignment)
 #if SLANG_WINDOWS_FAMILY
     return _aligned_malloc(size, alignment);
 #elif defined(__CYGWIN__)
-    return aligned_alloc(alignment, size);
+    // On POSIX, aligned_alloc & posix_memalign require a minimum alignment of
+    // sizeof(void*). malloc is required to have a minimum alignment of
+    // alignof(max_align_t) >= sizeof(void*), so we can just use malloc if
+    // the requested alignment is low enough.
+    if (alignment < alignof(max_align_t))
+        return malloc(size);
+    else
+    {
+        size_t roundedSize = (size + alignment-1)&~(alignment-1);
+        return aligned_alloc(alignment, roundedSize);
+    }
 #else
-    void* rs = nullptr;
-    int succ = posix_memalign(&rs, alignment, size);
-    return (succ == 0) ? rs : nullptr;
+    if (alignment < alignof(max_align_t))
+        return malloc(size);
+    else
+    {
+        void* rs = nullptr;
+        int succ = posix_memalign(&rs, alignment, size);
+        return (succ == 0) ? rs : nullptr;
+    }
 #endif
 }
 

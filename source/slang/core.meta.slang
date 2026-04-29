@@ -1614,6 +1614,391 @@ __intrinsic_op($(kIROp_Eql))
 bool operator ==($(fullPtrType) p1, $(fullPtrType) p2);
 
 //@public:
+/// Describes the kinds of errors thrown by `IAllocator` when a memory
+/// allocation fails.
+public enum MemoryAllocationError
+{
+    /// An allocation of the given size is not possible. Note that this does not
+    /// mean that a later allocation may not succeed - a gigabyte-sized
+    /// allocation can cause this error while a later megabyte-sized allocation
+    /// can still succeed.
+    OutOfMemory = 0,
+
+    /// The required alignment is not achievable with this allocator. Note that
+    /// there is no such thing as `AlignmentIsTooSmall` - the allocator can
+    /// always return addresses with a larger alignment than was requested.
+    AlignmentIsTooLarge = 1
+}
+
+/// Defines the interface for memory allocators.
+///
+/// As an implementor of a memory allocator, the minimum you need to implement
+/// is `allocate`, everything else has a technically valid default
+/// implementation. It's also good to implement `free` or `close` to allow
+/// the user some way of deallocating memory. The default implementations assume
+/// that `nullptr` is a valid pointer, which may or may not be true depending on
+/// your address space and allocator.
+///
+/// @param addrSpace The address space of pointers which the allocator operates with
+interface IAllocator<AddressSpace addrSpace>
+{
+    /// Allocates a segment of memory which is large enough to store `T[count]`
+    /// in the given layout L.
+    /// @param T The type of data to allocate
+    /// @param L (Optional) An explicit data layout to use for the resulting
+    /// pointer.
+    /// @param count Number of `T` to allocate.
+    /// @return pointer to at least enough memory to store `T[count]`
+    /// @throws MemoryAllocationError
+    ///
+    /// @remarks It is undefined behavior if count * sizeof(T, L) > size_t.maxValue.
+    ///
+    /// @remarks It is valid for `count` to be zero, but there is no guarantee
+    /// that the returned pointer would be unique.
+    [mutating]
+    Ptr<T, Access.ReadWrite, addrSpace, L>
+        allocate<T, L:IBufferDataLayout = DefaultDataLayout>(size_t count) throws MemoryAllocationError;
+
+    /// Allocates a segment of memory with at least the given alignment. The
+    /// resulting pointer must only be freed using `alignedFree()`, not the
+    /// normal `free()`, and it also must not be used with `reallocate()`.
+    ///
+    /// @param bytes Number of bytes to allocate.
+    /// @param alignment The desired alignment for the returned pointer.
+    /// @return pointer to at least enough memory to store the given number of
+    /// bytes that is also aligned as requested.
+    /// @throws MemoryAllocationError Can run out of memory or reject given
+    /// alignment depending on allocator.
+    ///
+    /// @remarks the regular `allocate()` already returns pointers aligned
+    /// correctly for `T`, so this function only needs to be used in very
+    /// specific circumstances where e.g. cache line or page alignment is
+    /// required.
+    ///
+    /// @remarks It is valid for `bytes` to be zero, but there is no guarantee
+    /// that the returned pointer would be unique.
+    [mutating]
+    Ptr<void, Access.ReadWrite, addrSpace>
+        alignedAllocate(size_t bytes, uint alignment) throws MemoryAllocationError
+    {
+        size_t allocCount = __alignedAllocPtrLength<addrSpace>(bytes, alignment);
+        let unalignedPtr = try allocate<Ptr<void, Access.ReadWrite, addrSpace>, DefaultDataLayout>(allocCount);
+        return __finalizeAlignedAlloc<addrSpace>(
+            reinterpret<Ptr<void, Access.ReadWrite, addrSpace>>(unalignedPtr),
+            alignment);
+    }
+
+    /// Returns a pointer to a memory allocation that is large enough to store
+    /// `T[newCount]` and is initialized with the first
+    /// `min(oldCount, newCount)` entries from `oldPtr`.
+    ///
+    /// `oldPtr` must have been allocated by this allocator instance using
+    /// `allocate<T>()` or `reallocate<T>()`, where the `oldCount` parameter is
+    /// smaller than or equal to `count` or `newCount` used to allocate the
+    /// memory. It is undefined behavior to call this function with a pointer
+    /// that was not allocated with `allocate` or `reallocate`, even if it is
+    /// nullptr.
+    ///
+    /// The returned pointer is either `oldPtr` if the existing allocation was
+    /// extended, or a new pointer to a new allocation. Either way, you must not
+    /// manually call `free(oldPtr)` after calling this function.
+    ///
+    /// @param oldPtr Pointer to an allocation that is either to be extended
+    /// or reallocated.
+    /// @param oldCount The count of `T` instances available via `oldPtr`
+    /// @param newCount The number of `T` to allocate.
+    /// @return pointer to at least enough memory to store `T[newCount]`,
+    /// initialized with contents from `oldPtr`.
+    /// @throws MemoryAllocationError
+    /// @remarks It is undefined behavior if newCount * sizeof(T, L) > size_t.maxValue.
+    ///
+    /// @remarks It is valid for `newCount` to be zero, but there is no
+    /// guarantee that the returned pointer would be unique.
+    [mutating]
+    Ptr<T, Access.ReadWrite, addrSpace, L> reallocate<T, L:IBufferDataLayout = DefaultDataLayout>(
+        Ptr<T, Access.ReadWrite, addrSpace, L> oldPtr,
+        size_t oldCount,
+        size_t newCount
+    ) throws MemoryAllocationError {
+        let newPtr = try allocate<T, L>(newCount);
+        size_t copyCount = min(oldCount, newCount);
+        for (size_t i = 0; i < copyCount; ++i)
+            newPtr[i] = oldPtr[i];
+        free(oldPtr);
+        return newPtr;
+    }
+
+    /// This function may free the given pointer. The behavior is undefined if
+    /// the pointer was not acquired via `allocate<T>()` or `reallocate<T>()` of
+    /// the same allocator instance, and if the type of the given pointer has
+    /// different alignment than it was allocated with. It is undefined behavior
+    /// to call this function with a pointer that was not allocated with
+    /// `allocate` or `reallocate`, even if it is nullptr.
+    ///
+    /// After this call, you must not dereference the pointer.
+    ///
+    /// @param data A pointer to an allocation that should be released.
+    ///
+    /// @remarks It is possible that an allocator does not support this
+    /// operation, in which case the behavior will be a no-op.
+    [mutating]
+    void free<T, L:IBufferDataLayout = DefaultDataLayout>(Ptr<T, Access.ReadWrite, addrSpace, L> data)
+    {
+    }
+
+    /// This function may free the given pointer, which must have been
+    /// allocated with `alignedAllocate()`. It is undefined behavior if the
+    /// pointer was not allocated with that function, including nullptr.
+    ///
+    /// @param data A pointer to an allocation that should be released.
+    [mutating]
+    void alignedFree(Ptr<void, Access.ReadWrite, addrSpace> data)
+    {
+        let ptrData = reinterpret<Ptr<Ptr<void, Access.ReadWrite, addrSpace>, Access.ReadWrite, addrSpace>>(data);
+        let prevPtr = reinterpret<Ptr<Ptr<void, Access.ReadWrite, addrSpace>, Access.ReadWrite, addrSpace>>(ptrData[-1]);
+        free<Ptr<void, Access.ReadWrite, addrSpace>, DefaultDataLayout>(prevPtr);
+    }
+
+    /// This function may free all prior allocations made through this
+    /// allocator. After calling `close()`, you must never dereference pointers
+    /// allocated prior to the call.
+    ///
+    /// @remarks It is possible that an allocator does not support this
+    /// operation, in which case the behavior will be a no-op.
+    [mutating]
+    void close()
+    {
+        // default no-op impl
+    }
+}
+
+//@hidden:
+
+// Computes the size of `T[len]` (when `len` isn't known at compile-time as
+// otherwise you could simply use `sizeof<T[len]>()`), taking into account the
+// alignment requirements of `T` in the given layout. In Slang, it's possible
+// that sizeof(T) % alignof(T) != 0, so we may need to insert padding bytes
+// between entries in an array to achieve correct alignment.
+[ForceInline]
+size_t __arraySizeOf<T, L:IBufferDataLayout>(size_t len)
+{
+    if (len == 0)
+        return 0;
+
+    size_t unpaddedEntrySize = sizeof(T, L);
+    size_t paddedEntrySize = sizeof(T[2], L) - unpaddedEntrySize;
+    return paddedEntrySize * (len-1) + unpaddedEntrySize;
+}
+
+// Used as part of the default implementation of alignedAllocate.
+size_t __alignedAllocPtrLength<AddressSpace addrSpace>(size_t bytes, uint alignment)
+{
+    size_t ptrSize = sizeof(Ptr<void, Access.ReadWrite, addrSpace>);
+    size_t ptrAlign = alignof(Ptr<void, Access.ReadWrite, addrSpace>);
+    size_t allocSize = bytes + ptrSize;
+
+    if (alignment > ptrAlign)
+    {
+        // There's a chance we may have to realign the returned pointer,
+        // so we'll need extra space for that.
+        allocSize += alignment;
+    }
+    // If this were an array of pointers, determine the count.
+    return (allocSize + ptrSize - 1) / ptrSize;
+}
+
+// Used as part of the default implementation of alignedAllocate.
+Ptr<void, Access.ReadWrite, addrSpace> __finalizeAlignedAlloc<AddressSpace addrSpace>(
+    Ptr<void, Access.ReadWrite, addrSpace> unalignedPtr,
+    uint alignment)
+{
+    size_t ptrSize = sizeof(Ptr<void, Access.ReadWrite, addrSpace>);
+    size_t ptrAlign = alignof(Ptr<void, Access.ReadWrite, addrSpace>);
+
+    // Leave room to store original address in [-1].
+    uintptr_t alignedPtr = reinterpret<uintptr_t>(unalignedPtr)+ptrSize;
+
+    // If we need special alignment, do that!
+    if (alignment > ptrAlign)
+        alignedPtr = (alignedPtr + alignment-1) & (~uintptr_t(alignment-1));
+
+    let alignedPtrPtr = reinterpret<Ptr<Ptr<void, Access.ReadWrite, addrSpace>, Access.ReadWrite, addrSpace>>(alignedPtr);
+    alignedPtrPtr[-1] = reinterpret<Ptr<void, Access.ReadWrite, addrSpace>>(unalignedPtr);
+
+    return reinterpret<Ptr<void, Access.ReadWrite, addrSpace>>(alignedPtrPtr);
+}
+
+[ForceInline]
+[require(cpp_cuda_llvm)]
+Ptr<void> __cpu_malloc(size_t bytes)
+{
+    __target_switch
+    {
+    case cpp:
+    case cuda:
+        __intrinsic_asm "malloc($0)";
+    case llvm:
+        __intrinsic_asm "%result = call ptr @malloc($0)";
+    }
+}
+
+[ForceInline]
+[require(cpp_cuda_llvm)]
+Ptr<void> __cpu_realloc(Ptr<void> oldPtr, size_t oldBytes, size_t bytes)
+{
+    __target_switch
+    {
+    case cpp:
+        __intrinsic_asm "realloc($0, $2)";
+    case cuda:
+        __intrinsic_asm "__slang_cuda_realloc($0, $1, $2)";
+    case llvm:
+        __intrinsic_asm "%result = call ptr @realloc($0, $2)";
+    }
+}
+
+[ForceInline]
+[require(cpp_cuda_llvm)]
+void __cpu_free(Ptr<void> ptr)
+{
+    __target_switch
+    {
+    case cpp:
+    case cuda:
+        __intrinsic_asm "free($0)";
+    case llvm:
+        __intrinsic_asm "call void @free($0)";
+    }
+}
+
+//@public:
+
+/// This allocator allocates memory in the global memory heap. It provides
+/// functionality that is roughly equivalent to the `malloc`/`free` of C.
+///
+/// @remarks You do not need to form an instance of the allocator to use it, you
+/// can simply call `SystemHeapAllocator.allocate<T>(count)`.
+[require(cpp_cuda_llvm)]
+public struct SystemHeapAllocator: IAllocator<AddressSpace.Device>
+{
+    static LayoutPtr<T, L> allocate<T, L:IBufferDataLayout = DefaultDataLayout>(size_t count = 1) throws MemoryAllocationError
+    {
+        Ptr<void> allocation;
+        if (alignof(T, L) > alignof(Ptr<void>))
+        {
+            // malloc is only guaranteed to be aligned up to the maximum scalar
+            // size, so if our data layout requires a larger alignment for e.g.
+            // a vector, we have to do that ourselves.
+            allocation = try alignedAllocate(__arraySizeOf<T, L>(count), alignof(T, L));
+        }
+        else
+        {
+            allocation = __cpu_malloc(__arraySizeOf<T, L>(count));
+            if (allocation == nullptr && count != 0)
+                throw MemoryAllocationError.OutOfMemory;
+        }
+        return reinterpret<LayoutPtr<T, L>>(allocation);
+    }
+
+    static override Ptr<void> alignedAllocate(size_t bytes, uint alignment) throws MemoryAllocationError
+    {
+        size_t allocCount = __alignedAllocPtrLength<AddressSpace.Device>(bytes, alignment);
+        Ptr<void> allocation = __cpu_malloc(allocCount * sizeof(Ptr<void>));
+        if (allocation == nullptr && allocCount != 0)
+            throw MemoryAllocationError.OutOfMemory;
+        return __finalizeAlignedAlloc(allocation, alignment);
+    }
+
+    static override LayoutPtr<T, L> reallocate<T, L:IBufferDataLayout = DefaultDataLayout>(
+        LayoutPtr<T, L> oldPtr,
+        size_t oldCount,
+        size_t newCount
+    ) throws MemoryAllocationError {
+        if (oldPtr == nullptr)
+            return try allocate<T, L>(newCount);
+
+        if (alignof(T, L) > alignof(Ptr<void>))
+        {
+            let newPtr = try allocate<T, L>(newCount);
+            size_t copyCount = oldCount < newCount ? oldCount : newCount;
+            for (size_t i = 0; i < copyCount; ++i)
+                newPtr[i] = oldPtr[i];
+            free(oldPtr);
+            return newPtr;
+        }
+        else
+        {
+            let newPtr = __cpu_realloc(Ptr<void>(oldPtr), __arraySizeOf<T, L>(oldCount), __arraySizeOf<T, L>(newCount));
+            if (newPtr == nullptr && newCount != 0)
+                throw MemoryAllocationError.OutOfMemory;
+            return reinterpret<LayoutPtr<T, L>>(newPtr);
+        }
+    }
+
+    static override void free<T, L:IBufferDataLayout = DefaultDataLayout>(LayoutPtr<T, L> data)
+    {
+        if (alignof(T, L) > alignof(Ptr<void>))
+            alignedFree(reinterpret<Ptr<void>>(data));
+        else
+            __cpu_free(reinterpret<Ptr<void>>(data));
+    }
+
+    static override void alignedFree(Ptr<void> data)
+    {
+        if (data != nullptr)
+            __cpu_free(reinterpret<Ptr<Ptr<void>>>(data)[-1]);
+    }
+}
+
+/// This allocator allocates memory in the calling function's stack frame.
+/// It is effectively equivalent to `alloca()` in C and comes with the same
+/// caveats: Unnecessary use can hinder optimization and excessively large
+/// or looped allocations can easily cause stack overflows.
+///
+/// Ideally, you should only use it when you absolutely need a pointer to a
+/// stack-allocated object, and call it outside of loops.
+///
+/// @remarks you should not form an instance of the allocator to use it, you
+/// can simply call `StackFrameAllocator.allocate<T>(count)`.
+///
+/// @remarks all allocated memory is released automatically when the calling
+/// function returns, so you don't need to manually free it in any way, but you
+/// do need to avoid leaking the pointer outside of the function.
+[require(cpp_llvm)]
+[require(cuda, cuda_sm_6_0)]
+public struct StackFrameAllocator: IAllocator<AddressSpace.Device>
+{
+    [ForceInline]
+    __intrinsic_op($(kIROp_Alloca))
+    static LayoutPtr<T, L> allocate<T, L:IBufferDataLayout = DefaultDataLayout>(size_t count = 1);
+
+    [ForceInline]
+    static override LayoutPtr<T, L> reallocate<T, L:IBufferDataLayout = DefaultDataLayout>(
+        LayoutPtr<T, L> oldPtr,
+        size_t oldCount,
+        size_t newCount
+    ){
+        // No shrinking supported ever anyway, so we may as well return the old
+        // pointer.
+        if (newCount <= oldCount)
+            return oldPtr;
+
+        let newPtr = allocate<T, L>(newCount);
+        size_t copyCount = min(oldCount, newCount);
+        for (size_t i = 0; i < copyCount; ++i)
+            newPtr[i] = oldPtr[i];
+        return newPtr;
+    }
+
+    static override Ptr<void> alignedAllocate(size_t bytes, uint alignment) throws MemoryAllocationError
+    {
+        // Arbitrary-alignment allocas aren't really supported by C++, Cuda or
+        // LLVM IR (alignment needs to be compile-time for LLVM IR).
+        throw MemoryAllocationError.AlignmentIsTooLarge;
+    }
+}
+
+//@public:
 extension bool : IRangedValue
 {
     __generic<$(ptrTypeParameterList)>

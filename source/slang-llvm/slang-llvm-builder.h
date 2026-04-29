@@ -189,6 +189,7 @@ public:
     // Instructions
     //==========================================================================
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitAlloca(int64_t size, int64_t alignment) = 0;
+    virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitAlloca(LLVMInst* size, int64_t alignment) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL
     emitGetElementPtr(LLVMInst* ptr, int64_t stride, LLVMInst* index) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL

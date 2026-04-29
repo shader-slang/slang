@@ -2542,6 +2542,18 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uintptr_t UPTR_max(uintptr_t a, uintptr_t b)
     return a > b ? a : b;
 }
 
+// ----------------------------- Allocation -----------------------------------------
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void* __slang_cuda_realloc(void* oldPtr, size_t oldBytes, size_t newBytes)
+{
+    void* newPtr = malloc(newBytes);
+    if (!newPtr)
+        return nullptr;
+    memcpy(newPtr, oldPtr, oldBytes < newBytes ? oldBytes : newBytes);
+    free(oldPtr);
+    return newPtr;
+}
+
 // ----------------------------- ResourceType -----------------------------------------
 
 
