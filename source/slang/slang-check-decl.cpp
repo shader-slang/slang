@@ -8980,8 +8980,12 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     // ```
 
     // First we need to make sure the associated `Differential` type requirement is satisfied.
+    // Also detect whether the `Differential` type has any non-differentiable field.  Such fields
+    // cannot be meaningfully handled by the synthesized dadd/dzero bodies and will be left
+    // uninitialized in the result.
     bool hasDifferentialAssocType = false;
     bool typeIsSelfDifferential = false;
+    bool differentialTypeHasNonDifferentiableField = false;
     for (auto& existingEntry : witnessTable->getRequirementDictionary())
     {
         if (auto builtinReqAttr = existingEntry.key->findModifier<BuiltinRequirementModifier>())
@@ -8990,8 +8994,28 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
                 existingEntry.value.getFlavor() != RequirementWitness::Flavor::none)
             {
                 if (existingEntry.value.getFlavor() == RequirementWitness::Flavor::val)
+                {
                     if (existingEntry.value.m_val == context->conformingType)
                         typeIsSelfDifferential = true;
+                    if (auto diffDeclRefType = as<DeclRefType>(existingEntry.value.m_val))
+                    {
+                        if (auto diffAggDecl =
+                                as<AggTypeDecl>(diffDeclRefType->getDeclRef().getDecl()))
+                        {
+                            for (auto diffField :
+                                 diffAggDecl->getDirectMemberDeclsOfType<VarDeclBase>())
+                            {
+                                if (diffField->hasModifier<NoDiffModifier>())
+                                    continue;
+                                if (!tryGetDifferentialType(m_astBuilder, diffField->getType()))
+                                {
+                                    differentialTypeHasNonDifferentiableField = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
 
                 hasDifferentialAssocType = true;
             }
@@ -9146,6 +9170,16 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
                 _Move(synGenericArgs),
                 _Move(inductiveArgMask)))
             return false;
+    }
+
+    // Warn when the `Differential` type has one or more non-differentiable fields: those fields
+    // cannot be handled by the synthesized dadd/dzero bodies and will be left uninitialized.
+    if (differentialTypeHasNonDifferentiableField)
+    {
+        getSink()->diagnose(Diagnostics::CannotSynthesizeDaddDzeroForCustomDifferential{
+            .methodName = requirementDeclRef.getName(),
+            .typeDecl = context->parentDecl,
+        });
     }
 
     // TODO: synthesize assignments for inherited members here.
