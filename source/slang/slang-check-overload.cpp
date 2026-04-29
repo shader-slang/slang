@@ -13,6 +13,30 @@
 namespace Slang
 {
 
+// True for BFloat16/FloatE4M3/FloatE5M2 scalars or vectors of them.
+static bool _isStorageOnlyFloatType(Type* type)
+{
+    if (!type)
+        return false;
+    if (auto vecType = as<VectorExpressionType>(type))
+        type = vecType->getElementType();
+    return as<BFloat16Type>(type) || as<FloatE4M3Type>(type) || as<FloatE5M2Type>(type);
+}
+
+// On overload-resolution failure, point users at the fp32-roundtrip pattern
+// when any arg is a storage-only float type.
+static void _maybeDiagnoseStorageOnlyFloatArithmetic(DiagnosticSink* sink, InvokeExpr* expr)
+{
+    for (auto arg : expr->arguments)
+    {
+        if (arg && _isStorageOnlyFloatType(arg->type))
+        {
+            sink->diagnose(Diagnostics::Bfloat16Fp8StorageTypeHint{.location = expr->loc});
+            return;
+        }
+    }
+}
+
 bool isFreeFormTypePackParam(SemanticsVisitor* visitor, Type* type, ParamDecl* paramDecl)
 {
     if (auto declRef = isDeclRefTypeOf<GenericTypePackParamDecl>(type))
@@ -3213,10 +3237,13 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 getSink()->diagnose(
                     Diagnostics::NoApplicableWithArgs{.args = argsList, .expr = expr});
             }
+            _maybeDiagnoseStorageOnlyFloatArithmetic(getSink(), expr);
         }
         else
         {
             // There were multiple applicable candidates, so we need to report them.
+
+            _maybeDiagnoseStorageOnlyFloatArithmetic(getSink(), expr);
 
             if (getOptionSet().shouldEmitRichDiagnostics() && funcName)
             {
