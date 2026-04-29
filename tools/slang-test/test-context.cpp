@@ -21,12 +21,36 @@ static std::atomic<int> s_consecutiveFailures{0};
 
 TestContext::TestContext()
 {
-    /// if we are testing on arm, debug, we may want to increase the connection timeout
+    /// If we are testing on arm, debug, we may want to increase the connection timeout.
 #if (SLANG_PROCESSOR_ARM || SLANG_PROCESSOR_ARM_64) && defined(_DEBUG)
     // 10 mins(!). This seems to be the order of time needed for timeout on a CI ARM test system on
     // debug
     connectionTimeOutInMs = 1000 * 60 * 10;
+#elif SLANG_WINDOWS_FAMILY && defined(_DEBUG)
+    // Windows debug CI can spend more than two minutes in individual test-server requests.
+    connectionTimeOutInMs = 1000 * 60 * 5;
 #endif
+
+    StringBuilder rpcTimeoutEnvValue;
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice::fromLiteral("SLANG_TEST_RPC_TIMEOUT_MS"),
+            rpcTimeoutEnvValue)))
+    {
+        Int rpcTimeoutInMs = 0;
+        if (SLANG_SUCCEEDED(
+                StringUtil::parseInt(rpcTimeoutEnvValue.getUnownedSlice(), rpcTimeoutInMs)) &&
+            rpcTimeoutInMs > 0)
+        {
+            connectionTimeOutInMs = rpcTimeoutInMs;
+        }
+        else
+        {
+            fprintf(
+                stderr,
+                "warning: ignoring invalid SLANG_TEST_RPC_TIMEOUT_MS value '%s'\n",
+                rpcTimeoutEnvValue.getBuffer());
+        }
+    }
 }
 
 void TestContext::setThreadIndex(int index)
