@@ -200,8 +200,15 @@ def fetch_gpu_quota(metrics=None):
             metric = q.get("metric")
             if metric not in wanted_metrics:
                 continue
-            usage = int(q.get("usage", 0))
-            limit = int(q.get("limit", 0))
+            try:
+                usage = int(q.get("usage", 0))
+                limit = int(q.get("limit", 0))
+            except (TypeError, ValueError):
+                print(
+                    f"Warning: invalid quota values for {metric} in {region}",
+                    file=sys.stderr,
+                )
+                continue
             bucket = by_metric[metric]
             bucket["regions"][region] = {"usage": usage, "limit": limit}
             bucket["usage"] += usage

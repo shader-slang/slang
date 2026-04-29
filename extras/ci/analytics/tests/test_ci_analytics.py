@@ -266,6 +266,36 @@ class TestGpuQuota(unittest.TestCase):
         self.assertEqual(quota["by_metric"]["NVIDIA_L4_GPUS"]["usage"], 5)
         self.assertEqual(quota["by_metric"]["NVIDIA_L4_GPUS"]["limit"], 32)
 
+    def test_fetch_gpu_quota_skips_invalid_numeric_values(self):
+        response = {
+            "quotas": [
+                {"metric": "NVIDIA_T4_GPUS", "usage": "bad", "limit": 8},
+                {"metric": "NVIDIA_L4_GPUS", "usage": 2, "limit": None},
+                {"metric": "NVIDIA_L4_GPUS", "usage": "3", "limit": "16"},
+            ],
+        }
+
+        def fake_run(cmd, **kwargs):
+            return mock.Mock(
+                returncode=0,
+                stdout=json.dumps(response),
+                stderr="",
+            )
+
+        stderr = io.StringIO()
+        with mock.patch("ci_health.subprocess.run", side_effect=fake_run):
+            with contextlib.redirect_stderr(stderr):
+                quota = ci_health.fetch_gpu_quota([
+                    {"metric": "NVIDIA_T4_GPUS", "name": "T4", "regions": ["us-central1"]},
+                    {"metric": "NVIDIA_L4_GPUS", "name": "L4", "regions": ["us-central1"]},
+                ])
+
+        self.assertNotIn("NVIDIA_T4_GPUS", quota["by_metric"])
+        self.assertEqual(quota["by_metric"]["NVIDIA_L4_GPUS"]["usage"], 3)
+        self.assertEqual(quota["by_metric"]["NVIDIA_L4_GPUS"]["limit"], 16)
+        self.assertIn("invalid quota values for NVIDIA_T4_GPUS in us-central1", stderr.getvalue())
+        self.assertIn("invalid quota values for NVIDIA_L4_GPUS in us-central1", stderr.getvalue())
+
     def test_record_snapshot_stores_gpu_quota_per_region(self):
         queue_data = {
             "summary": {"jobs_queued": 0, "jobs_running": 0, "runs_queued": 0, "runs_in_progress": 0},
