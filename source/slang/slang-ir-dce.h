@@ -36,4 +36,6 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex);
 
 bool trimOptimizableTypes(IRModule* module);
 
+bool isStructEmpty(IRType* type);
+
 } // namespace Slang
