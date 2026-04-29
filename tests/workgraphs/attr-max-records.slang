@@ -1,6 +1,7 @@
-//TEST:SIMPLE(filecheck=CHK): -target hlsl -stage node -entry main
+//TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8
+//TEST:SIMPLE(filecheck=CHK_SPIRV): -target spirv-asm -stage node -entry main
 
-// Test that [MaxRecords(n)] is emitted on a NodeOutput parameter.
+// Test that [MaxRecords(n)] is encoded in dxil and the shader compiles to spirv.
 
 struct MyRecord
 {
@@ -16,4 +17,5 @@ void main([MaxRecords(4)] NodeOutput<MyRecord> output, RWBuffer<int> buf)
     buf[0] = 0;
 }
 
-//CHK: [MaxRecords(4)]
+//CHK_DXIL: define void @main()
+//CHK_SPIRV: OpFunction

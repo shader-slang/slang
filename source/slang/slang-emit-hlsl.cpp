@@ -1865,8 +1865,33 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         return;
 
     case kIROp_StructType:
-        m_writer->emit(getName(type));
-        return;
+        {
+            auto structType = cast<IRStructType>(type);
+            // Work-graph record types are native HLSL types (e.g. DispatchNodeInputRecord<T>,
+            // NodeOutput<T>, EmptyNodeOutput). Emit them using their original HLSL name so DXC
+            // recognises them; generic variants include the element type as a template argument.
+            if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>())
+            {
+                auto nameHint = structType->findDecoration<IRNameHintDecoration>();
+                if (auto elemDecor =
+                        structType->findDecoration<IRWorkGraphRecordElementTypeDecoration>())
+                {
+                    m_writer->emit(nameHint ? nameHint->getName() : getName(type));
+                    m_writer->emit("<");
+                    emitType(elemDecor->getElementType());
+                    m_writer->emit(">");
+                }
+                else
+                {
+                    // Non-generic work-graph type (EmptyNodeOutput, EmptyNodeInput, etc.):
+                    // emit the original HLSL name without a template argument.
+                    m_writer->emit(nameHint ? nameHint->getName() : getName(type));
+                }
+                return;
+            }
+            m_writer->emit(getName(type));
+            return;
+        }
 
     case kIROp_VectorType:
         {

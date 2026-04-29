@@ -38,6 +38,13 @@ struct RemoveUnusedGenericParamContext : InstPassBase
                 }
                 if (returnVal->findDecoration<IRTargetIntrinsicDecoration>())
                     continue;
+                // Work-graph record types (NodeOutput<T>, ThreadNodeOutputRecords<T>, etc.) are
+                // opaque HLSL template types. Even though T does not appear in the struct body,
+                // it IS semantically significant — the HLSL emitter needs T to reconstruct the
+                // native template name. Skip them here so specializeModule can create properly
+                // annotated per-T specializations via specializeGenericImpl.
+                if (returnVal->findDecoration<IRWorkGraphRecordTypeDecoration>())
+                    continue;
 
                 List<UInt> paramToPreserve;
                 UInt id = 0;

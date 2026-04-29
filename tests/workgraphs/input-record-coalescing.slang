@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHK): -target hlsl -stage node -entry main
+//TEST:SIMPLE(filecheck=CHK): -target dxil-asm -stage node -entry main -profile lib_6_8
 
 // Test that GroupNodeInputRecords<T> compiles as a coalescing-launch node shader parameter.
 
@@ -15,5 +15,5 @@ void main(GroupNodeInputRecords<RecordData> input, RWBuffer<int> output)
     output[0] = input.Get(0).value;
 }
 
-//CHK: [NodeLaunch("coalescing")]
-//CHK: void main(
+//CHK: dx.op.createNodeInputRecordHandle
+//CHK: dx.op.getNodeRecordPtr
