@@ -4529,6 +4529,43 @@ by calling `castAs` / `queryInterface` on the artifact-associated
 Extensible: future iterations may add accessors for branch coverage,
 function coverage, or column information.
 */
+/// Per-counter-slot attribution returned by
+/// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
+/// `structSize` for ABI-versioned struct growth: future revisions
+/// will add fields (column, function name, branch arm) at the end
+/// without changing the COM interface.
+struct CoverageEntryInfo
+{
+    size_t structSize = sizeof(CoverageEntryInfo);
+
+    /// Source file for this counter slot, or `nullptr` if the slot
+    /// could not be attributed to a real source file. The returned
+    /// pointer is valid for the lifetime of the metadata object.
+    const char* file = nullptr;
+
+    /// 1-based source line for this counter slot, or 0 if the slot
+    /// could not be attributed to a real source line.
+    uint32_t line = 0;
+};
+
+/// Coverage-buffer binding info returned by
+/// `ICoverageTracingMetadata::getBufferInfo`. Same `structSize`-
+/// versioning pattern as `CoverageEntryInfo`.
+struct CoverageBufferInfo
+{
+    size_t structSize = sizeof(CoverageBufferInfo);
+
+    /// Register space the coverage buffer is bound to (D3D12
+    /// `space`, Vulkan descriptor set), or -1 if not assigned for
+    /// this target.
+    int32_t space = -1;
+
+    /// Binding index the coverage buffer is bound at (D3D12
+    /// `register`, Vulkan `binding`), or -1 if not assigned for
+    /// this target.
+    int32_t binding = -1;
+};
+
 struct ICoverageTracingMetadata : public ISlangCastable
 {
     SLANG_COM_INTERFACE(
@@ -4540,22 +4577,19 @@ struct ICoverageTracingMetadata : public ISlangCastable
     /// Number of counter slots in the synthesized coverage buffer.
     virtual uint32_t SLANG_MCALL getCounterCount() = 0;
 
-    /// Source file for counter slot `index`, or `nullptr` if the index is out
-    /// of range or the slot could not be attributed to a real source file.
-    /// The returned pointer is valid for the lifetime of this metadata object.
-    virtual const char* SLANG_MCALL getEntryFile(uint32_t index) = 0;
+    /// Populate `outInfo` with attribution info for counter slot
+    /// `index`. The caller must pre-set `outInfo->structSize =
+    /// sizeof(CoverageEntryInfo)`. Returns `SLANG_OK` on success,
+    /// `SLANG_E_INVALID_ARG` for null `outInfo`, mismatched
+    /// `structSize`, or out-of-range `index`.
+    virtual SlangResult SLANG_MCALL getEntryInfo(uint32_t index, CoverageEntryInfo* outInfo) = 0;
 
-    /// 1-based source line for counter slot `index`, or 0 if the index is out
-    /// of range or the slot could not be attributed to a real source line.
-    virtual uint32_t SLANG_MCALL getEntryLine(uint32_t index) = 0;
-
-    /// Register space the coverage buffer is bound to (D3D12 `space`,
-    /// Vulkan descriptor set), or -1 if not assigned for this target.
-    virtual int32_t SLANG_MCALL getBufferSpace() = 0;
-
-    /// Binding index the coverage buffer is bound at (D3D12 `register`,
-    /// Vulkan `binding`), or -1 if not assigned for this target.
-    virtual int32_t SLANG_MCALL getBufferBinding() = 0;
+    /// Populate `outInfo` with the coverage buffer's binding info.
+    /// The caller must pre-set `outInfo->structSize =
+    /// sizeof(CoverageBufferInfo)`. Returns `SLANG_OK` on success,
+    /// `SLANG_E_INVALID_ARG` for null `outInfo` or mismatched
+    /// `structSize`.
+    virtual SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo* outInfo) = 0;
 };
     #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()
 

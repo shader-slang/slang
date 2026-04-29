@@ -357,28 +357,35 @@ uint32_t ArtifactPostEmitMetadata::getCounterCount()
     return (uint32_t)m_coverageEntries.getCount();
 }
 
-const char* ArtifactPostEmitMetadata::getEntryFile(uint32_t index)
+SlangResult ArtifactPostEmitMetadata::getEntryInfo(
+    uint32_t index,
+    slang::CoverageEntryInfo* outInfo)
 {
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize != sizeof(slang::CoverageEntryInfo))
+        return SLANG_E_INVALID_ARG;
     if (index >= (uint32_t)m_coverageEntries.getCount())
-        return nullptr;
-    return m_coverageEntries[index].file.getBuffer();
+        return SLANG_E_INVALID_ARG;
+    auto& entry = m_coverageEntries[index];
+    // Surface an empty source-file path as a null pointer so callers
+    // can branch on attributability without separately checking the
+    // length. An empty file string would otherwise look like a
+    // valid (but empty) path to consumers.
+    outInfo->file = entry.file.getLength() ? entry.file.getBuffer() : nullptr;
+    outInfo->line = entry.line;
+    return SLANG_OK;
 }
 
-uint32_t ArtifactPostEmitMetadata::getEntryLine(uint32_t index)
+SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* outInfo)
 {
-    if (index >= (uint32_t)m_coverageEntries.getCount())
-        return 0;
-    return m_coverageEntries[index].line;
-}
-
-int32_t ArtifactPostEmitMetadata::getBufferSpace()
-{
-    return m_coverageBufferSpace;
-}
-
-int32_t ArtifactPostEmitMetadata::getBufferBinding()
-{
-    return m_coverageBufferBinding;
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize != sizeof(slang::CoverageBufferInfo))
+        return SLANG_E_INVALID_ARG;
+    outInfo->space = m_coverageBufferSpace;
+    outInfo->binding = m_coverageBufferBinding;
+    return SLANG_OK;
 }
 
 SlangUInt ArtifactPostEmitMetadata::getCooperativeMatrixTypeCount()

@@ -109,24 +109,38 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     uint32_t counterCount = coverage->getCounterCount();
     SLANG_CHECK(counterCount > 0);
 
-    // Walk every slot and exercise the per-entry accessors. File
+    // Walk every slot and exercise the per-entry accessor. File
     // string and line number must both be populated for every slot;
     // the synthesizer gives every counter op a real source location.
     for (uint32_t i = 0; i < counterCount; ++i)
     {
-        const char* file = coverage->getEntryFile(i);
-        uint32_t line = coverage->getEntryLine(i);
-        SLANG_CHECK(file != nullptr);
-        SLANG_CHECK(line > 0);
+        slang::CoverageEntryInfo entry;
+        SLANG_CHECK(coverage->getEntryInfo(i, &entry) == SLANG_OK);
+        SLANG_CHECK(entry.file != nullptr);
+        SLANG_CHECK(entry.line > 0);
     }
 
-    // Out-of-range queries must not crash. No specific return value is
-    // part of the public contract here — only that the calls are safe.
-    (void)coverage->getEntryFile(counterCount);
-    (void)coverage->getEntryLine(counterCount);
+    // Out-of-range query must return SLANG_E_INVALID_ARG.
+    {
+        slang::CoverageEntryInfo entry;
+        SLANG_CHECK(coverage->getEntryInfo(counterCount, &entry) == SLANG_E_INVALID_ARG);
+    }
 
-    // Buffer binding accessors: for a CPU target, space/binding values
-    // may be -1, but both must be callable without crashing.
-    (void)coverage->getBufferSpace();
-    (void)coverage->getBufferBinding();
+    // Null pointer must return SLANG_E_INVALID_ARG, not crash.
+    SLANG_CHECK(coverage->getEntryInfo(0, nullptr) == SLANG_E_INVALID_ARG);
+
+    // Wrong structSize must return SLANG_E_INVALID_ARG.
+    {
+        slang::CoverageEntryInfo entry;
+        entry.structSize = 0;
+        SLANG_CHECK(coverage->getEntryInfo(0, &entry) == SLANG_E_INVALID_ARG);
+    }
+
+    // Buffer binding info: for a CPU target, space/binding values may
+    // be -1, but the call must succeed.
+    {
+        slang::CoverageBufferInfo bufferInfo;
+        SLANG_CHECK(coverage->getBufferInfo(&bufferInfo) == SLANG_OK);
+    }
+    SLANG_CHECK(coverage->getBufferInfo(nullptr) == SLANG_E_INVALID_ARG);
 }

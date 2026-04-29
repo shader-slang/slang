@@ -214,10 +214,10 @@ public:
 
     // ICoverageTracingMetadata
     SLANG_NO_THROW virtual uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual const char* SLANG_MCALL getEntryFile(uint32_t index) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual uint32_t SLANG_MCALL getEntryLine(uint32_t index) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual int32_t SLANG_MCALL getBufferSpace() SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual int32_t SLANG_MCALL getBufferBinding() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL
+    getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL
+    getBufferInfo(slang::CoverageBufferInfo* outInfo) SLANG_OVERRIDE;
 
     // ICooperativeTypesMetadata
     SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeMatrixTypeCount() SLANG_OVERRIDE;
