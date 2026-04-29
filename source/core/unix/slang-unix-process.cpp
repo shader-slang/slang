@@ -459,6 +459,7 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
     }
 
     const ssize_t writeResult = ::write(m_fd, buffer, length);
+    const int writeErrno = (writeResult < 0) ? errno : 0;
 
     // Log pipe write operation if debug enabled
     if (pipeDiagnosticsEnabled)
@@ -507,7 +508,7 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
                 stderr,
                 "[PIPE-ERROR] Write failed on fd=%d: errno=%d duration=%.3fms (thread=%zu)\n",
                 m_fd,
-                errno,
+                writeErrno,
                 durationMs,
                 getCurrentThreadDiagnosticId());
         }
