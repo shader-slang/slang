@@ -4969,6 +4969,13 @@ err(
     span { loc = "location", message = "whole struct must be assiged to mesh output at once for Metal target." }
 )
 
+err(
+    "storage-texture-access-mode-not-supported-in-wgsl",
+    56106,
+    "texture format '~format' does not support '~accessMode' access for storage textures in WGSL",
+    span { loc = "location" }  -- No span message: source location is not available at emit time
+)
+
 -- SPIRV (57001-57004)
 
 warning(

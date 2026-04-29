@@ -1258,7 +1258,7 @@ struct SCCPContext
         // since abstract interpretation of them should cause blocks to
         // be marked as executed, etc.
         //
-        if (const auto terminator = as<IRTerminatorInst>(inst))
+        if (const auto terminator = as<IRTerminatorInst>(inst); terminator)
         {
             if (auto unconditionalBranch = as<IRUnconditionalBranch>(inst))
             {
