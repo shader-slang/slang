@@ -154,11 +154,17 @@ func (m *Manager) MarkBusy(runnerName string) {
 func splitZones(zonesValue string) []string {
 	parts := strings.Split(zonesValue, ",")
 	zones := make([]string, 0, len(parts))
+	seen := make(map[string]struct{}, len(parts))
 	for _, zone := range parts {
 		zone = strings.TrimSpace(zone)
-		if zone != "" {
-			zones = append(zones, zone)
+		if zone == "" {
+			continue
 		}
+		if _, ok := seen[zone]; ok {
+			continue
+		}
+		seen[zone] = struct{}{}
+		zones = append(zones, zone)
 	}
 	return zones
 }

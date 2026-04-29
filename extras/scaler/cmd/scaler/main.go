@@ -387,6 +387,7 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 
 	drainCh := make(chan os.Signal, 1)
 	signal.Notify(drainCh, syscall.SIGUSR1)
+	defer signal.Stop(drainCh)
 	go func() {
 		select {
 		case <-drainCh:

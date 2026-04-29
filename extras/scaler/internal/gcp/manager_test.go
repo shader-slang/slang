@@ -37,6 +37,14 @@ func TestRemoveTrackedVMByVMName(t *testing.T) {
 	}
 }
 
+func TestSplitZonesTrimsAndDeduplicates(t *testing.T) {
+	got := splitZones(" us-east1-d,us-east1-d,,us-east1-b, us-east1-b ")
+	want := []string{"us-east1-d", "us-east1-b"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("splitZones = %v, want %v", got, want)
+	}
+}
+
 func TestRunCleanupLoopRunsImmediatePass(t *testing.T) {
 	m := &Manager{}
 
