@@ -2,6 +2,7 @@
 #include "slang-ir-sccp.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-translate.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 
@@ -19,6 +20,7 @@ struct SharedSCCPContext
     IRModule* module;
     TargetProgram* targetProgram;
     DiagnosticSink* sink;
+    TranslationContext* translationContext = nullptr;
 };
 //
 // Next we have a context struct that will be applied for each function (or other
@@ -296,7 +298,15 @@ struct SCCPContext
             // value, rather than the default of none.
             //
             if (!parentBlock || parentBlock->getParent() != code)
+            {
+                if (!parentBlock && shared->translationContext)
+                {
+                    auto resolvedInst = shared->translationContext->resolveInst(inst);
+                    if (resolvedInst != inst)
+                        return getLatticeVal(resolvedInst);
+                }
                 return LatticeVal::getAny();
+            }
         }
 
         return LatticeVal::getNone();
@@ -1248,7 +1258,7 @@ struct SCCPContext
         // since abstract interpretation of them should cause blocks to
         // be marked as executed, etc.
         //
-        if (const auto terminator = as<IRTerminatorInst>(inst))
+        if (const auto terminator = as<IRTerminatorInst>(inst); terminator)
         {
             if (auto unconditionalBranch = as<IRUnconditionalBranch>(inst))
             {
@@ -1525,7 +1535,6 @@ struct SCCPContext
             instsToProcess.add(child);
         }
 
-        List<IRInst*> instsToRemove;
         for (auto child : instsToProcess)
         {
             auto latticeVal = getLatticeVal(child);
@@ -1976,7 +1985,8 @@ bool applySparseConditionalConstantPropagationForGlobalScope(
 bool applySparseConditionalConstantPropagation(
     IRInst* func,
     TargetProgram* targetProgram,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    TranslationContext* translationContext)
 {
     if (sink && sink->getErrorCount())
         return false;
@@ -1985,6 +1995,7 @@ bool applySparseConditionalConstantPropagation(
     shared.module = func->getModule();
     shared.targetProgram = targetProgram;
     shared.sink = sink;
+    shared.translationContext = translationContext;
 
     SCCPContext globalContext;
     globalContext.shared = &shared;

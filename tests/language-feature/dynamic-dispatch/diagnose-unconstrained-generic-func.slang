@@ -1,18 +1,13 @@
 // An unconstrained generic function cannot be specialized with an
 // existential type because the concrete type is not known at compile
 // time. When the generic type parameter T is inferred from an
-// interface-typed argument, the compiler must reject the call.
-//
-// Unlike the constrained case (T : IFoo), where the compiler
-// recognizes the pattern and emits error 33180, unconstrained generics
-// currently crash with an internal compiler error (99999) during
-// type-flow specialization instead of producing a diagnostic.
+// interface-typed argument, the compiler must reject the call with
+// error 33180 instead of crashing.
 
-// Disabled: ICE -- should emit error 33180 but crashes with error 99999
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target glsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -stage compute -entry computeMain
 
 #lang slang 2025
 
@@ -51,10 +46,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     IFoo obj = makeInterface(dispatchThreadID.x);
 
-    // Inferring T from an interface-typed argument requires specializing
-    // the generic with the existential type, which is not allowed.
-    // CHECK: ([[# @LINE+1]]): error 33180
     IFoo result = identity(obj);
+//CHECK:                  ^ cannot specialize generic with existential type
+//CHECK:                  ^ specializing 'identity' with an existential type is not allowed. All generic arguments must be statically resolvable at compile time.
 
     outputBuffer[0] = result.calc(3.0);
 }

@@ -520,6 +520,8 @@ struct DiffTransposePass
                     currentBlock = breakBlock;
                     break;
                 }
+            default:
+                SLANG_UNEXPECTED("Unsupported terminator type in reverseCFGRegion");
             }
         }
 
@@ -527,7 +529,7 @@ struct DiffTransposePass
         {
             return RegionEntryPoint(revBlockMap[currentBlock], branchInst->getTargetBlock(), false);
         }
-        else if (const auto returnInst = as<IRReturn>(currentBlock->getTerminator()))
+        else if (const auto returnInst = as<IRReturn>(currentBlock->getTerminator()); returnInst)
         {
             return RegionEntryPoint(revBlockMap[currentBlock], nullptr, true);
         }
@@ -1791,7 +1793,7 @@ struct DiffTransposePass
         {
             auto argOperand = fwdMakeMatrix->getOperand(ii);
             IRInst* gradAtIndex = nullptr;
-            if (const auto vecType = as<IRVectorType>(argOperand->getDataType()))
+            if (const auto vecType = as<IRVectorType>(argOperand->getDataType()); vecType)
             {
                 gradAtIndex = builder->emitElementExtract(
                     argOperand->getDataType(),

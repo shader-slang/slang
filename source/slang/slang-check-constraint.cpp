@@ -446,6 +446,59 @@ bool addTypeCoercionWitnessToArgs(
     return true;
 }
 
+bool addHasDiffTypeInfoWitnessToArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    HasDiffTypeInfoConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    HashSet<Decl*>* maybeConstrainedGenericParams,
+    ShortList<Val*>& args,
+    bool shouldEmitError)
+{
+    SLANG_ASSERT(!shouldEmitError || maybeContext);
+
+    auto constraintDeclRef =
+        astBuilder
+            ->getGenericAppDeclRef(genericDeclRef, args.getArrayView().arrayView, constraintDecl)
+            .as<HasDiffTypeInfoConstraintDecl>();
+    auto constrainedType = getBaseType(astBuilder, constraintDeclRef);
+    if (!constrainedType)
+    {
+        if (shouldEmitError)
+        {
+            visitor->getSink()->diagnose(Diagnostics::TypeDoesNotHaveDiffTypeInfo{
+                .type = astBuilder->getErrorType(),
+                .location = maybeContext->loc});
+            visitor->getSink()->diagnose(
+                Diagnostics::SeeDefinitionOfConstraint{.decl = constraintDecl});
+        }
+        return false;
+    }
+    if (maybeConstrainedGenericParams)
+    {
+        if (auto declRefType = as<DeclRefType>(constrainedType))
+            maybeConstrainedGenericParams->add(declRefType->getDeclRef().getDecl());
+    }
+
+    if (auto witness = visitor->getDiffTypeInfoWitness(constrainedType))
+    {
+        args.add(witness);
+        return true;
+    }
+
+    if (shouldEmitError)
+    {
+        visitor->getSink()->diagnose(Diagnostics::TypeDoesNotHaveDiffTypeInfo{
+            .type = constrainedType,
+            .location = maybeContext->loc});
+        visitor->getSink()->diagnose(
+            Diagnostics::SeeDefinitionOfConstraint{.decl = constraintDecl});
+    }
+
+    return false;
+}
+
 DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     ConstraintSystem* system,
     DeclRef<GenericDecl> genericDeclRef,
@@ -979,6 +1032,23 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
                 args[_genericDecl].add(m_astBuilder->getNonEmptyPackWitness(constrainedArg));
             }
+            else if (
+                auto hasDiffTypeInfoConstraintDecl =
+                    as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+            {
+                if (!addHasDiffTypeInfoWitnessToArgs(
+                        getASTBuilder(),
+                        this,
+                        hasDiffTypeInfoConstraintDecl,
+                        genericDeclRef,
+                        nullptr,
+                        &constrainedGenericParams,
+                        args[_genericDecl],
+                        false))
+                {
+                    return DeclRef<Decl>();
+                }
+            }
         }
 
     // Make sure we haven't constructed any spurious constraints
@@ -1076,9 +1146,9 @@ bool SemanticsVisitor::TryUnifyVals(
         }
     }
 
-    if (auto fstWit = as<TypeCoercionWitness>(fst))
+    if (auto fstWit = as<TypeCoercionWitness>(fst); fstWit)
     {
-        if (auto sndWit = as<TypeCoercionWitness>(snd))
+        if (auto sndWit = as<TypeCoercionWitness>(snd); sndWit)
         {
             // Ignore unification for coercion constraints for now,
             // they will be checked later anyway.
@@ -1779,10 +1849,10 @@ bool SemanticsVisitor::TryUnifyTypes(
 
     // An error type can unify with anything, just so we avoid cascading errors.
 
-    if (const auto fstErrorType = as<ErrorType>(fst))
+    if (const auto fstErrorType = as<ErrorType>(fst); fstErrorType)
         return true;
 
-    if (const auto sndErrorType = as<ErrorType>(snd))
+    if (const auto sndErrorType = as<ErrorType>(snd); sndErrorType)
         return true;
 
     // If one or the other of the types is a conjunction `X & Y`,

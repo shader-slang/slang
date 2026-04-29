@@ -272,6 +272,9 @@ public:
                 }
                 keyAtomsFound.clear();
             }
+            // TODO: PR #4237 (ArielG-NV) - alreadySetStage is set but never read.
+            // Line 249 uses !alreadySetTarget instead of !alreadySetStage, which is likely a bug.
+            SLANG_UNUSED(alreadySetStage);
 
             // add all shared key atoms
             for (auto keyAtom : sharedKeyAtomsInCanonicalSet_target)
@@ -279,7 +282,7 @@ public:
             for (auto keyAtom : sharedKeyAtomsInCanonicalSet_stage)
                 this->keyAtomsPresent.add(keyAtom);
         }
-        if (auto base = this->getAbstractBase())
+        if (auto base = this->getAbstractBase(); base)
             keyAtomsPresent.add(this);
     }
 };

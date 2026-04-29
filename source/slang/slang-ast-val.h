@@ -540,7 +540,7 @@ public:
         }
         else
         {
-            if (const auto thatGenParam = as<DeclRefIntVal>(other.getParam()))
+            if (const auto thatGenParam = as<DeclRefIntVal>(other.getParam()); thatGenParam)
             {
                 return false;
             }
@@ -1019,7 +1019,7 @@ class HigherOrderDiffTypeTranslationWitness : public SubtypeWitness
 {
     FIDDLE(...)
 
-    SubtypeWitness* getBaseWitness() { return as<SubtypeWitness>(getOperand(0)); }
+    Witness* getBaseWitness() { return as<Witness>(getOperand(0)); }
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride();
@@ -1090,6 +1090,22 @@ class NoneWitness : public Witness
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class HasDiffTypeInfoWitness : public Witness
+{
+    FIDDLE(...)
+    HasDiffTypeInfoWitness(DeclRef<HasDiffTypeInfoConstraintDecl> inDeclRef)
+    {
+        setOperands(inDeclRef);
+    }
+
+    DeclRef<HasDiffTypeInfoConstraintDecl> getDeclRef() { return as<DeclRefBase>(getOperand(0)); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 FIDDLE()

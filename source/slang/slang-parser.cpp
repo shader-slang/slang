@@ -1783,6 +1783,24 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
             continue;
         }
 
+        Token hasDiffTypeInfoToken;
+        if (AdvanceIf(parser, "__hasDiffTypeInfo", &hasDiffTypeInfoToken))
+        {
+            auto constraint = parser->astBuilder->create<HasDiffTypeInfoConstraintDecl>();
+            constraint->whereTokenLoc = whereToken.loc;
+            constraint->loc = hasDiffTypeInfoToken.loc;
+            parser->ReadMatchingToken(TokenType::LParent);
+            constraint->type = parser->ParseTypeExp();
+            parser->ReadMatchingToken(TokenType::RParent);
+            if (optional)
+            {
+                parser->sink->diagnose(Diagnostics::OptionalHasDiffTypeInfoConstraintIsInvalid{
+                    .location = hasDiffTypeInfoToken.loc});
+            }
+            AddMember(genericParent, constraint);
+            continue;
+        }
+
         auto subType = parser->ParseTypeExp();
         Token constraintToken;
         if (AdvanceIf(parser, TokenType::Colon, &constraintToken))
@@ -7963,7 +7981,7 @@ static bool _isCast(Parser* parser, Expr* expr)
             // want the interpretation of something in parentheses to be determined by something
             // as common as + or - whitespace.
 
-            if (const auto staticMemberExpr = dynamicCast<StaticMemberExpr>(expr))
+            if (const auto staticMemberExpr = dynamicCast<StaticMemberExpr>(expr); staticMemberExpr)
             {
                 // Apply the heuristic:
                 TokenReader::ParsingCursor cursor = parser->tokenReader.getCursor();
@@ -9732,6 +9750,26 @@ static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
 
 static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
 {
+    if ((!parser->options.allowGLSLInput) &&
+        (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026))
+    {
+        parser->sink->diagnose(Diagnostics::RemovedModifierUsage{
+            .modifierName = "volatile",
+            .message = "Suggested replacement: Atomic<T>",
+            .location = parser->tokenReader.peekLoc()});
+    }
+    else if (
+        (!parser->options.allowGLSLInput) &&
+        (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025))
+    {
+        parser->sink->diagnose(Diagnostics::DeprecatedModifierUsage{
+            .modifierName = "volatile",
+            .message = "to be removed in Slang 2026. Suggested replacement: Atomic<T>",
+            .location = parser->tokenReader.peekLoc()});
+    }
+
+    // note: no diagnostics before Slang version 2025
+
     ModifierListBuilder listBuilder;
 
     auto hlslMod = parser->astBuilder->create<HLSLVolatileModifier>();

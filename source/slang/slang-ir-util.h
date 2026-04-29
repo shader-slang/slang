@@ -288,7 +288,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
 /// Get a unit-type (aka `void`) value using the `poison` instruction,
 /// which indicates an undefined (and potentially unstable) value.
 ///
-IRInst* getUnitPoisonVal(IRBuilder builder, IRModule* module);
+IRInst* getUnitPoisonVal(IRBuilder* builder, IRModule* module);
 
 // The the equivalent op of (a op b) in (b op' a). For example, a > b is equivalent to b < a. So (<)
 // ==> (>).
@@ -453,12 +453,18 @@ bool isFirstBlock(IRInst* inst);
 bool isSpecConstRateType(IRType* type);
 void hoistInstAndOperandsToGlobal(IRBuilder* builder, IRInst* inst);
 IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* oldType);
+IRType* ensureSpecConstRate(IRBuilder* builder, IRType* type);
 bool canOperationBeSpecConst(
     IROp op,
     IRType* resultType,
     IRInst* const* fixedArgs,
     IRUse* operands);
-bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs);
+bool shouldHaveSpecConstRate(
+    IROp op,
+    IRType* resultType,
+    UInt operandCount,
+    IRInst* const* operands);
+bool isInstHoistable(IROp op);
 
 // most of <algorithm> doesn't work on out non-const iterators, so define this
 // version

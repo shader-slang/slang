@@ -20,10 +20,11 @@ import ci_visualization
 
 
 class TestRunnerTypeCoverage(unittest.TestCase):
-    def test_classify_group_supports_all_three_gcp_runner_types(self):
+    def test_classify_group_supports_all_gcp_runner_types(self):
         config = {
             "label_groups": [],
             "runner_name_prefixes": [
+                {"prefix": "linux-sm80plus-", "name": "Linux SM80Plus GPU (GCP)", "self_hosted": True},
                 {"prefix": "linux-runner-", "name": "Linux GPU (GCP)", "self_hosted": True},
                 {"prefix": "win-build-", "name": "Windows Build (GCP)", "self_hosted": True},
                 {"prefix": "win-runner-", "name": "Windows GPU (GCP)", "self_hosted": True},
@@ -31,10 +32,13 @@ class TestRunnerTypeCoverage(unittest.TestCase):
             "non_production_periods": {"runners": {}},
         }
 
+        sm80_group, sm80_self_hosted = ci_visualization.classify_group([], config, "linux-sm80plus-1")
         linux_group, linux_self_hosted = ci_visualization.classify_group([], config, "linux-runner-1")
         build_group, build_self_hosted = ci_visualization.classify_group([], config, "win-build-5")
         gpu_group, gpu_self_hosted = ci_visualization.classify_group([], config, "win-runner-3")
 
+        self.assertEqual(sm80_group, "Linux SM80Plus GPU (GCP)")
+        self.assertTrue(sm80_self_hosted)
         self.assertEqual(linux_group, "Linux GPU (GCP)")
         self.assertTrue(linux_self_hosted)
         self.assertEqual(build_group, "Windows Build (GCP)")
@@ -42,7 +46,29 @@ class TestRunnerTypeCoverage(unittest.TestCase):
         self.assertEqual(gpu_group, "Windows GPU (GCP)")
         self.assertTrue(gpu_self_hosted)
 
-    def test_record_snapshot_counts_all_three_gcp_runner_types(self):
+    def test_classify_group_supports_sm80plus_without_generic_gpu_label(self):
+        config = {
+            "label_groups": [
+                {
+                    "labels": ["Linux", "self-hosted", "SM80Plus"],
+                    "name": "Linux SM80Plus GPU (GCP)",
+                    "self_hosted": True,
+                },
+                {"labels": ["Linux", "self-hosted", "GPU"], "name": "Linux GPU (GCP)", "self_hosted": True},
+            ],
+            "runner_name_prefixes": [],
+            "non_production_periods": {"runners": {}},
+        }
+
+        group, self_hosted = ci_visualization.classify_group(
+            ["Linux", "self-hosted", "SM80Plus"],
+            config,
+        )
+
+        self.assertEqual(group, "Linux SM80Plus GPU (GCP)")
+        self.assertTrue(self_hosted)
+
+    def test_record_snapshot_counts_all_gcp_runner_types(self):
         queue_data = {
             "summary": {
                 "jobs_queued": 4,
@@ -52,12 +78,14 @@ class TestRunnerTypeCoverage(unittest.TestCase):
             },
             "self_hosted_runners": [
                 {"group": "Linux GPU (GCP)", "status": "online", "busy": True},
+                {"group": "Linux SM80Plus GPU (GCP)", "status": "online", "busy": True},
                 {"group": "Windows Build (GCP)", "status": "online", "busy": False},
                 {"group": "Windows GPU (GCP)", "status": "online", "busy": True},
                 {"group": "Windows GPU (GCP)", "status": "offline", "busy": True},
             ],
             "queue_by_group": [
                 {"name": "Linux GPU (GCP)", "queued": 1, "running": 2},
+                {"name": "Linux SM80Plus GPU (GCP)", "queued": 1, "running": 1},
                 {"name": "Windows Build (GCP)", "queued": 3, "running": 4},
                 {"name": "Windows GPU (GCP)", "queued": 5, "running": 6},
             ],
@@ -69,10 +97,11 @@ class TestRunnerTypeCoverage(unittest.TestCase):
                 snapshot = json.loads(f.readline())
 
         self.assertEqual(snapshot["runner_groups"]["Linux GPU (GCP)"], {"busy": 1, "total": 1})
+        self.assertEqual(snapshot["runner_groups"]["Linux SM80Plus GPU (GCP)"], {"busy": 1, "total": 1})
         self.assertEqual(snapshot["runner_groups"]["Windows Build (GCP)"], {"busy": 0, "total": 1})
         self.assertEqual(snapshot["runner_groups"]["Windows GPU (GCP)"], {"busy": 1, "total": 1})
 
-    def test_build_history_chart_includes_all_three_gcp_runner_types(self):
+    def test_build_history_chart_includes_all_gcp_runner_types(self):
         snapshots = [
             {
                 "timestamp": "2026-03-03T10:00:00Z",
@@ -82,6 +111,7 @@ class TestRunnerTypeCoverage(unittest.TestCase):
                 "runs_in_progress": 4,
                 "runner_groups": {
                     "Linux GPU (GCP)": {"total": 1},
+                    "Linux SM80Plus GPU (GCP)": {"total": 1},
                     "Windows Build (GCP)": {"total": 2},
                     "Windows GPU (GCP)": {"total": 3},
                 },
@@ -94,6 +124,7 @@ class TestRunnerTypeCoverage(unittest.TestCase):
                 "runs_in_progress": 5,
                 "runner_groups": {
                     "Linux GPU (GCP)": {"total": 2},
+                    "Linux SM80Plus GPU (GCP)": {"total": 1},
                     "Windows Build (GCP)": {"total": 3},
                     "Windows GPU (GCP)": {"total": 4},
                 },
@@ -102,10 +133,11 @@ class TestRunnerTypeCoverage(unittest.TestCase):
 
         html = ci_health.build_history_chart(snapshots)
         self.assertIn("Linux GPU (GCP)", html)
+        self.assertIn("Linux SM80Plus GPU (GCP)", html)
         self.assertIn("Windows Build (GCP)", html)
         self.assertIn("Windows GPU (GCP)", html)
 
-    def test_generate_health_html_renders_all_three_gcp_runner_tables(self):
+    def test_generate_health_html_renders_all_gcp_runner_tables(self):
         queue_data = {
             "summary": {
                 "jobs_queued": 1,
@@ -115,6 +147,7 @@ class TestRunnerTypeCoverage(unittest.TestCase):
             },
             "self_hosted_runners": [
                 {"name": "linux-runner-1", "group": "Linux GPU (GCP)", "status": "online", "busy": True},
+                {"name": "linux-sm80plus-1", "group": "Linux SM80Plus GPU (GCP)", "status": "online", "busy": True},
                 {"name": "win-build-1", "group": "Windows Build (GCP)", "status": "online", "busy": False},
                 {"name": "win-runner-1", "group": "Windows GPU (GCP)", "status": "online", "busy": True},
             ],
@@ -128,6 +161,7 @@ class TestRunnerTypeCoverage(unittest.TestCase):
                 html = f.read()
 
         self.assertIn("Linux GPU (GCP)", html)
+        self.assertIn("Linux SM80Plus GPU (GCP)", html)
         self.assertIn("Windows Build (GCP)", html)
         self.assertIn("Windows GPU (GCP)", html)
 
@@ -147,8 +181,9 @@ class TestRunnerTypeCoverage(unittest.TestCase):
             with open(os.path.join(tmp, "health.html"), encoding="utf-8") as f:
                 html = f.read()
 
-        # All three groups should appear even when no runners are online
+        # All GCP groups should appear even when no runners are online
         self.assertIn("Linux GPU (GCP)", html)
+        self.assertIn("Linux SM80Plus GPU (GCP)", html)
         self.assertIn("Windows Build (GCP)", html)
         self.assertIn("Windows GPU (GCP)", html)
         self.assertIn("scales to zero when idle", html)
@@ -269,6 +304,56 @@ class TestStatisticsRunnerNamePrefixes(unittest.TestCase):
                 html = f.read()
 
         self.assertIn("Windows Build (GCP)", html)
+
+    def test_statistics_range_filter_wires_parallel_and_queue_percentile_charts(self):
+        """Range selector must update Average Concurrent Runners and queue percentiles."""
+        config = {
+            "label_groups": [],
+            "runner_name_prefixes": [
+                {"prefix": "linux-runner-", "name": "Linux GPU (GCP)", "self_hosted": True},
+            ],
+            "non_production_periods": {"runners": {}},
+        }
+
+        base = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
+        jobs = []
+        for offset in (3, 2):
+            created = (base - ci_health.timedelta(days=offset)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            completed = (
+                base - ci_health.timedelta(days=offset) + ci_health.timedelta(minutes=30)
+            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+            jobs.append(
+                {
+                    "name": "build-linux-debug",
+                    "workflow_name": "CI",
+                    "run_id": offset,
+                    "run_created_at": created,
+                    "created_at": created,
+                    "started_at": created,
+                    "completed_at": completed,
+                    "conclusion": "success",
+                    "event": "push",
+                    "head_branch": "main",
+                    "labels": [],
+                    "runner_name": "linux-runner-1",
+                    "duration_seconds": 1800,
+                    "queued_seconds": offset * 60,
+                    "html_url": "",
+                }
+            )
+
+        data = ci_visualization.process_jobs(jobs, config)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_visualization.generate_statistics(data, config, tmp)
+            with open(os.path.join(tmp, "statistics.html"), encoding="utf-8") as f:
+                html = f.read()
+
+        self.assertIn("makeChart('parallelRate_canvas', 'line'", html)
+        self.assertIn("_allData", html)
+        self.assertIn("const allQueueWaitAvg =", html)
+        self.assertIn("const allQueueWaitP95 =", html)
+        self.assertIn("makeChart('queueWait_canvas', 'line'", html)
 
 
 class TestPRsMergedChart(unittest.TestCase):

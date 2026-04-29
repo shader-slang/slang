@@ -786,11 +786,17 @@ Extensions
 `spvFragmentShaderPixelInterlockEXT`
 > Represents the SPIR-V capability for using SPV_EXT_fragment_shader_interlock.
 
+`spvGroupNonUniform`
+> Represents the SPIR-V GroupNonUniform capability (basic subgroup operations).
+
 `spvGroupNonUniformArithmetic`
 > Represents the SPIR-V capability for group non-uniform arithmetic operations.
 
 `spvGroupNonUniformBallot`
 > Represents the SPIR-V capability for group non-uniform ballot operations.
+
+`spvGroupNonUniformClustered`
+> Represents the SPIR-V capability for group non-uniform clustered operations.
 
 `spvGroupNonUniformPartitionedNV`
 > Represents the SPIR-V capability for group non-uniform partitioned operations.
@@ -803,6 +809,9 @@ Extensions
 
 `spvGroupNonUniformShuffle`
 > Represents the SPIR-V capability for group non-uniform shuffle operations.
+
+`spvGroupNonUniformShuffleRelative`
+> Represents the SPIR-V capability for group non-uniform shuffle relative operations.
 
 `spvGroupNonUniformVote`
 > Represents the SPIR-V capability for group non-uniform vote operations.
@@ -1096,6 +1105,9 @@ Compound Capabilities
 `cpp_cuda_metal_spirv`
 > CPP, CUDA, Metal, and SPIRV code-gen targets
 
+`cpp_cuda_metal_spirv_llvm`
+> CPP, CUDA, Metal, SPIRV, and LLVM code-gen targets
+
 `cpp_cuda_spirv`
 > CPP, CUDA and SPIRV code-gen targets
 
@@ -1161,6 +1173,9 @@ Compound Capabilities
 
 `cuda_hlsl_spirv`
 > CUDA, HLSL, SPIRV code-gen targets
+
+`cuda_metal_spirv`
+> CUDA, Metal and SPIRV code-gen targets
 
 `cuda_spirv`
 > CUDA and SPIRV code-gen targets

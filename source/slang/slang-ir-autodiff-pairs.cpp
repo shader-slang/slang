@@ -100,7 +100,8 @@ struct DifferentialPairTypeBuilder
             {
                 auto genericType = findInnerMostGenericReturnVal(
                     as<IRGeneric>(ptrInnerSpecializedType->getBase()));
-                if (const auto genericBasePairStructType = as<IRStructType>(genericType))
+                if (const auto genericBasePairStructType = as<IRStructType>(genericType);
+                    genericBasePairStructType)
                 {
                     return as<IRFieldAddress>(builder->emitFieldAddress(
                         builder->getPtrType((IRType*)findSpecializationForParam(
@@ -302,7 +303,7 @@ struct DifferentialPairTypeBuilder
             for (UInt i = 0; i < typePack->getOperandCount(); i++)
             {
                 auto type = (IRType*)typePack->getOperand(i);
-                auto diffType = (IRType*)typePack->getOperand(i);
+                auto diffType = (IRType*)diffTypePack->getOperand(i);
 
                 if (pairTypeCache.tryGetValue(type, result))
                 {
