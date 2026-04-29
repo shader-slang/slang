@@ -20,7 +20,8 @@ ExecStart=/opt/scaler/scaler \
     --gcp-instance-template=linux-gpu-runner-sm80plus-l4 \
     --gcp-gpu-type=nvidia-l4 \
     --platform=linux \
-    --vm-prefix=linux-sm80plus
+    --vm-prefix=linux-sm80plus \
+    --session-max-age=2h
 
 EnvironmentFile=/opt/scaler/scaler.env
 
