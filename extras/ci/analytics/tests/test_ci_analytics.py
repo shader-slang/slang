@@ -211,6 +211,19 @@ class TestGpuQuota(unittest.TestCase):
                 self.assertIn(warning, stderr.getvalue())
                 self.assertIn("using defaults", stderr.getvalue())
 
+    def test_load_gpu_quota_metrics_distinguishes_missing_from_empty_config(self):
+        with mock.patch("builtins.open", mock.mock_open(read_data=json.dumps({}))):
+            missing_metrics = ci_health.load_gpu_quota_metrics()
+
+        stderr = io.StringIO()
+        with mock.patch("builtins.open", mock.mock_open(read_data=json.dumps({"gpu_quota_metrics": []}))):
+            with contextlib.redirect_stderr(stderr):
+                empty_metrics = ci_health.load_gpu_quota_metrics()
+
+        self.assertEqual(missing_metrics, ci_health.DEFAULT_GPU_QUOTA_METRICS)
+        self.assertEqual(empty_metrics, [])
+        self.assertEqual(stderr.getvalue(), "")
+
     def test_fetch_gpu_quota_honors_explicit_empty_metric_list(self):
         with mock.patch("ci_health.subprocess.run") as run:
             quota = ci_health.fetch_gpu_quota([])

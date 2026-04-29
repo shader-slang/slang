@@ -112,7 +112,10 @@ def load_gpu_quota_metrics():
     if not isinstance(config, dict):
         return _default_gpu_quota_metrics("root must be an object")
 
-    configured_metrics = config.get("gpu_quota_metrics", [])
+    if "gpu_quota_metrics" not in config:
+        return _default_gpu_quota_metrics()
+
+    configured_metrics = config["gpu_quota_metrics"]
     if not isinstance(configured_metrics, list):
         return _default_gpu_quota_metrics("gpu_quota_metrics must be a list")
 
@@ -138,7 +141,7 @@ def load_gpu_quota_metrics():
             "name": name,
             "regions": list(dict.fromkeys(regions)),
         })
-    return metrics or _default_gpu_quota_metrics()
+    return metrics
 
 
 def fetch_gpu_quota(metrics=None):
