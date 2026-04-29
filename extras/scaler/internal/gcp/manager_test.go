@@ -212,6 +212,8 @@ func TestSelectZoneErrorsOnEmptyCandidates(t *testing.T) {
 
 	if _, err := m.selectZone(context.Background()); err == nil {
 		t.Fatal("selectZone should fail for empty candidate list")
+	} else if !strings.Contains(err.Error(), "no zone candidates available") {
+		t.Fatalf("selectZone error = %q, want empty-candidate failure", err)
 	}
 }
 
