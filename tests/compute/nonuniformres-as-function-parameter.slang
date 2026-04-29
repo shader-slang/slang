@@ -68,7 +68,7 @@ void main(uint3 pixelIndex : SV_DispatchThreadID)
     uint nonUniformIdx = NonUniformResourceIndex(bufferIdx);
     RWStructuredBuffer<uint> buffer = globalBuffer[nonUniformIdx];
 
-    // CHECK_SPV: %[[VAR1]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %bufferIdx
+    // CHECK_SPV: %[[VAR1_AC:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %bufferIdx
 
     // CHECK_GLSL_SPV: %[[VAR1]] = OpCopyObject %uint %{{.*}}
 
@@ -89,7 +89,7 @@ void main(uint3 pixelIndex : SV_DispatchThreadID)
 
     // Test case 2: Make sure we cover the case for the different data type of the index.
     // In this case, slang will specialize the function to 'MyStruct func(int)'
-    // CHECK_SPV: %[[VAR2]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %bufferIdx2
+    // CHECK_SPV: %[[VAR2_AC:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %bufferIdx2
 
 
     // CHECK_GLSL_SPV: %[[VAR2]] = OpCopyObject %int %{{.*}}
@@ -145,4 +145,3 @@ void main(uint3 pixelIndex : SV_DispatchThreadID)
     outputBuffer[2] = uint3(myStruct3.a, myStruct3.b, myStruct3.c);
     outputBuffer[3] = uint3(myStruct4.a, myStruct4.b, myStruct4.c);
 }
-
