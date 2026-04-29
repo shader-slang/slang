@@ -1961,6 +1961,13 @@ err(
     span { loc = "location", message = "function has both IDifferentiable value types and IDifferentiablePtrType outputs, which is not currently supported. Please split the function so that differentiable value parameters and pointer differentiable outputs are in separate functions." }
 )
 
+warning(
+    "cannot-synthesize-dadd-dzero-for-custom-differential",
+    30119,
+    "cannot synthesize complete differential method",
+    span { loc = "typeDecl:Decl", message = "cannot synthesize a complete '~methodName:Name' for type '~typeDecl' because its 'Differential' type contains fields that are not differentiable. Provide a user-defined '~methodName:Name' implementation." }
+)
+
 
 -- Load semantic checking diagnostics (part 3) - Include, Visibility, and Capability
 -- (inlined from slang-diagnostics-semantic-checking-3.lua)
