@@ -190,6 +190,34 @@ class TestRunnerTypeCoverage(unittest.TestCase):
 
 
 class TestGpuQuota(unittest.TestCase):
+    def test_load_gpu_quota_metrics_falls_back_for_malformed_config(self):
+        cases = [
+            (["not", "an", "object"], "root must be an object"),
+            ({"gpu_quota_metrics": {"metric": "NVIDIA_L4_GPUS"}}, "gpu_quota_metrics must be a list"),
+            (
+                {"gpu_quota_metrics": [{"metric": "NVIDIA_L4_GPUS", "regions": "us-central1"}]},
+                "regions must be a non-empty string list",
+            ),
+        ]
+
+        for payload, warning in cases:
+            with self.subTest(payload=payload):
+                stderr = io.StringIO()
+                with mock.patch("builtins.open", mock.mock_open(read_data=json.dumps(payload))):
+                    with contextlib.redirect_stderr(stderr):
+                        metrics = ci_health.load_gpu_quota_metrics()
+
+                self.assertEqual(metrics, ci_health.DEFAULT_GPU_QUOTA_METRICS)
+                self.assertIn(warning, stderr.getvalue())
+                self.assertIn("using defaults", stderr.getvalue())
+
+    def test_fetch_gpu_quota_honors_explicit_empty_metric_list(self):
+        with mock.patch("ci_health.subprocess.run") as run:
+            quota = ci_health.fetch_gpu_quota([])
+
+        self.assertIsNone(quota)
+        run.assert_not_called()
+
     def test_fetch_gpu_quota_fetches_configured_gpu_metrics(self):
         responses = {
             "us-central1": {
@@ -206,7 +234,7 @@ class TestGpuQuota(unittest.TestCase):
         }
 
         def fake_run(cmd, **kwargs):
-            region = cmd[4]
+            region = cmd[cmd.index("describe") + 1]
             return mock.Mock(
                 returncode=0,
                 stdout=json.dumps(responses[region]),

@@ -91,6 +91,15 @@ def _copy_gpu_quota_metrics(metrics):
     ]
 
 
+def _default_gpu_quota_metrics(reason=None):
+    if reason:
+        print(
+            f"Warning: invalid gpu_quota_metrics in runner_config.json: {reason}; using defaults",
+            file=sys.stderr,
+        )
+    return _copy_gpu_quota_metrics(DEFAULT_GPU_QUOTA_METRICS)
+
+
 def load_gpu_quota_metrics():
     """Load GPU quota metrics from runner_config.json."""
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "runner_config.json")
@@ -98,20 +107,38 @@ def load_gpu_quota_metrics():
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
     except (OSError, json.JSONDecodeError):
-        return _copy_gpu_quota_metrics(DEFAULT_GPU_QUOTA_METRICS)
+        return _default_gpu_quota_metrics()
+
+    if not isinstance(config, dict):
+        return _default_gpu_quota_metrics("root must be an object")
+
+    configured_metrics = config.get("gpu_quota_metrics", [])
+    if not isinstance(configured_metrics, list):
+        return _default_gpu_quota_metrics("gpu_quota_metrics must be a list")
 
     metrics = []
-    for entry in config.get("gpu_quota_metrics", []):
+    for index, entry in enumerate(configured_metrics):
+        if not isinstance(entry, dict):
+            return _default_gpu_quota_metrics(f"entry {index} must be an object")
         metric = entry.get("metric")
         regions = entry.get("regions", [])
-        if not metric or not regions:
-            continue
+        name = entry.get("name", metric)
+        if not isinstance(metric, str) or not metric:
+            return _default_gpu_quota_metrics(f"entry {index} metric must be a non-empty string")
+        if not isinstance(name, str) or not name:
+            return _default_gpu_quota_metrics(f"entry {index} name must be a non-empty string")
+        if (
+            not isinstance(regions, list)
+            or not regions
+            or any(not isinstance(region, str) or not region for region in regions)
+        ):
+            return _default_gpu_quota_metrics(f"entry {index} regions must be a non-empty string list")
         metrics.append({
             "metric": metric,
-            "name": entry.get("name", metric),
+            "name": name,
             "regions": list(dict.fromkeys(regions)),
         })
-    return metrics or _copy_gpu_quota_metrics(DEFAULT_GPU_QUOTA_METRICS)
+    return metrics or _default_gpu_quota_metrics()
 
 
 def fetch_gpu_quota(metrics=None):
@@ -120,7 +147,7 @@ def fetch_gpu_quota(metrics=None):
     Returns a dict with a 'by_metric' breakdown plus legacy T4 'usage',
     'limit', and 'regions' fields, or None if gcloud is unavailable.
     """
-    metric_configs = metrics or load_gpu_quota_metrics()
+    metric_configs = load_gpu_quota_metrics() if metrics is None else metrics
     if not metric_configs:
         return None
 
