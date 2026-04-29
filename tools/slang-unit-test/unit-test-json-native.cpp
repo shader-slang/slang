@@ -97,6 +97,27 @@ static const StructRttiInfo _makeArrayStyleOptionalFieldsTestStructRtti()
 /* static */ const StructRttiInfo ArrayStyleOptionalFieldsTestStruct::g_rttiInfo =
     _makeArrayStyleOptionalFieldsTestStructRtti();
 
+struct ArrayStyleRequiredAfterOptionalTestStruct
+{
+    String first;
+    String optionalMiddle;
+    String requiredTail;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
+static const StructRttiInfo _makeArrayStyleRequiredAfterOptionalTestStructRtti()
+{
+    ArrayStyleRequiredAfterOptionalTestStruct obj;
+    StructRttiBuilder builder(&obj, "ArrayStyleRequiredAfterOptionalTestStruct", nullptr);
+    builder.addField("first", &obj.first);
+    builder.addField("optionalMiddle", &obj.optionalMiddle, StructRttiInfo::Flag::Optional);
+    builder.addField("requiredTail", &obj.requiredTail);
+    return builder.make();
+}
+/* static */ const StructRttiInfo ArrayStyleRequiredAfterOptionalTestStruct::g_rttiInfo =
+    _makeArrayStyleRequiredAfterOptionalTestStructRtti();
+
 } // namespace
 
 
@@ -205,6 +226,8 @@ static SlangResult _checkStructFields(
     {
         SLANG_CHECK(String(info.m_fields[i].m_name) == expectedFields[i].name);
         SLANG_CHECK(info.m_fields[i].m_offset == expectedFields[i].offset);
+        // Keep protocol field flags stable: marking an existing field Optional changes
+        // array-style compatibility for external clients compiled against this header.
         SLANG_CHECK(info.m_fields[i].m_flags == expectedFields[i].flags);
     }
 
@@ -344,6 +367,65 @@ static SlangResult _checkArrayStyleOptionalFields()
         SLANG_CHECK(args.toolName == "render-test");
         SLANG_CHECK(args.args.getCount() == 2);
         SLANG_CHECK(args.optionalNote == "diagnostic-note");
+    }
+
+    // Test: Array-style parsing rejects a missing required field after an Optional field.
+    {
+        const char* json = R"(["first"])";
+        ArrayStyleRequiredAfterOptionalTestStruct args;
+
+        DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
+        RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
+
+        String contents(json);
+        SourceFile* sourceFile =
+            sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, &sink);
+
+        JSONBuilder builder(container);
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
+
+        JSONToNativeConverter converter(container, &typeMap, &sink);
+        SLANG_CHECK(SLANG_FAILED(converter.convertArrayToStruct(
+            builder.getRootValue(),
+            GetRttiInfo<ArrayStyleRequiredAfterOptionalTestStruct>::get(),
+            &args)));
+        SLANG_CHECK(sink.getErrorCount() > 0);
+    }
+
+    // Test: Array-style parsing accepts all fields in a struct with an Optional middle field.
+    {
+        const char* json = R"(["first", "middle", "tail"])";
+        ArrayStyleRequiredAfterOptionalTestStruct args;
+
+        DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
+        RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
+
+        String contents(json);
+        SourceFile* sourceFile =
+            sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, &sink);
+
+        JSONBuilder builder(container);
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
+
+        JSONToNativeConverter converter(container, &typeMap, &sink);
+        SLANG_RETURN_ON_FAIL(converter.convertArrayToStruct(
+            builder.getRootValue(),
+            GetRttiInfo<ArrayStyleRequiredAfterOptionalTestStruct>::get(),
+            &args));
+
+        SLANG_CHECK(args.first == "first");
+        SLANG_CHECK(args.optionalMiddle == "middle");
+        SLANG_CHECK(args.requiredTail == "tail");
     }
 
     // Test: Array-style parsing rejects a missing required field.

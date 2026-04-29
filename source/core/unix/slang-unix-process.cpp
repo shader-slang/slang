@@ -24,60 +24,47 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef __linux__
+#include <sys/ioctl.h>
+#endif
 
 extern char** environ;
 
 namespace Slang
 {
 
-// Helper function to read pipe buffer information on Linux
+// Helper function to read pipe buffer information on Linux.
 static void logPipeBufferInfo(int fd, const char* operation)
 {
 #ifdef __linux__
-    char path[64];
-    snprintf(path, sizeof(path), "/proc/self/fdinfo/%d", fd);
+#ifndef F_GETPIPE_SZ
+    static const int kFGetPipeSize = 1032;
+#else
+    static const int kFGetPipeSize = F_GETPIPE_SZ;
+#endif
 
-    FILE* f = fopen(path, "r");
-    if (f)
+    int pipeSize = ::fcntl(fd, kFGetPipeSize);
+    int pipeBytes = 0;
+    if (pipeSize > 0 && ::ioctl(fd, FIONREAD, &pipeBytes) == 0)
     {
-        char line[256];
-        int pipeSize = 0;
-        int pipeBytes = 0;
+        float fillPercent = (float)pipeBytes * 100.0f / (float)pipeSize;
+        fprintf(
+            stderr,
+            "[PIPE-BUFFER] %s fd=%d: %d/%d bytes (%.1f%% full)\n",
+            operation,
+            fd,
+            pipeBytes,
+            pipeSize,
+            fillPercent);
 
-        while (fgets(line, sizeof(line), f))
+        // Warn if buffer is getting full.
+        if (fillPercent > 75.0f)
         {
-            if (strncmp(line, "pipe-buf-size:", 14) == 0)
-            {
-                sscanf(line + 14, "%d", &pipeSize);
-            }
-            else if (strncmp(line, "pipe-buf-usage:", 15) == 0)
-            {
-                sscanf(line + 15, "%d", &pipeBytes);
-            }
-        }
-        fclose(f);
-
-        if (pipeSize > 0)
-        {
-            float fillPercent = (float)pipeBytes * 100.0f / (float)pipeSize;
             fprintf(
                 stderr,
-                "[PIPE-BUFFER] %s fd=%d: %d/%d bytes (%.1f%% full)\n",
-                operation,
+                "[PIPE-WARNING] Buffer nearly full on fd=%d: %.1f%%\n",
                 fd,
-                pipeBytes,
-                pipeSize,
                 fillPercent);
-
-            // Warn if buffer is getting full
-            if (fillPercent > 75.0f)
-            {
-                fprintf(
-                    stderr,
-                    "[PIPE-WARNING] Buffer nearly full on fd=%d: %.1f%%\n",
-                    fd,
-                    fillPercent);
-            }
         }
     }
 #else
