@@ -76,20 +76,53 @@ runs:
       shell: bash
       run: |
         echo "Checking supported backends"
-        # Capture the output of slang-test while also displaying it
-        # Add retry logic for intermittent failures
-        for attempt in 1 2 3; do
-          if smokeResult=$("$bin_dir/slang-test" "tests/render/check-backend-support-on-ci.slang" 2>&1); then
-            break
-          else
-            echo "⚠️  Attempt $attempt failed, retrying..."
-            if [ $attempt -eq 3 ]; then
-              echo "❌ ERROR: slang-test failed to run after 3 attempts"
-              echo "Output: $smokeResult"
-              exit 1
+
+        # Per-OS list of APIs the smoke check must report as Supported. If any
+        # are missing we retry — device startup (e.g. Metal on the macOS VM)
+        # occasionally fails on the first try and recovers on a retry.
+        required_apis=()
+        if [[ "${{ inputs.os }}" == "macos" ]]; then
+          required_apis=("mtl,metal")
+        elif [[ "${{ inputs.os }}" == "windows" ]]; then
+          required_apis=("vk,vulkan" "dx12,d3d12" "dx11,d3d11" "cuda")
+        fi
+
+        # Returns 0 if every required API appears as "<api>: Supported" in the smoke output.
+        all_required_apis_supported() {
+          local out=$1
+          for api in "${required_apis[@]}"; do
+            if ! echo "$out" | grep -qi "${api}: Supported"; then
+              return 1
             fi
-            sleep 2
+          done
+          return 0
+        }
+
+        # Capture the output of slang-test while also displaying it.
+        # Retry on either a non-zero exit or a missing required API.
+        for attempt in 1 2 3; do
+          smokeResult=$("$bin_dir/slang-test" "tests/render/check-backend-support-on-ci.slang" 2>&1)
+          smokeStatus=$?
+          if [ "$smokeStatus" -eq 0 ] && all_required_apis_supported "$smokeResult"; then
+            break
           fi
+          if [ "$smokeStatus" -ne 0 ]; then
+            echo "⚠️  Attempt $attempt: slang-test exited with status $smokeStatus, retrying..."
+          else
+            missing=()
+            for api in "${required_apis[@]}"; do
+              if ! echo "$smokeResult" | grep -qi "${api}: Supported"; then
+                missing+=("$api")
+              fi
+            done
+            echo "⚠️  Attempt $attempt: required API(s) not detected: ${missing[*]}, retrying..."
+          fi
+          if [ "$attempt" -eq 3 ]; then
+            echo "❌ ERROR: smoke check failed after 3 attempts"
+            echo "Output: $smokeResult"
+            exit 1
+          fi
+          sleep 2
         done
         supportedBackends="$(echo "$smokeResult" | grep 'Supported backends: ')"
         echo "$smokeResult"
