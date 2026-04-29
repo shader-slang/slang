@@ -1,17 +1,13 @@
-//TEST:SIMPLE(filecheck=CHK): -target hlsl -stage node -entry main
+//TEST:SIMPLE(filecheck=CHK): -target dxil-asm -stage node -entry main -profile lib_6_8
 
 // Test that EmptyNodeInput, EmptyNodeOutput, and EmptyNodeOutputArray compile
 // and emit correctly.
 
-struct MyRecord
-{
-    uint value;
-};
-
+// EmptyNodeInput is valid for coalescing-launch nodes; EmptyNodeOutput and
+// EmptyNodeOutputArray are valid for any launch type.
 [shader("node")]
-[NodeLaunch("broadcasting")]
-[NodeMaxDispatchGrid(1, 1, 1)]
-[numthreads(1, 1, 1)]
+[NodeLaunch("coalescing")]
+[numthreads(4, 1, 1)]
 void main(
     EmptyNodeInput input,
     EmptyNodeOutput outputA,
@@ -19,12 +15,12 @@ void main(
 {
     uint count = input.Count();
     if (outputA.IsValid())
-        outputA.OutputComplete();
+        outputA.ThreadIncrementOutputCount(1);
     EmptyNodeOutput elem = outputArr[0];
     if (elem.IsValid())
-        elem.OutputComplete();
+        elem.ThreadIncrementOutputCount(1);
 }
 
-//CHK: EmptyNodeInput
-//CHK: EmptyNodeOutput
-//CHK: EmptyNodeOutputArray
+//CHK: dx.op.createNodeOutputHandle
+//CHK: dx.op.nodeOutputIsValid
+//CHK: dx.op.incrementOutputCount

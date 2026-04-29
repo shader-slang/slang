@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHK): -target hlsl -stage node -entry main
+//TEST:SIMPLE(filecheck=CHK): -target dxil-asm -stage node -entry main -profile lib_6_8
 
 // Test that NodeOutputArray compiles and emits indexing correctly.
 
@@ -9,7 +9,7 @@ struct MyRecord
 
 [shader("node")]
 [NodeLaunch("broadcasting")]
-[NodeMaxDispatchGrid(4, 1, 1)]
+[NodeDispatchGrid(4, 1, 1)]
 [numthreads(4, 1, 1)]
 void main(
     DispatchNodeInputRecord<MyRecord> input,
@@ -24,5 +24,6 @@ void main(
     }
 }
 
-//CHK: NodeOutputArray
-//CHK: NodeOutput
+//CHK: dx.op.createNodeOutputHandle
+//CHK: dx.op.indexNodeHandle
+//CHK: dx.op.allocateNodeOutputRecords
