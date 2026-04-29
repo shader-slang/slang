@@ -48,12 +48,12 @@ on:
         required: false
         type: boolean
         default: false
+        description: "Restrict slang-test to GPU APIs (vk+cuda+dx11+dx12+mtl+wgpu) while retaining no-API tests needed by multi-step workflows"
       gpu-tier:
         required: false
         type: string
         default: ""
         description: "GPU tier label (e.g., 't4', 'sm80plus'). Used to apply tier-specific skip lists."
-        description: "Restrict slang-test to GPU APIs (vk+cuda+dx11+dx12+mtl+wgpu) while retaining no-API tests needed by multi-step workflows"
 
 jobs:
   test-slang:
