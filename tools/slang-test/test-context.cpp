@@ -5,6 +5,7 @@
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-shared-library.h"
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-test-diagnostics.h"
 #include "../../source/core/slang-test-tool-util.h"
 
 #include <stdio.h>
@@ -37,6 +38,7 @@ void TestContext::setThreadIndex(int index)
 void TestContext::setMaxTestRunnerThreadCount(int count)
 {
     m_jsonRpcConnections.setCount(count);
+    m_testServerStderrStreams.setCount(count);
     m_testRequirements.setCount(count);
     m_reporters.setCount(count);
     for (auto& reporter : m_reporters)
@@ -197,22 +199,31 @@ DownstreamCompilerSet* TestContext::getCompilerSet()
 SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out)
 {
     RefPtr<Process> process;
+    const bool captureTestServerStderr = isTestDiagnosticEnabled("rpc") ||
+                                         isTestDiagnosticEnabled("timing") ||
+                                         isTestDiagnosticEnabled("timing-phases");
 
     {
         CommandLine cmdLine;
         cmdLine.setExecutableLocation(ExecutableLocation(exeDirectoryPath, "test-server"));
 
-        SLANG_RETURN_ON_FAIL(Process::create(
-            cmdLine,
-            Process::Flag::AttachDebugger | Process::Flag::DisableStdErrRedirection,
-            process));
+        Process::Flags flags = Process::Flag::AttachDebugger;
+        if (!captureTestServerStderr)
+        {
+            flags |= Process::Flag::DisableStdErrRedirection;
+        }
+
+        SLANG_RETURN_ON_FAIL(Process::create(cmdLine, flags, process));
     }
 
     Stream* writeStream = process->getStream(StdStreamType::In);
     RefPtr<BufferedReadStream> readStream(
         new BufferedReadStream(process->getStream(StdStreamType::Out)));
-    RefPtr<BufferedReadStream> readErrStream(
-        new BufferedReadStream(process->getStream(StdStreamType::ErrorOut)));
+    RefPtr<BufferedReadStream> readErrStream;
+    if (Stream* stderrStream = process->getStream(StdStreamType::ErrorOut))
+    {
+        readErrStream = new BufferedReadStream(stderrStream);
+    }
 
     RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, writeStream);
     RefPtr<JSONRPCConnection> rpcConnection = new JSONRPCConnection;
@@ -221,6 +232,7 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
         rpcConnection->init(connection, JSONRPCConnection::CallStyle::Default, process));
 
     out = rpcConnection;
+    m_testServerStderrStreams[slangTestThreadIndex] = readErrStream;
 
     return SLANG_OK;
 }
@@ -256,9 +268,44 @@ void TestContext::destroyRPCConnection()
 {
     if (m_jsonRpcConnections[slangTestThreadIndex])
     {
+        drainTestServerStderr();
+
         m_jsonRpcConnections[slangTestThreadIndex]->disconnect();
         m_jsonRpcConnections[slangTestThreadIndex].setNull();
+
+        drainTestServerStderr();
+        m_testServerStderrStreams[slangTestThreadIndex].setNull();
     }
+}
+
+void TestContext::drainTestServerStderr()
+{
+    drainTestServerStderr(slangTestThreadIndex);
+}
+
+void TestContext::drainTestServerStderr(Index threadIndex)
+{
+    if (threadIndex < 0 || threadIndex >= m_testServerStderrStreams.getCount())
+        return;
+
+    auto& stderrStream = m_testServerStderrStreams[threadIndex];
+    if (!stderrStream)
+        return;
+
+    List<uint8_t> buffer;
+    buffer.setCount(4096);
+
+    while (!stderrStream->isEnd())
+    {
+        size_t bytesRead = 0;
+        SlangResult res = stderrStream->read(buffer.getBuffer(), buffer.getCount(), bytesRead);
+
+        if (SLANG_FAILED(res) || bytesRead == 0)
+            break;
+
+        fwrite(buffer.getBuffer(), 1, bytesRead, stderr);
+    }
+    fflush(stderr);
 }
 
 Slang::JSONRPCConnection* TestContext::getOrCreateJSONRPCConnection()

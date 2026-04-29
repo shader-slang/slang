@@ -8,6 +8,7 @@
 #include "../../source/core/slang-shared-library.h"
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-string.h"
+#include "../../source/core/slang-test-diagnostics.h"
 #include "../../source/core/slang-test-tool-util.h"
 #include "../../source/core/slang-writer.h"
 #include "../render-test/slang-support.h"
@@ -17,6 +18,7 @@
 #include "test-server-diagnostics.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +35,68 @@ SLANG_RHI_EXPORT_AGILITY_SDK
 namespace TestServer
 {
 using namespace Slang;
+
+static double _getElapsedTimeInMs(uint64_t startTick)
+{
+    const uint64_t elapsedTicks = Process::getClockTick() - startTick;
+    return (double(elapsedTicks) * 1000.0) / double(Process::getClockFrequency());
+}
+
+static bool _isRPCDiagnosticsEnabled()
+{
+    return isTestDiagnosticEnabled("rpc");
+}
+
+static bool _isTimingDiagnosticsEnabled()
+{
+    return isTestDiagnosticEnabled("timing") || isTestDiagnosticEnabled("timing-phases");
+}
+
+static bool _isTimingPhaseDiagnosticsEnabled()
+{
+    return isTestDiagnosticEnabled("timing-phases");
+}
+
+static void _vwriteDiagnostic(const char* prefix, const char* format, va_list args)
+{
+    fprintf(stderr, "%s ", prefix);
+    vfprintf(stderr, format, args);
+    fprintf(stderr, "\n");
+    fflush(stderr);
+}
+
+static void _writeRPCDiagnostic(const char* format, ...)
+{
+    if (!_isRPCDiagnosticsEnabled())
+        return;
+
+    va_list args;
+    va_start(args, format);
+    _vwriteDiagnostic("[TEST-SERVER-RPC]", format, args);
+    va_end(args);
+}
+
+static void _writeTimingDiagnostic(const char* format, ...)
+{
+    if (!_isTimingDiagnosticsEnabled())
+        return;
+
+    va_list args;
+    va_start(args, format);
+    _vwriteDiagnostic("[TEST-SERVER-TIMING]", format, args);
+    va_end(args);
+}
+
+static void _writeTimingPhaseDiagnostic(const char* format, ...)
+{
+    if (!_isTimingPhaseDiagnosticsEnabled())
+        return;
+
+    va_list args;
+    va_start(args, format);
+    _vwriteDiagnostic("[TEST-SERVER-TIMING]", format, args);
+    va_end(args);
+}
 
 class TestReporter : public ITestReporter
 {
@@ -345,8 +409,26 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
 
 SlangResult TestServer::_executeSingle()
 {
+    const uint64_t waitStartTick = Process::getClockTick();
+    _writeRPCDiagnostic("wait begin pid=%u", Process::getId());
+
     // Block waiting for content (or error/closed)
-    SLANG_RETURN_ON_FAIL(m_connection->waitForResult());
+    SlangResult waitResult = m_connection->waitForResult();
+    if (SLANG_FAILED(waitResult))
+    {
+        _writeRPCDiagnostic(
+            "wait failed pid=%u elapsedMs=%.3f result=0x%08x",
+            Process::getId(),
+            _getElapsedTimeInMs(waitStartTick),
+            uint32_t(waitResult));
+        return waitResult;
+    }
+
+    _writeRPCDiagnostic(
+        "wait complete pid=%u elapsedMs=%.3f hasMessage=%s",
+        Process::getId(),
+        _getElapsedTimeInMs(waitStartTick),
+        m_connection->hasMessage() ? "true" : "false");
 
     // If we don't have a message, we can quit for now
     if (!m_connection->hasMessage())
@@ -362,21 +444,53 @@ SlangResult TestServer::_executeSingle()
         {
             JSONRPCCall call;
             SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&call));
+            String methodName(call.method);
+            _writeRPCDiagnostic(
+                "call received pid=%u method=%s",
+                Process::getId(),
+                methodName.getBuffer());
 
             // Do different things
             if (call.method == TestServerProtocol::QuitArgs::g_methodName)
             {
+                _writeRPCDiagnostic("quit received pid=%u", Process::getId());
                 m_quit = true;
                 return SLANG_OK;
             }
             else if (call.method == TestServerProtocol::ExecuteUnitTestArgs::g_methodName)
             {
-                SLANG_RETURN_ON_FAIL(_executeUnitTest(call));
+                const uint64_t dispatchStartTick = Process::getClockTick();
+                _writeTimingPhaseDiagnostic(
+                    "dispatch begin pid=%u method=%s",
+                    Process::getId(),
+                    methodName.getBuffer());
+
+                SlangResult result = _executeUnitTest(call);
+                _writeTimingDiagnostic(
+                    "dispatch complete pid=%u method=%s elapsedMs=%.3f result=0x%08x",
+                    Process::getId(),
+                    methodName.getBuffer(),
+                    _getElapsedTimeInMs(dispatchStartTick),
+                    uint32_t(result));
+                SLANG_RETURN_ON_FAIL(result);
                 return SLANG_OK;
             }
             else if (call.method == TestServerProtocol::ExecuteToolTestArgs::g_methodName)
             {
-                SLANG_RETURN_ON_FAIL(_executeTool(call));
+                const uint64_t dispatchStartTick = Process::getClockTick();
+                _writeTimingPhaseDiagnostic(
+                    "dispatch begin pid=%u method=%s",
+                    Process::getId(),
+                    methodName.getBuffer());
+
+                SlangResult result = _executeTool(call);
+                _writeTimingDiagnostic(
+                    "dispatch complete pid=%u method=%s elapsedMs=%.3f result=0x%08x",
+                    Process::getId(),
+                    methodName.getBuffer(),
+                    _getElapsedTimeInMs(dispatchStartTick),
+                    uint32_t(result));
+                SLANG_RETURN_ON_FAIL(result);
                 break;
             }
             else
@@ -412,10 +526,17 @@ static Index _findTestIndex(IUnitTestModule* testModule, const String& name)
 
 SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 {
+    const uint64_t totalStartTick = Process::getClockTick();
     auto id = m_connection->getPersistentValue(call.id);
 
     TestServerProtocol::ExecuteUnitTestArgs args;
     SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
+
+    _writeRPCDiagnostic(
+        "unit-test begin pid=%u module=%s test=%s",
+        Process::getId(),
+        args.moduleName.getBuffer(),
+        args.testName.getBuffer());
 
     auto sink = m_connection->getSink();
 
@@ -460,6 +581,12 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 
     UnitTestFunc testFunc = testModule->getTestFunc(testIndex);
 
+    const uint64_t bodyStartTick = Process::getClockTick();
+    _writeTimingPhaseDiagnostic(
+        "unit-test body begin pid=%u module=%s test=%s",
+        Process::getId(),
+        args.moduleName.getBuffer(),
+        args.testName.getBuffer());
     try
     {
         testFunc(&unitTestContext);
@@ -468,6 +595,14 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     {
         testReporter.m_failCount++;
     }
+    _writeTimingDiagnostic(
+        "unit-test body complete pid=%u module=%s test=%s elapsedMs=%.3f failures=%lld tests=%lld",
+        Process::getId(),
+        args.moduleName.getBuffer(),
+        args.testName.getBuffer(),
+        _getElapsedTimeInMs(bodyStartTick),
+        (long long)testReporter.m_failCount,
+        (long long)testReporter.m_testCount);
 
     TestServerProtocol::ExecutionResult result;
     result.result = SLANG_OK;
@@ -484,16 +619,46 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     }
 
     result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
-    return m_connection->sendResult(&result, id);
+
+    const uint64_t sendStartTick = Process::getClockTick();
+    _writeRPCDiagnostic(
+        "unit-test send-result begin pid=%u module=%s test=%s returnCode=%d",
+        Process::getId(),
+        args.moduleName.getBuffer(),
+        args.testName.getBuffer(),
+        result.returnCode);
+    SlangResult sendResult = m_connection->sendResult(&result, id);
+    _writeTimingDiagnostic(
+        "unit-test send-result complete pid=%u module=%s test=%s elapsedMs=%.3f result=0x%08x",
+        Process::getId(),
+        args.moduleName.getBuffer(),
+        args.testName.getBuffer(),
+        _getElapsedTimeInMs(sendStartTick),
+        uint32_t(sendResult));
+    _writeRPCDiagnostic(
+        "unit-test complete pid=%u module=%s test=%s elapsedMs=%.3f result=0x%08x",
+        Process::getId(),
+        args.moduleName.getBuffer(),
+        args.testName.getBuffer(),
+        _getElapsedTimeInMs(totalStartTick),
+        uint32_t(sendResult));
+    return sendResult;
 }
 
 SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 {
+    const uint64_t totalStartTick = Process::getClockTick();
     auto id = m_connection->getPersistentValue(call.id);
 
     TestServerProtocol::ExecuteToolTestArgs args;
 
     SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, id));
+
+    _writeRPCDiagnostic(
+        "tool begin pid=%u tool=%s argc=%lld",
+        Process::getId(),
+        args.toolName.getBuffer(),
+        (long long)args.args.getCount());
 
     auto sink = m_connection->getSink();
 
@@ -542,8 +707,19 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, stdErrorWriter);
     }
 
+    const uint64_t bodyStartTick = Process::getClockTick();
+    _writeTimingPhaseDiagnostic(
+        "tool body begin pid=%u tool=%s",
+        Process::getId(),
+        args.toolName.getBuffer());
     const SlangResult funcRes =
         func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
+    _writeTimingDiagnostic(
+        "tool body complete pid=%u tool=%s elapsedMs=%.3f result=0x%08x",
+        Process::getId(),
+        args.toolName.getBuffer(),
+        _getElapsedTimeInMs(bodyStartTick),
+        uint32_t(funcRes));
 
     TestServerProtocol::ExecutionResult result;
     result.result = funcRes;
@@ -552,7 +728,27 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     result.debugLayer = debugCallback.getString();
 
     result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
-    return m_connection->sendResult(&result, id);
+
+    const uint64_t sendStartTick = Process::getClockTick();
+    _writeRPCDiagnostic(
+        "tool send-result begin pid=%u tool=%s returnCode=%d",
+        Process::getId(),
+        args.toolName.getBuffer(),
+        result.returnCode);
+    SlangResult sendResult = m_connection->sendResult(&result, id);
+    _writeTimingDiagnostic(
+        "tool send-result complete pid=%u tool=%s elapsedMs=%.3f result=0x%08x",
+        Process::getId(),
+        args.toolName.getBuffer(),
+        _getElapsedTimeInMs(sendStartTick),
+        uint32_t(sendResult));
+    _writeRPCDiagnostic(
+        "tool complete pid=%u tool=%s elapsedMs=%.3f result=0x%08x",
+        Process::getId(),
+        args.toolName.getBuffer(),
+        _getElapsedTimeInMs(totalStartTick),
+        uint32_t(sendResult));
+    return sendResult;
 }
 
 SlangResult TestServer::execute()
