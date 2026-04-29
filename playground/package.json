@@ -1,0 +1,48 @@
+{
+  "name": "slang-playground",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "engine/*"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build-engine && run-p type-check build-only",
+    "build-engine": "npm run build -w slang-playground-shared && npm run build --workspaces --exclude=slang-playground-shared",
+    "preview": "vite preview",
+    "build-only": "vite build",
+    "type-check": "vue-tsc --build"
+  },
+  "dependencies": {
+    "@vueuse/core": "^12.5.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "jjsontree.js": "^4.6.4",
+    "lucide-vue-next": "^0.473.0",
+    "monaco-editor": "^0.52.0",
+    "pako": "^2.1.0",
+    "playground-render-canvas": "0.0.1",
+    "playground-uniform-panel": "0.0.1",
+    "slang-compilation-engine": "0.0.1",
+    "slang-playground-shared": "0.0.1",
+    "splitpanes": "^3.1.8",
+    "vue": "^3.5.17"
+  },
+  "devDependencies": {
+    "@tsconfig/node22": "^22.0.0",
+    "@types/emscripten": "^1.39.13",
+    "@types/node": "^22.10.2",
+    "@types/pako": "^2.0.3",
+    "@types/splitpanes": "^2.2.6",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vitejs/plugin-vue-jsx": "^4.1.1",
+    "@vue/tsconfig": "^0.7.0",
+    "@webgpu/types": "^0.1.51",
+    "npm-run-all2": "^7.0.2",
+    "typescript": "^5.8.3",
+    "vite": "^6.0.5",
+    "vite-plugin-vue-devtools": "^7.6.8",
+    "vue-tsc": "^2.1.10"
+  }
+}
