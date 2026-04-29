@@ -1094,50 +1094,60 @@ bool SemanticsVisitor::isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scop
         // apply to `S`, even though the declaration's parent is the extension node rather than the
         // original `S` declaration.
         //
-        auto getTargetTypeForContainer = [&](AggTypeDeclBase* containerDecl) -> Type*
+        struct ContainerTargetTypeResolver
         {
-            if (auto extensionDecl = as<ExtensionDecl>(containerDecl))
-            {
-                auto extensionDeclRef = getDefaultDeclRef(extensionDecl).as<ExtensionDecl>();
-                if (!extensionDeclRef)
-                    return nullptr;
+            SemanticsVisitor* visitor;
+            ASTBuilder* astBuilder;
 
-                auto targetType = getTargetType(m_astBuilder, extensionDeclRef);
-                if (auto targetDeclRefType = as<DeclRefType>(targetType))
+            Type* getTargetTypeForContainer(AggTypeDeclBase* containerDecl)
+            {
+                if (auto extensionDecl = as<ExtensionDecl>(containerDecl))
                 {
-                    if (auto targetCallableDeclRef =
-                            targetDeclRefType->getDeclRef().as<CallableDecl>())
+                    auto extensionDeclRef =
+                        visitor->getDefaultDeclRef(extensionDecl).as<ExtensionDecl>();
+                    if (!extensionDeclRef)
+                        return nullptr;
+
+                    auto targetType = getTargetType(astBuilder, extensionDeclRef);
+                    if (auto targetDeclRefType = as<DeclRefType>(targetType))
                     {
-                        // Auto-diff synthesizes derivative members as extensions on a
-                        // function-as-type. When that function is a member of an aggregate,
-                        // private access should still be governed by the member function's
-                        // owning aggregate, not by the synthetic function type itself.
-                        for (auto parent = targetCallableDeclRef.getDecl()->parentDecl; parent;
-                             parent = parent->parentDecl)
+                        if (auto targetCallableDeclRef =
+                                targetDeclRefType->getDeclRef().as<CallableDecl>())
                         {
-                            if (auto parentAggTypeDecl = as<AggTypeDeclBase>(parent))
-                                return DeclRefType::create(
-                                    m_astBuilder,
-                                    getDefaultDeclRef(parentAggTypeDecl));
-                            if (as<NamespaceDeclBase>(parent))
-                                break;
+                            // Auto-diff synthesizes derivative members as extensions on a
+                            // function-as-type. When that function is a member of an aggregate,
+                            // private access should still be governed by the member function's
+                            // owning aggregate, not by the synthetic function type itself.
+                            //
+                            // The callable can itself be declared in an extension, so resolve the
+                            // parent aggregate through this helper recursively rather than using
+                            // the extension declaration as the semantic container.
+                            if (auto parentAggTypeDecl =
+                                    getParentAggTypeDeclBase(targetCallableDeclRef.getDecl()))
+                            {
+                                return getTargetTypeForContainer(parentAggTypeDecl);
+                            }
                         }
                     }
+
+                    return targetType;
                 }
 
-                return targetType;
+                return DeclRefType::create(astBuilder, visitor->getDefaultDeclRef(containerDecl));
             }
-
-            return DeclRefType::create(m_astBuilder, getDefaultDeclRef(containerDecl));
         };
 
-        auto privateDeclContainerType = getTargetTypeForContainer(parentAggTypeDecl);
+        ContainerTargetTypeResolver targetTypeResolver = {this, m_astBuilder};
+
+        auto privateDeclContainerType =
+            targetTypeResolver.getTargetTypeForContainer(parentAggTypeDecl);
         if (!privateDeclContainerType)
             return false;
 
         auto doesContainerTargetTypeMatch = [&](AggTypeDeclBase* scopeAggTypeDecl) -> bool
         {
-            auto scopeContainerType = getTargetTypeForContainer(scopeAggTypeDecl);
+            auto scopeContainerType =
+                targetTypeResolver.getTargetTypeForContainer(scopeAggTypeDecl);
             if (!scopeContainerType)
                 return false;
 

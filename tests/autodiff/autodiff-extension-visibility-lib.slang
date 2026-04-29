@@ -101,6 +101,11 @@ public struct VisibilityCase
             .d;
     }
 
+    public static float callPrivateExtensionFwd(float x)
+    {
+        return fwd_diff(VisibilityCase.privateExtensionSquare)(diffPair(x, 1.0)).d;
+    }
+
     public static float callPublicBwd(float x)
     {
         var dx = diffPair(x);
@@ -127,5 +132,14 @@ public struct VisibilityCase
         var dx = diffPair(x);
         bwd_diff(VisibilityCase.privateCustomCube)(dx, 1.0);
         return dx.d;
+    }
+}
+
+extension VisibilityCase
+{
+    [ForwardDifferentiable]
+    private static float privateExtensionSquare(float x)
+    {
+        return x * x;
     }
 }
