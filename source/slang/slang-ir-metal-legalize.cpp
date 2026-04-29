@@ -251,11 +251,13 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
 
 static bool isSubpassLoadIntrinsicCall(IRCall* call, CapabilitySet const& targetCaps)
 {
+    if (call->getArgCount() < 1)
+        return false;
+    if (!as<IRSubpassInputType>(call->getArg(0)->getDataType()))
+        return false;
     auto callee = call->getOperand(0);
     if (auto decor = findBestTargetIntrinsicDecoration(callee, targetCaps))
-    {
         return decor->getDefinition() == toSlice("$0");
-    }
     return false;
 }
 
@@ -314,7 +316,12 @@ static void legalizeSubpassInputsForMetal(
             }
         }
         if (!entryPointFunc)
+        {
+            sink->diagnose(
+                Diagnostics::SubpassInputUsedOutsideEntryPoint{
+                    .location = getDiagnosticPos(globalParam)});
             continue;
+        }
 
         IRIntegerValue attachmentIndex = 0;
         if (auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>())
@@ -362,6 +369,7 @@ static void legalizeSubpassInputsForMetal(
                 sink->diagnose(
                     Diagnostics::SubpassInputUsedOutsideEntryPoint{
                         .location = getDiagnosticPos(user)});
+                use->set(newParam);
                 continue;
             }
 
