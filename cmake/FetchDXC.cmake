@@ -456,9 +456,15 @@ if(NOT DEFINED SLANG_DXC_BINARY_URL)
         )
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
-            set(SLANG_DXC_BINARY_URL
-                "https://github.com/microsoft/DirectXShaderCompiler/releases/download/${_dxc_version_tag}/linux_dxc_${_dxc_release_date}.x86_64.tar.gz"
-            )
+            # Reuse the probe tarball already downloaded during GLIBC detection
+            # to avoid fetching the same file twice.
+            if(DEFINED _dxc_probe_tarball AND EXISTS "${_dxc_probe_tarball}")
+                set(SLANG_DXC_BINARY_URL "file://${_dxc_probe_tarball}")
+            else()
+                set(SLANG_DXC_BINARY_URL
+                    "https://github.com/microsoft/DirectXShaderCompiler/releases/download/${_dxc_version_tag}/linux_dxc_${_dxc_release_date}.x86_64.tar.gz"
+                )
+            endif()
         endif()
     endif()
 endif()
