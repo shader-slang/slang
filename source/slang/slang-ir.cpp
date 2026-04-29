@@ -2882,7 +2882,7 @@ IRPtrTypeBase* IRBuilder::getPtrTypeWithAddressSpace(
     IRType* valueType,
     IRPtrTypeBase* ptrWithAddrSpace)
 {
-    if (ptrWithAddrSpace->hasAddressSpace())
+    if (ptrWithAddrSpace->hasAddressSpace() || ptrWithAddrSpace->getDataLayout())
         return (IRPtrTypeBase*)getPtrType(
             ptrWithAddrSpace->getOp(),
             valueType,

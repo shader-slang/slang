@@ -207,6 +207,33 @@ IRInst* getInvalidExistentialSpecializationTarget(IRInst* specializedValue)
     return specializationBase;
 }
 
+// Returns true if a specialization argument transitively derives from an existential.
+// Traces through LookupWitnessMethod chains to find existential roots,
+// handling nested associated types (e.g. outer.Inner.Value) at any depth.
+static bool isSpecArgExistentialDerived(IRInst* inst, int depth = 0)
+{
+    if (depth > 16)
+        return false;
+    switch (inst->getOp())
+    {
+    case kIROp_InterfaceType:
+    case kIROp_ExtractExistentialType:
+    case kIROp_ExtractExistentialWitnessTable:
+    case kIROp_MakeExistential:
+        return true;
+    case kIROp_TypeEqualityWitness:
+        return as<IRInterfaceType>(inst->getOperand(0)) != nullptr;
+    case kIROp_LookupWitnessMethod:
+        return isSpecArgExistentialDerived(
+            as<IRLookupWitnessMethod>(inst)->getWitnessTable(),
+            depth + 1);
+    case kIROp_BuiltinCast:
+        return isSpecArgExistentialDerived(inst->getOperand(0), depth + 1);
+    default:
+        return false;
+    }
+}
+
 bool isInvalidExistentialSpecialization(IRInst* specializedValue)
 {
     if (specializedValue->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
@@ -267,20 +294,8 @@ bool isInvalidExistentialSpecialization(IRInst* specializedValue)
     for (UInt i = 0; i < specialize->getArgCount(); ++i)
     {
         auto arg = specialize->getArg(i);
-        switch (arg->getOp())
-        {
-        case kIROp_InterfaceType:
-        case kIROp_ExtractExistentialType:
-        case kIROp_ExtractExistentialWitnessTable:
-        case kIROp_MakeExistential:
+        if (isSpecArgExistentialDerived(arg))
             return true;
-        case kIROp_TypeEqualityWitness:
-            if (as<IRInterfaceType>(arg->getOperand(0)))
-                return true;
-            break;
-        default:
-            break;
-        }
     }
 
     return false;
