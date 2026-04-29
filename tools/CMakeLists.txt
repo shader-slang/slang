@@ -410,7 +410,15 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             SLANG_SHARED_LIBRARY_TOOL
             SLANG_NO_DEPRECATION
         USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
+        LINK_WITH_PRIVATE
+            core
+            compiler-core
+            unit-test
+            slang
+            slang-fiddle-output
+            slang-capability-defs
+            slang-capability-lookup
+            Threads::Threads
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools
