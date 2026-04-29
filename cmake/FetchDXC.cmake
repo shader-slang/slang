@@ -26,9 +26,12 @@ include(FetchContent)
 # into the prebuilt binary URLs below. Bump in one place to update both.
 set(_dxc_version_tag "v1.9.2602")
 
-# Minimum GLIBC version required by the official prebuilt DXC binaries.
-# Bump this when the prebuilt binaries start requiring a newer GLIBC.
-set(_dxc_min_glibc "2.38")
+# Minimum GLIBC version required to run the prebuilt DXC binaries.
+# libdxcompiler.so requires GLIBC 2.29; libdxil.so requires GLIBC 2.38 but
+# is optional (OPTIONAL_REQUIRES). Use libdxcompiler.so's requirement so
+# that systems with GLIBC in [2.29, 2.38) still use prebuilt binaries.
+# Bump when upgrading to a DXC release that raises libdxcompiler.so's minimum.
+set(_dxc_min_glibc "2.29")
 
 # ---------------------------------------------------------------------------
 # Decide whether to build DXC from source.

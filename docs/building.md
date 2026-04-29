@@ -245,7 +245,7 @@ works for any given binary.
 | --------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------- |
 | `SLANG_VERSION`                   | Latest `v*` tag            | The project version, detected using git if available                                         |
 | `SLANG_DXC_BINARY_URL`            | Platform dependent         | URL of the prebuilt DXC binary archive to download; overrides the default release URL        |
-| `SLANG_DXC_BUILD_FROM_SOURCE`     | Auto-detected              | `ON`: always build DXC from source (Windows and Linux only); `OFF`: skip auto-detection and use prebuilt; unset: build from source automatically on Linux when the system GLIBC is older than the minimum required by the prebuilt binaries |
+| `SLANG_DXC_BUILD_FROM_SOURCE`     | Auto-detected              | `ON`: always build DXC from source (Windows and Linux only); `OFF`: skip auto-detection and use prebuilt; unset: build from source automatically on Linux when the system GLIBC is older than what the prebuilt `libdxcompiler.so` requires (currently GLIBC 2.29) |
 | `SLANG_EMBED_CORE_MODULE`         | `TRUE`                     | Build slang with an embedded version of the core module                                      |
 | `SLANG_EMBED_CORE_MODULE_SOURCE`  | `TRUE`                     | Embed the core module source in the binary                                                   |
 | `SLANG_ENABLE_DXIL`               | `TRUE`                     | Enable generating DXIL using DXC                                                             |
