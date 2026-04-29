@@ -26,11 +26,17 @@ include(FetchContent)
 # into the prebuilt binary URLs below. Bump in one place to update both.
 set(_dxc_version_tag "v1.9.2602")
 
-# Minimum GLIBC version required to run the prebuilt DXC binaries.
-# libdxcompiler.so requires GLIBC 2.29; libdxil.so requires GLIBC 2.38 but
-# is optional (OPTIONAL_REQUIRES). Use libdxcompiler.so's requirement so
-# that systems with GLIBC in [2.29, 2.38) still use prebuilt binaries.
-# Bump when upgrading to a DXC release that raises libdxcompiler.so's minimum.
+# GLIBC threshold below which DXC is built from source instead of using the
+# prebuilt binaries. Both libdxcompiler.so and libdxil.so from the v1.9.2602
+# release require GLIBC 2.38 to load at runtime. However, this threshold is
+# intentionally set to 2.29 — below the real runtime requirement — so that
+# the source-build path only activates for the project's oldest release CI
+# containers (Ubuntu 18.04 / GLIBC 2.27-2.28). Systems with GLIBC in
+# [2.29, 2.38) continue to download prebuilt binaries that may not load at
+# runtime (DXC silently unavailable), which matches the behavior before this
+# feature was added. Set SLANG_DXC_BUILD_FROM_SOURCE=ON explicitly to force
+# a source build on those systems if DXC is needed.
+# Bump when upgrading to a DXC release that changes the oldest supported container.
 set(_dxc_min_glibc "2.29")
 
 # ---------------------------------------------------------------------------
@@ -57,7 +63,14 @@ elseif(
         ERROR_QUIET
     )
     # First line is typically: "ldd (Ubuntu GLIBC 2.35-0ubuntu3.6) 2.35"
-    string(REGEX MATCH "([0-9]+)\\.([0-9]+)" _glibc_match "${_ldd_output}")
+    # Anchor on the word "glibc" (case-insensitive) so we don't mistake a
+    # package build number or other X.Y token for the GLIBC version.
+    string(
+        REGEX MATCH
+        "[Gg][Ll][Ii][Bb][Cc][^0-9]*([0-9]+)\\.([0-9]+)"
+        _glibc_match
+        "${_ldd_output}"
+    )
     if(_glibc_match)
         set(_glibc_version "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}")
         message(STATUS "Detected GLIBC version: ${_glibc_version}")
@@ -161,6 +174,7 @@ if(_dxc_build_from_source)
 
     ExternalProject_Add(
         dxc_from_source
+        BINARY_DIR "${_dxc_build_dir}"
         GIT_REPOSITORY "https://github.com/microsoft/DirectXShaderCompiler.git"
         GIT_TAG "${_dxc_version_tag}"
         GIT_SHALLOW ON
@@ -171,6 +185,9 @@ if(_dxc_build_from_source)
             ${CMAKE_COMMAND} -B <BINARY_DIR> -S <SOURCE_DIR>
             ${_dxc_generator_args} -C
             <SOURCE_DIR>/cmake/caches/PredefinedParams.cmake
+            # CMAKE_BUILD_TYPE is ignored by multi-config generators (VS);
+            # the config is selected via --config MinSizeRel in BUILD_COMMAND.
+            # Passing it here covers single-config generators (Ninja) in one line.
             -DCMAKE_BUILD_TYPE=MinSizeRel -DHLSL_COPY_GENERATED_SOURCES=ON
             -DLLVM_INCLUDE_TESTS=OFF -DCLANG_INCLUDE_TESTS=OFF
             -DLLVM_ENABLE_WARNINGS=OFF ${_dxc_warning_flags} -Wno-dev
