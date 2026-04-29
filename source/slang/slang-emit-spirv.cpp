@@ -1739,50 +1739,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return false;
     }
 
+    // Cached fallback debug source, populated from the first IRDebugCompilationUnit processed.
+    // Used as a fallback when emitting debug info for types/variables without explicit locations.
     IRInst* m_defaultDebugSource = nullptr;
-
-    // Explicitly set the default debug source (used by entry point to set the main file)
-    void setDefaultDebugSource(IRDebugSource* source)
-    {
-        if (source)
-            m_defaultDebugSource = source;
-    }
-
-    // Create DebugCompilationUnit for the module using the default (main) debug source.
-    // This should be called after all debug sources are processed so we use the correct source.
-    void ensureDebugCompilationUnit(IRModule* irModule)
-    {
-        auto debugLevel = m_targetProgram->getOptionSet().getDebugInfoLevel();
-        if (debugLevel <= DebugInfoLevel::Minimal)
-            return;
-
-        if (!m_defaultDebugSource)
-            return;
-
-        auto moduleInst = irModule->getModuleInst();
-        if (m_mapIRInstToSpvDebugInst.containsKey(moduleInst))
-            return; // Already created
-
-        // Get the SpvInst for the default debug source
-        SpvInst* sourceSpvInst = nullptr;
-        if (!m_mapIRInstToSpvInst.tryGetValue(m_defaultDebugSource, sourceSpvInst))
-            return;
-
-        IRBuilder builder(m_defaultDebugSource);
-        builder.setInsertBefore(m_defaultDebugSource);
-        auto translationUnit = emitOpDebugCompilationUnit(
-            getSection(SpvLogicalSectionID::ConstantsAndTypes),
-            moduleInst,
-            m_defaultDebugSource->getFullType(),
-            getNonSemanticDebugInfoExtInst(),
-            emitIntConstant(100, builder.getUIntType()), // ExtDebugInfo version.
-            emitIntConstant(5, builder.getUIntType()),   // DWARF version.
-            sourceSpvInst,
-            emitIntConstant(
-                SpvSourceLanguageSlang,
-                builder.getUIntType())); // Language.
-        registerDebugInst(moduleInst, translationUnit);
-    }
 
     Dictionary<UnownedStringSlice, SpvInst*> m_extensionInsts;
     SpvInst* ensureExtensionDeclaration(UnownedStringSlice name)
@@ -1990,15 +1949,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         sliceSpvStr);
                 }
 
-                // Only create DebugCompilationUnit for non-included files
-                auto isIncludedFile = as<IRBoolLit>(debugSource->getIsIncludedFile())->getValue();
-                // Prefer setting default debug source to the main file (non-included file)
-                // Fall back to an included file only if no main file has been found yet
-                if (!isIncludedFile || !m_defaultDebugSource)
-                    m_defaultDebugSource = debugSource;
-                // Note: DebugCompilationUnit is created later via ensureDebugCompilationUnit()
-                // after all debug sources are processed, so we use the correct main source file.
-
                 *emittedSpvInst = result;
                 return true;
             }
@@ -2015,6 +1965,43 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     getNonSemanticDebugInfoExtInst(),
                     debugBuildIdentifier->getBuildIdentifier(),
                     debugBuildIdentifier->getFlags());
+                return true;
+            }
+
+        case kIROp_DebugCompilationUnit:
+            {
+                if (!shouldEmitExtendedDebugInfo)
+                    return true;
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_non_semantic_info"));
+                auto debugCompilationUnit = as<IRDebugCompilationUnit>(inst);
+                auto source = debugCompilationUnit->getSource();
+                // Cache first source for use as fallback in type/variable debug info emission.
+                if (!m_defaultDebugSource)
+                    m_defaultDebugSource = source;
+                auto sourceSpvInst = ensureInst(source);
+                if (!sourceSpvInst)
+                    return true;
+                IRBuilder builder(inst);
+                builder.setInsertBefore(inst);
+                *emittedSpvInst = emitOpDebugCompilationUnit(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    inst,
+                    inst->getFullType(),
+                    getNonSemanticDebugInfoExtInst(),
+                    emitIntConstant(100, builder.getUIntType()), // ExtDebugInfo version.
+                    emitIntConstant(5, builder.getUIntType()),   // DWARF version.
+                    sourceSpvInst,
+                    emitIntConstant(SpvSourceLanguageSlang, builder.getUIntType())); // Language.
+                // Register the module inst with this compilation unit as its debug scope.
+                // findDebugScope uses this to resolve the scope for global-level debug insts
+                // (IRDebugFunction, IRDebugVar promoted to global scope, etc.).
+                // Use the first compilation unit processed as the module scope.
+                if (*emittedSpvInst)
+                {
+                    auto moduleInst = inst->getModule()->getModuleInst();
+                    if (!m_mapIRInstToSpvDebugInst.containsKey(moduleInst))
+                        registerDebugInst(moduleInst, *emittedSpvInst);
+                }
                 return true;
             }
 
@@ -2667,6 +2654,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         case kIROp_DebugSource:
         case kIROp_DebugBuildIdentifier:
+        case kIROp_DebugCompilationUnit:
         case kIROp_DebugFunction:
         case kIROp_DebugInlinedAt:
             SLANG_UNEXPECTED(
@@ -11153,30 +11141,52 @@ SlangResult emitSPIRVFromIR(
 
     for (auto inst : irModule->getGlobalInsts())
     {
-        if (as<IRDebugSource>(inst))
-        {
-            context.ensureInst(inst);
-        }
-        if (as<IRDebugBuildIdentifier>(inst))
+        if (as<IRDebugSource>(inst) || as<IRDebugBuildIdentifier>(inst) ||
+            as<IRDebugCompilationUnit>(inst))
         {
             context.ensureInst(inst);
         }
     }
-    // Explicitly use entry point's source file for DebugCompilationUnit.
-    // This ensures we use the main file (containing the entry point) rather than
-    // an imported module's source, regardless of processing order.
+
+    // Override m_defaultDebugSource with the entry point's source file.
+    // When multiple compilation units exist (e.g., with 'import' syntax), global insts
+    // may be processed in module order and m_defaultDebugSource may end up pointing to
+    // an imported module rather than the main shader file. Use the entry point location
+    // to find the correct source for use in DebugGlobalVariable and DebugType fallbacks.
     for (auto irEntryPoint : irEntryPoints)
     {
         if (auto loc = irEntryPoint->findDecoration<IRDebugLocationDecoration>())
         {
-            context.setDefaultDebugSource(as<IRDebugSource>(loc->getSource()));
-            context.ensureInst(loc->getSource());
-            break; // Use first entry point's source as the main file
+            auto entryPointSource = as<IRDebugSource>(loc->getSource());
+            if (entryPointSource)
+            {
+                context.m_defaultDebugSource = entryPointSource;
+                break;
+            }
         }
     }
-    // Create DebugCompilationUnit after all debug sources are processed,
-    // using the entry point's source file as the compilation unit source.
-    context.ensureDebugCompilationUnit(irModule);
+
+    // Also update the module-level debug scope to use the entry point's compilation unit.
+    // Without this, DebugFunction and DebugGlobalVariable from the main shader file would
+    // have their parent scope set to the first-processed compilation unit, which may belong
+    // to an imported module rather than the main shader file.
+    if (context.m_defaultDebugSource)
+    {
+        auto moduleInst = irModule->getModuleInst();
+        for (auto inst : irModule->getGlobalInsts())
+        {
+            if (auto cuInst = as<IRDebugCompilationUnit>(inst))
+            {
+                if (cuInst->getSource() == context.m_defaultDebugSource)
+                {
+                    SpvInst* cuSpvInst = nullptr;
+                    if (context.m_mapIRInstToSpvInst.tryGetValue(cuInst, cuSpvInst))
+                        context.m_mapIRInstToSpvDebugInst.set(moduleInst, cuSpvInst);
+                    break;
+                }
+            }
+        }
+    }
 
     for (auto inst : irModule->getGlobalInsts())
     {
