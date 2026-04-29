@@ -7,11 +7,14 @@
 #
 # Steps:
 # 1. Removes any pre-existing runner service from the base image
-# 2. Reads the JIT config from GCP instance metadata
-# 3. Starts the GitHub Actions runner as the correct user
-# 4. Shuts down the VM when the job completes
+# 2. Updates the preinstalled GitHub Actions runner if it is stale
+# 3. Reads the JIT config from GCP instance metadata
+# 4. Starts the GitHub Actions runner as the correct user
+# 5. Shuts down the VM when the job completes
 
 set -euo pipefail
+
+RUNNER_VERSION="2.334.0"
 
 # Find the runner directory and its owner
 RUNNER_DIR=""
@@ -66,6 +69,38 @@ for f in .runner .credentials .credentials_rsaparams .runner_migrated; do
     log "  Removed $f"
   fi
 done
+
+runner_version() {
+  if [ -x "$RUNNER_DIR/bin/Runner.Listener" ]; then
+    sudo -u "$RUNNER_USER" "$RUNNER_DIR/bin/Runner.Listener" --version 2>/dev/null | head -n 1 | tr -d '\r'
+  fi
+}
+
+current_runner_version="$(runner_version || true)"
+if [ -z "$current_runner_version" ]; then
+  current_runner_version="unknown"
+fi
+log "Current Actions runner version: $current_runner_version"
+
+if [ "$current_runner_version" != "$RUNNER_VERSION" ]; then
+  log "Updating Actions runner to v${RUNNER_VERSION}..."
+  runner_archive="$(mktemp /tmp/actions-runner.XXXXXX.tar.gz)"
+  runner_url="https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+
+  if curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 "$runner_url" -o "$runner_archive"; then
+    chown "$RUNNER_USER":"$RUNNER_USER" "$runner_archive"
+    sudo -u "$RUNNER_USER" tar xzf "$runner_archive" -C "$RUNNER_DIR"
+    rm -f "$runner_archive"
+  else
+    log "ERROR: Failed to download Actions runner v${RUNNER_VERSION}"
+    rm -f "$runner_archive"
+    shutdown -h now
+    exit 1
+  fi
+
+  updated_runner_version="$(runner_version || true)"
+  log "Actions runner version after update: ${updated_runner_version:-unknown}"
+fi
 
 # Step 0.5: Ensure NVIDIA GPU devices are initialized.
 # On fresh boot, the kernel module may not be loaded yet. Running nvidia-smi
