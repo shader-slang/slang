@@ -1019,14 +1019,22 @@ Result spawnAndWaitExe(
             commandLine.begin());
     }
 
-    // Time the process execution phase
-    auto execStartTime = std::chrono::steady_clock::now();
+    const bool phaseTimingEnabled = isPhaseTimingEnabled();
+    std::chrono::steady_clock::time_point execStartTime;
+    if (phaseTimingEnabled)
+    {
+        execStartTime = std::chrono::steady_clock::now();
+    }
     Result res = ProcessUtil::execute(cmdLine, outRes);
-    auto execEndTime = std::chrono::steady_clock::now();
-    auto execDurationMs =
-        std::chrono::duration_cast<std::chrono::microseconds>(execEndTime - execStartTime).count() /
-        1000.0;
-    reportPhaseTiming("exe:process-execute", execDurationMs);
+    if (phaseTimingEnabled)
+    {
+        auto execEndTime = std::chrono::steady_clock::now();
+        auto execDurationMs =
+            std::chrono::duration_cast<std::chrono::microseconds>(execEndTime - execStartTime)
+                .count() /
+            1000.0;
+        reportPhaseTiming("exe:process-execute", execDurationMs);
+    }
 
     if (SLANG_FAILED(res))
     {
@@ -1072,15 +1080,22 @@ Result spawnAndWaitSharedLibrary(
             testCmdLine.toString().getBuffer());
     }
 
-    // Time the function lookup phase
-    auto lookupStartTime = std::chrono::steady_clock::now();
+    const bool phaseTimingEnabled = isPhaseTimingEnabled();
+    std::chrono::steady_clock::time_point lookupStartTime;
+    if (phaseTimingEnabled)
+    {
+        lookupStartTime = std::chrono::steady_clock::now();
+    }
     auto func = context->getInnerMainFunc(context->options.binDir, exeName);
-    auto lookupEndTime = std::chrono::steady_clock::now();
-    auto lookupDurationMs =
-        std::chrono::duration_cast<std::chrono::microseconds>(lookupEndTime - lookupStartTime)
-            .count() /
-        1000.0;
-    reportPhaseTiming("sharedlib:function-lookup", lookupDurationMs);
+    if (phaseTimingEnabled)
+    {
+        auto lookupEndTime = std::chrono::steady_clock::now();
+        auto lookupDurationMs =
+            std::chrono::duration_cast<std::chrono::microseconds>(lookupEndTime - lookupStartTime)
+                .count() /
+            1000.0;
+        reportPhaseTiming("sharedlib:function-lookup", lookupDurationMs);
+    }
 
     if (func)
     {
@@ -1117,16 +1132,22 @@ Result spawnAndWaitSharedLibrary(
             args.add(cmdArg.getBuffer());
         }
 
-        // Time the execution phase
-        auto execStartTime = std::chrono::steady_clock::now();
+        std::chrono::steady_clock::time_point execStartTime;
+        if (phaseTimingEnabled)
+        {
+            execStartTime = std::chrono::steady_clock::now();
+        }
         SlangResult res =
             func(&stdWriters, context->getSession(), int(args.getCount()), args.begin());
-        auto execEndTime = std::chrono::steady_clock::now();
-        auto execDurationMs =
-            std::chrono::duration_cast<std::chrono::microseconds>(execEndTime - execStartTime)
-                .count() /
-            1000.0;
-        reportPhaseTiming("sharedlib:execution", execDurationMs);
+        if (phaseTimingEnabled)
+        {
+            auto execEndTime = std::chrono::steady_clock::now();
+            auto execDurationMs =
+                std::chrono::duration_cast<std::chrono::microseconds>(execEndTime - execStartTime)
+                    .count() /
+                1000.0;
+            reportPhaseTiming("sharedlib:execution", execDurationMs);
+        }
 
         StdWriters::setSingleton(prevStdWriters);
 
@@ -1772,9 +1793,6 @@ ToolReturnCode spawnAndWait(
 
     const auto finalSpawnType = context->getFinalSpawnType(spawnType);
 
-    // Start timing the test execution
-    auto startTime = std::chrono::steady_clock::now();
-
     SlangResult spawnResult = SLANG_FAIL;
     switch (finalSpawnType)
     {
@@ -1799,14 +1817,6 @@ ToolReturnCode spawnAndWait(
     default:
         break;
     }
-
-    // Calculate execution time
-    auto endTime = std::chrono::steady_clock::now();
-    auto durationMs =
-        std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() / 1000.0;
-
-    // Report execution time (measured locally)
-    context->getTestReporter()->addExecutionTime(durationMs / 1000.0);
 
     if (SLANG_FAILED(spawnResult))
     {

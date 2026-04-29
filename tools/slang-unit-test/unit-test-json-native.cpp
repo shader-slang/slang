@@ -365,6 +365,34 @@ static SlangResult _checkArrayStyleOptionalFields()
         SLANG_CHECK(args.testCommand == "tests/compute/simple.slang");
     }
 
+    // Test: Array-style parsing rejects a missing required field.
+    {
+        const char* json = R"(["render-test"])";
+        TestServerProtocol::ExecuteToolTestArgs args;
+
+        DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
+        RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
+
+        String contents(json);
+        SourceFile* sourceFile =
+            sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, &sink);
+
+        JSONBuilder builder(container);
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
+
+        JSONToNativeConverter converter(container, &typeMap, &sink);
+        SLANG_CHECK(SLANG_FAILED(converter.convertArrayToStruct(
+            builder.getRootValue(),
+            GetRttiInfo<TestServerProtocol::ExecuteToolTestArgs>::get(),
+            &args)));
+        SLANG_CHECK(sink.getErrorCount() > 0);
+    }
+
     return SLANG_OK;
 }
 

@@ -351,7 +351,12 @@ struct SleepState
 
 SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
 {
-    auto startTime = std::chrono::steady_clock::now();
+    const bool rpcDiagnosticsEnabled = isDiagnosticEnabled("rpc");
+    std::chrono::steady_clock::time_point startTime;
+    if (rpcDiagnosticsEnabled)
+    {
+        startTime = std::chrono::steady_clock::now();
+    }
 
     m_readResult = SLANG_OK;
 
@@ -380,7 +385,7 @@ SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
         // We timed out
         if (timeOutInTicks >= 0 && int64_t(Process::getClockTick()) - startTick >= timeOutInTicks)
         {
-            if (isDiagnosticEnabled("rpc"))
+            if (rpcDiagnosticsEnabled)
             {
                 fprintf(
                     stderr,
@@ -400,7 +405,7 @@ SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
         }
     }
 
-    if (isDiagnosticEnabled("rpc") && m_readState == ReadState::Done)
+    if (rpcDiagnosticsEnabled && m_readState == ReadState::Done)
     {
         auto endTime = std::chrono::steady_clock::now();
         auto duration =
@@ -447,7 +452,12 @@ void HTTPPacketConnection::consumeContent()
 
 SlangResult HTTPPacketConnection::write(const void* content, size_t sizeInBytes)
 {
-    auto startTime = std::chrono::steady_clock::now();
+    const bool rpcDiagnosticsEnabled = isDiagnosticEnabled("rpc");
+    std::chrono::steady_clock::time_point startTime;
+    if (rpcDiagnosticsEnabled)
+    {
+        startTime = std::chrono::steady_clock::now();
+    }
 
     // Write the header
     {
@@ -463,7 +473,7 @@ SlangResult HTTPPacketConnection::write(const void* content, size_t sizeInBytes)
     // Write the content
     SLANG_RETURN_ON_FAIL(m_writeStream->write(content, sizeInBytes));
 
-    if (isDiagnosticEnabled("rpc"))
+    if (rpcDiagnosticsEnabled)
     {
         auto endTime = std::chrono::steady_clock::now();
         auto duration =

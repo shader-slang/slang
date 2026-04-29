@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <mutex>
 #include <poll.h>
+#include <pthread.h>
 #include <signal.h>
 #include <spawn.h>
 #include <sys/stat.h>
@@ -302,6 +303,7 @@ SlangResult UnixPipeStream::flush()
 
 SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadBytes)
 {
+    const bool pipeDiagnosticsEnabled = isDiagnosticEnabled("pipe");
     outReadBytes = 0;
 
     if (!_has(FileAccess::Read))
@@ -313,7 +315,11 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         return SLANG_OK;
     }
 
-    auto startTime = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point startTime;
+    if (pipeDiagnosticsEnabled)
+    {
+        startTime = std::chrono::steady_clock::now();
+    }
 
     // Check if it's hung up.
     pollfd pollInfo;
@@ -365,7 +371,7 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         // - In the test-server process, stderr is captured by slang-test via
         //   drainTestServerStderr() and forwarded to the parent's stderr.
         // - In the slang-test process itself, stderr goes directly to the console.
-        if (isDiagnosticEnabled("pipe") && count > 0)
+        if (pipeDiagnosticsEnabled && count > 0)
         {
             auto endTime = std::chrono::steady_clock::now();
             auto durationMs =
@@ -426,6 +432,7 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
 
 SlangResult UnixPipeStream::write(const void* buffer, size_t length)
 {
+    const bool pipeDiagnosticsEnabled = isDiagnosticEnabled("pipe");
     if (!_has(FileAccess::Write))
     {
         return SLANG_E_NOT_AVAILABLE;
@@ -436,7 +443,11 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         return SLANG_FAIL;
     }
 
-    auto startTime = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point startTime;
+    if (pipeDiagnosticsEnabled)
+    {
+        startTime = std::chrono::steady_clock::now();
+    }
 
     pollfd pollInfo;
 
@@ -464,7 +475,7 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
     const ssize_t writeResult = ::write(m_fd, buffer, length);
 
     // Log pipe write operation if debug enabled
-    if (isDiagnosticEnabled("pipe"))
+    if (pipeDiagnosticsEnabled)
     {
         auto endTime = std::chrono::steady_clock::now();
         auto durationMs =
@@ -498,11 +509,10 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
             {
                 fprintf(
                     stderr,
-                    "[PIPE-WARNING] Partial write on fd=%d: %zd/%zu bytes (errno=%d)\n",
+                    "[PIPE-WARNING] Partial write on fd=%d: %zd/%zu bytes\n",
                     m_fd,
                     writeResult,
-                    length,
-                    errno);
+                    length);
             }
         }
         else

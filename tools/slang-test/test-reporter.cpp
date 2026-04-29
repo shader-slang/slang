@@ -147,6 +147,9 @@ void TestReporter::startTest(const char* testName)
     m_currentInfo = TestInfo();
     m_currentInfo.name = testName;
     m_currentMessage.clear();
+    m_currentTestStartTime = isDiagnosticEnabled("timing")
+                                 ? std::chrono::steady_clock::now()
+                                 : std::chrono::steady_clock::time_point{};
 }
 
 void TestReporter::endTest()
@@ -155,6 +158,15 @@ void TestReporter::endTest()
     SLANG_ASSERT(m_inTest);
 
     m_currentInfo.message = m_currentMessage;
+    if (m_currentTestStartTime != std::chrono::steady_clock::time_point{} &&
+        m_currentInfo.executionTime <= 0.0)
+    {
+        const auto endTime = std::chrono::steady_clock::now();
+        m_currentInfo.executionTime =
+            std::chrono::duration_cast<std::chrono::microseconds>(endTime - m_currentTestStartTime)
+                .count() /
+            1000000.0;
+    }
 
     _addResult(m_currentInfo);
 
@@ -744,11 +756,16 @@ void TestReporter::outputSummary()
                 double failedTimeMs = 0.0;
                 double ignoredTimeMs = 0.0;
                 double expectedFailTimeMs = 0.0;
+                int executedTestCount = 0;
 
                 for (const auto& testInfo : m_testInfos)
                 {
                     double timeMs = testInfo.executionTime * 1000.0;
                     totalTimeMs += timeMs;
+                    if (testInfo.testResult != TestResult::Ignored)
+                    {
+                        executedTestCount++;
+                    }
                     switch (testInfo.testResult)
                     {
                     case TestResult::Pass:
@@ -773,10 +790,10 @@ void TestReporter::outputSummary()
                 printf("--------------------------------------------------------\n");
                 printf(
                     "%-20s %8d %12.3f %12.3f\n",
-                    "All tests",
-                    m_totalTestCount,
+                    "Executed tests",
+                    executedTestCount,
                     totalTimeMs,
-                    m_totalTestCount > 0 ? totalTimeMs / m_totalTestCount : 0.0);
+                    executedTestCount > 0 ? totalTimeMs / executedTestCount : 0.0);
                 printf(
                     "%-20s %8d %12.3f %12.3f\n",
                     "Passed",

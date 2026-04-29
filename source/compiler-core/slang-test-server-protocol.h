@@ -7,16 +7,19 @@
 #include "slang-json-value.h"
 #include "slang.h"
 
-// WARNING: ABI Compatibility
-// These structs are part of the binary interface between test-server and pre-built binaries
-// (e.g., VK-GL-CTS). Adding or removing fields will change struct layout and break
-// compatibility, causing memory corruption or crashes.
+// WARNING: Protocol compatibility
+// These structs define the serialized test-server protocol used between test-server and
+// external clients/pre-built binaries (for example, VK-GL-CTS).
 //
-// To safely add new fields:
-// 1. First update and release new versions of all pre-built binaries that use this protocol
-// 2. Then add the new fields here
+// Compatibility concerns here are about the wire format/schema, not the in-memory C++ struct
+// layout. Do not remove, rename, or change the meaning/type of existing fields without
+// coordinating updates to both sides of the protocol.
 //
-// The VK-GL-CTS nightly CI workflow will fail if this ABI is broken.
+// To evolve this protocol compatibly, add new fields only as Optional in RTTI so older readers can
+// ignore fields they do not know about and newer readers can tolerate those fields being absent in
+// older messages.
+//
+// The VK-GL-CTS nightly CI workflow will fail if this protocol compatibility is broken.
 
 namespace TestServerProtocol
 {

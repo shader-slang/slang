@@ -336,6 +336,11 @@ SlangResult JSONToNativeConverter::convertArrayToStruct(
     // Cannot have more elements than fields
     if (arrayCount > totalFieldCount)
     {
+        m_sink->diagnose(
+            value.loc,
+            JSONDiagnostics::tooManyElementsForArray,
+            arrayCount,
+            totalFieldCount);
         return SLANG_FAIL;
     }
 
@@ -356,7 +361,11 @@ SlangResult JSONToNativeConverter::convertArrayToStruct(
                     const auto& field = info->m_fields[j];
                     if (!(field.m_flags & StructRttiInfo::Flag::Optional))
                     {
-                        // Required field is missing
+                        m_sink->diagnose(
+                            value.loc,
+                            JSONDiagnostics::fieldRequiredOnType,
+                            field.m_name,
+                            info->m_name);
                         return SLANG_FAIL;
                     }
                 }

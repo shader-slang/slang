@@ -80,20 +80,11 @@ public:
         auto endTime = Clock::now();
         auto duration = std::chrono::duration_cast<Duration>(endTime - startTime);
 
-        // Find or create entry for this event
-        TimingInfo* info = nullptr;
-        for (auto& kv : m_data)
-        {
-            if (strcmp(kv.key, eventName) == 0)
-            {
-                info = &kv.value;
-                break;
-            }
-        }
+        const String eventKey(eventName);
+        TimingInfo* info = m_data.tryGetValue(eventKey);
         if (!info)
         {
-            m_data.add(eventName, TimingInfo{});
-            // Get the newly added entry
+            m_data.add(eventKey, TimingInfo{});
             info = &m_data.getLast().value;
         }
 
@@ -165,7 +156,7 @@ public:
             fprintf(
                 stderr,
                 "%-35s %8d %12.3f %12.3f %12.3f %12.3f\n",
-                kv.key,
+                kv.key.getBuffer(),
                 kv.value.invocationCount,
                 totalMs,
                 avgMs,
@@ -193,7 +184,7 @@ public:
     void clear() { m_data.clear(); }
 
 private:
-    OrderedDictionary<const char*, TimingInfo> m_data;
+    OrderedDictionary<String, TimingInfo> m_data;
 };
 
 // RAII helper for automatic timing of scopes

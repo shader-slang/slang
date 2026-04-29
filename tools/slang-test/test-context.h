@@ -145,6 +145,7 @@ public:
 
     /// Drain and print any stderr output from test-server processes
     void drainTestServerStderr();
+    void drainTestServerStderr(Slang::Index threadIndex);
 
     /// Ctor
     TestContext();

@@ -108,25 +108,17 @@ TestContext::~TestContext()
     {
         if (m_jsonRpcConnections[i])
         {
+            // Drain before disconnect so a verbose test-server cannot block writing stderr while
+            // the parent waits for it to exit.
+            drainTestServerStderr(i);
+
             m_jsonRpcConnections[i]->disconnect();
             m_jsonRpcConnections[i].setNull();
 
-            // Drain stderr from this test-server
+            // Drain any shutdown diagnostics emitted after the quit request.
             if (i < m_testServerStderrStreams.getCount() && m_testServerStderrStreams[i])
             {
-                List<uint8_t> buffer;
-                buffer.setCount(4096);
-                while (!m_testServerStderrStreams[i]->isEnd())
-                {
-                    size_t bytesRead = 0;
-                    SlangResult res = m_testServerStderrStreams[i]->read(
-                        buffer.getBuffer(),
-                        buffer.getCount(),
-                        bytesRead);
-                    if (SLANG_FAILED(res) || bytesRead == 0)
-                        break;
-                    fwrite(buffer.getBuffer(), 1, bytesRead, stderr);
-                }
+                drainTestServerStderr(i);
                 m_testServerStderrStreams[i].setNull();
             }
         }
@@ -245,14 +237,14 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
     RefPtr<BufferedReadStream> readErrStream(
         new BufferedReadStream(process->getStream(StdStreamType::ErrorOut)));
 
-    // Store stderr stream for later draining (for diagnostic output from test-server)
-    m_testServerStderrStreams[slangTestThreadIndex] = readErrStream;
-
     RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, writeStream);
     RefPtr<JSONRPCConnection> rpcConnection = new JSONRPCConnection;
 
     SLANG_RETURN_ON_FAIL(
         rpcConnection->init(connection, JSONRPCConnection::CallStyle::Default, process));
+
+    // Store stderr stream for later draining only after the RPC connection is live.
+    m_testServerStderrStreams[slangTestThreadIndex] = readErrStream;
 
     out = rpcConnection;
 
@@ -290,11 +282,15 @@ void TestContext::destroyRPCConnection()
 {
     if (m_jsonRpcConnections[slangTestThreadIndex])
     {
-        // Disconnect sends quit message and waits for process to terminate
+        // Drain before disconnect so a verbose test-server cannot block writing stderr while the
+        // parent waits for it to exit.
+        drainTestServerStderr();
+
+        // Disconnect sends quit message and waits for process to terminate.
         m_jsonRpcConnections[slangTestThreadIndex]->disconnect();
         m_jsonRpcConnections[slangTestThreadIndex].setNull();
 
-        // Drain any remaining stderr output from test-server after it terminates
+        // Drain any shutdown diagnostics emitted after the quit request.
         drainTestServerStderr();
 
         // Clear the stderr stream reference
@@ -307,14 +303,22 @@ void TestContext::destroyRPCConnection()
 
 void TestContext::drainTestServerStderr()
 {
-    auto& stderrStream = m_testServerStderrStreams[slangTestThreadIndex];
+    drainTestServerStderr(slangTestThreadIndex);
+}
+
+void TestContext::drainTestServerStderr(Index threadIndex)
+{
+    if (threadIndex < 0 || threadIndex >= m_testServerStderrStreams.getCount())
+        return;
+
+    auto& stderrStream = m_testServerStderrStreams[threadIndex];
     if (!stderrStream)
         return;
 
     // Read any available data from the test-server's stderr and forward to our stderr.
     // This is safe to call while the test-server is running: on Unix, the underlying
     // UnixPipeStream::read uses poll() which returns immediately when no data is available.
-    // On Windows, the pipe read similarly returns when no data is buffered.
+    // On Windows, WinPipeStream checks PeekNamedPipe before ReadFile so empty pipes do not block.
     List<uint8_t> buffer;
     buffer.setCount(4096);
 

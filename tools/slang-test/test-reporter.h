@@ -9,6 +9,7 @@
 #include "../../source/core/slang-string-util.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <chrono>
 #include <mutex>
 
 // Forward declaration
@@ -152,6 +153,7 @@ protected:
 
     Slang::StringBuilder m_currentMessage;
     TestInfo m_currentInfo;
+    std::chrono::steady_clock::time_point m_currentTestStartTime;
     int m_numCurrentResults;
     int m_numFailResults;
 

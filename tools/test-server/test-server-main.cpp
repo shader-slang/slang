@@ -352,11 +352,11 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
 SlangResult TestServer::_executeSingle()
 {
     // Debug logging for test-server operations (writes to stderr, not RPC stdout)
-    auto startTime = std::chrono::steady_clock::now();
+    const bool rpcDiagnosticsEnabled = isDiagnosticEnabled("rpc");
 
-    if (isDiagnosticEnabled("rpc"))
+    if (rpcDiagnosticsEnabled)
     {
-        fprintf(stderr, "[TEST-SERVER] Waiting for RPC message (pid=%d)\n", Process::getId());
+        fprintf(stderr, "[TEST-SERVER] Waiting for RPC message (pid=%u)\n", Process::getId());
     }
 
     // Block waiting for content (or error/closed)
@@ -377,11 +377,17 @@ SlangResult TestServer::_executeSingle()
             JSONRPCCall call;
             SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&call));
 
-            if (isDiagnosticEnabled("rpc"))
+            std::chrono::steady_clock::time_point startTime;
+            if (rpcDiagnosticsEnabled)
+            {
+                startTime = std::chrono::steady_clock::now();
+            }
+
+            if (rpcDiagnosticsEnabled)
             {
                 fprintf(
                     stderr,
-                    "[TEST-SERVER] Received call: %s (pid=%d)\n",
+                    "[TEST-SERVER] Received call: %s (pid=%u)\n",
                     String(call.method).getBuffer(),
                     Process::getId());
             }
@@ -389,11 +395,11 @@ SlangResult TestServer::_executeSingle()
             // Do different things
             if (call.method == TestServerProtocol::QuitArgs::g_methodName)
             {
-                if (isDiagnosticEnabled("rpc"))
+                if (rpcDiagnosticsEnabled)
                 {
                     fprintf(
                         stderr,
-                        "[TEST-SERVER] Quit request received (pid=%d)\n",
+                        "[TEST-SERVER] Quit request received (pid=%u)\n",
                         Process::getId());
                 }
                 m_quit = true;
@@ -403,7 +409,7 @@ SlangResult TestServer::_executeSingle()
             {
                 SLANG_RETURN_ON_FAIL(_executeUnitTest(call));
 
-                if (isDiagnosticEnabled("rpc"))
+                if (rpcDiagnosticsEnabled)
                 {
                     auto endTime = std::chrono::steady_clock::now();
                     auto duration =
@@ -411,7 +417,7 @@ SlangResult TestServer::_executeSingle()
                             .count();
                     fprintf(
                         stderr,
-                        "[TEST-SERVER] ExecuteUnitTest completed in %lldms (pid=%d)\n",
+                        "[TEST-SERVER] ExecuteUnitTest completed in %lldms (pid=%u)\n",
                         (long long)duration,
                         Process::getId());
                 }
@@ -422,7 +428,7 @@ SlangResult TestServer::_executeSingle()
             {
                 SLANG_RETURN_ON_FAIL(_executeTool(call));
 
-                if (isDiagnosticEnabled("rpc"))
+                if (rpcDiagnosticsEnabled)
                 {
                     auto endTime = std::chrono::steady_clock::now();
                     auto duration =
@@ -430,7 +436,7 @@ SlangResult TestServer::_executeSingle()
                             .count();
                     fprintf(
                         stderr,
-                        "[TEST-SERVER] ExecuteTool completed in %lldms (pid=%d)\n",
+                        "[TEST-SERVER] ExecuteTool completed in %lldms (pid=%u)\n",
                         (long long)duration,
                         Process::getId());
 
