@@ -273,6 +273,51 @@ func TestCreateVMTryNextZoneAfterStockout(t *testing.T) {
 	}
 }
 
+func TestCreateVMAllCandidateZonesStockout(t *testing.T) {
+	m := &Manager{
+		config: ManagerConfig{
+			Project:          "test-project",
+			Zones:            "us-east1-d,us-east1-b",
+			InstanceTemplate: "linux-gpu-runner-sm80plus-l4",
+			GPUType:          "nvidia-l4",
+			Platform:         "linux",
+		},
+		vms: map[string]*vmInfo{},
+	}
+	m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
+		return []zoneCandidate{
+			{zone: "us-east1-d", region: "us-east1", available: 16},
+			{zone: "us-east1-b", region: "us-east1", available: 16},
+		}, nil
+	}
+
+	var attempts []string
+	m.insertVMFunc = func(_ context.Context, req *computepb.InsertInstanceRequest) error {
+		attempts = append(attempts, req.GetZone())
+		return errors.New("ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS: resource_availability")
+	}
+
+	_, err := m.CreateVM(context.Background(), "linux-sm80plus-test", "jit-config")
+	if err == nil {
+		t.Fatal("CreateVM should fail when all candidate zones are out of stock")
+	}
+	if !slices.Equal(attempts, []string{"us-east1-d", "us-east1-b"}) {
+		t.Fatalf("attempted zones = %v, want [us-east1-d us-east1-b]", attempts)
+	}
+	for _, want := range []string{
+		"all candidate zones are out of stock",
+		"us-east1-d",
+		"us-east1-b",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("CreateVM error = %q, want substring %q", err, want)
+		}
+	}
+	if len(m.vms) != 0 {
+		t.Fatalf("tracked VM count = %d, want 0", len(m.vms))
+	}
+}
+
 func TestCreateVMStopsOnNonStockoutError(t *testing.T) {
 	m := &Manager{
 		config: ManagerConfig{
