@@ -281,6 +281,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             copy-dxil
             copy-webgpu_dawn
             copy-slang-tint
+            copy-nvapi-headers
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
@@ -401,6 +402,9 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         REQUIRED_BY slang-test
         FOLDER test/tools
     )
+    if(TARGET copy-nvapi-headers AND TARGET render-test)
+        add_dependencies(render-test copy-nvapi-headers)
+    endif()
 
     slang_add_target(
         slang-unit-test

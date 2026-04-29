@@ -269,6 +269,16 @@ jobs:
               fi
             fi
 
+            # NVAPI shader extension headers (Windows only; only present when SLANG_ENABLE_NVAPI=ON)
+            if [ -d "build/${cmake_config}/external/nvapi" ]; then
+              echo "Copying NVAPI headers to test artifacts..."
+              mkdir -p "artifacts-staging/${cmake_config}/external/nvapi"
+              cp "build/${cmake_config}/external/nvapi"/*.h \
+                 "artifacts-staging/${cmake_config}/external/nvapi/"
+            else
+              echo "No NVAPI headers to copy (non-Windows or NVAPI disabled)"
+            fi
+
             # Copy everything from lib directory
             if [ -d "build/${cmake_config}/lib" ]; then
               cp -r "build/${cmake_config}/lib" "artifacts-staging/${cmake_config}/" || echo "Failed to copy lib directory"
