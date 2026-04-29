@@ -103,13 +103,12 @@ void __slang_linalg_OuterProductAccumulate(
 {
     using AccTy = dx::linalg::Matrix<
         MatDT,
-        MatM * dx::linalg::__detail::ComponentTypeTraits<ElTy>::ElementsPerScalar,
-        MatN * dx::linalg::__detail::ComponentTypeTraits<ElTy>::ElementsPerScalar,
+        MatM,
+        MatN,
         dx::linalg::MatrixUse::Accumulator,
         dx::linalg::MatrixScope::Thread>;
-    AccTy acc =
-        dx::linalg::OuterProduct<MatDT, dx::linalg::MatrixScope::Thread>(a, b);
-    acc.InterlockedAccumulate(matBuf, matOff, uint(sizeof(ElTy)));
+    AccTy acc = dx::linalg::OuterProduct<MatDT>(a, b);
+    acc.InterlockedAccumulate(matBuf, matOff);
 }
 
 template<typename ElTy, uint N, typename BufTy>
