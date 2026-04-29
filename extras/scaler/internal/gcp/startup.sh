@@ -15,6 +15,7 @@
 set -euo pipefail
 
 RUNNER_VERSION="2.334.0"
+RUNNER_SHA256="048024cd2c848eb6f14d5646d56c13a4def2ae7ee3ad12122bee960c56f3d271"
 
 # Find the runner directory and its owner
 RUNNER_DIR=""
@@ -51,6 +52,15 @@ log "=== Linux GPU Runner Startup ==="
 log "Runner directory: $RUNNER_DIR"
 log "Runner user: $RUNNER_USER"
 
+fail_update_and_shutdown() {
+  log "ERROR: $1"
+  if [ -n "${runner_archive:-}" ]; then
+    rm -f "$runner_archive" || true
+  fi
+  shutdown -h now
+  exit 1
+}
+
 # Step 0: Remove any pre-existing runner service from the base image.
 log "Removing pre-existing runner service (if any)..."
 if systemctl list-units --type=service --all 2>/dev/null | grep -q "actions.runner"; then
@@ -84,22 +94,34 @@ log "Current Actions runner version: $current_runner_version"
 
 if [ "$current_runner_version" != "$RUNNER_VERSION" ]; then
   log "Updating Actions runner to v${RUNNER_VERSION}..."
-  runner_archive="$(mktemp /tmp/actions-runner.XXXXXX.tar.gz)"
+  if ! runner_archive="$(mktemp /tmp/actions-runner.XXXXXX.tar.gz)"; then
+    fail_update_and_shutdown "Failed to create temporary Actions runner archive"
+  fi
   runner_url="https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
 
-  if curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 "$runner_url" -o "$runner_archive"; then
-    chown "$RUNNER_USER":"$RUNNER_USER" "$runner_archive"
-    sudo -u "$RUNNER_USER" tar xzf "$runner_archive" -C "$RUNNER_DIR"
-    rm -f "$runner_archive"
-  else
-    log "ERROR: Failed to download Actions runner v${RUNNER_VERSION}"
-    rm -f "$runner_archive"
-    shutdown -h now
-    exit 1
+  if ! curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 "$runner_url" -o "$runner_archive"; then
+    fail_update_and_shutdown "Failed to download Actions runner v${RUNNER_VERSION}"
   fi
+
+  if ! printf '%s  %s\n' "$RUNNER_SHA256" "$runner_archive" | sha256sum -c - >/dev/null 2>&1; then
+    fail_update_and_shutdown "Actions runner v${RUNNER_VERSION} checksum verification failed"
+  fi
+
+  if ! chown "$RUNNER_USER":"$RUNNER_USER" "$runner_archive"; then
+    fail_update_and_shutdown "Failed to change owner for Actions runner v${RUNNER_VERSION} archive"
+  fi
+
+  if ! sudo -u "$RUNNER_USER" tar xzf "$runner_archive" -C "$RUNNER_DIR"; then
+    fail_update_and_shutdown "Failed to extract Actions runner v${RUNNER_VERSION}"
+  fi
+  rm -f "$runner_archive" || true
+  runner_archive=""
 
   updated_runner_version="$(runner_version || true)"
   log "Actions runner version after update: ${updated_runner_version:-unknown}"
+  if [ "${updated_runner_version:-}" != "$RUNNER_VERSION" ]; then
+    fail_update_and_shutdown "Runner version mismatch after update (expected ${RUNNER_VERSION}, got ${updated_runner_version:-unknown})"
+  fi
 fi
 
 # Step 0.5: Ensure NVIDIA GPU devices are initialized.

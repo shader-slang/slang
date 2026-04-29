@@ -578,8 +578,17 @@ func (m *Manager) listTerminatedVMNames(ctx context.Context, zone string) ([]str
 	return m.listVMNamesByFilter(ctx, zone, cleanupFilter(m.config.VMPrefix))
 }
 
-func prefixFilter(vmPrefix string) string {
-	return fmt.Sprintf("name=%s-*", vmPrefix)
+func liveFilter(vmPrefix string) string {
+	return fmt.Sprintf("name=%s-* AND (status=PROVISIONING OR status=STAGING OR status=RUNNING)", vmPrefix)
+}
+
+func isLiveStatus(status string) bool {
+	switch status {
+	case "PROVISIONING", "STAGING", "RUNNING":
+		return true
+	default:
+		return false
+	}
 }
 
 func (m *Manager) listLiveVMNames(ctx context.Context, zone string) ([]string, error) {
@@ -593,7 +602,7 @@ func (m *Manager) listLiveVMNames(ctx context.Context, zone string) ([]string, e
 	req := &computepb.ListInstancesRequest{
 		Project: m.config.Project,
 		Zone:    zone,
-		Filter:  proto.String(prefixFilter(m.config.VMPrefix)),
+		Filter:  proto.String(liveFilter(m.config.VMPrefix)),
 	}
 
 	it := m.instancesClient.List(ctx, req)
@@ -606,8 +615,7 @@ func (m *Manager) listLiveVMNames(ctx context.Context, zone string) ([]string, e
 		if err != nil {
 			return names, err
 		}
-		switch instance.GetStatus() {
-		case "PROVISIONING", "STAGING", "RUNNING":
+		if isLiveStatus(instance.GetStatus()) {
 			names = append(names, instance.GetName())
 		}
 	}

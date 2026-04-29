@@ -19,6 +19,31 @@ func TestCleanupFilter(t *testing.T) {
 	}
 }
 
+func TestLiveFilter(t *testing.T) {
+	got := liveFilter("linux-test")
+	want := "name=linux-test-* AND (status=PROVISIONING OR status=STAGING OR status=RUNNING)"
+	if got != want {
+		t.Fatalf("liveFilter() = %q, want %q", got, want)
+	}
+}
+
+func TestIsLiveStatus(t *testing.T) {
+	tests := map[string]bool{
+		"PROVISIONING": true,
+		"STAGING":      true,
+		"RUNNING":      true,
+		"STOPPING":     false,
+		"TERMINATED":   false,
+		"":             false,
+	}
+
+	for status, want := range tests {
+		if got := isLiveStatus(status); got != want {
+			t.Fatalf("isLiveStatus(%q) = %v, want %v", status, got, want)
+		}
+	}
+}
+
 func TestRemoveTrackedVMByVMName(t *testing.T) {
 	m := &Manager{
 		vms: map[string]*vmInfo{
