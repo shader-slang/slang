@@ -578,6 +578,20 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             // index).
                             IRBuilder builder(getElement);
                             builder.setInsertBefore(user);
+                            auto index = getElement->getIndex();
+
+                            // If the index is wrapped in NonUniformResourceIndex, unwrap it
+                            // so the access chain uses the raw index, but transfer the
+                            // decoration to the new access chain instruction.
+                            bool isNonUniform =
+                                (index->getOp() == kIROp_NonUniformResourceIndex) ||
+                                index->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                                    nullptr ||
+                                user->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                                    nullptr;
+                            if (index->getOp() == kIROp_NonUniformResourceIndex)
+                                index = index->getOperand(0);
+
                             auto newAddr = builder.emitElementAddress(
                                 builder.getPtrType(
                                     innerElementType,
@@ -585,7 +599,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                     addressSpace,
                                     dataLayout),
                                 inst,
-                                getElement->getIndex());
+                                index);
+                            if (isNonUniform)
+                                builder.addSPIRVNonUniformResourceDecoration(newAddr);
                             user->replaceUsesWith(newAddr);
                             user->removeAndDeallocate();
                             return;
@@ -2076,54 +2092,109 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    // Ensure NonUniform decoration is present on both access-chain ops and their index operands.
-    // This fills gaps after legalization where only the access-chain inst was decorated.
+    bool addNonUniformDecoration(IRInst* inst)
+    {
+        if (inst->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+            return false;
+        IRBuilder builder(inst);
+        builder.addSPIRVNonUniformResourceDecoration(inst);
+        return true;
+    }
+
+    bool hasNonUniformDecoration(IRInst* inst)
+    {
+        return inst->findDecoration<IRSPIRVNonUniformResourceDecoration>() != nullptr;
+    }
+
+    // Propagate NonUniform decorations through the IR so that the actual resource
+    // operands consumed by memory/sampling instructions carry the decoration.
+    // Vulkan requires NonUniform on the resource operand of the consuming instruction,
+    // not just on the index used in an access chain.
+    //
+    // Uses a worklist seeded with already-decorated instructions. When an
+    // instruction is newly decorated, its users are added to the worklist so
+    // propagation continues downstream without rescanning the whole module.
     void propagateNonUniformAccessChainDecorations()
     {
+        List<IRInst*> worklist;
+        HashSet<IRInst*> inWorklist;
+
+        // Seed: collect all instructions that already carry NonUniform.
         for (auto globalInst : m_module->getGlobalInsts())
         {
             auto func = as<IRFunc>(globalInst);
             if (!func)
                 continue;
-
             for (auto block : func->getBlocks())
             {
                 for (auto inst : block->getChildren())
                 {
-                    IRInst* indexOperand = nullptr;
-                    switch (inst->getOp())
+                    if (hasNonUniformDecoration(inst))
                     {
-                    case kIROp_GetElement:
-                        indexOperand = inst->getOperand(1);
-                        break;
-                    case kIROp_GetElementPtr:
-                        indexOperand = inst->getOperand(1);
-                        break;
-                    case kIROp_RWStructuredBufferGetElementPtr:
-                        indexOperand = inst->getOperand(1);
-                        break;
-                    default:
-                        break;
+                        worklist.add(inst);
+                        inWorklist.add(inst);
                     }
-
-                    if (!indexOperand)
-                        continue;
-
-                    auto indexDecorated =
-                        indexOperand->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
-                        nullptr;
-                    auto instDecorated =
-                        inst->findDecoration<IRSPIRVNonUniformResourceDecoration>() != nullptr;
-                    if (!indexDecorated && !instDecorated)
-                        continue;
-
-                    IRBuilder builder(inst);
-                    builder.setInsertBefore(inst);
-                    if (!indexDecorated)
-                        builder.addSPIRVNonUniformResourceDecoration(indexOperand);
-                    if (!instDecorated)
-                        builder.addSPIRVNonUniformResourceDecoration(inst);
                 }
+            }
+        }
+
+        auto enqueueUsers = [&](IRInst* inst)
+        {
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                if (!inWorklist.contains(user))
+                {
+                    worklist.add(user);
+                    inWorklist.add(user);
+                }
+            }
+        };
+
+        // Returns true if inst was newly decorated and its users should be visited.
+        auto tryPropagate = [&](IRInst* inst) -> bool
+        {
+            if (hasNonUniformDecoration(inst))
+                return false;
+            switch (inst->getOp())
+            {
+            case kIROp_GetElement:
+            case kIROp_GetElementPtr:
+            case kIROp_RWStructuredBufferGetElementPtr:
+                if (hasNonUniformDecoration(inst->getOperand(0)) ||
+                    hasNonUniformDecoration(inst->getOperand(1)))
+                    return addNonUniformDecoration(inst);
+                break;
+            case kIROp_FieldAddress:
+            case kIROp_FieldExtract:
+                if (hasNonUniformDecoration(inst->getOperand(0)))
+                    return addNonUniformDecoration(inst);
+                break;
+            case kIROp_Load:
+                if (hasNonUniformDecoration(inst->getOperand(0)))
+                    return addNonUniformDecoration(inst);
+                break;
+            case kIROp_MakeCombinedTextureSampler:
+                if (hasNonUniformDecoration(inst->getOperand(0)) ||
+                    hasNonUniformDecoration(inst->getOperand(1)))
+                    return addNonUniformDecoration(inst);
+                break;
+            default:
+                break;
+            }
+            return false;
+        };
+
+        for (Index i = 0; i < worklist.getCount(); i++)
+        {
+            auto inst = worklist[i];
+            if (hasNonUniformDecoration(inst))
+            {
+                enqueueUsers(inst);
+            }
+            else if (tryPropagate(inst))
+            {
+                enqueueUsers(inst);
             }
         }
     }

@@ -63,6 +63,7 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         case kIROp_FieldAddress:
         case kIROp_FieldExtract:
         case kIROp_Load:
+        case kIROp_CastDynamicResource:
             {
                 auto base = arg->getOperand(0);
 
@@ -642,6 +643,11 @@ struct FunctionParameterSpecializationContext
             auto oldBase = oldArg->getOperand(0);
             getCallInfoForArg(ioInfo, oldBase);
         }
+        else if (oldArg->getOp() == kIROp_CastDynamicResource)
+        {
+            auto oldBase = oldArg->getOperand(0);
+            getCallInfoForArg(ioInfo, oldBase);
+        }
         else if (oldArg->getOp() == kIROp_CastDescriptorHandleToResource)
         {
             // We are accessing a resource from a bindless handle.
@@ -929,6 +935,21 @@ struct FunctionParameterSpecializationContext
             builder->setInsertInto(ioInfo.newBodyInsts);
             auto newVal = builder->emitLoad(oldArg->getFullType(), newPtr);
 
+            return newVal;
+        }
+        else if (oldArg->getOp() == kIROp_CastDynamicResource)
+        {
+            auto oldBase = oldArg->getOperand(0);
+            auto newBase = getSpecializedValueForArg(ioInfo, oldBase);
+
+            auto builder = getBuilder();
+            builder->setInsertInto(ioInfo.newBodyInsts);
+            IRInst* newOperands[] = {newBase};
+            auto newVal = builder->emitIntrinsicInst(
+                oldArg->getFullType(),
+                kIROp_CastDynamicResource,
+                1,
+                newOperands);
             return newVal;
         }
         else if (auto castHandleToResource = as<IRCastDescriptorHandleToResource>(oldArg))
