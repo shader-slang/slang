@@ -298,12 +298,13 @@ dispatching.
 > 📝 **Remark 1:** Function parameters with interface types do not impose the above restrictions when invoked
 > with variables with types known at compile time.
 
-> 📝 **Remark 2:** Initializing an interface variant using the default initializer is deprecated. Invoking a
-> default-initialized interface variant is undefined behavior.
+> 📝 **Remark 2:** Initializing an interface variant using the default initializer is deprecated in Slang 2025
+> and no longer allowed in Slang 2026. In Slang 2025, invoking a default-initialized interface variant is
+> undefined behavior.
 
-> 📝 **Remark 3:** In `slangc`, an interface variant is said to have an [existential
-> type](https://en.wikipedia.org/wiki/Type_system#Existential_types), meaning that its type exists such that
-> it conforms to the specified interface.
+> 📝 **Remark 3:** In `slangc`, an interface variant is said to have an
+> [existential type](https://en.wikipedia.org/wiki/Type_system#Existential_types), meaning that its type
+> exists such that it conforms to the specified interface.
 
 
 ## Example

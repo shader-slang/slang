@@ -6373,8 +6373,27 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
                 {
-                    context->getSink()->diagnose(
-                        Diagnostics::InterfaceDefaultInitializer{.expr = expr});
+                    auto moduleDecl = context->getMainModuleDecl();
+
+                    if (moduleDecl && moduleDecl->languageVersion >=
+                                          SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2026)
+                    {
+                        context->getSink()->diagnose(
+                            Diagnostics::InterfaceDefaultInitializerError{.expr = expr});
+                    }
+                    else
+                    {
+                        // We should always have moduleDecl available. But let's diagnose
+                        // it just in case
+                        if (!moduleDecl)
+                            context->getSink()->diagnose(Diagnostics::Unexpected{
+                                .message = "Cannot determine source language version: context has "
+                                           "no main module declaration",
+                                .location = expr->loc});
+
+                        context->getSink()->diagnose(
+                            Diagnostics::InterfaceDefaultInitializer{.expr = expr});
+                    }
                 }
             }
 
