@@ -28,5 +28,5 @@ void computeMain(int id : SV_DispatchThreadID)
     uint[2] payloadTooBig;
     serializeDynamicObject(foo, typeId, payloadTooBig);
 //CHECK:                  ^ serializeDynamicObject storage size mismatch
-//CHECK:                  ^ `serializeDynamicObject` payload type 'array<uint,2>' has size '8' but interface 'IFoo' requires any-value size '4'
+//CHECK:                  ^ `serializeDynamicObject` payload type 'array<uint,2>' has size '8' but the specialized payload size for interface 'IFoo' is '4'
 }

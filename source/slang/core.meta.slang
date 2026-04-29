@@ -3355,8 +3355,21 @@ T createDynamicObject(uint typeId)
 
 /// Inverse of `createDynamicObject`.  Unpacks an existential value of interface
 /// type `T` into its sequential witness-table ID and its concrete payload
-/// reinterpreted as storage type `U`.  `U` must be the same size as the
-/// interface's any-value payload.
+/// reinterpreted as storage type `U`.
+///
+/// `U` must match the *specialized* payload size of `T` at this call site,
+/// which is context-dependent:
+/// - With multiple conformances visible the packed type is the union of
+///   all conforming types and its size matches the `[anyValueSize]`
+///   annotation on `T`.
+/// - With a single conformance visible the typeflow pass collapses the
+///   packed type to the concrete struct, and `U` must match that struct's
+///   size — which can be smaller than the declared `[anyValueSize]`.
+///
+/// A mismatch is rejected at compile time with diagnostic E41206. Code
+/// that serializes in one compilation unit and deserializes in another
+/// must therefore use the same conformance set on both sides, or use a
+/// storage type whose size matches the worst-case `[anyValueSize]`.
 ///
 /// Use together with `createDynamicObject` to serialize and reconstruct
 /// interface-typed values through raw buffers.  Note: plain `bit_cast`

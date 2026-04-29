@@ -4604,7 +4604,7 @@ err(
     "serialize-dynamic-object-size-mismatch",
     41206,
     "serializeDynamicObject storage size mismatch",
-    span { loc = "location", message = "`serializeDynamicObject` payload type '~valueType:IRInst' has size '~valueSize:Int' but interface '~interfaceType:IRInst' requires any-value size '~anyValueSize:Int'" }
+    span { loc = "location", message = "`serializeDynamicObject` payload type '~valueType:IRInst' has size '~valueSize:Int' but the specialized payload size for interface '~interfaceType:IRInst' is '~anyValueSize:Int'" }
 )
 
 err(
