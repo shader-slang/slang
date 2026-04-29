@@ -3368,10 +3368,19 @@ struct TypeFlowSpecializationContext
             auto func = as<IRFunc>(globalInst);
             if (!func)
                 continue;
-            // Only diagnose lookups inside entry-point functions:
-            // those are the bodies that survive into codegen, so any
-            // unresolved lookup there will reach the unhandled-inst
-            // ICE the walker exists to prevent.
+            // Only diagnose lookups inside top-level functions
+            // that codegen actually emits as standalone callable
+            // bodies — shader entry points plus the various
+            // export decorations (CUDA kernels, DLL exports,
+            // extern-C, etc.). Those are the bodies that survive
+            // into codegen unchanged, so any unresolved lookup
+            // there will reach the unhandled-inst ICE the walker
+            // exists to prevent.
+            //
+            // Use the same `isEntryPoint(func)` predicate that
+            // `performDynamicInstLowering` uses to seed its work-
+            // list, so the walker's diagnostic coverage matches
+            // the lowering pass's coverage exactly.
             //
             // For non-entry-point helper functions, the typeflow
             // pass cannot tell whether the helper is reachable
@@ -3388,7 +3397,7 @@ struct TypeFlowSpecializationContext
             // unresolved lookup escapes into codegen via a non-
             // entry-point helper, the underlying ICE still fires
             // and points at the same source location.
-            if (!func->findDecoration<IREntryPointDecoration>())
+            if (!isEntryPoint(func))
                 continue;
             for (auto block : func->getBlocks())
             {
