@@ -174,7 +174,7 @@ public:
     ///
     /// Current default is 120 seconds. Windows debug builds default to 300 seconds, and ARM debug
     /// builds default to 600 seconds. SLANG_TEST_RPC_TIMEOUT_MS can override the default with a
-    /// value in milliseconds.
+    /// value in the range 1..86400000 milliseconds.
     Slang::Int connectionTimeOutInMs = 120 * 1000;
 
     void setThreadIndex(int index);
