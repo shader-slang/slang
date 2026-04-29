@@ -6,7 +6,7 @@
 
 // METAL-DAG: color(0)
 // METALLIB: framebuffer_fetch
-// DIAG: warning[E56105]
+// DIAG: warning[E56107]
 
 [[vk::input_attachment_index(0)]] SubpassInputMS<float4> inputMS;
 

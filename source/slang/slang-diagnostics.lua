@@ -4927,7 +4927,7 @@ fatal(
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 
--- Metal (56101-56104)
+-- Metal (56101-56108)
 
 err(
     "resource-types-in-constant-buffer-in-parameter-block-not-allowed-on-metal",
@@ -4957,25 +4957,25 @@ err(
     span { loc = "location", message = "whole struct must be assiged to mesh output at once for Metal target." }
 )
 
+err(
+    "storage-texture-access-mode-not-supported-in-wgsl",
+    56106,
+    "texture format '~format' does not support '~accessMode' access for storage textures in WGSL",
+    span { loc = "location" }  -- No span message: source location is not available at emit time
+)
+
 warning(
     "multisampled-subpass-input-not-supported-on-metal",
-    56105,
+    56107,
     "SubpassInputMS is not fully supported on Metal; the sample index argument to SubpassLoad will be ignored",
     span { loc = "location", message = "Metal framebuffer fetch does not support per-sample reads. The sample index is ignored and the resolved value is returned." }
 )
 
 err(
     "subpass-input-used-outside-entry-point",
-    56107,
+    56108,
     "SubpassInput used outside of the fragment entry point function",
     span { loc = "location", message = "SubpassInput globals must only be referenced from within the fragment entry point after inlining." }
-)
-
-err(
-    "storage-texture-access-mode-not-supported-in-wgsl",
-    56106,
-    "texture format '~format' does not support '~accessMode' access for storage textures in WGSL",
-    span { loc = "location" }  -- No span message: source location is not available at emit time
 )
 
 -- SPIRV (57001-57004)
