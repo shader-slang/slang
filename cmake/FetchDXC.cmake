@@ -3,17 +3,26 @@
 # Fetches DXC (DirectXShaderCompiler) prebuilt binaries via FetchContent and
 # copies them to the build output directory.
 #
-# On Linux, if the system GLIBC version is older than the minimum required by the
-# prebuilt binaries, DXC is built from source via ExternalProject instead.
+# On Linux, the prebuilt binary is downloaded at Slang configure time to detect
+# the actual GLIBC version it requires. Both libdxcompiler.so and libdxil.so are
+# inspected; if either requires a newer GLIBC than the system provides, DXC is
+# built from source instead. The source build also runs cmake-configuration at
+# Slang configure time so build-time surprises are avoided.
+#
+# All configure-time downloads and inspections are cached with stamp files so
+# that subsequent cmake reconfigures skip them.
 #
 # Both paths register the FetchContent 'dxc' name as populated so that slang-rhi
 # (which fetches its own DXC under the same name) skips its own download.
 #
 # Variables:
-#   SLANG_DXC_BINARY_URL        - Override the prebuilt binary download URL (optional)
+#   SLANG_DXC_BINARY_URL        - Override the prebuilt binary download URL
+#                                 (optional; skips auto-detection when set)
 #   SLANG_DXC_BUILD_FROM_SOURCE - ON: always build from source; OFF: always use
-#                                 prebuilt (skips auto-detection); unset: auto-detect
-#                                 on Linux by checking the system GLIBC version
+#                                 prebuilt (skips detection); unset: auto-detect on
+#                                 Linux by downloading the prebuilt binary and
+#                                 inspecting the GLIBC requirements of both
+#                                 libdxcompiler.so and libdxil.so
 #   SLANG_GITHUB_TOKEN          - GitHub token for authenticated downloads (optional)
 #
 # Requires the following variables to be set by the caller (set in SlangTarget.cmake):
@@ -22,28 +31,10 @@
 
 include(FetchContent)
 
-# DXC version Git tag. Used for the source build GIT_TAG and as the
-# release path component in the prebuilt binary URLs below.
-# When upgrading DXC, bump this AND update _dxc_release_date below.
+# DXC version Git tag and release date.
+# When upgrading DXC, bump BOTH variables together.
 set(_dxc_version_tag "v1.9.2602")
-
-# Release date embedded in the prebuilt binary filenames (e.g.
-# "dxc_2026_02_20.zip"). DXC releases use date-stamped filenames, so this
-# must be updated together with _dxc_version_tag when upgrading.
 set(_dxc_release_date "2026_02_20")
-
-# GLIBC threshold below which DXC is built from source instead of using the
-# prebuilt binaries. Both libdxcompiler.so and libdxil.so from the v1.9.2602
-# release require GLIBC 2.38 to load at runtime. However, this threshold is
-# intentionally set to 2.29 — below the real runtime requirement — so that
-# the source-build path only activates for the project's oldest release CI
-# containers (Ubuntu 18.04 / GLIBC 2.27-2.28). Systems with GLIBC in
-# [2.29, 2.38) continue to download prebuilt binaries that may not load at
-# runtime (DXC silently unavailable), which matches the behavior before this
-# feature was added. Set SLANG_DXC_BUILD_FROM_SOURCE=ON explicitly to force
-# a source build on those systems if DXC is needed.
-# Bump when upgrading to a DXC release that changes the oldest supported container.
-set(_dxc_min_glibc "2.29")
 
 # ---------------------------------------------------------------------------
 # Decide whether to build DXC from source.
@@ -59,123 +50,202 @@ elseif(
     AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
     AND NOT DEFINED SLANG_DXC_BINARY_URL
+    AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
 )
-    # Auto-detect: check GLIBC version only when the user has not explicitly
-    # set SLANG_DXC_BUILD_FROM_SOURCE or provided a custom SLANG_DXC_BINARY_URL.
+    # Auto-detect: download the prebuilt Linux binary and inspect both
+    # libdxcompiler.so and libdxil.so to find the highest GLIBC version they
+    # require across both libraries. Compare that against the system GLIBC; if
+    # the system is too old for either library, fall back to a source build.
     #
-    # Prefer getconf GNU_LIBC_VERSION: it outputs "glibc X.Y" on all glibc
-    # systems regardless of distro (Debian/Ubuntu say "GLIBC"; RHEL/Fedora/Arch
-    # say "GNU libc" in ldd output, which would not match a "glibc"-anchored
-    # regex). Fall back to ldd --version for completeness.
-    execute_process(
-        COMMAND getconf GNU_LIBC_VERSION
-        OUTPUT_VARIABLE _libc_probe
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        ERROR_QUIET
-        RESULT_VARIABLE _getconf_result
+    # All steps are cached via stamp files so subsequent reconfigures are fast.
+
+    set(_dxc_probe_url
+        "https://github.com/microsoft/DirectXShaderCompiler/releases/download/${_dxc_version_tag}/linux_dxc_${_dxc_release_date}.x86_64.tar.gz"
     )
-    if(NOT _getconf_result EQUAL 0)
+    set(_dxc_probe_dir "${CMAKE_BINARY_DIR}/_dxc_probe")
+    set(_dxc_probe_tarball "${_dxc_probe_dir}/dxc.tar.gz")
+    # Stamp stores the highest GLIBC version required across both .so files.
+    # Written only after a successful detection; never contains "0.0".
+    set(_dxc_glibc_stamp "${_dxc_probe_dir}/req_glibc_${_dxc_version_tag}.txt")
+
+    set(_dxc_required_glibc "0.0")
+    if(EXISTS "${_dxc_glibc_stamp}")
+        file(READ "${_dxc_glibc_stamp}" _dxc_required_glibc)
+        string(STRIP "${_dxc_required_glibc}" _dxc_required_glibc)
+    else()
+        file(MAKE_DIRECTORY "${_dxc_probe_dir}")
+
+        # Download the tarball once; reused by FetchContent for the actual
+        # binary deployment if the system GLIBC turns out to be new enough.
+        if(NOT EXISTS "${_dxc_probe_tarball}")
+            message(
+                STATUS
+                "Downloading DXC prebuilt binary to detect GLIBC requirement..."
+            )
+            set(_dl_headers "")
+            if(SLANG_GITHUB_TOKEN)
+                set(_dl_headers
+                    HTTPHEADER
+                    "Authorization: token ${SLANG_GITHUB_TOKEN}"
+                )
+            endif()
+            file(
+                DOWNLOAD "${_dxc_probe_url}" "${_dxc_probe_tarball}"
+                STATUS _dl_status
+                SHOW_PROGRESS
+                ${_dl_headers}
+            )
+            list(GET _dl_status 0 _dl_code)
+            if(NOT _dl_code EQUAL 0)
+                list(GET _dl_status 1 _dl_msg)
+                message(
+                    WARNING
+                    "Failed to download DXC prebuilt binary: ${_dl_msg}. "
+                    "GLIBC requirement detection skipped. "
+                    "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON if DXC is required."
+                )
+                file(REMOVE "${_dxc_probe_tarball}")
+            endif()
+        endif()
+
+        if(EXISTS "${_dxc_probe_tarball}")
+            # Extract only the two shared libraries that determine runtime
+            # compatibility; avoids unpacking the full ~30 MB tarball.
+            execute_process(
+                COMMAND
+                    ${CMAKE_COMMAND} -E tar xzf "${_dxc_probe_tarball}"
+                    lib/libdxcompiler.so lib/libdxil.so
+                WORKING_DIRECTORY "${_dxc_probe_dir}"
+                OUTPUT_QUIET
+                ERROR_QUIET
+            )
+
+            find_program(_dxc_objdump NAMES objdump)
+            find_program(_dxc_readelf NAMES readelf)
+
+            # Inspect each library and track the highest GLIBC version found
+            # across both. If either library requires GLIBC X.Y, the system
+            # must provide at least X.Y for both to load.
+            foreach(_lib libdxcompiler.so libdxil.so)
+                set(_so "${_dxc_probe_dir}/lib/${_lib}")
+                if(NOT EXISTS "${_so}")
+                    continue()
+                endif()
+                set(_elf_info "")
+                if(_dxc_objdump)
+                    execute_process(
+                        COMMAND "${_dxc_objdump}" -p "${_so}"
+                        OUTPUT_VARIABLE _elf_info
+                        ERROR_QUIET
+                    )
+                elseif(_dxc_readelf)
+                    execute_process(
+                        COMMAND "${_dxc_readelf}" --version-info "${_so}"
+                        OUTPUT_VARIABLE _elf_info
+                        ERROR_QUIET
+                    )
+                endif()
+                string(
+                    REGEX MATCHALL
+                    "GLIBC_([0-9]+[.][0-9]+)"
+                    _ver_list
+                    "${_elf_info}"
+                )
+                foreach(_entry ${_ver_list})
+                    string(REGEX REPLACE "^GLIBC_" "" _ver "${_entry}")
+                    if(_ver VERSION_GREATER _dxc_required_glibc)
+                        set(_dxc_required_glibc "${_ver}")
+                    endif()
+                endforeach()
+            endforeach()
+
+            if(NOT _dxc_required_glibc STREQUAL "0.0")
+                message(
+                    STATUS
+                    "DXC prebuilt binary (${_dxc_version_tag}) "
+                    "requires GLIBC >= ${_dxc_required_glibc}"
+                )
+                file(WRITE "${_dxc_glibc_stamp}" "${_dxc_required_glibc}")
+            else()
+                message(
+                    WARNING
+                    "Could not extract GLIBC version requirements from DXC "
+                    "shared libraries (objdump/readelf unavailable or produced "
+                    "no output). Prebuilt binaries may silently fail to load "
+                    "if the system GLIBC is older than required. "
+                    "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to force a source build."
+                )
+            endif()
+        endif()
+    endif()
+
+    # Compare the detected requirement against the system GLIBC.
+    if(NOT _dxc_required_glibc STREQUAL "0.0")
         execute_process(
-            COMMAND ldd --version
+            COMMAND getconf GNU_LIBC_VERSION
             OUTPUT_VARIABLE _libc_probe
             OUTPUT_STRIP_TRAILING_WHITESPACE
             ERROR_QUIET
+            RESULT_VARIABLE _getconf_result
         )
-    endif()
-    # getconf outputs "glibc 2.35"; ldd (Debian/Ubuntu) outputs
-    # "ldd (Ubuntu GLIBC 2.35-0ubuntu3.6) 2.35". Both contain "glibc X.Y".
-    string(
-        REGEX MATCH
-        "[Gg][Ll][Ii][Bb][Cc][^0-9]*([0-9]+)\\.([0-9]+)"
-        _glibc_match
-        "${_libc_probe}"
-    )
-    if(_glibc_match)
-        set(_glibc_version "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}")
-        message(STATUS "Detected GLIBC version: ${_glibc_version}")
-        if(_glibc_version VERSION_LESS _dxc_min_glibc)
-            message(
-                STATUS
-                "GLIBC ${_glibc_version} < ${_dxc_min_glibc}: prebuilt DXC binaries "
-                "require GLIBC ${_dxc_min_glibc}+, building DXC from source (${_dxc_version_tag})"
+        if(NOT _getconf_result EQUAL 0)
+            execute_process(
+                COMMAND ldd --version
+                OUTPUT_VARIABLE _libc_probe
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET
             )
-            set(_dxc_build_from_source ON)
         endif()
-    else()
-        # Neither getconf nor ldd returned a recognizable GLIBC version (e.g.
-        # musl libc). Prebuilt DXC binaries are glibc-linked and may not run.
-        # Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build from source if needed.
-        message(
-            WARNING
-            "Could not detect GLIBC version; "
-            "prebuilt DXC binaries may not run on this system. "
-            "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source."
+        string(
+            REGEX MATCH
+            "[Gg][Ll][Ii][Bb][Cc][^0-9]*([0-9]+)\\.([0-9]+)"
+            _glibc_match
+            "${_libc_probe}"
         )
+        if(_glibc_match)
+            set(_glibc_version "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}")
+            message(STATUS "Detected system GLIBC version: ${_glibc_version}")
+            if(_glibc_version VERSION_LESS _dxc_required_glibc)
+                message(
+                    STATUS
+                    "System GLIBC ${_glibc_version} < required "
+                    "${_dxc_required_glibc}: building DXC from source "
+                    "(${_dxc_version_tag})"
+                )
+                set(_dxc_build_from_source ON)
+            endif()
+        else()
+            message(
+                WARNING
+                "Could not detect system GLIBC version; "
+                "prebuilt DXC binaries may not run on this system. "
+                "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build from source."
+            )
+        endif()
     endif()
+elseif(
+    NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
+    AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
+    AND NOT CMAKE_CROSSCOMPILING
+    AND NOT DEFINED SLANG_DXC_BINARY_URL
+)
+    # Non-x86_64 Linux: no prebuilt binary is available.
+    message(
+        WARNING
+        "No prebuilt DXC binary is available for ${CMAKE_SYSTEM_PROCESSOR} "
+        "on Linux. "
+        "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source."
+    )
 endif()
 
 # ---------------------------------------------------------------------------
-# Source build path.
+# Source build: clone and cmake-configure at Slang configure time.
 # ---------------------------------------------------------------------------
 
 if(_dxc_build_from_source)
-    include(ExternalProject)
-
-    # DXC's build (PredefinedParams.cmake) is designed for a single-config
-    # generator. Normalize any Ninja variant (e.g. "Ninja Multi-Config") to
-    # plain "Ninja"; for non-Ninja generators (e.g. Visual Studio on Windows)
-    # mirror the parent so the same toolchain is used.
-    #
-    # LLVM uses CMAKE_CFG_INTDIR (e.g. "." for Ninja, "$(Configuration)" for VS)
-    # to set LLVM_RUNTIME_OUTPUT_INTDIR, so for VS the DLLs land in
-    # <BINARY_DIR>/MinSizeRel/bin/ rather than <BINARY_DIR>/bin/. Track this
-    # in _dxc_dll_subdir so byproducts and copy commands point to the right path.
-    if(CMAKE_GENERATOR MATCHES "Ninja")
-        set(_dxc_generator_args -G Ninja)
-        set(_dxc_build_command
-            ${CMAKE_COMMAND}
-            --build
-            <BINARY_DIR>
-            --target
-            dxcompiler
-            dxil
-        )
-        set(_dxc_dll_subdir "bin")
-    else()
-        set(_dxc_generator_args -G "${CMAKE_GENERATOR}")
-        if(CMAKE_GENERATOR_PLATFORM)
-            list(APPEND _dxc_generator_args -A "${CMAKE_GENERATOR_PLATFORM}")
-        endif()
-        if(CMAKE_GENERATOR_TOOLSET)
-            list(APPEND _dxc_generator_args -T "${CMAKE_GENERATOR_TOOLSET}")
-        endif()
-        set(_dxc_build_command
-            ${CMAKE_COMMAND}
-            --build
-            <BINARY_DIR>
-            --config
-            MinSizeRel
-            --target
-            dxcompiler
-            --target
-            dxil
-        )
-        set(_dxc_dll_subdir "MinSizeRel/bin")
-    endif()
-
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-        set(_dxc_src_byproducts
-            "<BINARY_DIR>/${_dxc_dll_subdir}/dxcompiler.dll"
-            "<BINARY_DIR>/${_dxc_dll_subdir}/dxil.dll"
-        )
         set(_dxc_warning_flags "")
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        # DXC's Linux source build produces libdxcompiler.so and libdxil.so
-        # (the DXIL validator), matching the layout of the prebuilt tarballs.
-        set(_dxc_src_byproducts
-            <BINARY_DIR>/lib/libdxcompiler.so
-            <BINARY_DIR>/lib/libdxil.so
-        )
         # LLVM_ENABLE_WARNINGS=OFF prevents adding warning flags but does not
         # actively suppress existing ones. Pass -w via CMAKE_*_FLAGS to silence
         # all GCC/Clang warnings from DXC's source.
@@ -188,48 +258,137 @@ if(_dxc_build_from_source)
         )
     endif()
 
-    # DXC's build runs clang-format on generated files inside its build directory.
-    # Clang-format walks up from there and finds Slang's root .clang-format, which
-    # uses options unsupported by older clang-format versions (e.g.
-    # PackConstructorInitializers: NextLineOnly on clang-format 14).
-    # Placing DXC's own style (BasedOnStyle: LLVM) in the DXC build directory
-    # stops the upward search at the right level.
+    # DXC's build (PredefinedParams.cmake) is designed for a single-config
+    # generator. Normalize any Ninja variant (e.g. "Ninja Multi-Config") to
+    # plain "Ninja"; for non-Ninja generators (e.g. Visual Studio on Windows)
+    # mirror the parent so the same toolchain is used.
     #
-    set(_dxc_build_dir
-        "${CMAKE_BINARY_DIR}/dxc_from_source-prefix/src/dxc_from_source-build"
-    )
-    file(MAKE_DIRECTORY "${_dxc_build_dir}")
-    file(WRITE "${_dxc_build_dir}/.clang-format" "BasedOnStyle: LLVM\n")
+    # LLVM uses CMAKE_CFG_INTDIR (e.g. "." for Ninja, "$(Configuration)" for VS)
+    # to set LLVM_RUNTIME_OUTPUT_INTDIR, so for VS the DLLs land in
+    # <BINARY_DIR>/MinSizeRel/bin/ rather than <BINARY_DIR>/bin/. Track this
+    # in _dxc_dll_subdir so byproducts and copy commands point to the right path.
+    if(CMAKE_GENERATOR MATCHES "Ninja")
+        set(_dxc_generator_args -G Ninja)
+        set(_dxc_dll_subdir "bin")
+    else()
+        set(_dxc_generator_args -G "${CMAKE_GENERATOR}")
+        if(CMAKE_GENERATOR_PLATFORM)
+            list(APPEND _dxc_generator_args -A "${CMAKE_GENERATOR_PLATFORM}")
+        endif()
+        if(CMAKE_GENERATOR_TOOLSET)
+            list(APPEND _dxc_generator_args -T "${CMAKE_GENERATOR_TOOLSET}")
+        endif()
+        set(_dxc_dll_subdir "MinSizeRel/bin")
+    endif()
 
-    ExternalProject_Add(
-        dxc_from_source
-        BINARY_DIR "${_dxc_build_dir}"
+    # Step 1: Clone DXC source at Slang configure time.
+    # FetchContent stamps ensure the clone is skipped on subsequent reconfigures.
+    FetchContent_Declare(
+        dxc_source
         GIT_REPOSITORY "https://github.com/microsoft/DirectXShaderCompiler.git"
         GIT_TAG "${_dxc_version_tag}"
         GIT_SHALLOW ON
         GIT_SUBMODULES_RECURSE ON
         GIT_PROGRESS ON
         UPDATE_DISCONNECTED ON
-        CONFIGURE_COMMAND
-            ${CMAKE_COMMAND} -B <BINARY_DIR> -S <SOURCE_DIR>
-            ${_dxc_generator_args} -C
-            <SOURCE_DIR>/cmake/caches/PredefinedParams.cmake
-            # CMAKE_BUILD_TYPE is ignored by multi-config generators (VS);
-            # the config is selected via --config MinSizeRel in BUILD_COMMAND.
-            # Passing it here covers single-config generators (Ninja) in one line.
-            -DCMAKE_BUILD_TYPE=MinSizeRel -DHLSL_COPY_GENERATED_SOURCES=ON
-            -DLLVM_INCLUDE_TESTS=OFF -DCLANG_INCLUDE_TESTS=OFF
-            -DLLVM_ENABLE_WARNINGS=OFF ${_dxc_warning_flags} -Wno-dev
-        BUILD_COMMAND ${_dxc_build_command}
-        INSTALL_COMMAND ""
-        BUILD_BYPRODUCTS ${_dxc_src_byproducts}
+        SOURCE_SUBDIR
+        _does_not_exist_
     )
+    FetchContent_MakeAvailable(dxc_source)
+    set(_dxc_src_dir "${dxc_source_SOURCE_DIR}")
+    set(_dxc_build_dir "${dxc_source_BINARY_DIR}")
 
-    ExternalProject_Get_Property(dxc_from_source BINARY_DIR)
+    # DXC's build runs clang-format on generated files inside its build
+    # directory. Clang-format walks up from there and finds Slang's root
+    # .clang-format, which uses options unsupported by older clang-format
+    # versions. Placing DXC's own style here stops the upward search.
+    file(MAKE_DIRECTORY "${_dxc_build_dir}")
+    file(WRITE "${_dxc_build_dir}/.clang-format" "BasedOnStyle: LLVM\n")
+
+    # Step 2: Configure DXC at Slang configure time.
+    # A stamp file keyed on the version tag makes this idempotent: the
+    # configure step is re-run only when the DXC version changes.
+    set(_dxc_configure_stamp
+        "${_dxc_build_dir}/.slang_dxc_configured_${_dxc_version_tag}"
+    )
+    if(NOT EXISTS "${_dxc_configure_stamp}")
+        message(STATUS "Configuring DXC from source (${_dxc_version_tag})...")
+        execute_process(
+            COMMAND
+                ${CMAKE_COMMAND} -B "${_dxc_build_dir}" -S "${_dxc_src_dir}"
+                ${_dxc_generator_args} -C
+                "${_dxc_src_dir}/cmake/caches/PredefinedParams.cmake"
+                # CMAKE_BUILD_TYPE is ignored by multi-config generators (VS);
+                # the config is selected via --config MinSizeRel in the build
+                # command. Passing it here covers single-config generators (Ninja).
+                -DCMAKE_BUILD_TYPE=MinSizeRel -DHLSL_COPY_GENERATED_SOURCES=ON
+                -DLLVM_INCLUDE_TESTS=OFF -DCLANG_INCLUDE_TESTS=OFF
+                -DLLVM_ENABLE_WARNINGS=OFF ${_dxc_warning_flags} -Wno-dev
+            RESULT_VARIABLE _dxc_configure_result
+            OUTPUT_VARIABLE _dxc_configure_output
+            ERROR_VARIABLE _dxc_configure_error
+        )
+        if(NOT _dxc_configure_result EQUAL 0)
+            message(
+                FATAL_ERROR
+                "DXC cmake configure failed "
+                "(exit ${_dxc_configure_result}):\n"
+                "${_dxc_configure_output}\n${_dxc_configure_error}"
+            )
+        endif()
+        file(WRITE "${_dxc_configure_stamp}" "${_dxc_version_tag}")
+        message(STATUS "DXC configured successfully")
+    endif()
+
+    # Step 3: Build DXC at Slang build time.
+    # The DXIL validator target is named 'dxildll' in DXC's CMake (it produces
+    # libdxil.so on Linux / dxil.dll on Windows).
+    if(CMAKE_GENERATOR MATCHES "Ninja")
+        set(_dxc_build_cmd
+            ${CMAKE_COMMAND}
+            --build
+            "${_dxc_build_dir}"
+            --target
+            dxcompiler
+            dxildll
+        )
+    else()
+        set(_dxc_build_cmd
+            ${CMAKE_COMMAND}
+            --build
+            "${_dxc_build_dir}"
+            --config
+            MinSizeRel
+            --target
+            dxcompiler
+            --target
+            dxildll
+        )
+    endif()
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        set(_dxc_src_byproducts
+            "${_dxc_build_dir}/${_dxc_dll_subdir}/dxcompiler.dll"
+            "${_dxc_build_dir}/${_dxc_dll_subdir}/dxil.dll"
+        )
+    else()
+        set(_dxc_src_byproducts
+            "${_dxc_build_dir}/lib/libdxcompiler.so"
+            "${_dxc_build_dir}/lib/libdxil.so"
+        )
+    endif()
+
+    add_custom_target(
+        dxc_from_source
+        COMMAND ${_dxc_build_cmd}
+        BYPRODUCTS ${_dxc_src_byproducts}
+        COMMENT "Building DXC ${_dxc_version_tag} from source"
+        VERBATIM
+    )
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         foreach(_dll dxcompiler dxil)
-            set(_src "${BINARY_DIR}/${_dxc_dll_subdir}/${_dll}.dll")
+            set(_src "${_dxc_build_dir}/${_dxc_dll_subdir}/${_dll}.dll")
             set(_dst
                 "${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/${_dll}.dll"
             )
@@ -244,7 +403,7 @@ if(_dxc_build_from_source)
         endforeach()
     else()
         foreach(_lib dxcompiler dxil)
-            set(_src "${BINARY_DIR}/lib/lib${_lib}.so")
+            set(_src "${_dxc_build_dir}/lib/lib${_lib}.so")
             set(_dst
                 "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/lib${_lib}.so"
             )
@@ -264,7 +423,7 @@ if(_dxc_build_from_source)
     # which reads the internal _FetchContent_dxc_populated global property and
     # skips its own download when TRUE. Setting this property directly is the
     # only practical option here: FetchContent_MakeAvailable would conflict with
-    # ExternalProject_Add (which owns the actual clone), and setting the
+    # the source build (which owns the actual clone), and setting the
     # public-facing dxc_POPULATED variable in this scope would not propagate to
     # the calling scope where slang-rhi's FetchPackage runs.
     #
@@ -308,7 +467,7 @@ if(NOT DEFINED SLANG_DXC_BINARY_URL)
     return()
 endif()
 
-message(STATUS "Downloading DXC from: ${SLANG_DXC_BINARY_URL} ...")
+message(STATUS "Fetching DXC prebuilt binary from: ${SLANG_DXC_BINARY_URL} ...")
 set(_dxc_fetch_args
     dxc
     URL
