@@ -203,34 +203,39 @@ static std::string buildManifestJson(slang::ICoverageTracingMetadata* coverage)
     out += "    \"element_type\": \"uint32\",\n";
     out += "    \"element_stride\": 4,\n";
     out += "    \"synthesized\": true";
-    int32_t space = coverage->getBufferSpace();
-    int32_t binding = coverage->getBufferBinding();
-    if (space >= 0)
+    slang::CoverageBufferInfo bufferInfo;
+    if (SLANG_SUCCEEDED(coverage->getBufferInfo(&bufferInfo)))
     {
-        char buf[64];
-        std::snprintf(buf, sizeof(buf), ",\n    \"space\": %d", (int)space);
-        out += buf;
-    }
-    if (binding >= 0)
-    {
-        char buf[64];
-        std::snprintf(buf, sizeof(buf), ",\n    \"binding\": %d", (int)binding);
-        out += buf;
+        if (bufferInfo.space >= 0)
+        {
+            char buf[64];
+            std::snprintf(buf, sizeof(buf), ",\n    \"space\": %d", (int)bufferInfo.space);
+            out += buf;
+        }
+        if (bufferInfo.binding >= 0)
+        {
+            char buf[64];
+            std::snprintf(buf, sizeof(buf), ",\n    \"binding\": %d", (int)bufferInfo.binding);
+            out += buf;
+        }
     }
     out += "\n  },\n";
     out += "  \"entries\": [";
-    for (uint32_t i = 0; i < coverage->getCounterCount(); ++i)
+    uint32_t counterCount = coverage->getCounterCount();
+    for (uint32_t i = 0; i < counterCount; ++i)
     {
+        slang::CoverageEntryInfo entry;
+        if (SLANG_FAILED(coverage->getEntryInfo(i, &entry)))
+            continue;
         if (i > 0)
             out += ",";
         char idxBuf[64];
         std::snprintf(idxBuf, sizeof(idxBuf), "\n    {\"index\": %u, \"file\": \"", i);
         out += idxBuf;
-        const char* file = coverage->getEntryFile(i);
-        for (const char* p = file; p && *p; ++p)
+        for (const char* p = entry.file; p && *p; ++p)
             appendJsonEscaped(out, *p);
         char tail[64];
-        std::snprintf(tail, sizeof(tail), "\", \"line\": %u}", coverage->getEntryLine(i));
+        std::snprintf(tail, sizeof(tail), "\", \"line\": %u}", entry.line);
         out += tail;
     }
     out += "\n  ]\n";
@@ -272,8 +277,14 @@ static uint32_t writeManifestFromMetadata(
     }
     if (opt.coverageBindingIndex >= 0)
     {
-        int32_t gotIndex = coverage->getBufferBinding();
-        int32_t gotSpace = coverage->getBufferSpace();
+        slang::CoverageBufferInfo bufferInfo;
+        int32_t gotIndex = -1;
+        int32_t gotSpace = -1;
+        if (SLANG_SUCCEEDED(coverage->getBufferInfo(&bufferInfo)))
+        {
+            gotIndex = bufferInfo.binding;
+            gotSpace = bufferInfo.space;
+        }
         if (gotIndex < 0 && gotSpace < 0)
         {
             // The CPU target doesn't expose buffers as (set, register)
@@ -589,12 +600,12 @@ int runDispatch(const Options& opt)
                 slang::ICoverageTracingMetadata::getTypeGuid());
             if (coverage && coverage->getCounterCount() > 0)
             {
-                int32_t covSpace = coverage->getBufferSpace();
-                int32_t covBinding = coverage->getBufferBinding();
-                if (covSpace >= 0 && covBinding >= 0)
+                slang::CoverageBufferInfo bufferInfo;
+                if (SLANG_SUCCEEDED(coverage->getBufferInfo(&bufferInfo)) &&
+                    bufferInfo.space >= 0 && bufferInfo.binding >= 0)
                 {
-                    coverageExtra.set = (uint32_t)covSpace;
-                    coverageExtra.binding = (uint32_t)covBinding;
+                    coverageExtra.set = (uint32_t)bufferInfo.space;
+                    coverageExtra.binding = (uint32_t)bufferInfo.binding;
                     coverageExtra.bindingType = slang::BindingType::MutableRawBuffer;
                     haveCoverageExtra = true;
                 }
