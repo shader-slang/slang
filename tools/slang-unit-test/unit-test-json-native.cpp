@@ -183,9 +183,16 @@ SLANG_UNIT_TEST(JSONNative)
     SLANG_CHECK(SLANG_SUCCEEDED(_check()));
 }
 
+struct ExpectedStructField
+{
+    const char* name;
+    uint32_t offset;
+    StructRttiInfo::Flags flags;
+};
+
 static SlangResult _checkStructFields(
     const StructRttiInfo& info,
-    const char* const* expectedFields,
+    const ExpectedStructField* expectedFields,
     Index expectedFieldCount)
 {
     if (info.m_fieldCount != expectedFieldCount)
@@ -196,7 +203,9 @@ static SlangResult _checkStructFields(
 
     for (Index i = 0; i < expectedFieldCount; ++i)
     {
-        SLANG_CHECK(String(info.m_fields[i].m_name) == expectedFields[i]);
+        SLANG_CHECK(String(info.m_fields[i].m_name) == expectedFields[i].name);
+        SLANG_CHECK(info.m_fields[i].m_offset == expectedFields[i].offset);
+        SLANG_CHECK(info.m_fields[i].m_flags == expectedFields[i].flags);
     }
 
     return SLANG_OK;
@@ -233,18 +242,21 @@ static SlangResult _checkProtocolCompatibility()
     SLANG_CHECK(
         alignof(TestServerProtocol::ExecutionResult) == alignof(ExpectedExecutionResultLayout));
 
-    static const char* const executeToolFields[] = {"toolName", "args"};
+    static const ExpectedStructField executeToolFields[] = {
+        {"toolName", uint32_t(offsetof(TestServerProtocol::ExecuteToolTestArgs, toolName)), 0},
+        {"args", uint32_t(offsetof(TestServerProtocol::ExecuteToolTestArgs, args)), 0},
+    };
     SLANG_RETURN_ON_FAIL(_checkStructFields(
         TestServerProtocol::ExecuteToolTestArgs::g_rttiInfo,
         executeToolFields,
         SLANG_COUNT_OF(executeToolFields)));
 
-    static const char* const executionResultFields[] = {
-        "stdOut",
-        "stdError",
-        "debugLayer",
-        "result",
-        "returnCode",
+    static const ExpectedStructField executionResultFields[] = {
+        {"stdOut", uint32_t(offsetof(TestServerProtocol::ExecutionResult, stdOut)), 0},
+        {"stdError", uint32_t(offsetof(TestServerProtocol::ExecutionResult, stdError)), 0},
+        {"debugLayer", uint32_t(offsetof(TestServerProtocol::ExecutionResult, debugLayer)), 0},
+        {"result", uint32_t(offsetof(TestServerProtocol::ExecutionResult, result)), 0},
+        {"returnCode", uint32_t(offsetof(TestServerProtocol::ExecutionResult, returnCode)), 0},
     };
     SLANG_RETURN_ON_FAIL(_checkStructFields(
         TestServerProtocol::ExecutionResult::g_rttiInfo,
@@ -337,6 +349,34 @@ static SlangResult _checkArrayStyleOptionalFields()
     // Test: Array-style parsing rejects a missing required field.
     {
         const char* json = R"(["render-test"])";
+        ArrayStyleOptionalFieldsTestStruct args;
+
+        DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
+        RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
+
+        String contents(json);
+        SourceFile* sourceFile =
+            sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, &sink);
+
+        JSONBuilder builder(container);
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
+
+        JSONToNativeConverter converter(container, &typeMap, &sink);
+        SLANG_CHECK(SLANG_FAILED(converter.convertArrayToStruct(
+            builder.getRootValue(),
+            GetRttiInfo<ArrayStyleOptionalFieldsTestStruct>::get(),
+            &args)));
+        SLANG_CHECK(sink.getErrorCount() > 0);
+    }
+
+    // Test: Array-style parsing rejects too many elements.
+    {
+        const char* json = R"(["render-test", ["-api", "vk"], "diagnostic-note", "extra"])";
         ArrayStyleOptionalFieldsTestStruct args;
 
         DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);

@@ -417,7 +417,7 @@ SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
             (long long)duration,
             (unsigned long)pthread_self());
 #else
-        fprintf(stderr, "[RPC-WAIT] waitForResult completed in %lldms\n", duration);
+        fprintf(stderr, "[RPC-WAIT] waitForResult completed in %lldms\n", (long long)duration);
 #endif
 
         // Warn if wait took more than 1 second
