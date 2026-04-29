@@ -16,7 +16,6 @@
 #include <fcntl.h>
 #include <mutex>
 #include <poll.h>
-#include <pthread.h>
 #include <signal.h>
 #include <spawn.h>
 #include <sys/stat.h>
@@ -366,12 +365,12 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
                 1000.0;
             fprintf(
                 stderr,
-                "[PIPE-READ] fd=%d requested=%zu actual=%zd duration=%.3fms (thread=%lu)\n",
+                "[PIPE-READ] fd=%d requested=%zu actual=%zd duration=%.3fms (thread=%zu)\n",
                 m_fd,
                 length,
                 count,
                 durationMs,
-                (unsigned long)pthread_self());
+                getCurrentThreadDiagnosticId());
 
             // Log pipe buffer status on Linux
             logPipeBufferInfo(m_fd, "READ");
@@ -473,12 +472,12 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         {
             fprintf(
                 stderr,
-                "[PIPE-WRITE] fd=%d requested=%zu actual=%zd duration=%.3fms (thread=%lu)\n",
+                "[PIPE-WRITE] fd=%d requested=%zu actual=%zd duration=%.3fms (thread=%zu)\n",
                 m_fd,
                 length,
                 writeResult,
                 durationMs,
-                (unsigned long)pthread_self());
+                getCurrentThreadDiagnosticId());
 
             // Log pipe buffer status on Linux
             logPipeBufferInfo(m_fd, "WRITE");
@@ -506,11 +505,11 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         {
             fprintf(
                 stderr,
-                "[PIPE-ERROR] Write failed on fd=%d: errno=%d duration=%.3fms (thread=%lu)\n",
+                "[PIPE-ERROR] Write failed on fd=%d: errno=%d duration=%.3fms (thread=%zu)\n",
                 m_fd,
                 errno,
                 durationMs,
-                (unsigned long)pthread_self());
+                getCurrentThreadDiagnosticId());
         }
     }
 

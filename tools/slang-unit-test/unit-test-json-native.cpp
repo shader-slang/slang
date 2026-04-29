@@ -266,8 +266,8 @@ static SlangResult _checkProtocolCompatibility()
         alignof(TestServerProtocol::ExecutionResult) == alignof(ExpectedExecutionResultLayout));
 
     static const ExpectedStructField executeToolFields[] = {
-        {"toolName", uint32_t(offsetof(TestServerProtocol::ExecuteToolTestArgs, toolName)), 0},
-        {"args", uint32_t(offsetof(TestServerProtocol::ExecuteToolTestArgs, args)), 0},
+        {"toolName", uint32_t(offsetof(ExpectedExecuteToolTestArgsLayout, toolName)), 0},
+        {"args", uint32_t(offsetof(ExpectedExecuteToolTestArgsLayout, args)), 0},
     };
     SLANG_RETURN_ON_FAIL(_checkStructFields(
         TestServerProtocol::ExecuteToolTestArgs::g_rttiInfo,
@@ -275,11 +275,11 @@ static SlangResult _checkProtocolCompatibility()
         SLANG_COUNT_OF(executeToolFields)));
 
     static const ExpectedStructField executionResultFields[] = {
-        {"stdOut", uint32_t(offsetof(TestServerProtocol::ExecutionResult, stdOut)), 0},
-        {"stdError", uint32_t(offsetof(TestServerProtocol::ExecutionResult, stdError)), 0},
-        {"debugLayer", uint32_t(offsetof(TestServerProtocol::ExecutionResult, debugLayer)), 0},
-        {"result", uint32_t(offsetof(TestServerProtocol::ExecutionResult, result)), 0},
-        {"returnCode", uint32_t(offsetof(TestServerProtocol::ExecutionResult, returnCode)), 0},
+        {"stdOut", uint32_t(offsetof(ExpectedExecutionResultLayout, stdOut)), 0},
+        {"stdError", uint32_t(offsetof(ExpectedExecutionResultLayout, stdError)), 0},
+        {"debugLayer", uint32_t(offsetof(ExpectedExecutionResultLayout, debugLayer)), 0},
+        {"result", uint32_t(offsetof(ExpectedExecutionResultLayout, result)), 0},
+        {"returnCode", uint32_t(offsetof(ExpectedExecutionResultLayout, returnCode)), 0},
     };
     SLANG_RETURN_ON_FAIL(_checkStructFields(
         TestServerProtocol::ExecutionResult::g_rttiInfo,

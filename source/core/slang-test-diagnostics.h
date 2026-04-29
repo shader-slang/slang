@@ -9,6 +9,10 @@
 #include "slang-string-util.h"
 #include "slang-string.h"
 
+#include <functional>
+#include <stddef.h>
+#include <thread>
+
 namespace Slang
 {
 
@@ -100,6 +104,12 @@ inline bool isDiagnosticEnabled(const char* category)
         return config.all;
 
     return false;
+}
+
+// Opaque thread value for correlating diagnostic log lines. This is not an OS thread id.
+inline size_t getCurrentThreadDiagnosticId()
+{
+    return std::hash<std::thread::id>{}(std::this_thread::get_id());
 }
 
 } // namespace Slang

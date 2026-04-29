@@ -8,11 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifndef _WIN32
-#include <pthread.h>
-#include <unistd.h>
-#endif
-
 namespace Slang
 {
 
@@ -410,15 +405,11 @@ SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
         auto endTime = std::chrono::steady_clock::now();
         auto duration =
             std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
-#ifndef _WIN32
         fprintf(
             stderr,
-            "[RPC-WAIT] waitForResult completed in %lldms (thread=%lu)\n",
+            "[RPC-WAIT] waitForResult completed in %lldms (thread=%zu)\n",
             (long long)duration,
-            (unsigned long)pthread_self());
-#else
-        fprintf(stderr, "[RPC-WAIT] waitForResult completed in %lldms\n", (long long)duration);
-#endif
+            getCurrentThreadDiagnosticId());
 
         // Warn if wait took more than 1 second
         if (duration > 1000)
@@ -478,20 +469,12 @@ SlangResult HTTPPacketConnection::write(const void* content, size_t sizeInBytes)
         auto endTime = std::chrono::steady_clock::now();
         auto duration =
             std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count();
-#ifndef _WIN32
         fprintf(
             stderr,
-            "[RPC-WRITE] HTTPPacketConnection::write size=%zu duration=%lldus (thread=%lu)\n",
+            "[RPC-WRITE] HTTPPacketConnection::write size=%zu duration=%lldus (thread=%zu)\n",
             sizeInBytes,
             (long long)duration,
-            (unsigned long)pthread_self());
-#else
-        fprintf(
-            stderr,
-            "[RPC-WRITE] HTTPPacketConnection::write size=%zu duration=%lldus\n",
-            sizeInBytes,
-            (long long)duration);
-#endif
+            getCurrentThreadDiagnosticId());
 
         // Warn if write took more than 100ms
         if (duration > 100000)

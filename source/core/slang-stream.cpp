@@ -10,10 +10,6 @@
 #include <stdio.h>
 #include <thread>
 
-#ifndef _WIN32
-#include <pthread.h>
-#endif
-
 namespace Slang
 {
 
@@ -203,19 +199,19 @@ SlangResult FileStream::_init(
 #ifdef _WIN32
         fprintf(
             stderr,
-            "[FD-DEBUG] Opened '%s' mode='%s' fd=%d (thread=%lu)\n",
+            "[FD-DEBUG] Opened '%s' mode='%s' fd=%d (thread=%zu)\n",
             fileName.getBuffer(),
             mode,
             _fileno(m_handle),
-            (unsigned long)GetCurrentThreadId());
+            getCurrentThreadDiagnosticId());
 #else
         fprintf(
             stderr,
-            "[FD-DEBUG] Opened '%s' mode='%s' fd=%d (thread=%lu)\n",
+            "[FD-DEBUG] Opened '%s' mode='%s' fd=%d (thread=%zu)\n",
             fileName.getBuffer(),
             mode,
             fileno(m_handle),
-            (unsigned long)pthread_self());
+            getCurrentThreadDiagnosticId());
 #endif
     }
 
@@ -350,15 +346,15 @@ void FileStream::close()
 #ifdef _WIN32
             fprintf(
                 stderr,
-                "[FD-DEBUG] Closing fd=%d (thread=%lu)\n",
+                "[FD-DEBUG] Closing fd=%d (thread=%zu)\n",
                 _fileno(m_handle),
-                (unsigned long)GetCurrentThreadId());
+                getCurrentThreadDiagnosticId());
 #else
             fprintf(
                 stderr,
-                "[FD-DEBUG] Closing fd=%d (thread=%lu)\n",
+                "[FD-DEBUG] Closing fd=%d (thread=%zu)\n",
                 fileno(m_handle),
-                (unsigned long)pthread_self());
+                getCurrentThreadDiagnosticId());
 #endif
         }
 
