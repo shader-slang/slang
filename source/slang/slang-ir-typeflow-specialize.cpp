@@ -3353,6 +3353,14 @@ struct TypeFlowSpecializationContext
     // nested cases (e.g. interface field inside a struct loaded from a
     // `StructuredBuffer`) that the load-site check in `analyzeLoad` misses —
     // see #9445.
+    //
+    // Skips lookups that have no uses: those are dead code that the
+    // downstream DCE pass will eliminate before codegen, so they cannot
+    // ICE. Imported library modules (e.g. slangpy's `sgl/device/print`)
+    // routinely produce such dead lookups inside generic / variadic helper
+    // functions whose `IPrintable arg` overload is never reached from the
+    // entry point that imports them. Diagnosing those was a regression
+    // against pre-PR behaviour where DCE simply removed them.
     void diagnoseUnresolvedLookupWitnesses()
     {
         for (auto globalInst : module->getGlobalInsts())
@@ -3360,12 +3368,36 @@ struct TypeFlowSpecializationContext
             auto func = as<IRFunc>(globalInst);
             if (!func)
                 continue;
+            // Only diagnose lookups inside entry-point functions:
+            // those are the bodies that survive into codegen, so any
+            // unresolved lookup there will reach the unhandled-inst
+            // ICE the walker exists to prevent.
+            //
+            // For non-entry-point helper functions, the typeflow
+            // pass cannot tell whether the helper is reachable
+            // (callers may exist but be themselves dead) or whether
+            // the helper is going to be inlined / DCE'd before
+            // codegen. Diagnosing those is a false positive — the
+            // canonical example is imported-library helpers like
+            // slangpy's `sgl/device/print.slang::write_arg(IPrintable)`
+            // whose `IPrintable arg` parameter is type-erased only
+            // inside the helper. The actual call sites supply
+            // concrete types via generic-pack expansion, but the
+            // pre-inlined helper body still contains an unresolved
+            // lookup at the moment the walker runs. If a real
+            // unresolved lookup escapes into codegen via a non-
+            // entry-point helper, the underlying ICE still fires
+            // and points at the same source location.
+            if (!func->findDecoration<IREntryPointDecoration>())
+                continue;
             for (auto block : func->getBlocks())
             {
                 for (auto inst : block->getChildren())
                 {
                     auto lookup = as<IRLookupWitnessMethod>(inst);
                     if (!lookup)
+                        continue;
+                    if (!lookup->firstUse)
                         continue;
                     auto witnessTable = lookup->getWitnessTable();
                     if (as<IRWitnessTable>(witnessTable))
