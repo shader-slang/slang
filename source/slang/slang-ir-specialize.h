@@ -31,6 +31,10 @@ bool specializeModule(
 
 void finalizeSpecialization(IRModule* module);
 
+/// Annotate work-graph record types with their element type by examining
+/// the Get() method signatures. Must be called after generic specialization.
+void annotateWorkGraphRecordElementTypes(IRModule* module);
+
 IRInst* specializeGeneric(SpecializationContext* context, IRSpecialize* specInst);
 IRInst* specializeGeneric(IRSpecialize* specInst);
 

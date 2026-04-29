@@ -290,8 +290,6 @@ struct SpecializationContext
         if (workListSet.add(inst))
         {
             workList.add(inst);
-
-
             addUsersToWorkList(inst);
         }
     }
@@ -438,7 +436,27 @@ struct SpecializationContext
             builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), specializeInst);
 
         if (auto existingVal = entry->getValue())
+        {
+            // For work-graph record types (e.g. DispatchNodeInputRecord<T>), the
+            // element type T may not have been recorded yet if the specialization was
+            // completed during module loading (before this compilation unit ran). Add
+            // the decoration here so the HLSL emitter can reconstruct the native
+            // template name.
+            if (auto structType = as<IRStructType>(existingVal))
+            {
+                if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>() &&
+                    !structType->findDecoration<IRWorkGraphRecordElementTypeDecoration>() &&
+                    specializeInst->getArgCount() == 1)
+                {
+                    if (auto elemType = as<IRType>(specializeInst->getArg(0)))
+                        builder.addDecoration(
+                            structType,
+                            kIROp_WorkGraphRecordElementTypeDecoration,
+                            elemType);
+                }
+            }
             return existingVal;
+        }
 
         // We want to see if an existing specialization
         // has already been made. To detect recursive specialization,
@@ -619,7 +637,6 @@ struct SpecializationContext
         //
         if (!areAllOperandsFullySpecialized(specInst))
             return false;
-
 
         if (!hasNonTrivialUses(specInst))
             return false;
@@ -3412,6 +3429,67 @@ bool specializeModule(
     return context.changed;
 }
 
+void annotateWorkGraphRecordElementTypes(IRModule* module)
+{
+    // After generic specialization, work-graph record types (e.g. DispatchNodeInputRecord<T>,
+    // NodeOutput<T>) lose their template argument information because generics are monomorphized.
+    // The HLSL emitter needs to know T in order to reconstruct the native template name
+    // (e.g. "DispatchNodeInputRecord<RecordData>") so DXC can compile the shader.
+    //
+    // We recover T by examining the "Get" method: its return type is T. For each work-graph
+    // record struct that still lacks the decoration, find its associated Get() method and
+    // annotate the struct with the element type.
+    //
+    IRBuilder builder(module);
+    for (auto inst = module->getModuleInst()->getFirstChild(); inst; inst = inst->getNextInst())
+    {
+        auto func = as<IRFunc>(inst);
+        if (!func)
+            continue;
+
+        // Only consider methods.
+        if (!func->findDecoration<IRMethodDecoration>())
+            continue;
+
+        auto nameHint = func->findDecoration<IRNameHintDecoration>();
+        if (!nameHint)
+            continue;
+
+        // Only look at "*.Get" methods — those return the element type T.
+        UnownedStringSlice name = nameHint->getName();
+        if (!name.endsWith(".Get"))
+            continue;
+
+        // The function type is Func(ReturnType, ThisParamType [, ExtraParams...]).
+        auto funcType = as<IRFuncType>(func->getFullType());
+        if (!funcType)
+            continue;
+
+        // Return type is the element type T.
+        auto elementType = as<IRType>(funcType->getResultType());
+        if (!elementType || elementType->getOp() == kIROp_VoidType)
+            continue;
+
+        // The "this" parameter type must be a work-graph record struct.
+        if (funcType->getParamCount() < 1)
+            continue;
+        auto thisParamType = as<IRStructType>(funcType->getParamType(0));
+        if (!thisParamType)
+            continue;
+        if (!thisParamType->findDecoration<IRWorkGraphRecordTypeDecoration>())
+            continue;
+
+        // Add the element type decoration if not yet present.
+        if (!thisParamType->findDecoration<IRWorkGraphRecordElementTypeDecoration>())
+        {
+            builder.addDecoration(
+                thisParamType,
+                kIROp_WorkGraphRecordElementTypeDecoration,
+                elementType);
+        }
+    }
+}
+
 void finalizeSpecialization(IRModule* module)
 {
     auto moduleInst = module->getModuleInst();
@@ -3825,6 +3903,25 @@ IRInst* specializeGenericImpl(
                 cloneInstDecorationsAndChildren(&env, module, specializeInst, specializedVal);
                 if (context)
                     context->removeSpecializationDepthDecorations(specializedVal);
+
+                // If the specialized type is a work-graph record type and was given exactly
+                // one type argument (the element type T), record T so the HLSL emitter can
+                // reconstruct the native template name (e.g. DispatchNodeInputRecord<RecordData>).
+                if (auto structType = as<IRStructType>(specializedVal))
+                {
+                    if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>() &&
+                        !structType->findDecoration<IRWorkGraphRecordElementTypeDecoration>() &&
+                        specializeInst->getArgCount() == 1)
+                    {
+                        if (auto elemType = as<IRType>(specializeInst->getArg(0)))
+                        {
+                            builder->addDecoration(
+                                structType,
+                                kIROp_WorkGraphRecordElementTypeDecoration,
+                                elemType);
+                        }
+                    }
+                }
 
                 // Perform IR simplifications to fold constants in this specialized value if it
                 // is a function, so further specializations from the specialized function will

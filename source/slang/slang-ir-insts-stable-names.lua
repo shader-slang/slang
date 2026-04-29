@@ -847,5 +847,6 @@ return {
 	["Decoration.nodeID"] = 871,
 	["Decoration.nodeIsProgramEntry"] = 872,
 	["Decoration.nodeArraySize"] = 873,
-	["Decoration.allowSparseNodes"] = 874
+	["Decoration.allowSparseNodes"] = 874,
+	["Decoration.workGraphRecordElementType"] = 875
 }
