@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	computepb "cloud.google.com/go/compute/apiv1/computepb"
 )
 
 func TestCleanupFilter(t *testing.T) {
@@ -190,5 +192,97 @@ func TestDoCleanupTerminatedVMsDeletesPartialListResultsOnError(t *testing.T) {
 	}
 	if _, ok := m.vms["runner-a"]; ok {
 		t.Fatalf("runner-a should be removed after deleting partial list result")
+	}
+}
+
+func TestCreateVMTryNextZoneAfterStockout(t *testing.T) {
+	m := &Manager{
+		config: ManagerConfig{
+			Project:          "test-project",
+			Zones:            "us-east1-d,us-east1-b",
+			InstanceTemplate: "linux-gpu-runner-sm80plus-l4",
+			GPUType:          "nvidia-l4",
+			Platform:         "linux",
+		},
+		vms: map[string]*vmInfo{},
+	}
+	m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
+		return []zoneCandidate{
+			{zone: "us-east1-d", region: "us-east1", available: 16},
+			{zone: "us-east1-b", region: "us-east1", available: 16},
+		}, nil
+	}
+
+	var attempts []string
+	m.insertVMFunc = func(_ context.Context, req *computepb.InsertInstanceRequest) error {
+		attempts = append(attempts, req.GetZone())
+		if req.GetInstanceResource().GetName() != "linux-sm80plus-test" {
+			t.Fatalf("VM name = %q, want linux-sm80plus-test", req.GetInstanceResource().GetName())
+		}
+		if req.GetZone() == "us-east1-d" {
+			return errors.New("ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS: resource_availability")
+		}
+		return nil
+	}
+
+	vmName, err := m.CreateVM(context.Background(), "linux-sm80plus-test", "jit-config")
+	if err != nil {
+		t.Fatalf("CreateVM returned error: %v", err)
+	}
+	if vmName != "linux-sm80plus-test" {
+		t.Fatalf("vmName = %q, want linux-sm80plus-test", vmName)
+	}
+	if !slices.Equal(attempts, []string{"us-east1-d", "us-east1-b"}) {
+		t.Fatalf("attempted zones = %v, want [us-east1-d us-east1-b]", attempts)
+	}
+	if got := m.vms["linux-sm80plus-test"].zone; got != "us-east1-b" {
+		t.Fatalf("tracked zone = %q, want us-east1-b", got)
+	}
+}
+
+func TestCreateVMStopsOnNonStockoutError(t *testing.T) {
+	m := &Manager{
+		config: ManagerConfig{
+			Project:          "test-project",
+			Zones:            "us-east1-d,us-east1-b",
+			InstanceTemplate: "linux-gpu-runner-sm80plus-l4",
+			GPUType:          "nvidia-l4",
+			Platform:         "linux",
+		},
+		vms: map[string]*vmInfo{},
+	}
+	m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
+		return []zoneCandidate{
+			{zone: "us-east1-d", region: "us-east1", available: 16},
+			{zone: "us-east1-b", region: "us-east1", available: 16},
+		}, nil
+	}
+
+	var attempts []string
+	m.insertVMFunc = func(_ context.Context, req *computepb.InsertInstanceRequest) error {
+		attempts = append(attempts, req.GetZone())
+		return errors.New("permission denied")
+	}
+
+	if _, err := m.CreateVM(context.Background(), "linux-sm80plus-test", "jit-config"); err == nil {
+		t.Fatal("CreateVM should fail on non-stockout errors")
+	}
+	if !slices.Equal(attempts, []string{"us-east1-d"}) {
+		t.Fatalf("attempted zones = %v, want [us-east1-d]", attempts)
+	}
+	if len(m.vms) != 0 {
+		t.Fatalf("tracked VM count = %d, want 0", len(m.vms))
+	}
+}
+
+func TestIsZoneResourceExhausted(t *testing.T) {
+	if !isZoneResourceExhausted(errors.New("ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS")) {
+		t.Fatal("expected ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS to be treated as stockout")
+	}
+	if !isZoneResourceExhausted(errors.New("resource_availability: does not have enough resources")) {
+		t.Fatal("expected resource_availability to be treated as stockout")
+	}
+	if isZoneResourceExhausted(errors.New("permission denied")) {
+		t.Fatal("permission denied should not be treated as stockout")
 	}
 }
