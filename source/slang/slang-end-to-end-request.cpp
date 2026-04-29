@@ -388,24 +388,30 @@ static String _buildCoverageMappingJson(slang::ICoverageTracingMetadata* coverag
     StringBuilder out;
     out << "{\n";
     out << "  \"version\": 1,\n";
-    out << "  \"counters\": " << (int64_t)coverage->getCounterCount() << ",\n";
+    uint32_t counterCount = coverage->getCounterCount();
+    out << "  \"counters\": " << (int64_t)counterCount << ",\n";
     out << "  \"buffer\": {\n";
     out << "    \"name\": \"__slang_coverage\",\n";
     out << "    \"element_type\": \"uint32\",\n";
     out << "    \"element_stride\": 4";
-    int32_t space = coverage->getBufferSpace();
-    int32_t binding = coverage->getBufferBinding();
-    if (space >= 0)
-        out << ",\n    \"space\": " << (int64_t)space;
-    if (binding >= 0)
-        out << ",\n    \"binding\": " << (int64_t)binding;
+    slang::CoverageBufferInfo bufferInfo;
+    if (SLANG_SUCCEEDED(coverage->getBufferInfo(&bufferInfo)))
+    {
+        if (bufferInfo.space >= 0)
+            out << ",\n    \"space\": " << (int64_t)bufferInfo.space;
+        if (bufferInfo.binding >= 0)
+            out << ",\n    \"binding\": " << (int64_t)bufferInfo.binding;
+    }
     out << "\n  },\n";
     out << "  \"entries\": [";
-    for (uint32_t i = 0; i < coverage->getCounterCount(); ++i)
+    for (uint32_t i = 0; i < counterCount; ++i)
     {
+        slang::CoverageEntryInfo entry;
+        if (SLANG_FAILED(coverage->getEntryInfo(i, &entry)))
+            continue;
         out << (i == 0 ? "" : ",");
         out << "\n    {\"index\": " << (int64_t)i << ", \"file\": \"";
-        auto file = coverage->getEntryFile(i);
+        auto file = entry.file;
         // JSON escape: backslash, double-quote, and all control chars
         // (U+0000..U+001F). Source paths may carry tabs / newlines
         // from `#line` directives or synthetic locations.
@@ -449,7 +455,7 @@ static String _buildCoverageMappingJson(slang::ICoverageTracingMetadata* coverag
                 break;
             }
         }
-        out << "\", \"line\": " << (int64_t)coverage->getEntryLine(i) << "}";
+        out << "\", \"line\": " << (int64_t)entry.line << "}";
     }
     out << "\n  ]\n";
     out << "}\n";

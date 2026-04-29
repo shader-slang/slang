@@ -1,9 +1,8 @@
 Shader Coverage Design
 ======================
 
-This document describes the phase-1 shader coverage implementation in
-Slang, the background that led to it, and the role of the main pieces in
-the pipeline.
+This document describes the shader coverage implementation in Slang
+and the role of the main pieces in the pipeline.
 
 Overview
 --------
@@ -14,14 +13,15 @@ Shader coverage has two separate jobs:
 2. let the host discover the counter buffer and map counter slots back
    to source locations
 
-In the current implementation, those jobs are handled by two different
-mechanisms:
+These are handled by two different mechanisms:
 
-- AST-time synthesis of `RWStructuredBuffer<uint> __slang_coverage`
+- IR-time synthesis of `RWStructuredBuffer<uint> __slang_coverage`
+  in the `slang-ir-coverage-instrument` pass
 - post-emit coverage metadata exposed as `ICoverageTracingMetadata`
 
-The first is about binding and reflection visibility. The second is
-about reporting and attribution.
+The first is about getting the buffer into the compiled shader. The
+second is about letting the host discover where the buffer lives and
+attribute counter values back to source.
 
 Binding and attribution
 -----------------------
@@ -30,13 +30,15 @@ Coverage instrumentation has two jobs that don't reduce to one
 primitive:
 
 - **Binding** — getting the host to allocate a GPU buffer of the
-  right size and put it where the shader expects. Reflection
-  already solves this for every other shader resource: hosts
-  (slang-rhi, slangpy, custom Vulkan/D3D12 wrappers) walk
-  `ProgramLayout` to discover parameters and bind them. AST-time
-  synthesis puts `__slang_coverage` into that pipeline, so the
-  buffer is bound the same way any other `RWStructuredBuffer<uint>`
-  would be — no coverage-specific code on the host.
+  right size and put it where the shader expects. The synthesized
+  `__slang_coverage` buffer is created inside the IR coverage pass
+  rather than via an AST decl. This keeps it out of Slang's public
+  reflection surface (no synthetic decl leaking into IDE / language-
+  server / `IComponentType::getLayout()` views) and produces exactly
+  one buffer per linked program by construction. The (set, binding)
+  the buffer ends up at is reported via `ICoverageTracingMetadata`,
+  and hosts use that information to declare the slot in their own
+  pipeline-layout / root-signature / descriptor-set machinery.
 
 - **Attribution** — turning counter values back into source
   locations. Reflection doesn't carry "slot 7 →
@@ -46,95 +48,107 @@ primitive:
   `ICoverageTracingMetadata` (and its on-disk twin
   `.coverage-mapping.json`) is that channel.
 
-The two channels carry complementary data, not duplicate data —
-binding info answers "where" and attribution answers "what." A host
-needs both: without the binding it cannot allocate or bind the
-buffer; without the attribution it cannot interpret the counter
-values it reads back. The metadata is also intentionally a little
-richer than LCOV line coverage — some slots may not map to a real
-source file and line, and that fact is preserved in the metadata
-and JSON sidecar. The LCOV conversion step then applies gcov-style
-reporting rules by filtering those entries out of line-oriented
-output.
+The two channels carry complementary data — binding info answers
+"where" and attribution answers "what." A host needs both: without
+the binding it cannot allocate or bind the buffer; without the
+attribution it cannot interpret the counter values it reads back.
+The metadata is also intentionally a little richer than LCOV line
+coverage — some slots may not map to a real source file and line,
+and that fact is preserved in the metadata and JSON sidecar. The
+LCOV conversion step then applies gcov-style reporting rules by
+filtering those entries out of line-oriented output.
 
-An IR-only synthesis approach was considered and rejected:
-`ProgramLayout` is built from AST-declared parameters and is frozen
-before the IR pass runs, so an IR-only buffer would be invisible to
-every reflection-driven host. Hosts would then need a separate code
-path to look up the binding via the metadata API, which defeats the
-"fits into existing integration patterns" goal. Reflection-visibility
-is what makes the feature drop-in for slang-rhi, slangpy, and the
-custom Vulkan/D3D12 hosts that walk reflection data — they don't
-need to know that this particular parameter came from
-`-trace-coverage` rather than the user's source.
+### Why the buffer is synthesized at IR-pass time
+
+Coverage is a runtime-instrumentation concern. It has no language-
+visible behaviour, no surface in the source program, and no role in
+semantic checking — counter ops are inserted by the front-end to
+mark statement boundaries, and the buffer they target exists purely
+to receive atomic increments at dispatch.
+
+Putting buffer synthesis in the IR pass keeps it at the layer that
+owns the rest of the feature:
+
+- **One buffer per linked program** by construction. The pass runs
+  on linked-program IR; there is no opportunity to produce more
+  than one.
+- **Not in user-facing reflection.** No synthetic decl appears in
+  `IModule::getLayout()`, IDE completion, or language-server
+  views. Hosts that need to bind the buffer consult
+  `ICoverageTracingMetadata`, which is the same channel that
+  carries the slot-to-source attribution they need anyway.
+- **Self-contained pass.** `slang-ir-coverage-instrument.cpp` owns
+  buffer creation, layout assignment, target-policy selection,
+  counter-op rewriting, and metadata recording. Disabling
+  `-trace-coverage` keeps the rest of the compiler unaware of the
+  feature's existence.
+
+For hosts that already use slang-rhi, the
+`ExtraDescriptorBinding` API on `ShaderProgramDesc` plus
+`IShaderObject::setExtraBinding` provides the binding path; for
+hosts integrating directly against Vulkan / D3D12 / CUDA / etc.,
+the metadata-driven binding info is the canonical source for any
+compiler-synthesized resource.
 
 Pipeline architecture
 ---------------------
 
-Enabling `-trace-coverage` runs four pipeline stages:
+Enabling `-trace-coverage` runs three pipeline stages:
 
-1. **AST-check time** (`source/slang/slang-check-synthesize-coverage.{h,cpp}`).
-   Runs during semantic check, before parameter binding. The
-   synthesizer:
-   - Creates a `RWStructuredBuffer<uint> __slang_coverage` `VarDecl`
-     in the module scope. The decl flows through Slang's normal
-     reflection and layout pipeline, so every backend and every
-     reflection-driven host sees it as a first-class shader
-     parameter — no coverage-specific code on the host.
-   - Skips synthesis if the user has already declared a
-     `__slang_coverage` themselves, or if a transitively-imported
-     module already carries one. The synthesizer walks imports to
-     dedupe — important for multi-file shaders that would otherwise
-     collide on an explicit binding.
-   - When `-trace-coverage-binding <index> <space>` is specified,
-     attaches an explicit `register(uN, spaceM)` semantic to the
-     synthesized decl so parameter binding pins it to the requested
-     slot rather than auto-allocating one.
-   - Marks the decl with a `SynthesizedModifier`. Downstream tooling
-     that walks parameters (IDEs, language server, reflection
-     viewers, doc generators) can filter on this marker to keep the
-     synthesized buffer out of user-facing views. The buffer stays
-     reflection-visible to runtime hosts that need to bind it; the
-     marker only affects *editor-side* consumers.
-
-2. **AST lowering** (`source/slang/slang-lower-to-ir.cpp`). Before
+1. **AST lowering** (`source/slang/slang-lower-to-ir.cpp`). Before
    each *executable* statement is lowered to IR, the front-end
-   emits an `IncrementCoverageCounter` IR op. Purely structural
-   compound statements (`BlockStmt`, `SeqStmt`, `EmptyStmt`) are
-   filtered to keep counter density proportional to real execution
-   events. The op's source position rides on the standard
-   per-instruction `sourceLoc` field — no operands, no debug
-   decoration — so it survives `stripDebugInfo` and every IR
-   transform that preserves operands (inline, clone, link).
+   emits an `IncrementCoverageCounter` IR op:
+   - The op is opaque (zero operands, void return) — it doesn't
+     reference a buffer at this point. The IR coverage pass will
+     rewrite it later.
+   - Purely structural compound statements (`BlockStmt`, `SeqStmt`,
+     `EmptyStmt`) are filtered to keep counter density proportional
+     to real execution events.
+   - The op's source position rides on the standard per-instruction
+     `sourceLoc` field — no operands, no debug decoration — so it
+     survives `stripDebugInfo` and every IR transform that preserves
+     operands (inline, clone, link).
 
-3. **IR pass** (`source/slang/slang-ir-coverage-instrument.cpp`).
-   Runs after parameter binding has assigned the coverage buffer a
-   binding slot, but before `collectGlobalUniformParameters` packs
-   it into the `GlobalParams` struct. The pass:
-   - Locates the coverage buffer by name (always present post-AST-
-     synthesis). A user-declared buffer with the wrong type produces
-     a `Diagnostics::CoverageBufferWrongType` warning (E45100)
-     anchored at the user's declaration; instrumentation is then
-     skipped cleanly.
-   - Assigns a counter slot to each `IncrementCoverageCounter` op
-     (per-inst UID — consecutive index in traversal order; multiple
-     ops on the same source line get distinct slots, which keeps the
-     door open for branch/function coverage later).
-   - Rewrites each op as `AtomicAdd(__slang_coverage[slot], 1,
-     Relaxed)`.
-   - Records `(slot → file, line)` plus the buffer's binding on the
-     artifact's `ICoverageTracingMetadata`. A slot is unattributable
-     when its `IncrementCoverageCounter` op carried an invalid
-     `sourceLoc`, or one whose humane-loc has no positive line —
-     typically because the underlying statement came from code
-     synthesis (autodiff reverse-mode, generic specialization,
-     struct constructor synthesis) rather than user-authored
-     source. The LCOV converter skips these slots so the report
-     stays line-oriented; consumers reading
-     `ICoverageTracingMetadata` directly see them as null
-     `getEntryFile` / zero `getEntryLine`.
+2. **IR pass** (`source/slang/slang-ir-coverage-instrument.cpp`).
+   Runs after `linkIR` has produced the linked-program IR, and
+   before `collectGlobalUniformParameters` packs globals into the
+   `GlobalParams` struct. The pass:
+   - **Synthesizes the coverage buffer** as a fresh `IRGlobalParam`
+     of type `RWStructuredBuffer<uint>`, with a target-aware layout:
+     `UnorderedAccess` for D3D-style targets, `DescriptorTableSlot`
+     for Khronos / SPIR-V / GLSL / WebGPU. For CPU and CUDA targets
+     it additionally reports `Uniform` size, which the global-uniform
+     packaging pass uses to fold the buffer into the standard
+     `GlobalParams` struct.
+   - **Picks a (set, binding)** — either honoring
+     `-trace-coverage-binding <reg> <space>` if supplied, or
+     auto-allocating an offset in space 0 that doesn't collide with
+     any existing global param's offsets for the chosen resource
+     kind.
+   - **Extends the program-scope var layout** to include the new
+     buffer as a struct field so `collectGlobalUniformParameters`
+     packs it alongside user globals on targets that pack ordinary
+     uniforms (CPU, CUDA). Graphics targets don't pack and the
+     extension is a no-op for them; the buffer flows through emit
+     as a standalone `IRGlobalParam`.
+   - **Assigns a counter slot to each `IncrementCoverageCounter`
+     op** (per-inst UID — consecutive index in traversal order;
+     multiple ops on the same source line get distinct slots, which
+     keeps the door open for branch/function coverage later).
+   - **Rewrites each op as `AtomicAdd(__slang_coverage[slot], 1,
+     Relaxed)`**.
+   - **Records `(slot → file, line)` plus the buffer's binding** on
+     the artifact's `ICoverageTracingMetadata`. A slot is
+     unattributable when its `IncrementCoverageCounter` op carried
+     an invalid `sourceLoc`, or one whose humane-loc has no positive
+     line — typically because the underlying statement came from
+     code synthesis (autodiff reverse-mode, generic specialization,
+     struct constructor synthesis) rather than user-authored source.
+     The LCOV converter skips these slots so the report stays line-
+     oriented; consumers reading `ICoverageTracingMetadata` directly
+     see them as null `getEntryFile` / zero `getEntryLine`.
 
-4. **Emission.** Each backend already handles `kIROp_AtomicAdd` on
+3. **Emission.** Each backend already handles `kIROp_AtomicAdd` on
    `RWStructuredBuffer<uint>`:
    - HLSL/DXIL → `InterlockedAdd`
    - SPIR-V → `OpAtomicIAdd`
@@ -154,14 +168,11 @@ Where each stage lives
 
 | Path | Role |
 |---|---|
-| `source/slang/slang-check-synthesize-coverage.{h,cpp}` | Injects `__slang_coverage` `VarDecl` during semantic check; walks transitively imported modules to dedupe |
-| `source/slang/slang-check-decl.cpp` | Hook that invokes the synthesizer from `checkModule` |
-| `source/slang/slang-ir-coverage-instrument.{h,cpp}` | IR pass — rewrites counter ops, writes metadata, diagnoses wrong-type user buffer |
+| `source/slang/slang-ir-coverage-instrument.{h,cpp}` | IR pass — synthesizes the buffer, extends program-scope layout, rewrites counter ops, writes metadata |
 | `source/slang/slang-ir-insts.lua` | Declares the `IncrementCoverageCounter` IR op |
 | `source/slang/slang-lower-to-ir.cpp` | Emits counter ops during AST lowering; filters `BlockStmt` / `SeqStmt` / `EmptyStmt` |
-| `source/slang/slang-emit.cpp` | Integrates the pass into the pipeline + allocates metadata |
+| `source/slang/slang-emit.cpp` | Integrates the pass into the pipeline + allocates metadata + plumbs `-trace-coverage-binding` |
 | `source/slang/slang-options.cpp` | Registers the `-trace-coverage` and `-trace-coverage-binding` CLI flags |
-| `source/slang/slang-diagnostics.lua` | `Diagnostics::CoverageBufferWrongType` (warning E45100) |
 | `source/slang/slang-end-to-end-request.cpp` | Writes the `.coverage-mapping.json` sidecar from slangc |
 | `include/slang.h` | `slang::ICoverageTracingMetadata` public interface |
 | `source/compiler-core/slang-artifact-associated-impl.{h,cpp}` | `ArtifactPostEmitMetadata` implements the interface |
@@ -256,46 +267,74 @@ dashboards, any non-Slang-linked tool) to embed a Slang process to
 query the metadata, defeating the point of shipping precompiled
 shaders without the toolchain.
 
-Alternative designs
--------------------
+Customer integration tiers
+--------------------------
 
-Other designs are possible. For example, a future API could allow some
-hosts to bind the coverage buffer through explicit `(space, binding)`
-information without requiring the resource to appear in reflection.
+Coverage integrates into customer host code at three increasingly-
+opinionated tiers. Each tier is a real path with at least one
+reference consumer in-tree.
 
-That would change the tradeoff for some integrations, but it would solve
-a different problem from source attribution metadata. It would also need
-to account for hosts and tools that currently rely on reflection-visible
-resources.
+### Tier 1 — raw graphics API integration
 
-This document does not treat the current phase-1 design as the only
-possible long-term design. It records the approach chosen for the
-current implementation and the constraints that made it a practical fit.
+Audience: custom Vulkan / D3D12 / CUDA hosts. RTX Remix, Omniverse,
+game engines (UE / Unity / custom), compute users — the dominant
+customer profile.
 
-Design direction for phase 1
-----------------------------
+Surfaces consumed:
 
-The phase-1 implementation therefore uses this split:
+- `slang::ICoverageTracingMetadata` (or the on-disk sidecar) for
+  binding info and per-slot attribution.
+- `slang-coverage-rt` C library for parsing and LCOV serialization.
 
-- AST-time synthesis for binding and discoverability
-- `ICoverageTracingMetadata` for reporting and attribution
+Host responsibility: declare the `(set, binding)` in the host's own
+pipeline-layout / root-signature machinery; allocate the counter
+buffer; bind it; dispatch; read back; feed values to
+`slang_coverage_accumulate`; write LCOV via
+`slang_coverage_save_lcov`.
 
-That separation is intended to make incremental coverage work practical
-without committing later phases to one specific host integration model.
+### Tier 2 — slang-rhi integration
 
-Roadmap beyond phase 1
-----------------------
+Audience: hosts already built on slang-rhi. Smaller set: slangpy,
+slang-rhi-internal tests, indie / educational projects, future
+slang-test scenarios.
 
-Phase 1 ships line coverage end-to-end across all five Slang backends.
-The directions below are the work that's been scoped but deferred
-out of this version. The list is grouped by category, not strictly
-by ordering; per-test attribution and branch coverage are the
-highest-leverage near-term picks.
+Surfaces consumed:
+
+- Tier-1 surfaces, plus —
+- `rhi::ShaderProgramDesc::extraDescriptorBindings` to declare the
+  coverage slot to slang-rhi's pipeline-layout builder.
+- `rhi::IShaderObject::setExtraBinding(set, binding, Binding)` to
+  bind the coverage buffer at command-recording time.
+
+The `ExtraDescriptorBinding` API is generic — not coverage-specific —
+so future compiler-synthesized bindings flow through the same path
+without slang-rhi ever needing to know about coverage.
+
+### Tier 3 — copy the demo
+
+Audience: anyone who wants a working starting point. Test-runner
+integrators, evaluators, customer engineering teams new to the
+feature.
+
+Artifact: `examples/shader-coverage-demo`. Built on Tier 2
+(slang-rhi). Compile mode produces SPIR-V + manifest; dispatch mode
+runs the full host loop end-to-end on whichever backend is
+available. Customers fork the demo and adapt the dispatch loop to
+their host or RHI.
+
+Roadmap
+-------
+
+The current implementation provides line coverage end-to-end across
+all Slang backends, with dispatch validated on Vulkan via slang-rhi.
+Directions scoped for follow-up work, grouped by category. Per-test
+attribution and branch coverage are the highest-leverage near-term
+picks.
 
 ### New LCOV record types
 
-Capabilities the LCOV format already names; phase 1 doesn't yet emit
-them. Required features to add.
+Capabilities the LCOV format already names that the current
+implementation does not yet emit.
 
 - **Branch coverage** (`BRDA:` records). Per-branch-arm counters;
   the existing per-inst slot model is forward-compatible.
@@ -314,16 +353,14 @@ them. Required features to add.
 
 Tracked outside this repository:
 
-- **slang-rhi multi-descriptor-set support.** Closes the Vulkan /
-  WebGPU non-zero-`space` gap documented in *Current limitations*
-  above. Compiler-side fix landed in phase 1; the slang-rhi half
-  is the remaining work.
+- **slang-rhi `ExtraDescriptorBinding` rollout to D3D12 / Metal /
+  CUDA / CPU.** The Vulkan path is implemented and verified
+  end-to-end; the same design extends to other backends with per-
+  backend pipeline-layout merge code. The compiler change is
+  backend-agnostic — slang-rhi-side rollout can land independently.
+- **slang-rhi multi-descriptor-set support.** Required for
+  Vulkan / WebGPU dispatch with non-zero `space`.
   [shader-slang/slang#10959](https://github.com/shader-slang/slang/issues/10959).
-- **slang-rhi raw-binding API.** Would let hosts bind the coverage
-  buffer via explicit `(space, binding)` from the metadata API
-  without going through reflection. If it lands, AST-time
-  synthesis in phase 1 becomes optional rather than load-bearing.
-  (optional)
 
 ### GPU-specific differentiators (optional)
 
