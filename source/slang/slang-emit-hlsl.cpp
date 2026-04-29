@@ -2202,6 +2202,9 @@ void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
     case kIROp_SNormAttr:
         m_writer->emit("snorm ");
         break;
+    case kIROp_CoherentAttr:
+        m_writer->emit("globallycoherent ");
+        break;
     }
 }
 
