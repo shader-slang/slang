@@ -44,8 +44,8 @@ for hook in "$HOOKS_SOURCE"/*; do
     continue
   fi
 
-  # Copy the hook and make it executable
-  cp "$hook" "$target_hook"
+  # Normalize line endings on install so Bash hooks remain portable on Windows
+  sed 's/\r$//' "$hook" >"$target_hook"
   chmod +x "$target_hook"
   echo "  $hook_name: installed"
   ((installed_count++)) || :
