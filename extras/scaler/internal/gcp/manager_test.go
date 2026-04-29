@@ -246,8 +246,12 @@ func TestCreateVMTryNextZoneAfterStockout(t *testing.T) {
 	if !slices.Equal(attempts, []string{"us-east1-d", "us-east1-b"}) {
 		t.Fatalf("attempted zones = %v, want [us-east1-d us-east1-b]", attempts)
 	}
-	if got := m.vms["linux-sm80plus-test"].zone; got != "us-east1-b" {
-		t.Fatalf("tracked zone = %q, want us-east1-b", got)
+	tracked, ok := m.vms["linux-sm80plus-test"]
+	if !ok {
+		t.Fatal("expected VM to be tracked after successful CreateVM")
+	}
+	if tracked.zone != "us-east1-b" {
+		t.Fatalf("tracked zone = %q, want us-east1-b", tracked.zone)
 	}
 }
 
@@ -292,6 +296,9 @@ func TestIsZoneResourceExhausted(t *testing.T) {
 	}
 	if !isZoneResourceExhausted(errors.New("resource_availability: does not have enough resources")) {
 		t.Fatal("expected resource_availability to be treated as stockout")
+	}
+	if !isZoneResourceExhausted(errors.New("Resource_Availability: Does Not Have Enough Resources")) {
+		t.Fatal("expected mixed-case resource availability message to be treated as stockout")
 	}
 	if isZoneResourceExhausted(errors.New("permission denied")) {
 		t.Fatal("permission denied should not be treated as stockout")

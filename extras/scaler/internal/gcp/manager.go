@@ -419,8 +419,8 @@ func isZoneResourceExhausted(err error) bool {
 	if err == nil {
 		return false
 	}
-	msg := err.Error()
-	return strings.Contains(msg, "ZONE_RESOURCE_POOL_EXHAUSTED") ||
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "zone_resource_pool_exhausted") ||
 		strings.Contains(msg, "resource_availability") ||
 		strings.Contains(msg, "does not have enough resources")
 }
