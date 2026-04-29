@@ -1,0 +1,1 @@
+genhtml tools/coverage-html/tests/fixtures/demo-cpu.info -o tools/coverage-html/tests/fixtures/genhtml-reference/
