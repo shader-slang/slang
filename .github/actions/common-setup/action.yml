@@ -16,6 +16,10 @@ inputs:
   use-cached-llvm:
     default: true
     required: false
+  llvm-targets:
+    description: "Semicolon-separated LLVM target architectures to build"
+    default: "X86;ARM;AArch64"
+    required: false
   min-disk-gb:
     description: "Minimum required free disk space in GB"
     default: "3"
@@ -111,6 +115,7 @@ runs:
         compiler: ${{ inputs.compiler }}
         platform: ${{ inputs.platform }}
         llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+        llvm-targets: ${{ inputs.llvm-targets }}
         build-if-missing: "true"
         github-token: ${{ github.token }}
 
@@ -118,8 +123,20 @@ runs:
       shell: bash
       run: |
         if [ "${{inputs.build-llvm}}" == "true" ]; then
-          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
-          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
+          # Set CMAKE_PREFIX_PATH to the LLVM install prefix so
+          # find_package(Clang CONFIG) can locate ClangConfig.cmake via
+          # CMake's standard subdirectory search. Also set LLVM_DIR/Clang_DIR
+          # to the explicit cmake-config directories as fallback. Use $PWD
+          # so the path resolves inside the current shell context (container
+          # or host). On Windows Git Bash, convert the path with `cygpath -m`
+          # so CMake sees "C:/..." instead of "/c/...".
+          LLVM_INSTALL="$PWD/build/llvm-project-install"
+          if command -v cygpath >/dev/null; then
+            LLVM_INSTALL="$(cygpath -m "$LLVM_INSTALL")"
+          fi
+          echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}" >> "$GITHUB_ENV"
+          echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> "$GITHUB_ENV"
+          echo "Clang_DIR=${LLVM_INSTALL}/lib/cmake/clang" >> "$GITHUB_ENV"
         fi
 
       # Note: ccache for Windows self-hosted has been replaced by sccache

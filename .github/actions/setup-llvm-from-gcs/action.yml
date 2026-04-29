@@ -11,6 +11,10 @@ inputs:
   llvm-hash:
     description: "Hash of build-llvm.sh for cache key"
     required: true
+  llvm-targets:
+    description: "Semicolon-separated LLVM target architectures to build"
+    required: false
+    default: "X86;ARM;AArch64"
   build-if-missing:
     description: "Build LLVM if not found in GCS"
     required: false
@@ -31,7 +35,10 @@ runs:
       id: download
       shell: bash
       run: |
-        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}"
+        # Cache key includes targets so different target sets get separate entries.
+        # Keep in sync with the identical computation in the "Upload LLVM to GCS" step below.
+        TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" | tr ';' '-')"
+        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${TARGETS_SLUG}-${{ inputs.llvm-hash }}"
         PUBLIC_URL="https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
 
         echo "🔍 Checking for LLVM prebuilt: ${PUBLIC_URL}"
@@ -54,15 +61,30 @@ runs:
         tar -xzf /tmp/llvm-prebuilt.tar.gz -C build/llvm-project-install
         rm /tmp/llvm-prebuilt.tar.gz
 
+        if [ ! -d "build/llvm-project-install/lib/cmake/clang" ]; then
+          echo "::error::Downloaded LLVM prebuilt is missing build/llvm-project-install/lib/cmake/clang/; cache entry ${LLVM_KEY} is invalid or stale."
+          exit 1
+        fi
+
         echo "cache-hit=true" >> $GITHUB_OUTPUT
         echo "✅ LLVM restored from GCS"
 
         echo "📊 LLVM installation size:"
         du -sh build/llvm-project-install
 
-        # Set environment variables for CMake
-        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        # Set environment variables for CMake. We set CMAKE_PREFIX_PATH to the
+        # LLVM install prefix so find_package(Clang CONFIG) can locate
+        # ClangConfig.cmake via CMake's standard subdirectory search. Use $PWD
+        # so the path resolves inside the current shell (container or host).
+        # On Windows Git Bash, convert the path with `cygpath -m` so CMake sees
+        # "C:/..." instead of "/c/...".
+        LLVM_INSTALL="$PWD/build/llvm-project-install"
+        if command -v cygpath >/dev/null; then
+          LLVM_INSTALL="$(cygpath -m "$LLVM_INSTALL")"
+        fi
+        echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}" >> $GITHUB_ENV
+        echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> $GITHUB_ENV
+        echo "Clang_DIR=${LLVM_INSTALL}/lib/cmake/clang" >> $GITHUB_ENV
 
     - name: Build LLVM from source
       if: steps.download.outputs.cache-hit != 'true' && inputs.build-if-missing == 'true'
@@ -76,23 +98,49 @@ runs:
           REPO_URL="https://${{ inputs.github-token }}@github.com/llvm/llvm-project"
         fi
 
+        # Use $PWD so the install prefix is an absolute path that is valid
+        # inside the current shell (container or host). On Windows Git Bash,
+        # convert to Windows-style ("C:/...") so CMake interprets it correctly.
+        LLVM_INSTALL="$PWD/build/llvm-project-install"
+        if command -v cygpath >/dev/null; then
+          LLVM_INSTALL="$(cygpath -m "$LLVM_INSTALL")"
+        fi
+
         ./external/build-llvm.sh \
-          --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
-          --repo "${REPO_URL}"
+          --install-prefix "${LLVM_INSTALL}" \
+          --repo "${REPO_URL}" \
+          --targets "${{ inputs.llvm-targets }}"
 
         echo "✅ LLVM build complete"
 
-        # Set environment variables for CMake
-        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        # Verify the install actually landed where we expect. Fail hard
+        # rather than letting the subsequent Slang configure fail with an
+        # opaque find_package(Clang) error.
+        if [ ! -d "${LLVM_INSTALL}/lib/cmake/clang" ]; then
+          echo "::error::LLVM install is missing ${LLVM_INSTALL}/lib/cmake/clang/; install-distribution in external/build-llvm.sh did not produce ClangConfig.cmake."
+          exit 1
+        fi
+        echo "📊 LLVM installation contents:"
+        ls -la "${LLVM_INSTALL}/lib/cmake/clang/"
+
+        # Set environment variables for CMake. See matching comment in the
+        # download step above.
+        echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}" >> $GITHUB_ENV
+        echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> $GITHUB_ENV
+        echo "Clang_DIR=${LLVM_INSTALL}/lib/cmake/clang" >> $GITHUB_ENV
 
     - name: Upload LLVM to GCS
       if: steps.download.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
       shell: bash
       run: |
-        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}"
+        # Keep in sync with the identical computation in the "Download LLVM from GCS" step above.
+        TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" | tr ';' '-')"
+        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${TARGETS_SLUG}-${{ inputs.llvm-hash }}"
         GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
-        LLVM_DIR="${{ github.workspace }}/build/llvm-project-install"
+        LLVM_DIR="$PWD/build/llvm-project-install"
+        if command -v cygpath >/dev/null; then
+          LLVM_DIR="$(cygpath -m "$LLVM_DIR")"
+        fi
 
         if [ ! -d "${LLVM_DIR}" ]; then
           echo "ERROR: LLVM directory not found at ${LLVM_DIR}"

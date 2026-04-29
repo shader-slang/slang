@@ -13,6 +13,7 @@ Options:
   --source-dir: Unpack and build in this directory: default $source_dir
   --config: The configuration to build, default $config
   --install-prefix: Install under this prefix
+  --targets: Semicolon-separated LLVM target architectures, default: $llvm_targets
   --: Any following arguments will be passed to the CMake configuration command
 EOF
 }
@@ -58,6 +59,7 @@ branch=llvmorg-21.1.2
 source_dir=$temp_dir
 install_prefix=
 config=Release
+llvm_targets="X86;ARM;AArch64"
 extra_arguments=()
 
 while [[ "$#" -gt 0 ]]; do
@@ -84,6 +86,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --install-prefix)
     install_prefix=$2
+    shift
+    ;;
+  --targets)
+    llvm_targets=$2
     shift
     ;;
   --)
@@ -132,8 +138,13 @@ cmake_arguments_for_slang=(
   -DCLANG_INCLUDE_TESTS=0
   # Requirements for Slang
   -DLLVM_ENABLE_PROJECTS=clang
-  "-DLLVM_TARGETS_TO_BUILD=X86;ARM;AArch64"
+  "-DLLVM_TARGETS_TO_BUILD=${llvm_targets}"
   -DLLVM_BUILD_TOOLS=0
+  # Narrow the distribution to just the libraries/headers Slang links against.
+  # Using install-distribution (below) with this list avoids `ninja all`, which
+  # would otherwise compile the Clang Static Analyzer and other unused pieces
+  # despite CLANG_ENABLE_STATIC_ANALYZER=0 (llvm/llvm-project#117705).
+  "-DLLVM_DISTRIBUTION_COMPONENTS=clang-libraries;clang-headers;clang-cmake-exports;llvm-libraries;llvm-headers;cmake-exports"
   # Get LLVM to use the static linked version of the msvc runtime
   "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>"
   "-DLLVM_USE_CRT_RELEASE=MT"
@@ -141,21 +152,28 @@ cmake_arguments_for_slang=(
 )
 build_dir=$source_dir/build
 mkdir -p "$build_dir"
+# Use the single-config Ninja generator rather than Ninja Multi-Config because
+# LLVM_DISTRIBUTION_COMPONENTS (used below) is not compatible with
+# multi-configuration generators.
 cmake \
   -S "$source_dir/llvm" -B "$build_dir" \
-  -G "Ninja Multi-Config" \
+  -G "Ninja" \
+  "-DCMAKE_BUILD_TYPE=$config" \
+  "-DCMAKE_INSTALL_PREFIX=$install_prefix" \
   "${cmake_arguments_for_slang[@]}" \
   "${extra_arguments[@]}"
 
 msg "##########################################################"
-msg "# Building LLVM in $build_dir"
+msg "# Building and installing LLVM into $install_prefix"
 msg "##########################################################"
-cmake --build "$build_dir" -j --config "$config"
-
-msg "##########################################################"
-msg "# Installing LLVM to $install_prefix"
-msg "##########################################################"
-cmake --install "$build_dir" --prefix "$install_prefix" --config "$config"
+# install-distribution builds and installs exactly the components listed in
+# LLVM_DISTRIBUTION_COMPONENTS (set at configure time). This is LLVM's
+# supported mechanism for producing a trimmed toolchain — see
+# https://llvm.org/docs/BuildingADistribution.html. It avoids `ninja all`,
+# which would otherwise compile the Clang Static Analyzer and other unused
+# pieces despite CLANG_ENABLE_STATIC_ANALYZER=0
+# (llvm/llvm-project#117705).
+cmake --build "$build_dir" -j --target install-distribution
 
 msg "##########################################################"
 msg "LLVM installed in $install_prefix"
