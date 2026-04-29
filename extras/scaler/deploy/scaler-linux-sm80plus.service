@@ -1,0 +1,42 @@
+[Unit]
+Description=GCP Runner Scaler (Linux SM80Plus GPU tests)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=scaler
+Group=scaler
+
+ExecReload=/bin/kill -USR1 $MAINPID
+ExecStart=/opt/scaler/scaler \
+    --url=https://github.com/shader-slang/slang \
+    --name=linux-gpu-sm80plus-runners \
+    --labels=Linux,self-hosted,SM80Plus \
+    --max-runners=1 \
+    --min-runners=0 \
+    --gcp-project=slang-runners \
+    --gcp-zones=us-east1-d,us-east1-b,us-east1-c,us-central1-a,us-west1-a \
+    --gcp-instance-template=linux-gpu-runner-sm80plus-l4 \
+    --gcp-gpu-type=nvidia-l4 \
+    --platform=linux \
+    --vm-prefix=linux-sm80plus
+
+EnvironmentFile=/opt/scaler/scaler.env
+
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=scaler-linux-sm80plus
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/scaler
+
+[Install]
+WantedBy=multi-user.target
