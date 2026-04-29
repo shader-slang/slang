@@ -1292,7 +1292,6 @@ static Result _executeRPC(
     outRes.standardError = exeRes.stdError;
     outRes.standardOutput = exeRes.stdOut;
     outRes.debugLayer = exeRes.debugLayer;
-    outRes.executionTimeMs = exeRes.executionTimeMs;
 
     // Drain test-server stderr (phase timing diagnostics) before returning
     // so it appears before the test result
@@ -1319,6 +1318,8 @@ Result spawnAndWaitTestServer(
     const CommandLine& inCmdLine,
     ExecuteResult& outRes)
 {
+    SLANG_UNUSED(testPath);
+
     String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executableLocation.m_pathOrName);
 
     // This is a test tool execution
@@ -1326,7 +1327,6 @@ Result spawnAndWaitTestServer(
 
     args.toolName = exeName;
     args.args = inCmdLine.m_args;
-    args.testCommand = testPath;
 
     return _executeRPC(
         context,

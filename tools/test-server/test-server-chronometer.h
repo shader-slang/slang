@@ -37,27 +37,6 @@ public:
     using TimePoint = Clock::time_point;
     using Duration = std::chrono::nanoseconds;
 
-    // Start timing a test - returns start time for use with endTest
-    // Returns invalid time point if timing is disabled, so executionTimeMs stays at default 0.0
-    TimePoint beginTest()
-    {
-        if (!isEnabled())
-            return TimePoint{};
-        return Clock::now();
-    }
-
-    // End timing a test and return duration in milliseconds
-    // Returns 0.0 if timing is disabled or start time is invalid
-    double endTest(TimePoint startTime)
-    {
-        if (startTime == TimePoint{})
-            return 0.0;
-
-        auto endTime = Clock::now();
-        auto duration = std::chrono::duration_cast<Duration>(endTime - startTime);
-        return std::chrono::duration_cast<std::chrono::microseconds>(duration).count() / 1000.0;
-    }
-
     // Start timing a named event (returns invalid time if disabled)
     TimePoint start(const char* eventName)
     {

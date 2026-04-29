@@ -76,6 +76,27 @@ static const StructRttiInfo _makeSomeStructRtti()
 }
 /* static */ const StructRttiInfo SomeStruct::g_rttiInfo = _makeSomeStructRtti();
 
+struct ArrayStyleOptionalFieldsTestStruct
+{
+    String toolName;
+    List<String> args;
+    String optionalNote;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
+static const StructRttiInfo _makeArrayStyleOptionalFieldsTestStructRtti()
+{
+    ArrayStyleOptionalFieldsTestStruct obj;
+    StructRttiBuilder builder(&obj, "ArrayStyleOptionalFieldsTestStruct", nullptr);
+    builder.addField("toolName", &obj.toolName);
+    builder.addField("args", &obj.args);
+    builder.addField("optionalNote", &obj.optionalNote, StructRttiInfo::Flag::Optional);
+    return builder.make();
+}
+/* static */ const StructRttiInfo ArrayStyleOptionalFieldsTestStruct::g_rttiInfo =
+    _makeArrayStyleOptionalFieldsTestStructRtti();
+
 } // namespace
 
 
@@ -162,131 +183,80 @@ SLANG_UNIT_TEST(JSONNative)
     SLANG_CHECK(SLANG_SUCCEEDED(_check()));
 }
 
-// Helper to parse JSON string and convert to native type
-template<typename T>
-static SlangResult _parseJsonToNative(
-    const char* jsonStr,
-    T* outValue,
-    SourceManager* sourceManager,
-    RttiTypeFuncsMap* typeMap)
+static SlangResult _checkStructFields(
+    const StructRttiInfo& info,
+    const char* const* expectedFields,
+    Index expectedFieldCount)
 {
-    DiagnosticSink sink(sourceManager, &JSONLexer::calcLexemeLocation);
-    RefPtr<JSONContainer> container(new JSONContainer(sourceManager));
-
-    String contents(jsonStr);
-    SourceFile* sourceFile =
-        sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), contents);
-    SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
-
-    JSONLexer lexer;
-    lexer.init(sourceView, &sink);
-
-    JSONBuilder builder(container);
-    JSONParser parser;
-    SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
-
-    JSONToNativeConverter converter(container, typeMap, &sink);
-    SLANG_RETURN_ON_FAIL(
-        converter.convert(builder.getRootValue(), GetRttiInfo<T>::get(), outValue));
-
-    return SLANG_OK;
-}
-
-// Helper to serialize native type to JSON string
-template<typename T>
-static SlangResult _serializeNativeToJson(
-    const T* value,
-    String& outJson,
-    SourceManager* sourceManager,
-    RttiTypeFuncsMap* typeMap)
-{
-    DiagnosticSink sink(sourceManager, nullptr);
-    RefPtr<JSONContainer> container(new JSONContainer(sourceManager));
-
-    NativeToJSONConverter converter(container, typeMap, &sink);
-    JSONValue jsonValue;
-    SLANG_RETURN_ON_FAIL(converter.convert(GetRttiInfo<T>::get(), value, jsonValue));
-
-    JSONWriter writer(JSONWriter::IndentationStyle::Allman);
-    container->traverseRecursively(jsonValue, &writer);
-    outJson = writer.getBuilder().produceString();
-
-    return SLANG_OK;
-}
-
-// Test that test-server protocol structures can be serialized/deserialized correctly.
-static SlangResult _checkProtocolRoundTrip()
-{
-    SourceManager sourceManager;
-    sourceManager.initialize(nullptr, nullptr);
-    auto typeMap = JSONNativeUtil::getTypeFuncsMap();
-
-    // Test 1: ExecuteToolTestArgs round-trip (without optional testCommand)
+    if (info.m_fieldCount != expectedFieldCount)
     {
-        const char* json = R"({"toolName": "render-test", "args": ["-api", "vk"]})";
-        TestServerProtocol::ExecuteToolTestArgs args;
-        SLANG_RETURN_ON_FAIL(_parseJsonToNative(json, &args, &sourceManager, &typeMap));
-        SLANG_CHECK(args.toolName == "render-test");
-        SLANG_CHECK(args.args.getCount() == 2);
-        SLANG_CHECK(args.testCommand.getLength() == 0); // Optional field defaults to empty
+        SLANG_CHECK(info.m_fieldCount == expectedFieldCount);
+        return SLANG_FAIL;
     }
 
-    // Test 2: ExecuteToolTestArgs with optional testCommand
+    for (Index i = 0; i < expectedFieldCount; ++i)
     {
-        const char* json =
-            R"({"toolName": "render-test", "args": [], "testCommand": "tests/compute/simple.slang"})";
-        TestServerProtocol::ExecuteToolTestArgs args;
-        SLANG_RETURN_ON_FAIL(_parseJsonToNative(json, &args, &sourceManager, &typeMap));
-        SLANG_CHECK(args.toolName == "render-test");
-        SLANG_CHECK(args.testCommand == "tests/compute/simple.slang");
-    }
-
-    // Test 3: ExecutionResult round-trip (without optional executionTimeMs)
-    {
-        const char* json =
-            R"({"stdOut": "ok", "stdError": "", "debugLayer": "", "result": 0, "returnCode": 0})";
-        TestServerProtocol::ExecutionResult result;
-        SLANG_RETURN_ON_FAIL(_parseJsonToNative(json, &result, &sourceManager, &typeMap));
-        SLANG_CHECK(result.stdOut == "ok");
-        SLANG_CHECK(result.result == 0);
-        SLANG_CHECK(result.returnCode == 0);
-        SLANG_CHECK(result.executionTimeMs == 0); // Optional field defaults to 0
-    }
-
-    // Test 4: ExecutionResult with optional executionTimeMs
-    {
-        const char* json =
-            R"({"stdOut": "", "stdError": "", "debugLayer": "", "result": 0, "returnCode": 0, "executionTimeMs": 123.5})";
-        TestServerProtocol::ExecutionResult result;
-        SLANG_RETURN_ON_FAIL(_parseJsonToNative(json, &result, &sourceManager, &typeMap));
-        SLANG_CHECK(result.executionTimeMs == 123.5);
-    }
-
-    // Test 5: ExecutionResult serialization
-    {
-        TestServerProtocol::ExecutionResult result;
-        result.stdOut = "output";
-        result.stdError = "";
-        result.debugLayer = "";
-        result.result = 0;
-        result.returnCode = 0;
-        result.executionTimeMs = 42.0;
-
-        String jsonOutput;
-        SLANG_RETURN_ON_FAIL(_serializeNativeToJson(&result, jsonOutput, &sourceManager, &typeMap));
-
-        // Verify expected fields are present
-        SLANG_CHECK(jsonOutput.indexOf("stdOut") >= 0);
-        SLANG_CHECK(jsonOutput.indexOf("result") >= 0);
-        SLANG_CHECK(jsonOutput.indexOf("executionTimeMs") >= 0);
+        SLANG_CHECK(String(info.m_fields[i].m_name) == expectedFields[i]);
     }
 
     return SLANG_OK;
 }
 
-SLANG_UNIT_TEST(TestServerProtocolRoundTrip)
+// Test that externally consumed test-server protocol structures keep their layout-compatible field
+// lists. VK-GL-CTS compiles this header into pre-built binaries, so even Optional RTTI fields can
+// break protocol compatibility.
+static SlangResult _checkProtocolCompatibility()
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(_checkProtocolRoundTrip()));
+    struct ExpectedExecuteToolTestArgsLayout
+    {
+        String toolName;
+        List<String> args;
+    };
+
+    struct ExpectedExecutionResultLayout
+    {
+        String stdOut;
+        String stdError;
+        String debugLayer;
+        int32_t result;
+        int32_t returnCode;
+    };
+
+    SLANG_CHECK(
+        sizeof(TestServerProtocol::ExecuteToolTestArgs) ==
+        sizeof(ExpectedExecuteToolTestArgsLayout));
+    SLANG_CHECK(
+        alignof(TestServerProtocol::ExecuteToolTestArgs) ==
+        alignof(ExpectedExecuteToolTestArgsLayout));
+    SLANG_CHECK(
+        sizeof(TestServerProtocol::ExecutionResult) == sizeof(ExpectedExecutionResultLayout));
+    SLANG_CHECK(
+        alignof(TestServerProtocol::ExecutionResult) == alignof(ExpectedExecutionResultLayout));
+
+    static const char* const executeToolFields[] = {"toolName", "args"};
+    SLANG_RETURN_ON_FAIL(_checkStructFields(
+        TestServerProtocol::ExecuteToolTestArgs::g_rttiInfo,
+        executeToolFields,
+        SLANG_COUNT_OF(executeToolFields)));
+
+    static const char* const executionResultFields[] = {
+        "stdOut",
+        "stdError",
+        "debugLayer",
+        "result",
+        "returnCode",
+    };
+    SLANG_RETURN_ON_FAIL(_checkStructFields(
+        TestServerProtocol::ExecutionResult::g_rttiInfo,
+        executionResultFields,
+        SLANG_COUNT_OF(executionResultFields)));
+
+    return SLANG_OK;
+}
+
+SLANG_UNIT_TEST(TestServerProtocolCompatibility)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_checkProtocolCompatibility()));
 }
 
 // Test that array-style JSON-RPC works with Optional fields (backward compatibility).
@@ -298,13 +268,12 @@ static SlangResult _checkArrayStyleOptionalFields()
     sourceManager.initialize(nullptr, nullptr);
     auto typeMap = JSONNativeUtil::getTypeFuncsMap();
 
-    // Test: Array-style parsing with missing Optional field (testCommand)
+    // Test: Array-style parsing with a missing Optional field.
     // Old clients send: ["toolName", ["arg1", "arg2"]]
-    // New struct has: toolName, args, testCommand (Optional)
+    // New struct has: toolName, args, optionalNote (Optional)
     {
-        // This JSON represents array-style params: [toolName, args] without testCommand
         const char* json = R"(["render-test", ["-api", "vk"]])";
-        TestServerProtocol::ExecuteToolTestArgs args;
+        ArrayStyleOptionalFieldsTestStruct args;
 
         DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
         RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
@@ -324,20 +293,20 @@ static SlangResult _checkArrayStyleOptionalFields()
         JSONToNativeConverter converter(container, &typeMap, &sink);
         SLANG_RETURN_ON_FAIL(converter.convertArrayToStruct(
             builder.getRootValue(),
-            GetRttiInfo<TestServerProtocol::ExecuteToolTestArgs>::get(),
+            GetRttiInfo<ArrayStyleOptionalFieldsTestStruct>::get(),
             &args));
 
         SLANG_CHECK(args.toolName == "render-test");
         SLANG_CHECK(args.args.getCount() == 2);
         SLANG_CHECK(args.args[0] == "-api");
         SLANG_CHECK(args.args[1] == "vk");
-        SLANG_CHECK(args.testCommand.getLength() == 0); // Optional field defaults to empty
+        SLANG_CHECK(args.optionalNote.getLength() == 0);
     }
 
     // Test: Array-style parsing with all fields provided (including Optional)
     {
-        const char* json = R"(["render-test", ["-api", "vk"], "tests/compute/simple.slang"])";
-        TestServerProtocol::ExecuteToolTestArgs args;
+        const char* json = R"(["render-test", ["-api", "vk"], "diagnostic-note"])";
+        ArrayStyleOptionalFieldsTestStruct args;
 
         DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
         RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
@@ -357,18 +326,18 @@ static SlangResult _checkArrayStyleOptionalFields()
         JSONToNativeConverter converter(container, &typeMap, &sink);
         SLANG_RETURN_ON_FAIL(converter.convertArrayToStruct(
             builder.getRootValue(),
-            GetRttiInfo<TestServerProtocol::ExecuteToolTestArgs>::get(),
+            GetRttiInfo<ArrayStyleOptionalFieldsTestStruct>::get(),
             &args));
 
         SLANG_CHECK(args.toolName == "render-test");
         SLANG_CHECK(args.args.getCount() == 2);
-        SLANG_CHECK(args.testCommand == "tests/compute/simple.slang");
+        SLANG_CHECK(args.optionalNote == "diagnostic-note");
     }
 
     // Test: Array-style parsing rejects a missing required field.
     {
         const char* json = R"(["render-test"])";
-        TestServerProtocol::ExecuteToolTestArgs args;
+        ArrayStyleOptionalFieldsTestStruct args;
 
         DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
         RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
@@ -388,7 +357,7 @@ static SlangResult _checkArrayStyleOptionalFields()
         JSONToNativeConverter converter(container, &typeMap, &sink);
         SLANG_CHECK(SLANG_FAILED(converter.convertArrayToStruct(
             builder.getRootValue(),
-            GetRttiInfo<TestServerProtocol::ExecuteToolTestArgs>::get(),
+            GetRttiInfo<ArrayStyleOptionalFieldsTestStruct>::get(),
             &args)));
         SLANG_CHECK(sink.getErrorCount() > 0);
     }

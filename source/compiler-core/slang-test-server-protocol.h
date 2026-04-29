@@ -7,17 +7,17 @@
 #include "slang-json-value.h"
 #include "slang.h"
 
-// WARNING: Protocol compatibility
+// WARNING: Protocol/layout compatibility
 // These structs define the serialized test-server protocol used between test-server and
 // external clients/pre-built binaries (for example, VK-GL-CTS).
 //
-// Compatibility concerns here are about the wire format/schema, not the in-memory C++ struct
-// layout. Do not remove, rename, or change the meaning/type of existing fields without
-// coordinating updates to both sides of the protocol.
+// These headers are also compiled into some external/pre-built clients, so the in-memory C++
+// layout is part of the effective binary contract for those clients. Do not add, remove, rename,
+// reorder, or change existing fields without first updating and releasing all pre-built clients
+// that include this header.
 //
-// To evolve this protocol compatibly, add new fields only as Optional in RTTI so older readers can
-// ignore fields they do not know about and newer readers can tolerate those fields being absent in
-// older messages.
+// Marking a field Optional in RTTI is not enough when an older binary was built with the previous
+// struct layout.
 //
 // The VK-GL-CTS nightly CI workflow will fail if this protocol compatibility is broken.
 
@@ -39,10 +39,9 @@ struct ExecuteUnitTestArgs
 
 struct ExecuteToolTestArgs
 {
-    String toolName;    ///< The name of the tool (will be a shared library typically - like
-                        ///< render-test). Doesn't need -tool suffix.
-    List<String> args;  ///< Arguments passed to the tool during exectution
-    String testCommand; ///< Full test command for diagnostic logging (Optional)
+    String toolName;   ///< The name of the tool (will be a shared library typically - like
+                       ///< render-test). Doesn't need -tool suffix.
+    List<String> args; ///< Arguments passed to the tool during exectution
 
     static const UnownedStringSlice g_methodName;
     static const StructRttiInfo g_rttiInfo;
@@ -59,8 +58,7 @@ struct ExecutionResult
     String stdError;
     String debugLayer;
     int32_t result = SLANG_OK;
-    int32_t returnCode = 0;     ///< As returned if invoked as command line
-    double executionTimeMs = 0; ///< Execution time in milliseconds (Optional)
+    int32_t returnCode = 0; ///< As returned if invoked as command line
 
     static const StructRttiInfo g_rttiInfo;
 };

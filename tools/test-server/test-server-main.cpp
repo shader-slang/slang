@@ -532,9 +532,9 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 
     UnitTestFunc testFunc = testModule->getTestFunc(testIndex);
 
-    auto testStartTime = m_chronometer.beginTest();
     try
     {
+        SCOPED_TIMER(m_chronometer, "unit-test");
         testFunc(&unitTestContext);
     }
     catch (...)
@@ -543,7 +543,6 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     }
 
     TestServerProtocol::ExecutionResult result;
-    result.executionTimeMs = m_chronometer.endTest(testStartTime);
     result.result = SLANG_OK;
     result.debugLayer = coreDebugCallback.getString();
 
@@ -616,12 +615,13 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, stdErrorWriter);
     }
 
-    auto testStartTime = m_chronometer.beginTest();
-    const SlangResult funcRes =
-        func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
+    SlangResult funcRes = SLANG_OK;
+    {
+        SCOPED_TIMER(m_chronometer, "tool-test");
+        funcRes = func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
+    }
 
     TestServerProtocol::ExecutionResult result;
-    result.executionTimeMs = m_chronometer.endTest(testStartTime);
     result.result = funcRes;
     result.stdError = stdError;
     result.stdOut = stdOut;

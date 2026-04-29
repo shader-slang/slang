@@ -19,14 +19,12 @@ struct ExecuteResult
         standardOutput = String();
         standardError = String();
         debugLayer = String();
-        executionTimeMs = 0;
     }
 
     ResultCode resultCode = 0;
     String standardOutput;
     String standardError;
     String debugLayer;
-    double executionTimeMs = 0; ///< Execution time in milliseconds
 };
 
 struct ProcessUtil
