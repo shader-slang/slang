@@ -7139,6 +7139,17 @@ struct TypeFlowSpecializationContext
 
         // Extract the packed payload and reinterpret it as the user-chosen
         // storage type behind `valueOutPtr`.
+        //
+        // Invariant: `emitGetValueFromTaggedUnion` returns an
+        // `IRUntaggedUnionType` for multi-conformance and the concrete
+        // struct type for the singleton case. The parallel fallback
+        // `lowerExtractDynamicObject` (in slang-ir-lower-dynamic-dispatch
+        // -insts.cpp) operates on a different IR shape — a packed tuple
+        // whose value field is `IRAnyValueType` — so its branch
+        // condition checks `IRAnyValueType` rather than
+        // `IRUntaggedUnionType`. Keep the branch conditions in sync
+        // with the upstream producer in each path; if either producer
+        // changes the type kind it emits, both branches need updating.
         auto packedValue = builder.emitGetValueFromTaggedUnion(obj);
 
         IRInst* unpackedValue = nullptr;

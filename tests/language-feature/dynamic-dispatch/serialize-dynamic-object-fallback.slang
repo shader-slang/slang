@@ -14,6 +14,13 @@
 // correctness (which is exercised in serialize-dynamic-object.slang).
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
+// SPIRV-asm coverage: the fallback's `emitUnpackAnyValue` is rewritten
+// by the any-value marshalling pass before SPIRV emission. A direct
+// `-target spirv-asm` compile pins that the marshalling pass actually
+// eliminates the unpack op for the IR shape this fallback produces;
+// the indirect `-vk` coverage in serialize-dynamic-object.slang only
+// exercises the typeflow-specialised path, not this fallback path.
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -stage compute -entry computeMain -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
 
 [anyValueSize(16)]
 interface IFoo
@@ -57,4 +64,6 @@ void computeMain()
         outputBuffer[1 + i] = payload[i];
 
     // CHECK: void computeMain
+    // SPIRV: OpEntryPoint
+    // SPIRV-NOT: OpUnpackAnyValue
 }

@@ -1872,20 +1872,26 @@ struct ExistentialLoweringContext : public InstPassBase
         auto tupleType = as<IRTupleType>(obj->getDataType());
         if (!tupleType || tupleType->getOperandCount() < 3)
         {
-            // The existential was not lowered to the expected tuple shape —
-            // leave the inst in place and let downstream validation report
-            // the unsupported state rather than silently miscompiling.
-            return false;
+            // The existential was not lowered to the expected
+            // (RTTI, WitnessTableIDVec, AnyValue) tuple shape that
+            // `lowerCreateExistentialObject` produces. If we silently
+            // return false the inst survives into emission and shows
+            // up as an unhandled opcode with no useful context, so
+            // surface the upstream-pass invariant violation here.
+            SLANG_UNEXPECTED("ExtractDynamicObject: operand was not lowered "
+                             "to the expected 3-element existential tuple");
         }
 
         auto witnessTableIDVecType = as<IRType>(tupleType->getOperand(1));
         auto packedValueType = as<IRType>(tupleType->getOperand(2));
         if (!witnessTableIDVecType || !packedValueType)
         {
-            // The tuple was constructed with non-IRType operands in those
-            // positions (shouldn't happen for a well-formed existential
-            // tuple, but guard rather than blind-cast).
-            return false;
+            // Tuple shape matched the operand count, but the type
+            // operands are not IRTypes — same upstream-pass invariant
+            // violation as above, surface it explicitly rather than
+            // letting it leak into emission.
+            SLANG_UNEXPECTED("ExtractDynamicObject: existential tuple field "
+                             "1 or 2 was not an IRType");
         }
 
         auto valuePtrType = as<IRPtrTypeBase>(valueOutPtr->getDataType());
@@ -1907,6 +1913,18 @@ struct ExistentialLoweringContext : public InstPassBase
         auto seqID = builder.emitElementExtract(witnessTableIDVec, IRIntegerValue(0));
         builder.emitStore(typeIDOutPtr, seqID);
 
+        // Invariant: `packedValueType` is `IRAnyValueType` here because the
+        // upstream `lowerCreateExistentialObject` lays out the existential
+        // tuple's value field via `emitPackAnyValue`. The parallel
+        // specialization path in `slang-ir-typeflow-specialize.cpp`
+        // (`specializeExtractDynamicObject`) operates on a different
+        // upstream — `emitGetValueFromTaggedUnion`, which returns
+        // `IRUntaggedUnionType` for multi-conformance and the concrete
+        // struct for the singleton case — so its branch condition checks
+        // `IRUntaggedUnionType` rather than `IRAnyValueType`. Keep the
+        // branch conditions in sync with the upstream producer in each
+        // path; if either producer changes the type kind it emits, both
+        // branches need updating.
         IRInst* unpackedValue = nullptr;
         if (as<IRAnyValueType>(packedValueType))
             unpackedValue = builder.emitUnpackAnyValue(valueType, packedValue);
