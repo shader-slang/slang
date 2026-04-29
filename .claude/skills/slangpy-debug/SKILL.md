@@ -25,7 +25,7 @@ When debugging slangpy compatibility issues or testing Slang changes against sla
 ```bash
 # From Slang repository root
 cmake --preset default
-cmake --build --preset debug    # or --preset release
+cmake --build --preset debug    # or --preset releaseWithDebugInfo
 ```
 
 ## Step 2: Clone slangpy Repository
