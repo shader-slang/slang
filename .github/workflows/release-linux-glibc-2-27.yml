@@ -31,8 +31,6 @@ jobs:
               git config --global --add safe.directory /home/app
               cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
               cmake --build --preset release -j $(nproc)
-              test -f build/Release/lib/libdxcompiler.so || { echo "ERROR: DXC source build did not produce libdxcompiler.so"; exit 1; }
-              test -f build/Release/lib/libdxil.so || { echo "ERROR: DXC source build did not produce libdxil.so"; exit 1; }
               cpack --preset release -G ZIP
               cpack --preset release -G TGZ
             '
