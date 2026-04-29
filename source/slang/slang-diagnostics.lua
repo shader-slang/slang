@@ -4037,6 +4037,13 @@ err(
     span { loc = "location", message = "'glsl' module is not available from the current global session. To enable GLSL compatibility mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session." }
 )
 
+err(
+    "module-already-loaded-with-different-source",
+    38204,
+    "module already loaded with different source",
+    span { loc = "location", message = "a module named '~moduleName:Name' is already loaded from different source contents in this session. Use a different module name or drop references to the previous module before reloading." }
+)
+
 -- Note: compilationCeased is a fatal diagnostic that is locationless
 fatal(
     "compilation-ceased",

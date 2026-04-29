@@ -238,28 +238,46 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     try
     {
-        auto getDigestStr = [](auto x)
+        auto computeDigest = [](auto x)
         {
             DigestBuilder<SHA1> digestBuilder;
             digestBuilder.append(x);
-            return digestBuilder.finalize().toString();
+            return digestBuilder.finalize();
         };
+
+        SHA1::Digest sourceDigest = computeDigest(source);
+        auto digestToString = [](SHA1::Digest const& d) { return d.toString(); };
 
         String moduleNameStr = moduleName;
         if (!moduleName)
-            moduleNameStr = getDigestStr(source);
+            moduleNameStr = digestToString(sourceDigest);
 
         auto name = getNamePool()->getName(moduleNameStr);
         RefPtr<LoadedModule> loadedModule;
         if (mapNameToLoadedModules.tryGetValue(name, loadedModule))
         {
-            return loadedModule;
+            // Returning the cached module is only safe when the incoming source
+            // is identical to whatever produced the cached module; otherwise the
+            // caller expects a module they have never actually loaded, leading
+            // to silent wrong-module use (and sometimes crashes) downstream.
+            // See #10957.
+            if (loadedModule && loadedModule->getSourceDigest() == sourceDigest)
+            {
+                return loadedModule;
+            }
+
+            sink.diagnose(Diagnostics::ModuleAlreadyLoadedWithDifferentSource{
+                .moduleName = name,
+                .location = SourceLoc(),
+            });
+            sink.getBlobIfNeeded(outDiagnostics);
+            return nullptr;
         }
         String pathStr = path;
         if (pathStr.getLength() == 0)
         {
             // If path is empty, use a digest from source as path.
-            pathStr = getDigestStr(source);
+            pathStr = digestToString(sourceDigest);
         }
         auto pathInfo = PathInfo::makeFromString(pathStr);
         if (File::exists(pathStr))
@@ -272,6 +290,8 @@ slang::IModule* Linkage::loadModuleFromBlob(
         }
         RefPtr<Module> module =
             loadModuleImpl(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
+        if (module)
+            module->setSourceDigest(sourceDigest);
         sink.getBlobIfNeeded(outDiagnostics);
         return asExternal(module.get());
     }
