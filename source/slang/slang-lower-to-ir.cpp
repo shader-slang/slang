@@ -6600,6 +6600,54 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
+    LoweredValInfo visitCastOptionalExpr(CastOptionalExpr* expr)
+    {
+        auto builder = getBuilder();
+
+        auto srcOpt = lowerRValueExpr(context, expr->valueArg);
+        auto srcOptIR = getSimpleVal(context, srcOpt);
+
+        auto toOptType = lowerType(context, expr->type);
+        SLANG_RELEASE_ASSERT(toOptType->getOp() == kIROp_OptionalType);
+
+        auto var = builder->emitVar(toOptType);
+
+        auto hasValue = builder->emitOptionalHasValue(srcOptIR);
+
+        IRBlock* trueBlock;
+        IRBlock* falseBlock;
+        IRBlock* afterBlock;
+        builder->emitIfElseWithBlocks(hasValue, trueBlock, falseBlock, afterBlock);
+
+        // True branch: extract inner value, coerce to U, wrap in Optional<U>.
+        builder->setInsertInto(trueBlock);
+        {
+            auto extractedInner = builder->emitGetOptionalValue(srcOptIR);
+
+            // Bind the synthetic innerVarDecl so the inner coercion expression resolves it.
+            context->setValue(expr->innerVarDecl, LoweredValInfo::simple(extractedInner));
+
+            auto coercedInner = lowerRValueExpr(context, expr->innerCoercedExpr);
+            auto coercedInnerIR = getSimpleVal(context, coercedInner);
+
+            auto someVal = builder->emitMakeOptionalValue(toOptType, coercedInnerIR);
+            builder->emitStore(var, someVal);
+            builder->emitBranch(afterBlock);
+        }
+
+        // False branch: source is none, propagate none.
+        builder->setInsertInto(falseBlock);
+        {
+            auto noneVal = builder->emitMakeOptionalNone(toOptType);
+            builder->emitStore(var, noneVal);
+            builder->emitBranch(afterBlock);
+        }
+
+        builder->setInsertInto(afterBlock);
+        auto result = builder->emitLoad(var);
+        return LoweredValInfo::simple(result);
+    }
+
     LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("codegen for aggregate type constructor expression");
