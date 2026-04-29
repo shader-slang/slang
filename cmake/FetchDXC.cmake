@@ -22,9 +22,15 @@
 
 include(FetchContent)
 
-# DXC version Git tag. Used for the source build GIT_TAG and interpolated
-# into the prebuilt binary URLs below. Bump in one place to update both.
+# DXC version Git tag. Used for the source build GIT_TAG and as the
+# release path component in the prebuilt binary URLs below.
+# When upgrading DXC, bump this AND update _dxc_release_date below.
 set(_dxc_version_tag "v1.9.2602")
+
+# Release date embedded in the prebuilt binary filenames (e.g.
+# "dxc_2026_02_20.zip"). DXC releases use date-stamped filenames, so this
+# must be updated together with _dxc_version_tag when upgrading.
+set(_dxc_release_date "2026_02_20")
 
 # GLIBC threshold below which DXC is built from source instead of using the
 # prebuilt binaries. Both libdxcompiler.so and libdxil.so from the v1.9.2602
@@ -251,6 +257,12 @@ if(_dxc_build_from_source)
     # ExternalProject_Add (which owns the actual clone), and setting the
     # public-facing dxc_POPULATED variable in this scope would not propagate to
     # the calling scope where slang-rhi's FetchPackage runs.
+    #
+    # Note: slang-rhi only accesses dxc_SOURCE_DIR on Windows (inside an
+    # if(WIN32) block); on Linux, population state is the only thing checked.
+    # If the project's CMake minimum is ever raised to 3.24+, replace the
+    # set_property call below with FetchContent_SetPopulated(dxc), which is
+    # the public API for this pattern.
     set_property(GLOBAL PROPERTY _FetchContent_dxc_populated TRUE)
 
     return()
@@ -263,12 +275,12 @@ endif()
 if(NOT DEFINED SLANG_DXC_BINARY_URL)
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         set(SLANG_DXC_BINARY_URL
-            "https://github.com/microsoft/DirectXShaderCompiler/releases/download/${_dxc_version_tag}/dxc_2026_02_20.zip"
+            "https://github.com/microsoft/DirectXShaderCompiler/releases/download/${_dxc_version_tag}/dxc_${_dxc_release_date}.zip"
         )
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
             set(SLANG_DXC_BINARY_URL
-                "https://github.com/microsoft/DirectXShaderCompiler/releases/download/${_dxc_version_tag}/linux_dxc_2026_02_20.x86_64.tar.gz"
+                "https://github.com/microsoft/DirectXShaderCompiler/releases/download/${_dxc_version_tag}/linux_dxc_${_dxc_release_date}.x86_64.tar.gz"
             )
         endif()
     endif()
