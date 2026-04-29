@@ -258,8 +258,16 @@ if(_dxc_build_from_source)
     # public-facing dxc_POPULATED variable in this scope would not propagate to
     # the calling scope where slang-rhi's FetchPackage runs.
     #
-    # Note: slang-rhi only accesses dxc_SOURCE_DIR on Windows (inside an
-    # if(WIN32) block); on Linux, population state is the only thing checked.
+    # On Linux, slang-rhi's DXC fetch is guarded by if(WIN32) and is never
+    # reached, so setting the population flag is sufficient.
+    # On Windows with this source-build path, slang-rhi will see
+    # dxc_POPULATED=TRUE and skip its own download, but its subsequent
+    # copy_file(${dxc_SOURCE_DIR}/bin/x64/...) step will get an empty
+    # dxc_SOURCE_DIR. This is a known limitation of the Windows source-build
+    # path. Slang's own copy-dxcompiler/copy-dxil targets (defined above)
+    # correctly deploy the source-built DLLs regardless, so DXC is available
+    # to the compiler at runtime even if slang-rhi's copy step fails.
+    #
     # If the project's CMake minimum is ever raised to 3.24+, replace the
     # set_property call below with FetchContent_SetPopulated(dxc), which is
     # the public API for this pattern.
