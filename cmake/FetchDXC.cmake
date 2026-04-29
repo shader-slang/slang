@@ -298,10 +298,10 @@ if(_dxc_build_from_source)
     set(_dxc_src_dir "${dxc_source_SOURCE_DIR}")
     set(_dxc_build_dir "${dxc_source_BINARY_DIR}")
 
-    # DXC's build runs clang-format on generated files inside its build
-    # directory. Clang-format walks up from there and finds Slang's root
-    # .clang-format, which uses options unsupported by older clang-format
-    # versions. Placing DXC's own style here stops the upward search.
+    # If HLSL_COPY_GENERATED_SOURCES were ever re-enabled, DXC's build would run
+    # clang-format on generated files and walk up to find .clang-format. Slang's
+    # root .clang-format uses options unsupported by older clang-format versions,
+    # so we place DXC's own style here to stop the upward search at the right level.
     file(MAKE_DIRECTORY "${_dxc_build_dir}")
     file(WRITE "${_dxc_build_dir}/.clang-format" "BasedOnStyle: LLVM\n")
 
@@ -321,7 +321,7 @@ if(_dxc_build_from_source)
                 # CMAKE_BUILD_TYPE is ignored by multi-config generators (VS);
                 # the config is selected via --config MinSizeRel in the build
                 # command. Passing it here covers single-config generators (Ninja).
-                -DCMAKE_BUILD_TYPE=MinSizeRel -DHLSL_COPY_GENERATED_SOURCES=ON
+                -DCMAKE_BUILD_TYPE=MinSizeRel -DHLSL_COPY_GENERATED_SOURCES=OFF
                 -DLLVM_INCLUDE_TESTS=OFF -DCLANG_INCLUDE_TESTS=OFF
                 -DLLVM_ENABLE_WARNINGS=OFF ${_dxc_warning_flags} -Wno-dev
             RESULT_VARIABLE _dxc_configure_result
