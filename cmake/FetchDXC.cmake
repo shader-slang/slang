@@ -132,7 +132,14 @@ if(_dxc_build_from_source)
     # in _dxc_dll_subdir so byproducts and copy commands point to the right path.
     if(CMAKE_GENERATOR MATCHES "Ninja")
         set(_dxc_generator_args -G Ninja)
-        set(_dxc_build_command ${CMAKE_COMMAND} --build <BINARY_DIR>)
+        set(_dxc_build_command
+            ${CMAKE_COMMAND}
+            --build
+            <BINARY_DIR>
+            --target
+            dxcompiler
+            dxil
+        )
         set(_dxc_dll_subdir "bin")
     else()
         set(_dxc_generator_args -G "${CMAKE_GENERATOR}")
@@ -148,6 +155,10 @@ if(_dxc_build_from_source)
             <BINARY_DIR>
             --config
             MinSizeRel
+            --target
+            dxcompiler
+            --target
+            dxil
         )
         set(_dxc_dll_subdir "MinSizeRel/bin")
     endif()
@@ -162,7 +173,6 @@ if(_dxc_build_from_source)
         # DXC's Linux source build produces libdxcompiler.so and libdxil.so
         # (the DXIL validator), matching the layout of the prebuilt tarballs.
         set(_dxc_src_byproducts
-            <BINARY_DIR>/bin/dxc
             <BINARY_DIR>/lib/libdxcompiler.so
             <BINARY_DIR>/lib/libdxil.so
         )
