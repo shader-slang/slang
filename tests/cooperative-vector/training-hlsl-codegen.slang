@@ -12,6 +12,9 @@
 // CHECK610-DAG: InterlockedAccumulate(
 // CHECK610-DAG: __slang_linalg_OuterProductAccumulate<
 // CHECK610-DAG: __slang_linalg_VectorAccumulate<
+// CHECK610-NOT: OuterProduct<MatDT, dx::linalg::MatrixScope::Thread>
+// CHECK610-NOT: InterlockedAccumulate(matBuf, matOff, uint(sizeof
+// CHECK610-NOT: ComponentTypeTraits<ElTy>
 
 RWByteAddressBuffer outerProductOutput;
 RWByteAddressBuffer reduceSumOutput;

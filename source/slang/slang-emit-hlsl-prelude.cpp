@@ -79,10 +79,7 @@ vector<OutElTy, MatM> __slang_linalg_MulAdd(
     MatTy mat = MatTy::template Load<LoadLayout>(matBuf, matOff, matStr);
     using BiasVecTy = vector<BiasElTy, BiasVecDim>;
     BiasVecTy biasVec = biasBuf.template Load<BiasVecTy>(biasOff);
-    return dx::linalg::MultiplyAdd<OutElTy>(
-        mat,
-        dx::linalg::MakeInterpretedVector<InputDT>(input),
-        biasVec);
+    return dx::linalg::MultiplyAdd<OutElTy>(mat, input, biasVec);
 }
 
 template<
