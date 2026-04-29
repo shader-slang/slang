@@ -1,0 +1,3 @@
+# Expected failures for CUDA 12.5
+# Tests that pass on CUDA 13.0 but fail on 12.5 go here.
+# Populate after the first CI run with CUDA 12.5.
