@@ -739,6 +739,37 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessMangled
     return SLANG_OK;
 }
 
+uint32_t Linkage::getFirstFreeTypeConformanceWitnessSequentialID(String const& interfaceMangledName)
+{
+    auto idAllocator =
+        mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceMangledName);
+    if (!idAllocator)
+    {
+        mapInterfaceMangledNameToSequentialIDCounters[interfaceMangledName] = 0;
+        idAllocator =
+            mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceMangledName);
+    }
+
+    while (usedTypeConformanceWitnessSequentialIDKeys.contains(
+        TypeConformanceSequentialIDKey{interfaceMangledName, *idAllocator}))
+    {
+        ++(*idAllocator);
+    }
+
+    return *idAllocator;
+}
+
+void Linkage::registerTypeConformanceWitnessSequentialID(
+    String const& witnessTableMangledName,
+    String const& interfaceMangledName,
+    uint32_t sequentialID)
+{
+    // Caller holds `m_sequentialIDMapMutex`.
+    mapMangledNameToRTTIObjectIndex[witnessTableMangledName] = sequentialID;
+    usedTypeConformanceWitnessSequentialIDKeys.add(
+        TypeConformanceSequentialIDKey{interfaceMangledName, sequentialID});
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequentialID(
     slang::TypeReflection* type,
     slang::TypeReflection* interfaceType,
@@ -764,15 +795,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
             *outId = resultIndex;
         return SLANG_OK;
     }
-    auto idAllocator = mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceName);
-    if (!idAllocator)
-    {
-        mapInterfaceMangledNameToSequentialIDCounters[interfaceName] = 0;
-        idAllocator = mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(interfaceName);
-    }
-    resultIndex = (*idAllocator);
-    ++(*idAllocator);
-    mapMangledNameToRTTIObjectIndex[name] = resultIndex;
+    resultIndex = getFirstFreeTypeConformanceWitnessSequentialID(interfaceName);
+    registerTypeConformanceWitnessSequentialID(name, interfaceName, resultIndex);
     if (outId)
         *outId = resultIndex;
     return SLANG_OK;
@@ -831,6 +855,19 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
         if (auto subtypeWitness = as<SubtypeWitness>(witness))
         {
             result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
+            if (conformanceIdOverride != -1)
+            {
+                auto subType = asInternal(type);
+                auto supType = asInternal(interfaceType);
+                if (subType && supType)
+                {
+                    std::lock_guard<std::mutex> lock(m_sequentialIDMapMutex);
+                    registerTypeConformanceWitnessSequentialID(
+                        getMangledNameForConformanceWitness(m_astBuilder, subType, supType),
+                        getMangledTypeName(m_astBuilder, supType),
+                        uint32_t(conformanceIdOverride));
+                }
+            }
         }
     }
     catch (...)
