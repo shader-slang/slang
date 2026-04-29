@@ -18,6 +18,7 @@ thread_local int slangTestThreadIndex = 0;
 // When GPU driver crashes, all threads fail simultaneously so this triggers quickly.
 static constexpr int kConsecutiveFailureAbortThreshold = 32;
 static std::atomic<int> s_consecutiveFailures{0};
+static constexpr Int kMaxRPCConnectionTimeoutInMs = 24 * 60 * 60 * 1000;
 
 TestContext::TestContext()
 {
@@ -36,19 +37,21 @@ TestContext::TestContext()
             UnownedStringSlice::fromLiteral("SLANG_TEST_RPC_TIMEOUT_MS"),
             rpcTimeoutEnvValue)))
     {
-        Int rpcTimeoutInMs = 0;
+        Int64 rpcTimeoutInMs = 0;
         if (SLANG_SUCCEEDED(
-                StringUtil::parseInt(rpcTimeoutEnvValue.getUnownedSlice(), rpcTimeoutInMs)) &&
-            rpcTimeoutInMs > 0)
+                StringUtil::parseInt64(rpcTimeoutEnvValue.getUnownedSlice(), rpcTimeoutInMs)) &&
+            rpcTimeoutInMs > 0 && rpcTimeoutInMs <= kMaxRPCConnectionTimeoutInMs)
         {
-            connectionTimeOutInMs = rpcTimeoutInMs;
+            connectionTimeOutInMs = Int(rpcTimeoutInMs);
         }
         else
         {
-            fprintf(
-                stderr,
-                "warning: ignoring invalid SLANG_TEST_RPC_TIMEOUT_MS value '%s'\n",
-                rpcTimeoutEnvValue.getBuffer());
+            String maxTimeoutInMs = String(kMaxRPCConnectionTimeoutInMs);
+            StdWriters::getError().print(
+                "warning: ignoring invalid SLANG_TEST_RPC_TIMEOUT_MS value '%s' "
+                "(expected 1..%s milliseconds)\n",
+                rpcTimeoutEnvValue.getBuffer(),
+                maxTimeoutInMs.getBuffer());
         }
     }
 }
