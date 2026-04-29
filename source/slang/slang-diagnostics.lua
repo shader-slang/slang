@@ -3985,6 +3985,27 @@ err(
 )
 
 err(
+    "mesh-shader-missing-vertices-output",
+    38047,
+    "mesh shader missing vertices output parameter",
+    span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must have an output parameter of type Vertices<T, N>" }
+)
+
+err(
+    "mesh-shader-missing-indices-output",
+    38048,
+    "mesh shader missing indices output parameter",
+    span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must have an output parameter of type Indices<T, N>" }
+)
+
+err(
+    "mesh-shader-missing-output-topology",
+    38049,
+    "mesh shader missing [outputtopology] attribute",
+    span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must have an '[outputtopology(...)]' attribute" }
+)
+
+err(
     "geometry-shader-missing-output-stream",
     38045,
     "geometry shader missing output stream parameter",
