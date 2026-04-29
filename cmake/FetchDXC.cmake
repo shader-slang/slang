@@ -56,20 +56,33 @@ elseif(
 )
     # Auto-detect: check GLIBC version only when the user has not explicitly
     # set SLANG_DXC_BUILD_FROM_SOURCE or provided a custom SLANG_DXC_BINARY_URL.
+    #
+    # Prefer getconf GNU_LIBC_VERSION: it outputs "glibc X.Y" on all glibc
+    # systems regardless of distro (Debian/Ubuntu say "GLIBC"; RHEL/Fedora/Arch
+    # say "GNU libc" in ldd output, which would not match a "glibc"-anchored
+    # regex). Fall back to ldd --version for completeness.
     execute_process(
-        COMMAND ldd --version
-        OUTPUT_VARIABLE _ldd_output
+        COMMAND getconf GNU_LIBC_VERSION
+        OUTPUT_VARIABLE _libc_probe
         OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
+        RESULT_VARIABLE _getconf_result
     )
-    # First line is typically: "ldd (Ubuntu GLIBC 2.35-0ubuntu3.6) 2.35"
-    # Anchor on the word "glibc" (case-insensitive) so we don't mistake a
-    # package build number or other X.Y token for the GLIBC version.
+    if(NOT _getconf_result EQUAL 0)
+        execute_process(
+            COMMAND ldd --version
+            OUTPUT_VARIABLE _libc_probe
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+    endif()
+    # getconf outputs "glibc 2.35"; ldd (Debian/Ubuntu) outputs
+    # "ldd (Ubuntu GLIBC 2.35-0ubuntu3.6) 2.35". Both contain "glibc X.Y".
     string(
         REGEX MATCH
         "[Gg][Ll][Ii][Bb][Cc][^0-9]*([0-9]+)\\.([0-9]+)"
         _glibc_match
-        "${_ldd_output}"
+        "${_libc_probe}"
     )
     if(_glibc_match)
         set(_glibc_version "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}")
@@ -83,12 +96,12 @@ elseif(
             set(_dxc_build_from_source ON)
         endif()
     else()
-        # ldd output was not recognized (e.g. musl libc). Prebuilt DXC binaries
-        # are glibc-linked and may not run. Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON
-        # to build from source if runtime failures occur.
+        # Neither getconf nor ldd returned a recognizable GLIBC version (e.g.
+        # musl libc). Prebuilt DXC binaries are glibc-linked and may not run.
+        # Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build from source if needed.
         message(
             WARNING
-            "Could not detect GLIBC version from ldd output; "
+            "Could not detect GLIBC version; "
             "prebuilt DXC binaries may not run on this system. "
             "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source."
         )
