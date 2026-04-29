@@ -838,14 +838,51 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             auto toType = inst->getDataType();
             auto fromType = inst->getOperand(0)->getDataType();
 
-            // Metal doesn't allow as_type<> casts involving pointer types.
-            // Use C-style cast for pointer-to-pointer, pointer-to-int, and int-to-pointer.
-            bool toIsPointer = as<IRPtrTypeBase>(toType) || as<IRRawPointerTypeBase>(toType);
-            bool fromIsPointer = as<IRPtrTypeBase>(fromType) || as<IRRawPointerTypeBase>(fromType);
-
-            if (toIsPointer || fromIsPointer)
+            auto isMetalPointerLike = [](IRType* t) -> bool
             {
-                // C-style cast for pointer conversions
+                if (as<IRPtrTypeBase>(t) || as<IRRawPointerTypeBase>(t))
+                    return true;
+                if (auto descType = as<IRDescriptorHandleType>(t))
+                {
+                    auto resType = descType->getResourceType();
+                    // Textures and samplers emit as opaque Metal types
+                    // (texture2d<...>, sampler) rather than pointers, so the
+                    // uint64_t bridge doesn't apply to them.
+                    if (as<IRTextureTypeBase>(resType) ||
+                        as<IRSamplerStateTypeBase>(resType))
+                    {
+                        return false;
+                    }
+                    return true;
+                }
+                return false;
+            };
+            bool toIsPointer = isMetalPointerLike(toType);
+            bool fromIsPointer = isMetalPointerLike(fromType);
+            bool toIsVector = as<IRVectorType>(toType) != nullptr;
+            bool fromIsVector = as<IRVectorType>(fromType) != nullptr;
+
+            if (fromIsPointer && toIsVector)
+            {
+                // pointer -> vector: convert pointer to uint64_t, then as_type to vector.
+                m_writer->emit("as_type<");
+                emitType(toType);
+                m_writer->emit(">(uint64_t(");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit("))");
+            }
+            else if (fromIsVector && toIsPointer)
+            {
+                // vector -> pointer: as_type to uint64_t, then C-style cast to pointer.
+                m_writer->emit("((");
+                emitType(toType);
+                m_writer->emit(")(as_type<uint64_t>(");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(")))");
+            }
+            else if (toIsPointer || fromIsPointer)
+            {
+                // C-style cast for pointer-to-pointer and pointer-to/from-scalar.
                 m_writer->emit("(");
                 emitType(toType);
                 m_writer->emit(")(");
