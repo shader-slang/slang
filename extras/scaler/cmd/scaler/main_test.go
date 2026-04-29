@@ -43,3 +43,9 @@ func TestParseSessionMaxAgeNegative(t *testing.T) {
 		t.Fatal("parseSessionMaxAge should fail for negative durations")
 	}
 }
+
+func TestValidateSessionMaxAgeNegative(t *testing.T) {
+	if err := validateSessionMaxAge(-1); err == nil {
+		t.Fatal("validateSessionMaxAge should fail for negative durations")
+	}
+}

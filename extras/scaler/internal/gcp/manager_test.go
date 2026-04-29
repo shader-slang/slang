@@ -195,6 +195,17 @@ func TestDoCleanupTerminatedVMsDeletesPartialListResultsOnError(t *testing.T) {
 	}
 }
 
+func TestSelectZoneErrorsOnEmptyCandidates(t *testing.T) {
+	m := &Manager{}
+	m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
+		return nil, nil
+	}
+
+	if _, err := m.selectZone(context.Background()); err == nil {
+		t.Fatal("selectZone should fail for empty candidate list")
+	}
+}
+
 func TestCreateVMTryNextZoneAfterStockout(t *testing.T) {
 	m := &Manager{
 		config: ManagerConfig{

@@ -295,6 +295,9 @@ func (m *Manager) selectZone(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if len(candidates) == 0 {
+		return "", fmt.Errorf("no zone candidates available")
+	}
 	return candidates[0].zone, nil
 }
 

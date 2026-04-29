@@ -154,6 +154,12 @@ func parseFlags() config {
 
 	flag.Parse()
 
+	if err := validateSessionMaxAge(cfg.sessionMaxAge); err != nil {
+		fmt.Fprintf(os.Stderr, "error: invalid --session-max-age: %v\n", err)
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	if cfg.registrationURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --url is required")
 		flag.Usage()
@@ -218,10 +224,17 @@ func parseSessionMaxAge(v string) (time.Duration, error) {
 	if err != nil {
 		return 0, fmt.Errorf("%q: %w", v, err)
 	}
-	if d < 0 {
-		return 0, fmt.Errorf("%q: must be non-negative", v)
+	if err := validateSessionMaxAge(d); err != nil {
+		return 0, fmt.Errorf("%q: %w", v, err)
 	}
 	return d, nil
+}
+
+func validateSessionMaxAge(d time.Duration) error {
+	if d < 0 {
+		return fmt.Errorf("must be non-negative")
+	}
+	return nil
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
