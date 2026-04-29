@@ -47,21 +47,15 @@ SLANG_UNIT_TEST(loadModuleFromSourceNameCollision)
 
     // First load of "mod" with source A -- should succeed.
     ComPtr<slang::IBlob> diagA1;
-    auto modA1 = session->loadModuleFromSourceString(
-        "mod",
-        "mod.slang",
-        sourceA,
-        diagA1.writeRef());
+    auto modA1 =
+        session->loadModuleFromSourceString("mod", "mod.slang", sourceA, diagA1.writeRef());
     SLANG_CHECK(modA1 != nullptr);
 
     // Reloading "mod" with identical source is still allowed (no-op):
     // should return the cached module and produce no diagnostic.
     ComPtr<slang::IBlob> diagA2;
-    auto modA2 = session->loadModuleFromSourceString(
-        "mod",
-        "mod.slang",
-        sourceA,
-        diagA2.writeRef());
+    auto modA2 =
+        session->loadModuleFromSourceString("mod", "mod.slang", sourceA, diagA2.writeRef());
     SLANG_CHECK(modA2 != nullptr);
     SLANG_CHECK(modA2 == modA1);
 
@@ -69,11 +63,7 @@ SLANG_UNIT_TEST(loadModuleFromSourceNameCollision)
     // diagnostic pointing at the collision, rather than silently returning
     // the previously cached module.
     ComPtr<slang::IBlob> diagB;
-    auto modB = session->loadModuleFromSourceString(
-        "mod",
-        "mod.slang",
-        sourceB,
-        diagB.writeRef());
+    auto modB = session->loadModuleFromSourceString("mod", "mod.slang", sourceB, diagB.writeRef());
     SLANG_CHECK(modB == nullptr);
     SLANG_CHECK(diagB != nullptr);
 
