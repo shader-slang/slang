@@ -1038,7 +1038,29 @@ Result linkAndOptimizeIR(
     // ICoverageTracingMetadata.
     if (requiredLoweringPassSet.coverageTracing)
     {
-        SLANG_PASS(instrumentCoverage, sink, codeGenContext->shouldTraceCoverage(), *metadata);
+        // Pull explicit binding values from `-trace-coverage-binding`
+        // here; pass -1 for either side to request auto-allocation in
+        // the synthesis routine.
+        int explicitBinding = -1;
+        int explicitSpace = -1;
+        auto& opts = codeGenContext->getTargetReq()->getOptionSet();
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
+        {
+            if (values->getCount() > 0)
+            {
+                explicitBinding = (int)(*values)[0].intValue;
+                explicitSpace = (int)(*values)[0].intValue2;
+            }
+        }
+        SLANG_PASS(
+            instrumentCoverage,
+            sink,
+            codeGenContext->shouldTraceCoverage(),
+            explicitBinding,
+            explicitSpace,
+            targetRequest,
+            outLinkedIR.globalScopeVarLayout,
+            *metadata);
     }
 
     SLANG_PASS(collectGlobalUniformParameters, outLinkedIR.globalScopeVarLayout, target);

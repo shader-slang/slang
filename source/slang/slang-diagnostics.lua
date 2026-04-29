@@ -4563,18 +4563,6 @@ err(
     span { loc = "location", message = "unresolved external symbol '~symbol:IRInst'." }
 )
 
--- 451xx - Coverage instrumentation (-trace-coverage)
-
-warning(
-    "coverage-buffer-wrong-type",
-    45100,
-    "user-declared __slang_coverage has wrong type",
-    span {
-        loc = "location",
-        message = "user-declared '__slang_coverage' must be 'RWStructuredBuffer<uint>' for '-trace-coverage'; ignoring (no instrumentation will be emitted).",
-    }
-)
-
 -- 41xxx - Semantic checking (continued)
 
 warning(

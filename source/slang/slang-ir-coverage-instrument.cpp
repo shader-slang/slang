@@ -5,7 +5,7 @@
 #include "compiler-core/slang-source-loc.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
-#include "slang-rich-diagnostics.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -13,76 +13,220 @@ namespace Slang
 namespace
 {
 
-// The coverage buffer is synthesized as an AST-level VarDecl at
-// semantic-check time by `maybeSynthesizeCoverageBufferDecl` (see
-// slang-check-synthesize-coverage.cpp). By the time this IR pass
-// runs, the buffer is a normal reflection-visible `IRGlobalParam`
-// with a binding assigned by the regular parameter-binding phase —
-// indistinguishable from a user-declared one. This pass only locates
-// it by name and rewrites `IncrementCoverageCounter` ops against it.
+// Well-known buffer name. Surfaced via `IRNameHintDecoration` and
+// matches the manifest / sidecar key that hosts read.
 static const char kCoverageBufferName[] = "__slang_coverage";
 
-// Locate the coverage buffer's `IRGlobalParam`. Post-AST-synthesis
-// the buffer is always present when tracing is enabled, but we still
-// validate the type defensively so a user-declared `__slang_coverage`
-// with the wrong shape produces a diagnostic rather than invalid IR.
-static IRGlobalParam* findCoverageBuffer(IRModule* module, DiagnosticSink* sink)
+// Choose the resource kind under which the coverage buffer is bound
+// for `target`. D3D-style targets express UAVs as `register(uN)`
+// (`UnorderedAccess`); every other target we care about (Vulkan,
+// SPIR-V, GLSL, WebGPU, Metal, CPU, CUDA) speaks the descriptor-table
+// concept (`DescriptorTableSlot`). Setting the wrong kind triggers
+// either an "unhandled HLSL register type" emit error or a SPIR-V
+// "conflicting resource uses" assertion in the layout pipeline.
+static LayoutResourceKind selectCoverageResourceKind(TargetRequest* targetRequest)
 {
+    return isD3DTarget(targetRequest) ? LayoutResourceKind::UnorderedAccess
+                                      : LayoutResourceKind::DescriptorTableSlot;
+}
+
+// Pick a binding offset in space 0 that doesn't collide with any
+// existing global param's offset for `kind`. Walks the module once
+// and returns max-occupied + 1, or 0 when nothing else claims a slot
+// of that kind in space 0.
+static int pickFreeBindingForCoverage(IRModule* module, LayoutResourceKind kind)
+{
+    int maxOccupied = -1;
     for (auto inst : module->getGlobalInsts())
     {
         auto param = as<IRGlobalParam>(inst);
         if (!param)
             continue;
-        auto nameHint = param->findDecoration<IRNameHintDecoration>();
-        if (!nameHint || nameHint->getName() != UnownedStringSlice(kCoverageBufferName))
+        auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
+        if (!layoutDecor)
             continue;
-        // Diagnose either kind of type mismatch with the same registered
-        // diagnostic — the user's fix is the same in both cases (declare
-        // `__slang_coverage` as `RWStructuredBuffer<uint>`). Anchoring at
-        // the IR param's sourceLoc points the message at the user's
-        // declaration so the error is debuggable.
-        auto bufferType = as<IRHLSLRWStructuredBufferType>(param->getDataType());
-        if (!bufferType)
+        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+        if (!varLayout)
+            continue;
+        UInt paramSpace = 0;
+        if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+            paramSpace = a->getOffset();
+        if (paramSpace != 0)
+            continue;
+        if (auto a = varLayout->findOffsetAttr(kind))
         {
-            if (sink)
-                sink->diagnose(Diagnostics::CoverageBufferWrongType{.location = param->sourceLoc});
-            return nullptr;
+            int offset = (int)a->getOffset();
+            if (offset > maxOccupied)
+                maxOccupied = offset;
         }
-        auto elementType = as<IRBasicType>(bufferType->getElementType());
-        if (!elementType || elementType->getBaseType() != BaseType::UInt)
-        {
-            if (sink)
-                sink->diagnose(Diagnostics::CoverageBufferWrongType{.location = param->sourceLoc});
-            return nullptr;
-        }
-        return param;
     }
-    return nullptr;
+    return maxOccupied + 1;
 }
 
-// Read the (space, binding) the parameter-binding pass assigned to
-// the coverage buffer. These are the real values the reflection API
-// will report and hosts will see via slang-rhi binding.
-static void readBufferBinding(IRGlobalParam* coverageBuffer, int32_t& outSpace, int32_t& outBinding)
+// Construct the layout for the synthesized coverage buffer at the
+// given (space, binding) for `kind`. One resource kind per layout —
+// pre-target — matches what AST→IR lowering produces for a buffer
+// declared with `register(uN, spaceM)` (D3D) or
+// `[[vk::binding(N, M)]]` (Vulkan).
+static IRVarLayout* createCoverageBufferVarLayout(
+    IRBuilder& builder,
+    TargetRequest* targetRequest,
+    LayoutResourceKind kind,
+    int space,
+    int binding)
 {
-    outSpace = -1;
-    outBinding = -1;
-    auto layoutDecor = coverageBuffer->findDecoration<IRLayoutDecoration>();
-    if (!layoutDecor)
-        return;
-    auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
-    if (!varLayout)
-        return;
-    if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
-        outSpace = (int32_t)a->getOffset();
-    if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::DescriptorTableSlot))
-        outBinding = (int32_t)a->getOffset();
-    // For HLSL/D3D-style targets the binding comes in as UAV register.
-    if (outBinding < 0)
+    IRTypeLayout::Builder typeLayoutBuilder(&builder);
+    typeLayoutBuilder.addResourceUsage(kind, 1);
+    // On targets that pack global parameters into a single struct
+    // (CPU/CUDA), `collectGlobalUniformParameters` only picks up
+    // fields whose type layout reports `Uniform` usage. Without this
+    // the synthesized buffer would skip packing and reappear as a
+    // standalone kernel parameter, breaking the standard 3-arg ABI
+    // (varying, entryPointParams, globalParams). Graphics targets
+    // (D3D / Khronos) reject the entire packaging step earlier and
+    // are unaffected.
+    if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest))
     {
-        if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::UnorderedAccess))
-            outBinding = (int32_t)a->getOffset();
+        typeLayoutBuilder.addResourceUsage(LayoutResourceKind::Uniform, sizeof(void*));
     }
+    auto typeLayout = typeLayoutBuilder.build();
+
+    IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
+    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->offset = (UInt)space;
+    varLayoutBuilder.findOrAddResourceInfo(kind)->offset = (UInt)binding;
+    return varLayoutBuilder.build();
+}
+
+// Synthesize the coverage buffer as a fresh `IRGlobalParam` in the
+// linked module. No AST decl exists for this buffer; it enters the
+// pipeline at IR time so user-facing AST/reflection paths never see
+// it. Backend emit treats it identically to any other
+// `RWStructuredBuffer<uint>` global param.
+static IRGlobalParam* synthesizeCoverageBuffer(
+    IRModule* module,
+    TargetRequest* targetRequest,
+    int explicitBinding,
+    int explicitSpace,
+    int& outSpace,
+    int& outBinding)
+{
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+
+    IRType* uintType = builder.getUIntType();
+    IRInst* typeOperands[2] = {uintType, builder.getType(kIROp_DefaultBufferLayoutType)};
+    auto bufferType = (IRType*)builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
+
+    auto param = builder.createGlobalParam(bufferType);
+    builder.addNameHintDecoration(param, UnownedTerminatedStringSlice(kCoverageBufferName));
+
+    auto kind = selectCoverageResourceKind(targetRequest);
+
+    int space, binding;
+    if (explicitSpace >= 0 && explicitBinding >= 0)
+    {
+        space = explicitSpace;
+        binding = explicitBinding;
+    }
+    else
+    {
+        space = 0;
+        binding = pickFreeBindingForCoverage(module, kind);
+    }
+
+    auto varLayout = createCoverageBufferVarLayout(builder, targetRequest, kind, space, binding);
+    builder.addLayoutDecoration(param, varLayout);
+
+    outSpace = space;
+    outBinding = binding;
+    return param;
+}
+
+// Find the inner `IRStructTypeLayout` inside a program-scope var
+// layout. The scope layout may be a bare struct or wrapped in a
+// parameter group (`ConstantBuffer<...>`), depending on target
+// policy; the field-attr list we want to extend lives on the inner
+// struct in either case.
+static IRStructTypeLayout* findScopeStructTypeLayout(IRVarLayout* scopeVarLayout)
+{
+    auto typeLayout = scopeVarLayout->getTypeLayout();
+    if (auto groupLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+        typeLayout = groupLayout->getElementVarLayout()->getTypeLayout();
+    return as<IRStructTypeLayout>(typeLayout);
+}
+
+// Rebuild the program-scope var layout to include our synthesized
+// buffer as an additional struct field. The field's key is the
+// buffer's `IRGlobalParam` itself (the convention
+// `collectGlobalUniformParameters` decodes). When the scope layout
+// involves a parameter group wrapper, we rebuild the inner element
+// var layout and the wrapper as well so the var layout's invariants
+// hold.
+//
+// Returns the new scope var layout. If the existing layout shape
+// can't be extended (no struct layout to add to), returns the input
+// unchanged — the buffer still lives as a standalone `IRGlobalParam`,
+// which is correct for graphics targets that don't pack globals.
+static IRVarLayout* extendScopeLayoutWithCoverageBuffer(
+    IRBuilder& builder,
+    IRVarLayout* oldScopeVarLayout,
+    IRGlobalParam* coverageBuffer)
+{
+    if (!oldScopeVarLayout)
+        return oldScopeVarLayout;
+    auto oldStructTypeLayout = findScopeStructTypeLayout(oldScopeVarLayout);
+    if (!oldStructTypeLayout)
+        return oldScopeVarLayout;
+
+    auto coverageVarLayout =
+        cast<IRVarLayout>(coverageBuffer->findDecoration<IRLayoutDecoration>()->getLayout());
+
+    // Build a new struct type layout: copy old fields, then add ours.
+    IRStructTypeLayout::Builder newStructTypeLayoutBuilder(&builder);
+    newStructTypeLayoutBuilder.addResourceUsageFrom(oldStructTypeLayout);
+    for (auto oldFieldAttr : oldStructTypeLayout->getFieldLayoutAttrs())
+        newStructTypeLayoutBuilder.addField(oldFieldAttr->getFieldKey(), oldFieldAttr->getLayout());
+    newStructTypeLayoutBuilder.addField(coverageBuffer, coverageVarLayout);
+    auto newStructTypeLayout = newStructTypeLayoutBuilder.build();
+
+    // Rewrap: if the old layout had a parameter-group wrapper, build
+    // a new wrapper around the new struct; otherwise the new struct
+    // *is* the new outer type layout.
+    IRTypeLayout* newOuterTypeLayout = newStructTypeLayout;
+    auto oldOuterTypeLayout = oldScopeVarLayout->getTypeLayout();
+    if (auto oldGroupLayout = as<IRParameterGroupTypeLayout>(oldOuterTypeLayout))
+    {
+        auto oldElementVarLayout = oldGroupLayout->getElementVarLayout();
+        IRVarLayout::Builder newElementVarLayoutBuilder(&builder, newStructTypeLayout);
+        newElementVarLayoutBuilder.cloneEverythingButOffsetsFrom(oldElementVarLayout);
+        for (auto oldResInfo : oldElementVarLayout->getOffsetAttrs())
+        {
+            auto newResInfo =
+                newElementVarLayoutBuilder.findOrAddResourceInfo(oldResInfo->getResourceKind());
+            newResInfo->offset = oldResInfo->getOffset();
+            newResInfo->space = oldResInfo->getSpace();
+        }
+        auto newElementVarLayout = newElementVarLayoutBuilder.build();
+
+        IRParameterGroupTypeLayout::Builder newGroupBuilder(&builder);
+        newGroupBuilder.setContainerVarLayout(oldGroupLayout->getContainerVarLayout());
+        newGroupBuilder.setElementVarLayout(newElementVarLayout);
+        newGroupBuilder.setOffsetElementTypeLayout(newStructTypeLayout);
+        newOuterTypeLayout = newGroupBuilder.build();
+    }
+
+    // Rebuild the outer var layout pointing at the new outer type
+    // layout, preserving offsets/semantics from the old.
+    IRVarLayout::Builder newScopeVarLayoutBuilder(&builder, newOuterTypeLayout);
+    newScopeVarLayoutBuilder.cloneEverythingButOffsetsFrom(oldScopeVarLayout);
+    for (auto oldResInfo : oldScopeVarLayout->getOffsetAttrs())
+    {
+        auto newResInfo =
+            newScopeVarLayoutBuilder.findOrAddResourceInfo(oldResInfo->getResourceKind());
+        newResInfo->offset = oldResInfo->getOffset();
+        newResInfo->space = oldResInfo->getSpace();
+    }
+    return newScopeVarLayoutBuilder.build();
 }
 
 // Collect every IncrementCoverageCounter op in the module. Deterministic
@@ -211,6 +355,10 @@ void instrumentCoverage(
     IRModule* module,
     DiagnosticSink* sink,
     bool enabled,
+    int explicitBinding,
+    int explicitSpace,
+    TargetRequest* targetRequest,
+    IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata)
 {
     // Collect any counter ops so stale ones from cached modules can't
@@ -220,7 +368,8 @@ void instrumentCoverage(
 
     if (!enabled)
     {
-        // Flag off: drop any counter ops without emitting atomics.
+        // Flag off: drop any counter ops without emitting atomics or
+        // synthesizing a buffer.
         for (auto op : counterOps)
             op->removeAndDeallocate();
         return;
@@ -229,26 +378,42 @@ void instrumentCoverage(
     if (counterOps.getCount() == 0)
         return;
 
-    // The AST-time synthesizer guarantees `__slang_coverage` exists
-    // when the flag is on (or the user declared one themselves).
-    // If it doesn't, something earlier in the pipeline failed; bail
-    // gracefully rather than producing invalid IR.
-    auto buffer = findCoverageBuffer(module, sink);
-    if (!buffer)
+    int chosenSpace = -1;
+    int chosenBinding = -1;
+    auto buffer = synthesizeCoverageBuffer(
+        module,
+        targetRequest,
+        explicitBinding,
+        explicitSpace,
+        chosenSpace,
+        chosenBinding);
+
+    // Extend the program-scope layout so the buffer participates in
+    // global-uniform packaging on targets that pack (CPU, CUDA). On
+    // graphics targets the scope layout typically has no struct to
+    // extend; the helper is a no-op there and the buffer remains a
+    // standalone `IRGlobalParam`.
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+    auto newScopeVarLayout =
+        extendScopeLayoutWithCoverageBuffer(builder, globalScopeVarLayout, buffer);
+    if (newScopeVarLayout != globalScopeVarLayout)
     {
-        for (auto op : counterOps)
-            op->removeAndDeallocate();
-        return;
+        globalScopeVarLayout = newScopeVarLayout;
+        // The module inst also carries the scope layout as a layout
+        // decoration; refresh that so subsequent passes that read
+        // from the module rather than the linked-IR struct see the
+        // new layout. Replacing the decoration's payload requires
+        // removing the old and adding the new.
+        if (auto oldDecor = module->getModuleInst()->findDecoration<IRLayoutDecoration>())
+            oldDecor->removeAndDeallocate();
+        builder.addLayoutDecoration(module->getModuleInst(), newScopeVarLayout);
     }
 
-    // Record the buffer's binding on the metadata so hosts can query
-    // it via ICoverageTracingMetadata. Binding was assigned by the
-    // normal parameter-binding phase, so it reflects whatever the
-    // front-end chose (not a hardcoded reservation).
-    readBufferBinding(
-        buffer,
-        outMetadata.m_coverageBufferSpace,
-        outMetadata.m_coverageBufferBinding);
+    outMetadata.m_coverageBufferSpace = chosenSpace;
+    outMetadata.m_coverageBufferBinding = chosenBinding;
+
+    SLANG_UNUSED(sink);
 
     CoverageInstrumenter instrumenter(
         module,
