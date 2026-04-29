@@ -46,9 +46,7 @@ vector<OutElTy, MatM> __slang_linalg_Mul(
         dx::linalg::MatrixUse::A,
         dx::linalg::MatrixScope::Thread>;
     MatTy mat = MatTy::template Load<LoadLayout>(matBuf, matOff, matStr);
-    return dx::linalg::Multiply<OutElTy>(
-        mat,
-        dx::linalg::MakeInterpretedVector<InputDT>(input));
+    return dx::linalg::Multiply<OutElTy>(mat, input);
 }
 
 template<
