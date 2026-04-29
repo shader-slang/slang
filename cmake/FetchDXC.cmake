@@ -6,8 +6,8 @@
 # On Linux, if the system GLIBC version is older than the minimum required by the
 # prebuilt binaries, DXC is built from source via ExternalProject instead.
 #
-# Using FetchContent with the name 'dxc' ensures that slang-rhi (which uses the
-# same FetchContent name) will see dxc_POPULATED=TRUE and skip its own download.
+# Both paths register the FetchContent 'dxc' name as populated so that slang-rhi
+# (which fetches its own DXC under the same name) skips its own download.
 #
 # Variables:
 #   SLANG_DXC_BINARY_URL        - Override the prebuilt binary download URL (optional)
@@ -89,10 +89,41 @@ endif()
 if(_dxc_build_from_source)
     include(ExternalProject)
 
+    # DXC's build (PredefinedParams.cmake) is designed for a single-config
+    # generator. Normalize any Ninja variant (e.g. "Ninja Multi-Config") to
+    # plain "Ninja"; for non-Ninja generators (e.g. Visual Studio on Windows)
+    # mirror the parent so the same toolchain is used.
+    #
+    # LLVM uses CMAKE_CFG_INTDIR (e.g. "." for Ninja, "$(Configuration)" for VS)
+    # to set LLVM_RUNTIME_OUTPUT_INTDIR, so for VS the DLLs land in
+    # <BINARY_DIR>/MinSizeRel/bin/ rather than <BINARY_DIR>/bin/. Track this
+    # in _dxc_dll_subdir so byproducts and copy commands point to the right path.
+    if(CMAKE_GENERATOR MATCHES "Ninja")
+        set(_dxc_generator_args -G Ninja)
+        set(_dxc_build_command ${CMAKE_COMMAND} --build <BINARY_DIR>)
+        set(_dxc_dll_subdir "bin")
+    else()
+        set(_dxc_generator_args -G "${CMAKE_GENERATOR}")
+        if(CMAKE_GENERATOR_PLATFORM)
+            list(APPEND _dxc_generator_args -A "${CMAKE_GENERATOR_PLATFORM}")
+        endif()
+        if(CMAKE_GENERATOR_TOOLSET)
+            list(APPEND _dxc_generator_args -T "${CMAKE_GENERATOR_TOOLSET}")
+        endif()
+        set(_dxc_build_command
+            ${CMAKE_COMMAND}
+            --build
+            <BINARY_DIR>
+            --config
+            MinSizeRel
+        )
+        set(_dxc_dll_subdir "MinSizeRel/bin")
+    endif()
+
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         set(_dxc_src_byproducts
-            <BINARY_DIR>/bin/dxcompiler.dll
-            <BINARY_DIR>/bin/dxil.dll
+            "<BINARY_DIR>/${_dxc_dll_subdir}/dxcompiler.dll"
+            "<BINARY_DIR>/${_dxc_dll_subdir}/dxil.dll"
         )
         set(_dxc_warning_flags "")
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -128,30 +159,6 @@ if(_dxc_build_from_source)
     file(MAKE_DIRECTORY "${_dxc_build_dir}")
     file(WRITE "${_dxc_build_dir}/.clang-format" "BasedOnStyle: LLVM\n")
 
-    # DXC's build (PredefinedParams.cmake) is designed for a single-config
-    # generator. Normalize any Ninja variant (e.g. "Ninja Multi-Config") to
-    # plain "Ninja"; for non-Ninja generators (e.g. Visual Studio on Windows)
-    # mirror the parent so the same toolchain is used.
-    if(CMAKE_GENERATOR MATCHES "Ninja")
-        set(_dxc_generator_args -G Ninja)
-        set(_dxc_build_command ${CMAKE_COMMAND} --build <BINARY_DIR>)
-    else()
-        set(_dxc_generator_args -G "${CMAKE_GENERATOR}")
-        if(CMAKE_GENERATOR_PLATFORM)
-            list(APPEND _dxc_generator_args -A "${CMAKE_GENERATOR_PLATFORM}")
-        endif()
-        if(CMAKE_GENERATOR_TOOLSET)
-            list(APPEND _dxc_generator_args -T "${CMAKE_GENERATOR_TOOLSET}")
-        endif()
-        set(_dxc_build_command
-            ${CMAKE_COMMAND}
-            --build
-            <BINARY_DIR>
-            --config
-            MinSizeRel
-        )
-    endif()
-
     ExternalProject_Add(
         dxc_from_source
         GIT_REPOSITORY "https://github.com/microsoft/DirectXShaderCompiler.git"
@@ -176,7 +183,7 @@ if(_dxc_build_from_source)
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         foreach(_dll dxcompiler dxil)
-            set(_src "${BINARY_DIR}/bin/${_dll}.dll")
+            set(_src "${BINARY_DIR}/${_dxc_dll_subdir}/${_dll}.dll")
             set(_dst
                 "${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/${_dll}.dll"
             )
@@ -206,8 +213,14 @@ if(_dxc_build_from_source)
         endforeach()
     endif()
 
-    # Prevent slang-rhi from downloading its own prebuilt DXC independently
-    # (it skips its fetch when the FetchContent 'dxc' name is already populated).
+    # Prevent slang-rhi from downloading its own prebuilt DXC independently.
+    # slang-rhi's FetchPackage macro calls FetchContent_GetProperties(dxc),
+    # which reads the internal _FetchContent_dxc_populated global property and
+    # skips its own download when TRUE. Setting this property directly is the
+    # only practical option here: FetchContent_MakeAvailable would conflict with
+    # ExternalProject_Add (which owns the actual clone), and setting the
+    # public-facing dxc_POPULATED variable in this scope would not propagate to
+    # the calling scope where slang-rhi's FetchPackage runs.
     set_property(GLOBAL PROPERTY _FetchContent_dxc_populated TRUE)
 
     return()
