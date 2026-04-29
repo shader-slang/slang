@@ -16,80 +16,53 @@ of the Slang compiler itself.
 
 ---
 
-## Compiler-side flow
+## Quick start
 
-Enable with `-trace-coverage` on the `slangc` CLI.
-
-To pin the coverage buffer at a specific binding slot instead of
-letting parameter binding auto-allocate one, add
-`-trace-coverage-binding <index> <space>`:
+Compile any `.slang` shader with `-trace-coverage`:
 
 ```bash
 slangc shader.slang -target spirv -stage compute -entry main \
-    -trace-coverage-binding 7 3 -o shader.spv
-# __slang_coverage lands at register(u7, space3) on HLSL,
-# DescriptorSet 3 / Binding 7 on SPIR-V.
+    -trace-coverage -o shader.spv
+# Produces shader.spv plus shader.spv.coverage-mapping.json
 ```
 
-`-trace-coverage-binding` implies `-trace-coverage`. The override is
-ignored (with the user's declaration winning) when the user has
+Every executable statement in the shader gets instrumented to
+increment a counter at runtime. The compiler synthesizes a
+`RWStructuredBuffer<uint> __slang_coverage` parameter that any
+reflection-driven host (slang-rhi, slangpy, custom Vulkan/D3D12
+wrappers) discovers and binds the same way as any other shader
+parameter. The `.coverage-mapping.json` sidecar tells the host how
+many counters to allocate and which source line each slot
+corresponds to.
+
+After the host dispatches the shader and reads the counter buffer
+back, [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py)
+or [`slang-coverage-rt`](../../source/slang-coverage-rt/) converts
+the snapshot to LCOV `.info` for `genhtml`, Codecov, VS Code
+Coverage Gutters, etc.
+
+For the pipeline architecture, design rationale, and alternatives
+weighed, see
+[`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md).
+
+## Pinning the coverage buffer at an explicit slot
+
+By default parameter binding auto-allocates a slot for
+`__slang_coverage`. Pass `-trace-coverage-binding <index> <space>`
+to pin it at a specific `(register, space)` pair instead:
+
+```bash
+slangc shader.slang -target spirv -stage compute -entry main \
+    -trace-coverage-binding 7 0 -o shader.spv
+# __slang_coverage lands at register(u7) on HLSL,
+# DescriptorSet 0 / Binding 7 on SPIR-V.
+```
+
+`-trace-coverage-binding` implies `-trace-coverage`. The override
+is ignored (with the user's declaration winning) when the user has
 already declared a `__slang_coverage` themselves. Use this when the
 host needs the slot fixed at compile time — for example when
 pre-building a D3D12 root signature before reflection runs.
-
-1. **AST-check time** (`source/slang/slang-check-synthesize-coverage.{h,cpp}`).
-   A `RWStructuredBuffer<uint> __slang_coverage` `VarDecl` is synthesized
-   in the module scope before parameter binding runs. This lets the
-   buffer flow through Slang's normal reflection and layout pipeline,
-   so every backend and every reflection-driven host (slang-rhi,
-   slangpy, custom Vulkan/D3D12 hosts) sees it as a first-class
-   shader parameter. Skipped if the user has already declared a
-   `__slang_coverage` themselves.
-2. **AST lowering** (`source/slang/slang-lower-to-ir.cpp`). Before
-   each statement is lowered to IR, the front-end emits an
-   `IncrementCoverageCounter` IR op. The op's source position is
-   carried on the standard per-instruction `sourceLoc` field — no
-   operands, no debug decoration — so it survives `stripDebugInfo`
-   and every IR transform that preserves operands (inline, clone,
-   link).
-3. **IR pass** (`source/slang/slang-ir-coverage-instrument.cpp`).
-   Runs after parameter binding has assigned the coverage buffer a
-   binding slot, but before `collectGlobalUniformParameters` packs
-   it into the `GlobalParams` struct. The pass:
-   - Locates the coverage buffer by name (always present post-AST-
-     synthesis).
-   - Assigns a counter slot to each `IncrementCoverageCounter` op
-     (per-inst UID — consecutive index in traversal order; multiple
-     ops on the same source line get distinct slots, which keeps the
-     door open for branch/function coverage later).
-   - Rewrites each op as `AtomicAdd(__slang_coverage[slot], 1,
-     Relaxed)`.
-   - Records `(slot → file, line)` plus the buffer's binding on the
-     artifact's `ICoverageTracingMetadata` (see next section). Some
-     slots may remain unattributable if they do not correspond to a
-     real source file/line.
-
-AST synthesis and `ICoverageTracingMetadata` serve different roles:
-- AST synthesis is the binding/discoverability mechanism. It makes the
-  coverage buffer reflection-visible so reflection-driven hosts can bind it.
-- `ICoverageTracingMetadata` is the reporting mechanism. It tells the host
-  which slot maps to which source location and what binding was chosen.
-
-They are complementary, not alternatives.
-4. **Emission.** Each backend already handles `kIROp_AtomicAdd` on
-   `RWStructuredBuffer<uint>`:
-   - HLSL/DXIL → `InterlockedAdd`
-   - SPIR-V → `OpAtomicIAdd`
-   - GLSL → `atomicAdd`
-   - Metal → Metal atomic builtins
-   - WGSL → `atomicAdd`
-   - CUDA → `atomicAdd`
-   - CPU → `_slang_atomic_add_u32` prelude helper (GCC/Clang
-     `__atomic_fetch_add`, MSVC `_InterlockedExchangeAdd`)
-
-The `IncrementCoverageCounter` op is side-effectful by default in
-the DCE analysis, so it survives optimizations untouched until the
-coverage pass rewrites it.
 
 ---
 
@@ -216,38 +189,50 @@ coverage semantics.
 
 ---
 
-## Current scope
+## Supported features
 
-- Line coverage only — emits `DA:` records; no `FN:` / `BRDA:`
+| Backend | Default `-trace-coverage` | `-trace-coverage-binding=N:0` | `-trace-coverage-binding=N:M` (M ≠ 0) |
+|---|---|---|---|
+| CPU | Supported | (no-op — backend uses uniform offsets) | (no-op) |
+| Vulkan (incl. MoltenVK on macOS) | Supported | Supported | Skipped — slang-rhi follow-up pending |
+| D3D12 | Supported | Supported | Supported (compiler reflection fix landed) |
+| CUDA | Supported | (no-op — backend uses uniform offsets) | (no-op) |
+| Metal (direct) | Pre-existing slang-rhi binding-init quirk; counter values unreliable. Tracked at [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724). Use Vulkan via MoltenVK on Apple silicon. | (untested) | (untested) |
+| GLSL / WebGPU | Supported codegen | (untested) | (untested) |
+
+LCOV output is byte-identical across CPU / Vulkan / D3D12 / CUDA in
+the supported cells.
+
+### Format scope
+
+- **Line coverage only** — emits `DA:` records; no `FN:` / `BRDA:`
   (function / branch) coverage yet. Per-inst slot assignment is
-  forward-compatible with branch coverage: each branch point gets
-  its own slot and the LCOV emitter would grow a `BRDA:` writer.
-- Column position is dropped; only `(file, line)` reaches LCOV.
-- Counter type is `uint32`; saturates at ~4 × 10⁹ hits per slot.
+  forward-compatible with branch coverage: each branch point would
+  get its own slot, and the LCOV emitter would grow a `BRDA:`
+  writer.
+- **Column position is dropped.** Only `(file, line)` reaches LCOV.
+- **Counter type is `uint32`.** Saturates at ~4 × 10⁹ hits per
+  slot. Multiple ops on the same source line accumulate
+  independently before LCOV-emit-time aggregation.
 
-## Pending work
+## Current limitations
 
-- **Branch / function coverage.** `BRDA:` and `FN:` LCOV records,
-  driven by extending `ICoverageTracingMetadata` with additional
-  entry types and having the IR pass insert extra counter ops at
-  branch points.
+- **`-trace-coverage-binding=N:M` runtime status with `M != 0`** is
+  partially wired through. The compiler now emits the correct
+  `(set, register)` decoration — the Slang reflection bug that
+  used to leave `DescriptorSetInfo::spaceOffset = 0` is fixed —
+  so D3D12's slang-rhi root-signature builder accepts the layout
+  and dispatch works end-to-end. Vulkan and WebGPU remain pending
+  a slang-rhi follow-up: their binding-data builder assumes ≤ 1
+  descriptor set per shader object, so non-zero space mis-binds.
+  The companion `examples/shader-coverage-demo` skips Vulkan /
+  WebGPU dispatch with a clear `[coverage] skip` message in this
+  case rather than letting the assertion fire. Tracked at
+  [shader-slang/slang#10959](https://github.com/shader-slang/slang/issues/10959).
+- **Metal counter values** are unreliable due to a pre-existing
+  slang-rhi Metal binding/initialization quirk — atomic writes
+  appear to land in the wrong buffer. Not a coverage-feature bug;
+  tracked at
+  [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724).
+  On Apple silicon, use Vulkan via MoltenVK.
 
----
-
-## Related files in the Slang tree
-
-| Path | Role |
-|---|---|
-| `source/slang/slang-check-synthesize-coverage.{h,cpp}` | Injects `__slang_coverage` `VarDecl` during semantic check |
-| `source/slang/slang-check-decl.cpp` | Hook that invokes the synthesizer from `checkModule` |
-| `source/slang/slang-ir-coverage-instrument.{h,cpp}` | IR pass — rewrites counter ops, writes metadata |
-| `source/slang/slang-ir-insts.lua` | Declares the `IncrementCoverageCounter` IR op |
-| `source/slang/slang-lower-to-ir.cpp` | Emits counter ops during AST lowering |
-| `source/slang/slang-emit.cpp` | Integrates the pass into the pipeline + allocates metadata |
-| `source/slang/slang-options.cpp` | Registers the `-trace-coverage` CLI flag |
-| `source/slang/slang-end-to-end-request.cpp` | Writes the `.coverage-mapping.json` sidecar from slangc |
-| `include/slang.h` | `slang::ICoverageTracingMetadata` public interface |
-| `source/compiler-core/slang-artifact-associated-impl.{h,cpp}` | `ArtifactPostEmitMetadata` implements the interface |
-| `prelude/slang-cpp-prelude.h` | CPU-target atomic helpers (`_slang_atomic_add_u32/i32`) |
-| `source/slang/slang-emit-cpp.cpp` | CPU emitter's `kIROp_AtomicAdd` handling |
-| `tests/language-feature/coverage/` | End-to-end tests |
