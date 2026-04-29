@@ -19,6 +19,7 @@ namespace Slang
     X(Half)                  \
     X(Float)                 \
     X(Double)                \
+    X(BFloat16)              \
     X(Char)                  \
     X(IntPtr)                \
     X(UIntPtr)               \

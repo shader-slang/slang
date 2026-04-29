@@ -138,10 +138,6 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
     {
         return NaturalSize::makeFromBaseType(basicType->getBaseType());
     }
-    else if (as<BFloat16Type>(type))
-    {
-        return NaturalSize::make(2, 2);
-    }
     else if (as<Fp8Type>(type))
     {
         return NaturalSize::make(1, 1);

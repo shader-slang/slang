@@ -149,7 +149,7 @@ static bool isScalarType(Type* type)
     if (as<BasicExpressionType>(type))
         return true;
 
-    return as<BFloat16Type>(type) || as<FloatE4M3Type>(type) || as<FloatE5M2Type>(type);
+    return as<FloatE4M3Type>(type) || as<FloatE5M2Type>(type);
 }
 
 // user attribute
@@ -760,6 +760,7 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
             CASE(Half, FLOAT16);
             CASE(Float, FLOAT32);
             CASE(Double, FLOAT64);
+            CASE(BFloat16, BFLOAT16);
             CASE(IntPtr, INTPTR);
             CASE(UIntPtr, UINTPTR);
 
@@ -771,8 +772,6 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
         }
     }
 
-    if (as<BFloat16Type>(type))
-        return SLANG_SCALAR_TYPE_BFLOAT16;
     if (as<FloatE4M3Type>(type))
         return SLANG_SCALAR_TYPE_FLOAT_E4M3;
     if (as<FloatE5M2Type>(type))

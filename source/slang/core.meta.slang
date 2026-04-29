@@ -1119,6 +1119,7 @@ ${
     case BaseType::Half:
     case BaseType::Float:
     case BaseType::Double:
+    case BaseType::BFloat16:
 $}
     ,  __BuiltinFloatingPointType
     ,  __BuiltinRealType
@@ -1286,6 +1287,7 @@ ${
     case BaseType::Half:
     case BaseType::Float:
     case BaseType::Double:
+    case BaseType::BFloat16:
 $}
         [Differentiable]
         static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
@@ -1708,22 +1710,10 @@ struct FloatE5M2 : IFloatingPointCoopElement
     __init(U val);
 }
 
-/// Represent a 16-bit floating point value with 8 bits of exponent and 7 bits of mantissa.
-[require(spvBFloat16KHR)]
-[require(cuda_sm_8_0)]
-__intrinsic_type($(kIROp_BFloat16Type))
-__magic_type(BFloat16Type)
-struct BFloat16 : IFloatingPointCoopElement
-{
-    __intrinsic_op($(kIROp_CastIntToFloat))
-    __init(int val);
-
-    [OverloadRank(-10)]
-    __intrinsic_op($(kIROp_FloatCast))
-    __generic<U:IFloatingPointCoopElement>
-    __init(U val);
-}
-
+// BFloat16 is now declared as a __BuiltinFloatingPointType via the kBaseTypes[] code-gen loop.
+// Capability enforcement (spvBFloat16KHR, cuda_sm_8_0) is at the backend emit level
+// rather than on the type declaration, because capability atoms are not yet available
+// when the kBaseTypes[] loop runs during early module compilation.
 
 extension<T:__BuiltinFloatingPointType> T
 {
@@ -1734,10 +1724,19 @@ extension<T:__BuiltinFloatingPointType> T
     [OverloadRank(-5)]
     __intrinsic_op($(kIROp_FloatCast))
     __init(FloatE5M2 val);
+}
+
+// BFloat16 operators are now auto-generated via __BuiltinFloatingPointType conformance.
+// Conversions from packed float types (FloatE4M3, FloatE5M2) to BFloat16.
+extension BFloat16
+{
+    [OverloadRank(-5)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __init(FloatE4M3 val);
 
     [OverloadRank(-5)]
     __intrinsic_op($(kIROp_FloatCast))
-    __init(BFloat16 val);
+    __init(FloatE5M2 val);
 }
 
 

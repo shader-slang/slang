@@ -8269,6 +8269,7 @@ bool isFloatingType(IRType* t)
         case BaseType::Float:
         case BaseType::Half:
         case BaseType::Double:
+        case BaseType::BFloat16:
             return true;
         default:
             return false;

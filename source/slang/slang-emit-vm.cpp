@@ -379,6 +379,7 @@ public:
             extCode.scalarBitWidth = 2;
             break;
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
             extCode.scalarType = kSlangByteCodeScalarTypeFloat;
             extCode.scalarBitWidth = 1;
             break;

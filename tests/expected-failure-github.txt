@@ -19,3 +19,11 @@ tests/bugs/array-size-groupshared.slang.1 syn (wgpu)
 tests/bugs/generic-groupshared.slang.2 syn (wgpu)
 tests/compute/groupshared.slang.4 syn (wgpu)
 tests/metal/groupshared-threadlocal-same-parameter.slang.4 syn (wgpu)
+
+# BFloat16 GPU compute tests: CI GPUs report VK_KHR_shader_bfloat16 support
+# but produce wrong results (zeros). Tracking in #10750.
+tests/hlsl-intrinsic/bf16-arithmetic.slang (vk)
+tests/hlsl-intrinsic/bf16-autodiff.slang (vk)
+tests/hlsl-intrinsic/bf16-comparison.slang (vk)
+tests/hlsl-intrinsic/bf16-conversions.slang (vk)
+tests/hlsl-intrinsic/bf16-math.slang (vk)

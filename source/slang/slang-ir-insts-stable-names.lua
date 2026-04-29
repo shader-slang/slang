@@ -696,7 +696,7 @@ return {
 	["setOptiXPayloadRegister"] = 720,
 	["Type.PackedFloatType.FloatE4M3Type"] = 721,
 	["Type.PackedFloatType.FloatE5M2Type"] = 722,
-	["Type.PackedFloatType.BFloat16Type"] = 723,
+	["Type.BasicType.BFloat16"] = 723,
 	["IsCoopFloat"] = 724,
 	["Type.OptionalNoneType"] = 725,
 	["ReinterpretOptional"] = 726,

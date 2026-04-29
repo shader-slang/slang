@@ -660,6 +660,7 @@ SLANG_MAKE_VECTOR(__half)
 #endif
 
 #if SLANG_CUDA_ENABLE_BF16
+SLANG_CUDA_VECTOR_FLOAT_OPS(__nv_bfloat16)
 SLANG_MAKE_VECTOR(__nv_bfloat16)
 #endif
 

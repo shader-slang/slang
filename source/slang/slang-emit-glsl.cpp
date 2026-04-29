@@ -3431,6 +3431,12 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("float16_t");
             return;
         }
+    case kIROp_BFloat16Type:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            type->sourceLoc,
+            "'BFloat16' type is not supported on GLSL target");
+        return;
     case kIROp_StructType:
     case kIROp_PtrType:
         m_writer->emit(getName(type));

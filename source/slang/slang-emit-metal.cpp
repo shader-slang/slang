@@ -1223,6 +1223,12 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_DoubleType:
         SLANG_UNEXPECTED("'double' type emitted");
         return;
+    case kIROp_BFloat16Type:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            type->sourceLoc,
+            "'BFloat16' type is not supported on Metal target");
+        return;
     case kIROp_VectorType:
         {
             auto vecType = (IRVectorType*)type;

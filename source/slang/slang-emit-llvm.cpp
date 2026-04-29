@@ -189,6 +189,7 @@ public:
         case kIROp_Int16Type:
         case kIROp_UInt16Type:
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
             return 16;
         case kIROp_IntType:
         case kIROp_UIntType:
@@ -249,6 +250,7 @@ public:
             break;
 
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
         case kIROp_FloatType:
         case kIROp_DoubleType:
             llvmType = builder->getFloatType(getTypeBits(type));

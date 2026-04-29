@@ -528,6 +528,12 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_f16ExtensionEnabled = true;
         m_writer->emit("f16");
         break;
+    case kIROp_BFloat16Type:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            type->sourceLoc,
+            "'BFloat16' type is not supported on WGSL target");
+        break;
     case kIROp_BoolType:
         m_writer->emit("bool");
         break;
@@ -1114,6 +1120,13 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
                 switch (type->getBaseType())
                 {
+                case BaseType::BFloat16:
+                    SLANG_DIAGNOSE_UNEXPECTED(
+                        getSink(),
+                        inst->sourceLoc,
+                        "'BFloat16' type is not supported on WGSL target");
+                    break;
+
                 default:
 
                 case BaseType::Half:
