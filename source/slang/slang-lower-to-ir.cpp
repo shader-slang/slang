@@ -610,6 +610,11 @@ struct IRGenContext
     // (For use by functions that returns non-copyable types)
     LoweredValInfo returnDestination;
 
+    // True when the function being lowered has a ref-accessor-style return type (IRRefParamType).
+    // A `return` statement in such a function should emit the address of its result rather than a
+    // loaded value so the reference is preserved to callers (needed e.g. for atomic operations).
+    bool returnStmtShouldCoerceToRef = false;
+
     // A reference to the Function decl to identify the parent function
     // that contains the Inst.
     FunctionDeclBase* funcDecl = nullptr;
@@ -4517,9 +4522,11 @@ void _lowerInfoFromFuncParameters(
 
         if (auto refAccessorDeclRef = declRef.as<RefAccessorDecl>())
         {
-            // A `ref` accessor needs to return a *pointer* to the value
-            // being accessed, rather than a simple value.
-            irResultType = builder->getPtrType(irResultType);
+            // A `ref` accessor needs to return a reference to the value being accessed, not a
+            // simple value.  `IRRefParamType` is a pointer-type variant that distinctly marks the
+            // return as a reference, so downstream passes (atomic-destination validation, spirv
+            // legalisation) can see through the call and recognise the underlying buffer pointer.
+            irResultType = builder->getRefParamType(irResultType, AddressSpace::Generic);
         }
     }
 
@@ -8177,7 +8184,23 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             //
             if (!expr->type.type->equals(context->astBuilder->getVoidType()))
             {
-                getBuilder()->emitReturn(getSimpleVal(context, loweredExpr));
+                IRInst* resultInst = nullptr;
+                if (context->returnStmtShouldCoerceToRef)
+                {
+                    // The enclosing function returns an `IRRefParamType`, so we want to pass the
+                    // address of the returned expression rather than its loaded value.  This
+                    // preserves the underlying pointer (and its address space) to the caller.
+                    //
+                    // `MakeRefExpr` / `ExplicitRef` may not expose an address, in which case we
+                    // fall back to the value path.
+                    auto address =
+                        tryGetAddress(context, loweredExpr, TryGetAddressMode::Aggressive);
+                    if (address.flavor == LoweredValInfo::Flavor::Ptr)
+                        resultInst = address.val;
+                }
+                if (!resultInst)
+                    resultInst = getSimpleVal(context, loweredExpr);
+                getBuilder()->emitReturn(resultInst);
             }
             else
             {
@@ -12955,6 +12978,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         auto irFuncType = info.type;
         auto& irResultType = info.resultType;
+        if (as<IRRefParamType>(irResultType))
+            subContext->returnStmtShouldCoerceToRef = true;
         auto& parameterLists = info.parameterLists;
         auto& paramTypes = info.paramTypes;
 
