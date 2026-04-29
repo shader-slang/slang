@@ -171,6 +171,19 @@ func zoneRegion(zone string) string {
 	return parts[0] + "-" + parts[1]
 }
 
+func validateZones(zones []string) error {
+	var invalidZones []string
+	for _, zone := range zones {
+		if zoneRegion(zone) == "" {
+			invalidZones = append(invalidZones, zone)
+		}
+	}
+	if len(invalidZones) > 0 {
+		return fmt.Errorf("invalid zone(s): %s", strings.Join(invalidZones, ", "))
+	}
+	return nil
+}
+
 // selectZones picks candidate zones for creating a VM. For GPU VMs, it checks
 // quota availability across regions. For non-GPU VMs (GPUType == "none"),
 // it round-robins through configured zones.
@@ -182,6 +195,9 @@ func (m *Manager) selectZones(ctx context.Context) ([]zoneCandidate, error) {
 	zones := splitZones(m.config.Zones)
 	if len(zones) == 0 {
 		return nil, fmt.Errorf("no zones configured")
+	}
+	if err := validateZones(zones); err != nil {
+		return nil, err
 	}
 
 	// Non-GPU VMs: simple round-robin, no quota check needed
@@ -200,9 +216,6 @@ func (m *Manager) selectZones(ctx context.Context) ([]zoneCandidate, error) {
 	regionOrder := make(map[string]int)
 	for _, z := range zones {
 		region := zoneRegion(z)
-		if region == "" {
-			continue
-		}
 		if _, ok := regionOrder[region]; !ok {
 			regionOrder[region] = len(regionOrder)
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -203,6 +204,23 @@ func TestSelectZoneErrorsOnEmptyCandidates(t *testing.T) {
 
 	if _, err := m.selectZone(context.Background()); err == nil {
 		t.Fatal("selectZone should fail for empty candidate list")
+	}
+}
+
+func TestSelectZonesErrorsOnInvalidZone(t *testing.T) {
+	m := &Manager{
+		config: ManagerConfig{
+			Zones:   "us-east1-d,invalid-zone",
+			GPUType: "nvidia-l4",
+		},
+	}
+
+	_, err := m.selectZones(context.Background())
+	if err == nil {
+		t.Fatal("selectZones should fail for invalid zone config")
+	}
+	if !strings.Contains(err.Error(), "invalid-zone") {
+		t.Fatalf("selectZones error = %q, want invalid zone name", err)
 	}
 }
 

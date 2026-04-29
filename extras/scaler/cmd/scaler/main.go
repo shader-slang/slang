@@ -380,8 +380,8 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 	requestDrain := func(reason string) {
 		drainOnce.Do(func() {
 			logger.Info("entering drain mode: no new jobs will be accepted, waiting for running VMs to finish", "reason", reason)
-			lst.SetMaxRunners(0)
 			gcpScaler.setDraining(true)
+			lst.SetMaxRunners(0)
 		})
 	}
 
