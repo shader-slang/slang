@@ -570,8 +570,45 @@ int runDispatch(const Options& opt)
     if (diagnostics)
         std::fprintf(stderr, "%s", (const char*)diagnostics->getBufferPointer());
 
+    // Query the coverage buffer's (set, binding) from the linked
+    // program's metadata. The synthesized buffer is not in Slang's
+    // public reflection, so we declare it as an extra descriptor
+    // binding on the slang-rhi program — slang-rhi includes the
+    // slot in the pipeline layout and we bind a buffer to it via
+    // `setExtraBinding` below. This is the canonical Tier-2
+    // integration path for compiler-synthesized resources.
+    ExtraDescriptorBinding coverageExtra = {};
+    bool haveCoverageExtra = false;
+    {
+        ComPtr<slang::IBlob> diag;
+        ComPtr<slang::IMetadata> metadata;
+        if (SLANG_SUCCEEDED(
+                linked->getEntryPointMetadata(0, 0, metadata.writeRef(), diag.writeRef())))
+        {
+            auto* coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
+                slang::ICoverageTracingMetadata::getTypeGuid());
+            if (coverage && coverage->getCounterCount() > 0)
+            {
+                int32_t covSpace = coverage->getBufferSpace();
+                int32_t covBinding = coverage->getBufferBinding();
+                if (covSpace >= 0 && covBinding >= 0)
+                {
+                    coverageExtra.set = (uint32_t)covSpace;
+                    coverageExtra.binding = (uint32_t)covBinding;
+                    coverageExtra.bindingType = slang::BindingType::MutableRawBuffer;
+                    haveCoverageExtra = true;
+                }
+            }
+        }
+    }
+
     ShaderProgramDesc progDesc = {};
     progDesc.slangGlobalScope = linked;
+    if (haveCoverageExtra)
+    {
+        progDesc.extraDescriptorBindings = &coverageExtra;
+        progDesc.extraDescriptorBindingCount = 1;
+    }
     ComPtr<ISlangBlob> rhiDiag;
     ComPtr<IShaderProgram> shaderProgram;
     Result spResult =
@@ -652,22 +689,23 @@ int runDispatch(const Options& opt)
         cursor["particles"].setBinding(partBuf);
         cursor["Params"]["particleCount"].setData(particleCount);
         cursor["Params"]["dt"].setData(0.016f);
-        // Probe whether the reflection system knows about the
-        // synthesized coverage buffer. `ShaderCursor::isValid()`
-        // lets us detect the reflection-integration gap rather than
-        // dereferencing a stale cursor and crashing.
-        ShaderCursor covCursor = cursor["__slang_coverage"];
-        if (covCursor.isValid())
+        // Bind the coverage buffer at the (set, binding) declared on
+        // the program via `extraDescriptorBindings`. The buffer is
+        // intentionally not in Slang's public reflection, so the
+        // cursor-by-name path used for ordinary resources doesn't
+        // apply — `setExtraBinding` is the canonical path for
+        // compiler-synthesized slots.
+        if (haveCoverageExtra)
         {
-            covCursor.setBinding(covBuf);
+            rootObject->setExtraBinding(coverageExtra.set, coverageExtra.binding, covBuf);
         }
         else if (step == 0)
         {
             std::fprintf(
                 stderr,
-                "[dispatch] NOTE: `__slang_coverage` not found in reflection;\n"
-                "[dispatch] the shader will still run but counters will stay 0.\n"
-                "[dispatch] (follow-up work: make synthesized buffer reflection-visible)\n");
+                "[dispatch] NOTE: no coverage metadata reported a buffer slot for backend "
+                "'%s'; skipping bind.\n",
+                opt.backend.c_str());
         }
         uint32_t groups = (particleCount + 63) / 64;
         passEnc->dispatchCompute(groups, 1, 1);

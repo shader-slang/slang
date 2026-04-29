@@ -18,10 +18,10 @@ host-side helper library `slang-coverage-rt`. Runs in three modes:
   previous dispatch run, or any compatible host.
 
 - **`--mode=dispatch`** — Full compile → bind → dispatch → readback →
-  LCOV pipeline via slang-rhi. Works end-to-end on CPU, Vulkan, D3D12
-  and CUDA, producing byte-identical LCOV across all four backends.
-  Metal runs but has pre-existing slang-rhi quirks (see *Backend
-  status matrix*).
+  LCOV pipeline via slang-rhi. End-to-end verified on Vulkan via the
+  new `ExtraDescriptorBinding` slang-rhi API; other backends await
+  the matching per-backend slang-rhi work. See *Backend status
+  matrix* for the per-backend details.
 
 ## Usage
 
@@ -32,12 +32,16 @@ to HTML. Platform-specific rendering commands are in
 [Rendering the report](#rendering-the-report) below.
 
 ```bash
-# Step 1: run the demo. Pick any of: cpu, vulkan, d3d12, cuda.
-./build/Debug/bin/shader-coverage-demo --mode=dispatch --backend=cpu
+# Step 1: run the demo on Vulkan (the verified end-to-end backend).
+./build/Debug/bin/shader-coverage-demo --mode=dispatch --backend=vulkan
 # → produces coverage.lcov and simulate.coverage-mapping.json
 
 # Step 2: render. See "Rendering the report" below for your platform.
 ```
+
+Other backends (cpu/d3d12/cuda/metal) currently work in
+`--mode=compile` but await per-backend slang-rhi `ExtraDescriptorBinding`
+support for `--mode=dispatch`. See *Backend status matrix* below.
 
 ### Pinning the coverage buffer at a specific (index, space)
 
@@ -48,21 +52,12 @@ useful when the host needs the slot fixed before reflection runs
 (e.g. a pre-built D3D12 root signature):
 
 ```bash
-# Works end-to-end on every supported runtime backend (cpu/vulkan/d3d12/cuda).
+# End-to-end verified on Vulkan via the new ExtraDescriptorBinding API.
 ./build/Debug/bin/shader-coverage-demo \
     --mode=dispatch --backend=vulkan \
     --coverage-binding=7:0
 # → __slang_coverage lands at DescriptorSet 0, Binding 7
 # → "[coverage] binding pinned at (index=7, space=0) — round-trip verified"
-
-# Non-zero descriptor space (M ≠ 0) currently works on D3D12 only;
-# Vulkan and WebGPU skip cleanly until a slang-rhi follow-up lands
-# (see the "Non-zero descriptor space" caveat below).
-./build/Debug/bin/shader-coverage-demo \
-    --mode=dispatch --backend=d3d12 \
-    --coverage-binding=7:3
-# → __slang_coverage lands at register(u7, space3) in the D3D12 root signature
-# → "[coverage] binding pinned at (index=7, space=3) — round-trip verified"
 ```
 
 After the dispatch, the demo asserts via the
@@ -73,25 +68,22 @@ into a uniform-offset struct rather than exposing them at
 silently has no effect (the demo prints a `[coverage] note: …`
 explaining this).
 
-> **Non-zero descriptor space:** the underlying Slang reflection
-> bug (`DescriptorSetInfo::spaceOffset` never being assigned) was
-> fixed in `feature/shader-coverage` alongside the
-> `-trace-coverage-binding` work, so **D3D12 now handles
-> `--coverage-binding=N:M` with `M != 0` end-to-end**. Vulkan and
-> WebGPU still need follow-up work in slang-rhi's binding-data
-> builder, which assumes ≤ 1 descriptor set per shader object. The
-> demo refuses to dispatch on those backends with non-zero space
-> and prints a clear `[coverage] skip: …` message rather than
-> letting the `SLANG_RHI_ASSERT` fire mid-dispatch. CPU and CUDA
-> are unaffected because they don't use (set, register). Tracked
-> in shader-slang/slang#10959.
+> **Non-zero descriptor space:** D3D12 handles
+> `--coverage-binding=N:M` with `M != 0` end-to-end. Vulkan and
+> WebGPU require slang-rhi's binding-data builder to support more
+> than one descriptor set per shader object; the demo refuses to
+> dispatch on those backends with non-zero space and prints a
+> clear `[coverage] skip: …` message rather than letting the
+> `SLANG_RHI_ASSERT` fire mid-dispatch. CPU and CUDA are
+> unaffected because they don't use (set, register). Tracked in
+> shader-slang/slang#10959.
 
-CPU, Vulkan, D3D12 and CUDA produce **byte-identical LCOV output** —
-same hit counts per source line — which validates that instrumentation
-semantics, slot assignment, and binding work consistently across
-backends. D3D12 and Vulkan have been validated on desktop Windows
-with NVIDIA drivers; CPU runs via the slang-rhi CPU backend; CUDA
-requires an NVIDIA CUDA runtime.
+Vulkan dispatch produces real per-line LCOV (e.g. `DA:31,512` =
+64 particles × 8 dispatches = 512 hits per always-executed line),
+verified on macOS via MoltenVK. Other backends produce correct
+compile output but their dispatch path is gated on per-backend
+slang-rhi `ExtraDescriptorBinding` rollout — see the matrix
+below.
 
 ### Separate compile + report (no GPU required)
 
@@ -205,13 +197,26 @@ demo and open `coverage-html/index.html` to see the current values.
 
 ## Backend status matrix
 
-| Backend | `--mode=compile` | `--mode=dispatch` |
+The compiler-side instrumentation (counter ops, IR-time buffer
+synthesis, `ICoverageTracingMetadata` generation) works on every
+backend. Dispatch via slang-rhi additionally requires the
+`ExtraDescriptorBinding` machinery to be implemented per-backend.
+Vulkan is the first backend with that support; others are scoped as
+follow-ups.
+
+Customers integrating directly against raw graphics APIs (Tier 1 —
+RTX Remix, Omniverse, custom engines) are not affected by the per-
+backend slang-rhi rollout: they declare the slot through their
+native pipeline-layout / root-signature API based on
+`ICoverageTracingMetadata`.
+
+| Backend | `--mode=compile` | `--mode=dispatch` (via slang-rhi) |
 |---|---|---|
-| `cpu` | Supported | **Fully supported** — clean non-zero counter values, complete LCOV report, dead-code detection verified |
-| `vulkan` (incl. SPIR-V) | Supported | **Fully supported** for default and `--coverage-binding=N:0` — validated on macOS (MoltenVK) and desktop Windows with NVIDIA drivers; byte-identical LCOV to CPU. **Caveat:** `--coverage-binding=N:M` with `M != 0` is gated by a slang-rhi limitation (≤1 descriptor set per shader object); the demo refuses to dispatch in this case with a clear skip message. Tracked in shader-slang/slang#10959. |
-| `d3d12` | Supported | **Fully supported** including `--coverage-binding=N:M` with non-zero `M` — validated on desktop Windows. The Slang reflection fix on this branch unblocks the multi-space root-signature path; round-trip metadata + non-zero counter readback confirm end-to-end correctness. |
-| `cuda` | Supported | **Fully supported** — validated on desktop Windows with NVIDIA CUDA runtime; byte-identical LCOV to CPU/Vulkan/D3D12 |
-| `metal` | Supported (with benign unused-variable warnings from Metal's compiler) | Pipeline builds; dispatch runs; but counter values are unreliable — most slots are zero while others show overflow-like values. **Not a coverage-feature issue** — a pre-existing slang-rhi Metal binding / initialization quirk. Tracked at [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724). |
+| `vulkan` (incl. SPIR-V) | Supported | **Verified end-to-end** via `ExtraDescriptorBinding` + `setExtraBinding`. Real per-line LCOV produced on macOS/MoltenVK. Default and `--coverage-binding=N:0` work; `--coverage-binding=N:M` with `M != 0` blocked by a separate slang-rhi multi-set limitation (shader-slang/slang#10959). |
+| `cpu` | Supported | Pending — slang-rhi CPU backend needs the same `ExtraDescriptorBinding` merge applied to its global-uniform packing. |
+| `d3d12` | Supported | Pending — same `ExtraDescriptorBinding` design extends to root-signature merging. |
+| `cuda` | Supported | Pending — slang-rhi CUDA path packs globals as kernel parameters; needs equivalent extras handling. |
+| `metal` | Supported (with benign unused-variable warnings from Metal's compiler) | Pending — same per-backend rollout. Note: a separate pre-existing slang-rhi Metal binding quirk (shader-slang/slang-rhi#724) causes counter values to be unreliable; that's independent of the `ExtraDescriptorBinding` work. |
 
 ## SPIR-V integration (Vulkan, custom engines)
 
@@ -226,7 +231,13 @@ properties a Vulkan host needs:
 | Native atomic instructions for counters | One `OpAtomicIAdd` per counter op |
 | Coverage buffer exposed in entry-point interface | `OpEntryPoint GLCompute %computeMain "main" %Params %particles %...InvocationID %__slang_coverage` |
 | Source-level debug info | `OpSource Slang 1` preserved (for debug tooling) |
-| Reflection visibility | `__slang_coverage` appears in `slangc -reflection-json` and resolves via standard `ShaderCursor["__slang_coverage"]` |
+| Descriptor decoration on the buffer | `OpDecorate %__slang_coverage DescriptorSet 0 Binding N` (where N is the metadata-reported binding) |
+
+The buffer is **not** in Slang's public reflection (no
+`ShaderCursor["__slang_coverage"]` resolution) — it's synthesized at
+IR time and surfaced via `slang::ICoverageTracingMetadata`. Hosts
+declare the slot in their own pipeline-layout API based on the
+metadata-reported `(set, binding)`.
 
 ### For engines that don't use slang-rhi
 
@@ -292,67 +303,22 @@ same data via `slang::ICoverageTracingMetadata` on the artifact's
 `writeManifestFromMetadata` helper in `main.cpp` for a concrete
 example.
 
-## History / design notes
+## Notes for host integrators
 
-Earlier revisions of this feature synthesized `__slang_coverage` at
-IR-pass time — after Slang's AST-derived reflection tree had already
-been frozen. That meant `ShaderCursor["__slang_coverage"]` returned
-an invalid cursor on all backends, the buffer was never actually
-bound at dispatch, and the demo's dispatch mode produced zeroed
-counters. The architectural fix was to synthesize the buffer as an
-AST-level `VarDecl` during semantic checking, before parameter
-binding runs, so every downstream layer (reflection, layout, target
-codegen) treats it identically to a user-declared global. That
-change lives in `source/slang/slang-check-synthesize-coverage.{h,cpp}`.
+- **Use `=` for `loadModule`, not `ComPtr::attach()`.**
+  `slang::ISession::loadModule()` returns a module pointer that the
+  session keeps its own ref on, so callers must `AddRef`. The `=`
+  form (`ComPtr<IModule> m = session->loadModule(...)`) is correct;
+  `.attach()` causes a double-release that surfaces as heap
+  corruption on Windows D3D12/CUDA/CPU device teardown.
+- **Non-zero descriptor space (Vulkan / WebGPU).** Vulkan and WebGPU
+  through slang-rhi currently require `space == 0`. The demo refuses
+  to dispatch on those backends with non-zero space and prints a
+  clear `[coverage] skip` message. D3D12 handles non-zero spaces
+  end-to-end. Tracked in shader-slang/slang#10959.
 
-The practical consequence: any backend that correctly handles a
-user-declared `RWStructuredBuffer<uint>` + `kIROp_AtomicAdd` also
-correctly handles coverage. Validated empirically on cpu, vulkan,
-d3d12 and cuda — all four produce byte-identical counter output.
-
-One host-side gotcha worth flagging: `slang::ISession::loadModule()`
-returns a module pointer that the session keeps its own ref on.
-Callers must `AddRef` (e.g. `ComPtr<IModule> m = session->loadModule(...)`)
-rather than steal the pointer via `ComPtr::attach()`. An early
-revision of this demo used `.attach()`, which left the caller and
-session sharing a single ref; the resulting double-release surfaced
-as heap corruption on Windows D3D12/CUDA/CPU device teardown while
-going silently unnoticed on macOS. Every other Slang example uses
-the `=` form; reuse that pattern.
-
-A second compiler-side issue surfaced when adding
-`--coverage-binding`: `__slang_coverage` was synthesized once per
-module being checked, so a multi-file shader (`simulate.slang`
-imports `physics.slang`) ended up with two synthesized buffers, both
-pinned to the same explicit `(register, space)`. HLSL emit
-deduplicated by name but parameter binding kept both entries; D3D12
-root-signature creation rejected the duplicate slot. The synthesizer
-now walks transitively imported modules and reuses an existing
-`__slang_coverage` rather than adding a duplicate. Vulkan + macOS
-allocators tolerated the duplicate, which is why the bug only
-surfaced when D3D12 + explicit binding was first exercised.
-
-A third issue, found while validating the multi-module fix on
-Windows D3D12, turned out to be unrelated to coverage: any HLSL
-`register(_, spaceN)` or Vulkan `[[vk::binding(_, N)]]` with
-`N != 0` mis-binds through slang-rhi because Slang's
-`_findOrAddDescriptorSet` allocated `DescriptorSetInfo` instances
-without ever assigning their `spaceOffset` field. Reflection's
-high-level per-parameter `binding.space` JSON output was correct
-(it goes through a different code path), but
-`getDescriptorSetSpaceOffset(setIndex)` always returned 0 — which
-is what slang-rhi backends use to lay out their descriptor tables.
-On D3D12 this produced a root-signature collision; on Vulkan it
-silently mis-bound the buffer to a different descriptor set than
-the SPIR-V was decorated with, and the shader's writes never
-reached our buffer (counters came back zero). The Slang half was
-fixed in the parent compiler PR; the demo's post-dispatch sum
-check refused to write a misleading zero-counter LCOV in the
-meantime. D3D12 now works end-to-end including with
-`--coverage-binding=N:M, M != 0`. Vulkan and WebGPU still need
-slang-rhi's binding-data builder to grow multi-descriptor-set
-support; the demo skips those cases with a clear message.
-Tracked in shader-slang/slang#10959.
+For the design rationale and pipeline architecture, see
+[`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md).
 
 ## Scenarios (future expansion)
 

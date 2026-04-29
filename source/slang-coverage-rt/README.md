@@ -18,6 +18,39 @@ For a runnable end-to-end sample, see
 
 ---
 
+## How this library fits
+
+`slang-coverage-rt` is the **graphics-API-independent** half of the
+host-side story. It handles parsing the manifest, accumulating
+counter snapshots, and emitting LCOV. It deliberately doesn't know
+about Vulkan / D3D12 / CUDA / Metal — your host already knows how
+to bind a buffer in its own API, and the library hands you the
+information needed to do so.
+
+Customer-side integration falls into three tiers:
+
+- **Tier 1 — raw graphics API.** RTX Remix, Omniverse, game engines
+  with their own RHI, custom Vulkan/D3D12/CUDA hosts. The library +
+  `slang::ICoverageTracingMetadata` are the entire integration:
+  query `(set, binding)`, declare in your pipeline-layout / root-
+  signature, allocate the buffer, bind, dispatch, read back, feed
+  to `slang_coverage_accumulate`, save LCOV.
+- **Tier 2 — slang-rhi-based hosts.** slangpy, slang-test, indie or
+  educational projects already on slang-rhi. The library is still
+  the Tier-1 surface for parsing/accumulating/serializing; on top
+  of that, slang-rhi's `ShaderProgramDesc::extraDescriptorBindings`
+  + `IShaderObject::setExtraBinding` provide the binding path so
+  you don't write descriptor declarations directly.
+- **Tier 3 — start from the demo.** Anyone wanting a working
+  reference forks `examples/shader-coverage-demo` and adapts it.
+  The demo is built on Tier 2 (slang-rhi); Tier-1 customers swap
+  the dispatch loop for their own RHI.
+
+This library is the only host-side dependency for Tier 1 customers,
+and one of two for Tier 2 (the other being slang-rhi).
+
+---
+
 ## Integration in ~30 lines of host code
 
 ```c
@@ -144,15 +177,25 @@ codes are listed below for matching against expected error paths.
 | `SLANG_E_CANNOT_OPEN` | Manifest read or LCOV write failed (file existed but I/O failed). |
 | `SLANG_FAIL` | Manifest is not well-formed v1 JSON, or declares an unsupported `version`. |
 
-### Migration from the 2026-04-24 preview
+### Migrating older host code
 
-The previous preview's API used a custom `SlangCoverageResult`
-enum with codes like `SLANG_COVERAGE_OK`. As of this preview, all
-functions return `SlangResult` (matching the rest of the Slang C
-API), error codes map to existing `SLANG_E_*` constants, and
-`SlangCoverageBindingInfo` gained a leading `size_t structSize`
-field for ABI-versioned struct growth (populated by
-`slang_coverage_binding`).
+If you have host code written against an older preview, two
+patterns may need updating:
+
+**Reflection-cursor binding for `__slang_coverage` (slang-rhi
+hosts).** The buffer is not in Slang's public reflection. Replace
+any `cursor["__slang_coverage"].setBinding(buf)` with the
+`ExtraDescriptorBinding` field on `ShaderProgramDesc` plus
+`IShaderObject::setExtraBinding(set, binding, Binding(buf))` at
+dispatch time. See `examples/shader-coverage-demo/main.cpp` for
+the canonical pattern. Tier 1 hosts (raw Vulkan / D3D12 / CUDA)
+are unaffected — they read the binding from
+`ICoverageTracingMetadata` and declare the slot in their own
+pipeline-layout API as usual.
+
+**`SlangCoverageResult` enum.** Replaced by `SlangResult`. Map old
+codes to new per the table below, or use `SLANG_FAILED(r)` for a
+uniform failure check.
 
 If your existing host code compiles against the new headers and
 fails with errors like `'SLANG_COVERAGE_OK' was not declared`,
@@ -169,10 +212,9 @@ uniform failure check.
 | `SLANG_COVERAGE_ERROR_UNSUPPORTED_VERSION` | `SLANG_FAIL`          |
 | `SLANG_COVERAGE_ERROR_OUT_OF_RANGE`        | `SLANG_E_INVALID_ARG` |
 
-`slang_coverage_accumulate` also tightened its `count` check: it
-now requires exactly `slang_coverage_counter_count(ctx)` values
-(previously a short snapshot was silently accepted). Pass-through
-callers that always passed the correct size aren't affected.
+`slang_coverage_accumulate` requires `count` to equal
+`slang_coverage_counter_count(ctx)` exactly; mismatched sizes
+return `SLANG_E_INVALID_ARG`.
 
 ---
 
