@@ -116,9 +116,19 @@ elseif(
                     ${CMAKE_COMMAND} -E tar xzf "${_dxc_probe_tarball}"
                     lib/libdxcompiler.so lib/libdxil.so
                 WORKING_DIRECTORY "${_dxc_probe_dir}"
+                RESULT_VARIABLE _tar_result
                 OUTPUT_QUIET
                 ERROR_QUIET
             )
+            if(NOT _tar_result EQUAL 0)
+                message(
+                    WARNING
+                    "Failed to extract shared libraries from DXC prebuilt "
+                    "tarball (exit ${_tar_result}). "
+                    "GLIBC requirement detection skipped. "
+                    "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON if DXC is required."
+                )
+            endif()
 
             find_program(_dxc_objdump NAMES objdump)
             find_program(_dxc_readelf NAMES readelf)
