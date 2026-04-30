@@ -381,8 +381,19 @@ internal struct SharedMemorySizeForLayer<
     // With MMAHelperNew (CUDA + OptimalLayout), forward and backward MMA
     // use zero shmem (LoadRaw + FromLocal). This term only applies to
     // the legacy shmem-based MMAHelper/TiledMMAHelper paths (non-CUDA).
-    static const uint BytesForMMA =
-        (ShMemInfo.SharedMemSizeInVectorMatA + (ShMemInfo.SharedMemSizeInVectorMatC) * SubgroupCount) * sizeof(uint4);
+    //
+    // Metal: on-demand per-k fromVectorViaShMem for both half and float.
+    // Shmem per warp = SubgroupSize * TileWidthUint4 (in uint4 units).
+    // Half: 8 halfs / 8 per uint4 = 1 uint4 per lane.
+    // Float: 8 floats / 4 per uint4 = 2 uint4s per lane (stored as bit_cast, not converted to half).
+    static const int MetalTile_ = 8;
+    static const int MetalElemsPerUint4_ = sizeof(uint4) / sizeof(T);
+    static const int MetalTileWidthUint4_ = (MetalTile_ + MetalElemsPerUint4_ - 1) / MetalElemsPerUint4_;
+    static const uint MetalBytes =
+        uint(SubgroupCount) * uint(SubgroupSize * MetalTileWidthUint4_) * sizeof(uint4);
+    static const uint BytesForMMA = (Target == TargetEnum.Metal)
+        ? MetalBytes
+        : (ShMemInfo.SharedMemSizeInVectorMatA + (ShMemInfo.SharedMemSizeInVectorMatC) * SubgroupCount) * sizeof(uint4);
 
     // Cross-warp butterfly reduction for outer product.
     // The first butterfly pass has G/2 warps storing simultaneously, each
@@ -413,7 +424,7 @@ internal struct SharedMemorySizeForLayer<
         (SubgroupCount * SubgroupSize * HeightInVecB_SR + SubgroupCount * TileStrideVec_SR * CMShape.ROW_C) * sizeof(uint4)
         + ((SubgroupCount * MPadded_SR * sizeof(T) + sizeof(uint4) - 1) / sizeof(uint4)) * sizeof(uint4);
 
-    static const uint Bytes = Max(Max(Max(BytesForMMA, BytesForOuterProductStore),
+    public static const uint Bytes = Max(Max(Max(BytesForMMA, BytesForOuterProductStore),
                                           BytesForCrossWarpReduction),
                                                 BytesForSumReduceRows);
 }
