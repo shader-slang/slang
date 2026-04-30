@@ -205,10 +205,10 @@ Vulkan is the first backend with that support; others are scoped as
 follow-ups.
 
 Customers integrating directly against raw graphics APIs (Tier 1 —
-RTX Remix, Omniverse, custom engines) are not affected by the per-
-backend slang-rhi rollout: they declare the slot through their
-native pipeline-layout / root-signature API based on
-`ICoverageTracingMetadata`.
+production engines, custom shader runtimes, content-creation
+applications) are not affected by the per-backend slang-rhi
+rollout: they declare the slot through their native pipeline-
+layout / root-signature API based on `ICoverageTracingMetadata`.
 
 | Backend | `--mode=compile` | `--mode=dispatch` (via slang-rhi) |
 |---|---|---|

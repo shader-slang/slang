@@ -29,9 +29,10 @@ information needed to do so.
 
 Customer-side integration falls into three tiers:
 
-- **Tier 1 — raw graphics API.** RTX Remix, Omniverse, game engines
-  with their own RHI, custom Vulkan/D3D12/CUDA hosts. The library +
-  `slang::ICoverageTracingMetadata` are the entire integration:
+- **Tier 1 — raw graphics API.** Production engines with their own
+  RHI, custom Vulkan/D3D12/CUDA hosts, content-creation
+  applications. The library + `slang::ICoverageTracingMetadata`
+  are the entire integration:
   query `(set, binding)`, declare in your pipeline-layout / root-
   signature, allocate the buffer, bind, dispatch, read back, feed
   to `slang_coverage_accumulate`, save LCOV.
@@ -247,8 +248,8 @@ test-suite use cases that's the right pick:
   `RPATH` / `LD_LIBRARY_PATH` games on Linux.
 
 A shared-library shape is appropriate when **the host distributes the
-library to plugin authors** — for example, an application runtime
-(Omniverse, a game engine) wanting plugins to share one coverage
+library to plugin authors** — for example, a game engine or
+content-creation application wanting plugins to share one coverage
 runtime so reports aggregate cleanly across plugins. In that mode the
 ABI matters across versions; the public header's `structSize`-prefixed
 structs (currently `SlangCoverageBindingInfo`) provide the version-
