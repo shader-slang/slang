@@ -182,7 +182,7 @@ if (-not $jitConfig) {
     exit 1
 }
 
-Write-Log "JIT config retrieved (${($jitConfig.Length)} chars)"
+Write-Log "JIT config retrieved ($($jitConfig.Length) chars)"
 
 # Step 2: Log GPU and system info
 Write-Log "=== System Information ==="
