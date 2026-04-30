@@ -579,12 +579,12 @@ func (m *Manager) listTerminatedVMNames(ctx context.Context, zone string) ([]str
 }
 
 func liveFilter(vmPrefix string) string {
-	return fmt.Sprintf("name=%s-* AND (status=PROVISIONING OR status=STAGING OR status=RUNNING)", vmPrefix)
+	return fmt.Sprintf("name=%s-* AND (status=PROVISIONING OR status=STAGING OR status=RUNNING OR status=REPAIRING)", vmPrefix)
 }
 
 func isLiveStatus(status string) bool {
 	switch status {
-	case "PROVISIONING", "STAGING", "RUNNING":
+	case "PROVISIONING", "STAGING", "RUNNING", "REPAIRING":
 		return true
 	default:
 		return false

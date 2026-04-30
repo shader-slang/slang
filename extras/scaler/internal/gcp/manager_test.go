@@ -21,7 +21,7 @@ func TestCleanupFilter(t *testing.T) {
 
 func TestLiveFilter(t *testing.T) {
 	got := liveFilter("linux-test")
-	want := "name=linux-test-* AND (status=PROVISIONING OR status=STAGING OR status=RUNNING)"
+	want := "name=linux-test-* AND (status=PROVISIONING OR status=STAGING OR status=RUNNING OR status=REPAIRING)"
 	if got != want {
 		t.Fatalf("liveFilter() = %q, want %q", got, want)
 	}
@@ -32,6 +32,7 @@ func TestIsLiveStatus(t *testing.T) {
 		"PROVISIONING": true,
 		"STAGING":      true,
 		"RUNNING":      true,
+		"REPAIRING":    true,
 		"STOPPING":     false,
 		"TERMINATED":   false,
 		"":             false,
