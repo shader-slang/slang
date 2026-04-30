@@ -1541,12 +1541,16 @@ static bool typeCheck(IROp op, uint32_t matrixUse)
     {
     case SLANG_COOPERATIVE_MATRIX_USE_A:
     case SLANG_COOPERATIVE_MATRIX_USE_B:
-        // PTX m16n8k16 supports both f16 and bf16 inputs.
-        return op == kIROp_HalfType || op == kIROp_BFloat16Type;
+        // PTX m16n8k16 supports f16, bf16, and 8-bit integer (s8 / u8) inputs.
+        return op == kIROp_HalfType || op == kIROp_BFloat16Type ||
+               op == kIROp_Int8Type || op == kIROp_UInt8Type;
     case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR:
-        // bf16 MMA only allows an f32 accumulator on PTX, so the accumulator type
-        // can only be half or float here regardless of input element type.
-        return op == kIROp_HalfType || op == kIROp_FloatType;
+        // bf16 MMA only allows an f32 accumulator on PTX, and integer mma only
+        // allows an s32 accumulator, so this is the union of the legal accumulator
+        // element types across all currently-supported A/B element types. (Type
+        // pair compatibility itself is checked structurally by the emitted helper
+        // dispatch in `Slang_CUDA_WMMA::coopMatMulAdd`.)
+        return op == kIROp_HalfType || op == kIROp_FloatType || op == kIROp_IntType;
     }
     return false;
 }
