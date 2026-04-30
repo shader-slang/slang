@@ -3579,6 +3579,12 @@ bool isUnsizedArrayType(Type* type);
 
 bool isInterfaceType(Type* type);
 
+/// Returns true if `type` is or transitively contains an interface type,
+/// used to reject `bit_cast` where either end would touch a
+/// compiler-managed existential header.  `astBuilder` is required so that
+/// generic struct fields are substituted through the instantiated DeclRef.
+bool typeInvolvesInterface(ASTBuilder* astBuilder, Type* type);
+
 bool isImmutableBufferType(Type* type);
 
 // Check if `type` is nullable. An `Optional<T>` will occupy the same space as `T`, if `T`

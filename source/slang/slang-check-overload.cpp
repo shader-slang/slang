@@ -3033,6 +3033,41 @@ String SemanticsVisitor::getCallSignatureString(OverloadResolveContext& context)
     return argsListBuilder.produceString();
 }
 
+// Unwraps the common wrappers around a callee expression (paren, generic
+// application, partial application) and returns the IR opcode for an
+// intrinsic callee (via `IntrinsicOpModifier` on the inner FuncDecl), or
+// kIROp_Nop if the callee is not an intrinsic.
+static IROp getCalleeIntrinsicOp(Expr* funcExpr)
+{
+    for (;;)
+    {
+        if (auto parenExpr = as<ParenExpr>(funcExpr))
+            funcExpr = parenExpr->base;
+        else if (auto genericAppExpr = as<GenericAppExpr>(funcExpr))
+            funcExpr = genericAppExpr->functionExpr;
+        else if (auto partiallyApplied = as<PartiallyAppliedGenericExpr>(funcExpr))
+            funcExpr = partiallyApplied->baseExpr;
+        else
+            break;
+    }
+    auto declRefExpr = as<DeclRefExpr>(funcExpr);
+    if (!declRefExpr)
+        return kIROp_Nop;
+    auto decl = declRefExpr->declRef.getDecl();
+    if (!decl)
+        return kIROp_Nop;
+    // The IntrinsicOpModifier lives on the inner FuncDecl, not on the surrounding
+    // GenericDecl that name-lookup returns for generic builtins.
+    if (auto genericDecl = as<GenericDecl>(decl))
+        decl = genericDecl->inner;
+    if (!decl)
+        return kIROp_Nop;
+    auto intrinsicOp = decl->findModifier<IntrinsicOpModifier>();
+    if (!intrinsicOp)
+        return kIROp_Nop;
+    return (IROp)intrinsicOp->op;
+}
+
 Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 {
     OverloadResolveContext context;
@@ -3048,10 +3083,64 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 
     maybeExpandArgList(expr->arguments);
 
+    IROp calleeIntrinsicOp = getCalleeIntrinsicOp(funcExpr);
+
+    // Reject `bit_cast` where either end (result type or any argument) is or
+    // contains an interface type.  Use `createDynamicObject` /
+    // `serializeDynamicObject` for existential<->raw conversion instead; the
+    // existential's memory layout is a compiler-managed detail that must not
+    // leak through `bit_cast`.  Check the argument types BEFORE the opening
+    // loop below so we see the original interface types, not the extracted
+    // concrete payloads.
+    if (calleeIntrinsicOp == kIROp_BitCast)
+    {
+        // Argument-type check catches the forward-direction cases
+        // `bit_cast<Raw>(iface)`, which is how user code most commonly trips
+        // this.  Checked before the `maybeOpenExistential` loop below so the
+        // original interface types are visible, not the extracted concrete
+        // payload.
+        for (auto& arg : expr->arguments)
+        {
+            if (arg && typeInvolvesInterface(m_astBuilder, arg->type.type))
+            {
+                getSink()->diagnose(Diagnostics::BitCastInvolvingInterfaceType{
+                    .type = arg->type.type,
+                    .location = arg->loc});
+                return CreateErrorExpr(expr);
+            }
+        }
+
+        // Result-type check, defensive guard.  For the reverse direction
+        // `bit_cast<IFoo>(raw)` with a generic intrinsic, the generic
+        // application is a `TypeType` (not a `FuncType`) at this point, so
+        // this branch does not fire — the IR-level `isConcreteType` guard
+        // in `diagnoseUnsupportedBitCast` emits E41204 instead.  The branch
+        // is kept for any future call shape that DOES resolve a `FuncType`
+        // here (e.g. a non-generic intrinsic that later gains `kIROp_BitCast`
+        // or a call through a fully-specialized declref).
+        if (auto funcType = as<FuncType>(funcExpr->type.type))
+        {
+            auto resultType = funcType->getResultType();
+            if (typeInvolvesInterface(m_astBuilder, resultType))
+            {
+                getSink()->diagnose(Diagnostics::BitCastInvolvingInterfaceType{
+                    .type = resultType,
+                    .location = expr->loc});
+                return CreateErrorExpr(expr);
+            }
+        }
+    }
+
+    // Some intrinsics (e.g. `serializeDynamicObject`) consume the full existential
+    // value; skip the automatic `maybeOpenExistential` that would otherwise extract
+    // the concrete payload before they see it.
+    bool preserveExistentialArgs = (calleeIntrinsicOp == kIROp_ExtractDynamicObject);
+
     for (auto& arg : expr->arguments)
     {
         arg = maybeOpenRef(arg);
-        arg = maybeOpenExistential(arg);
+        if (!preserveExistentialArgs)
+            arg = maybeOpenExistential(arg);
     }
 
     context.originalExpr = expr;

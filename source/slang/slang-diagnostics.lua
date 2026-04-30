@@ -4594,6 +4594,20 @@ err(
 )
 
 err(
+    "bit-cast-involving-interface-type",
+    41205,
+    "bit_cast involving interface type is not supported",
+    span { loc = "location", message = "'~type:Type' involves an interface type; use `createDynamicObject` / `serializeDynamicObject` for existential<->raw conversion instead of `bit_cast`" }
+)
+
+err(
+    "serialize-dynamic-object-size-mismatch",
+    41206,
+    "serializeDynamicObject storage size mismatch",
+    span { loc = "location", message = "`serializeDynamicObject` payload type '~valueType:IRInst' has size '~valueSize:Int' but the specialized payload size for interface '~interfaceType:IRInst' is '~anyValueSize:Int'" }
+)
+
+err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",
