@@ -5398,7 +5398,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
         auto zeroVec = builder.emitMakeVectorFromScalar(
-            builder.getVectorType(builder.getIntType(), builder.getIntValue(builder.getIntType(), 2)),
+            builder.getVectorType(
+                builder.getIntType(),
+                builder.getIntValue(builder.getIntType(), 2)),
             builder.getIntValue(builder.getIntType(), 0));
 
         return emitInstCustomOperandFunc(

@@ -273,13 +273,11 @@ static void legalizeSubpassInputsForMetal(
 
         if (subpassType->isMultisample())
         {
-            sink->diagnose(
-                Diagnostics::MultisampledSubpassInputNotSupportedOnMetal{
-                    .location = getDiagnosticPos(globalParam)});
+            sink->diagnose(Diagnostics::MultisampledSubpassInputNotSupportedOnMetal{
+                .location = getDiagnosticPos(globalParam)});
         }
 
-        auto entryPointParamDecor =
-            globalParam->findDecoration<IREntryPointParamDecoration>();
+        auto entryPointParamDecor = globalParam->findDecoration<IREntryPointParamDecoration>();
         IRFunc* entryPointFunc = nullptr;
         if (entryPointParamDecor)
             entryPointFunc = as<IRFunc>(entryPointParamDecor->getEntryPoint());
@@ -306,9 +304,8 @@ static void legalizeSubpassInputsForMetal(
         }
         if (!entryPointFunc)
         {
-            sink->diagnose(
-                Diagnostics::SubpassInputUsedOutsideEntryPoint{
-                    .location = getDiagnosticPos(globalParam)});
+            sink->diagnose(Diagnostics::SubpassInputUsedOutsideEntryPoint{
+                .location = getDiagnosticPos(globalParam)});
             continue;
         }
 
@@ -354,9 +351,8 @@ static void legalizeSubpassInputsForMetal(
 
             if (getParentFunc(user) != entryPointFunc)
             {
-                sink->diagnose(
-                    Diagnostics::SubpassInputUsedOutsideEntryPoint{
-                        .location = getDiagnosticPos(user)});
+                sink->diagnose(Diagnostics::SubpassInputUsedOutsideEntryPoint{
+                    .location = getDiagnosticPos(user)});
                 IRBuilder localBuilder(user);
                 localBuilder.setInsertBefore(user);
                 use->set(localBuilder.emitPoison(elementType));
