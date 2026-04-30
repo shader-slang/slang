@@ -5284,6 +5284,14 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         auto requirementWitness = RequirementWitness(satisfyingMemberDeclRef);
         witnessTable->m_requirementDictionary[requiredMemberDeclRef.getDecl()] = requirementWitness;
 
+        List<Decl*> speculativeConstraintWitnesses;
+        for (auto constraintDeclRef :
+             getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, requiredMemberDeclRef))
+        {
+            if (!witnessTable->m_requirementDictionary.containsKey(constraintDeclRef.getDecl()))
+                speculativeConstraintWitnesses.add(constraintDeclRef.getDecl());
+        }
+
         // We need to check that the satisfying member has the same constraints as the requirement.
         bool conformance =
             doesTypeSatisfyConstraintRequirements(requiredMemberDeclRef, witnessTable);
@@ -5291,6 +5299,8 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         if (!conformance)
         {
             witnessTable->m_requirementDictionary.remove(requiredMemberDeclRef.getDecl());
+            for (auto constraintDecl : speculativeConstraintWitnesses)
+                witnessTable->m_requirementDictionary.remove(constraintDecl);
             return false;
         }
     }

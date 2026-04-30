@@ -1287,8 +1287,14 @@ struct DiffTransposePass
         // Transpose each argument (skip the first one, which is the context struct)
         for (UIndex ii = 1; ii < fwdCall->getArgCount(); ii++)
         {
-            const auto& [argDirection, argType] =
-                splitParameterDirectionAndType(fwdPropCalleeFuncType->getParamType(ii));
+            auto fwdPropParamType = fwdPropCalleeFuncType->getParamType(ii);
+            if (isConstExprRateQualifiedType(fwdPropParamType))
+            {
+                bwdPropArgs.add(fwdCall->getArg(ii));
+                continue;
+            }
+
+            const auto& [argDirection, argType] = splitParameterDirectionAndType(fwdPropParamType);
             if (as<IRVoidType>(argType))
             {
                 bwdPropArgs.add(builder->getVoidValue());
