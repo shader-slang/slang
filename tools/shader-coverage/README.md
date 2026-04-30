@@ -103,11 +103,16 @@ auto* coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
     slang::ICoverageTracingMetadata::getTypeGuid());
 
 uint32_t n = coverage->getCounterCount();
-int32_t space = coverage->getBufferSpace();
-int32_t binding = coverage->getBufferBinding();
+
+slang::CoverageBufferInfo bufferInfo;
+coverage->getBufferInfo(&bufferInfo);
+// bufferInfo.space, bufferInfo.binding (-1 when not assigned for this target)
+
 for (uint32_t i = 0; i < n; ++i) {
-    const char* file = coverage->getEntryFile(i);
-    uint32_t line    = coverage->getEntryLine(i);
+    slang::CoverageEntryInfo entry;
+    if (SLANG_SUCCEEDED(coverage->getEntryInfo(i, &entry))) {
+        // entry.file, entry.line
+    }
 }
 ```
 

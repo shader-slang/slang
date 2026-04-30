@@ -1,14 +1,13 @@
-// Regression test that the CPU backend treats the AST-synthesized
-// `__slang_coverage` buffer as a first-class reflection-visible
-// resource — packed into the standard `GlobalParams` struct alongside
-// user-declared globals, accessed via the standard 3-argument kernel
-// ABI (varyingInput, entryPointParams, globalParams).
+// Regression test that the CPU backend packs the IR-synthesized
+// `__slang_coverage` buffer into the standard `GlobalParams` struct
+// alongside user-declared globals, so the kernel keeps the standard
+// 3-argument ABI (varyingInput, entryPointParams, globalParams).
 //
-// If AST-time synthesis regresses (e.g. back to IR-time synthesis),
-// the buffer escapes GlobalParams and re-appears as a fourth kernel
-// parameter. Downstream C++ compilation rejects the wrappers, and
-// slang-rhi's reflection-driven binding can't find the buffer to
-// bind at dispatch time.
+// The IR coverage pass extends the program-scope var layout so
+// `collectGlobalUniformParameters` packs the synthesized buffer
+// alongside user globals. If that extension regresses, the buffer
+// escapes GlobalParams and reappears as a fourth kernel parameter,
+// breaking host integrations that rely on the 3-arg ABI.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain -trace-coverage
 
@@ -27,8 +26,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK: RWStructuredBuffer{{.*}}_slang_coverage
 
 // Kernel keeps the standard 3-arg ABI (varying, entryPointParams,
-// globalParams). If AST-synth regressed and the buffer escaped
-// GlobalParams, a fourth typed param would appear here.
+// globalParams). If global-uniform packing regresses and the
+// coverage buffer escapes GlobalParams, a fourth typed param would
+// appear here.
 //CHECK: void _computeMain(void*{{[^,]*}}, void*{{[^,]*}}, void*{{[^)]*}})
 
 // Counter increments happen against the coverage buffer accessed via

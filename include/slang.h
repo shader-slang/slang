@@ -4575,21 +4575,24 @@ struct ICoverageTracingMetadata : public ISlangCastable
         {0x8e, 0x21, 0x3f, 0x7b, 0x82, 0xa3, 0xd9, 0x51})
 
     /// Number of counter slots in the synthesized coverage buffer.
-    virtual uint32_t SLANG_MCALL getCounterCount() = 0;
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() = 0;
 
     /// Populate `outInfo` with attribution info for counter slot
     /// `index`. The caller must pre-set `outInfo->structSize =
     /// sizeof(CoverageEntryInfo)`. Returns `SLANG_OK` on success,
     /// `SLANG_E_INVALID_ARG` for null `outInfo`, mismatched
     /// `structSize`, or out-of-range `index`.
-    virtual SlangResult SLANG_MCALL getEntryInfo(uint32_t index, CoverageEntryInfo* outInfo) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryInfo(
+        uint32_t index,
+        CoverageEntryInfo* outInfo) = 0;
 
     /// Populate `outInfo` with the coverage buffer's binding info.
     /// The caller must pre-set `outInfo->structSize =
     /// sizeof(CoverageBufferInfo)`. Returns `SLANG_OK` on success,
     /// `SLANG_E_INVALID_ARG` for null `outInfo` or mismatched
     /// `structSize`.
-    virtual SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo* outInfo) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(
+        CoverageBufferInfo* outInfo) = 0;
 };
     #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()
 
