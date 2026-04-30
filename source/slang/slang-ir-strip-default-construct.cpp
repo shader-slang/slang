@@ -46,26 +46,25 @@ struct RemoveDefaultConstructInsts : InstPassBase
                 defaultConstruct->removeAndDeallocate();
             });
 
-        // TODO: clean this up (should either rename the pass, or put this in its own pass)
-        // or preferably make sure that when intermediate context types are turned into structs,
-        // they have the defualt construct re-emitted.
-        //
+        // TODO: Consider splitting this into a dedicated re-materialization
+        // pass, separate from the pure "strip raw default constructors"
+        // behavior above.
         IRBuilder builder(module);
         for (auto defaultConstruct : defaultConstructsToReEmit)
         {
             builder.setInsertBefore(defaultConstruct);
 
             // Re-emit the default construct in materialized form (e.g.
-            // MakeStruct/MakeArray/constant) when possible.
+            // MakeStruct/MakeArray/constant) when possible. For types that
+            // cannot yet be materialized at this stage, this may still fall
+            // back to raw `DefaultConstruct`, matching existing behavior.
             IRInst* replacement =
-                builder.emitDefaultConstruct(defaultConstruct->getDataType(), false);
+                builder.emitDefaultConstruct(defaultConstruct->getDataType());
             if (replacement)
             {
                 defaultConstruct->replaceUsesWith(replacement);
                 defaultConstruct->removeAndDeallocate();
             }
-            // If materialization fails (e.g. opaque/resource-like types),
-            // keep the raw DefaultConstruct in place for later legalization.
         }
     }
 };
