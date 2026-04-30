@@ -78,8 +78,9 @@ elseif(
     )
     set(_dxc_probe_dir "${CMAKE_BINARY_DIR}/_dxc_probe")
     set(_dxc_probe_tarball "${_dxc_probe_dir}/dxc.tar.gz")
-    # Stamp stores the highest GLIBC version required across both .so files.
-    # Written only after a successful detection; never contains "0.0".
+    # Stamp stores the highest GLIBC version required across both .so files
+    # (e.g. "2.34"), or the sentinel "DETECTION_FAILED" when objdump/readelf
+    # could not extract version info.
     set(_dxc_glibc_stamp "${_dxc_probe_dir}/req_glibc_${_dxc_version_tag}.txt")
 
     set(_dxc_required_glibc "0.0")
@@ -138,13 +139,13 @@ elseif(
                 WORKING_DIRECTORY "${_dxc_probe_dir}"
                 RESULT_VARIABLE _tar_result
                 OUTPUT_QUIET
-                ERROR_QUIET
+                ERROR_VARIABLE _tar_error
             )
             if(NOT _tar_result EQUAL 0)
                 message(
                     WARNING
                     "Failed to extract shared libraries from DXC prebuilt "
-                    "tarball (exit ${_tar_result}). "
+                    "tarball (exit ${_tar_result}): ${_tar_error}. "
                     "GLIBC requirement detection skipped. "
                     "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON if DXC is required."
                 )
@@ -281,14 +282,16 @@ elseif(
             "SLANG_DXC_BUILD_FROM_SOURCE=OFF but no prebuilt DXC binary is "
             "available for ${CMAKE_SYSTEM_PROCESSOR} on Linux. "
             "DXC will be unavailable. "
-            "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source."
+            "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source, "
+            "or set -DSLANG_DXC_BINARY_URL=<url> to use a custom prebuilt binary."
         )
     else()
         message(
             WARNING
             "No prebuilt DXC binary is available for ${CMAKE_SYSTEM_PROCESSOR} "
             "on Linux. "
-            "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source."
+            "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source, "
+            "or set -DSLANG_DXC_BINARY_URL=<url> to use a custom prebuilt binary."
         )
     endif()
 endif()
