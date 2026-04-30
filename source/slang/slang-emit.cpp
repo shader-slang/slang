@@ -2168,6 +2168,18 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(eliminateMultiLevelBreak, targetProgram);
 
+    // `eliminateMultiLevelBreak` invokes `legalizeDefUse`, which can hoist a
+    // local var out of an inner control-flow region and emit a
+    // `kIROp_DefaultConstruct` + `Store` pair to make the value defined on
+    // entry. When the user's subsequent code unconditionally overwrites the
+    // var (typical for output-buffer accumulators inside `[ForceUnroll]`
+    // loops), this pair is dead and bloats codegen with a full zero-fill of
+    // the var's storage. Stripping it here removes that overhead before
+    // downstream simplification / SSA-out / codegen runs. (The pass is also
+    // run earlier for SPIRV / CPU-via-LLVM, but those calls run before
+    // `legalizeDefUse` produces these new `DefaultConstruct` insts.)
+    SLANG_PASS(removeRawDefaultConstructors);
+
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
         IRSimplificationOptions simplificationOptions = fastIRSimplificationOptions;

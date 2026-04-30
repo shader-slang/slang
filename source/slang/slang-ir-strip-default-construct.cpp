@@ -16,7 +16,7 @@ struct RemoveDefaultConstructInsts : InstPassBase
     }
     void processModule()
     {
-        List<IRInst*> structDefaultConstructs;
+        List<IRInst*> defaultConstructsToReEmit;
         processInstsOfType<IRDefaultConstruct>(
             kIROp_DefaultConstruct,
             [&](IRDefaultConstruct* defaultConstruct)
@@ -28,8 +28,13 @@ struct RemoveDefaultConstructInsts : InstPassBase
                         instsToRemove.add(use->getUser());
                     else
                     {
-                        if (as<IRStructType>(defaultConstruct->getDataType()))
-                            structDefaultConstructs.add(defaultConstruct);
+                        // Re-emit any `DefaultConstruct` that has a non-store
+                        // use, regardless of its data type. For struct/array
+                        // types this expands to `MakeStruct`/`MakeArray`; for
+                        // primitive types it produces an `IRConstant` zero.
+                        // Either way, downstream codegen can handle the result
+                        // without requiring native `DefaultConstruct` support.
+                        defaultConstructsToReEmit.add(defaultConstruct);
                         return; // Ignore this inst if there are non-store
                                 // uses.
                     }
@@ -46,13 +51,14 @@ struct RemoveDefaultConstructInsts : InstPassBase
         // they have the defualt construct re-emitted.
         //
         IRBuilder builder(module);
-        for (auto structDefaultConstruct : structDefaultConstructs)
+        for (auto defaultConstruct : defaultConstructsToReEmit)
         {
-            builder.setInsertBefore(structDefaultConstruct);
+            builder.setInsertBefore(defaultConstruct);
 
-            // Re-emit the default construct, which will create a MakeStruct instead.
-            structDefaultConstruct->replaceUsesWith(
-                builder.emitDefaultConstruct(structDefaultConstruct->getDataType()));
+            // Re-emit the default construct, which will create a MakeStruct or
+            // primitive constant value instead.
+            defaultConstruct->replaceUsesWith(
+                builder.emitDefaultConstruct(defaultConstruct->getDataType()));
         }
     }
 };

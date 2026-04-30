@@ -2729,11 +2729,22 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
 
                     if (shouldInitializeVar)
                     {
+                        // Emit a `kIROp_DefaultConstruct` directly rather than
+                        // the fully expanded form (`MakeStruct(MakeArray(...))`).
+                        // The expanded form materializes a literal zero array
+                        // for every element of an aggregate, which (for
+                        // targets where this pass's output is the final IR)
+                        // bloats codegen with dead zero-stores when user code
+                        // unconditionally overwrites the value. The
+                        // `removeRawDefaultConstructors` pass strips the
+                        // single `kIROp_DefaultConstruct` + its sole `Store`
+                        // use, leaving the var uninitialized for downstream
+                        // analysis to handle.
                         IRBuilder builder(func);
                         builder.setInsertAfter(var);
                         builder.emitStore(
                             var,
-                            builder.emitDefaultConstruct(
+                            builder.emitDefaultConstructRaw(
                                 as<IRPtrTypeBase>(var->getDataType())->getValueType()));
                     }
                 }
@@ -2778,10 +2789,11 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                 {
                     // For all other insts, we need to create a local var for it,
                     // and replace all uses with a load from the local var.
+                    // See comment above re: `emitDefaultConstructRaw`.
                     IRBuilder builder(func);
                     builder.setInsertBefore(commonDominator->getTerminator());
                     IRVar* tempVar = builder.emitVar(inst->getFullType());
-                    auto defaultVal = builder.emitDefaultConstruct(inst->getFullType());
+                    auto defaultVal = builder.emitDefaultConstructRaw(inst->getFullType());
                     builder.emitStore(tempVar, defaultVal);
 
                     traverseUses(
