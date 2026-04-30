@@ -273,9 +273,13 @@ elseif(
         else()
             message(
                 WARNING
-                "Could not detect system GLIBC version; "
-                "prebuilt DXC binaries may not run on this system. "
-                "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build from source."
+                "Could not detect system GLIBC version (getconf and ldd "
+                "both failed or produced unrecognisable output). "
+                "Proceeding with prebuilt DXC binaries; if the system libc "
+                "is older than the binaries require, they will fail to load "
+                "at runtime with a dynamic-linker error. "
+                "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build from source "
+                "and guarantee compatibility."
             )
         endif()
     endif()
@@ -353,12 +357,16 @@ if(_dxc_build_from_source)
 
     # Step 1: Clone DXC source at Slang configure time.
     # FetchContent stamps ensure the clone is skipped on subsequent reconfigures.
-    # DXC includes LLVM/Clang as submodules; the first clone can take several
-    # minutes even with GIT_SHALLOW ON.
+    # DXC includes LLVM/Clang as submodules; the first clone can take
+    # 10–30 minutes depending on network speed, and the subsequent build
+    # adds another 10–30 minutes. Subsequent reconfigures and incremental
+    # builds skip both steps via stamp files and add_custom_command OUTPUT
+    # tracking.
     message(
         STATUS
         "Cloning DXC ${_dxc_version_tag} from source "
-        "(first run may take several minutes)..."
+        "(first run: ~500 MB download + 10-30 min build; "
+        "subsequent runs are skipped via stamp files)..."
     )
     FetchContent_Declare(
         dxc_source
