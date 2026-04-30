@@ -22008,7 +22008,7 @@ $}
 /// @category stage_io
 __magic_type(SubpassInputType)
 __intrinsic_type($(kIROp_SubpassInputType))
-[require(glsl_hlsl_spirv, subpass)]
+[require(glsl_hlsl_metal_spirv, subpass)]
 struct __SubpassImpl<T, let isMS:int>
 {
 }
@@ -22020,25 +22020,9 @@ typealias SubpassInput = __SubpassImpl<T, isMS>;
 __generic<T>
 extension __SubpassImpl<T, 0>
 {
-    [ForceInline]
-    [require(glsl_hlsl_spirv, subpass)]
-    T SubpassLoad()
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm "$0.SubpassLoad()";
-        case glsl: __intrinsic_asm "subpassLoad($0)";
-        case spirv:
-        {
-            let zeroVec = int2(0);
-            return spirv_asm
-            {
-                OpCapability StorageImageReadWithoutFormat;
-                result:$$T = OpImageRead $this $zeroVec
-            };
-        }
-        }
-    }
+    [require(glsl_hlsl_metal_spirv, subpass)]
+    __intrinsic_op($(kIROp_SubpassLoad))
+    T SubpassLoad();
 }
 
 /// @category stage_io
@@ -22048,25 +22032,9 @@ typealias SubpassInputMS = __SubpassImpl<T, isMS>;
 __generic<T>
 extension __SubpassImpl<T, 1>
 {
-    [ForceInline]
-    [require(glsl_hlsl_spirv, subpass)]
-    T SubpassLoad(int sample)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm "$0.SubpassLoad($1)";
-        case glsl: __intrinsic_asm "subpassLoad($0, $1)";
-        case spirv:
-        {
-            let zeroVec = int2(0);
-            return spirv_asm
-            {
-                OpCapability StorageImageReadWithoutFormat;
-                result:$$T = OpImageRead $this $zeroVec Sample $sample
-            };
-        }
-        }
-    }
+    [require(glsl_hlsl_metal_spirv, subpass)]
+    __intrinsic_op($(kIROp_SubpassLoad))
+    T SubpassLoad(int sample);
 }
 
 ///

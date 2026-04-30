@@ -8,6 +8,8 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-target-program.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -247,6 +249,136 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
     }
 }
 
+static void legalizeSubpassInputsForMetal(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink,
+    List<EntryPointInfo>& entryPoints)
+{
+    List<IRGlobalParam*> subpassGlobals;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto globalParam = as<IRGlobalParam>(inst))
+        {
+            if (as<IRSubpassInputType>(globalParam->getDataType()))
+                subpassGlobals.add(globalParam);
+        }
+    }
+
+    for (auto globalParam : subpassGlobals)
+    {
+        auto subpassType = as<IRSubpassInputType>(globalParam->getDataType());
+        auto elementType = subpassType->getElementType();
+
+        if (subpassType->isMultisample())
+        {
+            sink->diagnose(
+                Diagnostics::MultisampledSubpassInputNotSupportedOnMetal{
+                    .location = getDiagnosticPos(globalParam)});
+        }
+
+        auto entryPointParamDecor =
+            globalParam->findDecoration<IREntryPointParamDecoration>();
+        IRFunc* entryPointFunc = nullptr;
+        if (entryPointParamDecor)
+            entryPointFunc = as<IRFunc>(entryPointParamDecor->getEntryPoint());
+
+        if (!entryPointFunc)
+        {
+            for (auto use = globalParam->firstUse; use; use = use->nextUse)
+            {
+                auto parentFunc = getParentFunc(use->getUser());
+                if (!parentFunc)
+                    continue;
+                for (auto& ep : entryPoints)
+                {
+                    if (ep.entryPointFunc == parentFunc &&
+                        ep.entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                    {
+                        entryPointFunc = ep.entryPointFunc;
+                        break;
+                    }
+                }
+                if (entryPointFunc)
+                    break;
+            }
+        }
+        if (!entryPointFunc)
+        {
+            sink->diagnose(
+                Diagnostics::SubpassInputUsedOutsideEntryPoint{
+                    .location = getDiagnosticPos(globalParam)});
+            continue;
+        }
+
+        IRIntegerValue attachmentIndex = 0;
+        if (auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>())
+        {
+            if (auto varLayout = as<IRVarLayout>(layoutDecor->getLayout()))
+            {
+                if (auto offsetAttr =
+                        varLayout->findOffsetAttr(LayoutResourceKind::InputAttachmentIndex))
+                {
+                    attachmentIndex = offsetAttr->getOffset();
+                }
+            }
+        }
+
+        IRBuilder builder(module);
+        auto firstBlock = entryPointFunc->getFirstBlock();
+        if (!firstBlock)
+            continue;
+
+        auto newParam = builder.createParam(elementType);
+
+        auto firstOrdinary = firstBlock->getFirstOrdinaryInst();
+        if (firstOrdinary)
+            newParam->insertBefore(firstOrdinary);
+        else
+            newParam->insertAtEnd(firstBlock);
+
+        StringBuilder colorStr;
+        colorStr << "color(" << Int(attachmentIndex) << ")";
+        String colorString = colorStr.produceString();
+        builder.addTargetSystemValueDecoration(newParam, colorString.getUnownedSlice());
+
+        if (auto nameHint = globalParam->findDecoration<IRNameHintDecoration>())
+            builder.addNameHintDecoration(newParam, nameHint->getName());
+
+        IRUse* nextUse = nullptr;
+        for (IRUse* use = globalParam->firstUse; use; use = nextUse)
+        {
+            nextUse = use->nextUse;
+            auto user = use->getUser();
+
+            if (getParentFunc(user) != entryPointFunc)
+            {
+                sink->diagnose(
+                    Diagnostics::SubpassInputUsedOutsideEntryPoint{
+                        .location = getDiagnosticPos(user)});
+                IRBuilder localBuilder(user);
+                localBuilder.setInsertBefore(user);
+                use->set(localBuilder.emitPoison(elementType));
+                continue;
+            }
+
+            if (user->getOp() == kIROp_SubpassLoad)
+            {
+                // For SubpassInputMS, the sample operand is silently dropped
+                // since Metal framebuffer fetch doesn't support per-sample reads.
+                // The unused sample operand will be cleaned up by DCE.
+                user->replaceUsesWith(newParam);
+                user->removeAndDeallocate();
+                continue;
+            }
+            use->set(newParam);
+        }
+
+        globalParam->removeAndDeallocate();
+        fixUpFuncType(entryPointFunc);
+    }
+}
+
 void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     List<EntryPointInfo> entryPoints;
@@ -264,6 +396,8 @@ void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, Diagnost
             legalizeFuncBody(func);
         }
     }
+
+    legalizeSubpassInputsForMetal(module, targetProgram, sink, entryPoints);
 
     legalizeEntryPointVaryingParamsForMetal(module, sink, entryPoints);
 
