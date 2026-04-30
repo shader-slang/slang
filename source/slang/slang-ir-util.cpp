@@ -1730,7 +1730,7 @@ IRInst* getInstInBlock(IRInst* inst)
 {
     SLANG_RELEASE_ASSERT(inst);
 
-    if (const auto block = as<IRBlock>(inst->getParent()))
+    if (const auto block = as<IRBlock>(inst->getParent()); block)
         return inst;
 
     return getInstInBlock(inst->getParent());

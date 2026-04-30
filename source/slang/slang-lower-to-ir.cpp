@@ -5,6 +5,7 @@
 #include "../core/slang-hash.h"
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-random-generator.h"
+#include "slang-check-impl.h"
 #include "slang-check.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bit-field-accessors.h"
@@ -1500,7 +1501,7 @@ static String getNameForNameHint(IRGenContext* context, Decl* decl)
         return String();
 
 
-    if (const auto varDecl = as<VarDeclBase>(decl))
+    if (const auto varDecl = as<VarDeclBase>(decl); varDecl)
     {
         // For an ordinary local variable, global variable,
         // parameter, or field, we will just use the name
@@ -1584,20 +1585,20 @@ static void addNameHint(IRGenContext* context, IRInst* inst, char const* text)
 
 bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
 {
-    if (const auto funcDecl = as<CallableDecl>(requirementDecl))
+    if (const auto funcDecl = as<CallableDecl>(requirementDecl); funcDecl)
     {
         // Subscript decl itself won't have a witness table entry.
         // But its accessors will.
-        if (const auto subscriptDecl = as<SubscriptDecl>(requirementDecl))
+        if (const auto subscriptDecl = as<SubscriptDecl>(requirementDecl); subscriptDecl)
             return false;
     }
-    else if (const auto assocTypeDecl = as<AssocTypeDecl>(requirementDecl))
+    else if (const auto assocTypeDecl = as<AssocTypeDecl>(requirementDecl); assocTypeDecl)
     {
     }
-    else if (const auto typeConstraint = as<TypeConstraintDecl>(requirementDecl))
+    else if (const auto typeConstraint = as<TypeConstraintDecl>(requirementDecl); typeConstraint)
     {
     }
-    else if (const auto varDecl = as<VarDeclBase>(requirementDecl))
+    else if (const auto varDecl = as<VarDeclBase>(requirementDecl); varDecl)
     {
     }
     else if (as<AccessorDecl>(requirementDecl))
@@ -4761,7 +4762,7 @@ struct ExprLoweringContext
         // In such a case we should be careful to not statically
         // resolve things.
         //
-        if (auto callableDecl = as<CallableDecl>(declRefExpr->declRef.getDecl()))
+        if (auto callableDecl = as<CallableDecl>(declRefExpr->declRef.getDecl()); callableDecl)
         {
             // Okay, the declaration is directly callable, so we can continue.
 
@@ -4818,7 +4819,7 @@ struct ExprLoweringContext
                     continue;
                 }
             }
-            else if (auto andType = as<AndType>(e->type))
+            else if (auto andType = as<AndType>(e->type); andType)
             {
                 // TODO: We might eventually need to tell the difference
                 // between conjunctions of interfaces and conjunctions
@@ -6230,7 +6231,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         type = getOriginalTypeFromModifiedType(type);
 
         auto irType = lowerType(context, type);
-        if (auto basicType = as<BasicExpressionType>(type))
+        if (auto basicType = as<BasicExpressionType>(type); basicType)
         {
             return getSimpleDefaultVal(irType);
         }
@@ -6256,7 +6257,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
         }
-        else if (auto ptrType = as<PtrType>(type))
+        else if (auto ptrType = as<PtrType>(type); ptrType)
         {
             return LoweredValInfo::simple(getBuilder()->getNullPtrValue(irType));
         }
@@ -6270,7 +6271,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
         }
-        else if (auto resourceType = as<ResourceType>(type))
+        else if (auto resourceType = as<ResourceType>(type); resourceType)
         {
             // A resource type does not have a default value, so we defensively assign poison value.
             // In practice, we should never get here. If the value remains unassigned after all of
@@ -6761,6 +6762,30 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
+    /// Emit a chain of `lookupWitnessMethod` insts that walks an interface-to-interface
+    /// sub-type witness, starting from `currentWT` (a witness-table value extracted
+    /// from an existential of the witness's sub-type).  Structured as a mechanical
+    /// recursion over the witness tree, mirroring `emitCastToConcreteSuperTypeRec`.
+    IRInst* emitCastToInterfaceSuperTypeRec(IRInst* currentWT, SubtypeWitness* witness)
+    {
+        if (auto declared = as<DeclaredSubtypeWitness>(witness))
+        {
+            auto key = getInterfaceRequirementKey(context, declared->getDeclRef().getDecl());
+            auto supType = lowerType(context, declared->getSup());
+            return getBuilder()->emitLookupInterfaceMethodInst(
+                getBuilder()->getWitnessTableType(supType),
+                currentWT,
+                key);
+        }
+        if (auto transitive = as<TransitiveSubtypeWitness>(witness))
+        {
+            auto midWT = emitCastToInterfaceSuperTypeRec(currentWT, transitive->getSubToMid());
+            return emitCastToInterfaceSuperTypeRec(midWT, transitive->getMidToSup());
+        }
+        SLANG_UNEXPECTED("unsupported witness shape for interface-to-interface upcast");
+        UNREACHABLE_RETURN(nullptr);
+    }
+
     LoweredValInfo visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
     {
         auto superType = lowerType(context, expr->type);
@@ -6795,13 +6820,36 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             auto declRef = declRefType->getDeclRef();
             if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
             {
-                // We have an expression that is "up-casting" some concrete value
-                // to an existential type (aka interface type), using a subtype witness
-                // (which will lower as a witness table) to show that the conversion
-                // is valid.
-                //
-                auto witnessTable = lowerSimpleVal(context, expr->witnessArg);
+                auto concreteValue = getSimpleVal(context, value);
+                auto builder = getBuilder();
 
+                // If the source is already an existential (interface type),
+                // this is an interface-to-interface upcast.  The witness
+                // provided by the type-checker can't be lowered as a static
+                // witness table (an interface's inheritance clause lowers to
+                // a requirement key, not a witness table).  Instead: decompose
+                // the source existential, walk the witness to compute a new
+                // witness table via `lookupWitnessMethod`, then recompose.
+                // Check the AST type (robust to generic instantiations whose
+                // IR form is `Specialize(Generic(...),...)` rather than a
+                // plain `IRInterfaceType`).
+                if (expr->valueArg && isInterfaceType(expr->valueArg->type))
+                {
+                    auto extractedType = builder->emitExtractExistentialType(concreteValue);
+                    auto extractedValue =
+                        builder->emitExtractExistentialValue(extractedType, concreteValue);
+                    auto sourceWT = builder->emitExtractExistentialWitnessTable(concreteValue);
+
+                    auto witness = as<SubtypeWitness>(expr->witnessArg);
+                    SLANG_RELEASE_ASSERT(witness);
+                    auto targetWT = emitCastToInterfaceSuperTypeRec(sourceWT, witness);
+
+                    return LoweredValInfo::simple(
+                        builder->emitMakeExistential(superType, extractedValue, targetWT));
+                }
+
+                // Concrete-to-interface: the witness lowers to a real witness table.
+                //
                 // At the IR level, this will become a `makeExistential` instruction,
                 // which collects the above information into a single IR-level value.
                 // A dynamic CPU implementation of Slang might encode an existential
@@ -6813,10 +6861,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // we should probably extend the AST and IR mechanism here to accept
                 // a sequence of witness tables.
                 //
-                auto concreteValue = getSimpleVal(context, value);
-                auto existentialValue =
-                    getBuilder()->emitMakeExistential(superType, concreteValue, witnessTable);
-                return LoweredValInfo::simple(existentialValue);
+                auto witnessTable = lowerSimpleVal(context, expr->witnessArg);
+                return LoweredValInfo::simple(
+                    builder->emitMakeExistential(superType, concreteValue, witnessTable));
             }
             else if (auto structDeclRef = declRef.as<StructDecl>())
             {
@@ -8426,11 +8473,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 }
             }
         }
-        else if (const auto caseStmt = as<CaseStmt>(stmt))
+        else if (const auto caseStmt = as<CaseStmt>(stmt); caseStmt)
         {
             return true;
         }
-        else if (const auto defaultStmt = as<DefaultStmt>(stmt))
+        else if (const auto defaultStmt = as<DefaultStmt>(stmt); defaultStmt)
         {
             // A 'default:' is a kind of case.
             return true;
@@ -8483,16 +8530,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             //
             // TODO: figure out something cleaner.
 
-            // Actually, one gotcha is that if we ever allow non-constant
-            // expressions here (or anything that requires instructions
-            // to be emitted to yield its value), then those instructions
-            // need to go into an appropriate block.
-
-            IRGenContext subContext = *context;
-            IRBuilder subBuilder = *getBuilder();
-            subBuilder.setInsertInto(info->initialBlock);
-            subContext.irBuilder = &subBuilder;
-
             auto constVal = as<ConstantIntVal>(caseStmt->exprVal);
             SLANG_ASSERT(constVal);
             auto caseType = lowerType(context, constVal->getType());
@@ -8507,7 +8544,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             info->cases.add(caseVal);
             info->cases.add(label);
         }
-        else if (const auto defaultStmt = as<DefaultStmt>(stmt))
+        else if (const auto defaultStmt = as<DefaultStmt>(stmt); defaultStmt)
         {
             auto label = getLabelForCase(info);
 
@@ -8516,7 +8553,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             info->defaultLabel = label;
         }
-        else if (const auto emptyStmt = as<EmptyStmt>(stmt))
+        else if (const auto emptyStmt = as<EmptyStmt>(stmt); emptyStmt)
         {
             // Special-case empty statements so they don't
             // mess up our "trivial fall-through" optimization.
@@ -9830,7 +9867,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // generic associated types.
 
 
-            if (const auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->parentDecl))
+            if (const auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->parentDecl);
+                interfaceDecl)
             {
                 // Okay, this seems to be an interface rquirement, and
                 // we should lower it as such.
@@ -9845,7 +9883,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             // TODO: needs more work for generic functions.
 
-            if (const auto interfaceDecl = as<InterfaceDecl>(funcDecl->parentDecl))
+            if (const auto interfaceDecl = as<InterfaceDecl>(funcDecl->parentDecl); interfaceDecl)
             {
                 // Okay, this seems to be an interface requirement, and
                 // we should lower it as such.
@@ -9855,7 +9893,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             SLANG_ASSERT("unexpected type constraint inside a function");
         }
 
-        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
+        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl);
+            globalGenericParamDecl)
         {
             // This is a constraint on a global generic type parameters,
             // and so it should lower as a parameter of its own.
@@ -10212,7 +10251,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // table, because it represents something the
         // interface requires, and not what it provides.
         //
-        if (const auto parentInterfaceDecl = as<InterfaceDecl>(parentDecl))
+        if (const auto parentInterfaceDecl = as<InterfaceDecl>(parentDecl); parentInterfaceDecl)
         {
             return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
         }
@@ -10499,7 +10538,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         if (auto extDecl = as<ExtensionDecl>(parent))
         {
-            if (const auto declRefType = as<DeclRefType>(extDecl->targetType.type))
+            if (const auto declRefType = as<DeclRefType>(extDecl->targetType.type); declRefType)
             {
                 return true;
             }
@@ -11357,7 +11396,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subBuilder->addAnyValueSizeDecoration(irInterface, anyValueSizeAttr->size);
         }
-        if (const auto specializeAttr = decl->findModifier<SpecializeAttribute>())
+        if (const auto specializeAttr = decl->findModifier<SpecializeAttribute>(); specializeAttr)
         {
             subBuilder->addSpecializeDecoration(irInterface);
         }
@@ -11367,7 +11406,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 irInterface,
                 comInterfaceAttr->guid.getUnownedSlice());
         }
-        if (const auto builtinAttr = decl->findModifier<BuiltinAttribute>())
+        if (const auto builtinAttr = decl->findModifier<BuiltinAttribute>(); builtinAttr)
         {
             subBuilder->addBuiltinDecoration(irInterface);
         }
@@ -11598,7 +11637,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addLinkageDecoration(context, irAggType, decl);
 
 
-        if (const auto rayPayloadAttribute = decl->findModifier<RayPayloadAttribute>())
+        if (const auto rayPayloadAttribute = decl->findModifier<RayPayloadAttribute>();
+            rayPayloadAttribute)
         {
             subBuilder->addDecoration(irAggType, kIROp_RayPayloadDecoration);
         }
@@ -12389,7 +12429,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 scrutinee);
         }
 
-        if (const auto nvapiMod = decl->findModifier<NVAPIMagicModifier>())
+        if (const auto nvapiMod = decl->findModifier<NVAPIMagicModifier>(); nvapiMod)
         {
             builder->addNVAPIMagicDecoration(irInst, decl->getName()->text.getUnownedSlice());
         }
@@ -12567,7 +12607,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // have a name, but its parent should.
         //
         Decl* declForName = decl;
-        if (const auto accessorDecl = as<AccessorDecl>(decl))
+        if (const auto accessorDecl = as<AccessorDecl>(decl); accessorDecl)
             declForName = decl->parentDecl;
 
         definition.append(getText(declForName->getName()));
@@ -14239,6 +14279,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                                                                       : UnownedStringSlice(),
                 source->isIncludedFile());
             context->shared->mapSourceFileToDebugSourceInst[source] = debugSource;
+
+            // For Standard and Maximal debug info, emit a DebugCompilationUnit for each
+            // non-included source file. This makes the IR the source of truth for which
+            // source files are compilation units, removing the need for heuristics during
+            // SPIR-V emission.
+            if (context->debugInfoLevel >= DebugInfoLevel::Standard && !source->isIncludedFile())
+            {
+                builder->emitDebugCompilationUnit(debugSource);
+            }
         }
     }
 
