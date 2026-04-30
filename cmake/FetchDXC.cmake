@@ -317,7 +317,9 @@ elseif(
 )
     # Non-x86_64 Linux: no prebuilt binary is available for this architecture,
     # regardless of whether SLANG_DXC_BUILD_FROM_SOURCE was explicitly set to
-    # OFF or left unset. Warn the user in both cases.
+    # OFF or left unset. Warn and return immediately so the downstream URL
+    # check (which would also return early) is not the only signal that DXC
+    # is unavailable.
     if(DEFINED SLANG_DXC_BUILD_FROM_SOURCE AND NOT SLANG_DXC_BUILD_FROM_SOURCE)
         message(
             WARNING
@@ -327,6 +329,7 @@ elseif(
             "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source, "
             "or set -DSLANG_DXC_BINARY_URL=<url> to use a custom prebuilt binary."
         )
+        return()
     else()
         message(
             WARNING
@@ -335,6 +338,7 @@ elseif(
             "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source, "
             "or set -DSLANG_DXC_BINARY_URL=<url> to use a custom prebuilt binary."
         )
+        return()
     endif()
 endif()
 
@@ -562,6 +566,15 @@ if(_dxc_build_from_source)
     # path. Slang's own copy-dxcompiler/copy-dxil targets (defined above)
     # correctly deploy the source-built DLLs regardless, so DXC is available
     # to the compiler at runtime even if slang-rhi's copy step fails.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        message(
+            WARNING
+            "SLANG_DXC_BUILD_FROM_SOURCE=ON on Windows: slang-rhi's DXC "
+            "copy step may fail because dxc_SOURCE_DIR is not set in the "
+            "source-build path. Slang's own copy-dxcompiler/copy-dxil "
+            "targets still deploy the built DLLs correctly."
+        )
+    endif()
     #
     # If the project's CMake minimum is ever raised to 3.24+, replace the
     # set_property call below with FetchContent_SetPopulated(dxc), which is
