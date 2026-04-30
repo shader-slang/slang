@@ -146,7 +146,8 @@ Enabling `-trace-coverage` runs three pipeline stages:
      struct constructor synthesis) rather than user-authored source.
      The LCOV converter skips these slots so the report stays line-
      oriented; consumers reading `ICoverageTracingMetadata` directly
-     see them as null `getEntryFile` / zero `getEntryLine`.
+     see them as `entry.file == nullptr` / `entry.line == 0` after
+     `getEntryInfo`.
 
 3. **Emission.** Each backend already handles `kIROp_AtomicAdd` on
    `RWStructuredBuffer<uint>`:
@@ -276,9 +277,9 @@ reference consumer in-tree.
 
 ### Tier 1 — raw graphics API integration
 
-Audience: custom Vulkan / D3D12 / CUDA hosts. RTX Remix, Omniverse,
-game engines (UE / Unity / custom), compute users — the dominant
-customer profile.
+Audience: custom Vulkan / D3D12 / CUDA hosts. Production engines,
+custom shader runtimes, content-creation applications, compute
+applications — the dominant customer profile.
 
 Surfaces consumed:
 

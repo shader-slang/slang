@@ -542,22 +542,17 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::TraceCoverage,
          "-trace-coverage",
          nullptr,
-         "Prototype: instrument the shader with per-statement execution counters. "
-         "Emits IncrementCoverageCounter ops at AST lowering that a later IR "
-         "pass rewrites into counter writes on the synthesized "
-         "`RWStructuredBuffer<uint> __slang_coverage` parameter. "
+         "Instrument the shader with per-statement execution counters. "
          "When writing compiled output to a file, slangc also emits "
-         "`<output>.coverage-mapping.json` to map counters back to source positions."},
+         "`<output>.coverage-mapping.json` mapping counter slots to source positions."},
         {OptionKind::TraceCoverageBinding,
          "-trace-coverage-binding",
          "-trace-coverage-binding <index> <space>",
          "Bind the synthesized `__slang_coverage` buffer at an explicit "
-         "(register index, space) instead of letting parameter binding "
-         "auto-allocate a slot. Useful when the host needs the binding "
-         "fixed at compile time (for example to pre-build a D3D12 root "
-         "signature). Implies `-trace-coverage`. Ignored if the user "
-         "declares `__slang_coverage` themselves; the user declaration "
-         "wins."},
+         "(register index, space) instead of auto-allocating a slot. "
+         "Useful when the host needs the binding fixed at compile time "
+         "(e.g. for a pre-built D3D12 root signature). Implies "
+         "`-trace-coverage`."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,

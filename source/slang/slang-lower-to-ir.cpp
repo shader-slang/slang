@@ -9035,29 +9035,10 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
     {
         maybeEmitDebugLine(context, &visitor, stmt, stmt->loc);
 
-        // Emit a coverage-counter op before lowering the statement.
-        // The IRBuilderSourceLocRAII above sets the builder's current
-        // source location to `stmt->loc`, so the emitted instruction
-        // inherits that as its `sourceLoc` — no separate decoration
-        // needed. The pass in slang-ir-coverage-instrument.cpp later
-        // rewrites these ops into counter writes, assigning one slot
-        // per op in traversal order. The host-side LCOV conversion
-        // layer aggregates slots back to `(file, line)` as needed.
-        //
-        // Empty statements are skipped because they have no observable
-        // execution.
-        //
-        // `startBlockIfNeeded` is required because `maybeEmitDebugLine`
-        // may have returned early (e.g. under `-g0`) without opening a
-        // fresh block after a terminator. Without it, a statement that
-        // follows a `break` / `return` could get its coverage counter
-        // inserted into the already-terminated predecessor block,
-        // corrupting the IR.
-        // Skip purely structural compound statements: BlockStmt and
-        // SeqStmt only wrap their children, so instrumenting them too
-        // would inflate the counter buffer ~30-50% on deeply nested
-        // shaders without adding any per-line signal that the wrapped
-        // children don't already provide.
+        // Emit a coverage-counter op before each executable statement
+        // under `-trace-coverage`. Block/Seq/Empty wrappers don't get
+        // their own counter — they have no execution distinct from
+        // their children.
         if (context->traceCoverage && stmt->loc.isValid() && !as<EmptyStmt>(stmt) &&
             !as<BlockStmt>(stmt) && !as<SeqStmt>(stmt))
         {
