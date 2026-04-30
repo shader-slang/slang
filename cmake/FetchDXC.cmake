@@ -128,6 +128,9 @@ elseif(
                     "GLIBC requirement detection skipped. "
                     "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON if DXC is required."
                 )
+                # Remove the tarball so a fresh download is attempted on the
+                # next reconfigure rather than retrying with a bad archive.
+                file(REMOVE "${_dxc_probe_tarball}")
             endif()
 
             find_program(_dxc_objdump NAMES objdump)
@@ -234,18 +237,30 @@ elseif(
         endif()
     endif()
 elseif(
-    NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
-    AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
+    CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
     AND NOT DEFINED SLANG_DXC_BINARY_URL
+    AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
 )
-    # Non-x86_64 Linux: no prebuilt binary is available.
-    message(
-        WARNING
-        "No prebuilt DXC binary is available for ${CMAKE_SYSTEM_PROCESSOR} "
-        "on Linux. "
-        "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source."
-    )
+    # Non-x86_64 Linux: no prebuilt binary is available for this architecture,
+    # regardless of whether SLANG_DXC_BUILD_FROM_SOURCE was explicitly set to
+    # OFF or left unset. Warn the user in both cases.
+    if(DEFINED SLANG_DXC_BUILD_FROM_SOURCE AND NOT SLANG_DXC_BUILD_FROM_SOURCE)
+        message(
+            WARNING
+            "SLANG_DXC_BUILD_FROM_SOURCE=OFF but no prebuilt DXC binary is "
+            "available for ${CMAKE_SYSTEM_PROCESSOR} on Linux. "
+            "DXC will be unavailable. "
+            "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source."
+        )
+    else()
+        message(
+            WARNING
+            "No prebuilt DXC binary is available for ${CMAKE_SYSTEM_PROCESSOR} "
+            "on Linux. "
+            "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source."
+        )
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------
@@ -316,13 +331,13 @@ if(_dxc_build_from_source)
     file(WRITE "${_dxc_build_dir}/.clang-format" "BasedOnStyle: LLVM\n")
 
     # Step 2: Configure DXC at Slang configure time.
-    # The stamp is keyed on both the version tag and the generator so that
-    # switching generators (e.g. Ninja → "Visual Studio 17 2022") invalidates
-    # the cached configure and forces a fresh cmake invocation with the correct
-    # generator. Spaces in generator names are handled correctly by CMake's
-    # file() and if(EXISTS) commands when the path is quoted.
+    # The stamp is keyed on the version tag, generator, and toolset so that
+    # switching any of these (e.g. Ninja → "Visual Studio 17 2022", or adding
+    # -T ClangCL) invalidates the cached configure. Spaces in generator names
+    # are handled correctly because CMake's file() and if(EXISTS) commands
+    # quote paths properly.
     set(_dxc_configure_stamp
-        "${_dxc_build_dir}/.slang_dxc_configured_${_dxc_version_tag}_${CMAKE_GENERATOR}"
+        "${_dxc_build_dir}/.slang_dxc_configured_${_dxc_version_tag}_${CMAKE_GENERATOR}_${CMAKE_GENERATOR_TOOLSET}"
     )
     if(NOT EXISTS "${_dxc_configure_stamp}")
         message(STATUS "Configuring DXC from source (${_dxc_version_tag})...")
