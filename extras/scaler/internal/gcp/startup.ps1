@@ -131,8 +131,15 @@ if ($installedRunnerVersion -ne $RunnerVersion) {
         Stop-WithFailure "Failed to download Actions runner v${RunnerVersion} after ${downloadAttempts} attempts" $runnerArchive
     }
 
-    $actualHash = (Get-FileHash -Path $runnerArchive -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actualHash -ne $RunnerSha256.ToLowerInvariant()) {
+    try {
+        $actualHash = (Get-FileHash -Path $runnerArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    catch {
+        Stop-WithFailure "Failed to hash Actions runner v${RunnerVersion}: $_" $runnerArchive
+    }
+
+    $expectedHash = $RunnerSha256.ToLowerInvariant()
+    if ($actualHash -ne $expectedHash) {
         Stop-WithFailure "Actions runner v${RunnerVersion} checksum verification failed (expected ${RunnerSha256}, got ${actualHash})" $runnerArchive
     }
 
