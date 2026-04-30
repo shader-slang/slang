@@ -261,11 +261,7 @@ elseif(
         # Detect musl libc before attempting the glibc regex: prebuilt DXC
         # binaries are glibc-linked and will definitely not load on musl
         # systems, so force a source build immediately.
-        if(
-            _libc_probe MATCHES "[Mm]usl"
-            OR EXISTS "/lib/ld-musl-x86_64.so.1"
-            OR EXISTS "/lib/ld-musl-aarch64.so.1"
-        )
+        if(_libc_probe MATCHES "[Mm]usl" OR EXISTS "/lib/ld-musl-x86_64.so.1")
             message(
                 STATUS
                 "Detected musl libc; prebuilt DXC binaries require glibc "
@@ -421,13 +417,13 @@ if(_dxc_build_from_source)
     file(WRITE "${_dxc_build_dir}/.clang-format" "BasedOnStyle: LLVM\n")
 
     # Step 2: Configure DXC at Slang configure time.
-    # The stamp is keyed on version tag, generator, toolset, and compiler so
-    # that switching any of these invalidates the cached configure. A SHA256
-    # hash keeps the filename short regardless of path lengths.
+    # The stamp is keyed on version tag, generator, platform, toolset, and
+    # compiler so that switching any of these invalidates the cached configure.
+    # A SHA256 hash keeps the filename short regardless of path lengths.
     string(
         SHA256
         _dxc_config_hash
-        "${_dxc_version_tag}_${CMAKE_GENERATOR}_${CMAKE_GENERATOR_TOOLSET}_${CMAKE_CXX_COMPILER}"
+        "${_dxc_version_tag}_${CMAKE_GENERATOR}_${CMAKE_GENERATOR_PLATFORM}_${CMAKE_GENERATOR_TOOLSET}_${CMAKE_CXX_COMPILER}"
     )
     set(_dxc_configure_stamp
         "${_dxc_build_dir}/.slang_dxc_configured_${_dxc_config_hash}"
