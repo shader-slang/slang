@@ -688,10 +688,13 @@ func (m *Manager) reconcileTrackedVMs(ctx context.Context) {
 		return
 	}
 
-	// Snapshot tracked VMs grouped by zone
-	zoneVMs := make(map[string][]string) // zone -> []runnerName
+	// Snapshot tracked VMs grouped by zone. Eviction must only consider this
+	// snapshot; new VMs can be added while the GCP list calls are in flight.
+	zoneVMs := make(map[string]struct{})
+	snapshot := make(map[string]vmInfo, len(m.vms))
 	for runnerName, vm := range m.vms {
-		zoneVMs[vm.zone] = append(zoneVMs[vm.zone], runnerName)
+		snapshot[runnerName] = *vm
+		zoneVMs[vm.zone] = struct{}{}
 	}
 	m.mu.Unlock()
 
@@ -716,12 +719,19 @@ func (m *Manager) reconcileTrackedVMs(ctx context.Context) {
 	// Skip VMs in zones where the list call failed.
 	m.mu.Lock()
 	evicted := 0
-	for runnerName, vm := range m.vms {
-		if failedZones[vm.zone] {
+	for runnerName, snap := range snapshot {
+		current, ok := m.vms[runnerName]
+		if !ok {
 			continue
 		}
-		if !liveVMs[vm.vmName] {
-			slog.Info("reconcile: removing stale tracked VM", "runner", runnerName, "vm", vm.vmName, "zone", vm.zone)
+		if current.vmName != snap.vmName || current.zone != snap.zone {
+			continue
+		}
+		if failedZones[snap.zone] {
+			continue
+		}
+		if !liveVMs[snap.vmName] {
+			slog.Info("reconcile: removing stale tracked VM", "runner", runnerName, "vm", snap.vmName, "zone", snap.zone)
 			delete(m.vms, runnerName)
 			evicted++
 		}

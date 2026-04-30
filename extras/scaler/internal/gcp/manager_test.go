@@ -283,6 +283,29 @@ func TestReconcileKeepsTrackedVMsWhenListFails(t *testing.T) {
 	}
 }
 
+func TestReconcileDoesNotEvictVMAddedAfterSnapshot(t *testing.T) {
+	m := &Manager{
+		vms: map[string]*vmInfo{
+			"runner-a": {vmName: "linux-test-a", zone: "us-east1-c"},
+		},
+	}
+	m.listLive = func(_ context.Context, _ string) ([]string, error) {
+		m.mu.Lock()
+		m.vms["runner-b"] = &vmInfo{vmName: "linux-test-b", zone: "us-east1-c"}
+		m.mu.Unlock()
+		return nil, nil
+	}
+
+	m.reconcileTrackedVMs(context.Background())
+
+	if _, ok := m.vms["runner-a"]; ok {
+		t.Fatalf("runner-a should be removed when snapshot VM is no longer live")
+	}
+	if _, ok := m.vms["runner-b"]; !ok {
+		t.Fatalf("runner-b should remain because it was added after the snapshot")
+	}
+}
+
 func TestSelectZoneErrorsOnEmptyCandidates(t *testing.T) {
 	m := &Manager{}
 	m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
