@@ -817,6 +817,10 @@ RequirementWitness tryLookUpRequirementWitness(
 
 void WitnessTable::add(Decl* decl, RequirementWitness const& witness)
 {
+    // Requirement synthesis can discover the same witness through multiple paths.
+    // Keep the first entry to match the lookup behavior used during conformance checking.
+    if (m_requirementDictionary.containsKey(decl))
+        return;
     m_requirementDictionary.add(decl, witness);
 }
 

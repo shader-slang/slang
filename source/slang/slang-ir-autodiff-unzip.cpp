@@ -402,31 +402,57 @@ struct UnzippingContext
         // func)
         //
 
-        List<IRInst*> propFuncArgs;
-        propFuncArgs.add(fullContextVal);
-        for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
-        {
-            auto arg = mixedCall->getArg(ii);
-            if (isMixedDifferentialInst(arg))
-                propFuncArgs.add(lookupDiffInst(arg));
-            else
-                propFuncArgs.add(diffBuilder->getVoidValue());
-        }
-
         // Build forward-prop func type. This is just the .Differential
         // of each param type & result type.
         //
         List<IRType*> fwdPropFuncParamTypes;
         auto baseFuncType = cast<IRFuncType>(baseFn->getFullType());
+        ShortList<IRParam*, 8> baseFuncParams;
+        if (auto baseFuncForParams =
+                as<IRGlobalValueWithParams>(getResolvedInstForDecorations(baseFn)))
+        {
+            for (auto param : baseFuncForParams->getParams())
+                baseFuncParams.add(param);
+        }
+
+        auto getBaseParamType = [&](UIndex ii) -> IRType*
+        {
+            auto paramType = baseFuncType->getParamType(ii);
+            if (Index(ii) < baseFuncParams.getCount() &&
+                isConstExprRateQualifiedType(baseFuncParams[ii]->getFullType()))
+            {
+                paramType = baseFuncParams[ii]->getFullType();
+            }
+            return paramType;
+        };
+
+        List<IRInst*> propFuncArgs;
+        propFuncArgs.add(fullContextVal);
+        for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
+        {
+            auto arg = mixedCall->getArg(ii);
+            auto paramType = getBaseParamType(ii);
+            if (isMixedDifferentialInst(arg))
+                propFuncArgs.add(lookupDiffInst(arg));
+            else if (isConstExprRateQualifiedType(paramType))
+                propFuncArgs.add(arg);
+            else
+                propFuncArgs.add(diffBuilder->getVoidValue());
+        }
+
         fwdPropFuncParamTypes.add(fullContextVal->getDataType());
         for (UIndex ii = 0; ii < baseFuncType->getParamCount(); ii++)
         {
-            const auto& [paramDirection, paramType] =
-                splitParameterDirectionAndType(baseFuncType->getParamType(ii));
+            auto baseParamType = getBaseParamType(ii);
+            const auto& [paramDirection, paramType] = splitParameterDirectionAndType(baseParamType);
             if (auto diffType = diffTypeContext.tryGetDifferentiableValueType(paramType))
             {
                 fwdPropFuncParamTypes.add(
                     fromDirectionAndType(diffBuilder, paramDirection, (IRType*)diffType));
+            }
+            else if (isConstExprRateQualifiedType(baseParamType))
+            {
+                fwdPropFuncParamTypes.add(baseParamType);
             }
             else
             {

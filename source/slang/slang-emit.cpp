@@ -35,6 +35,7 @@
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-com-interface.h"
 #include "slang-ir-composite-reg-to-mem.h"
+#include "slang-ir-constexpr.h"
 #include "slang-ir-cuda-immutable-load.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
@@ -107,6 +108,7 @@
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
+#include "slang-ir-specialize-function-call.h"
 #include "slang-ir-specialize-matrix-layout.h"
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-specialize-stage-switch.h"
@@ -886,6 +888,44 @@ void removeWeakUseInsts(IRModule* module)
     }
 }
 
+static bool isLiteralConstExprArg(IRInst* arg)
+{
+    switch (arg->getOp())
+    {
+    case kIROp_BoolLit:
+    case kIROp_FloatLit:
+    case kIROp_IntLit:
+    case kIROp_PtrLit:
+    case kIROp_StringLit:
+    case kIROp_VoidLit:
+        return true;
+    default:
+        return false;
+    }
+}
+
+struct ConstExprFunctionCallSpecializeCondition : FunctionCallSpecializeCondition
+{
+    virtual bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRCall* callInst) override
+    {
+        SLANG_UNUSED(arg);
+        SLANG_UNUSED(callInst);
+        return isConstExprRateQualifiedType(param->getFullType());
+    }
+
+    virtual bool isParamSuitableForSpecialization(IRParam* param, IRInst* arg) override
+    {
+        SLANG_UNUSED(param);
+        return isLiteralConstExprArg(arg);
+    }
+};
+
+static bool specializeConstExprFunctionCalls(IRModule* module, CodeGenContext* codeGenContext)
+{
+    ConstExprFunctionCallSpecializeCondition condition;
+    return specializeFunctionCalls(codeGenContext, module, &condition);
+}
+
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
     LinkingAndOptimizationOptions const& options,
@@ -1196,6 +1236,14 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+    SLANG_PASS(propagateConstExpr, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    SLANG_PASS(specializeConstExprFunctionCalls, codeGenContext);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     if (requiredLoweringPassSet.matrixSwizzleStore)
         SLANG_PASS(lowerMatrixSwizzleStores);
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);

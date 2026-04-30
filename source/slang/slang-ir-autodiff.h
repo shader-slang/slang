@@ -36,6 +36,12 @@ struct DiffInstPair
 
 typedef DiffInstPair<IRInst*, IRInst*> InstPair;
 
+inline bool isConstExprRateQualifiedType(IRType* type)
+{
+    auto rateQualifiedType = as<IRRateQualifiedType>(type);
+    return rateQualifiedType && as<IRConstExprRate>(rateQualifiedType->getRate());
+}
+
 enum class DiffConformanceKind
 {
     Any = 0,  // Perform actions for any conformance (infer from context)
@@ -396,6 +402,10 @@ struct DifferentiableTypeConformanceContext
                             builder,
                             transposeDirection(paramDirection),
                             (IRType*)diffValueType));
+                    }
+                    else if (isConstExprRateQualifiedType(innerFnType->getParamType(i)))
+                    {
+                        paramTypes.add(innerFnType->getParamType(i));
                     }
                     else
                         paramTypes.add(builder->getVoidType());
