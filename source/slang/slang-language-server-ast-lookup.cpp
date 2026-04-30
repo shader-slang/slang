@@ -244,7 +244,7 @@ public:
             if (expr->declRef.getDecl()->hasModifier<ImplicitConversionModifier>())
                 return false;
             Int declLength = 0;
-            if (const auto ctorDecl = as<ConstructorDecl>(expr->declRef.getDecl()))
+            if (const auto ctorDecl = as<ConstructorDecl>(expr->declRef.getDecl()); ctorDecl)
             {
                 auto humaneLoc =
                     context->sourceManager->getHumaneLoc(expr->loc, SourceLocType::Actual);
@@ -881,7 +881,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
         if (auto container = as<ContainerDecl>(node))
         {
             bool shouldInspectChildren = true;
-            if (const auto genericDecl = as<GenericDecl>(node))
+            if (const auto genericDecl = as<GenericDecl>(node); genericDecl)
             {
             }
             else if (container->closingSourceLoc.getRaw() >= container->loc.getRaw())

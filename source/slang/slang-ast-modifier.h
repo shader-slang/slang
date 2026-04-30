@@ -206,6 +206,25 @@ class LocalTempVarModifier : public Modifier
     FIDDLE(...)
 };
 
+// Marks a `VarDecl` whose existential type has been opened directly
+// (i.e. `maybeMoveTemp` reused the variable instead of creating a temporary).
+// If the variable is later reassigned, the opened existential type identity
+// would become stale, so the assignment must be diagnosed.
+FIDDLE()
+class ExistentialOpenedOnVarModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+// Marks a `VarDecl` that has been reassigned after its initial declaration.
+// A variable with this modifier will not be reused directly in `maybeMoveTemp`;
+// instead, a fresh temporary will be created for each existential opening.
+FIDDLE()
+class VarReassignedModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 // An `extern` variable in an extension is used to introduce additional attributes on an existing
 // field.
 FIDDLE()
@@ -1985,6 +2004,17 @@ FIDDLE()
 class DeprecatedAttribute : public Attribute
 {
     FIDDLE(...)
+    FIDDLE() String message;
+};
+
+/// A `[RemovedSince(languageVersion, "message")]` attribute indicates that the
+/// target has been removed starting from the specified language version.
+///
+FIDDLE()
+class RemovedSinceAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() int32_t sinceVersion;
     FIDDLE() String message;
 };
 

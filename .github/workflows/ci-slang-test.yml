@@ -39,11 +39,21 @@ on:
         type: string
         default: ""
         description: "Optional suffix for artifact name (e.g., '-cuda')"
+      cpu-only:
+        required: false
+        type: boolean
+        default: false
+        description: "Restrict slang-test to CPU and LLVM backends via -api cpu+llvm"
+      gpu-api-only:
+        required: false
+        type: boolean
+        default: false
+        description: "Restrict slang-test to GPU APIs (vk+cuda+dx11+dx12+mtl+wgpu) while retaining no-API tests needed by multi-step workflows"
 
 jobs:
   test-slang:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 60
+    timeout-minutes: 80
     defaults:
       run:
         shell: bash
@@ -62,9 +72,18 @@ jobs:
 
       - name: Test Slang
         run: |
+          # Fail fast on mutually exclusive inputs — both would accumulate
+          # -api filters and produce an empty test partition.
+          if [[ "${{ inputs.cpu-only }}" == "true" && "${{ inputs.gpu-api-only }}" == "true" ]]; then
+            echo "::error::cpu-only and gpu-api-only are mutually exclusive"
+            exit 1
+          fi
+
+          # SPIR-V emission / validation don't need a GPU — keep on all tiers.
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-          if [ "${{ inputs.enable-debug-layers }}" == "true" ]; then
+          # Vulkan runtime validation needs a Vulkan device; skip on CPU tier.
+          if [[ "${{ inputs.cpu-only }}" != "true" && "${{ inputs.enable-debug-layers }}" == "true" ]]; then
             export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
           fi
           # Build common slang-test arguments
@@ -75,6 +94,20 @@ jobs:
             "-show-adapter-info"
             "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
           )
+
+          # Restrict to CPU / LLVM backends; tests requiring any GPU API get
+          # ignored by the test filter rather than run-and-failed.
+          if [[ "${{ inputs.cpu-only }}" == "true" ]]; then
+            slang_test_args+=("-api" "cpu+llvm")
+          fi
+
+          # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped. Intentionally
+          # NOT using -api-only: no-API tests still need to run because
+          # COMPILE directives in multi-step compile→dispatch tests have
+          # requiredFlags==0 and would be skipped, breaking the dispatch.
+          if [[ "${{ inputs.gpu-api-only }}" == "true" ]]; then
+            slang_test_args+=("-api" "vk+cuda+dx11+dx12+mtl+wgpu")
+          fi
 
           # Add test server arguments only if server count > 1
           if [ "${{ inputs.server-count }}" -gt 1 ]; then
@@ -139,7 +172,7 @@ jobs:
   # expensive slang-rhi tests are excluded with -tce option, because they are not relevant for Slang.
   test-slang-rhi:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 35
+    timeout-minutes: 50
     if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:

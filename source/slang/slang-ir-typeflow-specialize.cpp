@@ -207,6 +207,33 @@ IRInst* getInvalidExistentialSpecializationTarget(IRInst* specializedValue)
     return specializationBase;
 }
 
+// Returns true if a specialization argument transitively derives from an existential.
+// Traces through LookupWitnessMethod chains to find existential roots,
+// handling nested associated types (e.g. outer.Inner.Value) at any depth.
+static bool isSpecArgExistentialDerived(IRInst* inst, int depth = 0)
+{
+    if (depth > 16)
+        return false;
+    switch (inst->getOp())
+    {
+    case kIROp_InterfaceType:
+    case kIROp_ExtractExistentialType:
+    case kIROp_ExtractExistentialWitnessTable:
+    case kIROp_MakeExistential:
+        return true;
+    case kIROp_TypeEqualityWitness:
+        return as<IRInterfaceType>(inst->getOperand(0)) != nullptr;
+    case kIROp_LookupWitnessMethod:
+        return isSpecArgExistentialDerived(
+            as<IRLookupWitnessMethod>(inst)->getWitnessTable(),
+            depth + 1);
+    case kIROp_BuiltinCast:
+        return isSpecArgExistentialDerived(inst->getOperand(0), depth + 1);
+    default:
+        return false;
+    }
+}
+
 bool isInvalidExistentialSpecialization(IRInst* specializedValue)
 {
     if (specializedValue->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
@@ -267,20 +294,8 @@ bool isInvalidExistentialSpecialization(IRInst* specializedValue)
     for (UInt i = 0; i < specialize->getArgCount(); ++i)
     {
         auto arg = specialize->getArg(i);
-        switch (arg->getOp())
-        {
-        case kIROp_InterfaceType:
-        case kIROp_ExtractExistentialType:
-        case kIROp_ExtractExistentialWitnessTable:
-        case kIROp_MakeExistential:
+        if (isSpecArgExistentialDerived(arg))
             return true;
-        case kIROp_TypeEqualityWitness:
-            if (as<IRInterfaceType>(arg->getOperand(0)))
-                return true;
-            break;
-        default:
-            break;
-        }
     }
 
     return false;
@@ -508,7 +523,7 @@ bool isGlobalInst(IRInst* inst)
 // accept the refinement (this is useful in cases like `UnsizedArrayType`, where
 // we only want to refine it if we can determine a concrete size).
 //
-bool isConcreteType(IRInst* inst)
+static bool isConcreteTypeImpl(IRInst* inst, HashSet<IRInst*>* visiting)
 {
     if (!inst)
         return false;
@@ -536,10 +551,10 @@ bool isConcreteType(IRInst* inst)
                                // methods that do use this
         return false;
     case kIROp_ArrayType:
-        return isConcreteType(cast<IRArrayType>(inst)->getElementType()) &&
+        return isConcreteTypeImpl(cast<IRArrayType>(inst)->getElementType(), visiting) &&
                isGlobalInst(cast<IRArrayType>(inst)->getElementCount());
     case kIROp_OptionalType:
-        return isConcreteType(cast<IROptionalType>(inst)->getValueType());
+        return isConcreteTypeImpl(cast<IROptionalType>(inst)->getValueType(), visiting);
     case kIROp_ConditionalType:
         {
             auto conditionalType = cast<IRConditionalType>(inst);
@@ -548,26 +563,47 @@ bool isConcreteType(IRInst* inst)
             {
                 if (!boolLit->getValue())
                     return true;
-                return isConcreteType(conditionalType->getValueType());
+                return isConcreteTypeImpl(conditionalType->getValueType(), visiting);
             }
             else if (auto intLit = as<IRIntLit>(hasValueInst))
             {
                 if (getIntVal(intLit) == 0)
                     return true;
-                return isConcreteType(conditionalType->getValueType());
+                return isConcreteTypeImpl(conditionalType->getValueType(), visiting);
             }
             return false;
         }
     case kIROp_DifferentialPairType:
-        return isConcreteType(cast<IRDifferentialPairTypeBase>(inst)->getValueType());
+        return isConcreteTypeImpl(cast<IRDifferentialPairTypeBase>(inst)->getValueType(), visiting);
     case kIROp_AttributedType:
-        return isConcreteType(cast<IRAttributedType>(inst)->getBaseType());
+        return isConcreteTypeImpl(cast<IRAttributedType>(inst)->getBaseType(), visiting);
     case kIROp_TupleType:
         {
             // Tuple is concrete if all element types are concrete
             for (UInt i = 0; i < inst->getOperandCount(); i++)
             {
-                if (!isConcreteType(inst->getOperand(i)))
+                if (!isConcreteTypeImpl(inst->getOperand(i), visiting))
+                    return false;
+            }
+            return true;
+        }
+    case kIROp_StructType:
+        {
+            // Struct is concrete only if all field types are concrete.
+            // A struct containing an interface-typed field is non-concrete
+            // and needs type-flow specialization.
+            // Use a visited set to guard against cyclic types (e.g. pack-branch
+            // types that resolve back to the same struct).
+            HashSet<IRInst*> localVisiting;
+            if (!visiting)
+                visiting = &localVisiting;
+            if (visiting->contains(inst))
+                return true; // Cycle detected: conservatively treat as concrete
+            visiting->add(inst);
+            auto structType = cast<IRStructType>(inst);
+            for (auto field : structType->getFields())
+            {
+                if (!isConcreteTypeImpl(field->getFieldType(), visiting))
                     return false;
             }
             return true;
@@ -580,7 +616,7 @@ bool isConcreteType(IRInst* inst)
     {
         if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
             return true; // Don't refine user pointers (for now)
-        return isConcreteType(ptrType->getValueType());
+        return isConcreteTypeImpl(ptrType->getValueType(), visiting);
     }
 
     if (auto generic = as<IRGeneric>(inst))
@@ -590,6 +626,11 @@ bool isConcreteType(IRInst* inst)
     }
 
     return true;
+}
+
+bool isConcreteType(IRInst* inst)
+{
+    return isConcreteTypeImpl(inst, nullptr);
 }
 
 // Create info for a concrete type, using `paramType` as a union mask to determine
@@ -789,7 +830,8 @@ bool isIntrinsic(IRInst* inst)
     // an intrinsic function, so this automatically implies
     // that this is not an intrinsic.
     //
-    if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(inst))
+    if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(inst);
+        existentialSpecializedFunc)
         return false;
 
     if (!func)
@@ -2377,8 +2419,21 @@ struct TypeFlowSpecializationContext
                 auto valueInfo = as<IRPtrTypeBase>(addrInfo)->getValueType();
                 return valueInfo;
             }
-            else
-                return none(); // No info for the address
+
+            // If there is no type flow info for the address but the loaded type
+            // is an interface, enumerate all conforming types globally.
+            // This handles groupshared global variables (and arrays thereof)
+            // with interface types, where the address traces back to a module-scope
+            // global variable that type flow analysis cannot track.
+            if (auto interfaceType = as<IRInterfaceType>(loadInst->getDataType()))
+            {
+                if (!isComInterfaceType(interfaceType))
+                {
+                    return findGlobalTables(interfaceType);
+                }
+            }
+
+            return none();
         }
         else if (as<IRRWStructuredBufferLoad>(inst) || as<IRStructuredBufferLoad>(inst))
         {
@@ -2400,6 +2455,11 @@ struct TypeFlowSpecializationContext
                     }
                     else
                     {
+                        StringBuilder typeStr;
+                        printDiagnosticArg(typeStr, interfaceType);
+                        sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                            .interfaceType = typeStr.produceString(),
+                            .location = inst->sourceLoc});
                         module->getContainerPool().free(&tables);
                         return none();
                     }
@@ -2618,6 +2678,40 @@ struct TypeFlowSpecializationContext
                         (IRType*)this->fieldInfo[structField],
                         as<IRPtrTypeBase>(fieldAddress->getDataType()));
                 }
+
+                // When accessing an interface-typed field and no fieldInfo has been
+                // propagated, fall back to enumerating global witness tables.
+                // See the analogous logic in analyzeLoad for direct interface
+                // loads from resource pointers.
+                if (auto interfaceType = as<IRInterfaceType>(structField->getFieldType()))
+                {
+                    if (!isComInterfaceType(interfaceType))
+                    {
+                        HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+                        collectExistentialTables(interfaceType, tables);
+                        if (tables.getCount() > 0)
+                        {
+                            auto valueInfo = makeTaggedUnionType(as<IRWitnessTableSet>(
+                                builder.getSet(kIROp_WitnessTableSet, tables)));
+                            module->getContainerPool().free(&tables);
+                            return builder.getPtrTypeWithAddressSpace(
+                                (IRType*)valueInfo,
+                                as<IRPtrTypeBase>(fieldAddress->getDataType()));
+                        }
+                        module->getContainerPool().free(&tables);
+                    }
+                }
+                else if (
+                    auto boundInterfaceType = as<IRBoundInterfaceType>(structField->getFieldType()))
+                {
+                    auto valueInfo =
+                        makeTaggedUnionType(cast<IRWitnessTableSet>(builder.getSingletonSet(
+                            kIROp_WitnessTableSet,
+                            boundInterfaceType->getWitnessTable())));
+                    return builder.getPtrTypeWithAddressSpace(
+                        (IRType*)valueInfo,
+                        as<IRPtrTypeBase>(fieldAddress->getDataType()));
+                }
             }
         }
 
@@ -2644,6 +2738,35 @@ struct TypeFlowSpecializationContext
             if (this->fieldInfo.containsKey(structField))
             {
                 return this->fieldInfo[structField];
+            }
+
+            // When extracting an interface-typed field from a struct and no fieldInfo
+            // has been propagated (e.g. the struct was loaded from a constant buffer
+            // rather than constructed via MakeStruct), fall back to enumerating all
+            // globally available witness tables for the interface. This mirrors the
+            // logic in analyzeLoad for direct interface loads from resource pointers.
+            if (auto interfaceType = as<IRInterfaceType>(structField->getFieldType()))
+            {
+                if (!isComInterfaceType(interfaceType))
+                {
+                    HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+                    collectExistentialTables(interfaceType, tables);
+                    if (tables.getCount() > 0)
+                    {
+                        auto result = makeTaggedUnionType(
+                            as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
+                        module->getContainerPool().free(&tables);
+                        return result;
+                    }
+                    module->getContainerPool().free(&tables);
+                }
+            }
+            else if (
+                auto boundInterfaceType = as<IRBoundInterfaceType>(structField->getFieldType()))
+            {
+                return makeTaggedUnionType(cast<IRWitnessTableSet>(builder.getSingletonSet(
+                    kIROp_WitnessTableSet,
+                    boundInterfaceType->getWitnessTable())));
             }
         }
         return none();
@@ -3236,6 +3359,98 @@ struct TypeFlowSpecializationContext
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeLookupWitnessMethod");
     }
 
+    // After specialization has lowered every dispatch site it could, walk any
+    // remaining `lookupWitnessMethod` insts whose witness-table operand is not
+    // a concrete `IRWitnessTable` and whose interface has no registered
+    // conformances.  Those insts will ICE in codegen ("Unhandled local inst
+    // lookupWitness") with no indication that the real problem is missing
+    // conformance registration.  Emit E50100 instead.  Catches transitively-
+    // nested cases (e.g. interface field inside a struct loaded from a
+    // `StructuredBuffer`) that the load-site check in `analyzeLoad` misses —
+    // see #9445.
+    //
+    // Skips lookups that have no uses: those are dead code that the
+    // downstream DCE pass will eliminate before codegen, so they cannot
+    // ICE. Imported library modules (e.g. slangpy's `sgl/device/print`)
+    // routinely produce such dead lookups inside generic / variadic helper
+    // functions whose `IPrintable arg` overload is never reached from the
+    // entry point that imports them. Diagnosing those was a regression
+    // against pre-PR behaviour where DCE simply removed them.
+    void diagnoseUnresolvedLookupWitnesses()
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            // Only diagnose lookups inside top-level functions
+            // that codegen actually emits as standalone callable
+            // bodies — shader entry points plus the various
+            // export decorations (CUDA kernels, DLL exports,
+            // extern-C, etc.). Those are the bodies that survive
+            // into codegen unchanged, so any unresolved lookup
+            // there will reach the unhandled-inst ICE the walker
+            // exists to prevent.
+            //
+            // Use the same `isEntryPoint(func)` predicate that
+            // `performDynamicInstLowering` uses to seed its work-
+            // list, so the walker's diagnostic coverage matches
+            // the lowering pass's coverage exactly.
+            //
+            // For non-entry-point helper functions, the typeflow
+            // pass cannot tell whether the helper is reachable
+            // (callers may exist but be themselves dead) or whether
+            // the helper is going to be inlined / DCE'd before
+            // codegen. Diagnosing those is a false positive — the
+            // canonical example is imported-library helpers like
+            // slangpy's `sgl/device/print.slang::write_arg(IPrintable)`
+            // whose `IPrintable arg` parameter is type-erased only
+            // inside the helper. The actual call sites supply
+            // concrete types via generic-pack expansion, but the
+            // pre-inlined helper body still contains an unresolved
+            // lookup at the moment the walker runs. If a real
+            // unresolved lookup escapes into codegen via a non-
+            // entry-point helper, the underlying ICE still fires
+            // and points at the same source location.
+            if (!isEntryPoint(func))
+                continue;
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    auto lookup = as<IRLookupWitnessMethod>(inst);
+                    if (!lookup)
+                        continue;
+                    if (!lookup->firstUse)
+                        continue;
+                    auto witnessTable = lookup->getWitnessTable();
+                    if (as<IRWitnessTable>(witnessTable))
+                        continue;
+                    auto witnessTableType = as<IRWitnessTableTypeBase>(witnessTable->getDataType());
+                    if (!witnessTableType)
+                        continue;
+                    auto interfaceType =
+                        as<IRInterfaceType>(witnessTableType->getConformanceType());
+                    if (!interfaceType || isComInterfaceType(interfaceType))
+                        continue;
+                    if (!diagnosedNoTypeConformancesInterfaces.add(interfaceType))
+                        continue;
+                    HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+                    collectExistentialTables(interfaceType, tables);
+                    if (tables.getCount() == 0)
+                    {
+                        StringBuilder typeStr;
+                        printDiagnosticArg(typeStr, interfaceType);
+                        sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                            .interfaceType = typeStr.produceString(),
+                            .location = lookup->sourceLoc});
+                    }
+                    module->getContainerPool().free(&tables);
+                }
+            }
+        }
+    }
+
     // Check if an existential operand is an entry-point parameter of interface type
     // that lacks typeflow info. This catches targets (like CUDA compute) that skip
     // collectEntryPointUniformParams and moveEntryPointUniformParamsToGlobalScope,
@@ -3758,10 +3973,11 @@ struct TypeFlowSpecializationContext
                             return;
                         }
 
-                        specializedSet.add(builder.emitSpecializeInst(
+                        auto newSpec = builder.emitSpecializeInst(
                             typeOfSpecialization,
                             arg,
-                            specializationArgs));
+                            specializationArgs);
+                        specializedSet.add(newSpec);
                     });
             }
             else
@@ -3769,8 +3985,9 @@ struct TypeFlowSpecializationContext
                 // Concrete case..
                 IRBuilder builder(module);
                 builder.setInsertInto(module);
-                specializedSet.add(
-                    builder.emitSpecializeInst(typeOfSpecialization, operand, specializationArgs));
+                auto newSpec =
+                    builder.emitSpecializeInst(typeOfSpecialization, operand, specializationArgs);
+                specializedSet.add(newSpec);
             }
 
             IRBuilder builder(module);
@@ -3880,8 +4097,14 @@ struct TypeFlowSpecializationContext
 
             if (!paramInfo)
             {
-                // Non-concrete param with no info yet - not ready to propagate.
-                return nullptr;
+                // Non-concrete param with no info yet - use VoidLit so the
+                // interprocedural edge is still registered. This allows
+                // propagation to proceed (e.g. diagnostics for __ref params
+                // with dynamic dispatch types) even before full info arrives.
+                IRBuilder builder(module);
+                bindings.add(builder.getVoidValue());
+                argIndex++;
+                continue;
             }
 
             hasAnyBinding = true;
@@ -5136,6 +5359,9 @@ struct TypeFlowSpecializationContext
         HashSet<IRInst*> processedSet;
         while (globalWorkList.hasItems())
         {
+            if (sink->getErrorCount() > 0)
+                break;
+
             auto globalInst = globalWorkList.dequeue();
 
             switch (globalInst->getOp())
@@ -5149,6 +5375,10 @@ struct TypeFlowSpecializationContext
                     hasChanges |= removeAnnotations(func);
                     hasChanges |= eliminateDeadCode(func);
                     hasChanges |= specializeFunc(func, globalWorkList);
+
+                    if (sink->getErrorCount() > 0)
+                        break;
+
                     hasChanges |= eliminateDeadCode(func);
                     hasChanges |= resolveTypesInFunc(func);
 
@@ -6336,9 +6566,16 @@ struct TypeFlowSpecializationContext
         if (auto setTag = as<IRSetTagType>(callee->getDataType()))
         {
             // Expect a callee-set to be associated with call.
-            auto calleeSet =
-                cast<IRElementOfSetType>(this->callSiteInfo[InstWithContext(context, inst)])
-                    ->getSet();
+            // The info-propagation phase may not record this call site when a
+            // struct with an existential field is passed by value — bail out
+            // gracefully instead of crashing on a missing dictionary entry.
+            auto callSiteInfoPtr = this->callSiteInfo.tryGetValue(InstWithContext(context, inst));
+            if (!callSiteInfoPtr || !*callSiteInfoPtr)
+            {
+                module->getContainerPool().free(&callArgs);
+                return false;
+            }
+            auto calleeSet = cast<IRElementOfSetType>(*callSiteInfoPtr)->getSet();
             if (!calleeSet->isSingleton() && !calleeSet->isEmpty())
             {
                 // Multiple callees case:
@@ -6431,12 +6668,18 @@ struct TypeFlowSpecializationContext
                     globalsWorkList.enqueue(callee);
                 }
             }
+            else if (auto specCallee = as<IRSpecialize>(callee))
+            {
+                // The callee is an IRSpecialize that escaped both the dispatch-action
+                // and set-specialized-generic resolution paths. This happens when an
+                // existential type flows into an unconstrained generic (no interface
+                // constraint), so the typeflow pass cannot generate dispatch code.
+                emitExistentialSpecializationDiagnostic(specCallee, inst->sourceLoc, inst);
+                module->getContainerPool().free(&callArgs);
+                return false;
+            }
             else
             {
-                // If we reach here, then something is wrong. Our callee is an inst of
-                // tag-type, but we could not resolve it through the dispatch action
-                // collection or set-specialized generic paths.
-                //
                 SLANG_UNEXPECTED(
                     "Unexpected operand type for type-flow specialization of Call inst");
             }
@@ -6463,9 +6706,13 @@ struct TypeFlowSpecializationContext
         }
         else if (isGlobalInst(callee))
         {
-            auto calleeSet =
-                as<IRElementOfSetType>(this->callSiteInfo[InstWithContext(context, inst)])
-                    ->getSet();
+            auto callSiteInfoPtr = this->callSiteInfo.tryGetValue(InstWithContext(context, inst));
+            if (!callSiteInfoPtr || !*callSiteInfoPtr)
+            {
+                module->getContainerPool().free(&callArgs);
+                return false;
+            }
+            auto calleeSet = as<IRElementOfSetType>(*callSiteInfoPtr)->getSet();
             SLANG_ASSERT(calleeSet->isSingleton());
 
             if (isIntrinsic(callee))
@@ -6789,7 +7036,7 @@ struct TypeFlowSpecializationContext
 
     bool specializeMakeDifferentialPair(IRInst* context, IRMakeDifferentialPair* inst)
     {
-        if (auto tupleType = as<IRTupleType>(tryGetInfo(context, inst)))
+        if (auto tupleType = as<IRTupleType>(tryGetInfo(context, inst)); tupleType)
         {
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
@@ -7707,7 +7954,8 @@ struct TypeFlowSpecializationContext
 
         if (sink->getErrorCount() > 0)
         {
-            // If there were errors during propagation, we bail out early.
+            // If there are any diagnostics after propagation, don't continue into
+            // the mutating lowering phase.
             return false;
         }
 
@@ -7716,6 +7964,18 @@ struct TypeFlowSpecializationContext
         //    type information in the previous phase.
         //
         hasChanges |= performDynamicInstLowering();
+
+        // If lowering reported its own diagnostics, the IR is in a partially
+        // lowered state; don't pile cascade errors from the walker below.
+        if (sink->getErrorCount() > 0)
+            return hasChanges;
+
+        // Part 3: Diagnose unresolved dispatch sites.
+        //    Any `lookupWitnessMethod` that survived specialization with a
+        //    non-concrete witness-table operand would ICE in codegen.  If the
+        //    corresponding interface has no conformances registered, report
+        //    E50100 pointing the user at the real fix.
+        diagnoseUnresolvedLookupWitnesses();
 
         return hasChanges;
     }
@@ -7755,6 +8015,14 @@ struct TypeFlowSpecializationContext
     // Set of bit-cast instructions already diagnosed for unsupported
     // non-concrete result types during propagation.
     HashSet<IRInst*> diagnosedBitCasts;
+
+    // Set of interface types already diagnosed with E50100 "no type conformances"
+    // inside `diagnoseUnresolvedLookupWitnesses`, so a single missing conformance
+    // surfacing at multiple surviving `lookupWitnessMethod` sites fires at most
+    // one diagnostic.  Local to the post-specialization walker — `processModule`
+    // bails out on any Part-1 error before that walker runs, so there is no
+    // cross-phase deduplication to coordinate.
+    HashSet<IRInst*> diagnosedNoTypeConformancesInterfaces;
 
     // Emit error 33180 for an invalid existential specialization, deduplicating by `dedupKey`.
     // Returns true if the diagnostic was emitted (first time for this key).

@@ -1236,9 +1236,9 @@ bool SemanticsVisitor::TryUnifyVals(
         }
     }
 
-    if (auto fstWit = as<TypeCoercionWitness>(fst))
+    if (auto fstWit = as<TypeCoercionWitness>(fst); fstWit)
     {
-        if (auto sndWit = as<TypeCoercionWitness>(snd))
+        if (auto sndWit = as<TypeCoercionWitness>(snd); sndWit)
         {
             // Ignore unification for coercion constraints for now,
             // they will be checked later anyway.
@@ -1941,10 +1941,10 @@ bool SemanticsVisitor::TryUnifyTypes(
 
     // An error type can unify with anything, just so we avoid cascading errors.
 
-    if (const auto fstErrorType = as<ErrorType>(fst))
+    if (const auto fstErrorType = as<ErrorType>(fst); fstErrorType)
         return true;
 
-    if (const auto sndErrorType = as<ErrorType>(snd))
+    if (const auto sndErrorType = as<ErrorType>(snd); sndErrorType)
         return true;
 
     // If one or the other of the types is a conjunction `X & Y`,

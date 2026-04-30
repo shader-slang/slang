@@ -34,7 +34,6 @@
 #include "slang-ir-cleanup-void.h"
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-com-interface.h"
-#include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-cuda-immutable-load.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
@@ -81,6 +80,7 @@
 #include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-conditional-type.h"
 #include "slang-ir-lower-coopvec.h"
+#include "slang-ir-lower-cpu-resource-types.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
 #include "slang-ir-lower-enum-type.h"
@@ -141,7 +141,6 @@
 #include "slang-vm-bytecode.h"
 
 #include <assert.h>
-
 Slang::String get_slang_cpp_host_prelude();
 Slang::String get_slang_torch_prelude();
 
@@ -419,6 +418,7 @@ void calcRequiredLoweringPassSet(
     case kIROp_DebugNoScope:
     case kIROp_DebugFunction:
     case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugCompilationUnit:
         result.debugInfo = true;
         break;
     case kIROp_ResultType:
@@ -944,6 +944,11 @@ Result linkAndOptimizeIR(
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    {
+        bool validate = !isCPUTarget(targetRequest) && !isCUDATarget(targetRequest);
+        SLANG_PASS(validateAndRemoveAssumeAddress, validate, sink);
+    }
 
     // If the user specified the flag that they want us to dump
     // IR, then do it here, for the target-specific, but
@@ -1698,6 +1703,14 @@ Result linkAndOptimizeIR(
         switch (target)
         {
         default:
+            if (isCPUTargetViaLLVM(targetRequest))
+            {
+                // We need to scalarize the loads on LLVM CPU targets, as
+                // ByteAddressBuffer loads & stores may only have an alignment
+                // of 4, meaning that vector loads / stores could be misaligned
+                // and cause crashes with SSE, AVX etc. SIMD instruction sets.
+                byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+            }
             break;
 
         case CodeGenTarget::GLSL:
@@ -1792,6 +1805,17 @@ Result linkAndOptimizeIR(
             targetProgram,
             codeGenContext->getSink(),
             byteAddressBufferOptions);
+    }
+
+    if (isCPUTargetViaLLVM(targetRequest))
+    {
+        // On CPU LLVM targets, the target itself has no concept of resource
+        // types (CPUs have no opinions on what a texture is), so we can lower
+        // those to concrete types here.
+        //
+        // We perform this after ByteAddressBuffer op lowering so that we don't
+        // have to deal with misaligned pointers.
+        SLANG_PASS(lowerCPUResourceTypes, codeGenContext);
     }
 
     // For SPIR-V, this function is called elsewhere, so that it can happen after address space
@@ -2258,10 +2282,22 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
 
-    SLANG_PASS(validateCooperativeOperations, sink);
-
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
+
+    // Runs after target-specific lowering so it only captures cooperative types that remain
+    // as native constructs visible to the driver (see ICooperativeTypesMetadata docs).
+    {
+        auto targetCaps = targetRequest->getTargetCaps();
+        if (targetCaps.atLeastOneSetImpliedInOther(
+                CapabilitySet(CapabilityName::cooperative_matrix)) ==
+                CapabilitySet::ImpliesReturnFlags::Implied ||
+            targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(
+                CapabilityName::cooperative_vector)) == CapabilitySet::ImpliesReturnFlags::Implied)
+        {
+            SLANG_PASS(collectCooperativeMetadata, sink, *metadata);
+        }
+    }
 
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
     {
