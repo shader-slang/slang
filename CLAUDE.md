@@ -251,6 +251,27 @@ wrong-method dispatch for any caller compiled against an older header.
 
 ### Debugging tools
 
+#### Test Diagnostics (`SLANG_TEST_DIAGNOSTICS`)
+
+Enable opt-in diagnostic logging for `slang-test` and `test-server` debugging. See
+`tools/slang-test/README.md` for the user-facing documentation:
+
+- `timing` — per-test execution timing and summary output
+- `timing-phases` — per-phase timing details; also enables `timing`
+- `rpc` — JSON-RPC wait/write timing and warnings
+- `fd` — file descriptor open/close tracking
+- `pipe` — pipe read/write diagnostics
+- `all` or `1` — enable all categories
+
+Example:
+
+```bash
+SLANG_TEST_DIAGNOSTICS=timing,rpc ./build/Debug/bin/slang-test -use-test-server tests/my-test.slang
+```
+
+In `-use-test-server` mode, server phase timing remains visible because `slang-test`
+drains and forwards server stderr; it is not carried in test-server protocol fields.
+
 #### IR Dump (`-dump-ir`)
 
 ```bash

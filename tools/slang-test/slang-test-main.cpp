@@ -14,6 +14,7 @@
 #include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-string-escape-util.h"
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-test-diagnostics.h"
 #include "../../source/core/slang-token-reader.h"
 #include "../../source/core/slang-type-text-util.h"
 #include "slang-com-helper.h"
@@ -47,6 +48,7 @@
 #include "../../prelude/slang-cpp-types.h"
 
 #include <atomic>
+#include <chrono>
 #include <thread>
 
 #if SLANG_UNIX_FAMILY
@@ -59,6 +61,22 @@ SLANG_RHI_EXPORT_AGILITY_SDK
 #endif
 
 using namespace Slang;
+
+// Helper function to check if phase-level timing is enabled
+static bool isPhaseTimingEnabled()
+{
+    static bool enabled = Slang::isDiagnosticEnabled("timing-phases");
+    return enabled;
+}
+
+// Helper to output phase timing (only when timing-phases is enabled)
+static void reportPhaseTiming(const char* phaseName, double durationMs)
+{
+    if (isPhaseTimingEnabled())
+    {
+        fprintf(stderr, "[TIMING] %s completed: %.3fms\n", phaseName, durationMs);
+    }
+}
 
 // Constants for slang-test specific options
 static const char* kPreserveEmbeddedSourceOption = "-preserve-embedded-source";
@@ -1001,7 +1019,23 @@ Result spawnAndWaitExe(
             commandLine.begin());
     }
 
+    const bool phaseTimingEnabled = isPhaseTimingEnabled();
+    std::chrono::steady_clock::time_point execStartTime;
+    if (phaseTimingEnabled)
+    {
+        execStartTime = std::chrono::steady_clock::now();
+    }
     Result res = ProcessUtil::execute(cmdLine, outRes);
+    if (phaseTimingEnabled)
+    {
+        auto execEndTime = std::chrono::steady_clock::now();
+        auto execDurationMs =
+            std::chrono::duration_cast<std::chrono::microseconds>(execEndTime - execStartTime)
+                .count() /
+            1000.0;
+        reportPhaseTiming("exe:process-execute", execDurationMs);
+    }
+
     if (SLANG_FAILED(res))
     {
         //        fprintf(stderr, "failed to run test '%S'\n", testPath.ToWString());
@@ -1046,7 +1080,23 @@ Result spawnAndWaitSharedLibrary(
             testCmdLine.toString().getBuffer());
     }
 
+    const bool phaseTimingEnabled = isPhaseTimingEnabled();
+    std::chrono::steady_clock::time_point lookupStartTime;
+    if (phaseTimingEnabled)
+    {
+        lookupStartTime = std::chrono::steady_clock::now();
+    }
     auto func = context->getInnerMainFunc(context->options.binDir, exeName);
+    if (phaseTimingEnabled)
+    {
+        auto lookupEndTime = std::chrono::steady_clock::now();
+        auto lookupDurationMs =
+            std::chrono::duration_cast<std::chrono::microseconds>(lookupEndTime - lookupStartTime)
+                .count() /
+            1000.0;
+        reportPhaseTiming("sharedlib:function-lookup", lookupDurationMs);
+    }
+
     if (func)
     {
         StringBuilder stdErrorString;
@@ -1082,8 +1132,22 @@ Result spawnAndWaitSharedLibrary(
             args.add(cmdArg.getBuffer());
         }
 
+        std::chrono::steady_clock::time_point execStartTime;
+        if (phaseTimingEnabled)
+        {
+            execStartTime = std::chrono::steady_clock::now();
+        }
         SlangResult res =
             func(&stdWriters, context->getSession(), int(args.getCount()), args.begin());
+        if (phaseTimingEnabled)
+        {
+            auto execEndTime = std::chrono::steady_clock::now();
+            auto execDurationMs =
+                std::chrono::duration_cast<std::chrono::microseconds>(execEndTime - execStartTime)
+                    .count() /
+                1000.0;
+            reportPhaseTiming("sharedlib:execution", execDurationMs);
+        }
 
         StdWriters::setSingleton(prevStdWriters);
 
@@ -1229,6 +1293,10 @@ static Result _executeRPC(
     outRes.standardOutput = exeRes.stdOut;
     outRes.debugLayer = exeRes.debugLayer;
 
+    // Drain test-server stderr (phase timing diagnostics) before returning
+    // so it appears before the test result
+    context->drainTestServerStderr();
+
     return SLANG_OK;
 }
 
@@ -1250,6 +1318,8 @@ Result spawnAndWaitTestServer(
     const CommandLine& inCmdLine,
     ExecuteResult& outRes)
 {
+    SLANG_UNUSED(testPath);
+
     String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executableLocation.m_pathOrName);
 
     // This is a test tool execution

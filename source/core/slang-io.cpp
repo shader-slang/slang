@@ -1115,7 +1115,6 @@ SlangResult File::readAllText(const Slang::String& fileName, String& outText)
     StreamReader reader;
     SLANG_RETURN_ON_FAIL(reader.init(stream));
     SLANG_RETURN_ON_FAIL(reader.readToEnd(outText));
-
     return SLANG_OK;
 }
 

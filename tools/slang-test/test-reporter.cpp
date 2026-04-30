@@ -3,6 +3,7 @@
 
 #include "../../source/core/slang-process-util.h"
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-test-diagnostics.h"
 #include "options.h"
 
 #include <mutex>
@@ -146,6 +147,9 @@ void TestReporter::startTest(const char* testName)
     m_currentInfo = TestInfo();
     m_currentInfo.name = testName;
     m_currentMessage.clear();
+    m_currentTestStartTime = isDiagnosticEnabled("timing")
+                                 ? std::chrono::steady_clock::now()
+                                 : std::chrono::steady_clock::time_point{};
 }
 
 void TestReporter::endTest()
@@ -154,6 +158,15 @@ void TestReporter::endTest()
     SLANG_ASSERT(m_inTest);
 
     m_currentInfo.message = m_currentMessage;
+    if (m_currentTestStartTime != std::chrono::steady_clock::time_point{} &&
+        m_currentInfo.executionTime <= 0.0)
+    {
+        const auto endTime = std::chrono::steady_clock::now();
+        m_currentInfo.executionTime =
+            std::chrono::duration_cast<std::chrono::microseconds>(endTime - m_currentTestStartTime)
+                .count() /
+            1000000.0;
+    }
 
     _addResult(m_currentInfo);
 
@@ -181,6 +194,92 @@ void TestReporter::addExecutionTime(double time)
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
     m_currentInfo.executionTime = time;
+}
+
+void TestReporter::_outputTimingSummary()
+{
+    if (!m_totalTestCount)
+        return;
+
+    double totalTimeMs = 0.0;
+    double passedTimeMs = 0.0;
+    double failedTimeMs = 0.0;
+    double ignoredTimeMs = 0.0;
+    double expectedFailTimeMs = 0.0;
+    int executedTestCount = 0;
+
+    for (const auto& testInfo : m_testInfos)
+    {
+        double timeMs = testInfo.executionTime * 1000.0;
+        totalTimeMs += timeMs;
+        if (testInfo.testResult != TestResult::Ignored)
+        {
+            executedTestCount++;
+        }
+        switch (testInfo.testResult)
+        {
+        case TestResult::Pass:
+            passedTimeMs += timeMs;
+            break;
+        case TestResult::Fail:
+            failedTimeMs += timeMs;
+            break;
+        case TestResult::Ignored:
+            ignoredTimeMs += timeMs;
+            break;
+        case TestResult::ExpectedFail:
+            expectedFailTimeMs += timeMs;
+            break;
+        default:
+            break;
+        }
+    }
+
+    fprintf(stderr, "\n[TIMING-SUMMARY] Test Execution Timing\n");
+    fprintf(stderr, "%-20s %8s %12s %12s\n", "Category", "Count", "Total(ms)", "Avg(ms)");
+    fprintf(stderr, "--------------------------------------------------------\n");
+    fprintf(
+        stderr,
+        "%-20s %8d %12.3f %12.3f\n",
+        "Executed tests",
+        executedTestCount,
+        totalTimeMs,
+        executedTestCount > 0 ? totalTimeMs / executedTestCount : 0.0);
+    fprintf(
+        stderr,
+        "%-20s %8d %12.3f %12.3f\n",
+        "Passed",
+        m_passedTestCount,
+        passedTimeMs,
+        m_passedTestCount > 0 ? passedTimeMs / m_passedTestCount : 0.0);
+    fprintf(
+        stderr,
+        "%-20s %8d %12.3f %12.3f\n",
+        "Failed",
+        m_failedTestCount,
+        failedTimeMs,
+        m_failedTestCount > 0 ? failedTimeMs / m_failedTestCount : 0.0);
+    if (m_expectedFailedTestCount > 0)
+    {
+        fprintf(
+            stderr,
+            "%-20s %8d %12.3f %12.3f\n",
+            "Expected failures",
+            m_expectedFailedTestCount,
+            expectedFailTimeMs,
+            m_expectedFailedTestCount > 0 ? expectedFailTimeMs / m_expectedFailedTestCount : 0.0);
+    }
+    if (m_ignoredTestCount > 0)
+    {
+        fprintf(
+            stderr,
+            "%-20s %8d %12.3f %12.3f\n",
+            "Ignored",
+            m_ignoredTestCount,
+            ignoredTimeMs,
+            m_ignoredTestCount > 0 ? ignoredTimeMs / m_ignoredTestCount : 0.0);
+    }
+    fprintf(stderr, "\n");
 }
 
 void TestReporter::addResultWithLocation(
@@ -326,26 +425,11 @@ static void _appendEncodedTeamCityString(const UnownedStringSlice& in, StringBui
 static void _appendTime(double timeInSec, StringBuilder& out)
 {
     SLANG_ASSERT(timeInSec >= 0.0);
-    if (timeInSec == 0.0 || timeInSec >= 1.0)
-    {
-        out << timeInSec << "s";
-        return;
-    }
-    timeInSec *= 1000.0f;
-    if (timeInSec > 1.0f)
-    {
-        out << timeInSec << "ms";
-        return;
-    }
-    timeInSec *= 1000.0f;
-    if (timeInSec > 1.0f)
-    {
-        out << timeInSec << "us";
-        return;
-    }
-
-    timeInSec *= 1000.0f;
-    out << timeInSec << "ns";
+    // Always output in milliseconds for consistency
+    double timeInMs = timeInSec * 1000.0;
+    char buffer[32];
+    snprintf(buffer, sizeof(buffer), "%.3fms", timeInMs);
+    out << buffer;
 }
 
 void TestReporter::_addResult(TestInfo info)
@@ -435,7 +519,9 @@ void TestReporter::_addResult(TestInfo info)
         StringBuilder buffer;
         if (info.executionTime > 0.0f)
         {
+            buffer << "(";
             _appendTime(info.executionTime, buffer);
+            buffer << ")";
         }
         printf(
             "%s test: '%S' %s\n",
@@ -825,6 +911,11 @@ void TestReporter::outputSummary()
             // Don't output a summary
             break;
         }
+    }
+
+    if (isDiagnosticEnabled("timing"))
+    {
+        _outputTimingSummary();
     }
 }
 
