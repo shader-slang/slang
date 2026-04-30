@@ -1148,6 +1148,29 @@ Result spawnAndWaitProxy(
     return res;
 }
 
+static Int64 _getElapsedTimeInMs(uint64_t startTick)
+{
+    const uint64_t elapsedTicks = Process::getClockTick() - startTick;
+    return Int64((elapsedTicks * 1000) / Process::getClockFrequency());
+}
+
+static String _getRPCServerStatus(JSONRPCConnection* rpcConnection)
+{
+    if (!rpcConnection->hasProcess())
+    {
+        return String("none");
+    }
+
+    if (rpcConnection->isProcessTerminated())
+    {
+        StringBuilder builder;
+        builder << "terminated, exitCode=" << rpcConnection->getProcessReturnValue();
+        return builder.produceString();
+    }
+
+    return String("running");
+}
+
 static Result _executeRPC(
     TestContext* context,
     SpawnType spawnType,
@@ -1184,18 +1207,25 @@ static Result _executeRPC(
     }
 
     // Wait for the result
+    const uint64_t waitStartTick = Process::getClockTick();
     if (SLANG_FAILED(rpcConnection->waitForResult(context->connectionTimeOutInMs)))
     {
+        String serverStatus = _getRPCServerStatus(rpcConnection);
         context->getTestReporter()->messageFormat(
             TestMessageType::RunError,
-            "JSON RPC failure: waitForResult()");
+            "JSON RPC failure: waitForResult() after %lld ms (timeout=%lld ms, server=%s)",
+            (long long)_getElapsedTimeInMs(waitStartTick),
+            (long long)context->connectionTimeOutInMs,
+            serverStatus.getBuffer());
     }
 
     if (!rpcConnection->hasMessage())
     {
+        String serverStatus = _getRPCServerStatus(rpcConnection);
         context->getTestReporter()->messageFormat(
             TestMessageType::RunError,
-            "JSON RPC failure: hasMessage()");
+            "JSON RPC failure: hasMessage() (server=%s)",
+            serverStatus.getBuffer());
 
         // We can assume somethings gone wrong. So lets kill the connection and fail.
         context->destroyRPCConnection();
@@ -1228,6 +1258,8 @@ static Result _executeRPC(
     outRes.standardError = exeRes.stdError;
     outRes.standardOutput = exeRes.stdOut;
     outRes.debugLayer = exeRes.debugLayer;
+
+    context->drainTestServerStderr();
 
     return SLANG_OK;
 }

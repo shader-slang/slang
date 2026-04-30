@@ -94,6 +94,54 @@ private:
     HANDLE m_handle;
 };
 
+class WinProcThreadAttributeList
+{
+public:
+    SlangResult init(DWORD attributeCount)
+    {
+        SIZE_T attributeListSize = 0;
+        ::InitializeProcThreadAttributeList(nullptr, attributeCount, 0, &attributeListSize);
+        if (attributeListSize == 0)
+        {
+            return SLANG_FAIL;
+        }
+
+        m_attributeList =
+            (LPPROC_THREAD_ATTRIBUTE_LIST)::HeapAlloc(::GetProcessHeap(), 0, attributeListSize);
+        if (!m_attributeList)
+        {
+            return SLANG_FAIL;
+        }
+
+        SLANG_RETURN_FAIL_ON_FALSE(::InitializeProcThreadAttributeList(
+            m_attributeList,
+            attributeCount,
+            0,
+            &attributeListSize));
+
+        m_isInitialized = true;
+        return SLANG_OK;
+    }
+
+    LPPROC_THREAD_ATTRIBUTE_LIST get() const { return m_attributeList; }
+
+    ~WinProcThreadAttributeList()
+    {
+        if (m_attributeList)
+        {
+            if (m_isInitialized)
+            {
+                ::DeleteProcThreadAttributeList(m_attributeList);
+            }
+            ::HeapFree(::GetProcessHeap(), 0, m_attributeList);
+        }
+    }
+
+private:
+    LPPROC_THREAD_ATTRIBUTE_LIST m_attributeList = nullptr;
+    bool m_isInitialized = false;
+};
+
 /* A simple Stream implementation of a File HANDLE (or Pipe). Note that currently does not allow
  * getPosition/seek/atEnd */
 class WinPipeStream : public Stream
@@ -516,14 +564,35 @@ void WinProcess::kill(int32_t returnCode)
                 DUPLICATE_SAME_ACCESS));
         }
 
-        // TODO: switch to proper wide-character versions of these...
-        STARTUPINFOW startupInfo;
+        STARTUPINFOEXW startupInfo;
         ZeroMemory(&startupInfo, sizeof(startupInfo));
-        startupInfo.cb = sizeof(startupInfo);
-        startupInfo.hStdError = childStdErrWrite;
-        startupInfo.hStdOutput = childStdOutWrite;
-        startupInfo.hStdInput = childStdInRead;
-        startupInfo.dwFlags = STARTF_USESTDHANDLES;
+        startupInfo.StartupInfo.cb = sizeof(startupInfo);
+        startupInfo.StartupInfo.hStdError = childStdErrWrite;
+        startupInfo.StartupInfo.hStdOutput = childStdOutWrite;
+        startupInfo.StartupInfo.hStdInput = childStdInRead;
+        startupInfo.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+
+        // Avoid inheriting unrelated pipe handles from concurrent Process::create calls.
+        HANDLE inheritedHandles[3];
+        DWORD inheritedHandleCount = 0;
+        inheritedHandles[inheritedHandleCount++] = childStdOutWrite;
+        inheritedHandles[inheritedHandleCount++] = childStdInRead;
+        if (childStdErrWrite)
+        {
+            inheritedHandles[inheritedHandleCount++] = childStdErrWrite;
+        }
+
+        WinProcThreadAttributeList attributeList;
+        SLANG_RETURN_ON_FAIL(attributeList.init(1));
+        startupInfo.lpAttributeList = attributeList.get();
+        SLANG_RETURN_FAIL_ON_FALSE(::UpdateProcThreadAttribute(
+            startupInfo.lpAttributeList,
+            0,
+            PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+            inheritedHandles,
+            sizeof(HANDLE) * inheritedHandleCount,
+            nullptr,
+            nullptr));
 
         OSString pathBuffer;
         LPCWSTR path = nullptr;
@@ -547,7 +616,7 @@ void WinProcess::kill(int32_t returnCode)
 
         // https://docs.microsoft.com/en-us/windows/win32/procthread/process-creation-flags
 
-        DWORD createFlags = CREATE_NO_WINDOW;
+        DWORD createFlags = CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT;
 
         if (flags & Process::Flag::AttachDebugger)
         {
@@ -575,7 +644,7 @@ void WinProcess::kill(int32_t returnCode)
             createFlags,
             nullptr, // TODO: allow specifying environment variables?
             nullptr,
-            &startupInfo,
+            &startupInfo.StartupInfo,
             &processInfo);
 
         if (!success)

@@ -159,6 +159,10 @@ public:
     /// If we have an JSON-RPC message m_jsonRoot the root.
     bool hasMessage() const { return m_jsonRoot.isValid(); }
 
+    bool hasProcess() const { return m_process != nullptr; }
+    bool isProcessTerminated() { return m_process && m_process->isTerminated(); }
+    int32_t getProcessReturnValue() const { return m_process ? m_process->getReturnValue() : 0; }
+
     /// If there is a message returns kind of JSON RPC message
     JSONRPCMessageType getMessageType();
 

@@ -142,6 +142,10 @@ public:
     Slang::JSONRPCConnection* getOrCreateJSONRPCConnection();
     void destroyRPCConnection();
 
+    /// Drain and print any stderr output from test-server processes.
+    void drainTestServerStderr();
+    void drainTestServerStderr(Slang::Index threadIndex);
+
     /// Ctor
     TestContext();
     /// Dtor
@@ -216,6 +220,7 @@ protected:
     };
 
     Slang::List<Slang::RefPtr<Slang::JSONRPCConnection>> m_jsonRpcConnections;
+    Slang::List<Slang::RefPtr<Slang::BufferedReadStream>> m_testServerStderrStreams;
     Slang::List<TestReporter*> m_reporters;
     Slang::List<TestRequirements*> m_testRequirements = nullptr;
 
