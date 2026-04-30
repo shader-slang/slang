@@ -340,6 +340,12 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             auto coopType = as<IRCoopMatrixType>(type);
             auto result = emitWMMAFragmentType(coopType, out);
             m_extensionTracker->requireSMVersion(SemanticVersion(8, 0));
+            // FP8 mma instructions (mma.sync.m16n8k16 with .e4m3/.e5m2) were
+            // introduced in PTX ISA 8.7 / SM 8.9 (Ada Lovelace).  Earlier SM
+            // targets reject the PTX as invalid at JIT time.
+            auto elemOp = coopType->getElementType()->getOp();
+            if (elemOp == kIROp_FloatE4M3Type || elemOp == kIROp_FloatE5M2Type)
+                m_extensionTracker->requireSMVersion(SemanticVersion(8, 9));
             return result;
         }
     case kIROp_FloatE4M3Type:
@@ -1541,15 +1547,17 @@ static bool typeCheck(IROp op, uint32_t matrixUse)
     {
     case SLANG_COOPERATIVE_MATRIX_USE_A:
     case SLANG_COOPERATIVE_MATRIX_USE_B:
-        // PTX m16n8k16 supports f16, bf16, and 8-bit integer (s8 / u8) inputs.
+        // PTX m16n8k16 supports f16, bf16, 8-bit integer (s8 / u8), and 8-bit
+        // float (e4m3 / e5m2) inputs.
         return op == kIROp_HalfType || op == kIROp_BFloat16Type ||
-               op == kIROp_Int8Type || op == kIROp_UInt8Type;
+               op == kIROp_Int8Type || op == kIROp_UInt8Type ||
+               op == kIROp_FloatE4M3Type || op == kIROp_FloatE5M2Type;
     case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR:
-        // bf16 MMA only allows an f32 accumulator on PTX, and integer mma only
-        // allows an s32 accumulator, so this is the union of the legal accumulator
-        // element types across all currently-supported A/B element types. (Type
-        // pair compatibility itself is checked structurally by the emitted helper
-        // dispatch in `Slang_CUDA_WMMA::coopMatMulAdd`.)
+        // Union of the legal accumulator element types across all
+        // currently-supported A/B element types: half/float (for f16, bf16, f8
+        // inputs) and int (for s8 / u8 inputs).  Type pair compatibility itself
+        // is enforced structurally by the emitted helper dispatch in
+        // `Slang_CUDA_WMMA::coopMatMulAdd`.
         return op == kIROp_HalfType || op == kIROp_FloatType || op == kIROp_IntType;
     }
     return false;

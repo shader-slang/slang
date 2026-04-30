@@ -7629,6 +7629,22 @@ inline unsigned __device__ Pack32Helper<unsigned char>(unsigned char value)
     return (bits << 24) | (bits << 16) | (bits << 8) | bits;
 };
 
+#if SLANG_CUDA_ENABLE_FP8
+template<>
+inline unsigned __device__ Pack32Helper<__nv_fp8_e4m3>(__nv_fp8_e4m3 value)
+{
+    // fp8 types are 1-byte structs; extract the storage byte and replicate.
+    unsigned bits = (unsigned)*reinterpret_cast<const uint8_t*>(&value);
+    return (bits << 24) | (bits << 16) | (bits << 8) | bits;
+};
+template<>
+inline unsigned __device__ Pack32Helper<__nv_fp8_e5m2>(__nv_fp8_e5m2 value)
+{
+    unsigned bits = (unsigned)*reinterpret_cast<const uint8_t*>(&value);
+    return (bits << 24) | (bits << 16) | (bits << 8) | bits;
+};
+#endif
+
 
 // ====================================================================================
 // WmmaFragment struct
@@ -8426,12 +8442,153 @@ struct Int8MMAHelper<AInputT, int32_t, int32_t, 16, 16, 16, Saturating>
 };
 
 // ====================================================================================
+// 8-bit Float MMA intrinsics (m16n8k16 with .e4m3 / .e5m2 inputs).
+//
+// PTX form: mma.sync.aligned.m16n8k16.row.col.{f16|f32}.{e4m3|e5m2}.{e4m3|e5m2}.{f16|f32}
+//   - Matrix A:  16x16, 2 b32 regs per thread (4 e4m3/e5m2 elements per reg)
+//   - Matrix B:  16x8,  1 b32 reg  per thread (4 e4m3/e5m2 elements)
+//   - Matrix C:  16x8,  4 .f32 regs per thread (with f32 accumulator) OR
+//                       2 .f16x2 regs per thread (with f16 accumulator)
+// Same A/B register layout as the integer m16n8k16 path; only the accumulator
+// differs.  Requires SM 8.9+ (Ada Lovelace) at runtime.
+// ====================================================================================
+
+#if SLANG_CUDA_ENABLE_FP8
+
+template<>
+__device__ inline void mma<__nv_fp8_e4m3, float, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.e4m3.e4m3.f32 "
+                 "{%0, %1, %2, %3}, "
+                 "{%4, %5}, "
+                 "{%6}, "
+                 "{%7, %8, %9, %10};\n"
+                 : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
+                 : "r"(a[0]),
+                   "r"(a[1]),
+                   "r"(b[0]),
+                   "r"(c[0]),
+                   "r"(c[1]),
+                   "r"(c[2]),
+                   "r"(c[3]));
+}
+
+template<>
+__device__ inline void mma<__nv_fp8_e5m2, float, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.e5m2.e5m2.f32 "
+                 "{%0, %1, %2, %3}, "
+                 "{%4, %5}, "
+                 "{%6}, "
+                 "{%7, %8, %9, %10};\n"
+                 : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
+                 : "r"(a[0]),
+                   "r"(a[1]),
+                   "r"(b[0]),
+                   "r"(c[0]),
+                   "r"(c[1]),
+                   "r"(c[2]),
+                   "r"(c[3]));
+}
+
+template<>
+__device__ inline void mma<__nv_fp8_e4m3, half, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile(
+        "mma.sync.aligned.m16n8k16.row.col.f16.e4m3.e4m3.f16 "
+        "{%0, %1}, "
+        "{%2, %3}, "
+        "{%4}, "
+        "{%5, %6};\n"
+        : "=r"(d[0]), "=r"(d[1])
+        : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]));
+}
+
+template<>
+__device__ inline void mma<__nv_fp8_e5m2, half, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile(
+        "mma.sync.aligned.m16n8k16.row.col.f16.e5m2.e5m2.f16 "
+        "{%0, %1}, "
+        "{%2, %3}, "
+        "{%4}, "
+        "{%5, %6};\n"
+        : "=r"(d[0]), "=r"(d[1])
+        : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]));
+}
+
+#endif // #if SLANG_CUDA_ENABLE_FP8
+
+// ====================================================================================
+// Fp8MMAHelper m16n16k16 (via 2x mma.sync.m16n8k16)
+//
+// Register layout for m16n16k16 = 2x m16n8k16 with 8-bit FP inputs:
+//   A: 2 regs per thread (shared between both calls)
+//   B: 2 regs per thread (b[0] -> lo N-half cols 0..7, b[1] -> hi N-half cols 8..15)
+//   C/D float (f32 acc): 8 regs per thread (4 per sub-tile)
+//   C/D half  (f16 acc): 4 regs per thread (2 per sub-tile)
+// AInputT must be either __nv_fp8_e4m3 or __nv_fp8_e5m2.  CType==DType, both
+// either float (f32 mma form) or half (f16 mma form).
+// ====================================================================================
+
+template<typename AInputT, typename CType, typename DType, int M, int N, int K>
+struct Fp8MMAHelper;
+
+#if SLANG_CUDA_ENABLE_FP8
+
+template<typename AInputT>
+struct Fp8MMAHelper<AInputT, float, float, 16, 16, 16>
+{
+    __device__ static void eval(
+        WmmaFragment<float, 16, 16, 16, MatrixC>& d,
+        const WmmaFragment<AInputT, 16, 16, 16, MatrixUse::MatrixA>& a,
+        const WmmaFragment<AInputT, 16, 16, 16, MatrixUse::MatrixB>& b,
+        const WmmaFragment<float, 16, 16, 16, MatrixC>& c)
+    {
+        mma<AInputT, float, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
+        mma<AInputT, float, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 1, c.regs + 4);
+    }
+};
+
+template<typename AInputT>
+struct Fp8MMAHelper<AInputT, half, half, 16, 16, 16>
+{
+    __device__ static void eval(
+        WmmaFragment<half, 16, 16, 16, MatrixC>& d,
+        const WmmaFragment<AInputT, 16, 16, 16, MatrixUse::MatrixA>& a,
+        const WmmaFragment<AInputT, 16, 16, 16, MatrixUse::MatrixB>& b,
+        const WmmaFragment<half, 16, 16, 16, MatrixC>& c)
+    {
+        mma<AInputT, half, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
+        mma<AInputT, half, 16, 8, 16>(d.regs + 2, a.regs, b.regs + 1, c.regs + 2);
+    }
+};
+
+#endif // #if SLANG_CUDA_ENABLE_FP8
+
+// ====================================================================================
 // MMA Helper - Primary Template (dispatcher)
 //
 // Selects between Fp16MMAHelper (half x half), Bf16MMAHelper (bfloat16 x bfloat16),
-// and Int8MMAHelper (s8/u8 x s32 accumulator) based on the input element type.
-// AType is required to equal BType — the supported PTX shapes always have matching
-// A/B element types.
+// Int8MMAHelper (s8/u8 x s32 accumulator), and Fp8MMAHelper (e4m3/e5m2 x f16/f32
+// accumulator) based on the input element type.  AType is required to equal BType
+// — the supported PTX shapes always have matching A/B element types.
 // ====================================================================================
 
 template<
@@ -8457,6 +8614,13 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
             matB,
             matC);
     }
+#if SLANG_CUDA_ENABLE_FP8
+    else if constexpr (
+        IsSameType<AType, __nv_fp8_e4m3>::value || IsSameType<AType, __nv_fp8_e5m2>::value)
+    {
+        Fp8MMAHelper<AType, CType, DType, M, N, K>::eval(matD, matA, matB, matC);
+    }
+#endif
 #if SLANG_CUDA_ENABLE_BF16
     else if constexpr (IsSameType<AType, __nv_bfloat16>::value)
     {
