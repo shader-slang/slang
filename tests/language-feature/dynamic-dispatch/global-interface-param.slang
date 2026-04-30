@@ -60,7 +60,9 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // REPORT-DAG: note[E50102]: generated{{.*}}dispatch code{{.*}}2 possible types: 'ImplA, ImplB'
+    // The type list ('ImplA, ImplB' or 'ImplB, ImplA') is iteration-
+    // order dependent across platforms — pin only the count + line.
+    // REPORT-DAG: note[E50102]: generated{{.*}}dispatch code{{.*}}2 possible types:
     // REPORT-DAG: :[[# @LINE+2]]:
     // SINGLE-NOT: E50102
     outputBuffer[0] = gFoo.getValue();

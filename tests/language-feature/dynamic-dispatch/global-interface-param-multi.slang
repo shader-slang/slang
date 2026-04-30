@@ -55,11 +55,13 @@ void computeMain()
     // IFoo has 2 conformances => dispatch is generated. IBar has 1
     // conformance => monomorphized, no dispatch report. We therefore
     // expect exactly one E50102 note overall, attached to this line.
-    // The `REPORT-NOT: ImplX` line below asserts the IBar call site
-    // does not appear anywhere in the diagnostic stream — pinning the
-    // monomorphization contract via the same diagnostic as the
-    // multi-conformance check, with no synthesized name dependence.
-    // REPORT-DAG: note[E50102]: generated{{.*}}dispatch code{{.*}}2 possible types: 'ImplA, ImplB'
+    // The `REPORT-NOT: E50102{{.*}}ImplX` line below asserts the IBar
+    // call site does not appear in the diagnostic stream — pinning
+    // monomorphization via the same diagnostic, with no synthesized
+    // name dependence. The type list itself ('ImplA, ImplB' or
+    // 'ImplB, ImplA') is iteration-order dependent across platforms,
+    // so we pin only the count + line, not the order.
+    // REPORT-DAG: note[E50102]: generated{{.*}}dispatch code{{.*}}2 possible types:
     // REPORT-DAG: :[[# @LINE+1]]:
     outputBuffer[0] = gFoo.getValue() + float(gBar.getCount());
     // REPORT-NOT: E50102{{.*}}ImplX
