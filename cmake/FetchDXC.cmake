@@ -205,9 +205,16 @@ elseif(
             execute_process(
                 COMMAND ldd --version
                 OUTPUT_VARIABLE _libc_probe
+                ERROR_VARIABLE _libc_probe_stderr
                 OUTPUT_STRIP_TRAILING_WHITESPACE
-                ERROR_QUIET
+                ERROR_STRIP_TRAILING_WHITESPACE
             )
+            # Some distributions (e.g. older CentOS/RHEL) print the version
+            # to stderr rather than stdout; fall back to stderr when stdout
+            # is empty.
+            if(NOT _libc_probe)
+                set(_libc_probe "${_libc_probe_stderr}")
+            endif()
         endif()
         string(
             REGEX MATCH
@@ -406,13 +413,17 @@ if(_dxc_build_from_source)
         )
     endif()
 
-    add_custom_target(
-        dxc_from_source
+    # Use add_custom_command(OUTPUT) rather than add_custom_target so the
+    # inner DXC build is only re-invoked when the output libraries do not
+    # exist. add_custom_target is always considered out-of-date and would
+    # run cmake --build on every incremental Slang build.
+    add_custom_command(
+        OUTPUT ${_dxc_src_byproducts}
         COMMAND ${_dxc_build_cmd}
-        BYPRODUCTS ${_dxc_src_byproducts}
         COMMENT "Building DXC ${_dxc_version_tag} from source"
         VERBATIM
     )
+    add_custom_target(dxc_from_source DEPENDS ${_dxc_src_byproducts})
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         foreach(_dll dxcompiler dxil)
