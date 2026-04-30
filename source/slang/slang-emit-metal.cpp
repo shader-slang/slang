@@ -425,6 +425,12 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_Discard:
         m_writer->emit("discard_fragment();\n");
         return true;
+    case kIROp_SubpassLoad:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            inst,
+            "SubpassLoad should have been lowered before Metal emission");
+        return true;
     case kIROp_MetalAtomicCast:
         {
             auto oldValName = getName(inst);
