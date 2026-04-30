@@ -356,12 +356,17 @@ static void legalizeSubpassInputsForMetal(
                 sink->diagnose(
                     Diagnostics::SubpassInputUsedOutsideEntryPoint{
                         .location = getDiagnosticPos(user)});
-                use->set(newParam);
+                IRBuilder localBuilder(user);
+                localBuilder.setInsertBefore(user);
+                use->set(localBuilder.emitPoison(elementType));
                 continue;
             }
 
             if (user->getOp() == kIROp_SubpassLoad)
             {
+                // For SubpassInputMS, the sample operand is silently dropped
+                // since Metal framebuffer fetch doesn't support per-sample reads.
+                // The unused sample operand will be cleaned up by DCE.
                 user->replaceUsesWith(newParam);
                 user->removeAndDeallocate();
                 continue;
