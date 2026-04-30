@@ -38,13 +38,28 @@ VertexOutput vertexMain(
 // HLSL emission preserves the user-declared semantics on the
 // struct field and on the function parameter. Both must round-trip
 // through the array-recursion legalization path.
-// CHECK_HLSL: OUT_VALUES
-// CHECK_HLSL: SV_Position
-// CHECK_HLSL: IN_VALUES
+// CHECK_HLSL-DAG: values_0[int(4)] : OUT_VALUES
+// CHECK_HLSL-DAG: position_0 : SV_Position
+// CHECK_HLSL-DAG: inValues_0[int(4)] : IN_VALUES
+// CHECK_HLSL-DAG: o_0.values_0[int(0)] = inValues_0[int(0)]
+// CHECK_HLSL-DAG: o_0.values_0[int(1)] = inValues_0[int(1)] + 1.0f
+// CHECK_HLSL-DAG: o_0.values_0[int(2)] = inValues_0[int(2)] + 2.0f
+// CHECK_HLSL-DAG: o_0.values_0[int(3)] = inValues_0[int(3)] + 3.0f
 
 // SPIRV emits one Location decoration per array element (or per
 // the top-level array, depending on the SPIR-V Location-bumping
 // rules). Either way, the entry point + Location decorations are
 // emitted.
-// CHECK_SPV: OpEntryPoint
-// CHECK_SPV: Location
+// CHECK_SPV-DAG: OpEntryPoint Vertex %vertexMain "main" %entryPointParam_vertexMain_values %gl_Position %pos %inValues
+// CHECK_SPV-DAG: OpDecorate %pos Location 0
+// CHECK_SPV-DAG: OpDecorate %inValues Location 1
+// CHECK_SPV-DAG: OpDecorate %entryPointParam_vertexMain_values Location 0
+// CHECK_SPV-DAG: OpDecorate %gl_Position BuiltIn Position
+// CHECK_SPV-DAG: %_arr_float_int_4 = OpTypeArray %float %int_4
+// CHECK_SPV-DAG: %_ptr_Input__arr_float_int_4 = OpTypePointer Input %_arr_float_int_4
+// CHECK_SPV-DAG: %_ptr_Output__arr_float_int_4 = OpTypePointer Output %_arr_float_int_4
+// CHECK_SPV-DAG: %inValues = OpVariable %_ptr_Input__arr_float_int_4 Input
+// CHECK_SPV-DAG: %entryPointParam_vertexMain_values = OpVariable %_ptr_Output__arr_float_int_4 Output
+// CHECK_SPV: OpCompositeConstruct %_arr_float_int_4
+// CHECK_SPV: OpStore %entryPointParam_vertexMain_values
+// CHECK_SPV: OpStore %gl_Position
