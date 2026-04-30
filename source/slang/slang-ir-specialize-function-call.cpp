@@ -10,6 +10,22 @@
 namespace Slang
 {
 
+static bool isLiteralSpecializationArg(IRInst* arg)
+{
+    switch (arg->getOp())
+    {
+    case kIROp_BoolLit:
+    case kIROp_FloatLit:
+    case kIROp_IntLit:
+    case kIROp_PtrLit:
+    case kIROp_StringLit:
+    case kIROp_VoidLit:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
     IRParam* param,
     IRInst* inArg)
@@ -568,6 +584,10 @@ struct FunctionParameterSpecializationContext
             // Similarly for other global constants
             ioInfo.key.vals.add(globalConstant);
         }
+        else if (isLiteralSpecializationArg(oldArg))
+        {
+            ioInfo.key.vals.add(oldArg);
+        }
         else if (isUserPointerType(oldArg->getDataType()))
         {
             // If the arg is a user pointer, we can pass it as an ordinary argument,
@@ -843,6 +863,10 @@ struct FunctionParameterSpecializationContext
             // As above, the identity of the specialized function is sufficient
             // to resolve the uses
             return globalFunc;
+        }
+        if (isLiteralSpecializationArg(oldArg))
+        {
+            return oldArg;
         }
         else if (isElementAccessInst(oldArg))
         {
