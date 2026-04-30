@@ -4372,7 +4372,7 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeParamDecl(GenericTypeParamDecl*
     //
     decl->initType = CheckProperType(decl->initType);
 
-    if (decl->initType)
+    if (decl->initType && getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
         checkForwardReferencesInGenericDecl(decl, decl->initType.exp, decl->initType.type);
 }
 
@@ -4391,7 +4391,7 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
         }
     }
 
-    if (decl->initExpr)
+    if (decl->initExpr && getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
         decl->initExpr = CheckTerm(decl->initExpr);
         checkForwardReferencesInGenericDecl(decl, decl->initExpr, nullptr);
