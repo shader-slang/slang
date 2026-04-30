@@ -29696,14 +29696,7 @@ extension<
         __target_switch
         {
         case _cuda_sm_8_0:
-            {
-                This ret;
-                for (int i = 0; i < GetLength(); ++i)
-                {
-                    ret[i] = BFloat16(half(this[i]) % half(other[i]));
-                }
-                return ret;
-            }
+            __intrinsic_asm "$0 % $1";
         case spvBFloat16KHR:
             {
                 This ret;
@@ -29730,16 +29723,7 @@ extension<
         __target_switch
         {
         case _cuda_sm_8_0:
-            {
-                for (int i = 0; i < GetLength(); i++)
-                {
-                    if (half(this[i]) != half(other[i]))
-                    {
-                        return false;
-                    }
-                }
-                return true;
-            }
+            __intrinsic_asm "$0 == $1";
         case spvBFloat16KHR:
             {
                 for (int i = 0; i < GetLength(); i++)
@@ -29768,20 +29752,7 @@ extension<
         __target_switch
         {
         case _cuda_sm_8_0:
-            {
-                for (int i = 0; i < GetLength(); i++)
-                {
-                    if (half(this[i]) < half(other[i]))
-                    {
-                        return true;
-                    }
-                    else if (half(this[i]) > half(other[i]))
-                    {
-                        return false;
-                    }
-                }
-                return false;
-            }
+            __intrinsic_asm "$0 < $1";
         case spvBFloat16KHR:
             {
                 for (int i = 0; i < GetLength(); i++)
@@ -29814,20 +29785,7 @@ extension<
         __target_switch
         {
         case _cuda_sm_8_0:
-            {
-                for (int i = 0; i < GetLength(); i++)
-                {
-                    if (half(this[i]) < half(other[i]))
-                    {
-                        return true;
-                    }
-                    else if (half(this[i]) > half(other[i]))
-                    {
-                        return false;
-                    }
-                }
-                return true;
-            }
+            __intrinsic_asm "$0 <= $1";
         case spvBFloat16KHR:
             {
                 for (int i = 0; i < GetLength(); i++)

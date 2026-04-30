@@ -7742,9 +7742,63 @@ struct WmmaFragment
     __device__ This operator%(const This& other)
     {
         This result;
-        for (int i = 0; i < GetLength(); i++)
-            result.set(i, get(i) % other.get(i));
+        if constexpr (IsPackedFp16<T>::value)
+        {
+            // 16-bit float types (half / bfloat16) have no native `%`. Compute the
+            // modulo through a float intermediate, which is precision-preserving for
+            // both half and bfloat16.
+            for (int i = 0; i < GetLength(); i++)
+            {
+                float a = static_cast<float>(get(i));
+                float b = static_cast<float>(other.get(i));
+                result.set(i, T(fmodf(a, b)));
+            }
+        }
+        else
+        {
+            for (int i = 0; i < GetLength(); i++)
+                result.set(i, get(i) % other.get(i));
+        }
         return result;
+    }
+
+    // Element-wise equality: true iff every element matches `other`'s element at
+    // the same index. Used by Slang's `equals` on cooperative matrices.
+    __device__ bool operator==(const This& other) const
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (get(i) != other.get(i))
+                return false;
+        }
+        return true;
+    }
+
+    // Lexicographic ordering: scan elements in index order; first non-equal pair
+    // decides. Used by Slang's `lessThan` / `lessThanOrEquals` on cooperative
+    // matrices.
+    __device__ bool operator<(const This& other) const
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (get(i) < other.get(i))
+                return true;
+            if (get(i) > other.get(i))
+                return false;
+        }
+        return false;
+    }
+
+    __device__ bool operator<=(const This& other) const
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (get(i) < other.get(i))
+                return true;
+            if (get(i) > other.get(i))
+                return false;
+        }
+        return true;
     }
 
     template<typename U, MatrixUse R2>
