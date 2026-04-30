@@ -90,6 +90,41 @@ void checkForInvalidShaderParameterTypeForMetal(IRModule* module, DiagnosticSink
                         .location = inst->sourceLoc});
         }
     }
+
+    auto isSubpassInput = [](IRType* type) -> std::optional<IRType*>
+    {
+        if (as<IRSubpassInputType>(type))
+            return type;
+        return {};
+    };
+
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (inst->getOp() != kIROp_ParameterBlockType)
+            continue;
+
+        auto type = as<IRType>(inst->getOperand(0));
+        if (isOrContains(isSubpassInput, type))
+        {
+            bool foundUseSite = false;
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                if (user->sourceLoc.isValid())
+                {
+                    sink->diagnose(
+                        Diagnostics::SubpassInputInParameterBlockNotAllowedOnMetal{
+                            .location = user->sourceLoc});
+                    foundUseSite = true;
+                    break;
+                }
+            }
+            if (!foundUseSite)
+                sink->diagnose(
+                    Diagnostics::SubpassInputInParameterBlockNotAllowedOnMetal{
+                        .location = inst->sourceLoc});
+        }
+    }
 }
 void checkForInvalidShaderParameterType(
     IRModule* module,

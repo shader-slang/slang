@@ -355,7 +355,7 @@ static void legalizeSubpassInputsForMetal(
                     .location = getDiagnosticPos(user)});
                 IRBuilder localBuilder(user);
                 localBuilder.setInsertBefore(user);
-                use->set(localBuilder.emitPoison(elementType));
+                use->set(localBuilder.emitPoison(subpassType));
                 continue;
             }
 

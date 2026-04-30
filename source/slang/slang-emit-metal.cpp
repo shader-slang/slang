@@ -1028,6 +1028,12 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit("nullptr");
             return true;
         }
+    case kIROp_SubpassLoad:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            inst,
+            "SubpassLoad should have been lowered before Metal emission");
+        return true;
     default:
         break;
     }

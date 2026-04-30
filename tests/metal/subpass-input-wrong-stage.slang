@@ -4,6 +4,7 @@
 // SubpassInput requires the fragment stage; using it in compute or vertex should fail.
 
 // CHECK: error[E36107]
+// CHECK: SubpassLoad
 
 RWStructuredBuffer<float4> outputBuffer;
 [[vk::input_attachment_index(0)]] SubpassInput<float4> input0;
