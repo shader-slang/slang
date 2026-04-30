@@ -45,3 +45,12 @@ LEAK: _maybeBeginMacroInvocation
 Slang::List<Slang::TypeLayout::ResourceInfo, Slang::StandardAllocator>::begin()
 slang-reflection-api.cpp:1384
 slang-type-layout.h:772
+
+# #10988: alloc-dealloc-mismatch in glslang_disassembleSPIRV.
+# String allocated with `new char[len]` in
+# glslang_disassembleSPIRVWithResult is freed with scalar `delete` in
+# glslang_disassembleSPIRV. The buggy free is reachable only from the
+# SPIR-V validation-failure branch in slang-emit.cpp, so it stayed
+# dormant from 2025-09-30 (PR #8526) until 2026-04-29, when a newly
+# added test on master produced invalid SPIR-V and walked into it.
+in glslang_disassembleSPIRV
