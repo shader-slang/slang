@@ -3917,7 +3917,7 @@ err(
     span { loc = "expr:Expr", message = "'no_diff' can only be used to decorate a call or a subscript operation" }
 )
 
-err(
+warning(
     "use-of-no-diff-on-differentiable-func",
     38032,
     "'no_diff' on differentiable function has no meaning",
