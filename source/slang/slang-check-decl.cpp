@@ -5943,6 +5943,10 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
     //
     bool conformance = true;
     Val* witness = nullptr;
+
+    // Later constraints may depend on witnesses from earlier constraints.
+    // Add witnesses as we discover them so lookup can see them during this
+    // check, and remember which ones to remove if the overall check fails.
     List<Decl*> addedRequirementWitnesses;
     for (auto requiredConstraintDeclRef :
          getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, requirementDeclRef))
