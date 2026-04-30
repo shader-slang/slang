@@ -265,6 +265,7 @@ static void legalizeSubpassInputsForMetal(
         }
     }
 
+    IRFunc* entryPointToFix = nullptr;
     for (auto globalParam : subpassGlobals)
     {
         auto subpassType = as<IRSubpassInputType>(globalParam->getDataType());
@@ -375,8 +376,11 @@ static void legalizeSubpassInputsForMetal(
         }
 
         globalParam->removeAndDeallocate();
-        fixUpFuncType(entryPointFunc);
+        entryPointToFix = entryPointFunc;
     }
+
+    if (entryPointToFix)
+        fixUpFuncType(entryPointToFix);
 }
 
 void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
