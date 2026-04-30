@@ -139,6 +139,8 @@ Stage getStageFromAtom(CapabilityAtom atom)
         return Stage::Callable;
     case CapabilityAtom::dispatch:
         return Stage::Dispatch;
+    case CapabilityAtom::node:
+        return Stage::Node;
     default:
         SLANG_UNEXPECTED("unknown stage atom");
         UNREACHABLE_RETURN(Stage::Unknown);
@@ -182,6 +184,8 @@ CapabilityAtom getAtomFromStage(Stage stage)
         return CapabilityAtom::_callable;
     case Stage::Dispatch:
         return CapabilityAtom::dispatch;
+    case Stage::Node:
+        return CapabilityAtom::node;
     default:
         SLANG_UNEXPECTED("unknown stage");
         UNREACHABLE_RETURN(CapabilityAtom::Invalid);

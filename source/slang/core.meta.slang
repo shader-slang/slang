@@ -4442,6 +4442,49 @@ attribute_syntax [NumThreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttr
 __attributeTarget(FuncDecl)
 attribute_syntax [WaveSize(numLanes: int)]   : WaveSizeAttribute;
 
+// Work Graph Node Shader attributes
+
+/// Specifies the launch mode for a work-graph node shader.
+/// @param mode One of "broadcasting", "thread", or "coalescing".
+__attributeTarget(FuncDecl)
+attribute_syntax [NodeLaunch(mode: String)] : NodeLaunchAttribute;
+
+/// Specifies the maximum dispatch grid for a broadcasting node.
+__attributeTarget(FuncDecl)
+attribute_syntax [NodeMaxDispatchGrid(x: int, y: int, z: int)] : NodeMaxDispatchGridAttribute;
+
+/// Specifies a fixed dispatch grid for a broadcasting node.
+__attributeTarget(FuncDecl)
+attribute_syntax [NodeDispatchGrid(x: int, y: int, z: int)] : NodeDispatchGridAttribute;
+
+/// Maximum number of output records for a node output parameter, or maximum input records
+/// for a coalescing node input parameter.
+__attributeTarget(FuncDecl)
+__attributeTarget(ParamDecl)
+attribute_syntax [MaxRecords(count: int)] : MaxRecordsAttribute;
+
+/// Overrides the node identifier (name and optional array index) used in the work graph.
+/// The second argument (array index) is optional and defaults to 0.
+__attributeTarget(FuncDecl)
+__attributeTarget(ParamDecl)
+attribute_syntax [NodeID(name: String)] : NodeIDAttribute;
+
+/// Marks this node shader as a program entry point in the work graph.
+__attributeTarget(FuncDecl)
+attribute_syntax [NodeIsProgramEntry] : NodeIsProgramEntryAttribute;
+
+/// Specifies the number of nodes in a node output array.
+__attributeTarget(ParamDecl)
+attribute_syntax [NodeArraySize(count: int)] : NodeArraySizeAttribute;
+
+/// Allows a node output array to contain unresolved (sparse) entries.
+__attributeTarget(ParamDecl)
+attribute_syntax [AllowSparseNodes] : AllowSparseNodesAttribute;
+
+//@hidden:
+__attributeTarget(StructDecl)
+attribute_syntax [__workGraphRecordType] : WorkGraphRecordTypeAttribute;
+
 //@hidden:
 __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanRayPayload(location : int = -1)] : VulkanRayPayloadAttribute;
@@ -4942,16 +4985,19 @@ semantic sv_dispatchthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -4963,16 +5009,19 @@ semantic sv_groupid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -4981,6 +5030,7 @@ semantic sv_groupindex
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 }
 
@@ -4992,16 +5042,19 @@ semantic sv_groupthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 

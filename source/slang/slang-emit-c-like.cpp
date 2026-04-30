@@ -1479,6 +1479,12 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_CapabilityDisjunction:
         return true;
 
+    // Work-graph Barrier flag helpers: must be inlined into the call site so the HLSL
+    // emitter can emit named constants directly rather than through a temporary int.
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+    case kIROp_GetEnumBarrierSemanticFlags:
+        return true;
+
     // Always fold these in, because their results
     // cannot be represented in the type system of
     // our current targets.
@@ -2677,6 +2683,16 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit("[");
             emitOperand(inst->getOperand(1), EmitOpInfo());
             m_writer->emit("]");
+        }
+        break;
+
+    case kIROp_NodeOutputRecordGetElementPtr:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, outerPrec);
+            m_writer->emit(".Get(");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit(")");
         }
         break;
 
@@ -4442,6 +4458,15 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
         return;
     }
 
+    // Work-graph record types (e.g. DispatchNodeInputRecord<T>, NodeOutput<T>) are native
+    // template types in HLSL/DXC; emitting a struct definition would shadow the built-in
+    // and break DXC's recognition of the type. Suppress both annotated and unannotated
+    // instances — the unannotated base struct should never appear in emitted code.
+    if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>())
+    {
+        return;
+    }
+
     m_writer->emit("struct ");
 
     emitPostKeywordTypeAttributes(structType);
@@ -5142,6 +5167,12 @@ void CLikeSourceEmitter::ensureInstOperand(
 
 void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, IRInst* inst)
 {
+    // SPIR-V asm blocks and their sub-instructions are opaque to C-like targets.
+    // Their operands may reference the enclosing function (e.g. $main), which
+    // would cause a false circularity in the emit ordering. Skip them entirely.
+    if (inst->getOp() == kIROp_SPIRVAsm)
+        return;
+
     ensureInstOperand(ctx, inst->getFullType());
 
     UInt operandCount = inst->operandCount;
@@ -5392,6 +5423,10 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
         emitFuncDecl(cast<IRFunc>(inst));
         break;
     case kIROp_StructType:
+        // Work-graph record types are native HLSL/DXC template types;
+        // forward-declaring them as structs would hide the built-in.
+        if (inst->findDecoration<IRWorkGraphRecordTypeDecoration>())
+            break;
         m_writer->emit("struct ");
         m_writer->emit(getName(inst));
         m_writer->emit(";\n");

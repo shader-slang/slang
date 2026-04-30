@@ -1265,6 +1265,73 @@ class WaveSizeAttribute : public Attribute
     FIDDLE() IntVal* numLanes;
 };
 
+// Work-graph node shader attributes
+
+FIDDLE()
+class NodeLaunchAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() String mode; // "broadcasting" | "thread" | "coalescing"
+};
+
+FIDDLE()
+class NodeMaxDispatchGridAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* x;
+    FIDDLE() IntVal* y;
+    FIDDLE() IntVal* z;
+};
+
+FIDDLE()
+class NodeDispatchGridAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* x;
+    FIDDLE() IntVal* y;
+    FIDDLE() IntVal* z;
+};
+
+FIDDLE()
+class MaxRecordsAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* value;
+};
+
+FIDDLE()
+class NodeIDAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() String name;
+    FIDDLE() IntVal* arrayIndex; // nullptr when the second argument is omitted (implies 0)
+};
+
+FIDDLE()
+class NodeIsProgramEntryAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class AllowSparseNodesAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class NodeArraySizeAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* count;
+};
+
+FIDDLE()
+class WorkGraphRecordTypeAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class MaxVertexCountAttribute : public Attribute
 {

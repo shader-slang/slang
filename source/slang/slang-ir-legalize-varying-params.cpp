@@ -2632,7 +2632,8 @@ private:
         List<IRParam*> paramsToProcess;
         for (auto param : func->getParams())
         {
-            if (as<IRStructType>(param->getDataType()))
+            auto paramType = as<IRStructType>(param->getDataType());
+            if (paramType && !isWorkGraphRecordType(paramType))
             {
                 paramsToProcess.add(param);
             }

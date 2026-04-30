@@ -506,6 +506,10 @@ def geometry : stage;
 /// [Stage]
 def dispatch : stage;
 
+/// Work-graph node stage
+/// [Stage]
+def node : stage;
+
 def _raygen : stage;
 alias _raygeneration = _raygen;
 def _intersection : stage;
@@ -1477,7 +1481,7 @@ alias amplification = _amplification + _meshshading;
 /// [Compound]
 alias any_stage = vertex | fragment | compute | hull | domain | geometry
                  | raygen | intersection | anyhit | closesthit | miss | mesh
-                 | amplification | callable
+                 | amplification | callable | node
                  ;
 
 /// Collection of shader stages
