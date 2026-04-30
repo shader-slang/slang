@@ -390,6 +390,9 @@ private:
         TargetProgram* targetProgram,
         const String& path,
         IArtifact* artifact);
+    /// If the artifact carries shader-coverage tracing data, write
+    /// `<path>.coverage-mapping.json` next to the compiled output.
+    SlangResult _maybeWriteCoverageMapping(const String& path, IArtifact* artifact);
     SlangResult _writeArtifact(const String& path, IArtifact* artifact);
 
     /// Adds any extra settings to complete a targetRequest
