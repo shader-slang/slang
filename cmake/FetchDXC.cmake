@@ -63,6 +63,18 @@ elseif(
     NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
     AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
+    AND DEFINED SLANG_DXC_BINARY_URL
+)
+    # User supplied a custom URL; skip GLIBC auto-detection and use it as-is.
+    message(
+        STATUS
+        "SLANG_DXC_BINARY_URL set: skipping GLIBC auto-detection, "
+        "using custom prebuilt URL."
+    )
+elseif(
+    NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
+    AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
+    AND NOT CMAKE_CROSSCOMPILING
     AND NOT DEFINED SLANG_DXC_BINARY_URL
     AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
 )
@@ -390,8 +402,8 @@ if(_dxc_build_from_source)
                 ${_dxc_generator_args} -C
                 "${_dxc_src_dir}/cmake/caches/PredefinedParams.cmake"
                 # Forward parent compilers so DXC uses the same toolchain.
-                -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+                "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
                 # CMAKE_BUILD_TYPE is ignored by multi-config generators (VS);
                 # the config is selected via --config MinSizeRel in the build
                 # command. Passing it here covers single-config generators (Ninja).
@@ -470,13 +482,14 @@ if(_dxc_build_from_source)
             set(_dst
                 "${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/${_dll}.dll"
             )
-            add_custom_target(
-                copy-${_dll}
+            add_custom_command(
+                OUTPUT "${_dst}"
                 COMMAND
                     ${CMAKE_COMMAND} -E copy_if_different "${_src}" "${_dst}"
+                DEPENDS "${_src}"
                 VERBATIM
             )
-            add_dependencies(copy-${_dll} dxc_from_source)
+            add_custom_target(copy-${_dll} DEPENDS "${_dst}")
             set_target_properties(copy-${_dll} PROPERTIES FOLDER generated)
         endforeach()
     else()
@@ -485,13 +498,14 @@ if(_dxc_build_from_source)
             set(_dst
                 "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/lib${_lib}.so"
             )
-            add_custom_target(
-                copy-${_lib}
+            add_custom_command(
+                OUTPUT "${_dst}"
                 COMMAND
                     ${CMAKE_COMMAND} -E copy_if_different "${_src}" "${_dst}"
+                DEPENDS "${_src}"
                 VERBATIM
             )
-            add_dependencies(copy-${_lib} dxc_from_source)
+            add_custom_target(copy-${_lib} DEPENDS "${_dst}")
             set_target_properties(copy-${_lib} PROPERTIES FOLDER generated)
         endforeach()
     endif()
