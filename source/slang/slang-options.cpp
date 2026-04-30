@@ -539,6 +539,20 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Reports information about checkpoint contexts used for reverse-mode automatic "
          "differentiation."},
+        {OptionKind::TraceCoverage,
+         "-trace-coverage",
+         nullptr,
+         "Instrument the shader with per-statement execution counters. "
+         "When writing compiled output to a file, slangc also emits "
+         "`<output>.coverage-mapping.json` mapping counter slots to source positions."},
+        {OptionKind::TraceCoverageBinding,
+         "-trace-coverage-binding",
+         "-trace-coverage-binding <index> <space>",
+         "Bind the synthesized `__slang_coverage` buffer at an explicit "
+         "(register index, space) instead of auto-allocating a slot. "
+         "Useful when the host needs the binding fixed at compile time "
+         "(e.g. for a pre-built D3D12 root signature). Implies "
+         "`-trace-coverage`."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -2382,6 +2396,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ReportPerfBenchmark:
         case OptionKind::ReportCheckpointIntermediates:
         case OptionKind::ReportDynamicDispatchSites:
+        case OptionKind::TraceCoverage:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
@@ -2787,6 +2802,20 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     OptionKind::VulkanBindGlobals,
                     (int)binding,
                     (int)bindingSet);
+                break;
+            }
+        case OptionKind::TraceCoverageBinding:
+            {
+                // -trace-coverage-binding <index> <space>
+                Int bindingIndex, bindingSpace;
+                SLANG_RETURN_ON_FAIL(_expectInt(arg, bindingIndex));
+                SLANG_RETURN_ON_FAIL(_expectInt(arg, bindingSpace));
+                linkage->m_optionSet.set(
+                    OptionKind::TraceCoverageBinding,
+                    (int)bindingIndex,
+                    (int)bindingSpace);
+                // Implies -trace-coverage so users don't have to spell both.
+                linkage->m_optionSet.set(OptionKind::TraceCoverage, true);
                 break;
             }
         case OptionKind::Profile:
@@ -3679,6 +3708,21 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                         .impliedStage = getStageName(rawTranslationUnit.impliedStage)});
                 }
             }
+        }
+
+        // `-trace-coverage` instruments at the Slang IR level and has
+        // no meaning when the user asks for pass-through codegen
+        // (where the downstream compiler sees the original source
+        // directly). Reject the combination rather than silently
+        // producing an uninstrumented shader.
+        if (m_requestImpl->m_passThrough != PassThroughMode::None &&
+            linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage))
+        {
+            m_sink->diagnoseRaw(
+                Severity::Error,
+                UnownedStringSlice("-trace-coverage cannot be combined with -pass-through; "
+                                   "pass-through bypasses the Slang IR pipeline and cannot "
+                                   "emit coverage instrumentation."));
         }
 
         // If the user is requesting code generation via pass-through,

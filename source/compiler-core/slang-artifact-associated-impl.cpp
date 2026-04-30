@@ -289,6 +289,10 @@ void* ArtifactPostEmitMetadata::getInterface(const Guid& guid)
     }
     if (guid == slang::IMetadata::getTypeGuid())
         return static_cast<slang::IMetadata*>(this);
+    if (guid == slang::ICoverageTracingMetadata::getTypeGuid())
+    {
+        return static_cast<slang::ICoverageTracingMetadata*>(this);
+    }
     if (guid == slang::ICooperativeTypesMetadata::getTypeGuid())
         return static_cast<slang::ICooperativeTypesMetadata*>(this);
     return nullptr;
@@ -346,6 +350,42 @@ SlangResult ArtifactPostEmitMetadata::isParameterLocationUsed(
 const char* ArtifactPostEmitMetadata::getDebugBuildIdentifier()
 {
     return m_debugBuildIdentifier.getBuffer();
+}
+
+uint32_t ArtifactPostEmitMetadata::getCounterCount()
+{
+    return (uint32_t)m_coverageEntries.getCount();
+}
+
+SlangResult ArtifactPostEmitMetadata::getEntryInfo(
+    uint32_t index,
+    slang::CoverageEntryInfo* outInfo)
+{
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize != sizeof(slang::CoverageEntryInfo))
+        return SLANG_E_INVALID_ARG;
+    if (index >= (uint32_t)m_coverageEntries.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto& entry = m_coverageEntries[index];
+    // Surface an empty source-file path as a null pointer so callers
+    // can branch on attributability without separately checking the
+    // length. An empty file string would otherwise look like a
+    // valid (but empty) path to consumers.
+    outInfo->file = entry.file.getLength() ? entry.file.getBuffer() : nullptr;
+    outInfo->line = entry.line;
+    return SLANG_OK;
+}
+
+SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* outInfo)
+{
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize != sizeof(slang::CoverageBufferInfo))
+        return SLANG_E_INVALID_ARG;
+    outInfo->space = m_coverageBufferSpace;
+    outInfo->binding = m_coverageBufferBinding;
+    return SLANG_OK;
 }
 
 SlangUInt ArtifactPostEmitMetadata::getCooperativeMatrixTypeCount()

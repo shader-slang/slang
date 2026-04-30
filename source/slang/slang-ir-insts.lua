@@ -1096,6 +1096,17 @@ local insts = {
 			{ atomicDec = { operands = { { "ptr" } } } },
 		},
 	},
+	-- Emitted at AST lowering when `-trace-coverage` is on. The
+	-- instruction has no operands; its source position is carried on
+	-- the standard per-instruction `sourceLoc` field, which is always
+	-- preserved and never stripped by `stripDebugInfo`. The coverage-
+	-- instrument IR pass later rewrites each occurrence into an atomic
+	-- add on the AST-synthesized coverage buffer; counter slots are
+	-- assigned one-per-op in traversal order. Host-side tooling can
+	-- aggregate those slots back to `(file, line)` when producing LCOV.
+	-- Inherent side-effect semantics keep the optimizer from deleting
+	-- or hoisting this op.
+	{ IncrementCoverageCounter = {} },
 	-- Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 	-- currently accumulated derivative to pass to some dOut argument in a nested call.
 	{ LoadReverseGradient = { operands = { { "value" } } } },
