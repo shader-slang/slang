@@ -2628,6 +2628,19 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(getIntVal(location));
             return true;
         }
+    case kIROp_SubpassLoad:
+        {
+            auto subpassLoad = as<IRSubpassLoad>(inst);
+            m_writer->emit("subpassLoad(");
+            emitOperand(subpassLoad->getSubpassInput(), getInfo(EmitOp::General));
+            if (auto sample = subpassLoad->getSample())
+            {
+                m_writer->emit(", ");
+                emitOperand(sample, getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_ImageLoad:
         {
             auto imageOp = as<IRImageLoad>(inst);

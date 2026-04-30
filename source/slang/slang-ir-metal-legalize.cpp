@@ -249,18 +249,6 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
     }
 }
 
-static bool isSubpassLoadIntrinsicCall(IRCall* call, CapabilitySet const& targetCaps)
-{
-    if (call->getArgCount() < 1)
-        return false;
-    if (!as<IRSubpassInputType>(call->getArg(0)->getDataType()))
-        return false;
-    auto callee = call->getOperand(0);
-    if (auto decor = findBestTargetIntrinsicDecoration(callee, targetCaps))
-        return decor->getDefinition() == toSlice("$0");
-    return false;
-}
-
 static void legalizeSubpassInputsForMetal(
     IRModule* module,
     TargetProgram* targetProgram,
@@ -357,7 +345,6 @@ static void legalizeSubpassInputsForMetal(
         if (auto nameHint = globalParam->findDecoration<IRNameHintDecoration>())
             builder.addNameHintDecoration(newParam, nameHint->getName());
 
-        auto targetCaps = targetProgram->getTargetReq()->getTargetCaps();
         IRUse* nextUse = nullptr;
         for (IRUse* use = globalParam->firstUse; use; use = nextUse)
         {
@@ -373,14 +360,11 @@ static void legalizeSubpassInputsForMetal(
                 continue;
             }
 
-            if (auto call = as<IRCall>(user))
+            if (user->getOp() == kIROp_SubpassLoad)
             {
-                if (isSubpassLoadIntrinsicCall(call, targetCaps))
-                {
-                    call->replaceUsesWith(newParam);
-                    call->removeAndDeallocate();
-                    continue;
-                }
+                user->replaceUsesWith(newParam);
+                user->removeAndDeallocate();
+                continue;
             }
             use->set(newParam);
         }

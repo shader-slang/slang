@@ -5096,6 +5096,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_ImageLoad:
             result = emitImageLoad(parent, as<IRImageLoad>(inst));
             break;
+        case kIROp_SubpassLoad:
+            result = emitSubpassLoad(parent, as<IRSubpassLoad>(inst));
+            break;
         case kIROp_ImageStore:
             result = emitImageStore(parent, as<IRImageStore>(inst));
             break;
@@ -5384,6 +5387,35 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         SpvImageOperandsMakeTexelVisibleMask | SpvImageOperandsNonPrivateTexelMask);
 
                     emitOperand(memoryScope);
+                }
+            });
+    }
+
+    SpvInst* emitSubpassLoad(SpvInstParent* parent, IRSubpassLoad* inst)
+    {
+        requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto zeroVec = builder.emitMakeVectorFromScalar(
+            builder.getVectorType(builder.getIntType(), builder.getIntValue(builder.getIntType(), 2)),
+            builder.getIntValue(builder.getIntType(), 0));
+
+        return emitInstCustomOperandFunc(
+            parent,
+            inst,
+            SpvOpImageRead,
+            [&]()
+            {
+                emitOperand(inst->getDataType());
+                emitOperand(kResultID);
+                emitOperand(inst->getSubpassInput());
+                emitOperand(zeroVec);
+
+                if (auto sample = inst->getSample())
+                {
+                    emitOperand(SpvImageOperandsSampleMask);
+                    emitOperand(sample);
                 }
             });
     }

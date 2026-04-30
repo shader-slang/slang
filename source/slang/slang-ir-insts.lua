@@ -1146,6 +1146,8 @@ local insts = {
 	},
 	-- Store into an Image.
 	{ imageStore = { operands = { { "image" }, { "coord" }, { "value" } } } },
+	-- Load from a SubpassInput.
+	{ SubpassLoad = { operands = { { "subpassInput" }, { "sample", optional = true } } } },
 	-- Load (almost) arbitrary-type data from a byte-address buffer
 	-- %dst = byteAddressBufferLoad(%buffer, %offset, %alignment)
 	-- where
