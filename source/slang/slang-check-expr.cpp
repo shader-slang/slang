@@ -3869,7 +3869,16 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                             //
                             // An argument can be made that transformation shouldn't apply to
                             // the ref scenario in general.
-                            if (implicitCastExpr && as<OutParamTypeBase>(paramType) &&
+                            // Only fall back to the implicit-cast-as-lvalue
+                            // mechanism if the inner expression is itself an
+                            // l-value: writing back the result of the call only
+                            // makes sense if we have somewhere to write back to.
+                            // Without this check, passing a literal (e.g.
+                            // `foo(0)` for `inout uint`) would survive the
+                            // front end and ICE during IR lowering.
+                            if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1 &&
+                                as<OutParamTypeBase>(paramType) &&
+                                implicitCastExpr->arguments[0]->type.isLeftValue &&
                                 _canLValueCoerce(
                                     implicitCastExpr->arguments[0]->type,
                                     implicitCastExpr->type))
@@ -3948,7 +3957,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                     .arg = argExpr});
 
 
-                                if (implicitCastExpr)
+                                if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1)
                                 {
                                     // Try and determine reason for failure
                                     if (as<RefParamType>(paramType))
