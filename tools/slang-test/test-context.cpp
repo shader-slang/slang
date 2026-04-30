@@ -18,15 +18,42 @@ thread_local int slangTestThreadIndex = 0;
 // When GPU driver crashes, all threads fail simultaneously so this triggers quickly.
 static constexpr int kConsecutiveFailureAbortThreshold = 32;
 static std::atomic<int> s_consecutiveFailures{0};
+static constexpr Int kMaxRPCConnectionTimeoutInMs = 24 * 60 * 60 * 1000;
 
 TestContext::TestContext()
 {
-    /// if we are testing on arm, debug, we may want to increase the connection timeout
+    /// If we are testing on arm, debug, we may want to increase the connection timeout.
 #if (SLANG_PROCESSOR_ARM || SLANG_PROCESSOR_ARM_64) && defined(_DEBUG)
     // 10 mins(!). This seems to be the order of time needed for timeout on a CI ARM test system on
     // debug
     connectionTimeOutInMs = 1000 * 60 * 10;
+#elif SLANG_WINDOWS_FAMILY && defined(_DEBUG)
+    // Windows debug CI can spend more than two minutes in individual test-server requests.
+    connectionTimeOutInMs = 1000 * 60 * 5;
 #endif
+
+    StringBuilder rpcTimeoutEnvValue;
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice::fromLiteral("SLANG_TEST_RPC_TIMEOUT_MS"),
+            rpcTimeoutEnvValue)))
+    {
+        Int64 rpcTimeoutInMs = 0;
+        if (SLANG_SUCCEEDED(
+                StringUtil::parseInt64(rpcTimeoutEnvValue.getUnownedSlice(), rpcTimeoutInMs)) &&
+            rpcTimeoutInMs > 0 && rpcTimeoutInMs <= kMaxRPCConnectionTimeoutInMs)
+        {
+            connectionTimeOutInMs = Int(rpcTimeoutInMs);
+        }
+        else
+        {
+            String maxTimeoutInMs = String(kMaxRPCConnectionTimeoutInMs);
+            StdWriters::getError().print(
+                "warning: ignoring invalid SLANG_TEST_RPC_TIMEOUT_MS value '%s' "
+                "(expected 1..%s milliseconds)\n",
+                rpcTimeoutEnvValue.getBuffer(),
+                maxTimeoutInMs.getBuffer());
+        }
+    }
 }
 
 void TestContext::setThreadIndex(int index)
