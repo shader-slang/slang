@@ -1541,8 +1541,11 @@ static bool typeCheck(IROp op, uint32_t matrixUse)
     {
     case SLANG_COOPERATIVE_MATRIX_USE_A:
     case SLANG_COOPERATIVE_MATRIX_USE_B:
-        return op == kIROp_HalfType;
+        // PTX m16n8k16 supports both f16 and bf16 inputs.
+        return op == kIROp_HalfType || op == kIROp_BFloat16Type;
     case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR:
+        // bf16 MMA only allows an f32 accumulator on PTX, so the accumulator type
+        // can only be half or float here regardless of input element type.
         return op == kIROp_HalfType || op == kIROp_FloatType;
     }
     return false;

@@ -6697,24 +6697,16 @@ struct RegisterCount<half, 16, 16, 16, MatrixUse::MatrixD>
 #endif // #if SLANG_CUDA_ENABLE_HALF
 
 #if SLANG_CUDA_ENABLE_BF16
-// bfloat16 - 8 regs for A/B, 4 regs for C/D
-template<int M, int N, int K>
-struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixA>
+// bfloat16 (bf16) - m16n16k16: 4 regs for A/B (mma.sync.m16n8k16 register layout).
+// Note: bf16 MMA only supports float (f32) accumulators on PTX, so MatrixC/D
+// register counts for __nv_bfloat16 are intentionally not defined here.
+template<>
+struct RegisterCount<__nv_bfloat16, 16, 16, 16, MatrixUse::MatrixA>
 {
     static constexpr int value = 4;
 };
-template<int M, int N, int K>
-struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixB>
-{
-    static constexpr int value = 4;
-};
-template<int M, int N, int K>
-struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixC>
-{
-    static constexpr int value = 4;
-};
-template<int M, int N, int K>
-struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixD>
+template<>
+struct RegisterCount<__nv_bfloat16, 16, 16, 16, MatrixUse::MatrixB>
 {
     static constexpr int value = 4;
 };
@@ -7472,6 +7464,61 @@ __device__ inline void mmaStore(void* ptr, const uint32_t* regs, int stride)
     MMAStoreHelper<ElemT, layout, Row, Col>::exec(buffer, regs, stride, laneid);
 }
 
+// ====================================================================================
+// Packed-pair traits for 16-bit float types (half / bfloat16).
+//
+// Both half and bfloat16 fit two elements per 32-bit register. Arithmetic operators
+// for the corresponding pair types (__half2 / __nv_bfloat162) are already available:
+//   - __half2 ops are defined at global scope earlier in this prelude (when
+//     SLANG_CUDA_ENABLE_HALF is defined; cuda_fp16.h is included with
+//     __CUDA_NO_HALF2_OPERATORS__ so the prelude can supply HLSL-friendly versions).
+//   - __nv_bfloat162 ops come straight from <cuda_bf16.h>.
+// So this trait only needs to expose the pair type and the per-type broadcast
+// intrinsic — arithmetic in the WmmaFragment operator overloads can use native
+// `+`, `-`, `*`, `/`, unary `-` directly.
+// ====================================================================================
+
+template<typename T>
+struct PackedFp16Traits;
+
+#if SLANG_CUDA_ENABLE_HALF
+template<>
+struct PackedFp16Traits<half>
+{
+    using PairType = __half2;
+    static __device__ PairType broadcast(half v) { return __half2half2(v); }
+};
+#endif
+
+#if SLANG_CUDA_ENABLE_BF16
+template<>
+struct PackedFp16Traits<__nv_bfloat16>
+{
+    using PairType = __nv_bfloat162;
+    static __device__ PairType broadcast(__nv_bfloat16 v) { return __bfloat162bfloat162(v); }
+};
+#endif
+
+template<typename T>
+struct IsPackedFp16
+{
+    static constexpr bool value = false;
+};
+#if SLANG_CUDA_ENABLE_HALF
+template<>
+struct IsPackedFp16<half>
+{
+    static constexpr bool value = true;
+};
+#endif
+#if SLANG_CUDA_ENABLE_BF16
+template<>
+struct IsPackedFp16<__nv_bfloat16>
+{
+    static constexpr bool value = true;
+};
+#endif
+
 template<typename T>
 inline unsigned __device__ Pack32Helper(T value);
 
@@ -7480,6 +7527,15 @@ template<>
 inline unsigned __device__ Pack32Helper<half>(half value)
 {
     return __half_as_ushort(value) | (__half_as_ushort(value) << 16);
+};
+#endif
+
+#if SLANG_CUDA_ENABLE_BF16
+template<>
+inline unsigned __device__ Pack32Helper<__nv_bfloat16>(__nv_bfloat16 value)
+{
+    unsigned short bits = __bfloat16_as_ushort(value);
+    return (unsigned)bits | ((unsigned)bits << 16);
 };
 #endif
 
@@ -7555,20 +7611,18 @@ struct WmmaFragment
     __device__ This operator*(T b)
     {
         This result;
-#if SLANG_CUDA_ENABLE_HALF
-        if (sizeof(T) == 2)
+        if constexpr (IsPackedFp16<T>::value)
         {
-            __half bh = *reinterpret_cast<const __half*>(&b);
-            __half2 bv = __half2half2(bh);
+            using PairT = typename PackedFp16Traits<T>::PairType;
+            PairT bv = PackedFp16Traits<T>::broadcast(b);
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __hmul2(*reinterpret_cast<const __half2*>(&regs[i]), bv);
+                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) * bv;
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
-#endif
         {
             for (int i = 0; i < GetLength(); i++)
                 result.set(i, get(i) * b);
@@ -7579,20 +7633,18 @@ struct WmmaFragment
     __device__ This operator*(const This& b)
     {
         This result;
-#if SLANG_CUDA_ENABLE_HALF
-        if (sizeof(T) == 2)
+        if constexpr (IsPackedFp16<T>::value)
         {
+            using PairT = typename PackedFp16Traits<T>::PairType;
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __hmul2(
-                    *reinterpret_cast<const __half2*>(&regs[i]),
-                    *reinterpret_cast<const __half2*>(&b.regs[i]));
+                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) *
+                          *reinterpret_cast<const PairT*>(&b.regs[i]);
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
-#endif
         {
             for (int i = 0; i < GetLength(); i++)
                 result.set(i, get(i) * b.get(i));
@@ -7603,20 +7655,18 @@ struct WmmaFragment
     __device__ This operator/(const This& other)
     {
         This result;
-#if SLANG_CUDA_ENABLE_HALF
-        if (sizeof(T) == 2)
+        if constexpr (IsPackedFp16<T>::value)
         {
+            using PairT = typename PackedFp16Traits<T>::PairType;
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __h2div(
-                    *reinterpret_cast<const __half2*>(&regs[i]),
-                    *reinterpret_cast<const __half2*>(&other.regs[i]));
+                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) /
+                          *reinterpret_cast<const PairT*>(&other.regs[i]);
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
-#endif
         {
             for (int i = 0; i < GetLength(); i++)
                 result.set(i, get(i) / other.get(i));
@@ -7627,20 +7677,18 @@ struct WmmaFragment
     __device__ This operator-(const This& other)
     {
         This result;
-#if SLANG_CUDA_ENABLE_HALF
-        if (sizeof(T) == 2)
+        if constexpr (IsPackedFp16<T>::value)
         {
+            using PairT = typename PackedFp16Traits<T>::PairType;
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __hsub2(
-                    *reinterpret_cast<const __half2*>(&regs[i]),
-                    *reinterpret_cast<const __half2*>(&other.regs[i]));
+                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) -
+                          *reinterpret_cast<const PairT*>(&other.regs[i]);
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
-#endif
         {
             for (int i = 0; i < GetLength(); i++)
                 result.set(i, get(i) - other.get(i));
@@ -7651,18 +7699,17 @@ struct WmmaFragment
     __device__ This operator-()
     {
         This result;
-#if SLANG_CUDA_ENABLE_HALF
-        if (sizeof(T) == 2)
+        if constexpr (IsPackedFp16<T>::value)
         {
+            using PairT = typename PackedFp16Traits<T>::PairType;
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __hneg2(*reinterpret_cast<const __half2*>(&regs[i]));
+                PairT r = -*reinterpret_cast<const PairT*>(&regs[i]);
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
-#endif
         {
             for (int i = 0; i < GetLength(); i++)
                 result.set(i, -get(i));
@@ -7673,20 +7720,18 @@ struct WmmaFragment
     __device__ This operator+(const This& other)
     {
         This result;
-#if SLANG_CUDA_ENABLE_HALF
-        if (sizeof(T) == 2)
+        if constexpr (IsPackedFp16<T>::value)
         {
+            using PairT = typename PackedFp16Traits<T>::PairType;
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __hadd2(
-                    *reinterpret_cast<const __half2*>(&regs[i]),
-                    *reinterpret_cast<const __half2*>(&other.regs[i]));
+                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) +
+                          *reinterpret_cast<const PairT*>(&other.regs[i]);
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
-#endif
         {
             for (int i = 0; i < GetLength(); i++)
                 result.set(i, get(i) + other.get(i));
@@ -7889,38 +7934,29 @@ struct WmmaFragment
 };
 
 // ====================================================================================
-// FP16 MMA Helper - For half x half inputs
-// Specialized on CType and DType (accumulator types)
+// 16-bit Float MMA Helpers - For half x half / bfloat16 x bfloat16 inputs
+// Specialized on CType and DType (accumulator/output types).
 //
 // Uses mma.sync.aligned.m16n8k16 instructions (2x per m16n16k16 tile).
 // Only the m16n16k16 shape is supported.
-// ====================================================================================
-
-template<typename CType, typename DType, int M, int N, int K>
-struct Fp16MMAHelper;
-
-
-// ====================================================================================
-// Fp16MMAHelper m16n16k16 specializations (via 2x mma.sync.m16n8k16)
-//
-// Override the generic WMMA-based Fp16MMAHelper for the m16n16k16 shape.
-// Each specialization fixes CType, DType AND M=16,N=16,K=16, making it
-// strictly more specialized than the corresponding generic — no ambiguity.
 //
 // Register layout for m16n16k16 = 2x m16n8k16:
 //   A: 4 regs (shared between both calls)
 //   B: 4 regs (b[0:1] → lo N-half, b[2:3] → hi N-half)
-//   C/D half: 4 regs (2 per sub-tile)
+//   C/D half:  4 regs (2 per sub-tile)
 //   C/D float: 8 regs (4 per sub-tile)
+//
+// The mma<> function template is parameterized on the input element type so half
+// and bfloat16 can share the same dispatch shape while emitting different PTX.
 // ====================================================================================
+
+template<typename InputT, typename AccumT, int M, int N, int K>
+__device__ inline void mma(uint32_t* d, const uint32_t* a, const uint32_t* b, const uint32_t* c);
 
 #if SLANG_CUDA_ENABLE_HALF
 
-template<typename AccumT, int M, int N, int K>
-__device__ inline void mma(uint32_t* d, const uint32_t* a, const uint32_t* b, const uint32_t* c);
-
 template<>
-__device__ inline void mma<float, 16, 8, 16>(
+__device__ inline void mma<half, float, 16, 8, 16>(
     uint32_t* d,
     const uint32_t* a,
     const uint32_t* b,
@@ -7945,7 +7981,7 @@ __device__ inline void mma<float, 16, 8, 16>(
 }
 
 template<>
-__device__ inline void mma<half, 16, 8, 16>(
+__device__ inline void mma<half, half, 16, 8, 16>(
     uint32_t* d,
     const uint32_t* a,
     const uint32_t* b,
@@ -7961,6 +7997,51 @@ __device__ inline void mma<half, 16, 8, 16>(
         : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]), "r"(c[0]), "r"(c[1]));
 }
 
+#endif // #if SLANG_CUDA_ENABLE_HALF
+
+#if SLANG_CUDA_ENABLE_BF16
+
+// bf16 MMA only supports float (f32) accumulators on PTX.
+template<>
+__device__ inline void mma<__nv_bfloat16, float, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32 "
+                 "{%0, %1, %2, %3}, "
+                 "{%4, %5, %6, %7}, "
+                 "{%8, %9}, "
+                 "{%10, %11, %12, %13};\n"
+                 : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
+                 : "r"(a[0]),
+                   "r"(a[1]),
+                   "r"(a[2]),
+                   "r"(a[3]),
+                   "r"(b[0]),
+                   "r"(b[1]),
+                   "r"(c[0]),
+                   "r"(c[1]),
+                   "r"(c[2]),
+                   "r"(c[3]));
+}
+
+#endif // #if SLANG_CUDA_ENABLE_BF16
+
+// ====================================================================================
+// Fp16MMAHelper m16n16k16 specializations (via 2x mma.sync.m16n8k16)
+//
+// Override the generic WMMA-based Fp16MMAHelper for the m16n16k16 shape.
+// Each specialization fixes CType, DType AND M=16,N=16,K=16, making it
+// strictly more specialized than the corresponding generic — no ambiguity.
+// ====================================================================================
+
+template<typename CType, typename DType, int M, int N, int K>
+struct Fp16MMAHelper;
+
+#if SLANG_CUDA_ENABLE_HALF
+
 template<>
 struct Fp16MMAHelper<half, half, 16, 16, 16>
 {
@@ -7970,8 +8051,8 @@ struct Fp16MMAHelper<half, half, 16, 16, 16>
         const WmmaFragment<half, 16, 16, 16, MatrixUse::MatrixB>& b,
         const WmmaFragment<half, 16, 16, 16, MatrixC>& c)
     {
-        mma<half, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
-        mma<half, 16, 8, 16>(d.regs + 2, a.regs, b.regs + 2, c.regs + 2);
+        mma<half, half, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
+        mma<half, half, 16, 8, 16>(d.regs + 2, a.regs, b.regs + 2, c.regs + 2);
     }
 };
 
@@ -7984,8 +8065,8 @@ struct Fp16MMAHelper<float, float, 16, 16, 16>
         const WmmaFragment<half, 16, 16, 16, MatrixUse::MatrixB>& b,
         const WmmaFragment<float, 16, 16, 16, MatrixC>& c)
     {
-        mma<float, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
-        mma<float, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 2, c.regs + 4);
+        mma<half, float, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
+        mma<half, float, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 2, c.regs + 4);
     }
 };
 
@@ -8007,8 +8088,8 @@ struct Fp16MMAHelper<half, float, 16, 16, 16>
             fc[2 * i] = __float_as_uint(__half2float(lo));
             fc[2 * i + 1] = __float_as_uint(__half2float(hi));
         }
-        mma<float, 16, 8, 16>(d.regs, a.regs, b.regs, fc);
-        mma<float, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 2, fc + 4);
+        mma<half, float, 16, 8, 16>(d.regs, a.regs, b.regs, fc);
+        mma<half, float, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 2, fc + 4);
     }
 };
 
@@ -8022,8 +8103,8 @@ struct Fp16MMAHelper<float, half, 16, 16, 16>
         const WmmaFragment<float, 16, 16, 16, MatrixC>& c)
     {
         uint32_t fd[8];
-        mma<float, 16, 8, 16>(fd, a.regs, b.regs, c.regs);
-        mma<float, 16, 8, 16>(fd + 4, a.regs, b.regs + 2, c.regs + 4);
+        mma<half, float, 16, 8, 16>(fd, a.regs, b.regs, c.regs);
+        mma<half, float, 16, 8, 16>(fd + 4, a.regs, b.regs + 2, c.regs + 4);
 #pragma unroll
         for (int i = 0; i < 4; i++)
         {
@@ -8037,7 +8118,39 @@ struct Fp16MMAHelper<float, half, 16, 16, 16>
 #endif // #if SLANG_CUDA_ENABLE_HALF
 
 // ====================================================================================
+// Bf16MMAHelper m16n16k16 specializations (via 2x mma.sync.m16n8k16)
+//
+// bfloat16 MMA only supports float (f32) accumulators on PTX, so only the
+// (CType=float, DType=float) combination is provided here.
+// ====================================================================================
+
+template<typename CType, typename DType, int M, int N, int K>
+struct Bf16MMAHelper;
+
+#if SLANG_CUDA_ENABLE_BF16
+
+template<>
+struct Bf16MMAHelper<float, float, 16, 16, 16>
+{
+    __device__ static void eval(
+        WmmaFragment<float, 16, 16, 16, MatrixC>& d,
+        const WmmaFragment<__nv_bfloat16, 16, 16, 16, MatrixUse::MatrixA>& a,
+        const WmmaFragment<__nv_bfloat16, 16, 16, 16, MatrixUse::MatrixB>& b,
+        const WmmaFragment<float, 16, 16, 16, MatrixC>& c)
+    {
+        mma<__nv_bfloat16, float, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
+        mma<__nv_bfloat16, float, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 2, c.regs + 4);
+    }
+};
+
+#endif // #if SLANG_CUDA_ENABLE_BF16
+
+// ====================================================================================
 // MMA Helper - Primary Template (dispatcher)
+//
+// Selects between Fp16MMAHelper (half x half) and Bf16MMAHelper (bfloat16 x bfloat16)
+// based on the input element type. AType is required to equal BType — the supported
+// PTX shapes always have matching A/B element types.
 // ====================================================================================
 
 template<
@@ -8055,7 +8168,16 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
     WmmaFragment<CType, M, N, K, MatrixUse::MatrixC> matC)
 {
     WmmaFragment<DType, M, N, K, MatrixC> matD;
-    Fp16MMAHelper<CType, DType, M, N, K>::eval(matD, matA, matB, matC);
+#if SLANG_CUDA_ENABLE_BF16
+    if constexpr (IsSameType<AType, __nv_bfloat16>::value)
+    {
+        Bf16MMAHelper<CType, DType, M, N, K>::eval(matD, matA, matB, matC);
+    }
+    else
+#endif
+    {
+        Fp16MMAHelper<CType, DType, M, N, K>::eval(matD, matA, matB, matC);
+    }
     return matD;
 }
 

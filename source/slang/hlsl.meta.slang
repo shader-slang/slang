@@ -29425,8 +29425,9 @@ extension<
 }
 
 // IArithmetic implementation for CoopMat, where T is __BuiltinArithmeticType.
-// Note that arithmetic operations are not allowed on CoopMat with FloatE4M3, FloatE5M2,
-// BFloat16 element types.
+// Note that arithmetic operations are not allowed on CoopMat with FloatE4M3 or
+// FloatE5M2 element types. CoopMat<BFloat16, ...> arithmetic is provided by a
+// separate, target-gated extension below.
 extension<
     T,
     let S : MemoryScope,
@@ -29533,6 +29534,319 @@ extension<
             }
         }
         return true;
+    }
+}
+
+// IArithmetic implementation for CoopMat<BFloat16, ...>.
+//
+// BFloat16 does not conform to __BuiltinArithmeticType today (cross-target scalar
+// bf16 arithmetic is not uniformly supported), so the IArithmetic extension above
+// does not apply. We provide a parallel implementation here gated on bf16-capable
+// targets only:
+//   - CUDA (cuda_sm_8_0): dispatch to the prelude's WmmaFragment operator overloads,
+//     which lower to packed __nv_bfloat162 PTX (add.bf16x2 / fma.rn.bf16x2 /
+//     neg.bf16x2 / ...).
+//   - SPIRV (spvBFloat16KHR): fall back to an element-wise loop, converting bf16
+//     -> half for the arithmetic and back to bf16, since SPIRV does not yet
+//     provide bf16 cooperative-matrix arithmetic ops directly.
+extension<
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+> CoopMat<BFloat16, S, M, N, R> : IArithmetic
+{
+    /// Performs element-wise addition of two cooperative matrices.
+    /// @param other The cooperative matrix to add.
+    /// @return A new cooperative matrix containing the element-wise sum.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    This add(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "$0 + $1";
+        case spvBFloat16KHR:
+            This ret;
+            for (int i = 0; i < GetLength(); ++i)
+            {
+                ret[i] = BFloat16(half(this[i]) + half(other[i]));
+            }
+            return ret;
+
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> add is not supported for this target");
+            return other;
+        }
+    }
+
+    /// Performs element-wise subtraction of two cooperative matrices.
+    /// @param other The cooperative matrix to subtract.
+    /// @return A new cooperative matrix containing the element-wise difference.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    This sub(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "$0 - $1";
+        case spvBFloat16KHR:
+            This ret;
+            for (int i = 0; i < GetLength(); ++i)
+            {
+                ret[i] = BFloat16(half(this[i]) - half(other[i]));
+            }
+            return ret;
+
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> sub is not supported for this target");
+            return other;
+        }
+    }
+
+    /// Performs element-wise multiplication of two cooperative matrices.
+    /// @param other The cooperative matrix to multiply with.
+    /// @return A new cooperative matrix containing the element-wise product.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    This mul(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "$0 * $1";
+        case spvBFloat16KHR:
+            This ret;
+            for (int i = 0; i < GetLength(); ++i)
+            {
+                ret[i] = BFloat16(half(this[i]) * half(other[i]));
+            }
+            return ret;
+
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> mul is not supported for this target");
+            return other;
+        }
+    }
+
+    /// Performs element-wise division of two cooperative matrices.
+    /// @param other The cooperative matrix to divide by.
+    /// @return A new cooperative matrix containing the element-wise quotient.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    This div(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "$0 / $1";
+        case spvBFloat16KHR:
+            This ret;
+            for (int i = 0; i < GetLength(); ++i)
+            {
+                ret[i] = BFloat16(half(this[i]) / half(other[i]));
+            }
+            return ret;
+
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> div is not supported for this target");
+            return other;
+        }
+    }
+
+    /// Negates all elements in the cooperative matrix.
+    /// @return A new cooperative matrix with all elements negated.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    This neg()
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "-$0";
+        case spvBFloat16KHR:
+            This ret;
+            for (int i = 0; i < GetLength(); ++i)
+            {
+                ret[i] = BFloat16(-half(this[i]));
+            }
+            return ret;
+
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> neg is not supported for this target");
+            return this;
+        }
+    }
+
+    /// Performs element-wise modulo operation of two cooperative matrices.
+    /// @param other The cooperative matrix to compute modulo with.
+    /// @return A new cooperative matrix containing the element-wise remainder.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    This mod(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            {
+                This ret;
+                for (int i = 0; i < GetLength(); ++i)
+                {
+                    ret[i] = BFloat16(half(this[i]) % half(other[i]));
+                }
+                return ret;
+            }
+        case spvBFloat16KHR:
+            {
+                This ret;
+                for (int i = 0; i < GetLength(); ++i)
+                {
+                    ret[i] = BFloat16(half(this[i]) % half(other[i]));
+                }
+                return ret;
+            }
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> mod is not supported for this target");
+            return other;
+        }
+    }
+
+    /// Tests if two cooperative matrices are equal by comparing all elements.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if all corresponding elements are equal, false otherwise.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    bool equals(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            {
+                for (int i = 0; i < GetLength(); i++)
+                {
+                    if (half(this[i]) != half(other[i]))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        case spvBFloat16KHR:
+            {
+                for (int i = 0; i < GetLength(); i++)
+                {
+                    if (half(this[i]) != half(other[i]))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> equals is not supported for this target");
+            return false;
+        }
+    }
+
+    /// Performs lexicographic comparison to test if this matrix is less than another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than other, false otherwise.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    bool lessThan(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            {
+                for (int i = 0; i < GetLength(); i++)
+                {
+                    if (half(this[i]) < half(other[i]))
+                    {
+                        return true;
+                    }
+                    else if (half(this[i]) > half(other[i]))
+                    {
+                        return false;
+                    }
+                }
+                return false;
+            }
+        case spvBFloat16KHR:
+            {
+                for (int i = 0; i < GetLength(); i++)
+                {
+                    if (half(this[i]) < half(other[i]))
+                    {
+                        return true;
+                    }
+                    else if (half(this[i]) > half(other[i]))
+                    {
+                        return false;
+                    }
+                }
+                return false;
+            }
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> lessThan is not supported for this target");
+            return false;
+        }
+    }
+
+    /// Performs lexicographic comparison to test if this matrix is less than or equal to another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than or equal to other, false otherwise.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    bool lessThanOrEquals(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            {
+                for (int i = 0; i < GetLength(); i++)
+                {
+                    if (half(this[i]) < half(other[i]))
+                    {
+                        return true;
+                    }
+                    else if (half(this[i]) > half(other[i]))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        case spvBFloat16KHR:
+            {
+                for (int i = 0; i < GetLength(); i++)
+                {
+                    if (half(this[i]) < half(other[i]))
+                    {
+                        return true;
+                    }
+                    else if (half(this[i]) > half(other[i]))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> lessThanOrEquals is not supported for this target");
+            return false;
+        }
     }
 }
 
