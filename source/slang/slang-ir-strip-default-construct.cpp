@@ -55,10 +55,17 @@ struct RemoveDefaultConstructInsts : InstPassBase
         {
             builder.setInsertBefore(defaultConstruct);
 
-            // Re-emit the default construct, which will create a MakeStruct or
-            // primitive constant value instead.
-            defaultConstruct->replaceUsesWith(
-                builder.emitDefaultConstruct(defaultConstruct->getDataType()));
+            // Re-emit the default construct in materialized form (e.g.
+            // MakeStruct/MakeArray/constant) when possible.
+            IRInst* replacement =
+                builder.emitDefaultConstruct(defaultConstruct->getDataType(), false);
+            if (replacement)
+            {
+                defaultConstruct->replaceUsesWith(replacement);
+                defaultConstruct->removeAndDeallocate();
+            }
+            // If materialization fails (e.g. opaque/resource-like types),
+            // keep the raw DefaultConstruct in place for later legalization.
         }
     }
 };

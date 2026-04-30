@@ -2023,8 +2023,10 @@ Result linkAndOptimizeIR(
 
     switch (target)
     {
-    // On targets that don't support default initialization, remove 'raw' default construct
-    // insts because our code-gen will not have any way to emit them.
+    // On targets that don't support default initialization, remove 'raw'
+    // default construct insts because our code-gen has no way to emit them.
+    // Keep this target-gated early run because earlier passes can also
+    // introduce raw `DefaultConstruct` before `eliminateMultiLevelBreak`.
     //
     case CodeGenTarget::SPIRV:
         if (targetProgram->shouldEmitSPIRVDirectly())
@@ -2177,7 +2179,10 @@ Result linkAndOptimizeIR(
     // the var's storage. Stripping it here removes that overhead before
     // downstream simplification / SSA-out / codegen runs. (The pass is also
     // run earlier for SPIRV / CPU-via-LLVM, but those calls run before
-    // `legalizeDefUse` produces these new `DefaultConstruct` insts.)
+    // `legalizeDefUse` produces these new `DefaultConstruct` insts.) Running
+    // this call unconditionally is safe because `removeRawDefaultConstructors`
+    // only removes dead default-init store patterns and materializes
+    // non-store uses when possible.
     SLANG_PASS(removeRawDefaultConstructors);
 
     if (!fastIRSimplificationOptions.minimalOptimization)

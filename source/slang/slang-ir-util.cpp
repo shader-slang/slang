@@ -2738,8 +2738,14 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                         // unconditionally overwrites the value. The
                         // `removeRawDefaultConstructors` pass strips the
                         // single `kIROp_DefaultConstruct` + its sole `Store`
-                        // use, leaving the var uninitialized for downstream
-                        // analysis to handle.
+                        // use when all uses are stores. This relies on
+                        // `legalizeDefUse` preserving the invariant that
+                        // later user stores dominate any loads.
+                        // Audit note: this hoist path is the only current
+                        // use in this file where default-init is introduced as
+                        // a dominance placeholder that is expected to become
+                        // dead. Other `emitDefaultConstruct(...)` call sites
+                        // initialize semantically observable values.
                         IRBuilder builder(func);
                         builder.setInsertAfter(var);
                         builder.emitStore(
@@ -2789,7 +2795,8 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                 {
                     // For all other insts, we need to create a local var for it,
                     // and replace all uses with a load from the local var.
-                    // See comment above re: `emitDefaultConstructRaw`.
+                    // See comment above re: `emitDefaultConstructRaw`; this is
+                    // the same dominance-placeholder pattern.
                     IRBuilder builder(func);
                     builder.setInsertBefore(commonDominator->getTerminator());
                     IRVar* tempVar = builder.emitVar(inst->getFullType());

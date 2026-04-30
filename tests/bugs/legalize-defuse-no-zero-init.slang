@@ -33,6 +33,7 @@
 //TEST:SIMPLE(filecheck=GLSL):  -target glsl  -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):  -target wgsl  -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SPV):   -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain -output-using-type
 
 static const int N = 8;
 
@@ -42,6 +43,7 @@ struct OutVec
 };
 
 uniform RWStructuredBuffer<float> outBuf;
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outBuf
 
 [ForceInline]
 OutVec makeBag()
@@ -59,22 +61,34 @@ OutVec makeBag()
 [shader("compute")]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
+    if (tid != 0)
+        return;
+
     let result = makeBag();
     for (int i = 0; i < N; i++)
         outBuf[tid * uint(N) + uint(i)] = result.data[i];
+
+    // BUF: 0.0
+    // BUF-NEXT: 1.0
+    // BUF-NEXT: 2.0
+    // BUF-NEXT: 3.0
+    // BUF-NEXT: 4.0
+    // BUF-NEXT: 5.0
+    // BUF-NEXT: 6.0
+    // BUF-NEXT: 7.0
 }
 
 // METAL: {{\[\[}}kernel{{\]\]}} void computeMain
-// METAL-NOT: 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+// METAL-NOT: {{0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?}}
 
 // HLSL:     void computeMain
-// HLSL-NOT: 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f
+// HLSL-NOT: {{0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?}}
 
 // GLSL:     void main(
-// GLSL-NOT: 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+// GLSL-NOT: {{0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?}}
 
 // WGSL:     fn computeMain
-// WGSL-NOT: 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f
+// WGSL-NOT: {{0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?}}
 
 // SPV:     OpEntryPoint
 // SPV-NOT: OpConstantComposite {{.*}} %float_0 %float_0 %float_0 %float_0 %float_0 %float_0 %float_0 %float_0

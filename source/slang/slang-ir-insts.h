@@ -3675,13 +3675,16 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRInst* emitIntrinsicInst(IRType* type, IROp op, UInt argCount, IRInst* const* args);
 
-    /// Emits appropriate inst for constructing a default value of `type`.
-    /// If `fallback` is true, will emit `DefaultConstruct` inst on unknown types.
-    /// Otherwise, returns nullptr if we can't materialize the inst.
+    /// Emit a materialized default value for `type` (e.g. `MakeStruct`,
+    /// `MakeArray`, scalar zero, null pointer).
+    /// If `fallback` is true, emits raw `kIROp_DefaultConstruct` on unknown
+    /// types. Otherwise returns nullptr when materialization is not possible.
+    /// Prefer this form when the value is consumed directly as an operand.
     IRInst* emitDefaultConstruct(IRType* type, bool fallback = true);
 
-    /// Emits a raw `DefaultConstruct` opcode without attempting to fold/materialize
-    /// the inst.
+    /// Emit raw `kIROp_DefaultConstruct` without attempting to materialize it.
+    /// Prefer this when introducing "maybe dead" placeholder initialization
+    /// that `removeRawDefaultConstructors` may later strip.
     IRInst* emitDefaultConstructRaw(IRType* type);
 
     IRInst* emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinCast = true);
