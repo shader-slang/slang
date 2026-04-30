@@ -39,7 +39,10 @@ class StandardAllocator
 public:
     // not really called
     void* allocate(size_t size) { return ::malloc(size); }
-    void deallocate(void* ptr) { return ::free(ptr); }
+    // Marked SLANG_NO_INLINE: GCC 13 inlines this through long destructor chains
+    // and then falsely reports that the freed pointer may be uninitialized
+    // (-Wmaybe-uninitialized). Preventing inlining breaks the chain.
+    SLANG_NO_INLINE void deallocate(void* ptr) { return ::free(ptr); }
 };
 
 template<int ALIGNMENT>
@@ -65,7 +68,10 @@ public:
         }
         return rs;
     }
-    static inline void deallocateArray(T* ptr, Index count)
+    // Marked SLANG_NO_INLINE: GCC 13 inlines this through long destructor chains
+    // into callers and then falsely reports the pointer argument as potentially
+    // uninitialized (-Wmaybe-uninitialized). Preventing inlining breaks the chain.
+    static SLANG_NO_INLINE void deallocateArray(T* ptr, Index count)
     {
         TAllocator allocator;
         if (!std::is_trivially_destructible<T>::value)
