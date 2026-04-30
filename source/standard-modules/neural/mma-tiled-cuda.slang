@@ -239,7 +239,7 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
     {
         WeightMatrix w;
         w.loadWeightRaw<T, Address>(weightAddress);
-        result = matMul<T, N, K, M>(inputMat, w);
+        result = matMul<half, T, N, K, M>(inputMat, w);
     }
 
     // =========================================================================
@@ -267,7 +267,7 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
         let wT = w.transpose();
 
         // MMA: result(N, K) = dOut(N, M) × W^T(M, K)
-        result = matMul<T, N, M, K>(dOut, wT);
+        result = matMul<half, T, N, M, K>(dOut, wT);
     }
 
     // =========================================================================
@@ -328,7 +328,7 @@ internal struct TiledMMACuda<T, int InputSize, int OutputSize, int SubgroupSize,
         }
 
         // MMA: C(M×K) = A(M×32) × B(32×K)
-        OPResult matC = matMul<T, M, N, K>(dOutT, inputB);
+        OPResult matC = matMul<half, T, M, N, K>(dOutT, inputB);
 
         // Cross-warp reduction
         if (SubgroupCount > 1)

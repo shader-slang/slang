@@ -70,7 +70,7 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
         inputB.fromVectorViaShMem<ShMemSize, T, InputVec.Uint4AlignedInputSize, false>(input.data, perWarpBase);
 
         // MMA: result(M, N) = W(M, K) × input(K, N)
-        MatrixC<T, M, N> resultMat = matMul<T, M, K, N>(wA, inputB);
+        MatrixC<T, M, N> resultMat = matMul<half, T, M, K, N>(wA, inputB);
 
         // Extract output vector
         typealias OutputVec = WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>;
@@ -107,7 +107,7 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
         wA.loadWeightTiled<T, Address, true>(weightAddress);
 
         // MMA: result(K, N) = W^T(K, M) × input(M, N)
-        MatrixC<T, K, N> resultMat = matMul<T, K, M, N>(wA, inputB);
+        MatrixC<T, K, N> resultMat = matMul<half, T, K, M, N>(wA, inputB);
 
         resultMat.toVectorViaShMem<ShMemSize, ResultVecSize, false>(resultArr, shBase);
     }
@@ -234,7 +234,7 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
 
         // MMA: dW(M, K) = dOut^T(M, N) × input(N, K)
         typealias OPResult = MatrixC<T, M, K>;
-        OPResult dW = matMul<T, M, N, K>(dOutA, inputB);
+        OPResult dW = matMul<half, T, M, N, K>(dOutA, inputB);
 
         // Cross-warp reduction via storeRaw/loadRaw/add (portable)
         if (SubgroupCount > 1)
