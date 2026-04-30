@@ -19,7 +19,7 @@ void test()
     ISelfOp copy = obj.clone();
     obj.matches(copy);
     //CHECK: type mismatch in expression
-    //CHECK: expected an expression of type 'test..This', got 'test..This'
+    //CHECK: expected an expression of type 'test..obj.This', got 'test..copy.This'
     //CHECK: the concrete 'This' type identity is lost after type erasure into interface type 'ISelfOp'; consider using a generic function with a type constraint instead
 }
 
@@ -31,7 +31,7 @@ void testNoErasureNote()
     ISelfOp obj = Impl(5.0);
     int x = obj.clone();
     //CHECK: type mismatch
-    //CHECK: expected an expression of type 'int', got 'testNoErasureNote...This'
+    //CHECK: expected an expression of type 'int', got 'testNoErasureNote..obj.This'
 }
 
 // Negative test: both sides are ExtractExistentialType but from different interfaces.
@@ -55,5 +55,5 @@ void testDifferentInterfaces()
     IOther b = Impl2(2.0);
     a.matches(b.make());
     //CHECK: type mismatch
-    //CHECK: expected an expression of type 'testDifferentInterfaces..This', got 'testDifferentInterfaces..This'
+    //CHECK: expected an expression of type 'testDifferentInterfaces..a.This', got 'testDifferentInterfaces..b.This'
 }

@@ -3,7 +3,6 @@
 
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
-#include "slang-mangled-lexer.h"
 #include "slang-rich-diagnostics.h"
 
 #include <assert.h>
@@ -1043,7 +1042,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 m_writer->emit(")");
                 return true;
             }
-            else if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
+            else if (const auto matrixType = as<IRMatrixType>(inst->getDataType()); matrixType)
             {
                 m_writer->emit("make");
                 emitType(inst->getDataType());
