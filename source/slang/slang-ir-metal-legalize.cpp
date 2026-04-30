@@ -271,12 +271,6 @@ static void legalizeSubpassInputsForMetal(
         auto subpassType = as<IRSubpassInputType>(globalParam->getDataType());
         auto elementType = subpassType->getElementType();
 
-        if (subpassType->isMultisample())
-        {
-            sink->diagnose(Diagnostics::MultisampledSubpassInputNotSupportedOnMetal{
-                .location = getDiagnosticPos(globalParam)});
-        }
-
         HashSet<IRFunc*> fragmentUsers;
         for (auto use = globalParam->firstUse; use; use = use->nextUse)
         {
@@ -356,11 +350,13 @@ static void legalizeSubpassInputsForMetal(
             {
                 sink->diagnose(Diagnostics::SubpassInputUsedOutsideEntryPoint{
                     .location = getDiagnosticPos(user)});
-                if (auto resultType = user->getDataType())
+                if (user->firstUse)
                 {
                     IRBuilder localBuilder(user);
                     localBuilder.setInsertBefore(user);
-                    user->replaceUsesWith(localBuilder.emitPoison(resultType));
+                    auto resultType = user->getDataType();
+                    user->replaceUsesWith(
+                        resultType ? localBuilder.emitPoison(resultType) : nullptr);
                 }
                 user->removeAndDeallocate();
                 continue;
@@ -378,7 +374,17 @@ static void legalizeSubpassInputsForMetal(
                 user->removeAndDeallocate();
                 continue;
             }
-            use->set(newParam);
+            sink->diagnose(Diagnostics::SubpassInputUsedOutsideEntryPoint{
+                .location = getDiagnosticPos(user)});
+            if (user->firstUse)
+            {
+                IRBuilder localBuilder(user);
+                localBuilder.setInsertBefore(user);
+                auto resultType = user->getDataType();
+                user->replaceUsesWith(
+                    resultType ? localBuilder.emitPoison(resultType) : nullptr);
+            }
+            user->removeAndDeallocate();
         }
 
         globalParam->removeAndDeallocate();

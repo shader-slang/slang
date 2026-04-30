@@ -8,7 +8,6 @@
 // METAL-NOT: {{\.read\(.*,.*\)}}
 // METALLIB: framebuffer_fetch
 // DIAG: warning[E56107]
-// DIAG: warning[E56107]
 
 [[vk::input_attachment_index(0)]] SubpassInputMS<float4> inputMS;
 
