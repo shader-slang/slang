@@ -46,6 +46,20 @@ if(SLANG_DXC_BUILD_FROM_SOURCE)
     # User explicitly requested a source build.
     set(_dxc_build_from_source ON)
 elseif(
+    DEFINED SLANG_DXC_BUILD_FROM_SOURCE
+    AND NOT SLANG_DXC_BUILD_FROM_SOURCE
+    AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
+    AND NOT CMAKE_CROSSCOMPILING
+)
+    # User explicitly disabled the source build; skip auto-detection and use
+    # prebuilt binaries without any GLIBC compatibility check.
+    message(
+        STATUS
+        "SLANG_DXC_BUILD_FROM_SOURCE=OFF: using prebuilt DXC without "
+        "GLIBC compatibility check — prebuilt binaries may fail to load "
+        "if the system GLIBC is older than required."
+    )
+elseif(
     NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
     AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
@@ -72,6 +86,12 @@ elseif(
     if(EXISTS "${_dxc_glibc_stamp}")
         file(READ "${_dxc_glibc_stamp}" _dxc_required_glibc)
         string(STRIP "${_dxc_required_glibc}" _dxc_required_glibc)
+        # "DETECTION_FAILED" is written when objdump/readelf produced no
+        # output; treat it the same as "0.0" so we skip the system check
+        # without re-running the (failing) inspection on every reconfigure.
+        if(_dxc_required_glibc STREQUAL "DETECTION_FAILED")
+            set(_dxc_required_glibc "0.0")
+        endif()
     else()
         file(MAKE_DIRECTORY "${_dxc_probe_dir}")
 
@@ -188,6 +208,9 @@ elseif(
                     "if the system GLIBC is older than required. "
                     "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to force a source build."
                 )
+                # Write a sentinel so subsequent reconfigures skip the
+                # inspection and avoid repeating this warning.
+                file(WRITE "${_dxc_glibc_stamp}" "DETECTION_FAILED")
             endif()
         endif()
     endif()
@@ -315,6 +338,13 @@ if(_dxc_build_from_source)
 
     # Step 1: Clone DXC source at Slang configure time.
     # FetchContent stamps ensure the clone is skipped on subsequent reconfigures.
+    # DXC includes LLVM/Clang as submodules; the first clone can take several
+    # minutes even with GIT_SHALLOW ON.
+    message(
+        STATUS
+        "Cloning DXC ${_dxc_version_tag} from source "
+        "(first run may take several minutes)..."
+    )
     FetchContent_Declare(
         dxc_source
         GIT_REPOSITORY "https://github.com/microsoft/DirectXShaderCompiler.git"
@@ -338,13 +368,16 @@ if(_dxc_build_from_source)
     file(WRITE "${_dxc_build_dir}/.clang-format" "BasedOnStyle: LLVM\n")
 
     # Step 2: Configure DXC at Slang configure time.
-    # The stamp is keyed on the version tag, generator, and toolset so that
-    # switching any of these (e.g. Ninja → "Visual Studio 17 2022", or adding
-    # -T ClangCL) invalidates the cached configure. Spaces in generator names
-    # are handled correctly because CMake's file() and if(EXISTS) commands
-    # quote paths properly.
+    # The stamp is keyed on version tag, generator, toolset, and compiler so
+    # that switching any of these invalidates the cached configure. A SHA256
+    # hash keeps the filename short regardless of path lengths.
+    string(
+        SHA256
+        _dxc_config_hash
+        "${_dxc_version_tag}_${CMAKE_GENERATOR}_${CMAKE_GENERATOR_TOOLSET}_${CMAKE_CXX_COMPILER}"
+    )
     set(_dxc_configure_stamp
-        "${_dxc_build_dir}/.slang_dxc_configured_${_dxc_version_tag}_${CMAKE_GENERATOR}_${CMAKE_GENERATOR_TOOLSET}"
+        "${_dxc_build_dir}/.slang_dxc_configured_${_dxc_config_hash}"
     )
     if(NOT EXISTS "${_dxc_configure_stamp}")
         message(STATUS "Configuring DXC from source (${_dxc_version_tag})...")
@@ -353,6 +386,9 @@ if(_dxc_build_from_source)
                 ${CMAKE_COMMAND} -B "${_dxc_build_dir}" -S "${_dxc_src_dir}"
                 ${_dxc_generator_args} -C
                 "${_dxc_src_dir}/cmake/caches/PredefinedParams.cmake"
+                # Forward parent compilers so DXC uses the same toolchain.
+                -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
                 # CMAKE_BUILD_TYPE is ignored by multi-config generators (VS);
                 # the config is selected via --config MinSizeRel in the build
                 # command. Passing it here covers single-config generators (Ninja).
