@@ -1061,6 +1061,7 @@ Result linkAndOptimizeIR(
             targetRequest,
             outLinkedIR.globalScopeVarLayout,
             *metadata);
+        validateIRModuleIfEnabled(codeGenContext, irModule);
     }
 
     SLANG_PASS(collectGlobalUniformParameters, outLinkedIR.globalScopeVarLayout, target);
