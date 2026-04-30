@@ -316,10 +316,13 @@ if(_dxc_build_from_source)
     file(WRITE "${_dxc_build_dir}/.clang-format" "BasedOnStyle: LLVM\n")
 
     # Step 2: Configure DXC at Slang configure time.
-    # A stamp file keyed on the version tag makes this idempotent: the
-    # configure step is re-run only when the DXC version changes.
+    # The stamp is keyed on both the version tag and the generator so that
+    # switching generators (e.g. Ninja → "Visual Studio 17 2022") invalidates
+    # the cached configure and forces a fresh cmake invocation with the correct
+    # generator. Spaces in generator names are handled correctly by CMake's
+    # file() and if(EXISTS) commands when the path is quoted.
     set(_dxc_configure_stamp
-        "${_dxc_build_dir}/.slang_dxc_configured_${_dxc_version_tag}"
+        "${_dxc_build_dir}/.slang_dxc_configured_${_dxc_version_tag}_${CMAKE_GENERATOR}"
     )
     if(NOT EXISTS "${_dxc_configure_stamp}")
         message(STATUS "Configuring DXC from source (${_dxc_version_tag})...")
