@@ -1,4 +1,18 @@
 // End-to-end correctness test for global-parameter dynamic dispatch.
+// This is the primary runtime-correctness coverage for the fix in this
+// PR — the compile-only `global-interface-param.slang` and
+// `parameterblock-interface.slang` tests verify dispatch is *generated*,
+// but only this compute test verifies it *executes correctly*.
+//
+// Path coverage: `ConstantBuffer<Params>` is an `IRPointerLikeType`,
+// so loading `gParams.foo` exercises the same `specializeLoad` and
+// `lowerExtractDynamicObject` paths fixed in this PR. Two distinct
+// global params (gParamsA / gParamsB) bound to different concrete
+// types verify the dispatch actually selects the right impl at the
+// witness-table tag, not just that one impl happens to come through.
+// (Direct `ConstantBuffer<IFoo>` binding is not supported by the CPU
+// compute test framework for non-trivial dispatch, so the wrapper
+// struct is the practical end-to-end vehicle.)
 //
 // Two complementary verifications:
 //

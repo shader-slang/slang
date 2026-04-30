@@ -1,9 +1,16 @@
 // Two global interface parameters of different interface types exercise the
 // ordering and interaction in `seedGlobalScope` / `specializeGlobalInsts`
-// (both iterate over all module-scope instructions).  With a single global the
+// (both iterate over all module-scope instructions). With a single global the
 // ordering is trivial; with two independent interfaces any cross-contamination
 // would surface here.
+//
+// `-report-dynamic-dispatch-sites` (E50102) is the stable structural
+// contract that each interface generated its own dispatch — IFoo with
+// 2 conformances dispatches dynamically, IBar with 1 conformance is
+// monomorphized (no E50102). The cross-target compile checks ensure
+// no backend crashes when both globals are present.
 
+//TEST:SIMPLE(filecheck=REPORT): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "ImplX:IBar=0" -report-dynamic-dispatch-sites
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "ImplX:IBar=0"
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "ImplX:IBar=0"
 
@@ -45,17 +52,19 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
+    // IFoo has 2 conformances => dispatch is generated. IBar has 1
+    // conformance => monomorphized, no dispatch report. We therefore
+    // expect exactly one E50102 note overall, attached to this line.
+    // The `REPORT-NOT: ImplX` line below asserts the IBar call site
+    // does not appear anywhere in the diagnostic stream — pinning the
+    // monomorphization contract via the same diagnostic as the
+    // multi-conformance check, with no synthesized name dependence.
+    // REPORT-DAG: note[E50102]: generated{{.*}}dispatch code{{.*}}2 possible types: 'ImplA, ImplB'
+    // REPORT-DAG: :[[# @LINE+1]]:
     outputBuffer[0] = gFoo.getValue() + float(gBar.getCount());
+    // REPORT-NOT: E50102{{.*}}ImplX
 }
 
-// Each interface must generate its own dispatch function.  `IFoo` has two
-// impls (dispatch switch), `IBar` has one (monomorphized).
-// HLSL-DAG: ImplA_getValue
-// HLSL-DAG: ImplB_getValue
-// HLSL-DAG: ImplX_getCount
-// HLSL-DAG: s_dispatch_IFoo_getValue
-// HLSL-DAG: switch(
-// HLSL: void computeMain
-
+// Each backend must produce the entry point without crashing.
 // SPIRV: OpEntryPoint
-// SPIRV: OpSwitch
+// HLSL: void computeMain
