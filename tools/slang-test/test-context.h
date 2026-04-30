@@ -212,6 +212,8 @@ public:
 
 protected:
     SlangResult _createJSONRPCConnection(Slang::RefPtr<Slang::JSONRPCConnection>& out);
+    void _disconnectRPCConnection(Slang::Index threadIndex);
+    void _drainTestServerStderr(Slang::Index threadIndex, bool limitBytes);
 
     SlangResult locateFileCheck();
 

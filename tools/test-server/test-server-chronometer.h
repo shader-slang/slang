@@ -148,14 +148,14 @@ public:
     // Check if timing is enabled (SLANG_TEST_DIAGNOSTICS=timing)
     static bool isEnabled()
     {
-        static bool enabled = isDiagnosticEnabled("timing");
+        static bool enabled = isTestTimingDiagnosticEnabled();
         return enabled;
     }
 
     // Check if phase-level logging is enabled (SLANG_TEST_DIAGNOSTICS=timing-phases)
     static bool isPhaseLoggingEnabled()
     {
-        static bool enabled = isDiagnosticEnabled("timing-phases");
+        static bool enabled = isTestTimingPhaseDiagnosticEnabled();
         return enabled;
     }
 

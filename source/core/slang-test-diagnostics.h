@@ -87,7 +87,37 @@ inline const TestDiagnosticConfig& getTestDiagnosticConfig()
 
 // Check if a diagnostic category is enabled via SLANG_TEST_DIAGNOSTICS env var.
 // Categories: timing, timing-phases, rpc, fd, pipe, all
-// Thread-safe: reads and parses the env var once.
+// Thread-safe: reads and parses the env var once. Prefer the typed helpers below for hot paths.
+inline bool isTestTimingDiagnosticEnabled()
+{
+    const TestDiagnosticConfig& config = getTestDiagnosticConfig();
+    return config.all || config.timing;
+}
+
+inline bool isTestTimingPhaseDiagnosticEnabled()
+{
+    const TestDiagnosticConfig& config = getTestDiagnosticConfig();
+    return config.all || config.timingPhases;
+}
+
+inline bool isTestRpcDiagnosticEnabled()
+{
+    const TestDiagnosticConfig& config = getTestDiagnosticConfig();
+    return config.all || config.rpc;
+}
+
+inline bool isTestFileDescriptorDiagnosticEnabled()
+{
+    const TestDiagnosticConfig& config = getTestDiagnosticConfig();
+    return config.all || config.fd;
+}
+
+inline bool isTestPipeDiagnosticEnabled()
+{
+    const TestDiagnosticConfig& config = getTestDiagnosticConfig();
+    return config.all || config.pipe;
+}
+
 inline bool isDiagnosticEnabled(const char* category)
 {
     const TestDiagnosticConfig& config = getTestDiagnosticConfig();
@@ -96,15 +126,15 @@ inline bool isDiagnosticEnabled(const char* category)
 
     const UnownedStringSlice categorySlice(category);
     if (categorySlice.caseInsensitiveEquals(UnownedStringSlice("timing")))
-        return config.timing;
+        return isTestTimingDiagnosticEnabled();
     if (categorySlice.caseInsensitiveEquals(UnownedStringSlice("timing-phases")))
-        return config.timingPhases;
+        return isTestTimingPhaseDiagnosticEnabled();
     if (categorySlice.caseInsensitiveEquals(UnownedStringSlice("rpc")))
-        return config.rpc;
+        return isTestRpcDiagnosticEnabled();
     if (categorySlice.caseInsensitiveEquals(UnownedStringSlice("fd")))
-        return config.fd;
+        return isTestFileDescriptorDiagnosticEnabled();
     if (categorySlice.caseInsensitiveEquals(UnownedStringSlice("pipe")))
-        return config.pipe;
+        return isTestPipeDiagnosticEnabled();
     if (categorySlice.caseInsensitiveEquals(UnownedStringSlice("all")) ||
         categorySlice.caseInsensitiveEquals(UnownedStringSlice("1")))
         return config.all;

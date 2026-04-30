@@ -346,7 +346,7 @@ struct SleepState
 
 SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
 {
-    const bool rpcDiagnosticsEnabled = isDiagnosticEnabled("rpc");
+    const bool rpcDiagnosticsEnabled = isTestRpcDiagnosticEnabled();
     std::chrono::steady_clock::time_point startTime;
     if (rpcDiagnosticsEnabled)
     {
@@ -443,7 +443,7 @@ void HTTPPacketConnection::consumeContent()
 
 SlangResult HTTPPacketConnection::write(const void* content, size_t sizeInBytes)
 {
-    const bool rpcDiagnosticsEnabled = isDiagnosticEnabled("rpc");
+    const bool rpcDiagnosticsEnabled = isTestRpcDiagnosticEnabled();
     std::chrono::steady_clock::time_point startTime;
     if (rpcDiagnosticsEnabled)
     {

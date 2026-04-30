@@ -65,7 +65,7 @@ using namespace Slang;
 // Helper function to check if phase-level timing is enabled
 static bool isPhaseTimingEnabled()
 {
-    static bool enabled = Slang::isDiagnosticEnabled("timing-phases");
+    static bool enabled = Slang::isTestTimingPhaseDiagnosticEnabled();
     return enabled;
 }
 

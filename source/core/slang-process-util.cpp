@@ -14,8 +14,6 @@ namespace Slang
     const CommandLine& commandLine,
     ExecuteResult& outExecuteResult)
 {
-    outExecuteResult.init();
-
     RefPtr<Process> process;
     SLANG_RETURN_ON_FAIL(Process::create(commandLine, 0, process));
     SLANG_RETURN_ON_FAIL(readUntilTermination(process, outExecuteResult));
@@ -41,8 +39,6 @@ static String _getText(const ConstArrayView<Byte>& bytes)
     Process* process,
     ExecuteResult& outExecuteResult)
 {
-    outExecuteResult.init();
-
     List<Byte> stdOut;
     List<Byte> stdError;
 

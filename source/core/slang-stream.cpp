@@ -1,7 +1,6 @@
 #include "slang-stream.h"
 #ifdef _WIN32
 #include <share.h>
-#include <windows.h>
 #endif
 #include "slang-io.h"
 #include "slang-process.h"
@@ -194,7 +193,7 @@ SlangResult FileStream::_init(
     }
 
     // Debug logging for file descriptor tracking
-    if (isDiagnosticEnabled("fd"))
+    if (isTestFileDescriptorDiagnosticEnabled())
     {
 #ifdef _WIN32
         fprintf(
@@ -341,7 +340,7 @@ void FileStream::close()
 {
     if (m_handle)
     {
-        if (isDiagnosticEnabled("fd"))
+        if (isTestFileDescriptorDiagnosticEnabled())
         {
 #ifdef _WIN32
             fprintf(

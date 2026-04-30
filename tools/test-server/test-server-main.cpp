@@ -352,7 +352,7 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
 SlangResult TestServer::_executeSingle()
 {
     // Debug logging for test-server operations (writes to stderr, not RPC stdout)
-    const bool rpcDiagnosticsEnabled = isDiagnosticEnabled("rpc");
+    const bool rpcDiagnosticsEnabled = isTestRpcDiagnosticEnabled();
 
     if (rpcDiagnosticsEnabled)
     {

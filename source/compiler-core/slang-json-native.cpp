@@ -345,6 +345,9 @@ SlangResult JSONToNativeConverter::convertArrayToStruct(
     }
 
     // If fewer elements than fields, verify that all missing fields are Optional.
+    // This converter is shared by all array-style JSON-RPC argument handling, not just
+    // test-server. The relaxed count rule only applies to fields that explicitly opt in with
+    // the Optional RTTI flag; missing required fields still fail here for every caller.
     // Fields are processed in base-to-derived order, so we need to check if
     // fields from arrayCount to totalFieldCount are all Optional.
     if (arrayCount < totalFieldCount)
@@ -378,7 +381,8 @@ SlangResult JSONToNativeConverter::convertArrayToStruct(
 
     // We work in the order from the base class to the final type
     Index argIndex = 0;
-    for (Index i = infos.getCount() - 1; i >= 0; --i)
+    bool done = false;
+    for (Index i = infos.getCount() - 1; i >= 0 && !done; --i)
     {
         auto info = infos[i];
 
@@ -388,6 +392,7 @@ SlangResult JSONToNativeConverter::convertArrayToStruct(
             // Skip if we've exhausted the array (remaining fields must be Optional)
             if (argIndex >= arrayCount)
             {
+                done = true;
                 break;
             }
             // Convert the field

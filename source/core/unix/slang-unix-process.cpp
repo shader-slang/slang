@@ -289,7 +289,7 @@ SlangResult UnixPipeStream::flush()
 
 SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadBytes)
 {
-    const bool pipeDiagnosticsEnabled = isDiagnosticEnabled("pipe");
+    const bool pipeDiagnosticsEnabled = isTestPipeDiagnosticEnabled();
     outReadBytes = 0;
 
     if (!_has(FileAccess::Read))
@@ -418,7 +418,7 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
 
 SlangResult UnixPipeStream::write(const void* buffer, size_t length)
 {
-    const bool pipeDiagnosticsEnabled = isDiagnosticEnabled("pipe");
+    const bool pipeDiagnosticsEnabled = isTestPipeDiagnosticEnabled();
     if (!_has(FileAccess::Write))
     {
         return SLANG_E_NOT_AVAILABLE;
