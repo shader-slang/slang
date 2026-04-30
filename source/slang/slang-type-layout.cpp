@@ -2691,7 +2691,7 @@ struct MetalTier2ObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::MutableTextureSampler:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 16, 8);
         case ShaderParameterKind::SubpassInput:
-            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+            return SimpleLayoutInfo(LayoutResourceKind::InputAttachmentIndex, 1);
         default:
             SLANG_UNEXPECTED("unhandled shader parameter kind");
             UNREACHABLE_RETURN(SimpleLayoutInfo());

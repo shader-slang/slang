@@ -277,32 +277,23 @@ static void legalizeSubpassInputsForMetal(
                 .location = getDiagnosticPos(globalParam)});
         }
 
-        auto entryPointParamDecor = globalParam->findDecoration<IREntryPointParamDecoration>();
-        IRFunc* entryPointFunc = nullptr;
-        if (entryPointParamDecor)
-            entryPointFunc = as<IRFunc>(entryPointParamDecor->getEntryPoint());
-
-        if (!entryPointFunc)
+        HashSet<IRFunc*> fragmentUsers;
+        for (auto use = globalParam->firstUse; use; use = use->nextUse)
         {
-            for (auto use = globalParam->firstUse; use; use = use->nextUse)
-            {
-                auto parentFunc = getParentFunc(use->getUser());
-                if (!parentFunc)
-                    continue;
-                for (auto& ep : entryPoints)
-                {
-                    if (ep.entryPointFunc == parentFunc &&
-                        ep.entryPointDecor->getProfile().getStage() == Stage::Fragment)
-                    {
-                        entryPointFunc = ep.entryPointFunc;
-                        break;
-                    }
-                }
-                if (entryPointFunc)
-                    break;
-            }
+            auto pf = getParentFunc(use->getUser());
+            if (!pf)
+                continue;
+            for (auto& ep : entryPoints)
+                if (ep.entryPointFunc == pf &&
+                    ep.entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                    fragmentUsers.add(pf);
         }
-        if (!entryPointFunc)
+        if (auto entryPointParamDecor = globalParam->findDecoration<IREntryPointParamDecoration>())
+        {
+            if (auto func = as<IRFunc>(entryPointParamDecor->getEntryPoint()))
+                fragmentUsers.add(func);
+        }
+        if (fragmentUsers.getCount() == 0)
         {
             sink->diagnose(Diagnostics::SubpassInputUsedOutsideEntryPoint{
                 .location = getDiagnosticPos(globalParam)});
@@ -322,34 +313,46 @@ static void legalizeSubpassInputsForMetal(
             }
         }
 
+        Dictionary<IRFunc*, IRInst*> paramPerEntryPoint;
         IRBuilder builder(module);
-        auto firstBlock = entryPointFunc->getFirstBlock();
-        if (!firstBlock)
-            continue;
+        for (auto entryPointFunc : fragmentUsers)
+        {
+            auto firstBlock = entryPointFunc->getFirstBlock();
+            if (!firstBlock)
+                continue;
 
-        auto newParam = builder.createParam(elementType);
+            auto newParam = builder.createParam(elementType);
+            auto firstOrdinary = firstBlock->getFirstOrdinaryInst();
+            if (firstOrdinary)
+                newParam->insertBefore(firstOrdinary);
+            else
+                newParam->insertAtEnd(firstBlock);
 
-        auto firstOrdinary = firstBlock->getFirstOrdinaryInst();
-        if (firstOrdinary)
-            newParam->insertBefore(firstOrdinary);
-        else
-            newParam->insertAtEnd(firstBlock);
+            StringBuilder colorStr;
+            colorStr << "color(" << Int(attachmentIndex) << ")";
+            String colorString = colorStr.produceString();
+            builder.addTargetSystemValueDecoration(newParam, colorString.getUnownedSlice());
 
-        StringBuilder colorStr;
-        colorStr << "color(" << Int(attachmentIndex) << ")";
-        String colorString = colorStr.produceString();
-        builder.addTargetSystemValueDecoration(newParam, colorString.getUnownedSlice());
+            if (auto nameHint = globalParam->findDecoration<IRNameHintDecoration>())
+                builder.addNameHintDecoration(newParam, nameHint->getName());
 
-        if (auto nameHint = globalParam->findDecoration<IRNameHintDecoration>())
-            builder.addNameHintDecoration(newParam, nameHint->getName());
+            paramPerEntryPoint[entryPointFunc] = newParam;
+            if (entryPointsToFix.indexOf(entryPointFunc) == -1)
+                entryPointsToFix.add(entryPointFunc);
+        }
 
         IRUse* nextUse = nullptr;
         for (IRUse* use = globalParam->firstUse; use; use = nextUse)
         {
             nextUse = use->nextUse;
             auto user = use->getUser();
+            auto parentFunc = getParentFunc(user);
 
-            if (getParentFunc(user) != entryPointFunc)
+            IRInst* newParam = nullptr;
+            if (parentFunc)
+                paramPerEntryPoint.tryGetValue(parentFunc, newParam);
+
+            if (!newParam)
             {
                 sink->diagnose(Diagnostics::SubpassInputUsedOutsideEntryPoint{
                     .location = getDiagnosticPos(user)});
@@ -365,9 +368,12 @@ static void legalizeSubpassInputsForMetal(
 
             if (user->getOp() == kIROp_SubpassLoad)
             {
-                // Metal framebuffer fetch doesn't support per-sample reads,
-                // so the sample operand (if present) is dropped here.
-                // If the sample value has no other uses, DCE will remove it.
+                auto subpassLoad = as<IRSubpassLoad>(user);
+                if (subpassLoad->getSample())
+                {
+                    sink->diagnose(Diagnostics::MultisampledSubpassInputNotSupportedOnMetal{
+                        .location = getDiagnosticPos(user)});
+                }
                 user->replaceUsesWith(newParam);
                 user->removeAndDeallocate();
                 continue;
@@ -376,8 +382,6 @@ static void legalizeSubpassInputsForMetal(
         }
 
         globalParam->removeAndDeallocate();
-        if (entryPointsToFix.indexOf(entryPointFunc) == -1)
-            entryPointsToFix.add(entryPointFunc);
     }
 
     for (auto func : entryPointsToFix)

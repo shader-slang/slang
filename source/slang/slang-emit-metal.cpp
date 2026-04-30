@@ -137,7 +137,8 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
     if (!layoutDecoration)
     {
-        maybeEmitSystemSemantic(param);
+        if (param->findDecoration<IRTargetSystemValueDecoration>())
+            maybeEmitSystemSemantic(param);
         return;
     }
     auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
@@ -1365,7 +1366,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_SubpassInputType:
         SLANG_DIAGNOSE_UNEXPECTED(
             getSink(),
-            SourceLoc(),
+            type,
             "SubpassInputType should have been lowered before Metal emission");
         return;
     default:
