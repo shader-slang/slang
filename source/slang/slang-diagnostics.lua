@@ -1961,6 +1961,13 @@ err(
     span { loc = "location", message = "function has both IDifferentiable value types and IDifferentiablePtrType outputs, which is not currently supported. Please split the function so that differentiable value parameters and pointer differentiable outputs are in separate functions." }
 )
 
+err(
+    "forward-reference-in-generic-default-initializer",
+    30119,
+    "forward reference in generic default initializer",
+    span { loc = "expr:Expr", message = "generic default initializer for parameter '~param:Decl' references parameter '~referenced:Decl' before it is declared" }
+)
+
 
 -- Load semantic checking diagnostics (part 3) - Include, Visibility, and Capability
 -- (inlined from slang-diagnostics-semantic-checking-3.lua)
