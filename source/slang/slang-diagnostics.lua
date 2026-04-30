@@ -306,7 +306,11 @@ err(
     "no specified '-target' option matches the output path '~path', which implies the '~format' format"
 )
 
-err("unknown-command-line-value", 62, "unknown value for option. Valid values are '~validValues'")
+err(
+    "unknown-command-line-value",
+    62,
+    "unknown value for option '~option'. Valid values are '~validValues'"
+)
 
 err("unknown-help-category", 63, "unknown help category")
 
