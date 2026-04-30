@@ -170,67 +170,70 @@ elseif(
                 # Remove the tarball so a fresh download is attempted on the
                 # next reconfigure rather than retrying with a bad archive.
                 file(REMOVE "${_dxc_probe_tarball}")
-            endif()
-
-            find_program(_dxc_objdump NAMES objdump)
-            find_program(_dxc_readelf NAMES readelf)
-
-            # Inspect each library and track the highest GLIBC version found
-            # across both. If either library requires GLIBC X.Y, the system
-            # must provide at least X.Y for both to load.
-            foreach(_lib libdxcompiler.so libdxil.so)
-                set(_so "${_dxc_probe_dir}/lib/${_lib}")
-                if(NOT EXISTS "${_so}")
-                    continue()
-                endif()
-                set(_elf_info "")
-                if(_dxc_objdump)
-                    execute_process(
-                        COMMAND "${_dxc_objdump}" -p "${_so}"
-                        OUTPUT_VARIABLE _elf_info
-                        ERROR_QUIET
-                    )
-                elseif(_dxc_readelf)
-                    execute_process(
-                        COMMAND "${_dxc_readelf}" --version-info "${_so}"
-                        OUTPUT_VARIABLE _elf_info
-                        ERROR_QUIET
-                    )
-                endif()
-                string(
-                    REGEX MATCHALL
-                    "GLIBC_([0-9]+[.][0-9]+)"
-                    _ver_list
-                    "${_elf_info}"
-                )
-                foreach(_entry ${_ver_list})
-                    string(REGEX REPLACE "^GLIBC_" "" _ver "${_entry}")
-                    if(_ver VERSION_GREATER _dxc_required_glibc)
-                        set(_dxc_required_glibc "${_ver}")
-                    endif()
-                endforeach()
-            endforeach()
-
-            if(NOT _dxc_required_glibc STREQUAL "0.0")
-                message(
-                    STATUS
-                    "DXC prebuilt binary (${_dxc_version_tag}) "
-                    "requires GLIBC >= ${_dxc_required_glibc}"
-                )
-                file(WRITE "${_dxc_glibc_stamp}" "${_dxc_required_glibc}")
-            else()
-                message(
-                    WARNING
-                    "Could not extract GLIBC version requirements from DXC "
-                    "shared libraries (objdump/readelf unavailable or produced "
-                    "no output). Prebuilt binaries may silently fail to load "
-                    "if the system GLIBC is older than required. "
-                    "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to force a source build."
-                )
-                # Write a sentinel so subsequent reconfigures skip the
-                # inspection and avoid repeating this warning.
+                # Write sentinel so the inspection is not re-attempted on the
+                # next reconfigure before a fresh download succeeds.
                 file(WRITE "${_dxc_glibc_stamp}" "DETECTION_FAILED")
-            endif()
+            else()
+                find_program(_dxc_objdump NAMES objdump)
+                find_program(_dxc_readelf NAMES readelf)
+
+                # Inspect each library and track the highest GLIBC version found
+                # across both. If either library requires GLIBC X.Y, the system
+                # must provide at least X.Y for both to load.
+                foreach(_lib libdxcompiler.so libdxil.so)
+                    set(_so "${_dxc_probe_dir}/lib/${_lib}")
+                    if(NOT EXISTS "${_so}")
+                        continue()
+                    endif()
+                    set(_elf_info "")
+                    if(_dxc_objdump)
+                        execute_process(
+                            COMMAND "${_dxc_objdump}" -p "${_so}"
+                            OUTPUT_VARIABLE _elf_info
+                            ERROR_QUIET
+                        )
+                    elseif(_dxc_readelf)
+                        execute_process(
+                            COMMAND "${_dxc_readelf}" --version-info "${_so}"
+                            OUTPUT_VARIABLE _elf_info
+                            ERROR_QUIET
+                        )
+                    endif()
+                    string(
+                        REGEX MATCHALL
+                        "GLIBC_([0-9]+[.][0-9]+)"
+                        _ver_list
+                        "${_elf_info}"
+                    )
+                    foreach(_entry ${_ver_list})
+                        string(REGEX REPLACE "^GLIBC_" "" _ver "${_entry}")
+                        if(_ver VERSION_GREATER _dxc_required_glibc)
+                            set(_dxc_required_glibc "${_ver}")
+                        endif()
+                    endforeach()
+                endforeach()
+
+                if(NOT _dxc_required_glibc STREQUAL "0.0")
+                    message(
+                        STATUS
+                        "DXC prebuilt binary (${_dxc_version_tag}) "
+                        "requires GLIBC >= ${_dxc_required_glibc}"
+                    )
+                    file(WRITE "${_dxc_glibc_stamp}" "${_dxc_required_glibc}")
+                else()
+                    message(
+                        WARNING
+                        "Could not extract GLIBC version requirements from DXC "
+                        "shared libraries (objdump/readelf unavailable or produced "
+                        "no output). Prebuilt binaries may silently fail to load "
+                        "if the system GLIBC is older than required. "
+                        "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to force a source build."
+                    )
+                    # Write a sentinel so subsequent reconfigures skip the
+                    # inspection and avoid repeating this warning.
+                    file(WRITE "${_dxc_glibc_stamp}" "DETECTION_FAILED")
+                endif()
+            endif() # else() of tar extraction success check
         endif()
     endif()
 
@@ -418,12 +421,12 @@ if(_dxc_build_from_source)
 
     # Step 2: Configure DXC at Slang configure time.
     # The stamp is keyed on version tag, generator, platform, toolset, and
-    # compiler so that switching any of these invalidates the cached configure.
-    # A SHA256 hash keeps the filename short regardless of path lengths.
+    # both compilers so that switching any of these invalidates the cached
+    # configure. A SHA256 hash keeps the filename short regardless of lengths.
     string(
         SHA256
         _dxc_config_hash
-        "${_dxc_version_tag}_${CMAKE_GENERATOR}_${CMAKE_GENERATOR_PLATFORM}_${CMAKE_GENERATOR_TOOLSET}_${CMAKE_CXX_COMPILER}"
+        "${_dxc_version_tag}_${CMAKE_GENERATOR}_${CMAKE_GENERATOR_PLATFORM}_${CMAKE_GENERATOR_TOOLSET}_${CMAKE_C_COMPILER}_${CMAKE_CXX_COMPILER}"
     )
     set(_dxc_configure_stamp
         "${_dxc_build_dir}/.slang_dxc_configured_${_dxc_config_hash}"
@@ -450,11 +453,16 @@ if(_dxc_build_from_source)
         )
         if(NOT _dxc_configure_result EQUAL 0)
             message(
-                FATAL_ERROR
+                WARNING
                 "DXC cmake configure failed "
-                "(exit ${_dxc_configure_result}):\n"
+                "(exit ${_dxc_configure_result}). "
+                "DXC/DXIL support will be unavailable. "
+                "Set -DSLANG_DXC_BUILD_FROM_SOURCE=OFF to skip the source "
+                "build, or fix the build environment.\n"
                 "${_dxc_configure_output}\n${_dxc_configure_error}"
             )
+            set_property(GLOBAL PROPERTY _FetchContent_dxc_populated TRUE)
+            return()
         endif()
         file(WRITE "${_dxc_configure_stamp}" "${_dxc_version_tag}")
         message(STATUS "DXC configured successfully")
