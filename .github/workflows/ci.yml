@@ -201,9 +201,9 @@ jobs:
       test-category: full
       full-gpu-tests: false
       cpu-only: true
-      # GitHub-hosted ubuntu-24.04 has 4 vCPUs; match test-server count
-      # to avoid IPC timeouts / JSON RPC failures on compute (cpu) tests.
-      server-count: 4
+      # Keep the CPU-only tier off the persistent test-server while we
+      # investigate intermittent JSON RPC failures on GitHub-hosted runners.
+      server-count: 1
 
   # macOS tests
   test-macos-debug-clang-aarch64:
