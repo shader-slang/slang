@@ -1024,13 +1024,13 @@ Result linkAndOptimizeIR(
     // can assume that all ordinary/uniform data is strictly
     // passed using constant buffers.
     //
-    // Shader coverage instrumentation. Runs BEFORE
-    // `collectGlobalUniformParameters` so the synthesized
-    // `__slang_coverage` buffer (declared at AST-check time) is still
-    // a standalone `IRGlobalParam` when the pass rewrites counter ops
-    // against it. The collection pass then packs the buffer into
-    // `GlobalParams` alongside user globals, and the replaced
-    // references are updated as part of the normal collection flow.
+    // Shader coverage instrumentation. The pass synthesizes
+    // `__slang_coverage` as an `IRGlobalParam` directly in the
+    // linked program IR, extends the program-scope var layout, and
+    // rewrites counter ops to atomic adds. Runs BEFORE
+    // `collectGlobalUniformParameters` so the synthesized buffer
+    // gets packed into `GlobalParams` alongside user globals on
+    // targets that pack ordinary uniforms (CPU, CUDA).
     //
     // Counter ops carry source position on their built-in `sourceLoc`,
     // so this pass is independent of debug-info state. It writes its

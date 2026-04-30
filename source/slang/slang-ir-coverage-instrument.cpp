@@ -18,16 +18,24 @@ namespace
 static const char kCoverageBufferName[] = "__slang_coverage";
 
 // Choose the resource kind under which the coverage buffer is bound
-// for `target`. D3D-style targets express UAVs as `register(uN)`
-// (`UnorderedAccess`); every other target we care about (Vulkan,
-// SPIR-V, GLSL, WebGPU, Metal, CPU, CUDA) speaks the descriptor-table
-// concept (`DescriptorTableSlot`). Setting the wrong kind triggers
-// either an "unhandled HLSL register type" emit error or a SPIR-V
-// "conflicting resource uses" assertion in the layout pipeline.
+// for `target`. Each target family speaks a different vocabulary
+// for buffer slots, and parameter binding only routes a kind through
+// to the emitter that the emitter actually handles:
+//   - D3D / HLSL: `UnorderedAccess` (UAV register `u<N>`)
+//   - Metal: `MetalBuffer` (`[[buffer(N)]]`)
+//   - Khronos / Vulkan / SPIR-V / GLSL / WebGPU / CPU / CUDA:
+//     `DescriptorTableSlot`
+// Setting the wrong kind triggers either an "unhandled HLSL register
+// type" emit error, a SPIR-V "conflicting resource uses" assertion,
+// or — on Metal — a silent failure to assign `[[buffer(N)]]` to the
+// synthesized parameter.
 static LayoutResourceKind selectCoverageResourceKind(TargetRequest* targetRequest)
 {
-    return isD3DTarget(targetRequest) ? LayoutResourceKind::UnorderedAccess
-                                      : LayoutResourceKind::DescriptorTableSlot;
+    if (isD3DTarget(targetRequest))
+        return LayoutResourceKind::UnorderedAccess;
+    if (isMetalTarget(targetRequest))
+        return LayoutResourceKind::MetalBuffer;
+    return LayoutResourceKind::DescriptorTableSlot;
 }
 
 // Pick a binding offset in space 0 that doesn't collide with any
