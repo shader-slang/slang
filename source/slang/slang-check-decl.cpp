@@ -4391,11 +4391,11 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
         }
     }
 
-    if (decl->initExpr && getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
-    {
+    if (decl->initExpr)
         decl->initExpr = CheckTerm(decl->initExpr);
+
+    if (decl->initExpr && getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
         checkForwardReferencesInGenericDecl(decl, decl->initExpr, nullptr);
-    }
 }
 
 void SemanticsDeclHeaderVisitor::visitGenericValuePackParamDecl(GenericValuePackParamDecl* decl)

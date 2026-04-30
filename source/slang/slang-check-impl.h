@@ -2649,7 +2649,8 @@ public:
     {
         // constraints from explicit parameters, inferred argument types or where-clauses
         Required = 0,
-        // hint values from value unification when the constraint is non-binding
+        // constraints from `where optional` clauses and hint values from
+        // inferred-but-non-binding unification steps
         Optional,
         // default generic argument values (e.g., T = int)
         Default
