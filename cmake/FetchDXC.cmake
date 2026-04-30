@@ -50,9 +50,12 @@ elseif(
     AND NOT SLANG_DXC_BUILD_FROM_SOURCE
     AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
+    AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
 )
-    # User explicitly disabled the source build; skip auto-detection and use
-    # prebuilt binaries without any GLIBC compatibility check.
+    # User explicitly disabled the source build on x86_64 Linux; skip
+    # auto-detection and use prebuilt binaries without any GLIBC check.
+    # Non-x86_64 Linux falls through to the dedicated architecture warning
+    # below (no prebuilt binary exists for those architectures).
     message(
         STATUS
         "SLANG_DXC_BUILD_FROM_SOURCE=OFF: using prebuilt DXC without "
@@ -89,7 +92,10 @@ elseif(
         "https://github.com/microsoft/DirectXShaderCompiler/releases/download/${_dxc_version_tag}/linux_dxc_${_dxc_release_date}.x86_64.tar.gz"
     )
     set(_dxc_probe_dir "${CMAKE_BINARY_DIR}/_dxc_probe")
-    set(_dxc_probe_tarball "${_dxc_probe_dir}/dxc.tar.gz")
+    # Include the version tag in the filename so that bumping _dxc_version_tag
+    # invalidates the cached tarball and forces a fresh download rather than
+    # re-using a stale archive from a previous version.
+    set(_dxc_probe_tarball "${_dxc_probe_dir}/dxc_${_dxc_version_tag}.tar.gz")
     # Stamp stores the highest GLIBC version required across both .so files
     # (e.g. "2.34"), or the sentinel "DETECTION_FAILED" when objdump/readelf
     # could not extract version info.
@@ -252,35 +258,55 @@ elseif(
                 set(_libc_probe "${_libc_probe_stderr}")
             endif()
         endif()
-        string(
-            REGEX MATCH
-            "[Gg][Ll][Ii][Bb][Cc][^0-9]*([0-9]+)\\.([0-9]+)"
-            _glibc_match
-            "${_libc_probe}"
+        # Detect musl libc before attempting the glibc regex: prebuilt DXC
+        # binaries are glibc-linked and will definitely not load on musl
+        # systems, so force a source build immediately.
+        if(
+            _libc_probe MATCHES "[Mm]usl"
+            OR EXISTS "/lib/ld-musl-x86_64.so.1"
+            OR EXISTS "/lib/ld-musl-aarch64.so.1"
         )
-        if(_glibc_match)
-            set(_glibc_version "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}")
-            message(STATUS "Detected system GLIBC version: ${_glibc_version}")
-            if(_glibc_version VERSION_LESS _dxc_required_glibc)
+            message(
+                STATUS
+                "Detected musl libc; prebuilt DXC binaries require glibc "
+                "and will not load. Building DXC from source "
+                "(${_dxc_version_tag})."
+            )
+            set(_dxc_build_from_source ON)
+        else()
+            string(
+                REGEX MATCH
+                "[Gg][Ll][Ii][Bb][Cc][^0-9]*([0-9]+)\\.([0-9]+)"
+                _glibc_match
+                "${_libc_probe}"
+            )
+            if(_glibc_match)
+                set(_glibc_version "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}")
                 message(
                     STATUS
-                    "System GLIBC ${_glibc_version} < required "
-                    "${_dxc_required_glibc}: building DXC from source "
-                    "(${_dxc_version_tag})"
+                    "Detected system GLIBC version: ${_glibc_version}"
                 )
-                set(_dxc_build_from_source ON)
+                if(_glibc_version VERSION_LESS _dxc_required_glibc)
+                    message(
+                        STATUS
+                        "System GLIBC ${_glibc_version} < required "
+                        "${_dxc_required_glibc}: building DXC from source "
+                        "(${_dxc_version_tag})"
+                    )
+                    set(_dxc_build_from_source ON)
+                endif()
+            else()
+                message(
+                    WARNING
+                    "Could not detect system GLIBC version (getconf and ldd "
+                    "both failed or produced unrecognisable output). "
+                    "Proceeding with prebuilt DXC binaries; if the system libc "
+                    "is older than the binaries require, they will fail to load "
+                    "at runtime with a dynamic-linker error. "
+                    "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build from source "
+                    "and guarantee compatibility."
+                )
             endif()
-        else()
-            message(
-                WARNING
-                "Could not detect system GLIBC version (getconf and ldd "
-                "both failed or produced unrecognisable output). "
-                "Proceeding with prebuilt DXC binaries; if the system libc "
-                "is older than the binaries require, they will fail to load "
-                "at runtime with a dynamic-linker error. "
-                "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build from source "
-                "and guarantee compatibility."
-            )
         endif()
     endif()
 elseif(
