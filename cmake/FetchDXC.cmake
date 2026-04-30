@@ -77,6 +77,24 @@ elseif(
 elseif(
     NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
     AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
+    AND CMAKE_CROSSCOMPILING
+    AND NOT DEFINED SLANG_DXC_BINARY_URL
+    AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
+)
+    # Cross-compiling for Linux x86_64: the host cannot probe the target
+    # system's GLIBC at configure time, so detection is skipped and the
+    # prebuilt binary is used as-is. Inform the user so they can opt in to
+    # a source build if the target GLIBC is older than the prebuilt requires.
+    message(
+        STATUS
+        "Cross-compiling for Linux x86_64: GLIBC auto-detection is skipped "
+        "(cannot probe the target system at configure time). "
+        "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON if the target GLIBC is older "
+        "than the prebuilt DXC binary requires."
+    )
+elseif(
+    NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
+    AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
     AND NOT DEFINED SLANG_DXC_BINARY_URL
     AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
