@@ -273,18 +273,25 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             slangd
             test-server
             test-process
-            slang-neural-module
         OPTIONAL_REQUIRES
             slang-rt
             slang-glslang
             slang-llvm
+            copy-dxcompiler
+            copy-dxil
             copy-webgpu_dawn
             copy-slang-tint
-            # See issue 5305.
-            copy-prebuilt-binaries
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
+    # Only depend on slang-neural-module when SLANG_EMBED_CORE_MODULE=ON.
+    # With SLANG_EMBED_CORE_MODULE=OFF, building the neural module crashes
+    # (slang-bootstrap exits 0xC0000005 when processing neural.slang), so we
+    # exclude the dependency to keep development builds with EMBED=OFF working.
+    if(SLANG_EMBED_CORE_MODULE)
+        add_dependencies(slang-test slang-neural-module)
+    endif()
+
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
         PROPERTY VS_STARTUP_PROJECT slang-test
@@ -435,9 +442,8 @@ if(SLANG_ENABLE_REPLAYER)
     slang_add_target(
         slang-replay
         EXECUTABLE
-        EXTRA_SOURCE_DIRS
-            ${slang_SOURCE_DIR}/source/slang-record-replay/replay
-            ${slang_SOURCE_DIR}/source/slang-record-replay/util
+        # Note: replay-context sources are already compiled into the slang library,
+        # so we only add include directories here, not EXTRA_SOURCE_DIRS
         LINK_WITH_PRIVATE core compiler-core slang
         INCLUDE_DIRECTORIES_PUBLIC
             ${slang_SOURCE_DIR}/source/slang-record-replay

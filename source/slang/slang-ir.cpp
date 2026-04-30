@@ -53,6 +53,33 @@ void printDiagnosticArg(StringBuilder& sb, IRInst* irObject)
     }
 }
 
+void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink)
+{
+    static const int maxDepth = 5;
+    for (int i = 0; i < maxDepth; i++)
+    {
+        auto func = getParentFunc(inst);
+        if (!func)
+            return;
+        bool shouldContinue = false;
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (auto call = as<IRCall>(user))
+            {
+                sink->diagnose(
+                    Diagnostics::SeeCallOfFuncIr{.inst = func, .location = call->sourceLoc});
+                inst = call;
+                shouldContinue = true;
+                break;
+            }
+        }
+        if (!shouldContinue)
+            return;
+    }
+}
+
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -73,8 +100,6 @@ bool isSimpleDecoration(IROp op)
     case kIROp_HLSLExportDecoration:
     case kIROp_ReadNoneDecoration:
     case kIROp_NoSideEffectDecoration:
-    case kIROp_ForwardDifferentiableDecoration:
-    case kIROp_BackwardDifferentiableDecoration:
     case kIROp_RequiresNVAPIDecoration:
     case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
     case kIROp_TriangleInputPrimitiveTypeDecoration:
@@ -1287,7 +1312,7 @@ IRBlock* IRInsertLoc::getBlock() const
 IRInst* IRInsertLoc::getFunc() const
 {
     auto pp = getParent();
-    if (const auto block = as<IRBlock>(pp))
+    if (const auto block = as<IRBlock>(pp); block)
     {
         pp = pp->getParent();
     }
@@ -1836,7 +1861,19 @@ IRInst* IRBuilder::_createInst(
     m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
     type = (IRType*)instReplacement;
 
-    if (isInstHoistable(op, type, fixedArgs))
+    if (type && shouldHaveSpecConstRate(op, type, fixedArgCount, fixedArgs))
+    {
+        type = ensureSpecConstRate(this, type);
+        return _findOrEmitHoistableInst(
+            type,
+            op,
+            fixedArgCount,
+            fixedArgs,
+            varArgListCount,
+            listArgCounts,
+            listArgs);
+    }
+    else if (isInstHoistable(op))
     {
         return _findOrEmitHoistableInst(
             type,
@@ -2845,7 +2882,7 @@ IRPtrTypeBase* IRBuilder::getPtrTypeWithAddressSpace(
     IRType* valueType,
     IRPtrTypeBase* ptrWithAddrSpace)
 {
-    if (ptrWithAddrSpace->hasAddressSpace())
+    if (ptrWithAddrSpace->hasAddressSpace() || ptrWithAddrSpace->getDataLayout())
         return (IRPtrTypeBase*)getPtrType(
             ptrWithAddrSpace->getOp(),
             valueType,
@@ -2912,7 +2949,6 @@ IRTorchTensorType* IRBuilder::getTorchTensorType(IRType* elementType)
 {
     return (IRTorchTensorType*)getType(kIROp_TorchTensorType, 1, (IRInst**)&elementType);
 }
-
 
 IRBackwardDiffIntermediateContextType* IRBuilder::getBackwardDiffIntermediateContextType(
     IRInst* func)
@@ -3139,6 +3175,171 @@ IRInst* IRBuilder::emitSymbolAlias(IRInst* aliasedSymbol)
     return emitIntrinsicInst(aliasedSymbol->getFullType(), kIROp_SymbolAlias, 1, &aliasedSymbol);
 }
 
+IRCompilerDictionaryEntry* IRBuilder::_getCompilerDictionaryEntry(List<IRInst*> const& keys)
+{
+    return cast<IRCompilerDictionaryEntry>(emitIntrinsicInst(
+        getVoidType(),
+        kIROp_CompilerDictionaryEntry,
+        (UInt)keys.getCount(),
+        keys.getBuffer()));
+}
+
+static IRCompilerDictionaryScope* findScope(IRCompilerDictionary* dict)
+{
+    for (auto dictChildren : dict->getDecorationsAndChildren())
+    {
+        if (auto dictScope = as<IRCompilerDictionaryScope>(dictChildren))
+        {
+            return dictScope;
+        }
+    }
+    return nullptr;
+}
+
+IRCompilerDictionaryEntry* IRBuilder::fetchCompilerDictionaryEntry(
+    IRCompilerDictionary* dict,
+    IRInst* translationInst)
+{
+    IRCompilerDictionaryScope* scope = findScope(dict);
+    SLANG_ASSERT(scope);
+
+    List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
+
+    keyVals.reserve(2 + translationInst->getOperandCount());
+    keyVals.add(scope);
+    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
+    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
+    {
+        keyVals.add(translationInst->getOperand(ii));
+    }
+
+    auto entry = _getCompilerDictionaryEntry(keyVals);
+    getModule()->getContainerPool().free(&keyVals);
+
+    return entry;
+}
+
+void IRBuilder::setCompilerDictionaryEntryValue(IRCompilerDictionaryEntry* entry, IRInst* valueInst)
+{
+    if (auto existingVal = entry->getValue(); existingVal)
+    {
+        // Invalid.
+        SLANG_UNEXPECTED("Translation entry already exists");
+    }
+
+    auto currentLoc = getInsertLoc();
+    setInsertInto(entry);
+    emitIntrinsicInst(getVoidType(), kIROp_CompilerDictionaryValue, 1, &valueInst);
+    setInsertLoc(currentLoc);
+}
+
+void IRBuilder::addCompilerDictionaryEntry(
+    IRCompilerDictionary* dict,
+    IRInst* translationInst,
+    IRInst* resultInst)
+{
+    IRCompilerDictionaryScope* scope = findScope(dict);
+    SLANG_ASSERT(scope);
+
+    List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
+
+    keyVals.reserve(2 + translationInst->getOperandCount());
+    keyVals.add(scope);
+    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
+    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
+    {
+        keyVals.add(translationInst->getOperand(ii));
+    }
+
+    auto entry = _getCompilerDictionaryEntry(keyVals);
+    if (auto existingVal = entry->getValue(); existingVal)
+    {
+        // Invalid.
+        SLANG_UNEXPECTED("Translation entry already exists");
+    }
+
+    auto currentLoc = getInsertLoc();
+    setInsertInto(entry);
+    emitIntrinsicInst(getVoidType(), kIROp_CompilerDictionaryValue, 1, &resultInst);
+    setInsertLoc(currentLoc);
+
+    getModule()->getContainerPool().free(&keyVals);
+}
+
+IRInst* IRBuilder::tryLookupCompilerDictionaryValue(
+    IRCompilerDictionary* dict,
+    IRInst* translationInst)
+{
+    IRCompilerDictionaryScope* scope = findScope(dict);
+    SLANG_ASSERT(scope);
+
+    List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
+
+    keyVals.reserve(2 + translationInst->getOperandCount());
+    keyVals.add(scope);
+    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
+    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
+    {
+        keyVals.add(translationInst->getOperand(ii));
+    }
+
+    auto entry = _getCompilerDictionaryEntry(keyVals);
+    getModule()->getContainerPool().free(&keyVals);
+
+    return entry->getValue();
+}
+
+void IRBuilder::addAnnotation(IRInst* target, AnnotationKind kind, IRInst* annotation)
+{
+    IRInst* args[] = {target, getIntValue(getUIntType(), (UInt)kind), annotation};
+    emitIntrinsicInst(getVoidType(), kIROp_Annotation, 3, args);
+    this->getModule()->getAnnotationLookupCache()->remove({target, kind});
+}
+
+IRInst* IRBuilder::tryLookupAnnotation(IRInst* target, AnnotationKind kind)
+{
+    if (!target)
+        return nullptr;
+
+    AnnotationCacheKey key = {target, kind};
+    if (IRAnnotation * cachedResult;
+        getModule()->getAnnotationLookupCache()->tryGetValue(key, cachedResult))
+    {
+        if (!cachedResult)
+            return nullptr;
+        if (cachedResult->getParent() == nullptr)
+        {
+            // The cached result has been removed from the IR, so we should remove it from the cache
+            // as well.
+            //
+            getModule()->getAnnotationLookupCache()->remove(key);
+
+            // Fall through to do a lookup as if it wasn't cached.
+        }
+        else
+        {
+            return cachedResult->getInst();
+        }
+    }
+
+    IRAnnotation* result = nullptr;
+    for (auto use = target->firstUse; use; use = use->nextUse)
+    {
+        if (auto annotation = as<IRAnnotation>(use->getUser()))
+        {
+            if (annotation->getConformanceID() == (IRIntegerValue)kind &&
+                annotation->getTarget() == target)
+            {
+                result = annotation;
+                break;
+            }
+        }
+    }
+
+    getModule()->getAnnotationLookupCache()->add(key, result);
+    return result ? result->getInst() : nullptr;
+}
+
 IRInst* IRBuilder::emitDebugSource(
     UnownedStringSlice fileName,
     UnownedStringSlice source,
@@ -3156,6 +3357,11 @@ IRInst* IRBuilder::emitDebugBuildIdentifier(
 {
     IRInst* args[] = {getStringValue(buildIdentifier), getIntValue(getUIntType(), flags)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugBuildIdentifier, 2, args);
+}
+IRInst* IRBuilder::emitDebugCompilationUnit(IRInst* source)
+{
+    IRInst* args[] = {source};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugCompilationUnit, 1, args);
 }
 IRInst* IRBuilder::emitDebugLine(
     IRInst* source,
@@ -3312,24 +3518,9 @@ IRInst* IRBuilder::emitForwardDifferentiateInst(IRType* type, IRInst* baseFn)
     return inst;
 }
 
-IRInst* IRBuilder::emitPrimalSubstituteInst(IRType* type, IRInst* baseFn)
-{
-    auto inst = createInst<IRPrimalSubstitute>(this, kIROp_PrimalSubstitute, type, baseFn);
-    addInst(inst);
-    return inst;
-}
-
 IRInst* IRBuilder::emitDetachDerivative(IRType* type, IRInst* value)
 {
     auto inst = createInst<IRDetachDerivative>(this, kIROp_DetachDerivative, type, value);
-    addInst(inst);
-    return inst;
-}
-
-IRInst* IRBuilder::emitIsDifferentialNull(IRInst* value)
-{
-    auto inst =
-        createInst<IRIsDifferentialNull>(this, kIROp_IsDifferentialNull, getBoolType(), value);
     addInst(inst);
     return inst;
 }
@@ -3400,11 +3591,19 @@ IRInst* IRBuilder::emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* 
     return inst;
 }
 
+IRInst* IRBuilder::emitForwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn)
+{
+    auto inst = createInst<IRForwardDifferentiatePropagate>(
+        this,
+        kIROp_ForwardDifferentiatePropagate,
+        type,
+        baseFn);
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitMakeDifferentialValuePair(IRType* type, IRInst* primal, IRInst* differential)
 {
-    SLANG_RELEASE_ASSERT(as<IRDifferentialPairType>(type));
-    SLANG_RELEASE_ASSERT(as<IRDifferentialPairType>(type)->getValueType() != nullptr);
-
     IRInst* args[] = {primal, differential};
     auto inst = createInstWithTrailingArgs<IRMakeDifferentialPair>(
         this,
@@ -3513,26 +3712,6 @@ IRInst* IRBuilder::emitDifferentialPairGetPrimal(IRType* primalType, IRInst* pai
     }
 }
 
-IRInst* IRBuilder::emitMakeDifferentialPairUserCode(
-    IRType* type,
-    IRInst* primal,
-    IRInst* differential)
-{
-    SLANG_RELEASE_ASSERT(as<IRDifferentialPairTypeBase>(type));
-    SLANG_RELEASE_ASSERT(as<IRDifferentialPairTypeBase>(type)->getValueType() != nullptr);
-
-    IRInst* args[] = {primal, differential};
-    auto inst = createInstWithTrailingArgs<IRMakeDifferentialPair>(
-        this,
-        kIROp_MakeDifferentialPairUserCode,
-        type,
-        2,
-        args);
-    addInst(inst);
-    inst->sourceLoc = primal->sourceLoc;
-    return inst;
-}
-
 IRInst* IRBuilder::emitSpecializeInst(
     IRType* type,
     IRInst* genericVal,
@@ -3577,6 +3756,16 @@ IRInst* IRBuilder::emitEachInst(IRType* type, IRInst* base, IRInst* indexArg)
 {
     IRInst* args[] = {base, indexArg};
     return emitIntrinsicInst(type, kIROp_Each, indexArg ? 2 : 1, args);
+}
+
+IRInst* IRBuilder::emitPackBranchInst(
+    IRType* type,
+    IRInst* pack,
+    IRInst* emptyValue,
+    IRInst* nonEmptyValue)
+{
+    IRInst* args[] = {pack, emptyValue, nonEmptyValue};
+    return emitIntrinsicInst(type, kIROp_PackBranch, 3, args);
 }
 
 IRInst* IRBuilder::emitLookupInterfaceMethodInst(
@@ -4068,6 +4257,111 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
     return result;
 }
 
+IRInst* IRBuilder::emitConstexprCast(IRType* type, IRInst* value)
+{
+    if (isTypeEqual(type, value->getDataType()))
+        return value;
+
+    auto toStyle = _getTypeStyleId(type);
+    auto fromStyle = _getTypeStyleId(value->getDataType());
+
+    // For constexpr casts, we only handle Int, Float, Bool, and Enum.
+    // Ptr and Void are not expected in IntVal contexts.
+
+    struct OpSeq
+    {
+        IROp op0, op1;
+        OpSeq(IROp op)
+        {
+            op0 = op;
+            op1 = kIROp_Nop;
+        }
+        OpSeq(IROp op, IROp inOp1)
+        {
+            op0 = op;
+            op1 = inOp1;
+        }
+    };
+
+    // Constexpr casting table for Int, Float, Bool, Enum (4x4).
+    static const OpSeq opMap[4][4] = {
+        /*      To:      Int, Float, Bool, Enum */
+        /* From Int   */
+        {kIROp_ConstexprIntCast,
+         kIROp_ConstexprCastIntToFloat,
+         kIROp_ConstexprIntCast,
+         kIROp_ConstexprCastIntToEnum},
+        /* From Float */
+        {kIROp_ConstexprCastFloatToInt,
+         kIROp_ConstexprFloatCast,
+         kIROp_ConstexprNeq,
+         {kIROp_ConstexprCastFloatToInt, kIROp_ConstexprCastIntToEnum}},
+        /* From Bool  */
+        {kIROp_ConstexprIntCast,
+         kIROp_ConstexprCastIntToFloat,
+         kIROp_Nop,
+         kIROp_ConstexprCastIntToEnum},
+        /* From Enum  */
+        {kIROp_ConstexprCastEnumToInt,
+         {kIROp_ConstexprCastEnumToInt, kIROp_ConstexprCastIntToFloat},
+         {kIROp_ConstexprCastEnumToInt, kIROp_ConstexprIntCast},
+         kIROp_ConstexprEnumCast},
+    };
+
+    // Map style to index in our 4x4 table.
+    auto styleToIndex = [](TypeCastStyle style) -> int
+    {
+        switch (style)
+        {
+        case TypeCastStyle::Int:
+            return 0;
+        case TypeCastStyle::Float:
+            return 1;
+        case TypeCastStyle::Bool:
+            return 2;
+        case TypeCastStyle::Enum:
+            return 3;
+        default:
+            return -1;
+        }
+    };
+
+    int fromIndex = styleToIndex(fromStyle);
+    int toIndex = styleToIndex(toStyle);
+
+    // Fall back to regular emitCast for unsupported types (Ptr, Void, Unknown).
+    if (fromIndex < 0 || toIndex < 0)
+        return emitCast(type, value);
+
+    auto op = opMap[fromIndex][toIndex];
+    if (op.op0 == kIROp_Nop)
+        return value;
+
+    auto t = type;
+    if (op.op1 != kIROp_Nop)
+    {
+        if (toStyle == TypeCastStyle::Bool)
+            t = getIntType();
+        else
+            t = getUInt64Type();
+        if (auto vecType = as<IRVectorType>(type))
+            t = getVectorType(t, vecType->getElementCount());
+        else if (auto matType = as<IRMatrixType>(type))
+            t = getMatrixType(
+                t,
+                matType->getRowCount(),
+                matType->getColumnCount(),
+                matType->getLayout());
+    }
+
+    auto result = emitIntrinsicInst(t, op.op0, 1, &value);
+    if (op.op1 != kIROp_Nop)
+    {
+        result = emitIntrinsicInst(type, op.op1, 1, &result);
+    }
+    return result;
+}
+
 IRInst* IRBuilder::emitVectorReshape(IRType* type, IRInst* value)
 {
     auto targetVectorType = as<IRVectorType>(type);
@@ -4246,7 +4540,17 @@ IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element
     case kIROp_TypePack:
         if (element < tuple->getOperandCount())
         {
-            return tuple->getOperand(element);
+            bool hasNestedPack = false;
+            for (UInt i = 0; i < tuple->getOperandCount(); i++)
+            {
+                if (as<IRMakeValuePack>(tuple->getOperand(i)) || as<IRExpand>(tuple->getOperand(i)))
+                {
+                    hasNestedPack = true;
+                    break;
+                }
+            }
+            if (!hasNestedPack)
+                return tuple->getOperand(element);
         }
         break;
     }
@@ -4351,7 +4655,6 @@ IRInst* IRBuilder::emitMakeVector(IRType* type, UInt argCount, IRInst* const* ar
 
 IRInst* IRBuilder::emitDifferentialValuePairGetDifferential(IRType* diffType, IRInst* diffPair)
 {
-    SLANG_ASSERT(as<IRDifferentialPairTypeBase>(diffPair->getDataType()));
     return emitIntrinsicInst(diffType, kIROp_DifferentialPairGetDifferential, 1, &diffPair);
 }
 
@@ -4382,18 +4685,6 @@ IRInst* IRBuilder::emitDifferentialPtrPairGetPrimal(IRInst* diffPair)
 IRInst* IRBuilder::emitDifferentialPtrPairGetPrimal(IRType* primalType, IRInst* diffPair)
 {
     return emitIntrinsicInst(primalType, kIROp_DifferentialPtrPairGetPrimal, 1, &diffPair);
-}
-
-IRInst* IRBuilder::emitDifferentialPairGetDifferentialUserCode(IRType* diffType, IRInst* diffPair)
-{
-    SLANG_ASSERT(as<IRDifferentialPairTypeBase>(diffPair->getDataType()));
-    return emitIntrinsicInst(diffType, kIROp_DifferentialPairGetDifferentialUserCode, 1, &diffPair);
-}
-
-IRInst* IRBuilder::emitDifferentialPairGetPrimalUserCode(IRInst* diffPair)
-{
-    auto valueType = cast<IRDifferentialPairTypeBase>(diffPair->getDataType())->getValueType();
-    return emitIntrinsicInst(valueType, kIROp_DifferentialPairGetPrimalUserCode, 1, &diffPair);
 }
 
 IRInst* IRBuilder::emitMakeMatrix(IRType* type, UInt argCount, IRInst* const* args)
@@ -4506,9 +4797,12 @@ IRInst* IRBuilder::emitWrapExistential(
     return inst;
 }
 
-IRInst* IRBuilder::addPrimalValueStructKeyDecoration(IRInst* target, IRStructKey* key)
+IRInst* IRBuilder::addPrimalValueStructKeyDecoration(
+    IRInst* target,
+    IRStructKey* firstKey,
+    IRStructKey* secondKey)
 {
-    return addDecoration(target, kIROp_PrimalValueStructKeyDecoration, key);
+    return addDecoration(target, kIROp_PrimalValueStructKeyDecoration, firstKey, secondKey);
 }
 
 IRInst* IRBuilder::addPrimalElementTypeDecoration(IRInst* target, IRInst* type)
@@ -5230,6 +5524,11 @@ IRInst* IRBuilder::emitElementExtract(IRInst* base, IRInst* index)
         type = (IRType*)tupleType->getOperand(getIntVal(index));
         return emitGetTupleElement(type, base, index);
     }
+    else if (auto typePack = as<IRTypePack>(base->getDataType()))
+    {
+        type = (IRType*)typePack->getOperand(getIntVal(index));
+        return emitGetTupleElement(type, base, index);
+    }
     SLANG_RELEASE_ASSERT(type);
 
     return emitElementExtract(type, base, index);
@@ -5661,6 +5960,36 @@ IRInst* IRBuilder::emitSwizzledStore(
     return emitSwizzledStore(dest, source, elementCount, irElementIndices);
 }
 
+IRInst* IRBuilder::emitMatrixSwizzleStore(
+    IRInst* dest,
+    IRInst* source,
+    UInt elementCount,
+    uint32_t const* rowIndices,
+    uint32_t const* colIndices)
+{
+    auto intType = getBasicType(BaseType::Int);
+
+    // Interleave row/col pairs as trailing operands
+    ShortList<IRInst*> args;
+    args.add(dest);
+    args.add(source);
+    for (UInt ii = 0; ii < elementCount; ++ii)
+    {
+        args.add(getIntValue(intType, rowIndices[ii]));
+        args.add(getIntValue(intType, colIndices[ii]));
+    }
+
+    auto inst = createInstWithTrailingArgs<IRMatrixSwizzleStore>(
+        this,
+        kIROp_MatrixSwizzleStore,
+        nullptr,
+        args.getCount(),
+        args.getArrayView().getBuffer());
+
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitReturn(IRInst* val)
 {
     auto inst = createInst<IRReturn>(this, kIROp_Return, nullptr, val);
@@ -5730,6 +6059,17 @@ IRInst* IRBuilder::emitCheckpointObject(IRInst* value)
 IRInst* IRBuilder::emitLoopExitValue(IRInst* value)
 {
     auto inst = createInst<IRLoopExitValue>(this, kIROp_LoopExitValue, value->getFullType(), value);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitReportCheckpointStore(
+    IRType* storedType,
+    IRInst* originalFunc,
+    IRInst* storeRef)
+{
+    IRInst* operands[] = {storedType, originalFunc, storeRef};
+    auto inst = createInst<IRInst>(this, kIROp_ReportCheckpointStore, getVoidType(), 3, operands);
     addInst(inst);
     return inst;
 }
@@ -5944,16 +6284,16 @@ IRInst* IRBuilder::emitExtractTaggedUnionPayload(IRType* type, IRInst* val, IRIn
 }
 
 
-IRInst* IRBuilder::emitSizeOf(IRInst* sizedType)
+IRInst* IRBuilder::emitSizeOf(IRInst* sizedType, IRType* dataLayoutType)
 {
-    auto inst = createInst<IRInst>(this, kIROp_SizeOf, getIntType(), sizedType);
+    auto inst = createInst<IRInst>(this, kIROp_SizeOf, getIntType(), sizedType, dataLayoutType);
     addInst(inst);
     return inst;
 }
 
-IRInst* IRBuilder::emitAlignOf(IRInst* sizedType)
+IRInst* IRBuilder::emitAlignOf(IRInst* sizedType, IRType* dataLayoutType)
 {
-    auto inst = createInst<IRInst>(this, kIROp_AlignOf, getIntType(), sizedType);
+    auto inst = createInst<IRInst>(this, kIROp_AlignOf, getIntType(), sizedType, dataLayoutType);
     addInst(inst);
     return inst;
 }
@@ -6143,6 +6483,164 @@ IRInst* IRBuilder::emitMul(IRType* type, IRInst* left, IRInst* right)
 IRInst* IRBuilder::emitDiv(IRType* type, IRInst* numerator, IRInst* denominator)
 {
     auto inst = createInst<IRInst>(this, kIROp_Div, type, numerator, denominator);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprAdd(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprAdd, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprSub(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprSub, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprMul(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprMul, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprNeg(IRType* type, IRInst* value)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprNeg, type, value);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprDiv(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprDiv, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprIRem(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprIRem, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprShl(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprShl, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprShr(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprShr, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprBitAnd(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprBitAnd, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprBitOr(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprBitOr, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprBitXor(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprBitXor, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprBitNot(IRType* type, IRInst* value)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprBitNot, type, value);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprNot(IRType* type, IRInst* value)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprNot, type, value);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprEql(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprEql, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprNeq(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprNeq, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprGreater(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprGreater, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprLess(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprLess, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprGeq(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprGeq, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprLeq(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprLeq, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprAnd(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprAnd, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprOr(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprOr, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprSelect(
+    IRType* type,
+    IRInst* condition,
+    IRInst* ifTrue,
+    IRInst* ifFalse)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprSelect, type, condition, ifTrue, ifFalse);
     addInst(inst);
     return inst;
 }
@@ -8128,6 +8626,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
 
     addToWorkList(thisInst, other);
 
+    List<IRInst*> duplicateAnnotations;
     List<IRSetBase*> setsToUpdate;
     for (Index i = 0; i < workList.getCount(); i++)
     {
@@ -8232,6 +8731,9 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                         // If existingVal has been replaced by something else, use that.
                         dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
                         addToWorkList(user, existingVal);
+
+                        if (!user->hasUses() && (as<IRAnnotation>(user)))
+                            duplicateAnnotations.add(user);
                     }
                     else
                     {
@@ -8279,6 +8781,9 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
 
         ff->debugValidate();
     }
+
+    for (auto annotation : duplicateAnnotations)
+        annotation->removeAndDeallocate();
 
     for (auto setInst : setsToUpdate)
     {
@@ -8541,6 +9046,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     if (as<IRSetBase>(this))
         return false;
 
+    if (as<IRTranslateBase>(this))
+        return false;
+
     switch (getOp())
     {
     // By default, assume that we might have side effects,
@@ -8567,7 +9075,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
             // common subexpression elimination, etc.
             //
             auto call = cast<IRCall>(this);
-            return !(isSideEffectFreeFunctionalCall(call, options));
+            return !(
+                isSideEffectFreeFunctionalCall(call, options) ||
+                call->findDecoration<IRIgnoreSideEffectsDecoration>());
         }
         break;
 
@@ -8623,7 +9133,17 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeCoopMatrixFromScalar:
     case kIROp_MatrixReshape:
     case kIROp_VectorReshape:
+    case kIROp_ExtractFirstFromPack:
+    case kIROp_ExtractLastFromPack:
+    case kIROp_TrimFirstOfPack:
+    case kIROp_TrimLastOfPack:
+    case kIROp_ShapeConcat:
+    case kIROp_ShapePermute:
+    case kIROp_ShapeSwap:
+    case kIROp_ShapeReduce:
+    case kIROp_PackBranch:
     case kIROp_MakeWitnessPack:
+    case kIROp_NonEmptyPackWitness:
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeStruct:
@@ -8638,6 +9158,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeOptionalNone:
     case kIROp_OptionalHasValue:
     case kIROp_GetOptionalValue:
+    case kIROp_MakeConditionalValue:
+    case kIROp_GetConditionalValue:
     case kIROp_DifferentialPairGetPrimal:
     case kIROp_DifferentialPairGetDifferential:
     case kIROp_MakeDifferentialPair:
@@ -8674,6 +9196,28 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_Add:
     case kIROp_Sub:
     case kIROp_Mul:
+    case kIROp_ConstexprAdd:
+    case kIROp_ConstexprSub:
+    case kIROp_ConstexprMul:
+    case kIROp_ConstexprNeg:
+    case kIROp_ConstexprShl:
+    case kIROp_ConstexprShr:
+    case kIROp_ConstexprBitAnd:
+    case kIROp_ConstexprBitOr:
+    case kIROp_ConstexprBitXor:
+    case kIROp_ConstexprBitNot:
+    case kIROp_ConstexprNot:
+    case kIROp_ConstexprEql:
+    case kIROp_ConstexprNeq:
+    case kIROp_ConstexprGreater:
+    case kIROp_ConstexprLess:
+    case kIROp_ConstexprGeq:
+    case kIROp_ConstexprLeq:
+    case kIROp_ConstexprAnd:
+    case kIROp_ConstexprOr:
+    case kIROp_ConstexprSelect:
+    case kIROp_CoopMatMulAdd:
+    case kIROp_CoopVecMatMulAdd:
     case kIROp_Lsh:
     case kIROp_Rsh:
     case kIROp_Eql:
@@ -8709,6 +9253,13 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_CastEnumToInt:
     case kIROp_CastIntToEnum:
     case kIROp_EnumCast:
+    case kIROp_ConstexprIntCast:
+    case kIROp_ConstexprCastIntToFloat:
+    case kIROp_ConstexprCastFloatToInt:
+    case kIROp_ConstexprFloatCast:
+    case kIROp_ConstexprCastIntToEnum:
+    case kIROp_ConstexprCastEnumToInt:
+    case kIROp_ConstexprEnumCast:
     case kIROp_CastUInt2ToDescriptorHandle:
     case kIROp_CastDescriptorHandleToUInt2:
     case kIROp_CastUInt64ToDescriptorHandle:
@@ -8752,9 +9303,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetValueFromTaggedUnion:
     case kIROp_MakeTaggedUnion:
     case kIROp_GetTagOfElementInSet:
-    case kIROp_MakeDifferentialPairUserCode:
     case kIROp_MakeDifferentialPtrPair:
     case kIROp_MakeStorageTypeLoweringConfig:
+    case kIROp_WeakUse:
     case kIROp_SPIRVLoadTexelPointerFromHeap:
         return false;
 
@@ -8766,17 +9317,17 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_UninitializedWitnessTableElement:
     case kIROp_NoneTypeElement:
     case kIROp_NoneWitnessTableElement:
-        return false;
-
-    case kIROp_ForwardDifferentiate:
-    case kIROp_BackwardDifferentiate:
-    case kIROp_BackwardDifferentiatePrimal:
-    case kIROp_BackwardDifferentiatePropagate:
     case kIROp_DetachDerivative:
+    case kIROp_FuncTypeOf:
+    case kIROp_MakeIDifferentiableWitness:
+    case kIROp_SpecializeExistentialsInFunc:
+    case kIROp_SpecializeExistentialsInType:
         return false;
 
     case kIROp_Div:
+    case kIROp_ConstexprDiv:
     case kIROp_IRem:
+    case kIROp_ConstexprIRem:
         if (isIntegralScalarOrCompositeType(getFullType()))
         {
             if (auto intLit = as<IRIntLit>(getOperand(1)))
@@ -8790,6 +9341,12 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
 
     case kIROp_FRem:
         return false;
+
+    case kIROp_Annotation:
+        if (getOperand(0)->getOp() == kIROp_Poison)
+            return false;
+        else
+            return true;
 
     case kIROp_IsBool:
     case kIROp_IsFloat:
@@ -9058,6 +9615,8 @@ IRInst* getResolvedInstForDecorations(IRInst* inst, bool resolveThroughDifferent
             case kIROp_BackwardDifferentiate:
             case kIROp_BackwardDifferentiatePrimal:
             case kIROp_BackwardDifferentiatePropagate:
+            case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+            case kIROp_BackwardRemat:
                 candidate = candidate->getOperand(0);
                 continue;
             default:
@@ -9188,6 +9747,8 @@ bool isMovableInst(IRInst* inst)
     case kIROp_OptionalHasValue:
     case kIROp_GetOptionalValue:
     case kIROp_MakeOptionalValue:
+    case kIROp_MakeConditionalValue:
+    case kIROp_GetConditionalValue:
     case kIROp_MakeTuple:
     case kIROp_GetTupleElement:
     case kIROp_MakeStruct:

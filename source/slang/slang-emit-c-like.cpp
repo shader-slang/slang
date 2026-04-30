@@ -2,6 +2,7 @@
 #include "slang-emit-c-like.h"
 
 #include "../compiler-core/slang-name.h"
+#include "../core/slang-char-util.h"
 #include "../core/slang-stable-hash.h"
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
@@ -20,7 +21,6 @@
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
-#include "slang-mangled-lexer.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
@@ -1464,6 +1464,10 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_MetalCastToDepthTexture:
     case kIROp_LoadResourceDescriptorFromHeap:
     case kIROp_LoadSamplerDescriptorFromHeap:
+    case kIROp_CoopMatMulAdd:
+    case kIROp_CoopVecMatMulAdd:
+    case kIROp_CoopVecOuterProductAccumulate:
+    case kIROp_CoopVecReduceSumAccumulate:
         return false;
 
     // Always fold these in, because they are trivial
@@ -1873,7 +1877,7 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
                 IRVectorType* vectorType = nullptr;
                 if (auto ptrType = as<IRPtrTypeBase>(inst->getOperand(0)->getDataType()))
                 {
-                    vectorType = as<IRVectorType>(ptrType->getValueType());
+                    vectorType = as<IRVectorType>(unwrapAttributedType(ptrType->getValueType()));
                 }
                 if (vectorType)
                 {
@@ -3217,6 +3221,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugFunction:
     case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugCompilationUnit:
         break;
 
     case kIROp_Unmodified:
@@ -3241,6 +3246,10 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_MetalAtomicCast:
     case kIROp_MetalCastToDepthTexture:
     case kIROp_SetOptiXPayloadRegister:
+    case kIROp_CoopMatMulAdd:
+    case kIROp_CoopVecMatMulAdd:
+    case kIROp_CoopVecOuterProductAccumulate:
+    case kIROp_CoopVecReduceSumAccumulate:
         emitInstStmt(inst);
         break;
 
@@ -5226,6 +5235,7 @@ void CLikeSourceEmitter::ensureGlobalInst(
     case kIROp_DebugValue:
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugCompilationUnit:
         return;
     default:
         break;

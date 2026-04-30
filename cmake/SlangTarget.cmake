@@ -413,6 +413,13 @@ function(slang_add_target dir type)
         )
     endif()
 
+    if(WIN32)
+        set_target_properties(
+            ${target}
+            PROPERTIES VS_DEBUGGER_ENVIRONMENT "SLANG_ASSERT=debugbreak"
+        )
+    endif()
+
     #
     # Link and include from dependencies
     #
@@ -550,6 +557,16 @@ function(slang_add_target dir type)
         target_compile_options(
             ${target}
             PRIVATE ${ARG_EXTRA_COMPILE_OPTIONS_PRIVATE}
+        )
+    endif()
+
+    #
+    # Secure CRT defines
+    #
+    if(SLANG_SECURE_CRT_DEFINES)
+        target_compile_definitions(
+            ${target}
+            PRIVATE ${SLANG_SECURE_CRT_DEFINES}
         )
     endif()
 

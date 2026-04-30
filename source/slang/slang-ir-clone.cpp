@@ -83,12 +83,6 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     //
     SLANG_ASSERT(!as<IRConstant>(oldInst));
 
-    const auto canBeSpecConst = canOperationBeSpecConst(
-        oldInst->getOp(),
-        oldInst->getDataType(),
-        nullptr,
-        oldInst->getOperands());
-
     // Next we will iterate over the operands of `oldInst`
     // to find their replacements and install them as
     // the operands of `newInst`.
@@ -103,10 +97,14 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
         auto newOperand = findCloneForOperand(env, oldOperand);
 
         newOperands[ii] = newOperand;
-
-        if (canBeSpecConst)
-            newType = maybeAddRateType(builder, newOperand->getFullType(), newType);
     }
+
+    if (shouldHaveSpecConstRate(
+            oldInst->getOp(),
+            newType,
+            operandCount,
+            newOperands.getArrayView().getBuffer()))
+        newType = ensureSpecConstRate(builder, newType);
 
     // Finally we create the inst with the updated operands.
     auto newInst = builder->emitIntrinsicInst(
@@ -250,6 +248,12 @@ static void _cloneInstDecorationsAndChildren(
         // parameters that are to be replaced).
         //
         if (lookUp(env, oldChild))
+            continue;
+
+        // When dedup returns a pre-existing instruction (e.g. a hoistable inst),
+        // cloning NameHintDecorations onto it again would cause unbounded
+        // accumulation across repeated generic-specialization passes.
+        if (as<IRNameHintDecoration>(oldChild) && newInst->findDecoration<IRNameHintDecoration>())
             continue;
 
         // Now we can perform the first phase of cloning

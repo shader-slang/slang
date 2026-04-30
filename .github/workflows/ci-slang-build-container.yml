@@ -20,7 +20,7 @@ jobs:
       contents: read
       packages: read # Required to pull container from ghcr.io
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
       options: --user root -v /:/host_root
 
     env:
@@ -68,6 +68,11 @@ jobs:
           submodules: "recursive"
           fetch-depth: "2"
 
+      - name: Check disk space
+        uses: ./.github/actions/check-disk-space
+        with:
+          min-disk-gb: "5"
+
       # Restore sccache local cache from master
       - name: Restore sccache cache
         uses: actions/cache/restore@v4
@@ -85,7 +90,7 @@ jobs:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
 
-      # Setup sccache with local disk backend (no GCS)
+      # Setup sccache
       - name: Setup sccache
         uses: ./.github/actions/setup-sccache
         with:
@@ -188,7 +193,7 @@ jobs:
             exit 1
           fi
 
-      # Save sccache cache for fork PRs (master only)
+      # Save sccache cache (master only, for populate-sccache workflow)
       - name: Save sccache cache (master only)
         if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@v4

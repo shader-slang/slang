@@ -168,27 +168,28 @@ bool isResourceType(IRType* type)
         type = arrayType->getElementType();
     }
 
-    if (const auto resourceTypeBase = as<IRResourceTypeBase>(type))
+    if (const auto resourceTypeBase = as<IRResourceTypeBase>(type); resourceTypeBase)
     {
         return true;
     }
-    else if (const auto builtinGenericType = as<IRBuiltinGenericType>(type))
+    else if (const auto builtinGenericType = as<IRBuiltinGenericType>(type); builtinGenericType)
     {
         return true;
     }
-    else if (const auto pointerLikeType = as<IRPointerLikeType>(type))
+    else if (const auto pointerLikeType = as<IRPointerLikeType>(type); pointerLikeType)
     {
         return true;
     }
-    else if (const auto samplerType = as<IRSamplerStateTypeBase>(type))
+    else if (const auto samplerType = as<IRSamplerStateTypeBase>(type); samplerType)
     {
         return true;
     }
-    else if (const auto subpassInputType = as<IRSubpassInputType>(type))
+    else if (const auto subpassInputType = as<IRSubpassInputType>(type); subpassInputType)
     {
         return true;
     }
-    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type);
+             untypedBufferType)
     {
         return true;
     }
@@ -353,11 +354,6 @@ struct TupleTypeBuilder
                 {
                     specialType = legalFieldType;
                 }
-
-                // `void` is currently legalized to simple, but we don't want to add a
-                // `void` field to the struct.
-                if (legalLeafType.getSimple()->getOp() == kIROp_VoidType)
-                    return;
             }
             break;
 
@@ -538,6 +534,9 @@ struct TupleTypeBuilder
             // original can also reference the new one.
             ordinaryStructType->insertAfter(originalStructType);
 
+            bool isOptimizableType =
+                (ordinaryStructType->findDecoration<IROptimizableTypeDecoration>());
+
             for (auto ee : ordinaryElements)
             {
                 // We will ensure that all the original fields are represented,
@@ -556,7 +555,14 @@ struct TupleTypeBuilder
                 //
                 IRType* fieldType = ee.type;
                 if (!fieldType)
-                    fieldType = context->getBuilder()->getVoidType();
+                    if (!isOptimizableType)
+                        // If the type is not optimizable, the position may be important for layout
+                        // information. In that case, we will keep the field but give it a `void`
+                        // type.
+                        //
+                        fieldType = context->getBuilder()->getVoidType();
+                    else
+                        continue; // If type is optimizable, skip the field entirely.
 
                 // TODO: shallow clone of modifiers, etc.
                 IRStructField* originalField = findStructField(originalStructType, ee.fieldKey);
@@ -1225,6 +1231,29 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
         else
         {
             legalElementType = legalizeType(context, originalElementType);
+
+            // When special types leak out of a parameter group, they need to
+            // be bound differently. Warn the user when this happens.
+            if (legalElementType.flavor == LegalType::Flavor::pair &&
+                as<IRConstantBufferType>(type))
+            {
+                context->m_sink->diagnose(Diagnostics::SpecialTypeLeaksFromParameterGroup{
+                    .location = findFirstUseLoc(type)});
+
+                // indicate which elements cannot be part of the parameter group
+                auto& specialType = legalElementType.getPair()->specialType;
+                if (specialType.flavor == LegalType::Flavor::tuple)
+                {
+                    auto specialTuple = specialType.getTuple();
+                    for (auto specialElement : specialTuple->elements)
+                    {
+                        context->m_sink->diagnose(
+                            Diagnostics::SpecialTypeMemberLeaksFromParameterGroup{
+                                .member = specialElement.key});
+                    }
+                }
+            }
+
             // As a bit of a corner case, if the user requested something
             // like `ConstantBuffer<Texture2D>` the element type would
             // legalize to a "simple" type, and that would be interpreted

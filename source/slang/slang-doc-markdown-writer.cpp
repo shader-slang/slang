@@ -838,6 +838,14 @@ void DocMarkdownWriter::writeExtensionConditions(
                             break;
                         }
                     }
+                    else if (auto valPackParamDecl = as<GenericValuePackParamDecl>(member))
+                    {
+                        if (valPackParamDecl->parameterIndex == parameterIndex)
+                        {
+                            originalParamDecl = valPackParamDecl;
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -910,13 +918,41 @@ void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
         out << "<span class='code_keyword'>static</span> ";
     }
 
+    auto declRef = makeDeclRef(callableDecl);
+
+    if (hasDirectFuncType(declRef.as<CallableDecl>()))
+    {
+        // For declarations whose type is expressed as a single func-type expression
+        // (e.g. autodiff synthesized functions like fwd_diff, bwd_diff), print as
+        //   name : <func-type>
+        // since the func-type may not decompose into a simple return + params form.
+        ASTPrinter namePrinter(
+            m_astBuilder,
+            ASTPrinter::OptionFlag::ParamNames |
+                ASTPrinter::OptionFlag::NoSpecializedExtensionTypeName);
+        namePrinter.addDeclPath(declRef);
+        out << translateToHTMLWithLinks(callableDecl, namePrinter.getSlice());
+
+        auto substituted = declRef.substitute(m_astBuilder, callableDecl->funcType.type);
+        auto resolved = substituted ? substituted->resolve() : nullptr;
+
+        ASTPrinter typePrinter(
+            m_astBuilder,
+            ASTPrinter::OptionFlag::ParamNames |
+                ASTPrinter::OptionFlag::NoSpecializedExtensionTypeName);
+        typePrinter.addType(as<Type>(resolved));
+
+        out << toSlice(" : ") << translateToHTMLWithLinks(callableDecl, typePrinter.getSlice());
+        return;
+    }
+
     List<ASTPrinter::Part> parts;
 
     ASTPrinter printer(
         m_astBuilder,
         ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoSpecializedExtensionTypeName,
         &parts);
-    printer.addDeclSignature(makeDeclRef(callableDecl));
+    printer.addDeclSignature(declRef);
 
     Signature signature;
     getSignature(parts, signature);
@@ -1643,7 +1679,7 @@ void DocMarkdownWriter::writeCallableOverridable(
                 {
                     for (Decl* decl : genericDecl->getDirectMemberDecls())
                     {
-                        if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl))
+                        if (isGenericParam(decl))
                         {
                             genericDecls.add(decl);
                         }
@@ -2357,7 +2393,7 @@ void DeclDocumentation::writeGenericParameters(
     List<Decl*> params;
     for (Decl* member : genericDecl->getDirectMemberDecls())
     {
-        if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
+        if (isGenericParam(member))
         {
             params.add(member);
         }
@@ -2535,7 +2571,7 @@ DocumentPage* DocMarkdownWriter::findPageForToken(
                             outDecl = member;
                             if (as<GenericTypeParamDeclBase>(member))
                                 outSectionName = String("typeparam-") + token;
-                            else if (as<GenericValueParamDecl>(member))
+                            else if (isGenericValueParam(member))
                                 outSectionName = String("decl-") + token;
                             return currentPage;
                         }

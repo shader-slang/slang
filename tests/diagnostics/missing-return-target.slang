@@ -14,10 +14,8 @@
 RWStructuredBuffer<uint> out;
 
 //CHECK_SUPP: non-void function does not return in all cases
-//CHECK_SUPP: non-void function does not return in all cases
 uint func()
 /*CHECK_NOT_SUPP:
-     ^^^^ non-void function does not return in all cases
      ^^^^ non-void function does not return in all cases
      ^^^^ non-void function must return
      ^^^^ non-void function must return in all cases for target

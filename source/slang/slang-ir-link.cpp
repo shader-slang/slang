@@ -8,12 +8,15 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-specialize-target-switch.h"
+#include "slang-ir-specialize.h"
 #include "slang-ir-string-hash.h"
+#include "slang-ir-translate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
 #include "slang-module-library.h"
 #include "slang-rich-diagnostics.h"
+
 
 namespace Slang
 {
@@ -150,15 +153,6 @@ void registerClonedValue(IRSpecContextBase* context, IRInst* clonedValue, IRInst
         context->deferredWitnessTableEntryKeys.add(
             getMangledName(as<IRLookupWitnessMethod>(clonedValue)->getRequirementKey()));
         break;
-    case kIROp_ForwardDerivativeDecoration:
-    case kIROp_BackwardDerivativeDecoration:
-    case kIROp_UserDefinedBackwardDerivativeDecoration:
-        if (context->getShared()->useAutodiff)
-        {
-            if (auto key = as<IRStructKey>(clonedValue->getOperand(0)))
-                context->deferredWitnessTableEntryKeys.add(getMangledName(key));
-        }
-        break;
     }
 }
 
@@ -199,31 +193,24 @@ IRInst* cloneInst(
     IRInst* originalInst,
     IROriginalValuesForClone const& originalValues);
 
-IRInst* cloneInst(IRSpecContextBase* context, IRBuilder* builder, IRInst* originalInst)
+static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRInst* originalInst)
 {
-    return cloneInst(context, builder, originalInst, originalInst);
+    SLANG_UNUSED(clonedInst);
+    traverseUsers<IRAnnotation>(
+        originalInst,
+        [&](IRAnnotation* annotation)
+        {
+            if (annotation->getTarget() == originalInst)
+                cloneInst(context, context->builder, annotation, annotation);
+        });
 }
 
-bool isAutoDiffDecoration(IRInst* decor)
+IRInst* cloneInst(IRSpecContextBase* context, IRBuilder* builder, IRInst* originalInst)
 {
-    switch (decor->getOp())
-    {
-    case kIROp_ForwardDerivativeDecoration:
-    case kIROp_BackwardDerivativeIntermediateTypeDecoration:
-    case kIROp_BackwardDerivativePrimalDecoration:
-    case kIROp_BackwardDerivativePropagateDecoration:
-    case kIROp_BackwardDerivativePrimalContextDecoration:
-    case kIROp_BackwardDerivativePrimalReturnDecoration:
-    case kIROp_PrimalSubstituteDecoration:
-    case kIROp_BackwardDerivativeDecoration:
-    case kIROp_UserDefinedBackwardDerivativeDecoration:
-    case kIROp_DifferentiableTypeDictionaryDecoration:
-    case kIROp_ForwardDifferentiableDecoration:
-    case kIROp_BackwardDifferentiableDecoration:
-        return true;
-    default:
-        return false;
-    }
+    auto clonedInst = cloneInst(context, builder, originalInst, originalInst);
+    cloneAnnotations(context, clonedInst, originalInst);
+
+    return clonedInst;
 }
 
 /// Clone any decorations from `originalValue` onto `clonedValue`
@@ -242,8 +229,6 @@ void cloneDecorations(IRSpecContextBase* context, IRInst* clonedValue, IRInst* o
     SLANG_UNUSED(context);
     for (auto originalDecoration : originalValue->getDecorations())
     {
-        if (!context->shared->useAutodiff && isAutoDiffDecoration(originalDecoration))
-            continue;
         cloneInst(context, builder, originalDecoration);
     }
 
@@ -264,8 +249,6 @@ void cloneDecorationsAndChildren(
     SLANG_UNUSED(context);
     for (auto originalItem : originalValue->getDecorationsAndChildren())
     {
-        if (!context->shared->useAutodiff && isAutoDiffDecoration(originalItem))
-            continue;
         cloneInst(context, builder, originalItem);
     }
 
@@ -309,7 +292,11 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_InterfaceType:
     case kIROp_EnumType:
     case kIROp_SymbolAlias:
-        return cloneGlobalValue(this, originalValue);
+        {
+            auto clonedInst = cloneGlobalValue(this, originalValue);
+            cloneAnnotations(this, clonedInst, originalValue);
+            return clonedInst;
+        }
 
     case kIROp_BoolLit:
         {
@@ -376,6 +363,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
 
             cloneDecorationsAndChildren(this, clonedValue, originalValue);
             addHoistableInst(builder, clonedValue);
+            cloneAnnotations(this, clonedValue, originalValue);
             return clonedValue;
         }
         break;
@@ -488,12 +476,6 @@ static void cloneExtraDecorationsFromInst(
         {
         default:
             break;
-        case kIROp_ForwardDerivativeDecoration:
-        case kIROp_UserDefinedBackwardDerivativeDecoration:
-        case kIROp_PrimalSubstituteDecoration:
-            if (!context->getShared()->useAutodiff)
-                break;
-            [[fallthrough]];
         case kIROp_HLSLExportDecoration:
         case kIROp_BindExistentialSlotsDecoration:
         case kIROp_LayoutDecoration:
@@ -687,6 +669,7 @@ IRGlobalGenericParam* cloneGlobalGenericParamImpl(
 
 bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* table)
 {
+    SLANG_UNUSED(context);
     for (auto decor : table->getDecorations())
     {
         switch (decor->getOp())
@@ -698,7 +681,6 @@ bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* tab
     }
 
     auto conformanceType = getResolvedInstForDecorations(table->getConformanceType());
-
     for (auto decor : conformanceType->getDecorations())
     {
         switch (decor->getOp())
@@ -708,9 +690,15 @@ bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* tab
         case kIROp_KnownBuiltinDecoration:
             {
                 auto name = as<IRKnownBuiltinDecoration>(decor)->getName();
-                if (name == KnownBuiltinDeclName::IDifferentiable ||
-                    name == KnownBuiltinDeclName::IDifferentiablePtr)
-                    return context->getShared()->useAutodiff;
+                switch (name)
+                {
+                case KnownBuiltinDeclName::IDifferentiable:
+                case KnownBuiltinDeclName::IDifferentiablePtr:
+                case KnownBuiltinDeclName::IForwardDifferentiable:
+                case KnownBuiltinDeclName::IBackwardDifferentiable:
+                case KnownBuiltinDeclName::IBwdCallable:
+                    return true;
+                }
                 break;
             }
         default:
@@ -915,9 +903,6 @@ void cloneGlobalValueWithCodeCommon(
                 }
                 else
                 {
-                    if (oi->getOp() == kIROp_DifferentiableTypeAnnotation &&
-                        !context->getShared()->useAutodiff)
-                        continue;
                     cloneInst(context, builder, oi);
                 }
             }
@@ -994,8 +979,6 @@ void cloneFunctionCommon(
 // needs to perform this operation even though it is logically part of
 // the later generic specialization pass.
 //
-IRInst* specializeGeneric(IRSpecialize* specializeInst);
-
 /// Copy layout information for an entry-point function to its parameters.
 ///
 /// When layout information is initially attached to an IR entry point,
@@ -1483,6 +1466,7 @@ IRInst* cloneGlobalValueImpl(
     auto clonedValue =
         cloneInst(context, &context->shared->builderStorage, originalInst, originalValues);
     clonedValue->moveToEnd();
+    cloneAnnotations(context, clonedValue, originalInst);
     return clonedValue;
 }
 
@@ -1757,12 +1741,6 @@ static bool isFunctionDefinedOrImported(IRInst* inst)
         case kIROp_IntrinsicOpDecoration:
         case kIROp_TargetIntrinsicDecoration:
         case kIROp_SPIRVOpDecoration:
-        // Autodiff decorations - the function's implementation is provided by the derivative
-        // function
-        case kIROp_ForwardDerivativeDecoration:
-        case kIROp_BackwardDerivativeDecoration:
-        case kIROp_UserDefinedBackwardDerivativeDecoration:
-        case kIROp_PrimalSubstituteDecoration:
         // Explicitly external functions
         case kIROp_ExternCDecoration:
         case kIROp_ExternCppDecoration:
@@ -2042,64 +2020,15 @@ bool isDiffPairType(IRInst* type)
     return as<IRDifferentialPairTypeBase>(type) != nullptr;
 }
 
-bool doesModuleUseAutodiff(IRInst* inst)
+bool doesModuleUseAutodiff(IRModule* module)
 {
-    switch (inst->getOp())
+    for (auto globalInst : module->getGlobalInsts())
     {
-    case kIROp_Call:
-        if (auto callee = getResolvedInstForDecorations(inst->getOperand(0)))
-        {
-            switch (callee->getOp())
-            {
-            case kIROp_ForwardDifferentiate:
-            case kIROp_BackwardDifferentiate:
-            case kIROp_BackwardDifferentiatePrimal:
-            case kIROp_BackwardDifferentiatePropagate:
-                return true;
-            }
-        }
-        return false;
-    case kIROp_DifferentialPairGetDifferentialUserCode:
-    case kIROp_DifferentialPairGetPrimalUserCode:
-    case kIROp_DifferentialPtrPairGetPrimal:
-    case kIROp_DifferentialPtrPairGetDifferential:
-        return true;
-    case kIROp_StructField:
-        return isDiffPairType(as<IRStructField>(inst)->getFieldType());
-    case kIROp_Param:
-        return isDiffPairType(inst->getDataType());
-    default:
-        for (auto child : inst->getChildren())
-        {
-            bool isImported = false;
-            for (auto decor : child->getDecorations())
-            {
-                if (as<IRImportDecoration>(decor))
-                {
-                    isImported = true;
-                    break;
-                }
-                else if (as<IRAutoPyBindCudaDecoration>(decor))
-                {
-                    return true;
-                }
-                else if (as<IRAutoPyBindExportInfoDecoration>(decor))
-                {
-                    return true;
-                }
-            }
-            if (isImported)
-                continue;
-            for (auto decor : child->getDecorations())
-            {
-                if (isAutoDiffDecoration(decor))
-                    return true;
-            }
-            if (doesModuleUseAutodiff(child))
-                return true;
-        }
-        return false;
+        if (as<IRTranslateBase>(globalInst))
+            return true;
     }
+
+    return false;
 }
 
 void cloneUsedWitnessTableEntries(IRSpecContext* context)
@@ -2200,7 +2129,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     {
         if (sharedContext->useAutodiff)
             break;
-        sharedContext->useAutodiff = doesModuleUseAutodiff(irModule->getModuleInst());
+        sharedContext->useAutodiff = doesModuleUseAutodiff(irModule);
     }
 
     auto context = state->getContext();
@@ -2233,6 +2162,8 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // arguments which might end up affecting the mangled
     // entry point name.
     //
+
+    initializeTranslationDictionary(context->getModule());
 
     List<IRFunc*> irEntryPoints;
     for (auto entryPointIndex : codeGenContext->getEntryPointIndices())
@@ -2297,6 +2228,10 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                 // but we still need to keep it around if it is in the IR.
                 cloneValue(context, inst);
                 break;
+            case kIROp_DebugCompilationUnit:
+                // DebugCompilationUnit references a DebugSource; clone it along with source.
+                cloneValue(context, inst);
+                break;
             }
         }
     }
@@ -2304,16 +2239,42 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     bool shouldCopyGlobalParams =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::PreserveParameters);
 
+    auto shouldCopy = [&](IRInst* inst) -> bool
+    {
+        // We need to copy over exported symbols,
+        // and any global parameters if preserve-params option is set.
+        //
+        if (_isHLSLExported(inst))
+        {
+            return true;
+        }
+
+        if (shouldCopyGlobalParams && as<IRGlobalParam>(inst))
+        {
+            return true;
+        }
+
+        if (auto knownBuiltin = inst->findDecoration<IRKnownBuiltinDecoration>())
+        {
+            switch (knownBuiltin->getName())
+            {
+            case KnownBuiltinDeclName::NullDifferential:
+                return true;
+            default:
+                break;
+            }
+        }
+
+        return false;
+    };
+
     for (IRModule* irModule : irModules)
     {
         for (auto inst : irModule->getGlobalInsts())
         {
             // We need to copy over exported symbols,
             // and any global parameters if preserve-params option is set.
-            if (_isHLSLExported(inst) || shouldCopyGlobalParams && as<IRGlobalParam>(inst) ||
-                sharedContext->useAutodiff &&
-                    (as<IRDifferentiableTypeAnnotation>(inst) ||
-                     inst->findDecorationImpl(kIROp_AutoDiffBuiltinDecoration) != nullptr))
+            if (shouldCopy(inst))
             {
                 auto cloned = cloneValue(context, inst);
                 if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
@@ -2539,6 +2500,7 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
     IRSharedSpecContext sharedContext;
     sharedContext.builderStorage = IRBuilder(irModule->getModuleInst());
     sharedContext.module = irModule;
+    sharedContext.useAutodiff = doesModuleUseAutodiff(irModule);
 
     IRPrelinkContext specContext;
     specContext.builder = &sharedContext.builderStorage;
@@ -2559,7 +2521,6 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
     // First, register all external symbols in the current module.
     insertGlobalValueSymbols(&sharedContext, irModule);
 
-    List<KeyValuePair<IRInst*, IRInst*>> pendingReplacements;
     for (auto originalInst : externalSymbolsToLink)
     {
         // originalInst is the function in the imported module to clone.
@@ -2570,19 +2531,19 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
         specContext.shared->symbols.remove(mangledName);
         specContext.builder->setInsertBefore(existingInst);
 
-        // Remove existing inst from the module before cloning so our duplication-check
-        // (`checkIRDuplicate`) doesn't complain.
-        existingInst->removeFromParent();
+        // Strip the linkage decoration from existingInst so that checkIRDuplicate
+        // won't find a name conflict when the clone is created.
+        // We intentionally keep existingInst in the module tree so that its children
+        // (e.g. Specialize insts inside a Generic's body that reference the Generic
+        // itself) remain connected to the module during replaceUsesWith. Removing it
+        // from parent would orphan the entire subtree and crash the dedup/hoisting
+        // logic when it encounters those children as users with no module.
+        if (auto linkageDecor = existingInst->findDecoration<IRLinkageDecoration>())
+            linkageDecor->removeAndDeallocate();
 
         auto cloned = cloneValue(&specContext, originalInst);
-        pendingReplacements.add(KeyValuePair<IRInst*, IRInst*>(existingInst, cloned));
-    }
-
-    // Now we can replace all the inlined extern symbols with the cloned values.
-    for (auto kv : pendingReplacements)
-    {
-        kv.key->replaceUsesWith(kv.value);
-        kv.key->removeAndDeallocate();
+        existingInst->replaceUsesWith(cloned);
+        existingInst->removeAndDeallocate();
     }
 }
 

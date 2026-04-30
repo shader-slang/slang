@@ -1945,6 +1945,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     //
     auto typeLayout = processEntryPointVaryingParameter(context, type, state, varLayout);
 
+    if (!typeLayout)
+        return nullptr;
+
     // For Khronos targets (OpenGL and Vulkan), we need to process
     // the `[[vk::location(...)]]` and `[[vk::index(...)]]` attributes,
     // if present.
@@ -2025,6 +2028,8 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     return typeLayout;
 }
 
+// Returns nullptr when `type` is not valid in a varying parameter position
+// (e.g. interface types, textures, samplers, constant buffers).
 static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     ParameterBindingContext* context,
     Type* type,
@@ -2065,6 +2070,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
         auto elementTypeLayout =
             processEntryPointVaryingParameter(context, elementType, elementState, nullptr);
+
+        if (!elementTypeLayout)
+            return nullptr;
 
         RefPtr<StreamOutputTypeLayout> typeLayout = new StreamOutputTypeLayout();
         typeLayout->type = type;
@@ -2231,6 +2239,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 state,
                 varLayout);
 
+            if (!elementTypeLayout)
+                return nullptr;
+
             // We still walk over subsequent elements to make sure they consume resources
             // as needed
             for (UInt ii = 1; ii < elementCount; ++ii)
@@ -2266,6 +2277,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 state,
                 varLayout);
 
+            if (!elementTypeLayout)
+                return nullptr;
+
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
             arrayTypeLayout->type = arrayType;
@@ -2295,6 +2309,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 state,
                 varLayout);
 
+            if (!elementTypeLayout)
+                return nullptr;
+
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
             arrayTypeLayout->type = arrayType;
@@ -2307,19 +2324,19 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             return arrayTypeLayout;
         }
         // Ignore a bunch of types that don't make sense here...
-        else if (const auto subpassType = as<SubpassInputType>(type))
+        else if (const auto subpassType = as<SubpassInputType>(type); subpassType)
         {
             return nullptr;
         }
-        else if (const auto textureType = as<TextureType>(type))
+        else if (const auto textureType = as<TextureType>(type); textureType)
         {
             return nullptr;
         }
-        else if (const auto samplerStateType = as<SamplerStateType>(type))
+        else if (const auto samplerStateType = as<SamplerStateType>(type); samplerStateType)
         {
             return nullptr;
         }
-        else if (const auto constantBufferType = as<ConstantBufferType>(type))
+        else if (const auto constantBufferType = as<ConstantBufferType>(type); constantBufferType)
         {
             return nullptr;
         }
@@ -2338,6 +2355,21 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 varLayout);
             ptrTypeLayout->valueTypeLayout = valueTypeLayout;
             return ptrTypeLayout;
+        }
+        else if (auto conditionalType = as<ConditionalType>(type))
+        {
+            auto hasValueVal = conditionalType->getHasValue();
+            auto folded =
+                hasValueVal ? context->getTargetProgram()->getProgram()->tryFoldIntVal(hasValueVal)
+                            : nullptr;
+            if (folded && getIntVal(folded) != 0)
+                return processParamOfTypeFunc(
+                    _Move(processParamOfTypeFunc),
+                    conditionalType->getValueType());
+            RefPtr<TypeLayout> typeLayout = new TypeLayout();
+            typeLayout->type = type;
+            typeLayout->rules = context->layoutContext.rules;
+            return typeLayout;
         }
         else if (auto optionalType = as<OptionalType>(type))
         {
@@ -2371,10 +2403,13 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
                 if (!fieldTypeLayout)
                 {
-                    getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
-                        .paramName = fieldDecl->getName(),
-                        .decl = varLayout->varDecl.getDecl()});
-                    continue;
+                    if (fieldDecl)
+                    {
+                        getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
+                            .paramName = fieldDecl->getName(),
+                            .decl = fieldDecl});
+                    }
+                    return nullptr;
                 }
                 fieldVarLayout->typeLayout = fieldTypeLayout;
 
@@ -2451,6 +2486,14 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                         getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
                             .paramName = field.getName(),
                             .decl = field.getDecl()});
+
+                        // Keep the aggregate layout structurally well-formed so later
+                        // validation and cleanup code doesn't trip over a null field layout
+                        // after we've already diagnosed the invalid varying field.
+                        fieldTypeLayout = new TypeLayout();
+                        fieldTypeLayout->type = getType(context->getASTBuilder(), field);
+                        fieldTypeLayout->rules = context->layoutContext.rules;
+                        fieldVarLayout->typeLayout = fieldTypeLayout;
                         continue;
                     }
                     fieldVarLayout->typeLayout = fieldTypeLayout;
@@ -2569,6 +2612,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 assocTypeLayout->type = type;
                 return assocTypeLayout;
             }
+            else if (declRef.as<InterfaceDecl>())
+            {
+                return nullptr;
+            }
             else
             {
                 SLANG_UNEXPECTED("unhandled type kind");
@@ -2576,7 +2623,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         }
 
         // If we ran into an error in checking the user's code, then skip this parameter
-        else if (const auto errorType = as<ErrorType>(type))
+        else if (const auto errorType = as<ErrorType>(type); errorType)
         {
             return nullptr;
         }
@@ -3160,14 +3207,13 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
             computeEntryPointParameterTypeLayout(context, paramDeclRef, paramVarLayout, state);
         paramVarLayout->typeLayout = paramTypeLayout;
 
-        // We expect to always be able to compute a layout for
-        // entry-point parameters, but to be defensive we will
-        // skip parameters that couldn't have a layout computed
-        // when assertions are disabled.
-        //
-        SLANG_ASSERT(paramTypeLayout);
         if (!paramTypeLayout)
+        {
+            getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
+                .paramName = paramDeclRef.getName(),
+                .decl = paramDeclRef.getDecl()});
             continue;
+        }
 
         // Now that we've computed the layout to use for the parameter,
         // we need to add its resource usage to that of the entry
@@ -3212,9 +3258,15 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
                     entryPointRes->count.getFiniteValue();
                 entryPointRes->count += rr.count;
             }
-        }
 
-        entryPointLayout->resultLayout = resultLayout;
+            entryPointLayout->resultLayout = resultLayout;
+        }
+        else
+        {
+            getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
+                .paramName = entryPointFuncDeclRef.getName(),
+                .decl = entryPointFuncDeclRef.getDecl()});
+        }
     }
 
     // We don't want certain kinds of resource usage within an entry
@@ -3978,6 +4030,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
     // Try to find rules based on the selected code-generation target
     auto layoutContext =
         getInitialLayoutContextForTarget(targetReq, programLayout, slang::LayoutRules::Default);
+    layoutContext.sink = sink;
 
     // If there was no target, or there are no rules for the target,
     // then bail out here.
@@ -4342,16 +4395,24 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
 
 ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 {
+    // Layout construction still walks shared linkage-owned front-end state, so serialize it with
+    // other component-type front-end operations.
+    std::lock_guard<std::recursive_mutex> lock(
+        m_program->getLinkage()->getComponentTypeOperationMutex());
+
+    m_targetReq->getTargetCaps();
+    m_targetReq->getHLSLToVulkanLayoutOptions();
+
     if (!m_layout)
     {
         m_layout = generateParameterBindings(this, sink);
         if (sink->getErrorCount() != 0)
             return nullptr;
+    }
 
-        if (m_layout)
-        {
-            m_irModuleForLayout = createIRModuleForLayout(sink);
-        }
+    if (m_layout && !m_irModuleForLayout)
+    {
+        m_irModuleForLayout = createIRModuleForLayout(sink);
     }
     return m_layout;
 }

@@ -11,6 +11,8 @@
 #include "slang-source-map.h"
 #include "slang.h"
 
+#include <mutex>
+
 namespace Slang
 {
 
@@ -352,7 +354,8 @@ protected:
     ComPtr<ISlangBlob> m_contentBlob; ///< A blob that owns the storage for the file contents. If
                                       ///< nullptr, there is no contents
     UnownedStringSlice m_content;     ///< The actual contents of the file.
-    size_t m_contentSize;             ///< The size of the actual contents
+    size_t m_contentSize; ///< Initially set to the raw blob size; updated by setContents() to
+                          ///< the decoded content size after BOM/encoding processing.
 
     SHA1::Digest m_digest;
 
@@ -360,6 +363,8 @@ protected:
     // we will cache the starting offset of each line break in
     // the input file:
     List<uint32_t> m_lineBreakOffsets;
+    // Parallel diagnostics and backend work can lazily populate these SourceFile caches.
+    std::mutex m_cacheMutex;
 
     // If set then the locations in this file are really from locations from elsewhere,
     // where the SourceMap specifies that mapping

@@ -854,6 +854,11 @@ List<RefPtr<SourceFile>> gSourceFiles;
 
 int main(int argc, const char* const* argv)
 {
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+
     // Parse command-line arguments.
     List<String> inputPaths;
     String outputDir;

@@ -7,7 +7,9 @@ glob_append(neural_shader_sources "*.slang")
 # Set output directories for build tree
 # Files go under a "slang/" subdirectory so that `import slang.neural;` resolves
 # to <standard-module-dir>/slang/neural.slang-module at runtime.
-set(neural_output_dir "${CMAKE_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}/slang")
+set(neural_output_dir
+    "${CMAKE_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}/slang"
+)
 set(neural_module_file "${neural_output_dir}/${SLANG_NEURAL_MODULE_FILE_NAME}")
 
 # Copy neural shader files to output directory
@@ -35,15 +37,36 @@ if(SLANG_GENERATORS_PATH)
     else()
         set(CMAKE_HOST_EXECUTABLE_SUFFIX "")
     endif()
-    set(SLANG_COMPILER "${SLANG_GENERATORS_PATH}/slang-bootstrap${CMAKE_HOST_EXECUTABLE_SUFFIX}")
+    set(SLANG_COMPILER
+        "${SLANG_GENERATORS_PATH}/slang-bootstrap${CMAKE_HOST_EXECUTABLE_SUFFIX}"
+    )
     set(SLANG_COMPILER_DEPENDENCY)
+    set(SLANG_COMPILER_EXTRA_DEPS)
+elseif(NOT SLANG_EMBED_CORE_MODULE)
+    # When the binary core module is not embedded, slangc (isBootstrap=false) would
+    # try to load the binary GLSL module from slang-glsl-module.dll. That binary was
+    # compiled by slang-bootstrap against its own core-from-source compilation and may
+    # not be compatible with slangc's independently compiled core module, causing a
+    # crash. Use slang-bootstrap instead: it compiles core and GLSL from source
+    # (isBootstrap=true skips binary-module loading) so there is no mismatch.
+    # We also depend on generate_core_module_headers, which (on Windows shared builds)
+    # copies slang-compiler.dll into the generators/ directory so slang-bootstrap
+    # can find it at runtime.
+    set(SLANG_COMPILER slang-bootstrap)
+    set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
+    set(SLANG_COMPILER_EXTRA_DEPS generate_core_module_headers)
 elseif(SLANG_ENABLE_SLANGC)
-    set(SLANG_COMPILER slangc)
-    set(SLANG_COMPILER_DEPENDENCY slangc)
+    set(SLANG_COMPILER "$<TARGET_FILE:slangc>")
+    set(SLANG_COMPILER_DEPENDENCY
+        slangc
+        slang
+    )
+    set(SLANG_COMPILER_EXTRA_DEPS)
 else()
     # As a fallback, use the system-installed `slangc` compiler
     set(SLANG_COMPILER slangc)
     set(SLANG_COMPILER_DEPENDENCY)
+    set(SLANG_COMPILER_EXTRA_DEPS)
 endif()
 
 # Determine compiler flags based on build type
@@ -56,18 +79,27 @@ endif()
 # Build neural.slang-module and output to the output directory
 add_custom_command(
     OUTPUT ${neural_module_file}
-    COMMAND ${SLANG_COMPILER} ${NEURAL_MODULE_DEFINES} neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
-    DEPENDS ${neural_copied_files} ${SLANG_COMPILER_DEPENDENCY}
+    COMMAND
+        ${SLANG_COMPILER} ${NEURAL_MODULE_DEFINES} neural.slang -o
+        ${SLANG_NEURAL_MODULE_FILE_NAME}
+    DEPENDS
+        ${neural_copied_files}
+        ${SLANG_COMPILER_DEPENDENCY}
+        ${SLANG_COMPILER_EXTRA_DEPS}
     WORKING_DIRECTORY ${neural_output_dir}
     VERBATIM
 )
 
-# Create a target to ensure the neural module is built
-add_custom_target(
-    slang-neural-module
-    ALL
-    DEPENDS ${neural_module_file}
-)
+# Create a target to ensure the neural module is built.
+# When SLANG_EMBED_CORE_MODULE=OFF the compiler runs slang-bootstrap from source and currently
+# crashes (exit 0xC0000005) when processing neural.slang's CoopMat/spirv_asm code. Exclude the
+# module from the default ALL build in that configuration so development builds with
+# SLANG_EMBED_CORE_MODULE=OFF do not fail. The target can still be built explicitly.
+if(SLANG_EMBED_CORE_MODULE)
+    add_custom_target(slang-neural-module ALL DEPENDS ${neural_module_file})
+else()
+    add_custom_target(slang-neural-module DEPENDS ${neural_module_file})
+endif()
 set_target_properties(slang-neural-module PROPERTIES FOLDER generated)
 
 # Install the neural directory to the configured location in the release package

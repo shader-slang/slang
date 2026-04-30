@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import datetime
+import glob
 import html as html_mod
 import json
 import os
@@ -35,7 +36,15 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Generate CI analytics HTML from job data."
     )
-    parser.add_argument("--input", default="ci_jobs.json", help="Input JSON file")
+    parser.add_argument("--input", default="ci_jobs.json", help="Input JSON file (legacy single-file mode)")
+    parser.add_argument(
+        "--input-dir",
+        help="Input directory containing monthly ci_jobs_YYYY-MM.json files (preferred over --input)",
+    )
+    parser.add_argument(
+        "--pr-input", default="pr_merges.json",
+        help="Input JSON file with merged PR data (default: pr_merges.json)",
+    )
     parser.add_argument("--output", default="ci_analytics", help="Output directory")
     return parser.parse_args()
 
@@ -277,6 +286,7 @@ def nav_html(active=""):
         ("index.html", "Home"),
         ("statistics.html", "Statistics"),
         ("health.html", "Health"),
+        ("status.html", "Status"),
     ]
     items = []
     for href, label in links:
@@ -493,6 +503,79 @@ def process_jobs(jobs_data, config):
             file=sys.stderr,
         )
 
+    # Merge queue statistics per date.
+    # A merge queue "check" is a CI workflow run with event=merge_group.
+    # We count success/failure/cancelled per run (not per job).
+    # Import shared helper for PR number extraction
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from gh_api import parse_merge_queue_pr_number
+
+    mq_runs_by_date = defaultdict(lambda: {"success": 0, "failure": 0, "cancelled": 0, "total": 0})
+    mq_tat_by_date = defaultdict(list)  # turnaround times for merge queue runs
+    mq_recent_failures = []  # most recent merge queue failures (for table)
+    for run_id, run_jobs in runs.items():
+        if not run_jobs:
+            continue
+        if run_jobs[0].get("event") != "merge_group":
+            continue
+        if run_jobs[0].get("workflow_name") != "CI":
+            continue
+
+        # Determine run conclusion from jobs
+        conclusions = [j.get("conclusion") for j in run_jobs]
+        if "failure" in conclusions:
+            conclusion = "failure"
+        elif "cancelled" in conclusions and "success" not in conclusions:
+            conclusion = "cancelled"
+        elif all(c == "success" for c in conclusions if c):
+            conclusion = "success"
+        else:
+            conclusion = "cancelled"
+
+        # Date from earliest created_at
+        earliest = None
+        latest = None
+        for j in run_jobs:
+            c = parse_dt(j.get("created_at"))
+            d = parse_dt(j.get("completed_at"))
+            if c and (earliest is None or c < earliest):
+                earliest = c
+            if d and (latest is None or d > latest):
+                latest = d
+        if not earliest:
+            continue
+
+        date_str = earliest.strftime("%Y-%m-%d")
+        if date_str == today_str:
+            continue
+        mq_runs_by_date[date_str][conclusion] += 1
+        mq_runs_by_date[date_str]["total"] += 1
+
+        if earliest and latest and latest > earliest:
+            tat = (latest - earliest).total_seconds() / 60
+            mq_tat_by_date[date_str].append(tat)
+
+        if conclusion == "failure":
+            branch = run_jobs[0].get("head_branch", "")
+            pr_num = parse_merge_queue_pr_number(branch)
+
+            # Find failing job names
+            failing_jobs = [
+                j.get("name", "") for j in run_jobs
+                if j.get("conclusion") == "failure"
+            ]
+            mq_recent_failures.append({
+                "date": date_str,
+                "created_at": earliest.isoformat(),
+                "run_id": run_id,
+                "branch": branch,
+                "pr_number": pr_num,
+                "url": run_jobs[0].get("html_url", ""),
+                "failing_jobs": failing_jobs[:5],
+            })
+
+    mq_recent_failures.sort(key=lambda x: x["created_at"], reverse=True)
+
     generated_at = datetime.datetime.now(datetime.timezone.utc).strftime(
         "%Y-%m-%d %H:%M UTC"
     )
@@ -507,10 +590,31 @@ def process_jobs(jobs_data, config):
         "ci_sol_by_date": dict(ci_sol_by_date),
         "build_wait_by_date": dict(build_wait_by_date),
         "test_wait_by_date": dict(test_wait_by_date),
+        "mq_runs_by_date": dict(mq_runs_by_date),
+        "mq_tat_by_date": dict(mq_tat_by_date),
+        "mq_recent_failures": mq_recent_failures[:50],
         "dates": sorted(jobs_by_date.keys()),
         "months": sorted(jobs_by_month.keys()),
         "generated_at": generated_at,
     }
+
+
+# --- Shared helpers ---
+
+
+def _count_pr_merges_by_date(pr_merges):
+    """Count PRs merged per date string from pr_collector data."""
+    counts = defaultdict(int)
+    for pr in pr_merges:
+        merged_at = pr.get("merged_at")
+        if not merged_at:
+            continue
+        try:
+            dt = parse_dt(merged_at)
+            counts[dt.strftime("%Y-%m-%d")] += 1
+        except (ValueError, TypeError):
+            continue
+    return counts
 
 
 # --- Index page ---
@@ -615,6 +719,22 @@ def generate_index(data, output_dir):
     prs_delta = _delta_str(prs_3d, prs_prev)
     fr_delta = _delta_str(failure_rate_3d, failure_rate_prev, "%", invert=True)
 
+    # PRs merged per day (from pr_collector data)
+    pr_merges = data.get("pr_merges", [])
+    prs_merged_by_date = _count_pr_merges_by_date(pr_merges)
+
+    def _avg_merged(window_dates):
+        total = sum(prs_merged_by_date.get(d, 0) for d in window_dates)
+        return total / len(window_dates) if window_dates else 0
+
+    merged_3d = _avg_merged(recent_dates)
+    merged_prev = _avg_merged(prev_dates)
+    merged_delta = _delta_str(merged_3d, merged_prev)
+
+    merged_card_html = ""
+    if pr_merges:
+        merged_card_html = f'  <div class="stat-card"><div class="value">{merged_3d:.1f}{merged_delta}</div><div class="label">PRs Merged / day</div></div>'
+
     months_html = ""
     for month in reversed(data["months"]):
         count = len(data["jobs_by_month"][month])
@@ -628,6 +748,7 @@ def generate_index(data, output_dir):
   <div class="stat-card"><div class="value">{ci_tat_3d:.0f}m{tat_delta}</div><div class="label">CI Turnaround (avg)</div></div>
   <div class="stat-card"><div class="value">{prs_3d:.1f}{prs_delta}</div><div class="label">Active PRs / day</div></div>
   <div class="stat-card"><div class="value">{failure_rate_3d:.1f}%{fr_delta}</div><div class="label">Failure Rate</div></div>
+{merged_card_html}
 </div>
 
 <h2>Pages</h2>
@@ -852,6 +973,20 @@ def generate_statistics(data, config, output_dir):
             "fill": True,
             "tension": 0.1,
         })
+    parallel_datasets_js = ",".join(
+        (
+            "{"
+            f"label:{json.dumps(ds['label'])}, "
+            f"data:sliceData({json.dumps(ds['data'])},30), "
+            f"_allData:{json.dumps(ds['data'])}, "
+            f"borderColor:{json.dumps(ds['borderColor'])}, "
+            f"backgroundColor:{json.dumps(ds['backgroundColor'])}, "
+            f"fill:{json.dumps(ds['fill'])}, "
+            f"tension:{json.dumps(ds['tension'])}"
+            "}"
+        )
+        for ds in parallel_datasets
+    )
 
     # Build and test wait times per day
     build_wait_by_date = data.get("build_wait_by_date", {})
@@ -870,6 +1005,77 @@ def generate_statistics(data, config, output_dir):
     test_os_datasets_js = build_os_phase_dataset_js(
         os_list, os_phase_avg_by_date, dates, "test"
     )
+
+    # PRs merged per day (from pr_collector data)
+    pr_merges = data.get("pr_merges", [])
+    prs_merged_by_date = _count_pr_merges_by_date(pr_merges)
+    prs_merged_per_day = [prs_merged_by_date.get(d, 0) for d in dates]
+
+    if pr_merges:
+        pr_merged_chart_html = chart_section(
+            "prsMerged", "PRs Merged per Day",
+            "Number of pull requests merged each day."
+        )
+    else:
+        pr_merged_chart_html = ""
+
+    # Merge queue stats per day
+    mq_runs_by_date = data.get("mq_runs_by_date", {})
+    mq_tat_by_date = data.get("mq_tat_by_date", {})
+    mq_recent_failures = data.get("mq_recent_failures", [])
+    mq_success_per_day = []
+    mq_failure_per_day = []
+    mq_cancelled_per_day = []
+    mq_fail_rate_per_day = []
+    mq_avg_tat_per_day = []
+    has_mq_data = bool(mq_runs_by_date)
+    for date in dates:
+        mq = mq_runs_by_date.get(date, {})
+        s = mq.get("success", 0)
+        f = mq.get("failure", 0)
+        c = mq.get("cancelled", 0)
+        mq_success_per_day.append(s)
+        mq_failure_per_day.append(f)
+        mq_cancelled_per_day.append(c)
+        total_sf = s + f
+        mq_fail_rate_per_day.append(round(f / total_sf * 100, 1) if total_sf > 0 else 0)
+        tats = mq_tat_by_date.get(date, [])
+        mq_avg_tat_per_day.append(round(sum(tats) / len(tats), 1) if tats else 0)
+
+    # Build merge queue failure table HTML
+    mq_failures_html = ""
+    if mq_recent_failures:
+        mq_failures_html = '\n<h3>Recent Merge Queue Failures</h3>\n'
+        mq_failures_html += '<table><tr><th>Date</th><th>PR</th><th>Run</th><th>Failing Jobs</th></tr>\n'
+        for mf in mq_recent_failures[:20]:
+            pr_num = mf.get("pr_number", "")
+            url = mf.get("url", "")
+            run_url = url.split("/jobs/")[0] if "/jobs/" in url else url
+            if pr_num:
+                pr_link = f'<a href="https://github.com/shader-slang/slang/pull/{html_mod.escape(pr_num)}" target="_blank">#{html_mod.escape(pr_num)}</a>'
+            else:
+                pr_link = "?"
+            run_link = f'<a href="{html_mod.escape(run_url)}" target="_blank">logs</a>' if run_url else ""
+            failing = ", ".join(mf.get("failing_jobs", [])[:3])
+            if len(mf.get("failing_jobs", [])) > 3:
+                failing += f" (+{len(mf['failing_jobs']) - 3} more)"
+            mq_failures_html += f"<tr><td>{html_mod.escape(mf.get('date', ''))}</td><td>{pr_link}</td><td>{run_link}</td><td>{html_mod.escape(failing)}</td></tr>\n"
+        mq_failures_html += "</table>\n"
+
+    mq_chart_html = ""
+    if has_mq_data:
+        mq_chart_html = f"""
+{chart_section("mqChecks", "Merge Queue Checks per Day",
+    "Stacked by conclusion: success, failure, cancelled. Shows merge queue CI check runs triggered by GitHub merge queue.")}
+
+{chart_section("mqFailRate", "Merge Queue Failure Rate (%)",
+    "Percentage of merge queue CI checks that failed (excludes cancelled).")}
+
+{chart_section("mqTurnaround", "Merge Queue Turnaround Time (minutes)",
+    "Average time from merge queue CI check start to completion.")}
+
+{mq_failures_html}
+"""
 
     body = f"""
 <h1>Statistics &amp; Trends</h1>
@@ -891,6 +1097,7 @@ def generate_statistics(data, config, output_dir):
 {chart_section("prsPerDay", "Active PRs per Day",
     "Unique PR branches with CI activity per day.")}
 
+{pr_merged_chart_html}
 {chart_section("buildTestWait", "Build and Test Wait Times (minutes)",
     "Build wait: run trigger to first build started. Test wait: last build completed to first test started (worst platform).")}
 
@@ -924,6 +1131,7 @@ def generate_statistics(data, config, output_dir):
 {chart_section("queueWait", "Queue Wait Time Percentiles (minutes)",
     "Time each job spent waiting in the CI queue for a runner before execution started. Shows average, median (p50), p90, and p95 per day.")}
 
+{mq_chart_html}
 
 <script src="{CHARTJS_CDN}"></script>
 <script>
@@ -943,6 +1151,17 @@ const allTurnP95 = {json.dumps(ci_p95_tat)};
 const allSoL = {json.dumps(ci_sol_avg)};
 const allBuildWait = {json.dumps(avg_build_wait)};
 const allTestWait = {json.dumps(avg_test_wait)};
+const allPRsMerged = {json.dumps(prs_merged_per_day)};
+const allMqSuccess = {json.dumps(mq_success_per_day)};
+const allMqFailure = {json.dumps(mq_failure_per_day)};
+const allMqCancelled = {json.dumps(mq_cancelled_per_day)};
+const allMqFailRate = {json.dumps(mq_fail_rate_per_day)};
+const allMqTat = {json.dumps(mq_avg_tat_per_day)};
+const allQueueWaitAvg = {json.dumps(cap_avg_queue)};
+const allQueueWaitP50 = {json.dumps(cap_p50_queue)};
+const allQueueWaitP90 = {json.dumps(cap_p90_queue)};
+const allQueueWaitP95 = {json.dumps(cap_p95_queue)};
+const hasMqData = {json.dumps(has_mq_data)};
 
 let charts = [];
 
@@ -1038,6 +1257,17 @@ makeChart('prsPerDay_canvas', 'line', {{
   options: {{responsive:true}}
 }});
 
+// PRs merged per day
+if (document.getElementById('prsMerged_canvas')) {{
+  makeChart('prsMerged_canvas', 'bar', {{
+    data: {{
+      labels: sliceData(allLabels, 30),
+      datasets: [{{label:'PRs Merged', data:sliceData(allPRsMerged,30), _allData:allPRsMerged, backgroundColor:'#6f42c1'}}]
+    }},
+    options: {{responsive:true, scales:{{y:{{beginAtZero:true, title:{{display:true,text:'PRs'}}}}}}}}
+  }});
+}}
+
 // Runs per day
 makeChart('runsPerDay_canvas', 'line', {{
   data: {{
@@ -1088,29 +1318,63 @@ new Chart(document.getElementById('byGroup_canvas').getContext('2d'), {{
 }});
 
 // Parallelization rate
-new Chart(document.getElementById('parallelRate_canvas').getContext('2d'), {{
-  type: 'line',
+makeChart('parallelRate_canvas', 'line', {{
   data: {{
-    labels: {json.dumps(dates)},
-    datasets: {json.dumps(parallel_datasets)}
+    labels: sliceData(allLabels, 30),
+    datasets: [
+      {parallel_datasets_js}
+    ]
   }},
   options: {{responsive:true, scales:{{y:{{stacked:true,min:0,title:{{display:true,text:'Avg Concurrent Runners'}}}}}}}}
 }});
 
 // Queue wait time percentiles
-new Chart(document.getElementById('queueWait_canvas').getContext('2d'), {{
-  type: 'line',
+makeChart('queueWait_canvas', 'line', {{
   data: {{
-    labels: {json.dumps(dates)},
+    labels: sliceData(allLabels, 30),
     datasets: [
-      {{label:'Avg', data:{json.dumps(cap_avg_queue)}, borderColor:'#0d6efd', fill:false, tension:0.1}},
-      {{label:'p50', data:{json.dumps(cap_p50_queue)}, borderColor:'#28a745', borderDash:[5,5], fill:false, tension:0.1}},
-      {{label:'p90', data:{json.dumps(cap_p90_queue)}, borderColor:'#ffc107', borderDash:[5,5], fill:false, tension:0.1}},
-      {{label:'p95', data:{json.dumps(cap_p95_queue)}, borderColor:'#dc3545', borderDash:[5,5], fill:false, tension:0.1}},
+      {{label:'Avg', data:sliceData(allQueueWaitAvg,30), _allData:allQueueWaitAvg, borderColor:'#0d6efd', fill:false, tension:0.1}},
+      {{label:'p50', data:sliceData(allQueueWaitP50,30), _allData:allQueueWaitP50, borderColor:'#28a745', borderDash:[5,5], fill:false, tension:0.1}},
+      {{label:'p90', data:sliceData(allQueueWaitP90,30), _allData:allQueueWaitP90, borderColor:'#ffc107', borderDash:[5,5], fill:false, tension:0.1}},
+      {{label:'p95', data:sliceData(allQueueWaitP95,30), _allData:allQueueWaitP95, borderColor:'#dc3545', borderDash:[5,5], fill:false, tension:0.1}},
     ]
   }},
   options: {{responsive:true, scales:{{y:{{title:{{display:true,text:'Minutes'}}}}}}}}
 }});
+
+// Merge queue charts (only if data exists)
+if (hasMqData) {{
+  // Merge queue checks per day (stacked bar)
+  makeChart('mqChecks_canvas', 'bar', {{
+    data: {{
+      labels: sliceData(allLabels, 30),
+      datasets: [
+        {{label:'Success', data:sliceData(allMqSuccess,30), _allData:allMqSuccess, backgroundColor:'{CONCLUSION_COLORS["success"]}'}},
+        {{label:'Failure', data:sliceData(allMqFailure,30), _allData:allMqFailure, backgroundColor:'{CONCLUSION_COLORS["failure"]}'}},
+        {{label:'Cancelled', data:sliceData(allMqCancelled,30), _allData:allMqCancelled, backgroundColor:'{CONCLUSION_COLORS["cancelled"]}'}},
+      ]
+    }},
+    options: {{responsive:true, scales:{{x:{{stacked:true}},y:{{stacked:true, title:{{display:true,text:'Merge Queue Checks'}}}}}}}}
+  }});
+
+  // Merge queue failure rate
+  makeChart('mqFailRate_canvas', 'line', {{
+    data: {{
+      labels: sliceData(allLabels, 30),
+      datasets: [{{label:'Failure Rate %', data:sliceData(allMqFailRate,30), _allData:allMqFailRate, borderColor:'#dc3545', fill:true, backgroundColor:'rgba(220,53,69,0.1)', tension:0.1}}]
+    }},
+    options: {{responsive:true, scales:{{y:{{min:0, max:100, title:{{display:true,text:'%'}}}}}}}}
+  }});
+
+  // Merge queue turnaround time
+  makeChart('mqTurnaround_canvas', 'line', {{
+    data: {{
+      labels: sliceData(allLabels, 30),
+      datasets: [{{label:'Avg Turnaround', data:sliceData(allMqTat,30), _allData:allMqTat, borderColor:'#0d6efd', fill:false, tension:0.1}}]
+    }},
+    options: {{responsive:true, scales:{{y:{{title:{{display:true,text:'Minutes'}}}}}}}}
+  }});
+}}
 </script>
 """
     with open(os.path.join(output_dir, "statistics.html"), "w") as f:
@@ -1297,6 +1561,40 @@ def generate_health(output_dir):
         f.write(page_template("Health", body, "Health"))
 
 
+def _load_monthly_jobs(input_dir):
+    """Load all ci_jobs_YYYY-MM.json files from a directory into a flat list."""
+    pattern = os.path.join(input_dir, "ci_jobs_*.json")
+    files = sorted(glob.glob(pattern))
+    # Filter to only YYYY-MM format files (exclude legacy ci_jobs.json if present)
+    prefix = "ci_jobs_"
+    suffix = ".json"
+    files = [
+        p for p in files
+        if (m := os.path.basename(p)[len(prefix):-len(suffix)])
+        and len(m) == 7
+        and m[4] == "-"
+    ]
+    if not files:
+        print(f"Error: no ci_jobs_*.json files found in {input_dir}", file=sys.stderr)
+        sys.exit(2)
+    all_jobs = []
+    for path in files:
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, list):
+                print(
+                    f"Error: expected top-level array in {path}, got {type(data).__name__}",
+                    file=sys.stderr,
+                )
+                sys.exit(2)
+            all_jobs.extend(data)
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Error: failed reading {path}: {e}", file=sys.stderr)
+            sys.exit(2)
+    return all_jobs
+
+
 # --- Main ---
 
 
@@ -1305,29 +1603,54 @@ def main():
     config = load_config()
 
     # Load job data
-    print(f"Loading job data from {args.input}...")
-    try:
-        with open(args.input, encoding="utf-8") as f:
-            jobs_data = json.load(f)
-    except FileNotFoundError:
-        print(f"Error: input JSON not found: {args.input}", file=sys.stderr)
-        sys.exit(2)
-    except json.JSONDecodeError as e:
-        print(f"Error: invalid JSON in {args.input}: {e}", file=sys.stderr)
-        sys.exit(2)
-    except OSError as e:
-        print(f"Error: failed reading {args.input}: {e}", file=sys.stderr)
-        sys.exit(2)
-    if not isinstance(jobs_data, list):
-        print(
-            f"Error: expected top-level array in {args.input}, got {type(jobs_data).__name__}",
-            file=sys.stderr,
-        )
-        sys.exit(2)
+    if args.input_dir:
+        print(f"Loading job data from {args.input_dir}/...")
+        jobs_data = _load_monthly_jobs(args.input_dir)
+    else:
+        print(f"Loading job data from {args.input}...")
+        try:
+            with open(args.input, encoding="utf-8") as f:
+                jobs_data = json.load(f)
+        except FileNotFoundError:
+            print(f"Error: input JSON not found: {args.input}", file=sys.stderr)
+            sys.exit(2)
+        except json.JSONDecodeError as e:
+            print(f"Error: invalid JSON in {args.input}: {e}", file=sys.stderr)
+            sys.exit(2)
+        except OSError as e:
+            print(f"Error: failed reading {args.input}: {e}", file=sys.stderr)
+            sys.exit(2)
+        if not isinstance(jobs_data, list):
+            print(
+                f"Error: expected top-level array in {args.input}, got {type(jobs_data).__name__}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
     print(f"Loaded {len(jobs_data)} jobs")
+
+    # Load PR merge data (optional)
+    pr_data = []
+    if os.path.exists(args.pr_input):
+        try:
+            with open(args.pr_input, encoding="utf-8") as f:
+                pr_data = json.load(f)
+            if not isinstance(pr_data, list):
+                print(
+                    f"Warning: PR data in {args.pr_input} is not a list; ignoring",
+                    file=sys.stderr,
+                )
+                pr_data = []
+            else:
+                pr_data = [p for p in pr_data if isinstance(p, dict)]
+            print(f"Loaded {len(pr_data)} merged PRs from {args.pr_input}")
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Warning: Could not load PR data: {e}", file=sys.stderr)
+    else:
+        print(f"No PR data at {args.pr_input} (skipping PRs merged chart)")
 
     # Process
     data = process_jobs(jobs_data, config)
+    data["pr_merges"] = pr_data
     print(f"Active jobs (excluding skipped): {len(data['active_jobs'])}")
     print(f"Date range: {data['dates'][0] if data['dates'] else 'N/A'} to {data['dates'][-1] if data['dates'] else 'N/A'}")
     print(f"Months: {len(data['months'])}")

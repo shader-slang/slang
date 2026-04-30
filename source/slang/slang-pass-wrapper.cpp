@@ -27,8 +27,7 @@ static bool shouldDumpPass(
         return false;
 
     // For after dumps, -dump-ir enables dumping after every pass
-    if (optionName == CompilerOptionName::DumpIRAfter &&
-        options.getBoolOption(CompilerOptionName::DumpIr))
+    if (optionName == CompilerOptionName::DumpIRAfter && options.shouldDumpIR())
         return true;
 
     // Check if this specific pass is in the list

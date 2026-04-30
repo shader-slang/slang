@@ -918,9 +918,13 @@ static LegalVal legalizeDebugValue(
         return LegalVal();
     case LegalType::Flavor::pair:
         {
+            // The var should be legalized as a simple value, because we discard the special part
+            // for debug info insts.
+            //
+            SLANG_ASSERT(debugVar.flavor == LegalVal::Flavor::simple);
             auto ordinaryVal = legalizeDebugValue(
                 context,
-                debugVar.getPair()->ordinaryVal,
+                debugVar,
                 debugValue.getPair()->ordinaryVal,
                 originalInst);
             return ordinaryVal;
@@ -1634,7 +1638,11 @@ static LegalVal legalizeMakeStruct(
             {
                 // Ignore none values.
                 if (legalArgs[aa].flavor == LegalVal::Flavor::none)
+                {
+                    if (!legalType.getSimple()->findDecoration<IROptimizableTypeDecoration>())
+                        args.add(builder->getVoidValue());
                     continue;
+                }
 
                 // Note: we assume that all the arguments
                 // must be simple here, because otherwise
@@ -2087,6 +2095,13 @@ static LegalVal legalizeInst(
         SLANG_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
     default:
+        if (type.flavor == LegalType::Flavor::none)
+        {
+            // If the result type of the instruction is `none`, then we can
+            // just legalize to `none` without worrying about the details of
+            // the instruction, since there will be no value to produce.
+            return LegalVal();
+        }
         // TODO: produce a user-visible diagnostic here
         SLANG_UNEXPECTED("non-simple operand(s)!");
         break;
@@ -3286,16 +3301,36 @@ static LegalVal declareVars(
             auto unwrappedTypeLayout = typeLayout;
             IRVarLayout* elementVarLayout = nullptr;
 
-            // If the type layout is a ParameterGroupTypeLayout wrapping a non-struct
-            // element, unwrap to the element layout so resource bindings (e.g.
-            // DescriptorTableSlot) propagate to the declared variable.
-            // Struct elements get pair-decomposed, and the element
-            // layout refers to the full struct rather than the ordinary-only part.
+            // If the type layout is a ParameterGroupTypeLayout whose element
+            // is a resource type (not a struct, and not plain data), unwrap to
+            // the element layout so resource bindings propagate to the declared
+            // variable.
+            //
+            // We must NOT unwrap when the element is a plain data type (e.g.
+            // uint inside ConstantBuffer<uint>), because its type layout only
+            // has Uniform size attributes and createVarLayout would never apply
+            // binding/set offsets from the var chain.
+            //
+            // Struct elements are excluded because they get pair-decomposed, and
+            // the element layout refers to the full struct rather than the
+            // ordinary-only part.
             if (auto paramGroupLayout = as<IRParameterGroupTypeLayout>(typeLayout))
             {
                 auto paramGroupElementVarLayout = paramGroupLayout->getElementVarLayout();
                 auto paramGroupElementTypeLayout = paramGroupElementVarLayout->getTypeLayout();
+                bool elementHasNonUniformResourceSize = false;
                 if (!as<IRStructTypeLayout>(paramGroupElementTypeLayout))
+                {
+                    for (auto sizeAttr : paramGroupElementTypeLayout->getSizeAttrs())
+                    {
+                        if (sizeAttr->getResourceKind() != LayoutResourceKind::Uniform)
+                        {
+                            elementHasNonUniformResourceSize = true;
+                            break;
+                        }
+                    }
+                }
+                if (elementHasNonUniformResourceSize)
                 {
                     elementVarLayout = paramGroupElementVarLayout;
                     unwrappedTypeLayout = paramGroupElementTypeLayout;

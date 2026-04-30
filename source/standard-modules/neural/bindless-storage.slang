@@ -8,7 +8,7 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    public typealias Differential = BindlessAddress<T.Differential>;
+    public typealias Differential = BindlessAddress<T>;
 
     internal RWStructuredBuffer<T>.Handle handle;
     internal uint baseIndex;
@@ -77,6 +77,7 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
         }
     }
 
+    [ForwardDerivative(fwd_getOffset)]
     public This getOffset(int elements)
     {
         uint newBaseIndex = baseIndex + elements;
@@ -84,6 +85,13 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
         This address = This(handle);
         address.baseIndex = newBaseIndex;
         return address;
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p.getOffset(elements),
+            self.d.getOffset(elements));
     }
 
     [ForceInline]
@@ -111,7 +119,7 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    public typealias Differential = PointerAddress<T.Differential>;
+    public typealias Differential = PointerAddress<T>;
 
     T* ptr;
 
@@ -129,9 +137,17 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
         set { ptr[index] = newValue; }
     }
 
+    [ForwardDerivative(fwd_getOffset)]
     public This getOffset(int elements)
     {
-        return This(ptr + elements);
+        return no_diff(This(ptr + elements));
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p.getOffset(elements),
+            self.d.getOffset(elements));
     }
 
     [ForceInline]
@@ -211,7 +227,7 @@ public struct TorchTensorViewAddress<T> : IPointerLikeAddress<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    public typealias Differential = TorchTensorViewAddress<T.Differential>;
+    public typealias Differential = TorchTensorViewAddress<T>;
 
     internal PointerAddress<T> inner;
 
@@ -229,11 +245,19 @@ public struct TorchTensorViewAddress<T> : IPointerLikeAddress<T>
     }
 
     [require(cuda)]
+    [ForwardDerivative(fwd_getOffset)]
     public This getOffset(int elements)
     {
         This result;
         result.inner = inner.getOffset(elements);
         return result;
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p.getOffset(elements),
+            self.d.getOffset(elements));
     }
 
     [ForceInline]
@@ -284,7 +308,7 @@ internal extension<T> Ptr<T, Access.ReadWrite, AddressSpace.Device> : IPointerLi
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    internal typealias Differential = Ptr<T.Differential, Access.ReadWrite, AddressSpace.Device>;
+    internal typealias Differential = Ptr<T, Access.ReadWrite, AddressSpace.Device>;
 
     internal __init(Ptr<T, Access.ReadWrite, AddressSpace.Device> ptr)
     {
@@ -300,9 +324,17 @@ internal extension<T> Ptr<T, Access.ReadWrite, AddressSpace.Device> : IPointerLi
         set { this[index] = newValue; }
     }
 
+    [ForwardDerivative(fwd_getOffset)]
     internal This getOffset(int elements)
     {
-        return This(this + elements);
+        return no_diff(This(this + elements));
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p + elements,
+            self.d + elements);
     }
 
     [require(hlsl, sm_6_6)]

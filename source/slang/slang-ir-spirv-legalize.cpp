@@ -4,7 +4,6 @@
 #include "slang-emit-base.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-clone.h"
-#include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-float-non-uniform-resource-index.h"
@@ -1780,7 +1779,26 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         bool isLegalGlobalInstForTarget(IRInst* inst) override
         {
-            return as<IRSPIRVAsmOperand>(inst);
+            // Spec-const-rate instructions must stay at their current scope
+            // (module level or inside a generic) because SPIR-V requires
+            // OpSpecConstantOp results to appear outside function bodies.
+            // Only ops validated by canOperationBeSpecConst (via
+            // shouldHaveSpecConstRate in _createInst) acquire this rate.
+            if (isSpecConstRateType(inst->getFullType()))
+                return true;
+            switch (inst->getOp())
+            {
+            case kIROp_MakeStruct:
+            case kIROp_MakeArray:
+            case kIROp_MakeArrayFromElement:
+            case kIROp_MakeVector:
+            case kIROp_MakeMatrix:
+            case kIROp_MakeMatrixFromScalar:
+            case kIROp_MakeVectorFromScalar:
+                return true;
+            default:
+                return as<IRSPIRVAsmOperand>(inst);
+            };
         }
 
         bool isInlinableGlobalInstForTarget(IRInst* inst) override
@@ -1863,6 +1881,44 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             inst = builder.replaceOperand(inst->getOperands(), newOperand0);
             inst = builder.replaceOperand(inst->getOperands() + 1, newOperand1);
         }
+    }
+
+    void emitPerMemberDebugValue(IRBuilder& builder, IRInst* debugVar, IRInst* value)
+    {
+        auto valueType = as<IRType>(unwrapAttributedType(value->getDataType()));
+        if (auto structType = as<IRStructType>(valueType))
+        {
+            for (auto field : structType->getFields())
+            {
+                auto fieldDebugVar = builder.emitFieldAddress(debugVar, field->getKey());
+                auto fieldValue =
+                    builder.emitFieldExtract(field->getFieldType(), value, field->getKey());
+                emitPerMemberDebugValue(builder, fieldDebugVar, fieldValue);
+            }
+            return;
+        }
+
+        auto debugValue = builder.emitDebugValue(debugVar, value);
+        addToWorkList(debugValue);
+    }
+
+    void processDebugValue(IRDebugValue* inst)
+    {
+        auto valueType = as<IRType>(unwrapAttributedType(inst->getValue()->getDataType()));
+        if (as<IRStructType>(valueType))
+        {
+            // Decompose the struct into per-member DebugValue updates to help
+            // shader debuggers resolve the struct value.
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            emitPerMemberDebugValue(builder, inst->getDebugVar(), inst->getValue());
+            inst->removeAndDeallocate();
+            return;
+        }
+
+        // Unsupported type, remove the DebugValue.
+        if (!isSimpleDataType(valueType))
+            inst->removeAndDeallocate();
     }
 
     List<IRInst*> m_instsToRemove;
@@ -1997,8 +2053,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
 
             case kIROp_DebugValue:
-                if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
-                    inst->removeAndDeallocate();
+                processDebugValue(as<IRDebugValue>(inst));
                 break;
             case kIROp_DebugVar:
                 if (!isSimpleDataType(as<IRDebugVar>(inst)->getDataType()))

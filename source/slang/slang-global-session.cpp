@@ -64,6 +64,11 @@ void Session::init()
     auto rootASTBuilder = new RootASTBuilder(this);
     m_rootASTBuilder = rootASTBuilder;
 
+    // Provide a non-null default for getCurrentASTBuilder(). Code inside compilation
+    // functions uses SLANG_AST_BUILDER_RAII to scope the builder properly; this just
+    // covers call sites that run outside those scopes (e.g. unit tests).
+    setCurrentASTBuilder(m_rootASTBuilder);
+
     // Make sure our source manager is initialized
     builtinSourceManager.initialize(nullptr, nullptr);
 
@@ -140,6 +145,9 @@ Session::~Session()
     // are still alive.
     //
     coreModules = decltype(coreModules)();
+
+    if (getCurrentASTBuilder() == m_rootASTBuilder.get())
+        setCurrentASTBuilder(nullptr);
 }
 
 SharedASTBuilder* Session::getSharedASTBuilder()
@@ -1026,7 +1034,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(
          source == CodeGenTarget::CPPHeader))
     {
         // We prefer LLVM if it's available
-        if (const auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr))
+        if (const auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr); llvm)
         {
             return SLANG_PASS_THROUGH_LLVM;
         }

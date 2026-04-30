@@ -116,11 +116,11 @@ Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
         expr = resolveOverloadedExpr(overloadedExpr, LookupMask::type);
     }
 
-    if (const auto typeType = as<TypeType>(expr->type))
+    if (const auto typeType = as<TypeType>(expr->type); typeType)
     {
         return expr;
     }
-    else if (const auto errorType = as<ErrorType>(expr->type))
+    else if (const auto errorType = as<ErrorType>(expr->type); errorType)
     {
         return expr;
     }
@@ -150,7 +150,8 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
     Expr* exp,
     Type* genericParamType,
     ConstantFoldingKind kind,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    ConstantFoldingCircularityInfo* circularityInfo)
 {
     IntVal* val = CheckIntegerConstantExpression(
         exp,
@@ -158,7 +159,8 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
                          : IntegerConstantExpressionCoercionType::AnyInteger,
         genericParamType,
         kind,
-        sink);
+        sink,
+        circularityInfo);
     if (val)
         return val;
 
@@ -176,10 +178,13 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, Type* genericParam
         exp,
         genericParamType,
         ConstantFoldingKind::LinkTime,
-        getSink());
+        getSink(),
+        nullptr);
 }
 
-Val* SemanticsVisitor::ExtractGenericArgVal(Expr* exp)
+Val* SemanticsVisitor::ExtractGenericArgVal(
+    Expr* exp,
+    ConstantFoldingCircularityInfo* circularityInfo)
 {
     if (auto overloadedExpr = as<OverloadedExpr>(exp))
     {
@@ -190,7 +195,7 @@ Val* SemanticsVisitor::ExtractGenericArgVal(Expr* exp)
     {
         return typeType->getType();
     }
-    else if (const auto errorType = as<ErrorType>(exp->type))
+    else if (const auto errorType = as<ErrorType>(exp->type); errorType)
     {
         return exp->type.type;
     }
@@ -200,7 +205,12 @@ Val* SemanticsVisitor::ExtractGenericArgVal(Expr* exp)
         {
             CheckExpr(exp);
         }
-        return ExtractGenericArgInteger(exp, nullptr);
+        return ExtractGenericArgInteger(
+            exp,
+            nullptr,
+            ConstantFoldingKind::LinkTime,
+            getSink(),
+            circularityInfo);
     }
 }
 
@@ -322,7 +332,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     return false;
                 }
             }
-            else if (as<GenericTypePackParamDecl>(member))
+            else if (as<GenericTypePackParamDecl>(member) || as<GenericValuePackParamDecl>(member))
             {
                 if (diagSink)
                 {
@@ -348,7 +358,12 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 }
                 // TODO: this is one place where syntax should get cloned!
                 if (outProperType)
-                    args.add(ExtractGenericArgVal(valParam->initExpr));
+                {
+                    ConstantFoldingCircularityInfo newCircularityInfo(
+                        makeDeclRef(valParam),
+                        nullptr);
+                    args.add(ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo));
+                }
             }
         }
 
@@ -452,6 +467,14 @@ TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
         }
     }
 
+    // Matrix row/column dimension validation is intentionally *not* done at
+    // type-construction time. Rejecting a matrix here would also reject uses
+    // that may be valid on specific targets (e.g. the CPU target, or
+    // capability-gated code paths). Instead, matrices with out-of-range
+    // dimensions are caught at entry-point varying sites by a rule in
+    // `validateEntryPoint`, and downstream codegen for other contexts is
+    // responsible for its own diagnostics.
+
     // A type pack is not a usable type other than for defining parameters.
     if (!as<ParamDecl>(decl) && isTypePack(type))
     {
@@ -460,6 +483,22 @@ TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
         result.type = m_astBuilder->getErrorType();
         return result;
     }
+
+    // Optional<T> cannot wrap a resource/opaque type (e.g. SamplerState, textures, buffers),
+    // nor a struct that transitively contains such a type.
+    if (auto optType = as<OptionalType>(type))
+    {
+        auto valueType = optType->getValueType();
+        if (typeTransitivelyContainsOpaqueHandle(this, valueType))
+        {
+            getSink()->diagnose(Diagnostics::OptionalCannotWrapResourceType{
+                .type = valueType,
+                .expr = typeExp.exp});
+            result.type = m_astBuilder->getErrorType();
+            return result;
+        }
+    }
+
     return result;
 }
 
@@ -487,7 +526,7 @@ bool SemanticsVisitor::ValuesAreEqual(IntVal* left, IntVal* right)
         {
             return leftVar->getDeclRef().equals(rightVar->getDeclRef());
         }
-        else if (const auto rightPoly = as<PolynomialIntVal>(right))
+        else if (const auto rightPoly = as<PolynomialIntVal>(right); rightPoly)
         {
             return right->equals(leftVar);
         }

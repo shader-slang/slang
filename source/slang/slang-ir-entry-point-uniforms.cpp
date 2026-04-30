@@ -413,7 +413,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
                 // we get back to the top of the loop the list of
                 // uses will be shorter.
                 //
-                use->set(fieldVal);
+                builder->replaceOperand(use, fieldVal);
             }
 
             // Once we've replaced all the uses of `param`, we
@@ -546,11 +546,9 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             //
             IRType* layoutType = nullptr;
 
-            if (m_options.targetReq->getOptionSet().getBoolOption(
-                    CompilerOptionName::GLSLForceScalarLayout))
+            if (m_options.targetReq->getOptionSet().shouldUseScalarLayout())
                 layoutType = builder.getType(kIROp_ScalarBufferLayoutType);
-            else if (m_options.targetReq->getOptionSet().getBoolOption(
-                         CompilerOptionName::ForceCLayout))
+            else if (m_options.targetReq->getOptionSet().shouldUseCLayout())
                 layoutType = builder.getType(kIROp_CBufferLayoutType);
             else if (isKhronosTarget(m_options.targetReq))
                 layoutType = builder.getType(kIROp_Std430BufferLayoutType);

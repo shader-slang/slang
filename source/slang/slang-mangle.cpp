@@ -241,11 +241,11 @@ void emitType(ManglingContext* context, Type* type)
         emitRaw(context, "t");
         emitQualifiedName(context, thisType->getInterfaceDeclRef(), true);
     }
-    else if (const auto errorType = dynamicCast<ErrorType>(type))
+    else if (const auto errorType = dynamicCast<ErrorType>(type); errorType)
     {
         emitRaw(context, "E");
     }
-    else if (const auto bottomType = dynamicCast<BottomType>(type))
+    else if (const auto bottomType = dynamicCast<BottomType>(type); bottomType)
     {
         emitRaw(context, "B");
     }
@@ -287,6 +287,33 @@ void emitType(ManglingContext* context, Type* type)
         emitRaw(context, "Tx");
         emitType(context, expandType->getPatternType());
     }
+    else if (auto packBranchType = as<PackBranchType>(type))
+    {
+        emitRaw(context, "Tb");
+        emitVal(context, packBranchType->getPackOperand());
+        emitType(context, packBranchType->getEmptyType());
+        emitType(context, packBranchType->getNonEmptyType());
+    }
+    else if (auto firstType = as<FirstPackElementType>(type))
+    {
+        emitRaw(context, "Tf");
+        emitType(context, firstType->getBasePack());
+    }
+    else if (auto lastType = as<LastPackElementType>(type))
+    {
+        emitRaw(context, "Tl");
+        emitType(context, lastType->getBasePack());
+    }
+    else if (auto trimFirstType = as<TrimFirstTypePack>(type))
+    {
+        emitRaw(context, "Th");
+        emitType(context, trimFirstType->getBasePack());
+    }
+    else if (auto trimLastType = as<TrimLastTypePack>(type))
+    {
+        emitRaw(context, "Tt");
+        emitType(context, trimLastType->getBasePack());
+    }
     else if (auto eachType = as<EachType>(type))
     {
         emitRaw(context, "Te");
@@ -298,6 +325,11 @@ void emitType(ManglingContext* context, Type* type)
         emit(context, typePack->getTypeCount());
         for (Index i = 0; i < typePack->getTypeCount(); i++)
             emitType(context, typePack->getElementType(i));
+    }
+    else if (auto valuePackType = as<ValuePackType>(type))
+    {
+        emitRaw(context, "TVp");
+        emitType(context, valuePackType->getElementType());
     }
     else
     {
@@ -311,7 +343,7 @@ void emitVal(ManglingContext* context, Val* val)
     {
         emitType(context, type);
     }
-    else if (const auto witness = dynamicCast<Witness>(val))
+    else if (const auto witness = dynamicCast<Witness>(val); witness)
     {
         // We don't emit witnesses as part of a mangled
         // name, because the way that the front-end
@@ -363,17 +395,27 @@ void emitVal(ManglingContext* context, Val* val)
     else if (auto sizeOfIntVal = dynamicCast<SizeOfIntVal>(val))
     {
         emitRaw(context, "KSO");
-        emitVal(context, sizeOfIntVal->getTypeArg());
+        emitVal(context, sizeOfIntVal->getValArg());
     }
     else if (auto alignOfIntVal = dynamicCast<AlignOfIntVal>(val))
     {
         emitRaw(context, "KAO");
-        emitVal(context, alignOfIntVal->getTypeArg());
+        emitVal(context, alignOfIntVal->getValArg());
     }
     else if (auto countOfIntVal = dynamicCast<CountOfIntVal>(val))
     {
         emitRaw(context, "KCO");
-        emitVal(context, countOfIntVal->getTypeArg());
+        emitVal(context, countOfIntVal->getValArg());
+    }
+    else if (auto firstIntVal = as<FirstIntVal>(val))
+    {
+        emitRaw(context, "KPF");
+        emitVal(context, firstIntVal->getBasePack());
+    }
+    else if (auto lastIntVal = as<LastIntVal>(val))
+    {
+        emitRaw(context, "KPL");
+        emitVal(context, lastIntVal->getBasePack());
     }
     else if (const auto polynomialIntVal = dynamicCast<PolynomialIntVal>(val))
     {
@@ -400,6 +442,62 @@ void emitVal(ManglingContext* context, Val* val)
     else if (auto modifier = as<ModifierVal>(val))
     {
         emitNameImpl(context, UnownedStringSlice(modifier->getClass().getName()));
+    }
+    else if (auto concreteValPack = as<ConcreteIntValPack>(val))
+    {
+        emitRaw(context, "Vp");
+        emit(context, concreteValPack->getCount());
+        for (Index i = 0; i < concreteValPack->getCount(); i++)
+            emitVal(context, concreteValPack->getElement(i));
+    }
+    else if (auto eachIntVal = as<EachIntVal>(val))
+    {
+        emitRaw(context, "Ve");
+        emitVal(context, eachIntVal->getBasePack());
+    }
+    else if (auto expandIntValPack = as<ExpandIntValPack>(val))
+    {
+        emitRaw(context, "Vx");
+        emitVal(context, expandIntValPack->getPatternVal());
+        emit(context, expandIntValPack->getCapturedPackCount());
+        for (Index i = 0; i < expandIntValPack->getCapturedPackCount(); i++)
+            emitVal(context, expandIntValPack->getCapturedPack(i));
+    }
+    else if (auto trimFirstIntValPack = as<TrimFirstIntValPack>(val))
+    {
+        emitRaw(context, "Vh");
+        emitVal(context, trimFirstIntValPack->getBasePack());
+    }
+    else if (auto trimLastIntValPack = as<TrimLastIntValPack>(val))
+    {
+        emitRaw(context, "Vt");
+        emitVal(context, trimLastIntValPack->getBasePack());
+    }
+    else if (auto shapeConcatIntValPack = as<ShapeConcatIntValPack>(val))
+    {
+        emitRaw(context, "Vc");
+        emitVal(context, shapeConcatIntValPack->getLeftPack());
+        emitVal(context, shapeConcatIntValPack->getRightPack());
+        emitVal(context, shapeConcatIntValPack->getAxis());
+    }
+    else if (auto shapePermuteIntValPack = as<ShapePermuteIntValPack>(val))
+    {
+        emitRaw(context, "Vr");
+        emitVal(context, shapePermuteIntValPack->getValuePack());
+        emitVal(context, shapePermuteIntValPack->getOrderPack());
+    }
+    else if (auto shapeSwapIntValPack = as<ShapeSwapIntValPack>(val))
+    {
+        emitRaw(context, "Vs");
+        emitVal(context, shapeSwapIntValPack->getValuePack());
+        emitVal(context, shapeSwapIntValPack->getDim0());
+        emitVal(context, shapeSwapIntValPack->getDim1());
+    }
+    else if (auto shapeReduceIntValPack = as<ShapeReduceIntValPack>(val))
+    {
+        emitRaw(context, "Vd");
+        emitVal(context, shapeReduceIntValPack->getValuePack());
+        emitVal(context, shapeReduceIntValPack->getAxis());
     }
     else
     {
@@ -467,6 +565,12 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
     {
         emit(context, "GP");
         emit(context, genValParamDecl->parameterIndex);
+        return;
+    }
+    if (auto genValPackParamDecl = as<GenericValuePackParamDecl>(declRef.getDecl()))
+    {
+        emit(context, "GP");
+        emit(context, genValPackParamDecl->parameterIndex);
         return;
     }
 
@@ -598,6 +702,10 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
                 {
                     genericParameterCount++;
                 }
+                else if (mm.is<GenericValuePackParamDecl>())
+                {
+                    genericParameterCount++;
+                }
                 else
                 {
                 }
@@ -615,6 +723,11 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
                 if (auto genericTypePackParamDecl = mm.as<GenericTypePackParamDecl>())
                 {
                     emitRaw(context, "TP");
+                }
+                else if (auto genericValuePackParamDecl = mm.as<GenericValuePackParamDecl>())
+                {
+                    emitRaw(context, "VP");
+                    emitType(context, getType(context->astBuilder, genericValuePackParamDecl));
                 }
                 else if (auto genericValueParamDecl = mm.as<GenericValueParamDecl>())
                 {
@@ -658,93 +771,129 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
     //
     if (auto callableDeclRef = declRef.as<CallableDecl>())
     {
-        auto parameters = getParameters(context->astBuilder, callableDeclRef);
-        UInt parameterCount = parameters.getCount();
-
-        emitRaw(context, "p");
-        emit(context, parameterCount);
-        emitRaw(context, "p");
-
-        for (auto paramDeclRef : parameters)
+        // If we're dealing with an alias, then pull the parameters from
+        // the target decl-ref. We're careful to only do this when emitting
+        // the parameter and result names, since we don't want to accidentally
+        // overwrite the function name (which should be the name of the alias).
+        //
+        if (auto funcAliasDeclRef = callableDeclRef.as<FuncAliasDecl>())
         {
-            // parameter modifier makes big difference in the spirv code generation, for example
-            // "out"/"inout" parameter will be passed by pointer. Therefore, we need to
-            // distinguish them in the mangled name to avoid name collision.
-            ParamPassingMode paramDirection = getParamPassingMode(paramDeclRef.getDecl());
-            switch (paramDirection)
-            {
-            case ParamPassingMode::Ref:
-                emitRaw(context, "r_");
-                break;
-            case ParamPassingMode::BorrowIn:
-                emitRaw(context, "c_");
-                break;
-            case ParamPassingMode::Out:
-                emitRaw(context, "o_");
-                break;
-            case ParamPassingMode::BorrowInOut:
-                emitRaw(context, "io_");
-                break;
-            case ParamPassingMode::In:
-                emitRaw(context, "i_");
-                break;
-            default:
-                StringBuilder errMsg;
-                errMsg << "Unknown parameter direction: " << int(paramDirection);
-                SLANG_ABORT_COMPILATION(errMsg.toString().begin());
-                break;
-            }
-            emitType(context, getType(context->astBuilder, paramDeclRef));
+            callableDeclRef = substituteDeclRef(
+                                  SubstitutionSet(funcAliasDeclRef),
+                                  context->astBuilder,
+                                  funcAliasDeclRef.getDecl()->targetDeclRef)
+                                  .as<CallableDecl>();
         }
 
-        // Don't print result type for an initializer/constructor,
-        // since it is implicit in the qualified name.
-        if (!callableDeclRef.is<ConstructorDecl>())
-        {
-            emitType(context, getResultType(context->astBuilder, callableDeclRef));
-        }
+        // Get parameter type as a list.
+        List<Type*> parameterTypes;
+        List<ParamPassingMode> paramPassingModes;
+        Type* resultType = nullptr;
 
-        // Include key modifiers in the mangled name so we never deduplicate
-        // things like a nonmutating method and a mutating method.
-        bool isMutating = false;
-        bool isRefThis = false;
-        bool isFwdDiff = false;
-        bool isBwdDiff = false;
-        bool isNoDiffThis = false;
-        for (auto modifier : callableDeclRef.getDecl()->modifiers)
+        if (!callableDeclRef.getDecl()->funcType.type)
         {
-            if (as<MutatingAttribute>(modifier))
+            auto parameters = getParameters(context->astBuilder, callableDeclRef);
+            for (auto paramDeclRef : parameters)
             {
-                isMutating = true;
+                auto paramType = getType(context->astBuilder, paramDeclRef);
+                parameterTypes.add(paramType);
+                paramPassingModes.add(getParamPassingMode(paramDeclRef.getDecl()));
             }
-            else if (as<RefAttribute>(modifier))
-            {
-                isRefThis = true;
-            }
-            else if (as<ForwardDifferentiableAttribute>(modifier))
-            {
-                isFwdDiff = true;
-            }
-            else if (as<BackwardDifferentiableAttribute>(modifier))
-            {
-                isBwdDiff = true;
-            }
-            else if (as<NoDiffThisAttribute>(modifier))
-            {
-                isNoDiffThis = true;
-            }
-        }
+            resultType = getResultType(context->astBuilder, callableDeclRef);
 
-        if (isMutating)
-            emitRaw(context, "m");
-        if (isRefThis)
-            emitRaw(context, "r");
-        if (isFwdDiff)
-            emitRaw(context, "f");
-        if (isBwdDiff)
-            emitRaw(context, "b");
-        if (isNoDiffThis)
-            emitRaw(context, "n");
+            emitRaw(context, "p");
+            emit(context, parameterTypes.getCount());
+            emitRaw(context, "p");
+
+            for (Index i = 0; i < parameterTypes.getCount(); i++)
+            {
+                // parameter modifier makes big difference in the spirv code generation, for example
+                // "out"/"inout" parameter will be passed by pointer. Therefore, we need to
+                // distinguish them in the mangled name to avoid name collision.
+                ParamPassingMode paramDirection = paramPassingModes[i];
+                switch (paramDirection)
+                {
+                case ParamPassingMode::Ref:
+                    emitRaw(context, "r_");
+                    break;
+                case ParamPassingMode::BorrowIn:
+                    emitRaw(context, "c_");
+                    break;
+                case ParamPassingMode::Out:
+                    emitRaw(context, "o_");
+                    break;
+                case ParamPassingMode::BorrowInOut:
+                    emitRaw(context, "io_");
+                    break;
+                case ParamPassingMode::In:
+                    emitRaw(context, "i_");
+                    break;
+                default:
+                    StringBuilder errMsg;
+                    errMsg << "Unknown parameter direction";
+                    SLANG_ABORT_COMPILATION(errMsg.toString().begin());
+                    break;
+                }
+                emitType(context, parameterTypes[i]);
+            }
+
+            // Don't print result type for an initializer/constructor,
+            // since it is implicit in the qualified name.
+            if (!callableDeclRef.is<ConstructorDecl>())
+            {
+                emitType(context, resultType);
+            }
+
+            // Include key modifiers in the mangled name so we never deduplicate
+            // things like a nonmutating method and a mutating method.
+            bool isMutating = false;
+            bool isRefThis = false;
+            bool isFwdDiff = false;
+            bool isBwdDiff = false;
+            bool isNoDiffThis = false;
+            for (auto modifier : callableDeclRef.getDecl()->modifiers)
+            {
+                if (as<MutatingAttribute>(modifier))
+                {
+                    isMutating = true;
+                }
+                else if (as<RefAttribute>(modifier))
+                {
+                    isRefThis = true;
+                }
+                else if (as<ForwardDifferentiableAttribute>(modifier))
+                {
+                    isFwdDiff = true;
+                }
+                else if (as<BackwardDifferentiableAttribute>(modifier))
+                {
+                    isBwdDiff = true;
+                }
+                else if (as<NoDiffThisAttribute>(modifier))
+                {
+                    isNoDiffThis = true;
+                }
+            }
+
+            if (isMutating)
+                emitRaw(context, "m");
+            if (isRefThis)
+                emitRaw(context, "r");
+            if (isFwdDiff)
+                emitRaw(context, "f");
+            if (isBwdDiff)
+                emitRaw(context, "b");
+            if (isNoDiffThis)
+                emitRaw(context, "n");
+        }
+        else
+        {
+            auto funcType = callableDeclRef.getDecl()->funcType.type;
+            auto resolvedFuncType =
+                as<Type>(funcType->substitute(context->astBuilder, SubstitutionSet(callableDeclRef))
+                             ->resolve());
+            emitType(context, resolvedFuncType);
+        }
     }
 }
 
@@ -802,22 +951,6 @@ void mangleName(ManglingContext* context, DeclRef<Decl> declRef)
 
         emitQualifiedName(context, makeDeclRef(innerDecl), true);
         return;
-    }
-    else if (auto fwdReq = as<ForwardDerivativeRequirementDecl>(decl))
-    {
-        emitRaw(context, "FwdReq_");
-        emitQualifiedName(context, fwdReq->originalRequirementDecl, true);
-        return;
-    }
-    else if (auto bwdReq = as<BackwardDerivativeRequirementDecl>(decl))
-    {
-        emitRaw(context, "BwdReq_");
-        emitQualifiedName(context, bwdReq->originalRequirementDecl, true);
-        return;
-    }
-    else if (as<AttributeDecl>(decl))
-    {
-        emitRaw(context, "A");
     }
     else
     {

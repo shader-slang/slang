@@ -1,14 +1,15 @@
-// Test the exact pattern from issue #9884: using explicit IProcessor
-// type annotation instead of `let`. This is known to be fragile for
-// associated type scope tracking (see issue #9883 explicit annotation gap).
-//
-// Uses createDynamicObject with type_conformance to ensure runtime dispatch
-// is not specialized away by the compiler.
+// Test the pattern from issue #9884: using explicit IProcessor type annotation
+// instead of `let`. This was broken for associated type scope tracking prior to
+// #10004 — the compiler created separate temporaries for each access, causing
+// the associated type from proc.Handler to differ between uses.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target cpp -entry computeMain -stage compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<int> outputBuffer;
 
 interface IHandler
 {
@@ -34,32 +35,28 @@ interface IProcessor
 struct ProcessorA : IProcessor
 {
     typealias Handler = DoubleHandler;
-    float pad;
     DoubleHandler getHandler() { return DoubleHandler(); }
 }
 
 struct ProcessorB : IProcessor
 {
     typealias Handler = TripleHandler;
-    float pad;
     TripleHandler getHandler() { return TripleHandler(); }
 }
 
-IProcessor createProcessor(uint id, float data)
+IProcessor createProcessor(int id)
 {
-    return createDynamicObject<IProcessor>(id, data);
+    if (id == 0)
+        return ProcessorA();
+    else
+        return ProcessorB();
 }
-
-RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // Using explicit IProcessor annotation breaks associated type
-    // scope tracking — the compiler treats proc.Handler at different
-    // scope depths, causing a false type mismatch.
-    // CHECK: error[E30019]
-    IProcessor proc = createProcessor(0, 1.0);
+    // Using explicit IProcessor annotation with associated type — fixed in #10004
+    IProcessor proc = createProcessor(0);
     proc.Handler h = proc.getHandler();
-    outputBuffer[0] = h.handle(5);
+    outputBuffer[0] = h.handle(5);  // CHECK: 10
 }

@@ -18,12 +18,26 @@ User-specific instructions for Slang (optional, may not exist):
 
 ### Building the Project
 
+If you are running in a Windows sandbox, run extras\win-sandbox-build.bat to produce a build in
+debug configuration. This script discovers Visual Studio, runs vcvarsall.bat, configures with the
+`vs2022-dev` preset, prefers locally cached dependencies instead of fetching them over the network,
+and defaults to building `slangc`, `slang-test`, and `slangi`. Pass extra target names if you need
+something other than that default target set.
+
+On non-Windows platforms (Linux/macOS), run cmake directly to build:
+
 ```bash
 # Configure with default settings (Ninja Multi-Config)
 cmake --preset default
 
 # Configure with visual studio 2022 settings (Preferred on Windows)
-cmake.exe --preset vs2022
+# On Windows, include -DSLANG_IGNORE_ABORT_MSG=ON to suppress
+# modal abort dialogs during unattended/LLM-driven builds.
+# Use -DSLANG_EMBED_CORE_MODULE=OFF to keep core module compilation separate
+# from C++ source compilation. This way errors in *.meta.slang files (e.g.
+# hlsl.meta.slang) do not break the C++ build — slangc and slang-test still
+# compile successfully and the module errors surface at runtime instead.
+cmake.exe --preset vs2022 -DSLANG_IGNORE_ABORT_MSG=ON -DSLANG_EMBED_CORE_MODULE=OFF
 
 # Build Release/Debug binaries.
 # It can take from 5 minutes to 20 minutes depending on the machine.
@@ -38,11 +52,14 @@ cmake --build --preset debug --target slangc
 cmake --build --preset debug --target slang-test
 ```
 
+**sccache**: Pass `-DSLANG_USE_SCCACHE=ON` at configure time (or set `SLANG_USE_SCCACHE=1` env var) to use sccache as the compiler launcher for faster rebuilds. This automatically disables precompiled headers due to a known incompatibility. Requires `sccache` in PATH.
+
 When building with `cmake --build`, redirect all of outputs to null-device.
 When the build failed, then, re-run the same command without the redirections.
 It is to avoid wasting the token usage of LLM.
 
 Example,
+
 ```
 # Print the build logs only when the initial attempt failed.
 cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
@@ -51,6 +68,26 @@ cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
 ### Formatting
 
 **Run `./extras/formatting.sh` before committing changes.** PRs must conform to the project's coding style. Use `./extras/formatting.sh --check-only` to verify without modifying files.
+
+### Suppressing Unused Variable Warnings
+
+When a variable declared in an `if` condition is unused inside the body (the condition exists only for its type-check side-effect), use the **C++17 if-init-statement** pattern instead of `SLANG_UNUSED`:
+
+```cpp
+// Preferred: C++17 if-init pattern
+if (auto foo = as<IRFoo>(inst); foo)
+{
+    // foo not needed in body — the type check is the point
+}
+
+// Avoid: SLANG_UNUSED inside the body
+if (auto foo = as<IRFoo>(inst))
+{
+    SLANG_UNUSED(foo);
+}
+```
+
+For variables that are set but never read outside an `if` (e.g., a plain local variable), use `SLANG_UNUSED(var)` with a comment explaining why.
 
 ### PR Workflow
 
@@ -79,6 +116,17 @@ slang-test must run from repository root
 - Use CPU compute: `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type`
 - Use interpreter: `//TEST:INTERPRET(filecheck=CHECK):`
 - Example test structure in `tests/language-feature/lambda/lambda-0.slang`
+
+**Diagnostic Tests** (see `docs/diagnostics.md` for full details):
+
+Use `// DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):` as the test directive to verify that the compiler emits expected diagnostics. Annotations in comments match against compiler output by message text, severity, or error code. Carets align to columns on the preceding source line:
+
+```slang
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
+int foo = undefined;
+//CHECK: E01234
+//CHECK:  ^^^^^^^^^ error
+```
 
 **SPIRV Validation**:
 
@@ -168,6 +216,39 @@ slang-test must run from repository root
 - **Adding a built-in function**: Add to appropriate module in `prelude/`
 - **Adding a new target**: Implement new emitter in `source/slang/slang-emit-*.cpp`
 
+### Modifying Public Headers (`include/`)
+
+All files under `include/` are public API. Changes must preserve binary (ABI) and source
+compatibility for callers compiled against older versions of the header.
+
+#### Enums
+
+- **Never insert a new enumerator in the middle of an existing enum.** Insertion shifts all
+  subsequent integer values, silently breaking any caller that stores or compares the value.
+- **Always append** new enumerators immediately before the terminal count/sentinel member
+  (e.g. `CountOf`, `Count`, `NUM_*`), assigning an explicit integer value (the next sequential
+  integer after the preceding enumerator).
+- **Removed enumerators**: rename to `REMOVED_<Name>` and keep the original integer value.
+  Never reuse or reclaim a retired integer.
+
+#### Virtual tables (COM interfaces)
+
+Slang's public interfaces (`ISession`, `IModule`, `IComponentType`, etc.) are COM-style
+vtables declared with `virtual` methods in `include/slang.h`. The vtable layout is fixed by
+declaration order. Violating these rules corrupts the vtable and causes silent crashes or
+wrong-method dispatch for any caller compiled against an older header.
+
+- **Never reorder virtual methods** within an interface.
+- **Never change a virtual method's signature** (return type, parameter types, calling
+  convention, or `SLANG_MCALL` decoration).
+- **Never insert a new virtual method** in the middle of an interface — append only, at the
+  end of the interface before the closing brace.
+- **Never remove a virtual method** — replace its body with a stub that returns
+  `SLANG_E_NOT_IMPLEMENTED` and keep the declaration in place.
+- Avoid extending an existing public COM interface in place when clients may implement or
+  query it by UUID. Prefer adding a new derived/versioned interface with its own UUID, while
+  keeping the original interface declaration and UUID supported for existing callers.
+
 ### Debugging tools
 
 #### IR Dump (`-dump-ir`)
@@ -188,6 +269,7 @@ slangc -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-
 #### InstTrace
 
 Trace where a problematic IR instruction was created:
+
 ```bash
 python3 ./extras/insttrace.py <debugUID> ./build/Debug/bin/slangc tests/my-test.slang -target spirv
 ```
@@ -197,6 +279,20 @@ python3 ./extras/insttrace.py <debugUID> ./build/Debug/bin/slangc tests/my-test.
 - `slangc -target spirv-asm` — compile to SPIRV assembly
 - Set `SLANG_RUN_SPIRV_VALIDATION=1` for static validation; use `-skip-spirv-validation` to see SPIRV output even when validation fails
 - `slangc -target spirv-asm -emit-spirv-via-glsl` — generate reference SPIRV via GLSL for comparison
+
+#### Assertion Behavior (`SLANG_ASSERT`)
+
+On Windows, assertion failures normally open a modal dialog that blocks execution. Set the `SLANG_ASSERT` environment variable to control this:
+
+| Value                 | Behavior                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `system`              | Use the system `assert()`, which shows a modal dialog and allows the developers to attach the debugger                         |
+| `debugbreak`          | When a debugger is already attached, it will hit a debug-break; fall back to `system` behavior when a debugger is not attached |
+| `release-assert-only` | Skip debug-only assertions (`SLANG_ASSERT`, `SLANG_ASSERT_FAILURE`) and continue; `SLANG_RELEASE_ASSERT` still fires           |
+| _(unset)_             | Throws an exception                                                                                                            |
+
+The behavior on Windows after an exception is thrown is controlled by the CMake option `SLANG_IGNORE_ABORT_MSG`.
+This option is highly recommended for unattended automation with LLM workflow; it bakes the behavior into all built executables at compile time.
 
 #### RTX Remix Testing
 
@@ -248,9 +344,14 @@ Code generation supports all major APIs but runtime testing requires appropriate
 
 **WSL on Windows**:
 When running under WSL environment, try to append `.exe` to the executables to avoid using Linux binaries
+
 - Use `cmake.exe` instead of `cmake`,
 - Use `python.exe` instead of `python`,
 - Use `gh.exe` instead of `gh` and so on.
+
+### Release Process
+
+Use the `/slang-release-process` skill to push a new release. See `.claude/skills/slang-release-process/SKILL.md` for the full workflow.
 
 ## Additional Documents
 

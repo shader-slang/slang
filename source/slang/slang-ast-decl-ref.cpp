@@ -67,6 +67,26 @@ DeclRefBase* MemberDeclRef::_substituteImplOverride(
     if (diff)
     {
         (*ioDiff)++;
+
+        // We'll special case one specific pattern.
+        if (auto origGenericAppParent = as<GenericAppDeclRef>(substParent))
+        {
+            if (auto origGenericLookedupVal = as<LookupDeclRef>(origGenericAppParent->getBase()))
+            {
+                auto resolvedWitness =
+                    as<SubtypeWitness>(origGenericLookedupVal->getWitness()->resolve());
+                // Otherwise, we need to get the effective inner decl-ref for the generic
+                // app.
+                auto resolvedTargetDecl =
+                    getUnspecializedLookupRec(getCurrentASTBuilder(), getDecl(), resolvedWitness);
+
+                if (resolvedTargetDecl.m_flavor == RequirementWitness::Flavor::declRef)
+                {
+                    return resolvedTargetDecl.getDeclRef();
+                }
+            }
+        }
+
         return astBuilder->getMemberDeclRef(substParent, getDecl());
     }
     return this;
@@ -88,7 +108,40 @@ Val* MemberDeclRef::_resolveImplOverride()
     auto resolvedParent = _resolveAsDeclRef(getParentOperand());
     if (resolvedParent != getParentOperand())
     {
-        return getCurrentASTBuilder()->getMemberDeclRef(resolvedParent, getDecl());
+        auto newChild = getDecl();
+
+        if (newChild->parentDecl != resolvedParent->getDecl())
+        {
+            // We'll special case one specific pattern.
+            if (auto origGenericAppParent = as<GenericAppDeclRef>(getParentOperand()))
+            {
+                if (auto origGenericLookedupVal =
+                        as<LookupDeclRef>(origGenericAppParent->getBase()))
+                {
+                    auto resolvedWitness =
+                        as<SubtypeWitness>(origGenericLookedupVal->getWitness()->resolve());
+                    // Otherwise, we need to get the effective inner decl-ref for the generic
+                    // app.
+                    auto resolvedTargetDecl = getUnspecializedLookupRec(
+                        getCurrentASTBuilder(),
+                        getDecl(),
+                        resolvedWitness);
+
+                    if (resolvedTargetDecl.m_flavor == RequirementWitness::Flavor::declRef)
+                    {
+                        newChild = resolvedTargetDecl.getDeclRef().getDecl();
+                    }
+                    else if (resolvedTargetDecl.m_flavor == RequirementWitness::Flavor::val)
+                    {
+                        return resolvedTargetDecl.getVal()->substitute(
+                            getCurrentASTBuilder(),
+                            getParentOperand());
+                    }
+                }
+            }
+        }
+
+        return getCurrentASTBuilder()->getMemberDeclRef(resolvedParent, newChild);
     }
     return this;
 }
@@ -171,25 +224,170 @@ DeclRefBase* LookupDeclRef::_getBaseOverride()
     return nullptr;
 }
 
+RequirementWitness getUnspecializedLookupRec(
+    ASTBuilder* astBuilder,
+    Decl* requirementKey,
+    SubtypeWitness* witness)
+{
+    // We never register the generic itself as the key, but rather use
+    // the inner-most non-generic declaration.
+    //
+    UCount genericLevels = 0;
+    while (auto genericDecl = as<GenericDecl>(requirementKey))
+    {
+        genericLevels++;
+        requirementKey = getInner(genericDecl);
+    }
+
+    if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(witness))
+    {
+        RefPtr<WitnessTable> witnessTable;
+        if (auto nestedLookupDeclRef =
+                as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
+        {
+            RequirementWitness nestedWitness = getUnspecializedLookupRec(
+                astBuilder,
+                nestedLookupDeclRef->getDecl(),
+                nestedLookupDeclRef->getWitness());
+            if (nestedWitness.getFlavor() == RequirementWitness::Flavor::witnessTable)
+            {
+                witnessTable = nestedWitness.getWitnessTable();
+            }
+            else if (nestedWitness.getFlavor() == RequirementWitness::Flavor::none)
+            {
+                return RequirementWitness();
+            }
+            else
+            {
+                SLANG_UNEXPECTED("expected witness table, not val or declRef");
+            }
+        }
+        else if (
+            auto inheritanceDeclRef = declaredSubtypeWitness->getDeclRef().as<InheritanceDecl>())
+        {
+            witnessTable = inheritanceDeclRef.getDecl()->witnessTable;
+        }
+        else if (
+            auto constraintDeclRef =
+                declaredSubtypeWitness->getDeclRef().as<GenericTypeConstraintDecl>())
+        {
+            // For generic type constraints, we also have a witness table that stores
+            // canonical paths for diamond conformance patterns.
+            witnessTable = constraintDeclRef.getDecl()->pathResolutionTable;
+        }
+
+        RequirementWitness requirementWitness;
+        if (witnessTable && witnessTable->getRequirementDictionary().tryGetValue(
+                                requirementKey,
+                                requirementWitness))
+        {
+            switch (requirementWitness.getFlavor())
+            {
+            default:
+                // No usable value was found, so there is nothing we can do.
+                break;
+            case RequirementWitness::Flavor::witnessTable:
+                return requirementWitness;
+            case RequirementWitness::Flavor::declRef:
+                {
+                    auto satisfyingVal =
+                        as<DeclRefBase>(requirementWitness.getDeclRef().declRefBase->resolve());
+                    if (genericLevels == 0)
+                        return RequirementWitness(satisfyingVal);
+                    else
+                    {
+                        for (; satisfyingVal && genericLevels > 0;
+                             satisfyingVal = satisfyingVal->getParent())
+                        {
+                            if (as<GenericDecl>(satisfyingVal->getParent()->getDecl()))
+                                genericLevels--;
+                        }
+
+                        return RequirementWitness(satisfyingVal);
+                    }
+                }
+            case RequirementWitness::Flavor::val:
+                {
+                    auto satisfyingVal = requirementWitness.getVal()->resolve();
+                    SLANG_ASSERT(!genericLevels);
+                    return satisfyingVal;
+                }
+                break;
+            }
+        }
+    }
+
+    return RequirementWitness();
+}
+
+RequirementWitness specializeLookedUpRec(
+    ASTBuilder* astBuilder,
+    SubtypeWitness* witness,
+    RequirementWitness lookedUpVal)
+{
+    // TODO: Will need to handle any generic-app-decl-refs..
+    if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(witness))
+    {
+        RefPtr<WitnessTable> witnessTable;
+        if (auto nestedLookupDeclRef =
+                as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
+        {
+            lookedUpVal =
+                specializeLookedUpRec(astBuilder, nestedLookupDeclRef->getWitness(), lookedUpVal);
+            return lookedUpVal.specialize(
+                astBuilder,
+                SubstitutionSet(declaredSubtypeWitness->getDeclRef()));
+        }
+        else if (
+            auto inheritanceDeclRef = declaredSubtypeWitness->getDeclRef().as<InheritanceDecl>())
+        {
+            return lookedUpVal.specialize(astBuilder, SubstitutionSet(inheritanceDeclRef));
+        }
+        else if (
+            auto constraintDeclRef =
+                declaredSubtypeWitness->getDeclRef().as<GenericTypeConstraintDecl>())
+        {
+            return lookedUpVal.specialize(astBuilder, SubstitutionSet(constraintDeclRef));
+        }
+    }
+
+    return RequirementWitness();
+}
+
+
 Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource)
 {
     auto astBuilder = getCurrentASTBuilder();
     Decl* requirementKey = getDecl();
-    RequirementWitness requirementWitness =
-        tryLookUpRequirementWitness(astBuilder, newWitness, requirementKey);
-    switch (requirementWitness.getFlavor())
-    {
-    default:
-        // No usable value was found, so there is nothing we can do.
-        break;
 
-    case RequirementWitness::Flavor::val:
+    // Recursively find the value associated with the requirement key.
+    RequirementWitness lookedUpVal =
+        getUnspecializedLookupRec(astBuilder, requirementKey, newWitness);
+
+    // If we found something, we need to specialize it using the substitutions from the witness
+    // chain.
+    //
+    if (lookedUpVal.getFlavor() != RequirementWitness::Flavor::none)
+    {
+        if (lookedUpVal.getFlavor() == RequirementWitness::Flavor::val ||
+            lookedUpVal.getFlavor() == RequirementWitness::Flavor::declRef)
         {
-            auto satisfyingVal = requirementWitness.getVal()->resolve();
-            return satisfyingVal;
+            auto specializedEntry = specializeLookedUpRec(astBuilder, newWitness, lookedUpVal);
+            switch (specializedEntry.getFlavor())
+            {
+            default:
+                // No usable value was found, so there is nothing we can do.
+                break;
+            case RequirementWitness::Flavor::declRef:
+                return specializedEntry.getDeclRef().declRefBase;
+            case RequirementWitness::Flavor::val:
+                return specializedEntry.getVal();
+            }
         }
-        break;
     }
+
+    // If we didn't find anything using a simple lookup, we might need to handle some special-case
+    // rules.
 
     // Hard code implementation of T.Differential.Differential == T.Differential rule.
     auto builtinReq = requirementKey->findModifier<BuiltinRequirementModifier>();
@@ -204,7 +402,8 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
         if (!builtinReq)
             return nullptr;
     }
-    if (builtinReq->kind != BuiltinRequirementKind::DifferentialType)
+    if (builtinReq->kind != BuiltinRequirementKind::DifferentialType &&
+        builtinReq->kind != BuiltinRequirementKind::DifferentialPtrType)
         return nullptr;
     // Is the concrete type a Differential associated type?
     auto innerDeclRefType = as<DeclRefType>(newLookupSource);
@@ -214,7 +413,8 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
         innerDeclRefType->getDeclRef().getDecl()->findModifier<BuiltinRequirementModifier>();
     if (!innerBuiltinReq)
         return nullptr;
-    if (innerBuiltinReq->kind != BuiltinRequirementKind::DifferentialType)
+    if (innerBuiltinReq->kind != BuiltinRequirementKind::DifferentialType &&
+        innerBuiltinReq->kind != BuiltinRequirementKind::DifferentialPtrType)
         return nullptr;
     if (isConstraint)
         return newWitness;
@@ -242,10 +442,41 @@ DeclRefBase* GenericAppDeclRef::_substituteImplOverride(
     if (diff == 0)
         return this;
     (*ioDiff)++;
-    return astBuilder->getGenericAppDeclRef(
-        substGenericDeclRef,
-        substArgs.getArrayView(),
-        getDecl());
+
+    if (getDecl()->isChildOf(substGenericDeclRef->getDecl()))
+        return astBuilder->getGenericAppDeclRef(
+            substGenericDeclRef,
+            substArgs.getArrayView(),
+            getDecl());
+    else
+    {
+        // If decl is no longer the child of the new parent, it's most likely due to
+        // the base lookup resolving to a different decl.
+        //
+        if (auto baseLookup = as<LookupDeclRef>(getGenericDeclRef()))
+        {
+            // Otherwise, we need to get the effective inner decl-ref for the generic app.
+            auto resolvedTargetDecl = astBuilder
+                                          ->getLookupDeclRef(
+                                              baseLookup->getLookupSource(),
+                                              baseLookup->getWitness(),
+                                              getDecl())
+                                          .substituteImpl(astBuilder, subst, &diff)
+                                          .declRefBase->resolve();
+
+            if (as<DeclRefBase>(resolvedTargetDecl))
+            {
+                return astBuilder->getGenericAppDeclRef(
+                    substGenericDeclRef,
+                    substArgs.getArrayView(),
+                    as<DeclRefBase>(resolvedTargetDecl)->getDecl());
+            }
+        }
+
+        SLANG_UNEXPECTED(
+            "GenericAppDeclRef::substituteImpl: generic decl ref is not a child of the new parent "
+            "& base is not a lookup");
+    }
 }
 
 GenericDecl* GenericAppDeclRef::getGenericDecl()
@@ -259,7 +490,7 @@ void GenericAppDeclRef::_toTextOverride(StringBuilder& out)
     auto genericDecl = as<GenericDecl>(getGenericDeclRef()->getDecl());
     Index paramCount = 0;
     for (auto member : genericDecl->getDirectMemberDecls())
-        if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
+        if (isGenericParam(member))
             paramCount++;
     getGenericDeclRef()->toText(out);
     out << "<";
@@ -291,10 +522,35 @@ Val* GenericAppDeclRef::_resolveImplOverride()
             diff = true;
     }
     if (diff)
-        resolvedVal = astBuilder->getGenericAppDeclRef(
-            resolvedGenericDeclRef,
-            resolvedArgs.getArrayView(),
-            getDecl());
+    {
+        if (getDecl()->isChildOf(resolvedGenericDeclRef->getDecl()))
+        {
+            resolvedVal = astBuilder->getGenericAppDeclRef(
+                resolvedGenericDeclRef,
+                resolvedArgs.getArrayView(),
+                getDecl());
+        }
+        else if (getDecl() == getGenericDecl()->inner)
+        {
+            // Use the inner of the resolved generic decl ref.
+            resolvedVal = astBuilder->getGenericAppDeclRef(
+                resolvedGenericDeclRef,
+                resolvedArgs.getArrayView());
+        }
+        else
+        {
+            // If we hit this case, we're referencing something that isn't
+            // the direct child (->inner) of the generic decl.
+            // There's no easy way to figure out which child of the new generic
+            // we should be referencing, so we'll assert out here instead of
+            // trying to continue with an ill-formed decl ref.
+            //
+            SLANG_ASSERT(
+                "Cannot resolve generic app decl ref to a non-direct child of the resolved generic "
+                "decl "
+                "ref");
+        }
+    }
     return resolvedVal;
 }
 
@@ -328,7 +584,7 @@ void DeclRefBase::toText(StringBuilder& out)
         out << this->getDecl()->getName()->text;
         return;
     }
-    else if (as<GenericValueParamDecl>(this->getDecl()))
+    else if (isGenericValueParam(this->getDecl()))
     {
         SLANG_ASSERT(as<DirectDeclRef>(this));
         out << this->getDecl()->getName()->text;
@@ -385,8 +641,7 @@ void DeclRefBase::toText(StringBuilder& out)
                 {
                     Index paramCount = 0;
                     for (auto member : genericDecl->getDirectMemberDecls())
-                        if (as<GenericTypeParamDeclBase>(member) ||
-                            as<GenericValueParamDecl>(member))
+                        if (isGenericParam(member))
                             paramCount++;
                     out << "<";
                     auto args = genericAppDeclRef->getArgs();
@@ -405,7 +660,8 @@ void DeclRefBase::toText(StringBuilder& out)
         {
             if (extDecl->targetType)
             {
-                getTargetType(getCurrentASTBuilder(), getParent())->toText(out);
+                getTargetType(getCurrentASTBuilder(), DeclRef(declRef).as<ExtensionDecl>())
+                    ->toText(out);
             }
         }
     }
@@ -567,12 +823,9 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
     SemanticsVisitor* semantics,
     DeclRef<Decl> declRef)
 {
-    if (declRef.as<GenericTypeParamDeclBase>())
+    if (isGenericParam(declRef))
         return declRef;
-    if (declRef.as<GenericValueParamDecl>())
-        return declRef;
-    if (declRef.as<GenericTypeConstraintDecl>())
-        return declRef;
+
     ShortList<GenericDecl*> genericParentDecls;
     auto lastSubstNode = SubstitutionSet(declRef).getInnerMostNodeWithSubstInfo();
     auto lastGenApp = as<GenericAppDeclRef>(lastSubstNode);
@@ -583,6 +836,11 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
             break;
         if (lastLookup && lastLookup->getDecl()->isChildOf(dd))
             break;
+        if ((as<GenericTypeConstraintDecl>(declRef.getDecl()) ||
+             as<TypeCoercionConstraintDecl>(declRef.getDecl()) ||
+             as<HasDiffTypeInfoConstraintDecl>(declRef.getDecl())) &&
+            dd == declRef.getDecl()->parentDecl)
+            continue;
         if (auto gen = as<GenericDecl>(dd))
             genericParentDecls.add(gen);
     }
@@ -593,12 +851,15 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
         auto args = getDefaultSubstitutionArgs(astBuilder, semantics, current);
         if (parentDeclRef)
         {
-            parentDeclRef = astBuilder->getMemberDeclRef(parentDeclRef, current);
+            // If the parent is a generic, we can skip directly to creating a generic app decl-ref.
+            if (!parentDeclRef.as<GenericDecl>())
+                parentDeclRef = astBuilder->getMemberDeclRef(parentDeclRef, current);
         }
         else
         {
             parentDeclRef = astBuilder->getDirectDeclRef(current);
         }
+
         parentDeclRef =
             astBuilder->getGenericAppDeclRef(parentDeclRef.as<GenericDecl>(), args.getArrayView());
     }

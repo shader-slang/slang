@@ -143,7 +143,7 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
         case LayoutResourceKind::SamplerState:
         case LayoutResourceKind::DescriptorTableSlot:
             {
-                auto kinds = LayoutResourceKindFlag::make(LayoutResourceKind::DescriptorTableSlot);
+                auto kinds = LayoutResourceKindFlag::make(kind);
                 m_writer->emit("@binding(");
                 auto index = getBindingOffsetForKinds(&containerChain, kinds);
                 m_writer->emit(index);
@@ -353,6 +353,28 @@ void WGSLSourceEmitter::emit(const AddressSpace addressSpace)
     case AddressSpace::GroupShared:
         m_writer->emit("workgroup");
         break;
+    }
+}
+
+static ImageFormat getImageFormat(IRTextureType* texType)
+{
+    return texType->hasFormat() ? (ImageFormat)getIntVal(texType->getFormat())
+                                : ImageFormat::unknown;
+}
+
+static bool wgslFormatSupportsReadWrite(ImageFormat fmt)
+{
+    // Per https://www.w3.org/TR/WGSL/#storage-texel-formats, rgba16float is explicitly
+    // prohibited from read_write access even when the readonly_and_readwrite_storage_textures
+    // WGSL feature is available. All other formats that Slang's WGSL backend emits
+    // (r32float, rg32float, rgba32float, rgba8unorm, bgra8unorm, and their integer
+    // variants) support read_write under that feature.
+    switch (fmt)
+    {
+    case ImageFormat::rgba16f:
+        return false;
+    default:
+        return true;
     }
 }
 
@@ -650,8 +672,19 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 switch (texType->getAccess())
                 {
                 case SLANG_RESOURCE_ACCESS_READ_WRITE:
-                    m_writer->emit(getWgslImageFormat(texType));
-                    m_writer->emit(", read_write");
+                    {
+                        ImageFormat fmt = getImageFormat(texType);
+                        const char* fmtStr = getWgslImageFormat(texType);
+                        if (!wgslFormatSupportsReadWrite(fmt))
+                        {
+                            getSink()->diagnose(
+                                Diagnostics::StorageTextureAccessModeNotSupportedInWgsl{
+                                    .format = fmtStr,
+                                    .accessMode = "read_write"});
+                        }
+                        m_writer->emit(fmtStr);
+                        m_writer->emit(", read_write");
+                    }
                     break;
                 case SLANG_RESOURCE_ACCESS_WRITE:
                     m_writer->emit(getWgslImageFormat(texType));
@@ -714,28 +747,35 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
         // @binding and @group unique, so that we can pass WGSL compile tests.
         // This will have to be revisited when we actually want to supply resources to
         // shaders.
-        if (kind == LayoutResourceKind::DescriptorTableSlot)
+        switch (kind)
         {
-            m_writer->emit("@binding(");
-            m_writer->emit(attr->getOffset());
-            m_writer->emit(") ");
+        case LayoutResourceKind::DescriptorTableSlot:
+        case LayoutResourceKind::ShaderResource:
+        case LayoutResourceKind::UnorderedAccess:
+        case LayoutResourceKind::SamplerState:
+        case LayoutResourceKind::ConstantBuffer:
+            {
+                m_writer->emit("@binding(");
+                m_writer->emit(attr->getOffset());
+                m_writer->emit(") ");
 
-            EmitVarChain chain = {};
-            chain.varLayout = layout;
-            auto space = getBindingSpaceForKinds(&chain, LayoutResourceKindFlag::make(kind));
-            m_writer->emit("@group(");
-            m_writer->emit(space);
-            m_writer->emit(") ");
+                EmitVarChain chain = {};
+                chain.varLayout = layout;
+                auto space = getBindingSpaceForKinds(&chain, LayoutResourceKindFlag::make(kind));
+                m_writer->emit("@group(");
+                m_writer->emit(space);
+                m_writer->emit(") ");
 
-            return;
-        }
-        else if (kind == LayoutResourceKind::SpecializationConstant)
-        {
+                return;
+            }
+        case LayoutResourceKind::SpecializationConstant:
             m_writer->emit("@id(");
             m_writer->emit(attr->getOffset());
             m_writer->emit(") ");
 
             return;
+        default:
+            break;
         }
     }
 }

@@ -391,7 +391,8 @@ err(
 
 err("null-component-type", 105, "componentTypes[~index:Int] is `nullptr`")
 
-standalone_note("note-failed-to-load-dynamic-library", 99999, "failed to load dynamic library '~path'")
+-- Code 99996: moved from 99999 to avoid severity conflict with internal-severity diagnostics at that code.
+standalone_note("note-failed-to-load-dynamic-library", 99996, "failed to load dynamic library '~path'")
 
 --
 -- 15xxx - Preprocessing
@@ -890,6 +891,13 @@ err(
     span { loc = "location", message = "cannot use 'const' as a type modifier" }
 )
 
+err(
+    "volatile-not-allowed-on-type",
+    20019,
+    "invalid 'volatile' usage",
+    span { loc = "location", message = "cannot use 'volatile' as a type modifier" }
+)
+
 warning(
     "unintended-empty-statement",
     20101,
@@ -1112,6 +1120,13 @@ err(
     }
 )
 
+standalone_note(
+    "this-type-mismatch-after-erasure",
+    30021,
+    "the concrete 'This' type identity is lost after type erasure into interface type '~interfaceType:Type'; consider using a generic function with a type constraint instead",
+    span { loc = "location" }
+)
+
 err(
     "cannot-convert-array-of-smaller-to-larger-size",
     30024,
@@ -1148,6 +1163,13 @@ err(
     30029,
     "array index out of bounds",
     span { loc = "location", message = "array index '~index' is out of bounds for array of size '~size'." }
+)
+
+err(
+    "reference-type-as-struct-field",
+    30030,
+    "reference type cannot be used as struct field",
+    span { loc = "location", message = "'~type:Type' cannot be used as a struct field; reference types can only be used for function parameters and return values." }
 )
 
 err(
@@ -1439,6 +1461,13 @@ err(
 )
 
 err(
+    "is-as-on-unrelated-concrete-types",
+    30304,
+    "'is'/'as' on unrelated concrete types",
+    span { loc = "expr:Expr", message = "'is'/'as' on unrelated concrete types will never succeed. Use an interface-typed expression for runtime type checks." }
+)
+
+err(
     "expected-function",
     33070,
     "expected a function",
@@ -1646,10 +1675,136 @@ err(
 )
 
 err(
+    "size-of-data-layout-is-invalid",
+    30086,
+    "invalid data layout for sizeof/alignof",
+    span { loc = "expr:Expr", message = "argument does not conform to IBufferDataLayout" }
+)
+
+err(
     "count-of-argument-is-invalid",
     30083,
     "invalid countof argument",
     span { loc = "expr:Expr", message = "argument to countof can only be a type pack or tuple" }
+)
+
+err(
+    "pack-query-argument-is-invalid",
+    30410,
+    "invalid ~queryName argument",
+    span { loc = "expr:Expr", message = "argument to ~queryName is invalid" }
+)
+
+err(
+    "empty-pack-query-is-invalid",
+    30411,
+    "cannot apply ~queryName to an empty pack",
+    span { loc = "expr:Expr", message = "~queryName requires a non-empty pack" }
+)
+
+err(
+    "pack-query-requires-non-empty-pack",
+    30412,
+    "cannot apply ~queryName to a pack that may be empty",
+    span { loc = "expr:Expr", message = "~queryName requires a non-empty pack; add a `where nonempty(...)` constraint or use a structurally non-empty pack" }
+)
+
+err(
+    "shape-pack-argument-is-invalid",
+    30417,
+    "invalid ~opName argument",
+    span { loc = "location", message = "arguments to ~opName must be compile-time int value packs, tuples of int values, or compile-time int indices" }
+)
+
+err(
+    "shape-pack-rank-mismatch",
+    30418,
+    "~opName requires packs of the same rank",
+    span { loc = "location", message = "~opName requires packs of the same rank, but got ranks ~leftRank:Int and ~rightRank:Int" }
+)
+
+err(
+    "shape-pack-axis-out-of-range",
+    30419,
+    "~opName axis is out of range",
+    span { loc = "location", message = "axis ~axis:Int is out of range for rank ~rank:Int in ~opName" }
+)
+
+err(
+    "shape-concat-non-axis-mismatch",
+    30420,
+    "__shapeConcat requires non-axis dimensions to match",
+    span { loc = "location", message = "__shapeConcat requires dimensions to match outside axis ~axis:Int, but dimension ~dimIndex:Int differs" }
+)
+
+err(
+    "shape-permute-order-length-mismatch",
+    30421,
+    "__shapePermute requires an order pack with matching rank",
+    span { loc = "location", message = "__shapePermute requires the order pack to have length ~orderRank:Int matching the input rank ~valueRank:Int" }
+)
+
+err(
+    "shape-permute-index-out-of-range",
+    30422,
+    "__shapePermute index is out of range",
+    span { loc = "location", message = "__shapePermute order index ~indexValue:Int at position ~indexPosition:Int is out of range for rank ~rank:Int" }
+)
+
+err(
+    "shape-permute-duplicate-index",
+    30423,
+    "__shapePermute order contains a duplicate index",
+    span { loc = "location", message = "__shapePermute order index ~indexValue:Int is duplicated at positions ~firstPosition:Int and ~secondPosition:Int" }
+)
+
+err(
+    "shape-pack-no-valid-axis",
+    30424,
+    "~opName has no valid axis",
+    span { loc = "location", message = "rank ~rank:Int provides no valid axis for ~opName" }
+)
+
+err(
+    "shape-concat-no-valid-axis",
+    30425,
+    "__shapeConcat has no valid axis",
+    span { loc = "location", message = "no axis in rank ~rank:Int can make __shapeConcat valid for these shapes" }
+)
+
+err(
+    "shape-permute-duplicate-equivalent-index",
+    30426,
+    "__shapePermute order contains a duplicate index",
+    span { loc = "location", message = "__shapePermute order positions ~firstPosition:Int and ~secondPosition:Int are provably equal, so the order contains a duplicate index" }
+)
+
+err(
+    "invalid-non-empty-pack-constraint-target",
+    30413,
+    "`nonempty(...)` requires a generic type pack or value pack parameter",
+    span { loc = "expr:Expr", message = "expected a direct reference to a generic pack parameter here" }
+)
+
+err(
+    "empty-pack-does-not-satisfy-non-empty-constraint",
+    30414,
+    "empty pack does not satisfy `nonempty(...)` constraint",
+    span { loc = "location", message = "pack argument here is empty" }
+)
+
+err(
+    "optional-non-empty-pack-constraint-is-invalid",
+    30415,
+    "`optional nonempty(...)` is not meaningful",
+    span { loc = "expr:Expr", message = "remove `optional` from this `nonempty(...)` constraint" }
+)
+
+err(
+    "non-empty-pack-constraint-target-must-be-from-current-generic",
+    30416,
+    "`nonempty(...)` target must be a generic pack parameter declared in the current generic",
+    span { loc = "expr:Expr", message = "this pack parameter is declared outside the current generic" }
 )
 
 -- Float bit cast diagnostics
@@ -1797,6 +1952,13 @@ err(
     30117,
     "forward reference in generic constraint",
     span { loc = "expr:Expr", message = "generic constraint for parameter '~param:Type' references type parameter '~referenced:Decl' before it is declared" }
+)
+
+err(
+    "cannot-mix-differentiable-value-and-ptr-outputs",
+    30118,
+    "cannot mix differentiable value types with differentiable pointer outputs",
+    span { loc = "location", message = "function has both IDifferentiable value types and IDifferentiablePtrType outputs, which is not currently supported. Please split the function so that differentiable value parameters and pointer differentiable outputs are in separate functions." }
 )
 
 
@@ -2163,6 +2325,20 @@ warning(
     span { loc = "location" }  -- No span message: this diagnostic has no meaningful source location
 )
 
+warning(
+    "special-type-leaks-from-parameter-group",
+    31106,
+    "Parameter group type includes some members with types which cannot be included in the same binding. These types will be moved into another parameter binding slot.",
+    span { loc = "location" }
+)
+
+warning(
+    "special-type-member-leaks-from-parameter-group",
+    31107,
+    "This member cannot be included in the same binding as some other parts of this struct, and will be moved into another parameter binding slot.",
+    span { loc = "member:IRInst", message = "This member will leak into a separate binding slot." }
+)
+
 err(
     "invalid-attribute-target",
     31120,
@@ -2389,10 +2565,17 @@ err(
     "invalid-address-of",
     31160,
     "invalid __getAddress usage",
-    span { loc = "expr:Expr", message = "'__getAddress' only supports groupshared variables and members of groupshared/device memory." }
+    span { loc = "location", message = "'__getAddress' cannot take the address of a function-local variable on this target." }
 )
 
--- 312xx - Modifiers and Deprecation
+err(
+    "interface-missing-function-interface-attribute",
+    31161,
+    "interface missing [__FunctionInterface]",
+    span { loc = "location", message = "interface '~decl:Decl' cannot be used as a constraint on a function type because it does not have the [__FunctionInterface] attribute." }
+)
+
+-- 312xx - Modifiers and Deprecation (part 1)
 
 warning(
     "deprecated-usage",
@@ -2422,6 +2605,20 @@ err(
     span { loc = "decl:Decl", message = "cannot export incomplete type '~decl'" }
 )
 
+warning(
+    "deprecated-bracket-attributes-placement",
+    31204,
+    "deprecated bracketed attribute list placement. Bracketed attributes should be placed before 'struct'.",
+    span { loc = "location", message = "deprecated placement of bracketed attributes list." }
+)
+
+err(
+    "invalid-bracket-attributes-placement",
+    31205,
+    "invalid bracketed attribute list placement. Bracketed attributes must be placed before 'struct'.",
+    span { loc = "location", message = "invalid placement of bracketed attributes list." }
+)
+
 err(
     "memory-qualifier-not-allowed-on-a-non-image-type-parameter",
     31206,
@@ -2430,10 +2627,24 @@ err(
 )
 
 err(
+    "removed-usage",
+    31207,
+    "use of removed declaration",
+    span { loc = "location", message = "~declName:Name has been removed since language version '~sinceVersion:Int': ~message" }
+)
+
+err(
     "require-input-decorated-var-for-parameter",
     31208,
     "shader input required",
     span { loc = "expr:Expr", message = "~func:Decl expects for argument ~paramNumber:Int a type which is a shader input (`in`) variable." }
+)
+
+err(
+    "removed-since-bad-version",
+    31209,
+    "'RemovedSince' argument 'version' is outside allowed range",
+    span { loc = "location", message = "valid range: [~minVersion:Int, ~maxVersion:Int]" }
 )
 
 -- 3121x - Derivative group requirements
@@ -2501,10 +2712,10 @@ err(
 -- Specialization and push constants
 
 err(
-    "specialization-constant-must-be-scalar",
+    "specialization-constant-must-be-scalar-or-enum",
     31218,
     "specialization constant type error",
-    span { loc = "modifier:Modifier", message = "specialization constant must be a scalar." }
+    span { loc = "modifier:Modifier", message = "specialization constant must be a scalar or enum type." }
 )
 
 err(
@@ -2560,6 +2771,22 @@ err(
     span { loc = "decl:Decl", message = "static const variable '~decl' must have an initializer" }
 )
 
+-- 3123x - Modifiers and Deprecation (part 2)
+
+err(
+    "removed-modifier-usage",
+    31230,
+    "use of removed modifier",
+    span { loc = "location", message = "modifier '~modifierName' has been removed from the language. ~message" }
+)
+
+warning(
+    "deprecated-modifier-usage",
+    31231,
+    "use of deprecated modifier",
+    span { loc = "location", message = "modifier '~modifierName' has been deprecated: ~message" }
+)
+
 -- Enums (320xx)
 
 err(
@@ -2577,13 +2804,6 @@ err(
 )
 
 -- 303xx: interfaces and associated types
-
-err(
-    "assoc-type-in-interface-only",
-    30300,
-    "associatedtype outside interface",
-    span { loc = "decl:Decl", message = "'associatedtype' can only be defined in an 'interface'." }
-)
 
 err(
     "global-gen-param-in-global-scope-only",
@@ -2607,6 +2827,13 @@ err(
 )
 
 err(
+    "type-cannot-conform-to-both-value-and-pointer-diff-interfaces",
+    30311,
+    "type cannot conform to both value and pointer differentiation interfaces",
+    span { loc = "decl:Decl", message = "type '~type:Type' should conform only to one of IDifferentiable or IDifferentiablePtrType, not both." }
+)
+
+err(
     "type-is-not-differentiable",
     30310,
     "type is not differentiable",
@@ -2627,6 +2854,34 @@ err(
     span { loc = "decl:Decl", message = "interface requirement cannot override a base declaration." }
 )
 
+err(
+    "treat-as-differentiable-on-interface-requirement",
+    30313,
+    "[TreatAsDifferentiable] cannot be applied to interface requirement",
+    span { loc = "attr:Modifier", message = "'[TreatAsDifferentiable]' cannot be applied to an interface requirement; it can only be applied to concrete function definitions." }
+)
+
+err(
+    "maybe-differentiable-on-non-interface-requirement",
+    30314,
+    "[MaybeDifferentiable] cannot be applied to non-interface requirement",
+    span { loc = "attr:Modifier", message = "'[MaybeDifferentiable]' cannot be applied to non-interface requirement; it can only be applied to interface requirements." }
+)
+
+err(
+    "optional-has-diff-type-info-constraint-is-invalid",
+    30315,
+    "optional __hasDiffTypeInfo constraint invalid",
+    span { loc = "location", message = "'optional' is not supported on '__hasDiffTypeInfo(...)' constraints" }
+)
+
+err(
+    "type-does-not-have-diff-type-info",
+    30316,
+    "type does not have diff type info",
+    span { loc = "location", message = "type '~type:Type' does not satisfy '__hasDiffTypeInfo(...)'" }
+)
+
 -- Interop (304xx)
 
 err(
@@ -2640,28 +2895,28 @@ err(
 
 warning(
     "for-loop-side-effect-changing-different-var",
-    30500,
+    30507,
     "for loop modifies wrong variable",
     span { loc = "sideEffect:Expr", message = "the for loop initializes and checks variable '~initVar:Decl' but the side effect expression is modifying '~modifiedVar:Decl'." }
 )
 
 warning(
     "for-loop-predicate-checking-different-var",
-    30501,
+    30508,
     "for loop predicate checks wrong variable",
     span { loc = "predicate:Expr", message = "the for loop initializes and modifies variable '~initVar:Decl' but the predicate expression is checking '~predicateVar:Decl'." }
 )
 
 warning(
     "for-loop-changing-iteration-variable-in-oppsoite-direction",
-    30502,
+    30511,
     "for loop modifies variable in wrong direction",
     span { loc = "sideEffect:Expr", message = "the for loop is modifiying variable '~var:Decl' in the opposite direction from loop exit condition." }
 )
 
 warning(
     "for-loop-not-modifying-iteration-variable",
-    30503,
+    30512,
     "for loop step is zero",
     span { loc = "sideEffect:Expr", message = "the for loop is not modifiying variable '~var:Decl' because the step size evaluates to 0." }
 )
@@ -2675,7 +2930,7 @@ warning(
 
 warning(
     "loop-runs-for-zero-iterations",
-    30505,
+    30514,
     "loop runs zero times",
     span { loc = "stmt:Stmt", message = "the loop runs for 0 iterations and will be removed." }
 )
@@ -2732,7 +2987,7 @@ warning(
 -- TODO: need to assign numbers to all these extra diagnostics...
 fatal(
     "cyclic-reference",
-    39999,
+    40002,
     "cyclic reference '~decl'",
     span { loc = "decl:Decl", message = "cyclic reference '~decl'" }
 )
@@ -2749,6 +3004,20 @@ err(
     39999,
     "the initial-value expression for variable '~decl' depends on the value of the variable itself",
     span { loc = "decl:Decl", message = "the initial-value expression for variable '~decl' depends on the value of the variable itself" }
+)
+
+err(
+    "generic-evaluation-recursion-limit-exceeded",
+    39998,
+    "recursive generic evaluation exceeded maximum depth",
+    span { loc = "decl:Decl", message = "evaluation of '~decl' exceeded the recursive generic evaluation budget (~budget:int)" }
+)
+
+fatal(
+    "maximum-type-nesting-level-exceeded",
+    39997,
+    "maximum type nesting level exceeded",
+    span { loc = "location", message = "maximum type nesting level exceeded" }
 )
 
 fatal(
@@ -2773,6 +3042,33 @@ err(
     30401,
     "type '~type:Type' cannot be used as a constraint",
     span { loc = "typeExp:Expr", message = "type '~type' cannot be used as a constraint" }
+)
+
+standalone_note(
+    "use-let-for-generic-value-param",
+    30499,
+    "use 'let' keyword to declare a generic value parameter: 'let ~paramName:Name : ~type:Type'"
+)
+
+standalone_note(
+    "use-let-each-for-generic-value-pack-param",
+    30509,
+    "use 'let each' to declare a variadic generic value parameter: 'let each ~paramName:Name : ~type:Type'"
+)
+
+warning(
+    "generic-param-shadows-outer-generic",
+    30515,
+    "generic parameter '~param:Decl' shadows a generic parameter from an enclosing scope",
+    span { loc = "param:Decl", message = "generic parameter '~param' shadows an outer generic parameter with the same name" },
+    span { loc = "outerParam:Decl", message = "outer generic parameter '~outerParam' declared here" }
+)
+
+err(
+    "pack-param-must-be-last",
+    30500,
+    "generic parameter after a variadic pack parameter is not allowed",
+    span { loc = "param:Decl", message = "generic parameter '~param' cannot appear after a variadic pack parameter" }
 )
 
 err(
@@ -2805,7 +3101,7 @@ err(
 
 standalone_note(
     "invalid-equality-constraint-sub-type",
-    30402,
+    30406,
     "type '~type:Type' cannot be constrained by a type equality",
     span { loc = "typeExp:Expr", message = "type '~type' cannot be constrained by a type equality" }
 )
@@ -2844,7 +3140,7 @@ err(
 
 err(
     "cannot-use-initializer-list-for-type",
-    30504,
+    30513,
     "cannot use initializer list for type '~type:Type'",
     span { loc = "initList:Expr", message = "cannot use initializer list for type '~type'" }
 )
@@ -2854,6 +3150,13 @@ err(
     30505,
     "cannot use initializer list for CoopVector of statically unknown size '~elementCount:Val'",
     span { loc = "initList:Expr", message = "cannot use initializer list for CoopVector of statically unknown size '~elementCount'" }
+)
+
+standalone_note(
+    "initializer-list-member-visibility-mismatch",
+    30516,
+    "member '~member:Decl' is ~memberVis:DeclVisibility, but '~type:Type' is ~structVis:DeclVisibility; all members must be ~structVis:DeclVisibility to use an initializer list",
+    span { loc = "member:Decl" }
 )
 
 warning(
@@ -2930,6 +3233,20 @@ err(
     30702,
     "system value semantic '~semantic' cannot be used as ~direction in '~stage' shader stage",
     span { loc = "location" }
+)
+
+err(
+    "per-primitive-semantic-in-vertex-output",
+    30703,
+    "per-primitive system value semantic '~semantic' must be placed in an 'OutputPrimitives' (or 'out primitives') parameter, not in a vertex or index output",
+    span { loc = "location" }
+)
+
+err(
+    "parameter-without-default-after-parameter-with-default",
+    30704,
+    "parameter '~param:Decl' does not have a default value, but follows a parameter that does",
+    span { loc = "param:Decl" }
 )
 
 --
@@ -3095,6 +3412,12 @@ err(
     span { loc = "location", message = "__subscript declaration must have a return type specified after '->'" }
 )
 
+err(
+    "optional-cannot-wrap-resource-type",
+    30902,
+    "'Optional<T>' cannot wrap a resource or opaque type",
+    span { loc = "expr:Expr", message = "'~type:Type' is a resource or opaque type and cannot be used as the value type of 'Optional<T>'." }
+)
 
 -- Load semantic checking diagnostics (part 8) - Accessors, Bit Fields, Integer Constants, Overloads, Switch, Generics, Ambiguity
 -- (inlined from slang-diagnostics-semantic-checking-8.lua)
@@ -3102,13 +3425,6 @@ err(
 --
 -- 311xx: accessors
 --
-err(
-    "accessor-must-be-inside-subscript-or-property",
-    31100,
-    "invalid accessor declaration location",
-    span { loc = "decl:Decl", message = "an accessor declaration is only allowed inside a subscript or property declaration" }
-)
-
 err(
     "non-set-accessor-must-not-have-params",
     31101,
@@ -3130,6 +3446,13 @@ err(
     span { loc = "param:Decl", message = "'set' parameter '~param' has type '~actualType:Type' which does not match the expected type '~expectedType:Type'" }
 )
 
+err(
+    "accessor-does-not-satisfy-type-constraint-requirements",
+    31103,
+    "accessor does not satisfy type constraint requirements",
+    span { loc = "accessorDecl:Decl", message = "an accessor declaration does not satisfy type constraint requirements for ~requirementDecl:Decl" }
+)
+
 --
 -- 313xx: bit fields
 --
@@ -3145,6 +3468,16 @@ err(
     31301,
     "bit-field type must be integral",
     span { loc = "location", message = "bit-field type (~type:Type) must be an integral type" }
+)
+
+--
+-- 314xx: declaration nesting validation
+--
+err(
+    "decl-not-allowed-in-context",
+    31400,
+    "declaration not allowed in this context",
+    span { loc = "decl:Decl", message = "~childKind declaration is not allowed inside ~parentKind." }
 )
 
 --
@@ -3202,21 +3535,21 @@ err(
 
 standalone_note(
     "overload-candidate",
-    39999,
+    40011,
     "candidate: ~candidate",
     span { loc = "location" }
 )
 
 standalone_note(
     "invisible-overload-candidate",
-    39999,
+    40014,
     "candidate (invisible): ~candidate",
     span { loc = "location" }
 )
 
 standalone_note(
     "more-overload-candidates",
-    39999,
+    40015,
     "~count:Int more overload candidates",
     span { loc = "location" }
 )
@@ -3331,28 +3664,35 @@ err(
 
 warning(
     "integer-literal-too-large",
-    39999,
+    40004,
     "integer literal is too large to be represented in a signed integer type, interpreting as unsigned",
     span { loc = "location", message = "integer literal is too large to be represented in a signed integer type, interpreting as unsigned" }
 )
 
 warning(
     "integer-literal-truncated",
-    39999,
+    40005,
     "integer literal truncated",
     span { loc = "location", message = "integer literal '~literal' too large for type '~type' truncated to '~truncatedValue'" }
 )
 
 warning(
+    "integer-constant-overflow",
+    40016,
+    "integer constant overflow in conversion",
+    span { loc = "expr:Expr", message = "integer value '~value' does not fit in type '~toType:Type'" }
+)
+
+warning(
     "float-literal-unrepresentable",
-    39999,
+    40009,
     "floating-point literal unrepresentable",
     span { loc = "location", message = "~type literal '~literal' unrepresentable, converted to '~convertedValue'" }
 )
 
 warning(
     "float-literal-too-small",
-    39999,
+    40010,
     "floating-point literal too small",
     span { loc = "location", message = "'~literal' is smaller than the smallest representable value for type ~type, converted to '~convertedValue'" }
 )
@@ -3481,6 +3821,13 @@ err(
     span { loc = "param:Decl", message = "parameter '~param' direction '~actualDirection:ParamPassingMode' does not match interface requirement '~expectedDirection:ParamPassingMode'." }
 )
 
+warning(
+    "non-copyable-type-cannot-conform-to-interface",
+    38109,
+    "non-copyable interface conformance is not fully supported",
+    span { loc = "inheritance:Decl", message = "conforming non-copyable type '~type:Type' to interface '~interface:Decl' is not properly supported and may lead to compiler crashes." }
+)
+
 --
 -- 381xx: this/init/return_val
 --
@@ -3490,13 +3837,6 @@ err(
     38101,
     "'this' used outside aggregate type",
     span { loc = "expr:Expr", message = "'this' expression can only be used in members of an aggregate type" }
-)
-
-err(
-    "initializer-not-inside-type",
-    38102,
-    "'init' used outside type",
-    span { loc = "decl:Decl", message = "an 'init' declaration is only allowed inside a type or 'extension' declaration" }
 )
 
 err(
@@ -3605,6 +3945,13 @@ err(
     span { loc = "attr:Modifier", message = "cannot use '[constref]' on a differentiable member method of a differentiable type." }
 )
 
+err(
+    "encountered-non-differentiable-function-during-higher-order-diff",
+    38035,
+    "cannot propagate through non-differentiable function",
+    span { loc = "location", message = "encountered non-differentiable function '~func' during higher-order differentiation" }
+)
+
 --
 -- 380xx: entry point parameters
 --
@@ -3637,6 +3984,34 @@ err(
     span { loc = "location", message = "'~fromType:Type' is not convertible to '~toType:Type', not satisfying the type coerce constraint '~toType:Type(~fromType:Type)'" }
 )
 
+err(
+    "geometry-shader-missing-output-stream",
+    38045,
+    "geometry shader missing output stream parameter",
+    span { loc = "location", message = "geometry shader entry point '~entryPoint:Name' must have an output stream parameter of type PointStream<T>, LineStream<T>, or TriangleStream<T>" }
+)
+
+err(
+    "geometry-shader-missing-max-vertex-count",
+    38046,
+    "geometry shader missing [maxvertexcount] attribute",
+    span { loc = "location", message = "geometry shader entry point '~entryPoint:Name' must have a '[maxvertexcount(N)]' attribute" }
+)
+
+err(
+    "invalid-entry-point-varying-type",
+    38050,
+    "type cannot be used as entry-point varying parameter or return type",
+    span { loc = "location", message = "type '~type:Type' cannot be used as ~direction ~context of entry point '~entryPoint:Name' because ~reason" }
+)
+
+err(
+    "invalid-entry-point-varying-type-for-target",
+    38051,
+    "type cannot be used as entry-point varying for this target",
+    span { loc = "location", message = "type '~type:Type' cannot be used as ~direction ~context of entry point '~entryPoint:Name' when targeting ~target because ~reason" }
+)
+
 --
 -- 382xx: module imports
 --
@@ -3665,7 +4040,7 @@ err(
 -- Note: compilationCeased is a fatal diagnostic that is locationless
 fatal(
     "compilation-ceased",
-    39999,
+    40003,
     "compilation ceased",
     span { loc = "location" }
 )
@@ -3701,7 +4076,6 @@ err(
     "recursive type in structured buffer",
     span { loc = "location", message = "structured buffer element type '~type:Type' contains recursive type references" }
 )
-
 
 -- Load semantic checking diagnostics (part 11) - Type layout and parameter binding
 -- (inlined from slang-diagnostics-semantic-checking-11.lua)
@@ -3858,7 +4232,7 @@ err(
 
 err(
     "target-does-not-support-descriptor-handle",
-    39029,
+    39030,
     "target does not support 'DescriptorHandle' types",
     span { loc = "location", message = "the current compilation target does not support 'DescriptorHandle' types." }
 )
@@ -3965,6 +4339,13 @@ err(
 )
 
 err(
+    "circular-conformance",
+    41003,
+    "type contains circular reference through conforming interface",
+    span { loc = "location", message = "type '~type:IRInst' contains circular reference through interface '~interfaceType:IRInst'. The type's conformance creates a cycle in dynamic-dispatch storage that prevents computing a finite AnyValue size." }
+)
+
+err(
     "missing-return-error",
     41009,
     "non-void function must return",
@@ -3994,7 +4375,7 @@ warning(
 
 err(
     "profile-implicitly-upgraded-restrictive",
-    41012,
+    41013,
     "entry point uses capabilities not in specified profile",
     span { loc = "location", message = "entry point '~entryPoint' uses capabilities that are not part of the specified profile '~profile'. Missing capabilities are: '~capabilities'" }
 )
@@ -4064,23 +4445,30 @@ warning(
 
 err(
     "cannot-default-initialize-resource",
-    41024,
+    41032,
     "cannot default-initialize resource type",
     span { loc = "location", message = "cannot default-initialize ~resourceName with '{}'. Resource types must be explicitly initialized" }
 )
 
 err(
     "cannot-default-initialize-struct-with-uninitialized-resource",
-    41024,
+    41028,
     "cannot default-initialize struct with uninitialized resource",
     span { loc = "location", message = "cannot default-initialize struct '~structName' with '{}' because it contains an uninitialized ~resourceName field" }
 )
 
 err(
     "cannot-default-initialize-struct-containing-resources",
-    41024,
+    41029,
     "cannot default-initialize struct containing resource fields",
     span { loc = "location", message = "cannot default-initialize struct '~structName' with '{}' because it contains resource fields" }
+)
+
+err(
+    "accessing-value-of-none-optional",
+    41027,
+    "accessing .value on an Optional that is always none",
+    span { loc = "location", message = "accessing .value on an Optional<~type:IRInst> that is always 'none'" }
 )
 
 
@@ -4112,14 +4500,14 @@ err(
 
 err(
     "loss-of-derivative-due-to-call-of-non-differentiable-function",
-    41020,
+    41022,
     "derivative cannot be propagated through non-differentiable call",
     span { loc = "location", message = "derivative cannot be propagated through call to non-~diffLevel-differentiable function `~funcName:IRInst`, use 'no_diff' to clarify intention." }
 )
 
 err(
     "loss-of-derivative-assigning-to-non-differentiable-location",
-    41024,
+    41031,
     "derivative is lost during assignment",
     span { loc = "location", message = "derivative is lost during assignment to non-differentiable location, use 'detach()' to clarify intention." }
 )
@@ -4196,6 +4584,13 @@ err(
     41202,
     "bit_cast size mismatch",
     span { loc = "location", message = "invalid to bit_cast differently sized types: '~fromType:IRInst' with size '~fromSize:Int' casted into '~toType:IRInst' with size '~toSize:Int'" }
+)
+
+err(
+    "bit-cast-to-non-concrete-type",
+    41204,
+    "cannot bit-cast to existential (non-concrete) type",
+    span { loc = "location", message = "cannot bit-cast to existential (non-concrete) type" }
 )
 
 err(
@@ -4283,6 +4678,13 @@ err(
     span { loc = "location", message = "Cannot dynamically dispatch on potentially uninitialized interface object '~object'." }
 )
 
+err(
+    "interface-typed-entry-point-param-not-supported",
+    50104,
+    "interface-typed entry point parameter not supported",
+    span { loc = "location", message = "Interface-typed entry point parameter of type '~interfaceType' is not supported on the current target. Use a concrete type or a different target." }
+)
+
 standalone_note(
     "dynamic-dispatch-code-generated-here",
     50102,
@@ -4367,6 +4769,13 @@ err(
     span { loc = "location", message = "'~paramKind' parameter of type '~paramType:IRInst' cannot be used in a dynamic dispatch context." }
 )
 
+err(
+    "ref-accessor-with-interface-type-in-dynamic-dispatch",
+    52012,
+    "ref accessor incompatible with dynamic dispatch",
+    span { loc = "location", message = "'ref' accessor returning type '~valueType:Type' is incompatible with dynamic dispatch because interface types require AnyValue marshalling." }
+)
+
 warning(
     "mesh-output-must-be-out",
     54001,
@@ -4393,6 +4802,20 @@ warning(
     54004,
     "unnecessary mesh output modifier",
     span { loc = "location", message = "Unnecessary HLSL style mesh shader output modifier" }
+)
+
+err(
+    "cannot-read-from-mesh-shader-output",
+    54005,
+    "cannot read values from mesh shader outputs",
+    span { loc = "inst:IRInst", message = "Cannot read values from mesh shader outputs" }
+)
+
+err(
+    "invalid-parameter-passing-mode-for-write-only-reference",
+    54006,
+    "Parameter passing mode requires reading a write-only value.",
+    span { loc = "location", message = "Parameter passing mode requires reading this value, but it is write-only." }
 )
 
 err(
@@ -4451,6 +4874,34 @@ err(
     span { loc = "location", message = "Specialization constants are not supported in the 'numthreads' attribute for the current target." }
 )
 
+fatal(
+    "generic-specialization-recursion-cycle",
+    55206,
+    "recursive generic specialization detected",
+    span { loc = "location", message = "generic specialization for '~generic:IRInst' recursively re-entered the same specialization key." }
+)
+
+fatal(
+    "generic-specialization-budget-exceeded",
+    55207,
+    "generic specialization exceeded maximum depth",
+    span { loc = "location", message = "generic specialization for '~generic:IRInst' exceeded the recursive specialization budget (~budget:int)." }
+)
+
+err(
+    "unsupported-coop-mat-element-type-for-hlsl",
+    55208,
+    "unsupported cooperative matrix element type for HLSL",
+    span { loc = "location", message = "element type '~typeName' is not supported for cooperative matrix in HLSL." }
+)
+
+err(
+    "unsupported-coop-mat-scope-for-hlsl",
+    55209,
+    "unsupported cooperative matrix scope for HLSL",
+    span { loc = "location", message = "memory scope value '~scopeVal:int' is not supported for cooperative matrix in HLSL." }
+)
+
 err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
@@ -4504,6 +4955,13 @@ err(
     56104,
     "mesh output must be assigned as whole struct",
     span { loc = "location", message = "whole struct must be assiged to mesh output at once for Metal target." }
+)
+
+err(
+    "storage-texture-access-mode-not-supported-in-wgsl",
+    56106,
+    "texture format '~format' does not support '~accessMode' access for storage textures in WGSL",
+    span { loc = "location" }  -- No span message: source location is not available at emit time
 )
 
 -- SPIRV (57001-57004)
@@ -4564,22 +5022,10 @@ err(
 standalone_note(
     "report-checkpoint-intermediates",
     -1,
-    "checkpointing context of ~size:Int bytes associated with function: '~func:IRInst'",
-    span { loc = "location" }
-)
-
-standalone_note(
-    "report-checkpoint-variable",
-    -1,
-    "~size:Int bytes (~typeName) used to checkpoint the following item:",
-    span { loc = "location" }
-)
-
-standalone_note(
-    "report-checkpoint-counter",
-    -1,
-    "~size:Int bytes (~typeName) used for a loop counter here:",
-    span { loc = "location" }
+    "checkpointing context of ~size:Int bytes associated with: '~func:IRInst'",
+    span { loc = "location" },
+    variadic_span { cpp_name = "Single", loc = "singleLocation", message = "~singleSize:Int bytes (~singleTypeName)" },
+    variadic_span { cpp_name = "Multi", loc = "multiLocation", message = "~multiCount:Int instances of ~multiSize:Int bytes (~multiTypeName)" }
 )
 
 standalone_note(
@@ -4644,13 +5090,13 @@ internal(
 
 err(
     "compilation-aborted",
-    99999,
+    99998,
     "Slang compilation aborted due to internal error\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)"
 )
 
 err(
     "compilation-aborted-due-to-exception",
-    99999,
+    99997,
     "Slang compilation aborted due to an exception of ~exceptionType: ~exceptionMessage\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)"
 )
 
@@ -4838,6 +5284,13 @@ standalone_note(
     "note-explicit-conversion-possible",
     -1,
     "explicit conversion from '~fromType:Type' to '~toType:Type' is possible",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "note-concrete-to-interface-ptr-unsafe",
+    -1,
+    "implicit conversion from '~from:Type*' to '~to:Type*' is not allowed because the pointed-to data layouts are not bit equivalent",
     span { loc = "location" }
 )
 

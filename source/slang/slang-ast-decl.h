@@ -416,6 +416,14 @@ class StructDecl : public AggTypeDecl
 };
 
 FIDDLE()
+class SynthesizedStructDecl : public AggTypeDecl
+{
+    FIDDLE(...)
+    FIDDLE() List<Val*> operands;
+    FIDDLE() uint32_t irOp;
+};
+
+FIDDLE()
 class ClassDecl : public AggTypeDecl
 {
     FIDDLE(...)
@@ -610,6 +618,11 @@ class CallableDecl : public ContainerDecl
     // If this callable throws an error code, `errorType` is the type of the error code.
     FIDDLE() TypeExp errorType;
 
+    // Optional function expression type, which, if present, will be used to determine
+    // the return type and parameter types of the callable.
+    //
+    FIDDLE() TypeExp funcType;
+
     // Fields related to redeclaration, so that we
     // can support multiple specialized variations
     // of the "same" logical function.
@@ -634,6 +647,14 @@ class FunctionDeclBase : public CallableDecl
     FIDDLE(...)
     Stmt* body = nullptr;
 };
+
+FIDDLE()
+class FuncAliasDecl : public CallableDecl
+{
+    FIDDLE(...)
+    FIDDLE() DeclRef<CallableDecl> targetDeclRef;
+};
+
 
 // A constructor/initializer to create instances of a type
 FIDDLE()
@@ -734,6 +755,14 @@ class FuncDecl : public FunctionDeclBase
     FIDDLE(...)
 };
 
+FIDDLE()
+class SynthesizedFuncDecl : public FunctionDeclBase
+{
+    FIDDLE(...)
+    FIDDLE() List<Val*> operands;
+    FIDDLE() uint32_t irOp;
+};
+
 FIDDLE(abstract)
 class NamespaceDeclBase : public ContainerDecl
 {
@@ -791,7 +820,7 @@ class ModuleDecl : public NamespaceDeclBase
     ///
     /// This mapping is filled in during semantic checking, as `ExtensionDecl`s get checked.
     ///
-    FIDDLE() Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> mapTypeToCandidateExtensions;
+    FIDDLE() Dictionary<Decl*, RefPtr<CandidateExtensionList>> mapDeclToCandidateExtensions;
 
     /// Is this module using on-demand deserialization for its exports?
     ///
@@ -944,6 +973,14 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
 
     FIDDLE() bool isEqualityConstraint = false;
 
+    // After checking, this dictionary will map members required by the
+    // super-type interface to their witnesses. This is used to store
+    // canonical inheritance paths, but does not store any concrete
+    // requirements (e.g. functions/assoc-types/etc..), only references
+    // to lookup paths (represented as LookupDeclRefs)
+    //
+    FIDDLE() RefPtr<WitnessTable> pathResolutionTable;
+
     // Overrides should be public so base classes can access
     const TypeExp& _getSupOverride() const { return sup; }
 };
@@ -958,12 +995,57 @@ class TypeCoercionConstraintDecl : public Decl
 };
 
 FIDDLE()
+class NonEmptyPackConstraintDecl : public Decl
+{
+    FIDDLE(...)
+    SourceLoc whereTokenLoc = SourceLoc();
+    FIDDLE() Expr* packExpr = nullptr;
+};
+
+FIDDLE()
+class HasDiffTypeInfoConstraintDecl : public Decl
+{
+    FIDDLE(...)
+    SourceLoc whereTokenLoc = SourceLoc();
+    FIDDLE() TypeExp type;
+};
+
+FIDDLE()
 class GenericValueParamDecl : public VarDeclBase
 {
     FIDDLE(...)
     // The index of the generic parameter.
     int parameterIndex = 0;
 };
+
+FIDDLE()
+class GenericValuePackParamDecl : public VarDeclBase
+{
+    FIDDLE(...)
+    int parameterIndex = 0;
+};
+
+inline bool isGenericValueParam(Decl* decl)
+{
+    return as<GenericValueParamDecl>(decl) || as<GenericValuePackParamDecl>(decl);
+}
+
+template<typename T>
+inline bool isGenericValueParam(DeclRef<T> declRef)
+{
+    return isGenericValueParam(declRef.getDecl());
+}
+
+inline bool isGenericParam(Decl* decl)
+{
+    return as<GenericTypeParamDeclBase>(decl) || isGenericValueParam(decl);
+}
+
+template<typename T>
+inline bool isGenericParam(DeclRef<T> declRef)
+{
+    return isGenericParam(declRef.getDecl());
+}
 
 // An empty declaration (which might still have modifiers attached).
 //
@@ -1004,42 +1086,6 @@ class AttributeDecl : public ContainerDecl
     FIDDLE(...)
     // What type of syntax node will be produced to represent this attribute.
     FIDDLE() SyntaxClass<NodeBase> syntaxClass;
-};
-
-// A synthesized decl used as a placeholder for a differentiable function requirement. This decl
-// will be a child of interface decl. This allows us to form an interface requirement key for the
-// derivative of an interface function. The synthesized `DerivativeRequirementDecl` will be a child
-// of the original function requirement decl after an interface type is checked.
-FIDDLE()
-class DerivativeRequirementDecl : public FunctionDeclBase
-{
-    FIDDLE(...)
-    // The original requirement decl.
-    FIDDLE() Decl* originalRequirementDecl = nullptr;
-
-    // Type to use for 'ThisType'
-    FIDDLE() Type* diffThisType = nullptr;
-};
-
-// A reference to a synthesized decl representing a differentiable function requirement, this decl
-// will be a child in the orignal function.
-FIDDLE()
-class DerivativeRequirementReferenceDecl : public Decl
-{
-    FIDDLE(...)
-    FIDDLE() DerivativeRequirementDecl* referencedDecl;
-};
-
-FIDDLE()
-class ForwardDerivativeRequirementDecl : public DerivativeRequirementDecl
-{
-    FIDDLE(...)
-};
-
-FIDDLE()
-class BackwardDerivativeRequirementDecl : public DerivativeRequirementDecl
-{
-    FIDDLE(...)
 };
 
 bool isInterfaceRequirement(Decl* decl);

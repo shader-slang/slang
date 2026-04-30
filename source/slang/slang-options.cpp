@@ -23,6 +23,7 @@
 #include "slang-compiler-options.h"
 #include "slang-compiler.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
+#include "slang-markdown.h"
 #include "slang-profile.h"
 #include "slang-repro.h"
 #include "slang-rich-diagnostics.h"
@@ -472,7 +473,7 @@ void initCommandOptions(CommandOptions& options)
          "-profile <profile>[+<capability>...]",
          "Specify the shader profile for code generation.\n"
          "Accepted profiles are:\n"
-         "* sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}\n"
+         "* sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6,6_7,6_8,6_9,6_10}\n"
          "* glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}\n"
          "Additional profiles that include -stage information:\n"
          "* {vs,hs,ds,gs,ps}_<version>\n"
@@ -1478,6 +1479,7 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
     };
 
     static const Entry entries[] = {
+        {".slang.md", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
         {".slang", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
 
         {".hlsl", SLANG_SOURCE_LANGUAGE_HLSL, SLANG_STAGE_NONE},
@@ -1528,7 +1530,9 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     {
         return addReferencedModule(path, SourceLoc(), false);
     }
-    else if (path.endsWith(".slang") || langOverride == SourceLanguage::Slang)
+    else if (
+        path.endsWith(".slang") || hasLiterateFileExtension(path) ||
+        langOverride == SourceLanguage::Slang)
     {
         // Plain old slang code
         addInputSlangPath(path);
@@ -3840,9 +3844,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         // Similar to the case for entry points, if there is a single target,
         // then we allow some of its options to come from the "default"
         // target state.
-        auto defaultTargetFloatingPointMode =
-            m_defaultTarget.optionSet.getEnumOption<FloatingPointMode>(
-                CompilerOptionName::FloatingPointMode);
+        auto defaultTargetFloatingPointMode = m_defaultTarget.optionSet.getFloatingPointMode();
 
         if (m_rawTargets.getCount() == 1)
         {
@@ -3922,8 +3924,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 m_requestImpl->addTargetCapability(targetID, SlangCapabilityID(atom.intValue));
             }
 
-            auto floatingPointMode = rawTarget.optionSet.getEnumOption<FloatingPointMode>(
-                CompilerOptionName::FloatingPointMode);
+            auto floatingPointMode = rawTarget.optionSet.getFloatingPointMode();
             if (floatingPointMode != FloatingPointMode::Default)
             {
                 m_compileRequest->setTargetFloatingPointMode(
@@ -4193,7 +4194,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
     applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
 
     // Warn about separate debug info being used with unsupported targets
-    if (linkage->m_optionSet.getBoolOption(CompilerOptionName::EmitSeparateDebug))
+    if (linkage->m_optionSet.shouldEmitSeparateDebugInfo())
     {
         // Check all targets to see if any use separate debug info with an unsupported target
         for (const auto& rawTarget : m_rawTargets)

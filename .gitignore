@@ -88,6 +88,7 @@ prelude/*.h.cpp
 /external/mimalloc/
 /external/slangpy/
 /external/dxvk-remix/
+/external/SaschaWillems-Vulkan/
 
 build/**/*.tlog
 build/**/*.lastbuildstate
@@ -111,6 +112,9 @@ vkd3d-proton.cache.write
 # Claude local settings, memory, and worktrees
 /.claude/settings.local.json
 /.claude/worktrees/
+/issue-*/plan.*.md
+/issue-*/claude.log
+/issue-*/claude.*.json
 CLAUDE.local.md
 
 # Other temporary files
@@ -140,3 +144,7 @@ perf.data.*
 .vars
 .github/test-events/
 __pycache__/
+
+.slang-replays*
+log*.txt
+replay-capture

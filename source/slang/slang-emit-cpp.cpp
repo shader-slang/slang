@@ -7,7 +7,6 @@
 #include "slang-emit-source-writer.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-util.h"
-#include "slang-mangled-lexer.h"
 
 #include <assert.h>
 
@@ -997,7 +996,8 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     // We start by emitting the result type and function name.
     //
     if (IREntryPointDecoration* const entryPointDecor =
-            func->findDecoration<IREntryPointDecoration>())
+            func->findDecoration<IREntryPointDecoration>();
+        entryPointDecor)
     {
         // Note: we currently emit multiple functions to represent an entry point
         // on CPU/CUDA, and these all bottleneck through the actual `IRFunc`
@@ -1528,7 +1528,8 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             auto getElementInst = static_cast<IRGetElement*>(inst);
 
             IRInst* baseInst = getElementInst->getBase();
-            IRType* baseType = as<IRPtrTypeBase>(baseInst->getDataType())->getValueType();
+            IRType* baseType = (IRType*)unwrapAttributedType(
+                as<IRPtrTypeBase>(baseInst->getDataType())->getValueType());
             if (auto vectorBaseType = as<IRVectorType>(baseType))
             {
                 if (auto intLitIndex = as<IRIntLit>(getElementInst->getIndex()))
