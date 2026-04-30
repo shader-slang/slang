@@ -273,10 +273,20 @@ struct BackwardDiffTranslationContext
 
         propagateParamTypes.add((IRType*)intermediateType);
 
+        ShortList<IRParam*, 8> targetFuncParams;
+        for (auto param = targetFunc->getFirstParam(); param; param = param->getNextParam())
+            targetFuncParams.add(param);
+
         for (UInt i = 0; i < targetFunc->getParamCount(); i++)
         {
-            const auto& [direction, paramType] =
-                splitParameterDirectionAndType(targetFunc->getParamType(i));
+            auto targetParamType = targetFunc->getParamType(i);
+            if (Index(i) < targetFuncParams.getCount() &&
+                isConstExprRateQualifiedType(targetFuncParams[i]->getFullType()))
+            {
+                targetParamType = targetFuncParams[i]->getFullType();
+            }
+
+            const auto& [direction, paramType] = splitParameterDirectionAndType(targetParamType);
             auto diffValueParamType = (IRType*)diffTypeContext.tryGetAssociationOfKind(
                 paramType,
                 AnnotationKind::DifferentialType);
@@ -286,6 +296,8 @@ struct BackwardDiffTranslationContext
                     builder,
                     transposeDirection(direction),
                     diffValueParamType));
+            else if (isConstExprRateQualifiedType(targetParamType))
+                propagateParamTypes.add(targetParamType);
             else
                 propagateParamTypes.add(builder->getVoidType());
         }
@@ -386,6 +398,17 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
 
     auto primalFuncType = cast<IRFuncType>(primalFunc->getDataType());
 
+    // Pull up a list of primal params, so we can use their original parameter
+    // modifiers for naming, location tagging, and constexpr propagation. The
+    // specialized function type can lose the rate qualification even though the
+    // resolved function parameter still carries it.
+    ShortList<IRParam*, 8> primalFuncParams;
+    auto funcForNames = as<IRFunc>(getResolvedInstForDecorations(primalFunc));
+    for (auto param : funcForNames->getParams())
+    {
+        primalFuncParams.add(param);
+    }
+
     List<IRInst*> applyForBwdFuncTypeParams;
     applyForBwdFuncTypeParams.add(primalFunc->getDataType());
     applyForBwdFuncTypeParams.add(minimalContextType);
@@ -407,6 +430,28 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
             kIROp_BwdCallableFuncType,
             bwdPropFuncTypeParams.getCount(),
             bwdPropFuncTypeParams.getBuffer())));
+
+    {
+        List<IRType*> bwdPropParamTypes;
+        bwdPropParamTypes.add(bwdPropFuncType->getParamType(0));
+        for (UIndex i = 0; i < applyForBwdFuncType->getParamCount(); i++)
+        {
+            auto bwdPropParamType = bwdPropFuncType->getParamType(i + 1);
+            if (Index(i) < primalFuncParams.getCount() &&
+                isConstExprRateQualifiedType(primalFuncParams[i]->getFullType()))
+            {
+                bwdPropParamType = primalFuncParams[i]->getFullType();
+            }
+            bwdPropParamTypes.add(bwdPropParamType);
+        }
+        for (UIndex i = applyForBwdFuncType->getParamCount() + 1;
+             i < bwdPropFuncType->getParamCount();
+             i++)
+        {
+            bwdPropParamTypes.add(bwdPropFuncType->getParamType(i));
+        }
+        bwdPropFuncType = builder.getFuncType(bwdPropParamTypes, builder.getVoidType());
+    }
 
     applyFunc->setFullType(applyForBwdFuncType);
     {
@@ -454,16 +499,6 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
 
     bwdPropFuncBuilder.setInsertBefore(placeholderCall);
 
-    // Pull up a list of primal params, so we can use them for naming &
-    // location tagging.
-    //
-    ShortList<IRParam*, 8> primalFuncParams;
-    auto funcForNames = as<IRFunc>(getResolvedInstForDecorations(primalFunc));
-    for (auto param : funcForNames->getParams())
-    {
-        primalFuncParams.add(param);
-    }
-
     // Jointly emit parameters for the apply and bwd prop functions, while
     // also building the context type.
     //
@@ -480,6 +515,12 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
             bwdPropFuncType->getParamType(idx + 1)); // +1 to skip the context param
         generateName(&builder, primalFuncParams[idx], bwdPropParam, "d_");
         bwdPropParam->sourceLoc = primalFuncParams[idx]->sourceLoc;
+
+        if (isConstExprRateQualifiedType(bwdPropParam->getFullType()))
+        {
+            bwdDiffFuncArgs.add(bwdPropParam);
+            continue;
+        }
 
         if (!as<IROutParamType>(applyForBwdParam->getDataType()))
         {
@@ -730,6 +771,16 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
         auto applyParamType = applyBwdFuncType->getParamType(i);
         auto bwdPropParamType =
             bwdPropFuncType->getParamType(i + 1); // +1 to skip the context param
+
+        if (isConstExprRateQualifiedType(applyParamType) ||
+            isConstExprRateQualifiedType(bwdPropParamType))
+        {
+            applyBwdFuncArgs.add(bwdDiffFuncParams[bwdDiffParamIdx]);
+            rematFuncArgs.add(bwdDiffFuncParams[bwdDiffParamIdx]);
+            bwdPropFuncParams.add(bwdDiffFuncParams[bwdDiffParamIdx]);
+            bwdDiffParamIdx++;
+            continue;
+        }
 
         if (as<IRVoidType>(bwdPropParamType))
         {
