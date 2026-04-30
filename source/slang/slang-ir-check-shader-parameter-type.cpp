@@ -112,17 +112,15 @@ void checkForInvalidShaderParameterTypeForMetal(IRModule* module, DiagnosticSink
                 auto user = use->getUser();
                 if (user->sourceLoc.isValid())
                 {
-                    sink->diagnose(
-                        Diagnostics::SubpassInputInParameterBlockNotAllowedOnMetal{
-                            .location = user->sourceLoc});
+                    sink->diagnose(Diagnostics::SubpassInputInParameterBlockNotAllowedOnMetal{
+                        .location = user->sourceLoc});
                     foundUseSite = true;
                     break;
                 }
             }
             if (!foundUseSite)
-                sink->diagnose(
-                    Diagnostics::SubpassInputInParameterBlockNotAllowedOnMetal{
-                        .location = inst->sourceLoc});
+                sink->diagnose(Diagnostics::SubpassInputInParameterBlockNotAllowedOnMetal{
+                    .location = inst->sourceLoc});
         }
     }
 }
