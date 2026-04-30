@@ -331,13 +331,14 @@ elseif(
         return()
     else()
         message(
-            WARNING
+            STATUS
             "No prebuilt DXC binary is available for ${CMAKE_SYSTEM_PROCESSOR} "
-            "on Linux. "
-            "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source, "
+            "on Linux; automatically building DXC from source "
+            "(${_dxc_version_tag}). "
+            "Set -DSLANG_DXC_BUILD_FROM_SOURCE=OFF to disable DXC entirely, "
             "or set -DSLANG_DXC_BINARY_URL=<url> to use a custom prebuilt binary."
         )
-        return()
+        set(_dxc_build_from_source ON)
     endif()
 endif()
 
@@ -513,6 +514,7 @@ if(_dxc_build_from_source)
     add_custom_command(
         OUTPUT ${_dxc_src_byproducts}
         COMMAND ${_dxc_build_cmd}
+        DEPENDS "${_dxc_configure_stamp}"
         COMMENT "Building DXC ${_dxc_version_tag} from source"
         VERBATIM
     )
