@@ -58,8 +58,7 @@ struct RemoveDefaultConstructInsts : InstPassBase
             // MakeStruct/MakeArray/constant) when possible. For types that
             // cannot yet be materialized at this stage, this may still fall
             // back to raw `DefaultConstruct`, matching existing behavior.
-            IRInst* replacement =
-                builder.emitDefaultConstruct(defaultConstruct->getDataType());
+            IRInst* replacement = builder.emitDefaultConstruct(defaultConstruct->getDataType());
             if (replacement)
             {
                 defaultConstruct->replaceUsesWith(replacement);
