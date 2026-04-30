@@ -1111,6 +1111,7 @@ bool finalizeAutoDiffPass(IRModule* module, TargetProgram* target)
     // IRMakeDifferentialPair with an IRMakeStruct.
     //
     modified |= processPairTypes(&autodiffContext);
+    SLANG_UNUSED(modified);
 
     removeDetachInsts(module);
 

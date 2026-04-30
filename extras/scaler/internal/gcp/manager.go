@@ -49,6 +49,12 @@ type vmInfo struct {
 	busy   bool
 }
 
+type zoneCandidate struct {
+	zone      string
+	region    string
+	available float64
+}
+
 // Manager handles creating and deleting GCP VMs for GitHub Actions runners.
 type Manager struct {
 	config          ManagerConfig
@@ -58,6 +64,8 @@ type Manager struct {
 	cleanupPass     func(context.Context)
 	listTerminated  func(context.Context, string) ([]string, error)
 	deleteVMFunc    func(context.Context, string, string) error
+	selectZonesFunc func(context.Context) ([]zoneCandidate, error)
+	insertVMFunc    func(context.Context, *computepb.InsertInstanceRequest) error
 
 	mu sync.Mutex
 	// runnerName -> vmInfo
@@ -143,13 +151,59 @@ func (m *Manager) MarkBusy(runnerName string) {
 	}
 }
 
-// selectZone picks the best zone for creating a VM. For GPU VMs, it checks
+func splitZones(zonesValue string) []string {
+	parts := strings.Split(zonesValue, ",")
+	zones := make([]string, 0, len(parts))
+	seen := make(map[string]struct{}, len(parts))
+	for _, zone := range parts {
+		zone = strings.TrimSpace(zone)
+		if zone == "" {
+			continue
+		}
+		if _, ok := seen[zone]; ok {
+			continue
+		}
+		seen[zone] = struct{}{}
+		zones = append(zones, zone)
+	}
+	return zones
+}
+
+func zoneRegion(zone string) string {
+	parts := strings.Split(zone, "-")
+	if len(parts) < 3 {
+		return ""
+	}
+	return parts[0] + "-" + parts[1]
+}
+
+func validateZones(zones []string) error {
+	var invalidZones []string
+	for _, zone := range zones {
+		if zoneRegion(zone) == "" {
+			invalidZones = append(invalidZones, zone)
+		}
+	}
+	if len(invalidZones) > 0 {
+		return fmt.Errorf("invalid zone(s): %s", strings.Join(invalidZones, ", "))
+	}
+	return nil
+}
+
+// selectZones picks candidate zones for creating a VM. For GPU VMs, it checks
 // quota availability across regions. For non-GPU VMs (GPUType == "none"),
 // it round-robins through configured zones.
-func (m *Manager) selectZone(ctx context.Context) (string, error) {
-	zones := strings.Split(m.config.Zones, ",")
-	for i := range zones {
-		zones[i] = strings.TrimSpace(zones[i])
+func (m *Manager) selectZones(ctx context.Context) ([]zoneCandidate, error) {
+	if m.selectZonesFunc != nil {
+		return m.selectZonesFunc(ctx)
+	}
+
+	zones := splitZones(m.config.Zones)
+	if len(zones) == 0 {
+		return nil, fmt.Errorf("no zones configured")
+	}
+	if err := validateZones(zones); err != nil {
+		return nil, err
 	}
 
 	// Non-GPU VMs: simple round-robin, no quota check needed
@@ -158,35 +212,34 @@ func (m *Manager) selectZone(ctx context.Context) (string, error) {
 		count := len(m.vms)
 		m.mu.Unlock()
 		zone := zones[count%len(zones)]
-		slog.Info("selected zone (no GPU)", "zone", zone)
-		return zone, nil
+		return []zoneCandidate{{zone: zone, region: zoneRegion(zone)}}, nil
 	}
 
 	// GPU VMs: select zone by quota availability
 
 	// Group zones by region (e.g., "us-east1-c" -> "us-east1")
 	regionZones := make(map[string][]string)
+	regionOrder := make(map[string]int)
 	for _, z := range zones {
-		parts := strings.Split(z, "-")
-		if len(parts) < 3 {
-			continue
+		region := zoneRegion(z)
+		if _, ok := regionOrder[region]; !ok {
+			regionOrder[region] = len(regionOrder)
 		}
-		region := parts[0] + "-" + parts[1]
 		regionZones[region] = append(regionZones[region], z)
 	}
 
 	// Check quota for each region
 	type regionQuota struct {
 		region    string
-		zone      string // first zone in this region from our list
 		available float64
+		order     int
 	}
 
 	var quotas []regionQuota
 
 	quotaMetric := gpuQuotaMetric(m.config.GPUType)
 
-	for region, rzones := range regionZones {
+	for region := range regionZones {
 		req := &regionspb.GetRegionRequest{
 			Project: m.config.Project,
 			Region:  region,
@@ -204,8 +257,8 @@ func (m *Manager) selectZone(ctx context.Context) (string, error) {
 				available := q.GetLimit() - q.GetUsage()
 				quotas = append(quotas, regionQuota{
 					region:    region,
-					zone:      rzones[0],
 					available: available,
+					order:     regionOrder[region],
 				})
 				slog.Debug("region quota",
 					"region", region,
@@ -219,21 +272,52 @@ func (m *Manager) selectZone(ctx context.Context) (string, error) {
 	}
 
 	if len(quotas) == 0 {
-		return "", fmt.Errorf("no regions with %s quota found", m.config.GPUType)
+		return nil, fmt.Errorf("no regions with %s quota found", m.config.GPUType)
 	}
 
 	// Sort by available quota (most available first)
 	sort.Slice(quotas, func(i, j int) bool {
+		if quotas[i].available == quotas[j].available {
+			return quotas[i].order < quotas[j].order
+		}
 		return quotas[i].available > quotas[j].available
 	})
 
 	best := quotas[0]
 	if best.available <= 0 {
-		return "", fmt.Errorf("no GPU quota available in any configured region (best: %s with %.0f available)", best.region, best.available)
+		return nil, fmt.Errorf("no GPU quota available in any configured region (best: %s with %.0f available)", best.region, best.available)
 	}
 
-	slog.Info("selected zone", "zone", best.zone, "region", best.region, "available_gpus", best.available)
-	return best.zone, nil
+	candidates := make([]zoneCandidate, 0, len(zones))
+	for _, quota := range quotas {
+		if quota.available <= 0 {
+			continue
+		}
+		for _, zone := range regionZones[quota.region] {
+			candidates = append(candidates, zoneCandidate{
+				zone:      zone,
+				region:    quota.region,
+				available: quota.available,
+			})
+		}
+	}
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("no GPU quota available in any configured region")
+	}
+	return candidates, nil
+}
+
+// selectZone is kept for focused tests and callers that only need the first
+// candidate. CreateVM uses the full candidate list for stockout fallback.
+func (m *Manager) selectZone(ctx context.Context) (string, error) {
+	candidates, err := m.selectZones(ctx)
+	if err != nil {
+		return "", err
+	}
+	if len(candidates) == 0 {
+		return "", fmt.Errorf("no zone candidates available")
+	}
+	return candidates[0].zone, nil
 }
 
 // gpuQuotaMetric returns the GCP quota metric name for a GPU type.
@@ -259,12 +343,12 @@ func gpuQuotaMetric(gpuType string) string {
 	}
 }
 
-// CreateVM creates a new GPU VM from the instance template, selecting the
-// best zone based on quota availability.
+// CreateVM creates a new GPU VM from the instance template, trying candidate
+// zones in quota order and falling through on zonal resource stockouts.
 func (m *Manager) CreateVM(ctx context.Context, runnerName, jitConfig string) (string, error) {
-	zone, err := m.selectZone(ctx)
+	candidates, err := m.selectZones(ctx)
 	if err != nil {
-		return "", fmt.Errorf("selecting zone: %w", err)
+		return "", fmt.Errorf("selecting zones: %w", err)
 	}
 
 	vmName := runnerName
@@ -284,42 +368,80 @@ func (m *Manager) CreateVM(ctx context.Context, runnerName, jitConfig string) (s
 		scriptContent = windowsStartupScript
 	}
 
-	req := &computepb.InsertInstanceRequest{
-		Project: m.config.Project,
-		Zone:    zone,
-		InstanceResource: &computepb.Instance{
-			Name: proto.String(vmName),
-			Metadata: &computepb.Metadata{
-				Items: []*computepb.Items{
-					{
-						Key:   proto.String("jit-config"),
-						Value: proto.String(jitConfig),
-					},
-					{
-						Key:   proto.String(scriptKey),
-						Value: proto.String(scriptContent),
+	var stockoutErrors []string
+	for _, candidate := range candidates {
+		zone := candidate.zone
+		slog.Info("selected zone", "zone", zone, "region", candidate.region, "available_gpus", candidate.available)
+
+		req := &computepb.InsertInstanceRequest{
+			Project: m.config.Project,
+			Zone:    zone,
+			InstanceResource: &computepb.Instance{
+				Name: proto.String(vmName),
+				Metadata: &computepb.Metadata{
+					Items: []*computepb.Items{
+						{
+							Key:   proto.String("jit-config"),
+							Value: proto.String(jitConfig),
+						},
+						{
+							Key:   proto.String(scriptKey),
+							Value: proto.String(scriptContent),
+						},
 					},
 				},
 			},
-		},
-		SourceInstanceTemplate: proto.String(templateURL),
+			SourceInstanceTemplate: proto.String(templateURL),
+		}
+
+		if err := m.insertVM(ctx, req); err != nil {
+			if isZoneResourceExhausted(err) {
+				slog.Warn("zone resource exhausted, trying next candidate zone", "zone", zone, "error", err)
+				stockoutErrors = append(stockoutErrors, fmt.Sprintf("%s: %v", zone, err))
+				continue
+			}
+			return "", err
+		}
+
+		m.mu.Lock()
+		m.vms[runnerName] = &vmInfo{vmName: vmName, zone: zone}
+		m.mu.Unlock()
+
+		slog.Info("VM created", "vm", vmName, "zone", zone)
+		return vmName, nil
+	}
+
+	if len(stockoutErrors) > 0 {
+		return "", fmt.Errorf("all candidate zones are out of stock for %s: %s", m.config.GPUType, strings.Join(stockoutErrors, "; "))
+	}
+	return "", fmt.Errorf("no candidate zones available for %s", m.config.GPUType)
+}
+
+func (m *Manager) insertVM(ctx context.Context, req *computepb.InsertInstanceRequest) error {
+	if m.insertVMFunc != nil {
+		return m.insertVMFunc(ctx, req)
 	}
 
 	op, err := m.instancesClient.Insert(ctx, req)
 	if err != nil {
-		return "", fmt.Errorf("inserting instance in %s: %w", zone, err)
+		return fmt.Errorf("inserting instance in %s: %w", req.GetZone(), err)
 	}
 
 	if err := op.Wait(ctx); err != nil {
-		return "", fmt.Errorf("waiting for instance creation in %s: %w", zone, err)
+		return fmt.Errorf("waiting for instance creation in %s: %w", req.GetZone(), err)
 	}
 
-	m.mu.Lock()
-	m.vms[runnerName] = &vmInfo{vmName: vmName, zone: zone}
-	m.mu.Unlock()
+	return nil
+}
 
-	slog.Info("VM created", "vm", vmName, "zone", zone)
-	return vmName, nil
+func isZoneResourceExhausted(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "zone_resource_pool_exhausted") ||
+		strings.Contains(msg, "resource_availability") ||
+		strings.Contains(msg, "does not have enough resources")
 }
 
 // DeleteByRunnerName deletes the VM associated with a runner name.

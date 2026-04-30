@@ -130,6 +130,10 @@ $SlangcExcludePatterns = @(
     '\source\slang\slang-ast-dump'
     '\source\slang\slang-repro'
     '\source\slang\slang-workspace-version'
+    # Language-server / doc-only files that live in compiler-core.
+    '\source\compiler-core\slang-language-server-protocol'
+    '\source\compiler-core\slang-json-rpc'
+    '\source\compiler-core\slang-doc-extractor'
     '\source\slang\slang-ast-expr.h'
     '\source\slang\slang-ast-modifier.h'
     '\source\slang\slang-ast-stmt.h'
