@@ -13385,12 +13385,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto instanceAttr = as<InstanceAttribute>(modifier))
             {
-                IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), instanceAttr);
+                auto builder = getBuilder();
+                IRIntLit* intLit = as<IRIntLit>(builder->getIntValue(builder->getIntType(), instanceAttr->value));
                 getBuilder()->addDecoration(irFunc, kIROp_InstanceDecoration, intLit);
             }
             else if (auto maxVertCountAttr = as<MaxVertexCountAttribute>(modifier))
             {
-                IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), maxVertCountAttr);
+                auto builder = getBuilder();
+                IRIntLit* intLit = as<IRIntLit>(builder->getIntValue(builder->getIntType(), maxVertCountAttr->value));
                 getBuilder()->addDecoration(irFunc, kIROp_MaxVertexCountDecoration, intLit);
             }
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
