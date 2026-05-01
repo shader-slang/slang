@@ -4467,7 +4467,7 @@ attribute_syntax [MaxRecords(count: int)] : MaxRecordsAttribute;
 /// The second argument (array index) is optional and defaults to 0.
 __attributeTarget(FuncDecl)
 __attributeTarget(ParamDecl)
-attribute_syntax [NodeID(name: String)] : NodeIDAttribute;
+attribute_syntax [NodeID(name: String, arrayIndex: int = 0)] : NodeIDAttribute;
 
 /// Marks this node shader as a program entry point in the work graph.
 __attributeTarget(FuncDecl)
