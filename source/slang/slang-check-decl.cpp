@@ -3539,9 +3539,7 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
 
         witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(newSynStructDeclRef));
 
-        if (!doesTypeSatisfyConstraintRequirements(
-                requirementDeclRef,
-                witnessTable))
+        if (!doesTypeSatisfyConstraintRequirements(requirementDeclRef, witnessTable))
         {
             witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
             return false;
@@ -3592,9 +3590,7 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
 
         witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(newSynStructDeclRef));
 
-        if (!doesTypeSatisfyConstraintRequirements(
-                requirementDeclRef,
-                witnessTable))
+        if (!doesTypeSatisfyConstraintRequirements(requirementDeclRef, witnessTable))
         {
             // If the synthesized type does not satisfy the requirement, we will remove it from the
             // witness table.
@@ -3662,9 +3658,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         witnessTable->add(
             requirementDeclRef.getDecl(),
             RequirementWitness(context->conformingType));
-        if (doesTypeSatisfyConstraintRequirements(
-                requirementDeclRef,
-                witnessTable))
+        if (doesTypeSatisfyConstraintRequirements(requirementDeclRef, witnessTable))
         {
             // Increase the epoch so that future calls to Type::getCanonicalType will return the
             // up-to-date folded types.
@@ -3851,9 +3845,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
     checkAggTypeConformance(aggTypeDecl);
 
     witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(satisfyingType));
-    if (!doesTypeSatisfyConstraintRequirements(
-            requirementDeclRef,
-            witnessTable))
+    if (!doesTypeSatisfyConstraintRequirements(requirementDeclRef, witnessTable))
     {
         // Note: the call to `doesTypeSatisfyConstraintRequirements` should always
         // succeed. If not, there is something wrong with the code synthesis logic. For now we just
@@ -5092,9 +5084,8 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         witnessTable->m_requirementDictionary[requiredMemberDeclRef.getDecl()] = requirementWitness;
 
         // We need to check that the satisfying member has the same constraints as the requirement.
-        bool conformance = doesTypeSatisfyConstraintRequirements(
-            requiredMemberDeclRef,
-            witnessTable);
+        bool conformance =
+            doesTypeSatisfyConstraintRequirements(requiredMemberDeclRef, witnessTable);
 
         if (!conformance)
         {
@@ -5233,9 +5224,7 @@ bool SemanticsVisitor::doesPropertyMatchRequirement(
     //
     for (const auto& [requirement, satisfying] : mapRequiredToSatisfyingAccessorDeclRef)
     {
-        if (!doesTypeSatisfyConstraintRequirements(
-                requirement,
-                witnessTable))
+        if (!doesTypeSatisfyConstraintRequirements(requirement, witnessTable))
         {
             // Diagnose.
             getSink()->diagnose(Diagnostics::AccessorDoesNotSatisfyTypeConstraintRequirements{
@@ -5344,9 +5333,7 @@ bool SemanticsVisitor::doesSubscriptMatchRequirement(
     //
     for (const auto& [requirement, satisfying] : mapRequiredToSatisfyingAccessorDeclRef)
     {
-        if (!doesTypeSatisfyConstraintRequirements(
-                requirement,
-                witnessTable))
+        if (!doesTypeSatisfyConstraintRequirements(requirement, witnessTable))
         {
             // Diagnose.
             getSink()->diagnose(Diagnostics::AccessorDoesNotSatisfyTypeConstraintRequirements{
@@ -5982,9 +5969,7 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
             if (requirementDecl->findModifier<OptionalConstraintModifier>())
             {
                 SLANG_ASSERT(!witnessTable->m_requirementDictionary.containsKey(requirementDecl));
-                witnessTable->add(
-                    requirementDecl,
-                    m_astBuilder->getOrCreate<NoneWitness>());
+                witnessTable->add(requirementDecl, m_astBuilder->getOrCreate<NoneWitness>());
                 addedRequirementDecls.add(requirementDecl);
                 continue;
             }
@@ -6030,9 +6015,8 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
     // We will enumerate the type constraints placed on the
     // associated type and see if they can be satisfied.
     //
-    bool conformance = doesTypeSatisfyConstraintRequirements(
-        requiredAssociatedTypeDeclRef,
-        witnessTable);
+    bool conformance =
+        doesTypeSatisfyConstraintRequirements(requiredAssociatedTypeDeclRef, witnessTable);
 
     // TODO: if any conformance check failed, we should probably include
     // that in an error message produced about not satisfying the requirement.
