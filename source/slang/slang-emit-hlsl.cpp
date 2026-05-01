@@ -424,7 +424,7 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
 
     if (profile.getFamily() == ProfileFamily::DX)
     {
-        if (profile.getVersion() >= ProfileVersion::DX_6_1)
+        if (profile.getVersion() >= ProfileVersion::DX_6_1 || stage == Stage::Node)
         {
             char const* stageName = getStageName(stage);
             if (stageName)
@@ -568,6 +568,51 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
     case Stage::Amplification:
         {
             emitNumThreadsAttribute();
+            break;
+        }
+    case Stage::Node:
+        {
+            auto launchDecor = irFunc->findDecoration<IRNodeLaunchDecoration>();
+            if (launchDecor)
+            {
+                m_writer->emit("[NodeLaunch(\"");
+                m_writer->emit(launchDecor->getMode()->getStringSlice());
+                m_writer->emit("\")]\n");
+            }
+            if (auto decor = irFunc->findDecoration<IRNodeMaxDispatchGridDecoration>())
+            {
+                m_writer->emit("[NodeMaxDispatchGrid(");
+                m_writer->emit(getIntVal(decor->getX()));
+                m_writer->emit(", ");
+                m_writer->emit(getIntVal(decor->getY()));
+                m_writer->emit(", ");
+                m_writer->emit(getIntVal(decor->getZ()));
+                m_writer->emit(")]\n");
+            }
+            if (auto decor = irFunc->findDecoration<IRNodeDispatchGridDecoration>())
+            {
+                m_writer->emit("[NodeDispatchGrid(");
+                m_writer->emit(getIntVal(decor->getX()));
+                m_writer->emit(", ");
+                m_writer->emit(getIntVal(decor->getY()));
+                m_writer->emit(", ");
+                m_writer->emit(getIntVal(decor->getZ()));
+                m_writer->emit(")]\n");
+            }
+            if (auto decor = irFunc->findDecoration<IRNodeIDDecoration>())
+            {
+                m_writer->emit("[NodeID(\"");
+                m_writer->emit(decor->getName()->getStringSlice());
+                m_writer->emit("\", ");
+                m_writer->emit(getIntVal(decor->getArrayIndex()));
+                m_writer->emit(")]\n");
+            }
+            if (irFunc->findDecoration<IRNodeIsProgramEntryDecoration>())
+            {
+                m_writer->emit("[NodeIsProgramEntry]\n");
+            }
+            if (!launchDecor || launchDecor->getMode()->getStringSlice() != toSlice("thread"))
+                emitNumThreadsAttribute();
             break;
         }
     // TODO: There are other stages that will need this kind of handling.
@@ -1077,6 +1122,79 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_ControlBarrier:
         {
             m_writer->emit("GroupMemoryBatrierWithGroupSync();\n");
+            return true;
+        }
+
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+        {
+            SLANG_UNUSED(inOuterPrec);
+            auto flagVal = (uint32_t)getIntVal(inst->getOperand(0));
+            m_writer->emit("(");
+            // ALL_MEMORY has its own named constant; otherwise decompose into individual flags.
+            if (flagVal == BarrierMemoryTypeFlags::AllMemory)
+            {
+                m_writer->emit("ALL_MEMORY");
+            }
+            else
+            {
+                bool first = true;
+                auto emitFlag = [&](const char* name, uint32_t bit)
+                {
+                    if (flagVal & bit)
+                    {
+                        if (!first)
+                            m_writer->emit(" | ");
+                        m_writer->emit(name);
+                        first = false;
+                    }
+                };
+                emitFlag("UAV_MEMORY", BarrierMemoryTypeFlags::UavMemory);
+                emitFlag("GROUP_SHARED_MEMORY", BarrierMemoryTypeFlags::GroupSharedMemory);
+                emitFlag("NODE_INPUT_MEMORY", BarrierMemoryTypeFlags::NodeInputMemory);
+                emitFlag("OUTPUT_MEMORY", BarrierMemoryTypeFlags::OutputMemory);
+                if (first)
+                    m_writer->emit("0"); // no bits set — fallback
+            }
+            m_writer->emit(")");
+            return true;
+        }
+
+    case kIROp_GetEnumBarrierSemanticFlags:
+        {
+            SLANG_UNUSED(inOuterPrec);
+            auto flagVal = (uint32_t)getIntVal(inst->getOperand(0));
+            m_writer->emit("(");
+            if (flagVal == BarrierSemanticFlags::Reorder)
+            {
+                m_writer->emit("REORDER");
+            }
+            else
+            {
+                bool first = true;
+                auto emitFlag = [&](const char* name, uint32_t bit)
+                {
+                    if (flagVal & bit)
+                    {
+                        if (!first)
+                            m_writer->emit(" | ");
+                        m_writer->emit(name);
+                        first = false;
+                    }
+                };
+                emitFlag("GROUP_SYNC", BarrierSemanticFlags::GroupSync);
+                emitFlag("GROUP_SCOPE", BarrierSemanticFlags::GroupScope);
+                emitFlag("DEVICE_SCOPE", BarrierSemanticFlags::DeviceScope);
+                if (first)
+                {
+                    StringBuilder sb;
+                    sb << "0x" << String(flagVal, 16);
+                    getSink()->diagnose(Diagnostics::InvalidBarrierSemanticFlagsValue{
+                        .value = sb.produceString(),
+                        .location = inst->sourceLoc});
+                    m_writer->emit("0");
+                }
+            }
+            m_writer->emit(")");
             return true;
         }
     case kIROp_MakeCoopVector:
@@ -1746,8 +1864,33 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         return;
 
     case kIROp_StructType:
-        m_writer->emit(getName(type));
-        return;
+        {
+            auto structType = cast<IRStructType>(type);
+            // Work-graph record types are native HLSL types (e.g. DispatchNodeInputRecord<T>,
+            // NodeOutput<T>, EmptyNodeOutput). Emit them using their original HLSL name so DXC
+            // recognises them; generic variants include the element type as a template argument.
+            if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>())
+            {
+                auto nameHint = structType->findDecoration<IRNameHintDecoration>();
+                if (auto elemDecor =
+                        structType->findDecoration<IRWorkGraphRecordElementTypeDecoration>())
+                {
+                    m_writer->emit(nameHint ? nameHint->getName() : getName(type));
+                    m_writer->emit("<");
+                    emitType(elemDecor->getElementType());
+                    m_writer->emit(">");
+                }
+                else
+                {
+                    // Non-generic work-graph type (EmptyNodeOutput, EmptyNodeInput, etc.):
+                    // emit the original HLSL name without a template argument.
+                    m_writer->emit(nameHint ? nameHint->getName() : getName(type));
+                }
+                return;
+            }
+            m_writer->emit(getName(type));
+            return;
+        }
 
     case kIROp_VectorType:
         {
@@ -2211,6 +2354,32 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     // invalid "groupshared" keyword.
     if (!param->findDecoration<IRHLSLMeshPayloadDecoration>())
         emitRateQualifiersAndAddressSpace(param);
+
+    // [MaxRecords(n)] on work-graph node output parameters
+    if (auto decor = param->findDecoration<IRMaxRecordsDecoration>())
+    {
+        m_writer->emit("[MaxRecords(");
+        m_writer->emit(getIntVal(decor->getCount()));
+        m_writer->emit(")] ");
+    }
+    if (auto decor = param->findDecoration<IRNodeIDDecoration>())
+    {
+        m_writer->emit("[NodeID(\"");
+        m_writer->emit(decor->getName()->getStringSlice());
+        m_writer->emit("\", ");
+        m_writer->emit(getIntVal(decor->getArrayIndex()));
+        m_writer->emit(")] ");
+    }
+    if (auto decor = param->findDecoration<IRNodeArraySizeDecoration>())
+    {
+        m_writer->emit("[NodeArraySize(");
+        m_writer->emit(getIntVal(decor->getCount()));
+        m_writer->emit(")] ");
+    }
+    if (param->findDecoration<IRAllowSparseNodesDecoration>())
+    {
+        m_writer->emit("[AllowSparseNodes] ");
+    }
 
     if (auto decor = param->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {

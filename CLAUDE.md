@@ -216,6 +216,30 @@ int foo = undefined;
 - **Adding a built-in function**: Add to appropriate module in `prelude/`
 - **Adding a new target**: Implement new emitter in `source/slang/slang-emit-*.cpp`
 
+### Capability Atoms Documentation
+
+**`docs/user-guide/a3-02-reference-capability-atoms.md` is auto-generated — never edit it directly.**
+
+It is produced by `slang-capability-generator` from `source/slang/slang-capabilities.capdef`. To add or update a capability atom's description:
+
+1. Add or update the `///` doc comment immediately before the `def` or `alias` in `slang-capabilities.capdef`:
+   ```
+   /// My description here.
+   alias myatom = ...;
+   ```
+2. Regenerate the doc:
+   ```bash
+   cmake --build --preset debug --target slang-capability-generator
+   mkdir -p build/capgen-out
+   ./build/generators/Debug/bin/slang-capability-generator \
+       source/slang/slang-capabilities.capdef \
+       --target-directory build/capgen-out \
+       --doc docs/user-guide/a3-02-reference-capability-atoms.md
+   ```
+3. Commit the updated `slang-capabilities.capdef` and the regenerated `.md` together.
+
+Note: the `///` comment must be on the **public alias** (e.g. `alias node = _node;`), not on the internal `def _node : stage;` atom, for the description to appear under the public name.
+
 ### Modifying Public Headers (`include/`)
 
 All files under `include/` are public API. Changes must preserve binary (ABI) and source
@@ -322,6 +346,55 @@ Use the `/repro-remix` skill or see `extras/repro-remix.md`.
 
 - The enum values starting with `kIROp_` are defined in a generated file, `build/source/slang/fiddle/slang-ir-insts-enum.h.fiddle`
 - `FIDDLE()` and `FIDDLE(...)` statements in AST node declarations indicate that additional source is generated and included from `build/source/slang/fiddle`, providing static type system and reflection metadata, visitor support, and serialization support.
+
+### Rebuilding after `hlsl.meta.slang` / `core.meta.slang` changes
+
+The core module source (`hlsl.meta.slang`, `core.meta.slang`, etc.) is embedded into the `slang-bootstrap` binary at compile time. After modifying these files you **must** `touch` the file before building to guarantee CMake detects the change, run the bootstrap generator, then rebuild `slangc`:
+
+```bash
+touch source/slang/hlsl.meta.slang   # (or whichever meta file changed)
+cmake --build --preset debug --target slang-bootstrap
+./build/generators/Debug/bin/slang-bootstrap
+cmake --build --preset debug --target slangc
+```
+
+If you skip the `touch` step the cached bootstrap binary may silently embed the OLD source, and diagnostic line numbers from `./build/generators/Debug/bin/slang-bootstrap` will not match the current source file — a sure sign the binary is stale.
+
+### HLSL named-constant emission rule
+
+**Never emit HLSL enum / named-constant values as hard-coded integers.** DXC maps named constants (attribute strings, flag identifiers, etc.) at parse time; if we bake in a numeric value and DXC later changes the internal mapping the generated HLSL will silently break.
+
+The correct pattern:
+
+1. **Define a Slang enum** (or a set of named intrinsic-backed constants) for each group of conceptual values (e.g. `NodeLaunch` mode, Barrier flag sets).
+2. **Store the name, not the integer, in the IR.** Use `IRStringLit` operands (as `NodeLaunchDecoration` does) or a `Ref<T>` / intrinsic-based accessor that preserves the identifier through to emission.
+3. **Provide a mapping function** in the HLSL emitter (`slang-emit-hlsl.cpp` or `slang-emit-c-like.cpp`) that converts the stored enum/string value back to the HLSL source name so that emitted code reads e.g. `[NodeLaunch("broadcasting")]` not `[NodeLaunch(0)]`.
+
+Examples of this pattern already in the codebase:
+- `NodeLaunchDecoration` stores the mode as `IRStringLit("broadcasting")` and the emitter re-emits the string verbatim.
+- Work-graph output record `Get()` returns `Ref<T>` backed by `__intrinsic_asm ".Get"` so the emitted HLSL says `.Get(i)` (an l-value in HLSL) rather than an integer offset.
+
+#### Pattern: emitting enum values as target named constants
+
+Use this when a Slang enum must be emitted as named constants rather than integers (e.g. `UAV_MEMORY` instead of `1`).
+
+1. **Define the C++ enum in `slang-type-system-shared.h`** (inside `namespace Slang`, plain `enum` not `enum class` so values implicitly convert to `int`). This header is transitively included by both the core-module source and the emitters.
+
+2. **Mirror it as a Slang enum in the appropriate `*.meta.slang` file**, pulling the actual values from C++ via `$(...)` splices so the two definitions stay in sync:
+   ```slang
+   enum MyFlags : uint { FlagA = $(MyFlags::FlagA), FlagB = $(MyFlags::FlagB) }
+   ```
+
+3. **Declare a `__intrinsic_op` converter in the `.meta.slang` file** to represent the enum-to-string conversion in the IR:
+   ```slang
+   __intrinsic_op(getEnumMyFlags)
+   int GetEnumMyFlags(MyFlags f);
+   ```
+   The mnemonic passed to `__intrinsic_op(...)` must exactly match the Lua key in the next step.
+
+4. **Register the new IR op in `slang-ir-insts.lua`** and add a stable ID in `slang-ir-insts-stable-names.lua`.
+
+5. **Emit the named-constant string in the target emitter** (e.g. `tryEmitInstExprImpl` in `slang-emit-hlsl.cpp`): read the compile-time integer operand via `getIntVal(inst->getOperand(0))`, then map each bit or value to its HLSL named-constant string and write it out with `m_writer->emit(...)`.
 
 ### Git commit message
 

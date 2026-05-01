@@ -1387,7 +1387,17 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // itself. GLSL allows each axis to be specified in a separate declaration,
     // so we merge all GLSLLayoutLocalSizeAttribute values into a single
     // NumThreadsAttribute.
-    if ((stage == Stage::Compute || stage == Stage::Mesh || stage == Stage::Amplification) &&
+    // Node shaders in thread-launch mode do not require [numthreads].
+    auto isThreadLaunchNode = [&]() -> bool
+    {
+        if (stage != Stage::Node)
+            return false;
+        auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
+        return launchAttr && launchAttr->mode == "thread";
+    };
+
+    if ((stage == Stage::Compute || stage == Stage::Mesh || stage == Stage::Amplification ||
+         (stage == Stage::Node && !isThreadLaunchNode())) &&
         !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
     {
         auto parentDecl = entryPointFuncDecl->parentDecl;
@@ -1459,6 +1469,24 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     case Stage::Dispatch:
         shouldWarnOnNonUniformParam = false;
         break;
+    case Stage::Node:
+        {
+            canHaveVaryingInput = true;
+            auto hasMaxGrid = entryPointFuncDecl->findModifier<NodeMaxDispatchGridAttribute>();
+            auto hasFixedGrid = entryPointFuncDecl->findModifier<NodeDispatchGridAttribute>();
+            if (hasMaxGrid && hasFixedGrid)
+            {
+                sink->diagnose(
+                    Diagnostics::ConflictingNodeGridAttributes{.decl = entryPointFuncDecl});
+            }
+            auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
+            if ((hasMaxGrid || hasFixedGrid) && launchAttr && launchAttr->mode != "broadcasting")
+            {
+                sink->diagnose(
+                    Diagnostics::NodeGridAttributeRequiresBroadcasting{.decl = entryPointFuncDecl});
+            }
+            break;
+        }
     default:
         break;
     }

@@ -102,6 +102,7 @@ public:
 };
 
 class DebugComputeCommandEncoder : public UnownedDebugObject<IComputeCommandEncoder>,
+                                   public IComputeCommandEncoderD3D12,
                                    public DebugResourceCommandEncoderImpl
 {
 public:
@@ -114,7 +115,11 @@ public:
         if (uuid == GfxGUID::IID_IResourceCommandEncoder ||
             uuid == GfxGUID::IID_IComputeCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
         {
-            return this;
+            return static_cast<IComputeCommandEncoder*>(this);
+        }
+        if (uuid == GfxGUID::IID_IComputeCommandEncoderD3D12)
+        {
+            return static_cast<IComputeCommandEncoderD3D12*>(this);
         }
         return nullptr;
     }
@@ -125,6 +130,8 @@ public:
     bindPipeline(IPipelineState* state, IShaderObject** outRootShaderObject) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
     bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    bindRootObjectAsCompute(IShaderProgram* program, IShaderObject* rootObject) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL dispatchCompute(int x, int y, int z) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
     dispatchComputeIndirect(IBufferResource* cmdBuffer, Offset offset) override;

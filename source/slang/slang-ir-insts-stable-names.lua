@@ -827,5 +827,18 @@ return {
 	["makeConditionalValue"] = 851,
 	["SpecializeExistentialsInType"] = 852,
 	["assumeAddress"] = 853,
-	["DebugCompilationUnit"] = 854
+	["DebugCompilationUnit"] = 854,
+        ["Decoration.nodeLaunch"] = 855,
+        ["Decoration.nodeMaxDispatchGrid"] = 856,
+        ["Decoration.nodeDispatchGrid"] = 857,
+        ["Decoration.maxRecords"] = 858,
+        ["nodeOutputRecordGetElementPtr"] = 859,
+        ["getEnumBarrierMemoryTypeFlags"] = 860,
+        ["getEnumBarrierSemanticFlags"] = 861,
+        ["Decoration.workGraphRecordType"] = 862,
+        ["Decoration.nodeID"] = 863,
+        ["Decoration.nodeIsProgramEntry"] = 864,
+        ["Decoration.nodeArraySize"] = 865,
+        ["Decoration.allowSparseNodes"] = 866,
+        ["Decoration.workGraphRecordElementType"] = 867
 }

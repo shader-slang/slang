@@ -94,6 +94,9 @@ Stages
 `miss`
 > Ray-Miss shader stage & ray-tracing capabilities
 
+`node`
+> Work-graph node stage
+
 `pixel`
 > Pixel shader stage
 

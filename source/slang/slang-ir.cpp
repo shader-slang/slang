@@ -9189,6 +9189,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetOptiXRayPayloadPtr:
     case kIROp_UpdateElement:
     case kIROp_MeshOutputRef:
+    case kIROp_NodeOutputRecordGetElementPtr:
     case kIROp_MakeVectorFromScalar:
     case kIROp_Swizzle:
     case kIROp_SwizzleSet: // Doesn't actually "set" anything - just returns the resulting

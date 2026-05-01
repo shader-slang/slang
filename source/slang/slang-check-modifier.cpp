@@ -488,6 +488,62 @@ Modifier* SemanticsVisitor::validateAttribute(
 
         waveSizeAttr->numLanes = value;
     }
+    else if (auto nodeLaunchAttr = as<NodeLaunchAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 1);
+        String mode;
+        if (!checkLiteralStringVal(attr->args[0], &mode))
+            return nullptr;
+        if (mode != "broadcasting" && mode != "thread" && mode != "coalescing")
+        {
+            getSink()->diagnose(Diagnostics::InvalidNodeLaunchMode{.mode = mode, .attr = attr});
+            return nullptr;
+        }
+        nodeLaunchAttr->mode = mode;
+    }
+    else if (auto gridAttr = as<NodeMaxDispatchGridAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 3);
+        gridAttr->x = checkConstantIntVal(attr->args[0]);
+        gridAttr->y = checkConstantIntVal(attr->args[1]);
+        gridAttr->z = checkConstantIntVal(attr->args[2]);
+        if (!gridAttr->x || !gridAttr->y || !gridAttr->z)
+            return nullptr;
+    }
+    else if (auto fixedGridAttr = as<NodeDispatchGridAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 3);
+        fixedGridAttr->x = checkConstantIntVal(attr->args[0]);
+        fixedGridAttr->y = checkConstantIntVal(attr->args[1]);
+        fixedGridAttr->z = checkConstantIntVal(attr->args[2]);
+        if (!fixedGridAttr->x || !fixedGridAttr->y || !fixedGridAttr->z)
+            return nullptr;
+    }
+    else if (auto maxRecAttr = as<MaxRecordsAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 1);
+        maxRecAttr->value = checkConstantIntVal(attr->args[0]);
+        if (!maxRecAttr->value)
+            return nullptr;
+    }
+    else if (auto nodeIDAttr = as<NodeIDAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 2);
+        String name;
+        if (!checkLiteralStringVal(attr->args[0], &name))
+            return nullptr;
+        nodeIDAttr->name = name;
+        nodeIDAttr->arrayIndex = checkConstantIntVal(attr->args[1]);
+        if (!nodeIDAttr->arrayIndex)
+            return nullptr;
+    }
+    else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 1);
+        nodeArraySizeAttr->count = checkConstantIntVal(attr->args[0]);
+        if (!nodeArraySizeAttr->count)
+            return nullptr;
+    }
     else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
     {
         // This case handles GLSL-oriented layout attributes

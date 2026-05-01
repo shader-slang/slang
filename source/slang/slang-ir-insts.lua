@@ -1203,6 +1203,7 @@ local insts = {
 	{ nonUniformResourceIndex = { operands = { { "index" } } } },
 	{ getNaturalStride = { operands = { { "type" } } } },
 	{ meshOutputRef = { operands = { { "base" }, { "index" } } } },
+	{ nodeOutputRecordGetElementPtr = { operands = { { "base" }, { "index" } } } },
 	{ meshOutputSet = { operands = { { "base" }, { "index" }, { "elementValue" } } } },
 	-- only two parameters as they are effectively static
 	-- TODO: make them reference the _slang_mesh object directly
@@ -1811,6 +1812,63 @@ local insts = {
 				waveSize = {
 					struct_name = "WaveSizeDecoration",
 					operands = { { "numLanes", "IRIntLit" } },
+				},
+			},
+			{
+				nodeLaunch = {
+					struct_name = "NodeLaunchDecoration",
+					operands = { { "mode", "IRStringLit" } },
+				},
+			},
+			{
+				nodeMaxDispatchGrid = {
+					struct_name = "NodeMaxDispatchGridDecoration",
+					operands = { { "x", "IRIntLit" }, { "y", "IRIntLit" }, { "z", "IRIntLit" } },
+				},
+			},
+			{
+				nodeDispatchGrid = {
+					struct_name = "NodeDispatchGridDecoration",
+					operands = { { "x", "IRIntLit" }, { "y", "IRIntLit" }, { "z", "IRIntLit" } },
+				},
+			},
+			{
+				maxRecords = {
+					struct_name = "MaxRecordsDecoration",
+					operands = { { "count", "IRIntLit" } },
+				},
+			},
+			{
+				nodeID = {
+					struct_name = "NodeIDDecoration",
+					operands = { { "name", "IRStringLit" }, { "arrayIndex", "IRIntLit" } },
+				},
+			},
+			{
+				nodeIsProgramEntry = {
+					struct_name = "NodeIsProgramEntryDecoration",
+				},
+			},
+			{
+				nodeArraySize = {
+					struct_name = "NodeArraySizeDecoration",
+					operands = { { "count", "IRIntLit" } },
+				},
+			},
+			{
+				allowSparseNodes = {
+					struct_name = "AllowSparseNodesDecoration",
+				},
+			},
+			{
+				workGraphRecordType = {
+					struct_name = "WorkGraphRecordTypeDecoration",
+				},
+			},
+			{
+				workGraphRecordElementType = {
+					struct_name = "WorkGraphRecordElementTypeDecoration",
+					operands = { { "elementType", "IRType" } },
 				},
 			},
 			{
@@ -3158,7 +3216,11 @@ local insts = {
 	{ constexprFloatCast = { operands = { { "value" } }, hoistable = true } },
 	{ constexprCastIntToEnum = { operands = { { "value" } }, hoistable = true } },
 	{ constexprCastEnumToInt = { operands = { { "value" } }, hoistable = true } },
-	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } }
+	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } },
+	-- Work-graph Barrier flag intrinsics: convert a compile-time BarrierMemoryTypeFlags/BarrierSemanticFlags
+	-- integer value to the corresponding target named-constant expression (e.g. "(UAV_MEMORY)").
+	{ getEnumBarrierMemoryTypeFlags = { operands = { { "flags" } }, hoistable = true } },
+	{ getEnumBarrierSemanticFlags = { operands = { { "flags" } }, hoistable = true } }
 }
 
 -- A function to calculate some useful properties and put it in the table,
