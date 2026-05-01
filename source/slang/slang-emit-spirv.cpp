@@ -6387,11 +6387,29 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
          * assigned the same Offset.
          *
          *****/
-        auto layout = structType->findDecoration<IRSizeAndAlignmentDecoration>();
+        // TODO: `IRSizeAndAlignmentDecoration` currently serves two purposes: it caches the
+        // result of layout queries on a type (any query simply attaches the decoration), and it is
+        // used here to decide which layout rule should be applied when emitting the struct.  That
+        // conflicts when multiple layout rules have been queried for the same struct -- in
+        // particular, debug-info emission asks for Natural layout on types that were originally
+        // laid out as Std430, which leaves both decorations on the struct and a plain
+        // `findDecoration` call would return whichever was attached first.  We prefer the
+        // non-Natural rule here as a heuristic, but the real fix is to either stop reusing the
+        // caching decoration as a layout-selection signal or to attach an explicit "primary
+        // layout" marker during `lowerBufferElementTypeToStorageType`.  See #10964.
         IRTypeLayoutRuleName layoutRuleName = IRTypeLayoutRuleName::Natural;
-        if (layout)
+        for (auto decor : structType->getDecorations())
         {
-            layoutRuleName = layout->getLayoutName();
+            if (auto sizeDecor = as<IRSizeAndAlignmentDecoration>(decor))
+            {
+                auto name = sizeDecor->getLayoutName();
+                if (name != IRTypeLayoutRuleName::Natural)
+                {
+                    layoutRuleName = name;
+                    break;
+                }
+                layoutRuleName = name;
+            }
         }
         int32_t id = 0;
         bool isPhysicalType = isPhysicalCompositeType(structType);

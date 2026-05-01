@@ -5,6 +5,7 @@
 #include "../core/slang-hash.h"
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-random-generator.h"
+#include "slang-check-impl.h"
 #include "slang-check.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bit-field-accessors.h"
@@ -6785,6 +6786,30 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
+    /// Emit a chain of `lookupWitnessMethod` insts that walks an interface-to-interface
+    /// sub-type witness, starting from `currentWT` (a witness-table value extracted
+    /// from an existential of the witness's sub-type).  Structured as a mechanical
+    /// recursion over the witness tree, mirroring `emitCastToConcreteSuperTypeRec`.
+    IRInst* emitCastToInterfaceSuperTypeRec(IRInst* currentWT, SubtypeWitness* witness)
+    {
+        if (auto declared = as<DeclaredSubtypeWitness>(witness))
+        {
+            auto key = getInterfaceRequirementKey(context, declared->getDeclRef().getDecl());
+            auto supType = lowerType(context, declared->getSup());
+            return getBuilder()->emitLookupInterfaceMethodInst(
+                getBuilder()->getWitnessTableType(supType),
+                currentWT,
+                key);
+        }
+        if (auto transitive = as<TransitiveSubtypeWitness>(witness))
+        {
+            auto midWT = emitCastToInterfaceSuperTypeRec(currentWT, transitive->getSubToMid());
+            return emitCastToInterfaceSuperTypeRec(midWT, transitive->getMidToSup());
+        }
+        SLANG_UNEXPECTED("unsupported witness shape for interface-to-interface upcast");
+        UNREACHABLE_RETURN(nullptr);
+    }
+
     LoweredValInfo visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
     {
         auto superType = lowerType(context, expr->type);
@@ -6819,13 +6844,36 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             auto declRef = declRefType->getDeclRef();
             if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
             {
-                // We have an expression that is "up-casting" some concrete value
-                // to an existential type (aka interface type), using a subtype witness
-                // (which will lower as a witness table) to show that the conversion
-                // is valid.
-                //
-                auto witnessTable = lowerSimpleVal(context, expr->witnessArg);
+                auto concreteValue = getSimpleVal(context, value);
+                auto builder = getBuilder();
 
+                // If the source is already an existential (interface type),
+                // this is an interface-to-interface upcast.  The witness
+                // provided by the type-checker can't be lowered as a static
+                // witness table (an interface's inheritance clause lowers to
+                // a requirement key, not a witness table).  Instead: decompose
+                // the source existential, walk the witness to compute a new
+                // witness table via `lookupWitnessMethod`, then recompose.
+                // Check the AST type (robust to generic instantiations whose
+                // IR form is `Specialize(Generic(...),...)` rather than a
+                // plain `IRInterfaceType`).
+                if (expr->valueArg && isInterfaceType(expr->valueArg->type))
+                {
+                    auto extractedType = builder->emitExtractExistentialType(concreteValue);
+                    auto extractedValue =
+                        builder->emitExtractExistentialValue(extractedType, concreteValue);
+                    auto sourceWT = builder->emitExtractExistentialWitnessTable(concreteValue);
+
+                    auto witness = as<SubtypeWitness>(expr->witnessArg);
+                    SLANG_RELEASE_ASSERT(witness);
+                    auto targetWT = emitCastToInterfaceSuperTypeRec(sourceWT, witness);
+
+                    return LoweredValInfo::simple(
+                        builder->emitMakeExistential(superType, extractedValue, targetWT));
+                }
+
+                // Concrete-to-interface: the witness lowers to a real witness table.
+                //
                 // At the IR level, this will become a `makeExistential` instruction,
                 // which collects the above information into a single IR-level value.
                 // A dynamic CPU implementation of Slang might encode an existential
@@ -6837,10 +6885,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // we should probably extend the AST and IR mechanism here to accept
                 // a sequence of witness tables.
                 //
-                auto concreteValue = getSimpleVal(context, value);
-                auto existentialValue =
-                    getBuilder()->emitMakeExistential(superType, concreteValue, witnessTable);
-                return LoweredValInfo::simple(existentialValue);
+                auto witnessTable = lowerSimpleVal(context, expr->witnessArg);
+                return LoweredValInfo::simple(
+                    builder->emitMakeExistential(superType, concreteValue, witnessTable));
             }
             else if (auto structDeclRef = declRef.as<StructDecl>())
             {
