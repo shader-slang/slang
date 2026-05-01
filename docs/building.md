@@ -257,7 +257,7 @@ works for any given binary.
 | `SLANG_ENABLE_SLANGI`                 | `TRUE`                     | Enable Slang interpreter target                                                                                                          |
 | `SLANG_ENABLE_SLANGRT`                | `TRUE`                     | Enable runtime target                                                                                                                    |
 | `SLANG_ENABLE_SLANG_GLSLANG`          | `TRUE`                     | Enable glslang dependency and slang-glslang wrapper target                                                                               |
-| `SLANG_ENABLE_TESTS`                  | `TRUE`                     | Enable test targets, requires SLANG_ENABLE_SLANG_RHI, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT                                       |
+| `SLANG_ENABLE_TESTS`                  | `TRUE`                     | Enable test targets, requires `SLANG_ENABLE_SLANG_RHI`; some tests require other CMake options                                            |
 | `SLANG_ENABLE_EXAMPLES`               | `TRUE`                     | Enable example targets, requires SLANG_ENABLE_SLANG_RHI                                                                                  |
 | `SLANG_ENABLE_REPLAYER`               | `TRUE`                     | Enable slang-replay tool                                                                                                                 |
 | `SLANG_ENABLE_PCH`                    | `TRUE`                     | Enable precompiled headers for faster builds (auto-disabled when using sccache)                                                          |
