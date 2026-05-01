@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage geometry -entry geometryMain
-//CHECK-NOT: error
+//CHECK-NOT: error:
 
 #define MAX_POINT_LIGHTS 4
 
