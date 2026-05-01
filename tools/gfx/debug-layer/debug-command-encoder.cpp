@@ -46,6 +46,18 @@ Result DebugComputeCommandEncoder::bindPipelineWithRootObject(
     return baseObject->bindPipelineWithRootObject(getInnerObj(state), getInnerObj(rootObject));
 }
 
+Result DebugComputeCommandEncoder::bindRootObjectAsCompute(
+    IShaderProgram* program,
+    IShaderObject* rootObject)
+{
+    SLANG_GFX_API_FUNC;
+    IComputeCommandEncoderD3D12* baseD3D12Encoder = nullptr;
+    SLANG_RETURN_ON_FAIL(baseObject->queryInterface(GfxGUID::IID_IComputeCommandEncoderD3D12, (void**)&baseD3D12Encoder));
+    Result result = baseD3D12Encoder->bindRootObjectAsCompute(getInnerObj(program), getInnerObj(rootObject));
+    baseObject->release();
+    return result;
+}
+
 Result DebugComputeCommandEncoder::dispatchCompute(int x, int y, int z)
 {
     SLANG_GFX_API_FUNC;
