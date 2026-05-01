@@ -92,22 +92,25 @@ jobs:
             value="${{ matrix.value_release }}"
           fi
 
-          # For boolean options (no explicit value in the matrix), query the
-          # current cmake default and test the opposite so the matrix stays
-          # in sync automatically when defaults change.
+          # For options with no explicit value in the matrix, query the current
+          # cmake default and test the opposite so the matrix stays in sync
+          # automatically when defaults change.
+          # Handles both BOOL (ON/OFF) and STRING (TRUE/FALSE) cache types,
+          # the latter being used by auto_option (SLANG_ENABLE_CUDA etc.).
           if [[ -z "$value" ]]; then
             defaultVal=$(
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DSLANG_USE_SCCACHE=OFF \
                 -LA 2>/dev/null \
-              | grep -E "^${option}:BOOL=" \
-              | sed 's/.*=//'
+              | grep -E "^${option}:(BOOL|STRING)=" \
+              | sed 's/.*=//' \
+              | tr '[:upper:]' '[:lower:]'
             )
             case "$defaultVal" in
-              ON) value=OFF ;;
-              OFF) value=ON ;;
-              *) echo "ERROR: could not detect boolean default for ${option} (got '${defaultVal}')"; exit 1 ;;
+              on|true)  value=OFF ;;
+              off|false) value=ON ;;
+              *) echo "ERROR: could not detect default for ${option} (got '${defaultVal}')"; exit 1 ;;
             esac
             echo "Detected default=${defaultVal}, testing ${option}=${value}"
             rm -fr build

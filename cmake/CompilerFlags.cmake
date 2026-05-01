@@ -254,9 +254,9 @@ function(set_default_compile_options target)
     endif()
 
     if(SLANG_ENABLE_COVERAGE)
-        # Coverage instrumentation for Clang/GCC
-        # Both flags must be used together for source mapping to work
-        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+            # Clang source-based coverage: both flags required together for
+            # source mapping to work
             target_compile_options(
                 ${target}
                 PRIVATE -fprofile-instr-generate -fcoverage-mapping
@@ -266,6 +266,10 @@ function(set_default_compile_options target)
                 BEFORE
                 PUBLIC -fprofile-instr-generate
             )
+        elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+            # GCC gcov-based coverage
+            target_compile_options(${target} PRIVATE --coverage)
+            target_link_options(${target} BEFORE PUBLIC --coverage)
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             # MSVC has no native source-level coverage tool; Windows coverage
             # is collected externally by OpenCppCoverage via PDBs. The only
