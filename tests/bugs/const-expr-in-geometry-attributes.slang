@@ -16,3 +16,6 @@ struct GSInput { float4 position : SV_Position; };
 [maxvertexcount((MAX_POINT_LIGHTS * 6 + 1) * 3)]
 [instance(instances)]
 void geometryMain(triangle GSInput input[3], inout TriangleStream<GSOutput> outStream) {}
+
+// CHECK: maxvertexcount(75)
+// CHECK: instance(3)
