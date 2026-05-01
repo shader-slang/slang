@@ -61,8 +61,7 @@ runs:
         du -sh build/llvm-project-install
 
         # Set environment variables for CMake
-        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
 
     - name: Build LLVM from source
       if: steps.download.outputs.cache-hit != 'true' && inputs.build-if-missing == 'true'
@@ -83,8 +82,7 @@ runs:
         echo "✅ LLVM build complete"
 
         # Set environment variables for CMake
-        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
 
     - name: Upload LLVM to GCS
       if: steps.download.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'

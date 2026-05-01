@@ -118,8 +118,7 @@ runs:
       shell: bash
       run: |
         if [ "${{inputs.build-llvm}}" == "true" ]; then
-          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
-          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
+          echo "CMAKE_PREFIX_PATH=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
         fi
 
       # Note: ccache for Windows self-hosted has been replaced by sccache
