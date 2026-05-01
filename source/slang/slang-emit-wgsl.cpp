@@ -1588,8 +1588,8 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
     case kIROp_ByteAddressBufferLoad:
         {
-            // Indices in Slang code count bytes, but in WASM they count u32's since
-            // byte address buffers translate to array<u32> in WASM, so divide by 4.
+            // Indices in Slang code count bytes, but in WGSL they count u32's since
+            // byte address buffers translate to array<u32> in WGSL, so divide by 4.
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit("[(");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -1600,8 +1600,8 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
     case kIROp_ByteAddressBufferStore:
         {
-            // Indices in Slang code count bytes, but in WASM they count u32's since
-            // byte address buffers translate to array<u32> in WASM, so divide by 4.
+            // Indices in Slang code count bytes, but in WGSL they count u32's since
+            // byte address buffers translate to array<u32> in WGSL, so divide by 4.
             auto base = inst->getOperand(0);
             emitOperand(base, EmitOpInfo());
             m_writer->emit("[(");
