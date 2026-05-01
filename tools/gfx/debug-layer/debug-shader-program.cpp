@@ -18,7 +18,7 @@ void* DebugShaderProgram::getInterface(const Slang::Guid& guid)
         IShaderProgramD3D12* baseD3D12Program = nullptr;
         if (SLANG_SUCCEEDED(baseObject->queryInterface(guid, (void**)&baseD3D12Program)))
         {
-            baseObject->release();
+            baseD3D12Program->release();
             return static_cast<IShaderProgramD3D12*>(this);
         }
     }
@@ -32,7 +32,7 @@ Result DebugShaderProgram::getRootSignature(void** outRootSignature)
     SLANG_RETURN_ON_FAIL(
         baseObject->queryInterface(GfxGUID::IID_IShaderProgramD3D12, (void**)&baseD3D12Program));
     Result result = baseD3D12Program->getRootSignature(outRootSignature);
-    baseObject->release();
+    baseD3D12Program->release();
     return result;
 }
 

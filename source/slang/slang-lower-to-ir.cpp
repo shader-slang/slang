@@ -13488,6 +13488,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 };
                 getBuilder()->addDecoration(irFunc, kIROp_NodeDispatchGridDecoration, ops, 3);
             }
+            else if (auto maxRecAttr = as<MaxRecordsAttribute>(modifier))
+            {
+                IRInst* val = getSimpleVal(subContext, lowerVal(subContext, maxRecAttr->value));
+                getBuilder()->addDecoration(irFunc, kIROp_MaxRecordsDecoration, val);
+            }
             else if (as<ReadNoneAttribute>(modifier))
             {
                 getBuilder()->addSimpleDecoration<IRReadNoneDecoration>(irFunc);
