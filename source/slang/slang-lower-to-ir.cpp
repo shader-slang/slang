@@ -3018,11 +3018,11 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         }
         else if (auto nodeIDAttr = as<NodeIDAttribute>(mod))
         {
-            IRStringLit* nameLit =
-                builder->getStringValue(nodeIDAttr->name.getUnownedSlice());
-            IRInst* indexVal = nodeIDAttr->arrayIndex
-                ? getSimpleVal(context, lowerVal(context, nodeIDAttr->arrayIndex))
-                : builder->getIntValue(builder->getIntType(), 0);
+            IRStringLit* nameLit = builder->getStringValue(nodeIDAttr->name.getUnownedSlice());
+            IRInst* indexVal =
+                nodeIDAttr->arrayIndex
+                    ? getSimpleVal(context, lowerVal(context, nodeIDAttr->arrayIndex))
+                    : builder->getIntValue(builder->getIntType(), 0);
             IRInst* ops[2] = {nameLit, indexVal};
             builder->addDecoration(inst, kIROp_NodeIDDecoration, ops, 2);
         }
@@ -13464,9 +13464,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 IRStringLit* nameLit =
                     getBuilder()->getStringValue(nodeIDAttr->name.getUnownedSlice());
-                IRInst* indexVal = nodeIDAttr->arrayIndex
-                    ? getSimpleVal(subContext, lowerVal(subContext, nodeIDAttr->arrayIndex))
-                    : getBuilder()->getIntValue(getBuilder()->getIntType(), 0);
+                IRInst* indexVal =
+                    nodeIDAttr->arrayIndex
+                        ? getSimpleVal(subContext, lowerVal(subContext, nodeIDAttr->arrayIndex))
+                        : getBuilder()->getIntValue(getBuilder()->getIntType(), 0);
                 IRInst* ops[2] = {nameLit, indexVal};
                 getBuilder()->addDecoration(irFunc, kIROp_NodeIDDecoration, ops, 2);
             }

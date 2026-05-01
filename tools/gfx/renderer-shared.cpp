@@ -35,8 +35,7 @@ const Slang::Guid GfxGUID::IID_IRenderPassLayout = SLANG_UUID_IRenderPassLayout;
 const Slang::Guid GfxGUID::IID_IRayTracingCommandEncoder = IRayTracingCommandEncoder::getTypeGuid();
 const Slang::Guid GfxGUID::IID_IResourceCommandEncoder = IResourceCommandEncoder::getTypeGuid();
 const Slang::Guid GfxGUID::IID_IComputeCommandEncoder = IComputeCommandEncoder::getTypeGuid();
-const Slang::Guid GfxGUID::IID_IComputeCommandEncoderD3D12 =
-    SLANG_UUID_IComputeCommandEncoderD3D12;
+const Slang::Guid GfxGUID::IID_IComputeCommandEncoderD3D12 = SLANG_UUID_IComputeCommandEncoderD3D12;
 const Slang::Guid GfxGUID::IID_IRenderCommandEncoder = IRenderCommandEncoder::getTypeGuid();
 
 const Slang::Guid GfxGUID::IID_ICommandBuffer = SLANG_UUID_ICommandBuffer;

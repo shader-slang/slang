@@ -1470,23 +1470,23 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         shouldWarnOnNonUniformParam = false;
         break;
     case Stage::Node:
-    {
-        canHaveVaryingInput = true;
-        auto hasMaxGrid = entryPointFuncDecl->findModifier<NodeMaxDispatchGridAttribute>();
-        auto hasFixedGrid = entryPointFuncDecl->findModifier<NodeDispatchGridAttribute>();
-        if (hasMaxGrid && hasFixedGrid)
         {
-            sink->diagnose(
-                Diagnostics::ConflictingNodeGridAttributes{.decl = entryPointFuncDecl});
+            canHaveVaryingInput = true;
+            auto hasMaxGrid = entryPointFuncDecl->findModifier<NodeMaxDispatchGridAttribute>();
+            auto hasFixedGrid = entryPointFuncDecl->findModifier<NodeDispatchGridAttribute>();
+            if (hasMaxGrid && hasFixedGrid)
+            {
+                sink->diagnose(
+                    Diagnostics::ConflictingNodeGridAttributes{.decl = entryPointFuncDecl});
+            }
+            auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
+            if ((hasMaxGrid || hasFixedGrid) && launchAttr && launchAttr->mode != "broadcasting")
+            {
+                sink->diagnose(
+                    Diagnostics::NodeGridAttributeRequiresBroadcasting{.decl = entryPointFuncDecl});
+            }
+            break;
         }
-        auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
-        if ((hasMaxGrid || hasFixedGrid) && launchAttr && launchAttr->mode != "broadcasting")
-        {
-            sink->diagnose(
-                Diagnostics::NodeGridAttributeRequiresBroadcasting{.decl = entryPointFuncDecl});
-        }
-        break;
-    }
     default:
         break;
     }

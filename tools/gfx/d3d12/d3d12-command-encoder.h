@@ -152,10 +152,9 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL endDebugEvent() override;
 };
 
-class ComputeCommandEncoderImpl
-    : public IComputeCommandEncoder,
-      public IComputeCommandEncoderD3D12,
-      public ResourceCommandEncoderImpl
+class ComputeCommandEncoderImpl : public IComputeCommandEncoder,
+                                  public IComputeCommandEncoderD3D12,
+                                  public ResourceCommandEncoderImpl
 {
 public:
     SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoderImpl)

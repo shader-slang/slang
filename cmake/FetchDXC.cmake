@@ -59,10 +59,16 @@ elseif(
     if(_glibc_match)
         set(_glibc_major ${CMAKE_MATCH_1})
         set(_glibc_minor ${CMAKE_MATCH_2})
-        message(STATUS "Detected GLIBC version: ${_glibc_major}.${_glibc_minor}")
+        message(
+            STATUS
+            "Detected GLIBC version: ${_glibc_major}.${_glibc_minor}"
+        )
         if(
             _glibc_major LESS _dxc_min_glibc_major
-            OR (_glibc_major EQUAL _dxc_min_glibc_major AND _glibc_minor LESS _dxc_min_glibc_minor)
+            OR (
+                _glibc_major EQUAL _dxc_min_glibc_major
+                AND _glibc_minor LESS _dxc_min_glibc_minor
+            )
         )
             message(
                 STATUS
@@ -96,10 +102,7 @@ if(_dxc_build_from_source)
         # LLVM_ENABLE_WARNINGS=OFF prevents adding warning flags but does not
         # actively suppress existing ones. Pass -w via CMAKE_*_FLAGS to silence
         # all GCC/Clang warnings from DXC's source.
-        set(_dxc_warning_flags
-            "-DCMAKE_C_FLAGS=-w"
-            "-DCMAKE_CXX_FLAGS=-w"
-        )
+        set(_dxc_warning_flags "-DCMAKE_C_FLAGS=-w" "-DCMAKE_CXX_FLAGS=-w")
     endif()
 
     # DXC's build runs clang-format on generated files inside its build directory.
@@ -109,7 +112,9 @@ if(_dxc_build_from_source)
     # Placing DXC's own style (BasedOnStyle: LLVM) in the DXC build directory
     # stops the upward search at the right level.
     #
-    set(_dxc_build_dir "${CMAKE_BINARY_DIR}/dxc_from_source-prefix/src/dxc_from_source-build")
+    set(_dxc_build_dir
+        "${CMAKE_BINARY_DIR}/dxc_from_source-prefix/src/dxc_from_source-build"
+    )
     file(MAKE_DIRECTORY "${_dxc_build_dir}")
     file(WRITE "${_dxc_build_dir}/.clang-format" "BasedOnStyle: LLVM\n")
 
@@ -121,22 +126,11 @@ if(_dxc_build_from_source)
         GIT_PROGRESS ON
         UPDATE_DISCONNECTED ON
         CONFIGURE_COMMAND
-            ${CMAKE_COMMAND}
-            -B
-            <BINARY_DIR>
-            -S
-            <SOURCE_DIR>
-            -G
-            Ninja
-            -C
+            ${CMAKE_COMMAND} -B <BINARY_DIR> -S <SOURCE_DIR> -G Ninja -C
             <SOURCE_DIR>/cmake/caches/PredefinedParams.cmake
-            -DCMAKE_BUILD_TYPE=MinSizeRel
-            -DHLSL_COPY_GENERATED_SOURCES=ON
-            -DLLVM_INCLUDE_TESTS=OFF
-            -DCLANG_INCLUDE_TESTS=OFF
-            -DLLVM_ENABLE_WARNINGS=OFF
-            ${_dxc_warning_flags}
-            -Wno-dev
+            -DCMAKE_BUILD_TYPE=MinSizeRel -DHLSL_COPY_GENERATED_SOURCES=ON
+            -DLLVM_INCLUDE_TESTS=OFF -DCLANG_INCLUDE_TESTS=OFF
+            -DLLVM_ENABLE_WARNINGS=OFF ${_dxc_warning_flags} -Wno-dev
         BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR>
         INSTALL_COMMAND ""
         BUILD_BYPRODUCTS ${_dxc_src_byproducts}
@@ -152,7 +146,8 @@ if(_dxc_build_from_source)
             )
             add_custom_target(
                 copy-${_dll}
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_src}" "${_dst}"
+                COMMAND
+                    ${CMAKE_COMMAND} -E copy_if_different "${_src}" "${_dst}"
                 VERBATIM
             )
             add_dependencies(copy-${_dll} dxc_from_source)
@@ -166,7 +161,8 @@ if(_dxc_build_from_source)
             )
             add_custom_target(
                 copy-${_lib}
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_src}" "${_dst}"
+                COMMAND
+                    ${CMAKE_COMMAND} -E copy_if_different "${_src}" "${_dst}"
                 VERBATIM
             )
             add_dependencies(copy-${_lib} dxc_from_source)
