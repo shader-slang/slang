@@ -5947,7 +5947,7 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
     // Later constraints may depend on witnesses from earlier constraints.
     // Add witnesses as we discover them so lookup can see them during this
     // check, and remember which ones to remove if the overall check fails.
-    List<Decl*> addedRequirementWitnesses;
+    List<Decl*> addedRequirementDecls;
     for (auto requiredConstraintDeclRef :
          getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, requirementDeclRef))
     {
@@ -5972,7 +5972,7 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
             // appears to hold, and we can satisfy that requirement.
             SLANG_ASSERT(!witnessTable->m_requirementDictionary.containsKey(requirementDecl));
             witnessTable->add(requirementDecl, RequirementWitness(witness));
-            addedRequirementWitnesses.add(requirementDecl);
+            addedRequirementDecls.add(requirementDecl);
         }
         else
         {
@@ -5985,7 +5985,7 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
                 witnessTable->add(
                     requirementDecl,
                     m_astBuilder->getOrCreate<NoneWitness>());
-                addedRequirementWitnesses.add(requirementDecl);
+                addedRequirementDecls.add(requirementDecl);
                 continue;
             }
 
@@ -5996,7 +5996,7 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
     }
     if (!conformance)
     {
-        for (auto requirementDecl : addedRequirementWitnesses)
+        for (auto requirementDecl : addedRequirementDecls)
             witnessTable->m_requirementDictionary.remove(requirementDecl);
     }
     return conformance;
