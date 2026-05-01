@@ -48,6 +48,18 @@
     {
       "option": "SLANG_LIB_TYPE",
       "value": "STATIC"
-    }
+    },
+    { "option": "SLANG_ENABLE_ASAN" },
+    { "option": "SLANG_ENABLE_COVERAGE" },
+    { "option": "SLANG_ENABLE_CUDA" },
+    {
+      "option": "SLANG_ENABLE_OPTIX",
+      "extra_cmake_flags": "-DSLANG_ENABLE_CUDA=ON"
+    },
+    {
+      "option": "SLANG_ENABLE_NVAPI",
+      "windows_only": "true"
+    },
+    { "option": "SLANG_ENABLE_AFTERMATH" }
   ]
 }

@@ -107,7 +107,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_packages }}
 
       - name: Configure CMake (${{ matrix.option }})
-        if: matrix.linux_only != 'true' || inputs.os == 'linux'
+        if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows')
         run: |
           option="${{ matrix.option }}"
           value="${{ matrix.value }}"
@@ -172,5 +172,5 @@ jobs:
           fi
 
       - name: Build Slang (${{ matrix.option }})
-        if: matrix.linux_only != 'true' || inputs.os == 'linux'
+        if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows')
         run: cmake --build build --config "$cmake_config"

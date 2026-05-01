@@ -79,6 +79,7 @@ jobs:
           fi
 
       - name: Configure CMake (${{ matrix.option }})
+        if: matrix.windows_only != 'true'
         run: |
           option="${{ matrix.option }}"
           value="${{ matrix.value }}"
@@ -123,4 +124,5 @@ jobs:
             ${{ matrix.extra_cmake_flags || '' }}
 
       - name: Build Slang (${{ matrix.option }})
+        if: matrix.windows_only != 'true'
         run: cmake --build build --config "$cmake_config"
