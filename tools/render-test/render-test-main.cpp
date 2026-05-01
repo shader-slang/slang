@@ -1921,8 +1921,20 @@ static SlangResult _innerMain(
         for (auto& name : options.renderFeatures)
             requiredFeatureList.add(_getFeatureFromName(name.getUnownedSlice()));
 
-        desc.requiredFeatures = requiredFeatureList.getBuffer();
-        desc.requiredFeatureCount = (int)requiredFeatureList.getCount();
+        List<rhi::Feature> requiredFeatureEnumList;
+        for (auto featureName : requiredFeatureList)
+        {
+            for (int i = 0; i < int(rhi::Feature::_Count); ++i)
+            {
+                if (strcmp(getRHI()->getFeatureName(rhi::Feature(i)), featureName) == 0)
+                {
+                    requiredFeatureEnumList.add(rhi::Feature(i));
+                    break;
+                }
+            }
+        }
+        desc.requiredFeatures = requiredFeatureEnumList.getBuffer();
+        desc.requiredFeatureCount = (int)requiredFeatureEnumList.getCount();
 
 #if defined(_WIN32)
         // When the experimental feature is enabled, things become unstable.

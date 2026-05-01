@@ -57,7 +57,7 @@ Result DebugComputeCommandEncoder::bindRootObjectAsCompute(
         (void**)&baseD3D12Encoder));
     Result result =
         baseD3D12Encoder->bindRootObjectAsCompute(getInnerObj(program), getInnerObj(rootObject));
-    baseObject->release();
+    baseD3D12Encoder->release();
     return result;
 }
 
