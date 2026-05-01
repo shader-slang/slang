@@ -54,7 +54,7 @@ trap cleanup EXIT SIGHUP SIGINT SIGTERM
 # Options and parsing
 #
 repo=https://github.com/llvm/llvm-project
-branch=llvmorg-22.1.0
+branch=llvmorg-22.1.4
 source_dir=$temp_dir
 install_prefix=
 config=Release
