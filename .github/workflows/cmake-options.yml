@@ -4,9 +4,6 @@ name: CMake Options
 # non-default value (one option changed at a time, all others at their
 # defaults). This is "depth-1" coverage: no multi-option combinations are
 # tested.
-#
-# The option matrix lives in cmake-options-build.yml (reusable workflow).
-# This file calls it once per platform / config combination.
 
 on:
   pull_request:
