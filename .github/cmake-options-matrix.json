@@ -63,7 +63,6 @@
     {
       "option": "SLANG_ENABLE_NVAPI",
       "windows_only": "true"
-    },
-    { "option": "SLANG_ENABLE_AFTERMATH", "container_only": "true" }
+    }
   ]
 }
