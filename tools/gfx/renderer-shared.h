@@ -14,6 +14,7 @@ struct GfxGUID
 {
     static const Slang::Guid IID_ISlangUnknown;
     static const Slang::Guid IID_IShaderProgram;
+    static const Slang::Guid IID_IShaderProgramD3D12;
     static const Slang::Guid IID_ITransientResourceHeap;
     static const Slang::Guid IID_IPipelineState;
     static const Slang::Guid IID_IResourceView;
@@ -33,6 +34,7 @@ struct GfxGUID
     static const Slang::Guid IID_ICommandEncoder;
     static const Slang::Guid IID_IRenderCommandEncoder;
     static const Slang::Guid IID_IComputeCommandEncoder;
+    static const Slang::Guid IID_IComputeCommandEncoderD3D12;
     static const Slang::Guid IID_IResourceCommandEncoder;
     static const Slang::Guid IID_IRayTracingCommandEncoder;
     static const Slang::Guid IID_ICommandBuffer;
@@ -842,7 +844,7 @@ class ShaderProgramBase : public IShaderProgram, public Slang::ComObject
 {
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
-    IShaderProgram* getInterface(const Slang::Guid& guid);
+    virtual void* getInterface(const Slang::Guid& guid);
 
     Desc desc;
 
