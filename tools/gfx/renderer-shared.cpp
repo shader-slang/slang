@@ -14,6 +14,7 @@ namespace gfx
 
 const Slang::Guid GfxGUID::IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
 const Slang::Guid GfxGUID::IID_IShaderProgram = SLANG_UUID_IShaderProgram;
+const Slang::Guid GfxGUID::IID_IShaderProgramD3D12 = SLANG_UUID_IShaderProgramD3D12;
 const Slang::Guid GfxGUID::IID_IInputLayout = SLANG_UUID_IInputLayout;
 const Slang::Guid GfxGUID::IID_IPipelineState = SLANG_UUID_IPipelineState;
 const Slang::Guid GfxGUID::IID_ITransientResourceHeap = SLANG_UUID_ITransientResourceHeap;
@@ -34,6 +35,8 @@ const Slang::Guid GfxGUID::IID_IRenderPassLayout = SLANG_UUID_IRenderPassLayout;
 const Slang::Guid GfxGUID::IID_IRayTracingCommandEncoder = IRayTracingCommandEncoder::getTypeGuid();
 const Slang::Guid GfxGUID::IID_IResourceCommandEncoder = IResourceCommandEncoder::getTypeGuid();
 const Slang::Guid GfxGUID::IID_IComputeCommandEncoder = IComputeCommandEncoder::getTypeGuid();
+const Slang::Guid GfxGUID::IID_IComputeCommandEncoderD3D12 =
+    SLANG_UUID_IComputeCommandEncoderD3D12;
 const Slang::Guid GfxGUID::IID_IRenderCommandEncoder = IRenderCommandEncoder::getTypeGuid();
 
 const Slang::Guid GfxGUID::IID_ICommandBuffer = SLANG_UUID_ICommandBuffer;
@@ -70,6 +73,7 @@ StageType translateStage(SlangStage slangStage)
         CASE(FRAGMENT, Fragment);
 
         CASE(COMPUTE, Compute);
+        CASE(NODE, Node);
 
         CASE(RAY_GENERATION, RayGeneration);
         CASE(INTERSECTION, Intersection);
@@ -182,6 +186,8 @@ StageType mapStage(SlangStage stage)
         return gfx::StageType::Mesh;
     case SLANG_STAGE_MISS:
         return gfx::StageType::Miss;
+    case SLANG_STAGE_NODE:
+        return gfx::StageType::Node;
     case SLANG_STAGE_RAY_GENERATION:
         return gfx::StageType::RayGeneration;
     case SLANG_STAGE_VERTEX:
@@ -284,7 +290,7 @@ bool _doesValueFitInExistentialPayload(
     return true;
 }
 
-IShaderProgram* ShaderProgramBase::getInterface(const Guid& guid)
+void* ShaderProgramBase::getInterface(const Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderProgram)
         return static_cast<IShaderProgram*>(this);
