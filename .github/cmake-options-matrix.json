@@ -60,9 +60,5 @@
       "container_only": "true",
       "extra_cmake_flags": "-DSLANG_ENABLE_CUDA=ON"
     },
-    {
-      "option": "SLANG_ENABLE_NVAPI",
-      "windows_only": "true"
-    }
   ]
 }
