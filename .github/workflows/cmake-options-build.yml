@@ -176,4 +176,8 @@ jobs:
 
       - name: Build Slang (${{ matrix.option }})
         if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true'
+        env:
+          # Suppress LeakSanitizer exit-code so build tools (e.g. slang-fiddle)
+          # don't abort the build when ASAN is enabled. No-op for other options.
+          ASAN_OPTIONS: detect_leaks=0
         run: cmake --build build --config "$cmake_config"
