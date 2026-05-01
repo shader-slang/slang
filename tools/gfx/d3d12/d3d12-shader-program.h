@@ -22,6 +22,8 @@ struct ShaderBinary
 class ShaderProgramImpl : public ShaderProgramBase, public IShaderProgramD3D12
 {
 public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+
     RefPtr<RootShaderObjectLayoutImpl> m_rootObjectLayout;
     List<ShaderBinary> m_shaders;
 
