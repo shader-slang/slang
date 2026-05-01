@@ -55,7 +55,7 @@ $null = Register-EngineEvent PowerShell.Exiting -Action $cleanup
 
 # Default values
 $repo = "https://github.com/llvm/llvm-project"
-$branch = "llvmorg-21.1.2"
+$branch = "llvmorg-22.1.0"
 $sourceDir = $tempDir.FullName
 $installPrefix = ""
 $config = "Release"

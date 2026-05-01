@@ -312,7 +312,7 @@ There are several options for getting llvm-support:
     the case that a prebuilt binary can't be found then the build will proceed
     as though `DISABLE` was chosen
 - Use a system supplied LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM`, you
-  must have llvm-21.1 and a matching libclang installed. It's important that
+  must have llvm-22.1 and a matching libclang installed. It's important that
   either:
   - You don't end up linking to a dynamic libllvm.so, this will almost
     certainly cause multiple versions of LLVM to be loaded at runtime,
