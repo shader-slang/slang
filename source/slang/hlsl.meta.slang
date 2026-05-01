@@ -29552,8 +29552,12 @@ extension<
 //     which lower to packed __nv_bfloat162 PTX (add.bf16x2 / fma.rn.bf16x2 /
 //     neg.bf16x2 / ...).
 //   - SPIRV (spvBFloat16KHR): fall back to an element-wise loop, converting bf16
-//     -> half for the arithmetic and back to bf16, since SPIRV does not yet
-//     provide bf16 cooperative-matrix arithmetic ops directly.
+//     -> float for the arithmetic and back to bf16, since SPIRV does not yet
+//     provide bf16 cooperative-matrix arithmetic ops directly.  We use `float`
+//     (not `half`) as the intermediate because BFloat16 has FP32's 8-bit
+//     exponent range, and routing through half (5-bit exponent, max ~65504)
+//     would overflow / underflow valid bf16 values during the temporary
+//     conversion.
 extension<
     let S : MemoryScope,
     let M : int,
@@ -29577,7 +29581,7 @@ extension<
             This ret;
             for (int i = 0; i < GetLength(); ++i)
             {
-                ret[i] = BFloat16(half(this[i]) + half(other[i]));
+                ret[i] = BFloat16(float(this[i]) + float(other[i]));
             }
             return ret;
 
@@ -29603,7 +29607,7 @@ extension<
             This ret;
             for (int i = 0; i < GetLength(); ++i)
             {
-                ret[i] = BFloat16(half(this[i]) - half(other[i]));
+                ret[i] = BFloat16(float(this[i]) - float(other[i]));
             }
             return ret;
 
@@ -29629,7 +29633,7 @@ extension<
             This ret;
             for (int i = 0; i < GetLength(); ++i)
             {
-                ret[i] = BFloat16(half(this[i]) * half(other[i]));
+                ret[i] = BFloat16(float(this[i]) * float(other[i]));
             }
             return ret;
 
@@ -29655,7 +29659,7 @@ extension<
             This ret;
             for (int i = 0; i < GetLength(); ++i)
             {
-                ret[i] = BFloat16(half(this[i]) / half(other[i]));
+                ret[i] = BFloat16(float(this[i]) / float(other[i]));
             }
             return ret;
 
@@ -29680,7 +29684,7 @@ extension<
             This ret;
             for (int i = 0; i < GetLength(); ++i)
             {
-                ret[i] = BFloat16(-half(this[i]));
+                ret[i] = BFloat16(-float(this[i]));
             }
             return ret;
 
@@ -29707,7 +29711,7 @@ extension<
                 This ret;
                 for (int i = 0; i < GetLength(); ++i)
                 {
-                    ret[i] = BFloat16(half(this[i]) % half(other[i]));
+                    ret[i] = BFloat16(float(this[i]) % float(other[i]));
                 }
                 return ret;
             }
@@ -29733,7 +29737,7 @@ extension<
             {
                 for (int i = 0; i < GetLength(); i++)
                 {
-                    if (half(this[i]) != half(other[i]))
+                    if (float(this[i]) != float(other[i]))
                     {
                         return false;
                     }
@@ -29762,11 +29766,11 @@ extension<
             {
                 for (int i = 0; i < GetLength(); i++)
                 {
-                    if (half(this[i]) < half(other[i]))
+                    if (float(this[i]) < float(other[i]))
                     {
                         return true;
                     }
-                    else if (half(this[i]) > half(other[i]))
+                    else if (float(this[i]) > float(other[i]))
                     {
                         return false;
                     }
@@ -29795,11 +29799,11 @@ extension<
             {
                 for (int i = 0; i < GetLength(); i++)
                 {
-                    if (half(this[i]) < half(other[i]))
+                    if (float(this[i]) < float(other[i]))
                     {
                         return true;
                     }
-                    else if (half(this[i]) > half(other[i]))
+                    else if (float(this[i]) > float(other[i]))
                     {
                         return false;
                     }

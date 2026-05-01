@@ -1,18 +1,23 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -capability cuda_sm_8_0
+//TEST:SIMPLE(filecheck=CHECK_PTX): -target ptx -capability cuda_sm_8_0 -entry computeMain -stage compute
 
 // CUDA `uint8_t` saturating cooperative matrix multiply-add.  Targets PTX
 // `mma.sync.m16n8k16.row.col.satfinite.s32.u8.u8.s32`.
 //
 // Inputs are chosen so that the unsaturated accumulator stays well within
 // the int32 range, so saturating and non-saturating give the same result.
-// This focused test exercises the `mma_sat<unsigned char, int32_t, ...>`
-// code path through to PTX.
+// The COMPARE_COMPUTE directive verifies the result is correct under the
+// saturating flag; the SIMPLE PTX directive guards the actual `.satfinite`
+// opcode emission so the saturating path cannot silently regress to the
+// non-saturating form.
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 1
 // CHECK-NEXT: 2
 // CHECK-NEXT: 3
 // CHECK-NEXT: 4
+
+// CHECK_PTX: mma.sync.aligned.m16n8k16.row.col.satfinite.s32.u8.u8.s32
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

@@ -1115,8 +1115,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto aElemType = cast<IRCoopMatrixType>(matA->getDataType())->getElementType();
             auto bElemType = cast<IRCoopMatrixType>(matB->getDataType())->getElementType();
             auto cElemType = cast<IRCoopMatrixType>(matC->getDataType())->getElementType();
-            auto dElemType =
-                cast<IRCoopMatrixType>(coopMatMulAdd->getDataType())->getElementType();
+            auto dElemType = cast<IRCoopMatrixType>(coopMatMulAdd->getDataType())->getElementType();
             if (!coopMatMulAddTypeCombinationIsValid(
                     aElemType->getOp(),
                     bElemType->getOp(),
@@ -1135,10 +1134,16 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     .cType = formatElem(cElemType),
                     .dType = formatElem(dElemType),
                     .location = inst->sourceLoc});
-                // The DiagnosticSink has already recorded the error; returning
-                // `true` lets the rest of the file emit so the user can see all
-                // diagnostics in one compile, while the recorded error makes
-                // the overall compile fail.
+                // The DiagnosticSink has already recorded the error, but the
+                // surrounding statement-emit path expects an expression to
+                // follow `Type _Sname = ` (otherwise we'd emit the syntactically
+                // invalid `Type _Sname = ;`).  Emit a default-constructed
+                // value of the result type as a placeholder; the recorded
+                // error makes the overall compile fail anyway, so the
+                // placeholder never reaches NVRTC.
+                m_writer->emit("(");
+                emitType(inst->getDataType());
+                m_writer->emit("{})");
                 return true;
             }
 
@@ -1580,9 +1585,8 @@ static bool typeCheck(IROp op, uint32_t matrixUse)
     case SLANG_COOPERATIVE_MATRIX_USE_B:
         // PTX m16n8k16 supports f16, bf16, 8-bit integer (s8 / u8), and 8-bit
         // float (e4m3 / e5m2) inputs.
-        return op == kIROp_HalfType || op == kIROp_BFloat16Type ||
-               op == kIROp_Int8Type || op == kIROp_UInt8Type ||
-               op == kIROp_FloatE4M3Type || op == kIROp_FloatE5M2Type;
+        return op == kIROp_HalfType || op == kIROp_BFloat16Type || op == kIROp_Int8Type ||
+               op == kIROp_UInt8Type || op == kIROp_FloatE4M3Type || op == kIROp_FloatE5M2Type;
     case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR:
         // Union of the legal accumulator element types across all
         // currently-supported A/B element types: half/float (for f16, bf16, f8
@@ -1607,8 +1611,7 @@ static bool coopMatMulAddTypeCombinationIsValid(IROp aType, IROp bType, IROp cTy
     if (aType != bType)
         return false;
 
-    auto isHalfOrFloat = [](IROp t)
-    { return t == kIROp_HalfType || t == kIROp_FloatType; };
+    auto isHalfOrFloat = [](IROp t) { return t == kIROp_HalfType || t == kIROp_FloatType; };
     auto isFloat = [](IROp t) { return t == kIROp_FloatType; };
     auto isInt32 = [](IROp t) { return t == kIROp_IntType; };
 

@@ -6925,8 +6925,7 @@ struct MMALoadHelper<ElemT, layout, 16, 16, MatrixUse::MatrixA>
                 // Row-major: a thread's 4 column-adjacent elements are 4 contiguous
                 // bytes in memory, so each register half is a single 32-bit load.
                 regs[0] = *reinterpret_cast<const uint32_t*>(&ubuf[gid * stride + 4 * tid]);
-                regs[1] =
-                    *reinterpret_cast<const uint32_t*>(&ubuf[(gid + 8) * stride + 4 * tid]);
+                regs[1] = *reinterpret_cast<const uint32_t*>(&ubuf[(gid + 8) * stride + 4 * tid]);
             }
             else
             {
@@ -7501,6 +7500,24 @@ struct MMAStoreHelper<ElemT, layout, 16, 16>
         int stride,
         unsigned laneid)
     {
+        // 8-bit cooperative-matrix fragments (s8 / u8 / e4m3 / e5m2) only
+        // exist as MatrixA / MatrixB on CUDA, and `Store` on MatA / MatB is
+        // broken in this prelude across element sizes -- the inner
+        // `MMAStoreHelper<...,16,8>` only implements the f32/int32 and f16/bf16
+        // *accumulator* register layouts.  For half/bf16 that produces
+        // silently-wrong data; for 8-bit it would also read past the
+        // fragment's `regs[]` array via `regs + regsPerSubTile` (an int8 16x16
+        // MatA fragment carries 2 regs total, so `regs + 2` is undefined
+        // behaviour).  Fail loudly here until a MatrixUse-aware Store path
+        // lands; in the meantime use `.equals()` against a known-expected
+        // fragment to verify content (see int8-arith.slang for the pattern).
+        static_assert(
+            sizeof(ElemT) != 1,
+            "CUDA `Store` on a 16x16 cooperative-matrix fragment with an 8-bit "
+            "element type (s8 / u8 / e4m3 / e5m2) is not implemented: it would "
+            "read past the fragment's register array.  Use `.equals()` against "
+            "a known-expected fragment to verify content (see int8-arith.slang) "
+            "until MatrixA / MatrixB Store is rewritten.");
         constexpr int regsPerSubTile = (sizeof(ElemT) == 4) ? 4 : 2;
         MMAStoreHelper<ElemT, layout, 16, 8>::exec(buffer, regs, stride, laneid);
         if constexpr (layout == Layout::RowMajor)
@@ -8310,13 +8327,7 @@ __device__ inline void mma<char, int32_t, 16, 8, 16>(
                  "{%6}, "
                  "{%7, %8, %9, %10};\n"
                  : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
-                 : "r"(a[0]),
-                   "r"(a[1]),
-                   "r"(b[0]),
-                   "r"(c[0]),
-                   "r"(c[1]),
-                   "r"(c[2]),
-                   "r"(c[3]));
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
 }
 
 // Non-saturating: unsigned 8-bit inputs.
@@ -8333,13 +8344,7 @@ __device__ inline void mma<unsigned char, int32_t, 16, 8, 16>(
                  "{%6}, "
                  "{%7, %8, %9, %10};\n"
                  : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
-                 : "r"(a[0]),
-                   "r"(a[1]),
-                   "r"(b[0]),
-                   "r"(c[0]),
-                   "r"(c[1]),
-                   "r"(c[2]),
-                   "r"(c[3]));
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
 }
 
 // Saturating variants are exposed via a parallel `mma_sat` template so the
@@ -8365,13 +8370,7 @@ __device__ inline void mma_sat<char, int32_t, 16, 8, 16>(
                  "{%6}, "
                  "{%7, %8, %9, %10};\n"
                  : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
-                 : "r"(a[0]),
-                   "r"(a[1]),
-                   "r"(b[0]),
-                   "r"(c[0]),
-                   "r"(c[1]),
-                   "r"(c[2]),
-                   "r"(c[3]));
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
 }
 
 template<>
@@ -8387,13 +8386,7 @@ __device__ inline void mma_sat<unsigned char, int32_t, 16, 8, 16>(
                  "{%6}, "
                  "{%7, %8, %9, %10};\n"
                  : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
-                 : "r"(a[0]),
-                   "r"(a[1]),
-                   "r"(b[0]),
-                   "r"(c[0]),
-                   "r"(c[1]),
-                   "r"(c[2]),
-                   "r"(c[3]));
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
 }
 
 // ====================================================================================
@@ -8405,14 +8398,7 @@ __device__ inline void mma_sat<unsigned char, int32_t, 16, 8, 16>(
 //   C/D: 8 regs per thread (4 per sub-tile)
 // ====================================================================================
 
-template<
-    typename AInputT,
-    typename CType,
-    typename DType,
-    int M,
-    int N,
-    int K,
-    bool Saturating>
+template<typename AInputT, typename CType, typename DType, int M, int N, int K, bool Saturating>
 struct Int8MMAHelper;
 
 template<typename AInputT, bool Saturating>
@@ -8427,11 +8413,7 @@ struct Int8MMAHelper<AInputT, int32_t, int32_t, 16, 16, 16, Saturating>
         if constexpr (Saturating)
         {
             mma_sat<AInputT, int32_t, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
-            mma_sat<AInputT, int32_t, 16, 8, 16>(
-                d.regs + 4,
-                a.regs,
-                b.regs + 1,
-                c.regs + 4);
+            mma_sat<AInputT, int32_t, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 1, c.regs + 4);
         }
         else
         {
@@ -8468,13 +8450,7 @@ __device__ inline void mma<__nv_fp8_e4m3, float, 16, 8, 16>(
                  "{%6}, "
                  "{%7, %8, %9, %10};\n"
                  : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
-                 : "r"(a[0]),
-                   "r"(a[1]),
-                   "r"(b[0]),
-                   "r"(c[0]),
-                   "r"(c[1]),
-                   "r"(c[2]),
-                   "r"(c[3]));
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
 }
 
 template<>
@@ -8490,13 +8466,7 @@ __device__ inline void mma<__nv_fp8_e5m2, float, 16, 8, 16>(
                  "{%6}, "
                  "{%7, %8, %9, %10};\n"
                  : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
-                 : "r"(a[0]),
-                   "r"(a[1]),
-                   "r"(b[0]),
-                   "r"(c[0]),
-                   "r"(c[1]),
-                   "r"(c[2]),
-                   "r"(c[3]));
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
 }
 
 template<>
@@ -8506,14 +8476,13 @@ __device__ inline void mma<__nv_fp8_e4m3, half, 16, 8, 16>(
     const uint32_t* b,
     const uint32_t* c)
 {
-    asm volatile(
-        "mma.sync.aligned.m16n8k16.row.col.f16.e4m3.e4m3.f16 "
-        "{%0, %1}, "
-        "{%2, %3}, "
-        "{%4}, "
-        "{%5, %6};\n"
-        : "=r"(d[0]), "=r"(d[1])
-        : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]));
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f16.e4m3.e4m3.f16 "
+                 "{%0, %1}, "
+                 "{%2, %3}, "
+                 "{%4}, "
+                 "{%5, %6};\n"
+                 : "=r"(d[0]), "=r"(d[1])
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]));
 }
 
 template<>
@@ -8523,14 +8492,13 @@ __device__ inline void mma<__nv_fp8_e5m2, half, 16, 8, 16>(
     const uint32_t* b,
     const uint32_t* c)
 {
-    asm volatile(
-        "mma.sync.aligned.m16n8k16.row.col.f16.e5m2.e5m2.f16 "
-        "{%0, %1}, "
-        "{%2, %3}, "
-        "{%4}, "
-        "{%5, %6};\n"
-        : "=r"(d[0]), "=r"(d[1])
-        : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]));
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f16.e5m2.e5m2.f16 "
+                 "{%0, %1}, "
+                 "{%2, %3}, "
+                 "{%4}, "
+                 "{%5, %6};\n"
+                 : "=r"(d[0]), "=r"(d[1])
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]));
 }
 
 #endif // #if SLANG_CUDA_ENABLE_FP8

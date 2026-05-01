@@ -1,20 +1,25 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -capability cuda_sm_8_0
+//TEST:SIMPLE(filecheck=CHECK_PTX): -target ptx -capability cuda_sm_8_0 -entry computeMain -stage compute
 
 // CUDA `int8_t` saturating cooperative matrix multiply-add.  Targets PTX
 // `mma.sync.m16n8k16.row.col.satfinite.s32.s8.s8.s32`.
 //
 // Inputs are chosen so that the unsaturated accumulator stays well within
 // the int32 range, so the saturating and non-saturating mma give the same
-// result.  This focused test exercises the `coopMatMulAdd<int, true>` /
-// `mma_sat<char, int32_t, ...>` code path through to PTX without depending
-// on the driver's actual saturation behaviour (which is reportedly broken on
-// some GPU/driver combinations -- see `mat-mul-add.slang` for context).
+// result.  The COMPARE_COMPUTE directive verifies the result matches B (i.e.
+// the helper / dispatch / load / store all stayed correct under the saturating
+// flag), and the SIMPLE PTX directive guards the actual `.satfinite` opcode
+// emission so it cannot silently regress to the non-saturating form.  We do
+// not depend on the driver's runtime saturation behaviour, which is reportedly
+// broken on some GPU/driver combinations -- see `mat-mul-add.slang`.
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 1
 // CHECK-NEXT: 2
 // CHECK-NEXT: 3
 // CHECK-NEXT: 4
+
+// CHECK_PTX: mma.sync.aligned.m16n8k16.row.col.satfinite.s32.s8.s8.s32
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
