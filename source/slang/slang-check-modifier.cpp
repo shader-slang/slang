@@ -528,18 +528,14 @@ Modifier* SemanticsVisitor::validateAttribute(
     }
     else if (auto nodeIDAttr = as<NodeIDAttribute>(attr))
     {
-        auto count = attr->args.getCount();
-        SLANG_ASSERT(count == 1 || count == 2);
+        SLANG_ASSERT(attr->args.getCount() == 2);
         String name;
         if (!checkLiteralStringVal(attr->args[0], &name))
             return nullptr;
         nodeIDAttr->name = name;
-        if (count == 2)
-        {
-            nodeIDAttr->arrayIndex = checkConstantIntVal(attr->args[1]);
-            if (!nodeIDAttr->arrayIndex)
-                return nullptr;
-        }
+        nodeIDAttr->arrayIndex = checkConstantIntVal(attr->args[1]);
+        if (!nodeIDAttr->arrayIndex)
+            return nullptr;
     }
     else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(attr))
     {
