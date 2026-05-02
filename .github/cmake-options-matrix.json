@@ -54,7 +54,10 @@
       "linux_only": "true",
       "extra_cmake_flags": "-DCMAKE_COMPILE_WARNING_AS_ERROR=OFF"
     },
-    { "option": "SLANG_ENABLE_COVERAGE" },
+    {
+      "option": "SLANG_ENABLE_COVERAGE",
+      "extra_cmake_flags": "-DCMAKE_COMPILE_WARNING_AS_ERROR=OFF"
+    },
     { "option": "SLANG_ENABLE_CUDA", "container_only": "true" },
     {
       "option": "SLANG_ENABLE_OPTIX",
