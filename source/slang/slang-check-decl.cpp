@@ -5957,9 +5957,14 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
         {
             // If a subtype witness was found, then the conformance
             // appears to hold, and we can satisfy that requirement.
-            SLANG_ASSERT(!witnessTable->m_requirementDictionary.containsKey(requirementDecl));
-            witnessTable->add(requirementDecl, RequirementWitness(witness));
-            addedRequirementDecls.add(requirementDecl);
+            // Skip if already present — this function can be called multiple times
+            // for the same witness table (e.g., when re-checking conformance during
+            // specialization), and we must not double-add entries.
+            if (!witnessTable->m_requirementDictionary.containsKey(requirementDecl))
+            {
+                witnessTable->add(requirementDecl, RequirementWitness(witness));
+                addedRequirementDecls.add(requirementDecl);
+            }
         }
         else
         {
@@ -5968,9 +5973,11 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
             //
             if (requirementDecl->findModifier<OptionalConstraintModifier>())
             {
-                SLANG_ASSERT(!witnessTable->m_requirementDictionary.containsKey(requirementDecl));
-                witnessTable->add(requirementDecl, m_astBuilder->getOrCreate<NoneWitness>());
-                addedRequirementDecls.add(requirementDecl);
+                if (!witnessTable->m_requirementDictionary.containsKey(requirementDecl))
+                {
+                    witnessTable->add(requirementDecl, m_astBuilder->getOrCreate<NoneWitness>());
+                    addedRequirementDecls.add(requirementDecl);
+                }
                 continue;
             }
 
