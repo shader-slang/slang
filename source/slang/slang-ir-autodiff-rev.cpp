@@ -273,10 +273,25 @@ struct BackwardDiffTranslationContext
 
         propagateParamTypes.add((IRType*)intermediateType);
 
+        // Collect actual IRParam nodes as an authoritative source for full types including
+        // rate qualifiers, since IRFuncType operands may not carry them.
+        ShortList<IRParam*, 8> targetFuncParams;
+        for (auto param : targetFunc->getParams())
+            targetFuncParams.add(param);
+
         for (UInt i = 0; i < targetFunc->getParamCount(); i++)
         {
-            const auto& [direction, paramType] =
-                splitParameterDirectionAndType(targetFunc->getParamType(i));
+            IRType* rawParamType = (Index(i) < targetFuncParams.getCount())
+                                       ? targetFuncParams[i]->getFullType()
+                                       : targetFunc->getParamType(i);
+            // Constexpr params are compile-time constants with no differential counterpart.
+            // Preserve them unchanged so the propagate func can forward them to the derivative.
+            if (isConstExprRateQualifiedType(rawParamType))
+            {
+                propagateParamTypes.add(rawParamType);
+                continue;
+            }
+            const auto& [direction, paramType] = splitParameterDirectionAndType(rawParamType);
             auto diffValueParamType = (IRType*)diffTypeContext.tryGetAssociationOfKind(
                 paramType,
                 AnnotationKind::DifferentialType);
@@ -458,10 +473,10 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     // location tagging.
     //
     ShortList<IRParam*, 8> primalFuncParams;
-    auto funcForNames = as<IRFunc>(getResolvedInstForDecorations(primalFunc));
-    for (auto param : funcForNames->getParams())
+    if (auto funcForNames = as<IRFunc>(getResolvedInstForDecorations(primalFunc)))
     {
-        primalFuncParams.add(param);
+        for (auto param : funcForNames->getParams())
+            primalFuncParams.add(param);
     }
 
     // Jointly emit parameters for the apply and bwd prop functions, while
@@ -473,13 +488,29 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
         auto applyForBwdParam = applyFuncBuilder.emitParam(applyForBwdFuncType->getParamType(idx));
         auto rematFuncParam = rematFuncBuilder.emitParam(applyForBwdFuncType->getParamType(idx));
 
-        generateName(&builder, primalFuncParams[idx], applyForBwdParam, "");
-        applyForBwdParam->sourceLoc = primalFuncParams[idx]->sourceLoc;
+        if (Index(idx) < primalFuncParams.getCount())
+        {
+            generateName(&builder, primalFuncParams[idx], applyForBwdParam, "");
+            applyForBwdParam->sourceLoc = primalFuncParams[idx]->sourceLoc;
+        }
 
         auto bwdPropParam = bwdPropFuncBuilder.emitParam(
             bwdPropFuncType->getParamType(idx + 1)); // +1 to skip the context param
-        generateName(&builder, primalFuncParams[idx], bwdPropParam, "d_");
-        bwdPropParam->sourceLoc = primalFuncParams[idx]->sourceLoc;
+        if (Index(idx) < primalFuncParams.getCount())
+        {
+            generateName(&builder, primalFuncParams[idx], bwdPropParam, "d_");
+            bwdPropParam->sourceLoc = primalFuncParams[idx]->sourceLoc;
+        }
+
+        // Constexpr params are compile-time constants — pass directly to the legacy bwd_diff
+        // function without routing through the context struct (which stores runtime values).
+        // Use getFullType() (not getDataType()) because getDataType() strips the @ConstExpr
+        // rate qualifier, making constexpr params appear as plain Int.
+        if (isConstExprRateQualifiedType(bwdPropParam->getFullType()))
+        {
+            bwdDiffFuncArgs.add(bwdPropParam);
+            continue;
+        }
 
         if (!as<IROutParamType>(applyForBwdParam->getDataType()))
         {
@@ -730,6 +761,18 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
         auto applyParamType = applyBwdFuncType->getParamType(i);
         auto bwdPropParamType =
             bwdPropFuncType->getParamType(i + 1); // +1 to skip the context param
+
+        // Constexpr params are compile-time constants: thread them through to all three call
+        // sites (apply, remat, bwdProp) directly, skipping the differential-pair path.
+        if (isConstExprRateQualifiedType(bwdPropParamType) ||
+            isConstExprRateQualifiedType(applyParamType))
+        {
+            applyBwdFuncArgs.add(bwdDiffFuncParams[bwdDiffParamIdx]);
+            rematFuncArgs.add(bwdDiffFuncParams[bwdDiffParamIdx]);
+            bwdPropFuncParams.add(bwdDiffFuncParams[bwdDiffParamIdx]);
+            bwdDiffParamIdx++;
+            continue;
+        }
 
         if (as<IRVoidType>(bwdPropParamType))
         {

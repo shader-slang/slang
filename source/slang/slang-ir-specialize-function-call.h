@@ -35,4 +35,12 @@ bool specializeFunctionCalls(
     CodeGenContext* codeGenContext,
     IRModule* module,
     FunctionCallSpecializeCondition* condition);
+
+/// Specialize calls to functions that have `constexpr`-qualified parameters
+/// by cloning the callee with the literal value baked in. This allows
+/// static_assert and other compile-time checks on those parameters to
+/// evaluate correctly after autodiff wrapper synthesis.
+/// Returns true if any changes are made.
+bool specializeConstExprFunctionCalls(IRModule* module, CodeGenContext* codeGenContext);
+
 } // namespace Slang
