@@ -238,6 +238,24 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
                 EXCLUDE_FROM_ALL
             )
         endif()
+
+        # On MSVC with ASAN, /fsanitize=address embeds annotate_string /
+        # annotate_vector markers per object file. The linker rejects a mix of
+        # instrumented and non-instrumented objects with LNK2038, so SPIRV-Tools
+        # must be compiled with the same flag as the rest of Slang.
+        if(SLANG_ENABLE_ASAN AND MSVC)
+            get_directory_property(
+                _spirv_tools_targets
+                DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/spirv-tools"
+                BUILDSYSTEM_TARGETS
+            )
+            foreach(_t ${_spirv_tools_targets})
+                get_target_property(_type ${_t} TYPE)
+                if(NOT _type STREQUAL "INTERFACE_LIBRARY")
+                    target_compile_options(${_t} PRIVATE /fsanitize=address)
+                endif()
+            endforeach()
+        endif()
     endif()
 
     if(NOT ${SLANG_USE_SYSTEM_GLSLANG})

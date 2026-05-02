@@ -51,7 +51,6 @@
     },
     {
       "option": "SLANG_ENABLE_ASAN",
-      "linux_only": "true",
       "extra_cmake_flags": "-DCMAKE_COMPILE_WARNING_AS_ERROR=OFF"
     },
     {
