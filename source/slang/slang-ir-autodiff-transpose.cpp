@@ -568,7 +568,8 @@ struct DiffTransposePass
         {
             const auto& [direction, type] = splitParameterDirectionAndType(param->getDataType());
 
-            if (as<IRVoidType>(param->getDataType()))
+            if (as<IRVoidType>(param->getDataType()) ||
+                isConstExprRateQualifiedType(param->getFullType()))
             {
                 transposedParams.add(param, param);
                 continue;
@@ -1287,8 +1288,14 @@ struct DiffTransposePass
         // Transpose each argument (skip the first one, which is the context struct)
         for (UIndex ii = 1; ii < fwdCall->getArgCount(); ii++)
         {
-            const auto& [argDirection, argType] =
-                splitParameterDirectionAndType(fwdPropCalleeFuncType->getParamType(ii));
+            auto rawParamType = fwdPropCalleeFuncType->getParamType(ii);
+            // Constexpr params have no differential contribution; pass through unchanged.
+            if (isConstExprRateQualifiedType(rawParamType))
+            {
+                bwdPropArgs.add(fwdCall->getArg(ii));
+                continue;
+            }
+            const auto& [argDirection, argType] = splitParameterDirectionAndType(rawParamType);
             if (as<IRVoidType>(argType))
             {
                 bwdPropArgs.add(builder->getVoidValue());
