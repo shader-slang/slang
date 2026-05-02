@@ -51,6 +51,7 @@
     },
     {
       "option": "SLANG_ENABLE_ASAN",
+      "linux_only": "true",
       "extra_cmake_flags": "-DCMAKE_COMPILE_WARNING_AS_ERROR=OFF -DSLANG_EMBED_CORE_MODULE_SOURCE=OFF"
     },
     { "option": "SLANG_ENABLE_COVERAGE" },
@@ -59,6 +60,6 @@
       "option": "SLANG_ENABLE_OPTIX",
       "container_only": "true",
       "extra_cmake_flags": "-DSLANG_ENABLE_CUDA=ON"
-    },
+    }
   ]
 }
