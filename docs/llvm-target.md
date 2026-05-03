@@ -73,9 +73,10 @@ will follow those layout rules.
 ### Special type memory layouts
 
 * `StructuredBuffer` and `ByteAddressBuffer` are stored as `{ Type* data; intptr_t size; }`,
-where `size` is the number of elements in `data`.
+  where `size` is the number of elements in `data`.
 
-* `Texture` and `SamplerState` types are stored as opaque pointers.
+* `Texture` and `SamplerState` types are stored as opaque pointers. Combined
+  image samplers (`Sampler2D` etc.) are `{ void* texture; void* sampler; }`.
 
 * Vectors are passed as LLVM vector types; there's no direct equivalent in standard C or C++.
 

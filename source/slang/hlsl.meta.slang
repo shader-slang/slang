@@ -813,9 +813,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,f
 {
     typealias TexelElement = T;
     typealias TextureShape = Shape;
-    typealias CoordType = vector<float, Shape.dimensions + isArray>;
-    typealias GradientType = vector<float, Shape.dimensions>;
-    typealias OffsetType = vector<int, Shape.planeDimensions>;
     static const bool isArrayTexture = isArray == 1;
     static const bool isMultisample = isMS == 1;
     static const int multisampleCount = sampleCount;
@@ -1149,7 +1146,7 @@ void __wgsl_check_texture_type_texel_offset()
 /// user to define this texture operation.
 ///
 /// @param T Texture type.
-/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
 /// @param location Texel coordinate. If this is an array texture, the last coordinate is the array index.
 /// @param levelOrSampleIndex If `T.isMultisample`, this is the sample index. Otherwise, it is the LOD level.
 /// @return The fetched texel.
@@ -1169,7 +1166,7 @@ extern T.TexelElement llvmTextureLoad<T:ITexture>(
 /// level 0.
 ///
 /// @param T Texture type.
-/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
 /// @param location Texel coordinate. If this is an array texture, the last coordinate is the array index.
 /// @param newValue New value to write to the texel.
 /// @param sampleIndex Sample index in multisample textures. Ignore it if `!T.isMultisample`.
@@ -1189,7 +1186,7 @@ extern void llvmTextureStore<T:ITexture>(
 /// allowing the user to define this texture operation.
 ///
 /// @param T Texture type.
-/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
 /// @param mipLevel The LOD level to query the sizes for.
 /// @param width Width of the texture, in texels.
 /// @param height Height of the texture, in texels. Unused if the texture is 1D.
@@ -1224,9 +1221,8 @@ extern void llvmTextureGetDimensions<T:ITexture>(
 /// explicit LOD level.
 ///
 /// @param T Texture type.
-/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
 /// @param sam Sampler that can be converted into an arbitrary pointer type with `bit_cast`.
-///            May be a null pointer if `T.isCombinedTextureSampler`.
 /// @param location Texture coordinate. If this is an array texture, the last coordinate is the array index.
 /// @param level The LOD level to sample from.
 /// @param offset An integer offset applied to the resolved texel coordinates.
@@ -1250,9 +1246,8 @@ extern T.TexelElement llvmTextureSampleLevel<T:ITexture>(
 /// automatic LOD level computation.
 ///
 /// @param T Texture type.
-/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
 /// @param sam Sampler that can be converted into an arbitrary pointer type with `bit_cast`.
-///            May be a null pointer if `T.isCombinedTextureSampler`.
 /// @param location Texture coordinate. If this is an array texture, the last coordinate is the array index.
 /// @param gradX Texture gradient on the X axis
 /// @param gradY Texture gradient on the Y axis
@@ -1281,9 +1276,8 @@ extern T.TexelElement llvmTextureSampleGrad<T:ITexture>(
 /// explicit LOD level.
 ///
 /// @param T Texture type.
-/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
 /// @param sam Sampler that can be converted into an arbitrary pointer type with `bit_cast`.
-///            May be a null pointer if `T.isCombinedTextureSampler`.
 /// @param location Texture coordinate. If this is an array texture, the last coordinate is the array index.
 /// @param compareValue The value to compare to.
 /// @param level The LOD level to sample from.
@@ -1309,9 +1303,8 @@ extern float llvmTextureSampleCmpLevel<T:ITexture>(
 /// automatic LOD level computation.
 ///
 /// @param T Texture type.
-/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
 /// @param sam Sampler that can be converted into an arbitrary pointer type with `bit_cast`.
-///            May be a null pointer if `T.isCombinedTextureSampler`.
 /// @param location Texture coordinate. If this is an array texture, the last coordinate is the array index.
 /// @param compareValue The value to compare to.
 /// @param gradX Texture gradient on the X axis
@@ -1342,9 +1335,8 @@ extern float llvmTextureSampleCmpGrad<T:ITexture>(
 ///
 /// @param T Texture type.
 /// @param Channel Channel index to gather from.
-/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
 /// @param sam Sampler that can be converted into an arbitrary pointer type with `bit_cast`.
-///            May be a null pointer if `T.isCombinedTextureSampler`.
 /// @param location Texture coordinate. If this is an array texture, the last coordinate is the array index.
 /// @param offset An integer offset applied to the resolved texel coordinates.
 /// @return The four gathered values.
@@ -1365,9 +1357,8 @@ extern vector<T.TexelElement.Element, 4> llvmTextureGather<T:ITexture, let Chann
 ///
 /// @param T Texture type.
 /// @param Channel Channel index to gather from.
-/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
 /// @param sam Sampler that can be converted into an arbitrary pointer type with `bit_cast`.
-///            May be a null pointer if `T.isCombinedTextureSampler`.
 /// @param location Texture coordinate. If this is an array texture, the last coordinate is the array index.
 /// @param compareValue The value to compare to.
 /// @param offset An integer offset applied to the resolved texel coordinates.
