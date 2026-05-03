@@ -1120,14 +1120,26 @@ Compound Capabilities
 `cpp_glsl_hlsl_metal_spirv`
 > CPP, GLSL, HLSL, Metal, and SPIRV code-gen targets
 
+`cpp_glsl_hlsl_metal_spirv_llvm`
+> CPP, GLSL, HLSL, Metal, SPIRV, and LLVM code-gen targets
+
 `cpp_glsl_hlsl_metal_spirv_wgsl`
 > CPP, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+
+`cpp_glsl_hlsl_metal_spirv_wgsl_llvm`
+> CPP, GLSL, HLSL, Metal, SPIRV, WGSL and LLVM code-gen targets
 
 `cpp_glsl_hlsl_spirv`
 > CPP, GLSL, HLSL, and SPIRV code-gen targets
 
+`cpp_glsl_hlsl_spirv_llvm`
+> CPP, GLSL, HLSL, SPIRV, and LLVM code-gen targets
+
 `cpp_glsl_hlsl_spirv_wgsl`
 > CPP, GLSL, HLSL, SPIRV and WGSL code-gen targets
+
+`cpp_glsl_hlsl_spirv_wgsl_llvm`
+> CPP, GLSL, HLSL, SPIRV, WGSL, and LLVM code-gen targets
 
 `cpp_hlsl`
 > CPP, and HLSL code-gen targets
@@ -1143,6 +1155,9 @@ Compound Capabilities
 
 `cuda_glsl_hlsl_metal_spirv_wgsl`
 > CUDA, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+
+`cuda_glsl_hlsl_metal_spirv_wgsl_llvm`
+> CUDA, GLSL, HLSL, Metal, SPIRV, WGSL and LLVM code-gen targets
 
 `cuda_glsl_hlsl_spirv`
 > CUDA, GLSL, HLSL, and SPIRV code-gen targets
@@ -1204,8 +1219,14 @@ Compound Capabilities
 `glsl_hlsl_metal_spirv`
 > GLSL, HLSL, Metal, and SPIRV code-gen targets
 
+`glsl_hlsl_metal_spirv_llvm`
+> GLSL, HLSL, Metal, SPIRV, and LLVM code-gen targets
+
 `glsl_hlsl_metal_spirv_wgsl`
 > GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+
+`glsl_hlsl_metal_spirv_wgsl_llvm`
+> GLSL, HLSL, Metal, SPIRV, WGSL, and LLVM code-gen targets
 
 `glsl_hlsl_spirv`
 > GLSL, HLSL, and SPIRV code-gen targets
@@ -1230,6 +1251,9 @@ Compound Capabilities
 
 `hlsl_spirv`
 > HLSL, and SPIRV code-gen targets
+
+`hlsl_spirv_llvm`
+> HLSL, SPIRV and LLVM code-gen targets
 
 `image_loadstore`
 > (GLSL/SPIRV) Capabilities required to use image load/image store operations

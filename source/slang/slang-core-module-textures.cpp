@@ -72,7 +72,8 @@ void TextureTypeInfo::writeFuncBody(
     const String& spirvRWDefault,
     const String& spirvCombined,
     const String& metal,
-    const String& wgsl)
+    const String& wgsl,
+    const String& llvm)
 {
     BraceScope funcScope{i, sb};
     {
@@ -131,6 +132,11 @@ void TextureTypeInfo::writeFuncBody(
             sb << i << "case wgsl:\n";
             sb << i << "__intrinsic_asm \"" << wgsl << "\";\n";
         }
+        if (llvm.getLength())
+        {
+            sb << i << "case llvm:\n";
+            sb << i << llvm << "\n";
+        }
     }
 }
 
@@ -144,13 +150,14 @@ void TextureTypeInfo::writeFuncWithSig(
     const String& cuda,
     const String& metal,
     const String& wgsl,
+    const String& llvm,
     const ReadNoneMode readNoneMode)
 {
     if (readNoneMode == ReadNoneMode::Always)
         sb << i << "[__readNone]\n";
     sb << i << "[ForceInline]\n";
     sb << i << sig << "\n";
-    writeFuncBody(funcName, glsl, cuda, spirvDefault, spirvRWDefault, spirvCombined, metal, wgsl);
+    writeFuncBody(funcName, glsl, cuda, spirvDefault, spirvRWDefault, spirvCombined, metal, wgsl, llvm);
     sb << "\n";
 }
 
@@ -165,6 +172,7 @@ void TextureTypeInfo::writeFunc(
     const String& cuda,
     const String& metal,
     const String& wgsl,
+    const String& llvm,
     const ReadNoneMode readNoneMode)
 {
     writeFuncWithSig(
@@ -177,6 +185,7 @@ void TextureTypeInfo::writeFunc(
         cuda,
         metal,
         wgsl,
+        llvm,
         readNoneMode);
 }
 
@@ -596,6 +605,36 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 generateSpirvAsm(spirvRWDefault, true, toSlice("$this"));
             }
 
+            StringBuilder llvm;
+            {
+                llvm << "int w, h, e, d, l, s;\n";
+                llvm << "llvmTextureGetDimensions(this,";
+                llvm << (includeMipInfo ? "mipLevel," : "0,");
+                llvm << "w,h,e,d,l,s);\n";
+                switch (baseShape)
+                {
+                case SLANG_TEXTURE_1D:
+                    llvm << "width = w;\n";
+                    break;
+                case SLANG_TEXTURE_2D:
+                case SLANG_TEXTURE_CUBE:
+                    llvm << "width = w;\n";
+                    llvm << "height = h;\n";
+                    break;
+                case SLANG_TEXTURE_3D:
+                    llvm << "width = w;\n";
+                    llvm << "height = h;\n";
+                    llvm << "depth = d;\n";
+                    break;
+                }
+                if (isArray)
+                    llvm << "elements = e;\n";
+                if (includeMipInfo)
+                    llvm << "numberOfLevels = l;\n";
+                if (isMultisample)
+                    llvm << "sampleCount = s;\n";
+            }
+
             sb << "    __glsl_version(450)\n";
 
             sb << "    [require(cpp";
@@ -610,6 +649,8 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 sb << "_spirv";
             if (wgsl.getLength())
                 sb << "_wgsl";
+            if (llvm.getLength())
+                sb << "_llvm";
             sb << ", texture_sm_4_1)]\n";
 
             writeFunc(
@@ -623,6 +664,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 cuda.produceString(),
                 metal,
                 wgsl,
+                llvm,
                 ReadNoneMode::Always);
         }
     }
