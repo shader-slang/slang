@@ -25,6 +25,44 @@ if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
     endif()
 endif()
 
+# On MSVC with ASAN, /fsanitize=address embeds annotate_string /
+# annotate_vector markers per object file. The linker rejects a mix of
+# instrumented and non-instrumented objects with LNK2038, so every external
+# subproject must be compiled with the same flag.
+#
+# BUILDSYSTEM_TARGETS only lists targets defined directly in a directory, not
+# in subdirectories. slang_apply_asan_to_dir() recurses into SUBDIRECTORIES
+# so every library target (e.g. SPIRV-Tools.lib under spirv-tools/source/) is
+# covered. Call it after each add_subdirectory() that needs ASAN propagation.
+if(SLANG_ENABLE_ASAN AND MSVC)
+    function(slang_get_all_targets result_var dir)
+        get_directory_property(_targets DIRECTORY "${dir}" BUILDSYSTEM_TARGETS)
+        get_directory_property(_subdirs DIRECTORY "${dir}" SUBDIRECTORIES)
+        set(_all ${_targets})
+        foreach(_subdir ${_subdirs})
+            slang_get_all_targets(_sub "${_subdir}")
+            list(APPEND _all ${_sub})
+        endforeach()
+        set(${result_var} ${_all} PARENT_SCOPE)
+    endfunction()
+
+    function(slang_apply_asan_to_dir dir)
+        slang_get_all_targets(_targets "${dir}")
+        foreach(_t ${_targets})
+            get_target_property(_type ${_t} TYPE)
+            if(
+                _type STREQUAL "STATIC_LIBRARY"
+                OR _type STREQUAL "SHARED_LIBRARY"
+                OR _type STREQUAL "MODULE_LIBRARY"
+                OR _type STREQUAL "OBJECT_LIBRARY"
+                OR _type STREQUAL "EXECUTABLE"
+            )
+                target_compile_options(${_t} PRIVATE /fsanitize=address)
+            endif()
+        endforeach()
+    endfunction()
+endif()
+
 # Unordered dense
 if(NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     if(NOT SLANG_OVERRIDE_UNORDERED_DENSE_PATH)
@@ -239,22 +277,8 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
             )
         endif()
 
-        # On MSVC with ASAN, /fsanitize=address embeds annotate_string /
-        # annotate_vector markers per object file. The linker rejects a mix of
-        # instrumented and non-instrumented objects with LNK2038, so SPIRV-Tools
-        # must be compiled with the same flag as the rest of Slang.
         if(SLANG_ENABLE_ASAN AND MSVC)
-            get_directory_property(
-                _spirv_tools_targets
-                DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/spirv-tools"
-                BUILDSYSTEM_TARGETS
-            )
-            foreach(_t ${_spirv_tools_targets})
-                get_target_property(_type ${_t} TYPE)
-                if(NOT _type STREQUAL "INTERFACE_LIBRARY")
-                    target_compile_options(${_t} PRIVATE /fsanitize=address)
-                endif()
-            endforeach()
+            slang_apply_asan_to_dir("${CMAKE_CURRENT_SOURCE_DIR}/spirv-tools")
         endif()
     endif()
 
@@ -273,6 +297,9 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
                 EXCLUDE_FROM_ALL
                 ${system}
             )
+        endif()
+        if(SLANG_ENABLE_ASAN AND MSVC)
+            slang_apply_asan_to_dir("${CMAKE_CURRENT_SOURCE_DIR}/glslang")
         endif()
     endif()
 endif()
@@ -343,6 +370,10 @@ if(SLANG_ENABLE_SLANG_RHI)
             EXCLUDE_FROM_ALL
             ${system}
         )
+    endif()
+
+    if(SLANG_ENABLE_ASAN AND MSVC)
+        slang_apply_asan_to_dir("${CMAKE_CURRENT_SOURCE_DIR}/slang-rhi")
     endif()
 
     # Output slang-rhi-tests to the bin directory so we can run it easily.
