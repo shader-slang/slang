@@ -57,7 +57,13 @@ if(SLANG_ENABLE_ASAN AND MSVC)
                 OR _type STREQUAL "OBJECT_LIBRARY"
                 OR _type STREQUAL "EXECUTABLE"
             )
-                target_compile_options(${_t} PRIVATE /fsanitize=address)
+                # /wd5072 suppresses "ASAN enabled without debug information
+                # emission" — external Release builds have no /Zi, and their
+                # /WX would turn C5072 into a fatal error otherwise.
+                target_compile_options(
+                    ${_t}
+                    PRIVATE /fsanitize=address /wd5072
+                )
             endif()
         endforeach()
     endfunction()
@@ -276,10 +282,6 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
                 EXCLUDE_FROM_ALL
             )
         endif()
-
-        if(SLANG_ENABLE_ASAN AND MSVC)
-            slang_apply_asan_to_dir("${CMAKE_CURRENT_SOURCE_DIR}/spirv-tools")
-        endif()
     endif()
 
     if(NOT ${SLANG_USE_SYSTEM_GLSLANG})
@@ -297,9 +299,6 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
                 EXCLUDE_FROM_ALL
                 ${system}
             )
-        endif()
-        if(SLANG_ENABLE_ASAN AND MSVC)
-            slang_apply_asan_to_dir("${CMAKE_CURRENT_SOURCE_DIR}/glslang")
         endif()
     endif()
 endif()

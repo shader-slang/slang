@@ -50,8 +50,7 @@
       "value": "STATIC"
     },
     {
-      "option": "SLANG_ENABLE_ASAN",
-      "extra_cmake_flags": "-DCMAKE_COMPILE_WARNING_AS_ERROR=OFF"
+      "option": "SLANG_ENABLE_ASAN"
     },
     {
       "option": "SLANG_ENABLE_COVERAGE",

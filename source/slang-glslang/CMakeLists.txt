@@ -6,6 +6,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         .
         MODULE
         USE_FEWER_WARNINGS
+        SKIP_ASAN
         LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt SPIRV-Tools-link
         INCLUDE_DIRECTORIES_PRIVATE
             ${slang_SOURCE_DIR}/include

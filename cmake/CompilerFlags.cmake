@@ -90,7 +90,7 @@ endfunction()
 function(set_default_compile_options target)
     cmake_parse_arguments(
         ARG
-        "USE_EXTRA_WARNINGS;USE_FEWER_WARNINGS"
+        "USE_EXTRA_WARNINGS;USE_FEWER_WARNINGS;SKIP_ASAN"
         ""
         ""
         ${ARGN}
@@ -210,7 +210,7 @@ function(set_default_compile_options target)
             $<$<STREQUAL:${SLANG_LIB_TYPE},STATIC>:STB_IMAGE_STATIC>
     )
 
-    if(SLANG_ENABLE_ASAN)
+    if(SLANG_ENABLE_ASAN AND NOT ARG_SKIP_ASAN)
         # -fno-sanitize-recover=undefined is intentionally omitted so that
         # halt_on_error can be controlled at runtime via UBSAN_OPTIONS.
         # For abort-on-first-UB locally, set UBSAN_OPTIONS=halt_on_error=1.
