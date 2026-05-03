@@ -1158,7 +1158,11 @@ void __wgsl_check_texture_type_texel_offset()
 extern T.TexelElement llvmTextureLoad<T:ITexture>(
     T tex,
     vector<int, T.coordDimensions> location,
-    int levelOrSampleIndex);
+    int levelOrSampleIndex)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureLoad to use Load() on LLVM targets!");
+    return {};
+}
 
 /// Declaration of texel writing functionality for the LLVM target, allowing the
 /// user to define this texture operation. This function always writes to LOD
@@ -1175,7 +1179,10 @@ extern void llvmTextureStore<T:ITexture>(
     T tex,
     vector<int, T.coordDimensions> location,
     T.TexelElement newValue,
-    int sampleIndex);
+    int sampleIndex)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureStore to use Store() on LLVM targets!");
+}
 
 
 /// Declaration of texture dimension querying functionality for the LLVM target,
@@ -1200,7 +1207,17 @@ extern void llvmTextureGetDimensions<T:ITexture>(
     out int elements,
     out int depth,
     out int numberOfLevels,
-    out int numberOfSamples);
+    out int numberOfSamples)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureGetDimensions to use GetDimensions() on LLVM targets!");
+    // Silence the warning about these being uninitialized.
+    width = 0;
+    height = 0;
+    elements = 0;
+    depth = 0;
+    numberOfLevels = 0;
+    numberOfSamples = 0;
+}
 
 /// Declaration of texture sampling functionality for the LLVM target,
 /// allowing the user to define this texture operation. This variant takes an
@@ -1221,7 +1238,11 @@ extern T.TexelElement llvmTextureSampleLevel<T:ITexture>(
     SamplerState sam,
     vector<float, T.coordDimensions> location,
     float level,
-    vector<int, T.offsetDimensions> offset);
+    vector<int, T.offsetDimensions> offset)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureSampleLevel to use SampleLevel*() on LLVM targets!");
+    return {};
+}
 
 /// Declaration of texture sampling functionality for the LLVM target,
 /// allowing the user to define this texture operation. This variant takes
@@ -1249,7 +1270,11 @@ extern T.TexelElement llvmTextureSampleGrad<T:ITexture>(
     vector<float, T.gradDimensions> gradY,
     vector<int, T.offsetDimensions> offset,
     float bias,
-    float lodClamp);
+    float lodClamp)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureSampleGrad to use Sample*() on LLVM targets!");
+    return {};
+}
 
 /// Declaration of texture compare sampling functionality for the LLVM target,
 /// allowing the user to define this texture operation. This variant takes an
@@ -1272,7 +1297,11 @@ extern float llvmTextureSampleCmpLevel<T:ITexture>(
     vector<float, T.coordDimensions> location,
     float compareValue,
     float level,
-    vector<int, T.offsetDimensions> offset);
+    vector<int, T.offsetDimensions> offset)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureSampleCmpLevel to use SampleCmpLevel*() on LLVM targets!");
+    return 0.0;
+}
 
 /// Declaration of texture compare functionality for the LLVM target,
 /// allowing the user to define this texture operation. This variant takes
@@ -1302,7 +1331,11 @@ extern float llvmTextureSampleCmpGrad<T:ITexture>(
     vector<float, T.gradDimensions> gradY,
     vector<int, T.offsetDimensions> offset,
     float bias,
-    float lodClamp);
+    float lodClamp)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureSampleCmpGrad to use SampleCmp*() on LLVM targets!");
+    return 0.0;
+}
 
 /// Declaration of texture gather functionality for the LLVM target,
 /// allowing the user to define this texture operation.
@@ -1321,7 +1354,11 @@ extern vector<T.TexelElement.Element, 4> llvmTextureGather<T:ITexture, let Chann
     T tex,
     SamplerState sam,
     vector<float, T.coordDimensions> location,
-    vector<int, T.offsetDimensions> offset);
+    vector<int, T.offsetDimensions> offset)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureGather to use Gather*() on LLVM targets!");
+    return {};
+}
 
 /// Declaration of texture gather functionality for the LLVM target,
 /// allowing the user to define this texture operation.
@@ -1342,7 +1379,11 @@ extern vector<T.TexelElement.Element, 4> llvmTextureGatherCmp<T:ITexture, let Ch
     SamplerComparisonState sam,
     vector<float, T.coordDimensions> location,
     T.TexelElement.Element compareValue,
-    vector<int, T.offsetDimensions> offset);
+    vector<int, T.offsetDimensions> offset)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureGatherCmp to use GatherCmp*() on LLVM targets!");
+    return {};
+}
 
 //@public:
 
