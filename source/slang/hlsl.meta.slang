@@ -631,7 +631,6 @@ interface ITexture
     static const bool isMultisample;
     static const int multisampleCount;
     static const int accessMode;
-    static const bool isDepthTexture;
     static const bool isShadowTexture;
     static const bool isCombinedTextureSampler;
     static const int storageFormat;
@@ -817,8 +816,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,f
     static const bool isMultisample = isMS == 1;
     static const int multisampleCount = sampleCount;
     static const int accessMode = access;
-    static const bool isDepthTexture = isCombined == 0 && isShadow == 1;
-    static const bool isShadowTexture = isCombined == 1 && isShadow == 1;
+    static const bool isShadowTexture = isShadow == 1;
     static const bool isCombinedTextureSampler = isCombined == 1;
     static const int storageFormat = format;
     static const int coordDimensions = Shape.dimensions + isArray;

@@ -110,10 +110,10 @@ export T.TexelElement llvmTextureLoad<T:ITexture>(
 {
     if (T is RWTexture2D<float4>)
     {
-        CPUTextureType* type = bitcast<MyCPUTextureType*>(T);
+        MyCPUTextureType* type = bit_cast<MyCPUTextureType*>(tex);
         float4 texel = loadFromMyTextureType(type, int2(location[0], location[1]), levelOrSampleIndex);
         // This cast is a no-op, but necessary due to how generic type-checking operates.
-        return (el as T.TexelElement).value;
+        return (texel as T.TexelElement).value;
     }
     return {};
 }
