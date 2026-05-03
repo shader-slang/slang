@@ -1272,7 +1272,7 @@ class MaxVertexCountAttribute : public Attribute
     // The number of max vertex count for geometry shader
     //
     // TODO: This should be an accessor that uses the
-    // `intArgVals` list, rather than side data.
+    // ordinary `args` list, rather than side data.
     FIDDLE() int32_t value;
 };
 
@@ -1283,7 +1283,7 @@ class InstanceAttribute : public Attribute
     // The number of instances to run for geometry shader
     //
     // TODO: This should be an accessor that uses the
-    // `intArgVals` list, rather than side data.
+    // ordinary `args` list, rather than side data.
     FIDDLE() int32_t value;
 };
 
