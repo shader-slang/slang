@@ -1,5 +1,6 @@
 #include "slang-metal-compiler.h"
 
+#include "../core/slang-io.h"
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-representation.h"
 #include "slang-artifact-util.h"
@@ -7,6 +8,26 @@
 
 namespace Slang
 {
+
+// The `-metal-path` option names the directory that contains the `metal`
+// executable.  On Windows, users commonly paste the full path to the
+// executable (e.g. `C:\Program Files\Metal Developer Tools\bin\metal.exe`),
+// which previously failed with `E52002: pass-through compiler not found`
+// because the lookup joined `<path>/metal(.exe)`.  Strip a trailing
+// `metal.exe` so both spellings resolve.  We intentionally do not strip a
+// bare `metal` basename: a directory literally named `metal` containing a
+// `metal` executable is a plausible real-world layout.
+static String normalizeMetalToolsPath(const String& path)
+{
+    if (path.getLength() == 0)
+        return path;
+    String fileName = Path::getFileName(path);
+    if (fileName.getUnownedSlice().caseInsensitiveEquals(toSlice("metal.exe")))
+    {
+        return Path::getParentDirectory(path);
+    }
+    return path;
+}
 
 class MetalDownstreamCompiler : public DownstreamCompilerBase
 {
@@ -64,10 +85,11 @@ public:
     }
 };
 
-static SlangResult locateMetalCompiler(const String& path, DownstreamCompilerSet* set)
+static SlangResult locateMetalCompiler(const String& inPath, DownstreamCompilerSet* set)
 {
     ComPtr<IDownstreamCompiler> innerCppCompiler;
 
+    String path = normalizeMetalToolsPath(inPath);
     ExecutableLocation metalcLocation = ExecutableLocation(path, "metal");
 
     String metalSDKPath = path;
