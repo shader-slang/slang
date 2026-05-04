@@ -32,7 +32,7 @@ Customer-side integration falls into three tiers:
 - **Tier 1 — raw graphics API.** Production engines with their own
   RHI, custom Vulkan/D3D12/CUDA hosts, content-creation
   applications. The library + `slang::ICoverageTracingMetadata`
-  are the entire integration:
+  are one viable integration:
   query `(set, binding)`, declare in your pipeline-layout / root-
   signature, allocate the buffer, bind, dispatch, read back, feed
   to `slang_coverage_accumulate`, save LCOV.
@@ -47,8 +47,27 @@ Customer-side integration falls into three tiers:
   The demo is built on Tier 2 (slang-rhi); Tier-1 customers swap
   the dispatch loop for their own RHI.
 
-This library is the only host-side dependency for Tier 1 customers,
-and one of two for Tier 2 (the other being slang-rhi).
+### When you don't need this library
+
+This library is a convenience layer, not a requirement. Skip it
+entirely if either fits:
+
+- **In-process compile + custom telemetry.** Hosts compiling shaders
+  via the Slang C++ API can read counter count, per-slot
+  `(file, line)`, and `(set, binding)` from
+  `slang::ICoverageTracingMetadata` directly using its typed
+  accessors. If your output is internal telemetry, a custom
+  dashboard, or an in-house LCOV writer, the metadata API is
+  everything you need.
+- **Python-only LCOV pipeline.** If you already use
+  [`tools/shader-coverage/slang-coverage-to-lcov.py`](../../tools/shader-coverage/slang-coverage-to-lcov.py)
+  to emit LCOV from a sidecar + counter snapshot, you don't need
+  this library either; the Python script covers the same conversion
+  in a different language.
+
+The library's specific value-add is: in-memory C-ABI parsing of the
+manifest JSON, additive counter accumulation across dispatches, and
+LCOV serialization without depending on Python.
 
 ---
 
@@ -57,8 +76,12 @@ and one of two for Tier 2 (the other being slang-rhi).
 ```c
 #include "slang-coverage.h"
 
-// 1. Parse the manifest (sidecar written by slangc, or JSON built from
-//    slang::ICoverageTracingMetadata — the two shapes are identical).
+// 1. Parse the manifest. Two ways to get the JSON file:
+//      - slangc writes `<output>.coverage-mapping.json` automatically
+//        when `-trace-coverage` is on; pass that path directly.
+//      - For in-process compiles, call `slang_writeCoverageManifestJson(
+//        metadata, &blob)` to produce the same bytes in memory, then
+//        write them to a temp file and pass that path.
 SlangCoverageContext* ctx = NULL;
 slang_coverage_create("shader.spv.coverage-mapping.json", &ctx);
 
@@ -119,10 +142,15 @@ write this shape:
 
 - **slangc sidecar.** Writing any artifact with `-trace-coverage`
   produces `<output>.coverage-mapping.json` alongside.
-- **Compile API.** Serialize
-  `slang::ICoverageTracingMetadata` at host-side — the demo's
-  `buildManifestJson` in `examples/shader-coverage-demo/main.cpp`
-  is a concrete reference.
+- **Compile API.** Call
+  `slang_writeCoverageManifestJson(metadata, &blob)` to produce the
+  same bytes in-memory from a `slang::ICoverageTracingMetadata`
+  artifact. Byte-identical to the slangc sidecar; consumers that
+  parse the JSON (Python LCOV converter, custom external tools) read
+  either form interchangeably. The current rt library entry point
+  (`slang_coverage_create`) takes a file path only — feeding it the
+  in-memory blob requires staging the bytes to a temp file or
+  waiting for an in-memory variant in a follow-up.
 
 ```json
 {

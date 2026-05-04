@@ -144,105 +144,6 @@ DeviceType pickDeviceType(const std::string& backend)
 
 // ---- mode=compile ---------------------------------------------------
 
-// JSON-escape one character into `out`. Handles `\`, `"`, control
-// characters per RFC 8259 — enough for file paths.
-static void appendJsonEscaped(std::string& out, char c)
-{
-    unsigned char uc = (unsigned char)c;
-    switch (uc)
-    {
-    case '\\':
-        out += "\\\\";
-        break;
-    case '"':
-        out += "\\\"";
-        break;
-    case '\b':
-        out += "\\b";
-        break;
-    case '\f':
-        out += "\\f";
-        break;
-    case '\n':
-        out += "\\n";
-        break;
-    case '\r':
-        out += "\\r";
-        break;
-    case '\t':
-        out += "\\t";
-        break;
-    default:
-        if (uc < 0x20)
-        {
-            char buf[8];
-            std::snprintf(buf, sizeof(buf), "\\u%04x", (unsigned)uc);
-            out += buf;
-        }
-        else
-        {
-            out.push_back((char)uc);
-        }
-    }
-}
-
-// Build a `.coverage-mapping.json` payload from the compiler's
-// ICoverageTracingMetadata. This matches the same JSON shape that
-// slangc emits via `_maybeWriteCoverageMapping`, so the resulting
-// file is interchangeable with slangc's sidecar output.
-static std::string buildManifestJson(slang::ICoverageTracingMetadata* coverage)
-{
-    std::string out;
-    out += "{\n";
-    out += "  \"version\": 1,\n";
-    char countBuf[64];
-    std::snprintf(countBuf, sizeof(countBuf), "  \"counters\": %u,\n", coverage->getCounterCount());
-    out += countBuf;
-    out += "  \"buffer\": {\n";
-    out += "    \"name\": \"__slang_coverage\",\n";
-    out += "    \"element_type\": \"uint32\",\n";
-    out += "    \"element_stride\": 4,\n";
-    out += "    \"synthesized\": true";
-    slang::CoverageBufferInfo bufferInfo;
-    if (SLANG_SUCCEEDED(coverage->getBufferInfo(&bufferInfo)))
-    {
-        if (bufferInfo.space >= 0)
-        {
-            char buf[64];
-            std::snprintf(buf, sizeof(buf), ",\n    \"space\": %d", (int)bufferInfo.space);
-            out += buf;
-        }
-        if (bufferInfo.binding >= 0)
-        {
-            char buf[64];
-            std::snprintf(buf, sizeof(buf), ",\n    \"binding\": %d", (int)bufferInfo.binding);
-            out += buf;
-        }
-    }
-    out += "\n  },\n";
-    out += "  \"entries\": [";
-    uint32_t counterCount = coverage->getCounterCount();
-    for (uint32_t i = 0; i < counterCount; ++i)
-    {
-        slang::CoverageEntryInfo entry;
-        if (SLANG_FAILED(coverage->getEntryInfo(i, &entry)))
-            continue;
-        if (i > 0)
-            out += ",";
-        char idxBuf[64];
-        std::snprintf(idxBuf, sizeof(idxBuf), "\n    {\"index\": %u, \"file\": \"", i);
-        out += idxBuf;
-        for (const char* p = entry.file; p && *p; ++p)
-            appendJsonEscaped(out, *p);
-        char tail[64];
-        std::snprintf(tail, sizeof(tail), "\", \"line\": %u}", entry.line);
-        out += tail;
-    }
-    out += "\n  ]\n";
-    out += "}\n";
-    return out;
-}
-
 // Fetch ICoverageTracingMetadata from a linked program and serialize
 // it to `path` as a JSON manifest in the same shape slangc writes.
 // Returns the counter count on success, or 0 on failure.
@@ -320,14 +221,19 @@ static uint32_t writeManifestFromMetadata(
                 gotSpace);
         }
     }
-    std::string json = buildManifestJson(coverage);
+    ComPtr<ISlangBlob> manifest;
+    if (SLANG_FAILED(slang_writeCoverageManifestJson(coverage, manifest.writeRef())))
+    {
+        std::fprintf(stderr, "failed to serialize coverage manifest\n");
+        return 0;
+    }
     FILE* f = std::fopen(path.c_str(), "wb");
     if (!f)
     {
         std::fprintf(stderr, "failed to open '%s' for writing\n", path.c_str());
         return 0;
     }
-    std::fwrite(json.data(), 1, json.size(), f);
+    std::fwrite(manifest->getBufferPointer(), 1, manifest->getBufferSize(), f);
     std::fclose(f);
     return coverage->getCounterCount();
 }

@@ -299,9 +299,12 @@ additional host code, no new runtime dependency beyond
 
 Hosts that go through the Slang compile API directly can query the
 same data via `slang::ICoverageTracingMetadata` on the artifact's
-`IMetadata`, without needing the sidecar file. See the demo's
-`writeManifestFromMetadata` helper in `main.cpp` for a concrete
-example.
+`IMetadata`, without needing the sidecar file. To produce the
+canonical `.coverage-mapping.json` bytes from in-process metadata,
+call `slang_writeCoverageManifestJson(metadata, &blob)` — the bytes
+are byte-identical to slangc's sidecar output. The demo's
+`writeManifestFromMetadata` in `main.cpp` is a working example of
+this pattern.
 
 ## Notes for host integrators
 
