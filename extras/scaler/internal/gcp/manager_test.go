@@ -19,6 +19,32 @@ func TestCleanupFilter(t *testing.T) {
 	}
 }
 
+func TestLiveFilter(t *testing.T) {
+	got := liveFilter("linux-test")
+	want := "name=linux-test-* AND (status=PROVISIONING OR status=STAGING OR status=RUNNING OR status=REPAIRING)"
+	if got != want {
+		t.Fatalf("liveFilter() = %q, want %q", got, want)
+	}
+}
+
+func TestIsLiveStatus(t *testing.T) {
+	tests := map[string]bool{
+		"PROVISIONING": true,
+		"STAGING":      true,
+		"RUNNING":      true,
+		"REPAIRING":    true,
+		"STOPPING":     false,
+		"TERMINATED":   false,
+		"":             false,
+	}
+
+	for status, want := range tests {
+		if got := isLiveStatus(status); got != want {
+			t.Fatalf("isLiveStatus(%q) = %v, want %v", status, got, want)
+		}
+	}
+}
+
 func TestRemoveTrackedVMByVMName(t *testing.T) {
 	m := &Manager{
 		vms: map[string]*vmInfo{
@@ -201,6 +227,83 @@ func TestDoCleanupTerminatedVMsDeletesPartialListResultsOnError(t *testing.T) {
 	}
 	if _, ok := m.vms["runner-a"]; ok {
 		t.Fatalf("runner-a should be removed after deleting partial list result")
+	}
+}
+
+func TestReconcileKeepsLiveTrackedVMs(t *testing.T) {
+	m := &Manager{
+		vms: map[string]*vmInfo{
+			"runner-a": {vmName: "linux-test-a", zone: "us-east1-c"},
+		},
+	}
+	m.listLive = func(_ context.Context, zone string) ([]string, error) {
+		if zone != "us-east1-c" {
+			t.Fatalf("zone = %q, want us-east1-c", zone)
+		}
+		return []string{"linux-test-a"}, nil
+	}
+
+	m.reconcileTrackedVMs(context.Background())
+
+	if _, ok := m.vms["runner-a"]; !ok {
+		t.Fatalf("runner-a should remain while VM is live")
+	}
+}
+
+func TestReconcileEvictsMissingTrackedVMs(t *testing.T) {
+	m := &Manager{
+		vms: map[string]*vmInfo{
+			"runner-a": {vmName: "linux-test-a", zone: "us-east1-c"},
+		},
+	}
+	m.listLive = func(_ context.Context, _ string) ([]string, error) {
+		return nil, nil
+	}
+
+	m.reconcileTrackedVMs(context.Background())
+
+	if _, ok := m.vms["runner-a"]; ok {
+		t.Fatalf("runner-a should be removed when VM is no longer live")
+	}
+}
+
+func TestReconcileKeepsTrackedVMsWhenListFails(t *testing.T) {
+	m := &Manager{
+		vms: map[string]*vmInfo{
+			"runner-a": {vmName: "linux-test-a", zone: "us-east1-c"},
+		},
+	}
+	m.listLive = func(_ context.Context, _ string) ([]string, error) {
+		return nil, errors.New("list failed")
+	}
+
+	m.reconcileTrackedVMs(context.Background())
+
+	if _, ok := m.vms["runner-a"]; !ok {
+		t.Fatalf("runner-a should remain when live VM listing fails")
+	}
+}
+
+func TestReconcileDoesNotEvictVMAddedAfterSnapshot(t *testing.T) {
+	m := &Manager{
+		vms: map[string]*vmInfo{
+			"runner-a": {vmName: "linux-test-a", zone: "us-east1-c"},
+		},
+	}
+	m.listLive = func(_ context.Context, _ string) ([]string, error) {
+		m.mu.Lock()
+		m.vms["runner-b"] = &vmInfo{vmName: "linux-test-b", zone: "us-east1-c"}
+		m.mu.Unlock()
+		return nil, nil
+	}
+
+	m.reconcileTrackedVMs(context.Background())
+
+	if _, ok := m.vms["runner-a"]; ok {
+		t.Fatalf("runner-a should be removed when snapshot VM is no longer live")
+	}
+	if _, ok := m.vms["runner-b"]; !ok {
+		t.Fatalf("runner-b should remain because it was added after the snapshot")
 	}
 }
 
