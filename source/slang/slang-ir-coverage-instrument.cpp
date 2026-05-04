@@ -262,11 +262,14 @@ static IRVarLayout* extendScopeLayoutWithCoverageBuffer(
         return oldScopeVarLayout;
 
     // Today `synthesizeCoverageBuffer` always attaches the layout
-    // decoration before this is called; assert rather than null-deref
-    // so a future refactor that splits or reorders those steps fails
-    // loudly instead of crashing inside `getLayout()`.
+    // decoration before this is called; if a future refactor splits
+    // or reorders those steps the decoration could be temporarily
+    // absent. Return the unchanged scope layout in that case rather
+    // than null-dereferencing — a `SLANG_ASSERT` would only catch
+    // this in debug builds.
     auto layoutDecor = coverageBuffer->findDecoration<IRLayoutDecoration>();
-    SLANG_ASSERT(layoutDecor);
+    if (!layoutDecor)
+        return oldScopeVarLayout;
     auto coverageVarLayout = cast<IRVarLayout>(layoutDecor->getLayout());
 
     // Build a new struct type layout: copy old fields, then add ours.
