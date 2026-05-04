@@ -760,17 +760,19 @@ IROp getSetOpFromType(IRType* type)
     case kIROp_TypeType: // Can be refined into set of concrete types
         return kIROp_TypeSet;
 
-    // Plain value types — int / bool are the only `static const`
-    // requirement types the front-end currently permits (E30302),
-    // but the set machinery treats any constant IR value uniformly.
+    // Plain value types — integer and bool types are the only `static const`
+    // requirement types the front-end currently permits (E30302), but the set
+    // machinery treats any constant IR value uniformly.
     case kIROp_IntType:
     case kIROp_Int8Type:
     case kIROp_Int16Type:
     case kIROp_Int64Type:
+    case kIROp_IntPtrType:
     case kIROp_UIntType:
     case kIROp_UInt8Type:
     case kIROp_UInt16Type:
     case kIROp_UInt64Type:
+    case kIROp_UIntPtrType:
     case kIROp_BoolType:
         return kIROp_ValueSet;
 

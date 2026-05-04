@@ -2165,7 +2165,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 15;
+    const static UInt k_maxSupportedModuleVersion = 16;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

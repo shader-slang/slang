@@ -453,6 +453,8 @@ struct TagOpsLoweringContext : public InstPassBase
     {
     }
 
+    Dictionary<KeyValuePair<IRInst*, IRInst*>, IRFunc*> valueSetDispatchFuncCache;
+
     void lowerGetTagForSuperSet(IRGetTagForSuperSet* inst)
     {
         // `GetTagForSuperSet` is a no-op since we want to translate the tag
@@ -491,13 +493,21 @@ struct TagOpsLoweringContext : public InstPassBase
     // Lowering builds a `(UInt witnessTag) -> ValueType` dispatch function:
     // a switch that returns the constant entry for each witness-table tag,
     // then replaces the `GetTagForMappedSet` with a call to that function.
-    void lowerGetTagForMappedSetForValueSet(IRGetTagForMappedSet* inst, IRValueSet* /*destSet, unused*/)
+    IRFunc* getOrCreateValueSetDispatchFunc(
+        IRWitnessTableSet* srcSet,
+        IRStructKey* requirementKey,
+        IRType* resultType)
     {
-        auto srcSet = cast<IRWitnessTableSet>(
-            cast<IRSetTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
-        auto key = cast<IRStructKey>(inst->getOperand(1));
-        auto resultType = inst->getDataType();
-        auto module = inst->getModule();
+        KeyValuePair<IRInst*, IRInst*> cacheKey(srcSet, requirementKey);
+
+        IRFunc* dispatchFunc = nullptr;
+        if (valueSetDispatchFuncCache.tryGetValue(cacheKey, dispatchFunc))
+        {
+            SLANG_RELEASE_ASSERT(dispatchFunc->getResultType() == resultType);
+            return dispatchFunc;
+        }
+
+        auto module = srcSet->getModule();
 
         // Collect (witness-tag, value-entry) pairs.
         List<UInt> caseTags;
@@ -507,33 +517,26 @@ struct TagOpsLoweringContext : public InstPassBase
             for (UInt i = 0; i < srcSet->getCount(); i++)
             {
                 auto table = as<IRWitnessTable>(srcSet->getElement(i));
-                SLANG_ASSERT(table);
-                auto entry = findWitnessTableEntry(table, key);
-                SLANG_ASSERT(entry);
+                SLANG_RELEASE_ASSERT(table);
+                auto entry = findWitnessTableEntry(table, requirementKey);
+                SLANG_RELEASE_ASSERT(entry);
                 caseTags.add(getUniqueID(&tagBuilder, table));
                 caseEntries.add(entry);
             }
         }
-        SLANG_ASSERT(caseEntries.getCount() > 0);
+        SLANG_RELEASE_ASSERT(caseEntries.getCount() > 0);
 
         // Build a dispatch function `(UInt) -> resultType`.
         IRBuilder funcBuilder(module);
         auto funcType =
             funcBuilder.getFuncType(List<IRType*>({funcBuilder.getUIntType()}), resultType);
-        auto dispatchFunc = funcBuilder.createFunc();
+        dispatchFunc = funcBuilder.createFunc();
         funcBuilder.setInsertInto(dispatchFunc);
         dispatchFunc->setFullType(funcType);
 
         auto entryBlock = funcBuilder.emitBlock();
         funcBuilder.setInsertInto(entryBlock);
         auto tagParam = funcBuilder.emitParam(funcBuilder.getUIntType());
-
-        // In a correctly-tagged program the default is unreachable, but the
-        // IR requires a value return. The first case's entry is arbitrary-
-        // but-valid.
-        auto defaultBlock = funcBuilder.emitBlock();
-        funcBuilder.setInsertInto(defaultBlock);
-        funcBuilder.emitReturn(caseEntries[0]);
 
         List<IRInst*> caseValues;
         List<IRBlock*> caseBlocks;
@@ -562,9 +565,22 @@ struct TagOpsLoweringContext : public InstPassBase
         funcBuilder.emitSwitch(
             tagParam,
             unreachableBlock,
-            defaultBlock,
+            unreachableBlock,
             flattenedCaseArgs.getCount(),
             flattenedCaseArgs.getBuffer());
+
+        valueSetDispatchFuncCache.add(cacheKey, dispatchFunc);
+        return dispatchFunc;
+    }
+
+    void lowerGetTagForMappedSetForValueSet(IRGetTagForMappedSet* inst)
+    {
+        auto srcSet = cast<IRWitnessTableSet>(
+            cast<IRSetTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
+        auto key = cast<IRStructKey>(inst->getOperand(1));
+        auto resultType = inst->getDataType();
+        auto module = inst->getModule();
+        auto dispatchFunc = getOrCreateValueSetDispatchFunc(srcSet, key, resultType);
 
         // Replace the inst with a call to the dispatch function. The
         // witness-tag operand has SetTagType but is treated as UInt at the
@@ -588,7 +604,7 @@ struct TagOpsLoweringContext : public InstPassBase
         // returning the constant entries directly.
         if (!as<IRSetTagType>(inst->getDataType()))
         {
-            lowerGetTagForMappedSetForValueSet(inst, /*destSet=*/nullptr);
+            lowerGetTagForMappedSetForValueSet(inst);
             return;
         }
 
