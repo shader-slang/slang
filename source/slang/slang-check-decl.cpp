@@ -3998,8 +3998,8 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericDecl(
     Expr* expr,
     Val* val)
 {
-    // Check if this constraint references type parameters that appear later
-    // in the same GenericDecl's parameter list and report a forward reference error
+    // Check if this decl references type parameters that appear later in the
+    // same GenericDecl's parameter list and report a forward reference error
     // if it does.
 
     // Only applies to constraints within GenericDecl contexts where declaration order matters.

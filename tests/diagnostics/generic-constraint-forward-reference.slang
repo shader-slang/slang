@@ -4,6 +4,7 @@
 interface IFloat {}
 interface IFoo<T : IFloat> {}
 interface IBar<T, U> {}
+interface IBaz<let V : int> {}
 
 // Test case 1: Simple forward reference in interface constraint
 void test1<Foo : IFoo<T>, T : IFloat>() {}
@@ -20,3 +21,8 @@ void test2<A : IBar<B, C>, B : IFloat, C : IFloat>() {}
 // Valid case that should NOT produce our error:
 // Test case 3: Correct order - type parameter declared before use
 void test3<T : IFloat, Foo : IFoo<T>>() {}
+
+// Test case 4: Forward reference to value parameter
+void tes41<A : IBaz<V>, let V : int>() {}
+//CHECK:       ^^^^ forward reference in generic constraint
+//CHECK:       ^^^^ generic constraint for parameter 'A' references type parameter 'V' before it is declared

@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 interface IFoo
@@ -155,6 +155,14 @@ struct MemberFuncs
     }
 }
 
+struct NestedGenerics<T>
+{
+    int foo<U = T>()
+    {
+        return sizeof(U);
+    }
+}
+
 [numthreads(1, 1, 1)]
 void computeMain()
 {
@@ -228,4 +236,10 @@ void computeMain()
     outputBuffer[32] = m.dependentValueDefault<5>();
     // CHECK: 4
     outputBuffer[33] = m.overloadedSize<float>();
+
+    NestedGenerics<int> n;
+    // CHECK: 8
+    outputBuffer[34] = n.foo<float2>();
+    // CHECK: 4
+    outputBuffer[35] = n.foo();
 }
