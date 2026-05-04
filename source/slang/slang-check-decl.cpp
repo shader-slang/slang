@@ -3263,6 +3263,13 @@ static bool _initExprContainsMutableGlobalRef(Expr* expr)
     }
     if (auto parenExpr = as<ParenExpr>(expr))
         return _initExprContainsMutableGlobalRef(parenExpr->base);
+    if (auto initListExpr = as<InitializerListExpr>(expr))
+    {
+        for (auto arg : initListExpr->args)
+            if (_initExprContainsMutableGlobalRef(arg))
+                return true;
+        return false;
+    }
     return false;
 }
 

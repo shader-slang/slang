@@ -65,6 +65,13 @@ static const float VELEM = Vec[1];
 //CHECK:           ^^^^^ static const global initializer must be a compile-time constant
 //CHECK:           ^^^^^ initializer of static const global 'VELEM' does not evaluate to a compile-time constant
 
+// Array subscript where the INDEX is a mutable global (IndexExpr index) must also be caught.
+static int runtimeIndex = 1;
+// CHECK: error[E31226]
+static const float ELEM_BY_RUNTIME_INDEX = Arr[runtimeIndex];
+//CHECK:           ^^^^^^^^^^^^^^^^^^^^^ static const global initializer must be a compile-time constant
+//CHECK:           ^^^^^^^^^^^^^^^^^^^^^ initializer of static const global 'ELEM_BY_RUNTIME_INDEX' does not evaluate to a compile-time constant
+
 RWStructuredBuffer<float> OutData;
 
 [shader("compute")]

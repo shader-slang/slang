@@ -1,4 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl
 
 // Regression test for: https://github.com/shader-slang/slang/issues/8550
 // A `static const` global initialized from a non-const global should produce
