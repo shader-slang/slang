@@ -84,6 +84,21 @@ extern "C"
     // `*outCtx` is set to `nullptr`.
     SlangResult slang_coverage_create(const char* manifestPath, SlangCoverageContext** outCtx);
 
+    // Create a context from in-memory manifest bytes (typically produced
+    // by `slang_writeCoverageManifestJson` on a compile artifact, but
+    // any byte-identical copy of slangc's `.coverage-mapping.json`
+    // sidecar is accepted). This avoids a temp-file round-trip when the
+    // host is already in-process and holds the manifest as a buffer.
+    //
+    // `jsonData` points at `jsonSize` bytes of UTF-8 JSON. The bytes are
+    // parsed and copied; `jsonData` need not outlive the call. Returns
+    // `SLANG_E_INVALID_ARG` for null arguments, `SLANG_FAIL` if the
+    // bytes are not well-formed v1 manifest JSON.
+    SlangResult slang_coverage_create_from_json_data(
+        const void* jsonData,
+        size_t jsonSize,
+        SlangCoverageContext** outCtx);
+
     // Release a context and its resources. Safe to call on a nullptr
     // context.
     void slang_coverage_destroy(SlangCoverageContext* ctx);

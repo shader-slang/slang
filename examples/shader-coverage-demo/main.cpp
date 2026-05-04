@@ -235,6 +235,34 @@ static uint32_t writeManifestFromMetadata(
     }
     std::fwrite(manifest->getBufferPointer(), 1, manifest->getBufferSize(), f);
     std::fclose(f);
+
+    // In-memory roundtrip: feed the same bytes the sidecar holds back
+    // through the rt library's `_from_json_data` entry point. This both
+    // exercises the in-process composition path and acts as a smoke
+    // test that the rt parser agrees with the public serializer about
+    // the manifest shape.
+    SlangCoverageContext* ctx = nullptr;
+    if (slang_coverage_create_from_json_data(
+            manifest->getBufferPointer(),
+            manifest->getBufferSize(),
+            &ctx) != SLANG_OK)
+    {
+        std::fprintf(stderr, "in-memory roundtrip: rt parser rejected manifest\n");
+        return 0;
+    }
+    uint32_t rtCount = slang_coverage_counter_count(ctx);
+    slang_coverage_destroy(ctx);
+    if (rtCount != coverage->getCounterCount())
+    {
+        std::fprintf(
+            stderr,
+            "in-memory roundtrip: rt counter count %u != metadata counter count %u\n",
+            rtCount,
+            coverage->getCounterCount());
+        return 0;
+    }
+    std::printf("[coverage] in-memory roundtrip ok (%u slots)\n", rtCount);
+
     return coverage->getCounterCount();
 }
 

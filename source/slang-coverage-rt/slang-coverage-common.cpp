@@ -493,6 +493,28 @@ bool parseManifest(const std::string& text, SlangCoverageContext* ctx)
 // C API implementation.
 //
 
+namespace
+{
+// Build a context from a manifest body already loaded into memory.
+// Shared by both public constructors (`slang_coverage_create` reads
+// from a file, `slang_coverage_create_from_json_data` from a buffer).
+SlangResult createFromText(const std::string& text, SlangCoverageContext** outCtx)
+{
+    auto* ctx = new SlangCoverageContext();
+    // Stamp the binding-info struct's `structSize` so consumers can
+    // version-gate field reads. parseManifest may overwrite individual
+    // fields but won't touch this.
+    ctx->binding.structSize = sizeof(SlangCoverageBindingInfo);
+    if (!parseManifest(text, ctx))
+    {
+        delete ctx;
+        return SLANG_FAIL;
+    }
+    *outCtx = ctx;
+    return SLANG_OK;
+}
+} // namespace
+
 extern "C" SlangResult slang_coverage_create(
     const char* manifestPath,
     SlangCoverageContext** outCtx)
@@ -518,18 +540,20 @@ extern "C" SlangResult slang_coverage_create(
     }
     std::fclose(f);
 
-    auto* ctx = new SlangCoverageContext();
-    // Stamp the binding-info struct's `structSize` so consumers can
-    // version-gate field reads. parseManifest may overwrite individual
-    // fields but won't touch this.
-    ctx->binding.structSize = sizeof(SlangCoverageBindingInfo);
-    if (!parseManifest(text, ctx))
-    {
-        delete ctx;
-        return SLANG_FAIL;
-    }
-    *outCtx = ctx;
-    return SLANG_OK;
+    return createFromText(text, outCtx);
+}
+
+extern "C" SlangResult slang_coverage_create_from_json_data(
+    const void* jsonData,
+    size_t jsonSize,
+    SlangCoverageContext** outCtx)
+{
+    if (!jsonData || !outCtx)
+        return SLANG_E_INVALID_ARG;
+    *outCtx = nullptr;
+
+    std::string text(static_cast<const char*>(jsonData), jsonSize);
+    return createFromText(text, outCtx);
 }
 
 extern "C" void slang_coverage_destroy(SlangCoverageContext* ctx)

@@ -76,12 +76,13 @@ LCOV serialization without depending on Python.
 ```c
 #include "slang-coverage.h"
 
-// 1. Parse the manifest. Two ways to get the JSON file:
-//      - slangc writes `<output>.coverage-mapping.json` automatically
-//        when `-trace-coverage` is on; pass that path directly.
-//      - For in-process compiles, call `slang_writeCoverageManifestJson(
-//        metadata, &blob)` to produce the same bytes in memory, then
-//        write them to a temp file and pass that path.
+// 1. Parse the manifest. Two equivalent entry points:
+//      - From the slangc sidecar:
+//          slang_coverage_create("shader.spv.coverage-mapping.json", &ctx);
+//      - From in-memory bytes (e.g. `slang_writeCoverageManifestJson`
+//        output, or any byte-identical copy of the sidecar):
+//          slang_coverage_create_from_json_data(blob->getBufferPointer(),
+//                                               blob->getBufferSize(), &ctx);
 SlangCoverageContext* ctx = NULL;
 slang_coverage_create("shader.spv.coverage-mapping.json", &ctx);
 
@@ -145,12 +146,13 @@ write this shape:
 - **Compile API.** Call
   `slang_writeCoverageManifestJson(metadata, &blob)` to produce the
   same bytes in-memory from a `slang::ICoverageTracingMetadata`
-  artifact. Byte-identical to the slangc sidecar; consumers that
-  parse the JSON (Python LCOV converter, custom external tools) read
-  either form interchangeably. The current rt library entry point
-  (`slang_coverage_create`) takes a file path only — feeding it the
-  in-memory blob requires staging the bytes to a temp file or
-  waiting for an in-memory variant in a follow-up.
+  artifact. The output is byte-identical to slangc's sidecar.
+
+The rt library accepts both shapes interchangeably:
+`slang_coverage_create(path, &ctx)` for the on-disk sidecar,
+`slang_coverage_create_from_json_data(bytes, size, &ctx)` for the
+in-memory blob. Both produce equivalent `SlangCoverageContext`
+handles.
 
 ```json
 {
