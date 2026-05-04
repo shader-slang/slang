@@ -115,11 +115,13 @@ Enabling `-trace-coverage` runs three pipeline stages:
    `GlobalParams` struct. The pass:
    - **Synthesizes the coverage buffer** as a fresh `IRGlobalParam`
      of type `RWStructuredBuffer<uint>`, with a target-aware layout:
-     `UnorderedAccess` for D3D-style targets, `DescriptorTableSlot`
-     for Khronos / SPIR-V / GLSL / WebGPU. For CPU and CUDA targets
-     it additionally reports `Uniform` size, which the global-uniform
-     packaging pass uses to fold the buffer into the standard
-     `GlobalParams` struct.
+     `UnorderedAccess` for D3D-style targets, `MetalBuffer` for
+     Metal, `DescriptorTableSlot` for Khronos / SPIR-V / GLSL. For
+     CPU and CUDA targets it additionally reports `Uniform` size,
+     which the global-uniform packaging pass uses to fold the buffer
+     into the standard `GlobalParams` struct. WGSL targets currently
+     skip instrumentation entirely (warning E45102) until the
+     synthesized type is wrapped in `Atomic<...>`.
    - **Picks a (set, binding)** — either honoring
      `-trace-coverage-binding <reg> <space>` if supplied, or
      auto-allocating an offset in space 0 that doesn't collide with
