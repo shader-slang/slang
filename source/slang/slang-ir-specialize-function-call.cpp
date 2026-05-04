@@ -1255,11 +1255,16 @@ bool specializeConstExprFunctionCalls(IRModule* module, CodeGenContext* codeGenC
 {
     ConstExprFunctionCallSpecializeCondition condition;
     bool anyChanged = false;
-    bool changed = true;
-    while (changed)
+    // Iterate to a fixed point, but cap iterations to guard against pathological
+    // cases (e.g. recursive constexpr helpers that produce a new distinct literal
+    // each iteration).  64 rounds is far more than any realistic shader needs;
+    // if we haven't converged by then, bail out rather than hang the compiler.
+    static constexpr int kMaxIters = 64;
+    for (int iter = 0; iter < kMaxIters; ++iter)
     {
-        changed = specializeFunctionCalls(codeGenContext, module, &condition);
-        anyChanged |= changed;
+        if (!specializeFunctionCalls(codeGenContext, module, &condition))
+            break;
+        anyChanged = true;
     }
     return anyChanged;
 }

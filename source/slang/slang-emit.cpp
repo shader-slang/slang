@@ -1201,6 +1201,12 @@ Result linkAndOptimizeIR(
     // Re-run constexpr propagation for newly generated autodiff wrapper functions.
     // These didn't exist when propagateConstExpr ran during IR lowering, so
     // static_assert on constexpr params in backward derivatives requires a second pass.
+    //
+    // The gate on `requiredLoweringPassSet.autodiff` is intentional: this pass exists
+    // to handle constexpr-param calls that appear *inside synthesized autodiff wrappers*
+    // (which are created during finalizeAutoDiffPass).  Non-autodiff code with constexpr
+    // params is handled earlier by specializeHigherOrderParameters; running this pass
+    // unconditionally on non-autodiff modules would be harmless but wasteful.
     if (requiredLoweringPassSet.autodiff)
     {
         SLANG_PASS(propagateConstExpr, sink);
