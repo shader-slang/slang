@@ -1156,8 +1156,13 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
     for (uint32_t i = 0; i < counterCount; ++i)
     {
         slang::CoverageEntryInfo entry;
+        // Every index in [0, counterCount) is a valid argument to
+        // `getEntryInfo` by construction; failure here means an
+        // internal invariant violation. Bail rather than silently
+        // dropping entries — a partial manifest with out-of-order
+        // slot indices would misalign the host's counter array.
         if (SLANG_FAILED(metadata->getEntryInfo(i, &entry)))
-            continue;
+            return SLANG_FAIL;
         out << (i == 0 ? "" : ",");
         out << "\n    {\"index\": " << (int64_t)i << ", \"file\": \"";
         for (const char* p = entry.file; p && *p; ++p)

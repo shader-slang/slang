@@ -2807,9 +2807,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::TraceCoverageBinding:
             {
                 // -trace-coverage-binding <index> <space>
+                // Reject negative values up front so a typo or sentinel
+                // (`-trace-coverage-binding -1 0`) produces a clear
+                // diagnostic instead of silently degrading to auto-
+                // allocation downstream.
                 Int bindingIndex, bindingSpace;
-                SLANG_RETURN_ON_FAIL(_expectInt(arg, bindingIndex));
-                SLANG_RETURN_ON_FAIL(_expectInt(arg, bindingSpace));
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindingIndex));
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindingSpace));
                 linkage->m_optionSet.set(
                     OptionKind::TraceCoverageBinding,
                     (int)bindingIndex,

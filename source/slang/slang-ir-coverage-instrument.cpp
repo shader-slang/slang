@@ -7,6 +7,8 @@
 #include "slang-ir.h"
 #include "slang-target.h"
 
+#include <limits>
+
 namespace Slang
 {
 
@@ -68,6 +70,13 @@ static int pickFreeBindingForCoverage(IRModule* module, LayoutResourceKind kind)
                 maxOccupied = offset;
         }
     }
+    // Guard against signed overflow on a malformed module that pins a
+    // user binding at INT_MAX; `INT_MAX + 1` is undefined behavior in
+    // C++ and would wrap to `INT_MIN`, producing a negative offset
+    // downstream. Returning -1 lets callers signal the failure
+    // explicitly.
+    if (maxOccupied == std::numeric_limits<int>::max())
+        return -1;
     return maxOccupied + 1;
 }
 
@@ -186,8 +195,13 @@ static IRVarLayout* extendScopeLayoutWithCoverageBuffer(
     if (!oldStructTypeLayout)
         return oldScopeVarLayout;
 
-    auto coverageVarLayout =
-        cast<IRVarLayout>(coverageBuffer->findDecoration<IRLayoutDecoration>()->getLayout());
+    // Today `synthesizeCoverageBuffer` always attaches the layout
+    // decoration before this is called; assert rather than null-deref
+    // so a future refactor that splits or reorders those steps fails
+    // loudly instead of crashing inside `getLayout()`.
+    auto layoutDecor = coverageBuffer->findDecoration<IRLayoutDecoration>();
+    SLANG_ASSERT(layoutDecor);
+    auto coverageVarLayout = cast<IRVarLayout>(layoutDecor->getLayout());
 
     // Build a new struct type layout: copy old fields, then add ours.
     IRStructTypeLayout::Builder newStructTypeLayoutBuilder(&builder);

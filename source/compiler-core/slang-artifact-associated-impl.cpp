@@ -363,7 +363,12 @@ SlangResult ArtifactPostEmitMetadata::getEntryInfo(
 {
     if (!outInfo)
         return SLANG_E_INVALID_ARG;
-    if (outInfo->structSize != sizeof(slang::CoverageEntryInfo))
+    // ABI versioning: accept any caller whose `structSize` is at least
+    // the size of the fields we know how to write. A caller compiled
+    // against a newer header may pass a larger struct — we still fill
+    // only the fields we know about; trailing bytes (added in future
+    // revisions) are the caller's responsibility to zero-initialize.
+    if (outInfo->structSize < sizeof(slang::CoverageEntryInfo))
         return SLANG_E_INVALID_ARG;
     if (index >= (uint32_t)m_coverageEntries.getCount())
         return SLANG_E_INVALID_ARG;
@@ -381,7 +386,8 @@ SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* o
 {
     if (!outInfo)
         return SLANG_E_INVALID_ARG;
-    if (outInfo->structSize != sizeof(slang::CoverageBufferInfo))
+    // ABI versioning: see comment in `getEntryInfo` above.
+    if (outInfo->structSize < sizeof(slang::CoverageBufferInfo))
         return SLANG_E_INVALID_ARG;
     outInfo->space = m_coverageBufferSpace;
     outInfo->binding = m_coverageBufferBinding;
