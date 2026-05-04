@@ -66,6 +66,8 @@ void checkForOperatorShiftOverflowRecursive(IRInst* inst, DiagnosticSink* sink)
                             // targets the C/C++ integer-promotion surprise: `uint8_t x; x << n`
                             // keeps the result as uint8_t in Slang, not widened to int as in C.
                             IRType* rhsType = rhs->getDataType();
+                            if (auto rhsVecType = as<IRVectorType>(rhsType))
+                                rhsType = rhsVecType->getElementType();
                             IRSizeAndAlignment rhsSizeAlignment;
                             if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(
                                     nullptr,
