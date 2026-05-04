@@ -1390,9 +1390,26 @@ struct TypeFlowSpecializationContext
     // Replace the propagation info for an instruction (no union with existing info).
     // Used at single-definition sites where there is exactly one incoming edge.
     //
+    // The static IR type cannot always tell us whether dynamic info is meaningful.
+    // For most insts, a "concrete" data type (Int, Bool, struct of concretes, …)
+    // implies the value is statically known and tracking propagation info is
+    // wasted work. The exception is `LookupWitnessMethod` whose result type is
+    // a value type (Int/Bool from a `static const` interface requirement): the
+    // static type is concrete but the value is dynamically refined by `ValueSet`.
+    // Detect that exception by checking whether the new info is a non-trivial
+    // set-typed info — if so, we must propagate it regardless of static type.
+    static bool shouldStorePropagationInfo(IRInst* inst, IRInst* newInfo)
+    {
+        if (!isConcreteType(inst->getDataType()))
+            return true;
+        // ElementOfSetType represents dynamic refinement (e.g. one of N possible
+        // values picked at runtime by a witness tag). Always propagate.
+        return as<IRElementOfSetType>(newInfo) != nullptr;
+    }
+
     void updateInfo(IRInst* context, IRInst* inst, IRInst* newInfo, WorkQueue<WorkItem>& workQueue)
     {
-        if (isConcreteType(inst->getDataType()))
+        if (!shouldStorePropagationInfo(inst, newInfo))
             return;
 
         auto existingInfo = tryGetInfo(context, inst);
@@ -1418,7 +1435,7 @@ struct TypeFlowSpecializationContext
         IRInst* mergePointType,
         WorkQueue<WorkItem>& workQueue)
     {
-        if (isConcreteType(inst->getDataType()))
+        if (!shouldStorePropagationInfo(inst, newInfo))
             return;
 
         auto existingInfo = tryGetInfo(context, inst);
@@ -3363,12 +3380,16 @@ struct TypeFlowSpecializationContext
             auto setOp = getSetOpFromType(inst->getDataType());
             if (setOp == kIROp_Invalid)
             {
-                // Result type is not refinable by the set machinery (rare:
-                // pointer/handle/aggregate types that don't yet have a set
-                // representation). Leave the lookup intact for downstream
-                // passes to handle.
+                // Every result type the front-end currently allows for a
+                // dispatchable interface requirement maps to a set kind:
+                // FuncType / WitnessTableType / GenericKind / TypeKind / TypeType
+                // / Int* / UInt* / Bool. If we ever land here, the front-end
+                // accepted a requirement type the typeflow set machinery
+                // doesn't model — surface it loudly close to the source so
+                // the missing case gets added rather than the lookup
+                // silently surviving until emit time.
                 module->getContainerPool().free(&results);
-                return none();
+                SLANG_UNEXPECTED("LookupWitnessMethod result type has no set representation");
             }
             auto resultSetType = makeElementOfSetType(builder.getSet(setOp, results));
             module->getContainerPool().free(&results);
@@ -5714,11 +5735,21 @@ struct TypeFlowSpecializationContext
             {
                 IRInst* operands[] = {witnessTableInst, inst->getRequirementKey()};
 
-                auto newInst = builder.emitIntrinsicInst(
-                    (IRType*)makeTagType(thisInstInfo->getSet()),
-                    kIROp_GetTagForMappedSet,
-                    2,
-                    operands);
+                // For ValueSet (e.g. Int / Bool from `static const` interface
+                // requirements), the "tag" IS the value — each entry is an
+                // immediate constant (IRIntLit / IRBoolLit). Using a TagType
+                // result would create a type mismatch at every existing use
+                // site (which expects the value type). Emit GetTagForMappedSet
+                // with the original value type as its result type instead;
+                // lowerGetTagForMappedSet detects this and synthesizes a
+                // switch returning the actual constant for each witness tag.
+                IRType* resultType =
+                    as<IRValueSet>(thisInstInfo->getSet())
+                        ? inst->getDataType()
+                        : (IRType*)makeTagType(thisInstInfo->getSet());
+
+                auto newInst =
+                    builder.emitIntrinsicInst(resultType, kIROp_GetTagForMappedSet, 2, operands);
 
                 inst->replaceUsesWith(newInst);
                 inst->removeAndDeallocate();

@@ -482,8 +482,116 @@ struct TagOpsLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
+    // Lower a `GetTagForMappedSet` whose destination is a `ValueSet` (i.e.
+    // value-typed `static const` interface members like `Int` or `Bool`).
+    //
+    // The typeflow specialization pass emits this with result type = the
+    // underlying value type (Int / Bool) rather than `TagType(ValueSet)`, so
+    // that the existing use sites at the call site continue to type-check.
+    // Lowering builds a `(UInt witnessTag) -> ValueType` dispatch function:
+    // a switch that returns the constant entry for each witness-table tag,
+    // then replaces the `GetTagForMappedSet` with a call to that function.
+    void lowerGetTagForMappedSetForValueSet(IRGetTagForMappedSet* inst, IRValueSet* /*destSet, unused*/)
+    {
+        auto srcSet = cast<IRWitnessTableSet>(
+            cast<IRSetTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
+        auto key = cast<IRStructKey>(inst->getOperand(1));
+        auto resultType = inst->getDataType();
+        auto module = inst->getModule();
+
+        // Collect (witness-tag, value-entry) pairs.
+        List<UInt> caseTags;
+        List<IRInst*> caseEntries;
+        {
+            IRBuilder tagBuilder(module);
+            for (UInt i = 0; i < srcSet->getCount(); i++)
+            {
+                auto table = as<IRWitnessTable>(srcSet->getElement(i));
+                SLANG_ASSERT(table);
+                auto entry = findWitnessTableEntry(table, key);
+                SLANG_ASSERT(entry);
+                caseTags.add(getUniqueID(&tagBuilder, table));
+                caseEntries.add(entry);
+            }
+        }
+        SLANG_ASSERT(caseEntries.getCount() > 0);
+
+        // Build a dispatch function `(UInt) -> resultType`.
+        IRBuilder funcBuilder(module);
+        auto funcType =
+            funcBuilder.getFuncType(List<IRType*>({funcBuilder.getUIntType()}), resultType);
+        auto dispatchFunc = funcBuilder.createFunc();
+        funcBuilder.setInsertInto(dispatchFunc);
+        dispatchFunc->setFullType(funcType);
+
+        auto entryBlock = funcBuilder.emitBlock();
+        funcBuilder.setInsertInto(entryBlock);
+        auto tagParam = funcBuilder.emitParam(funcBuilder.getUIntType());
+
+        // In a correctly-tagged program the default is unreachable, but the
+        // IR requires a value return. The first case's entry is arbitrary-
+        // but-valid.
+        auto defaultBlock = funcBuilder.emitBlock();
+        funcBuilder.setInsertInto(defaultBlock);
+        funcBuilder.emitReturn(caseEntries[0]);
+
+        List<IRInst*> caseValues;
+        List<IRBlock*> caseBlocks;
+        for (Index i = 0; i < caseEntries.getCount(); i++)
+        {
+            auto caseBlock = funcBuilder.emitBlock();
+            funcBuilder.setInsertInto(caseBlock);
+            funcBuilder.emitReturn(caseEntries[i]);
+
+            caseValues.add(funcBuilder.getIntValue(funcBuilder.getUIntType(), caseTags[i]));
+            caseBlocks.add(caseBlock);
+        }
+
+        List<IRInst*> flattenedCaseArgs;
+        for (Index i = 0; i < caseValues.getCount(); i++)
+        {
+            flattenedCaseArgs.add(caseValues[i]);
+            flattenedCaseArgs.add(caseBlocks[i]);
+        }
+
+        auto unreachableBlock = funcBuilder.emitBlock();
+        funcBuilder.setInsertInto(unreachableBlock);
+        funcBuilder.emitUnreachable();
+
+        funcBuilder.setInsertInto(entryBlock);
+        funcBuilder.emitSwitch(
+            tagParam,
+            unreachableBlock,
+            defaultBlock,
+            flattenedCaseArgs.getCount(),
+            flattenedCaseArgs.getBuffer());
+
+        // Replace the inst with a call to the dispatch function. The
+        // witness-tag operand has SetTagType but is treated as UInt at the
+        // IR level after lowerTagTypes.
+        IRBuilder builder(module);
+        builder.setInsertBefore(inst);
+        auto callResult =
+            builder.emitCallInst(resultType, dispatchFunc, List<IRInst*>({inst->getOperand(0)}));
+
+        inst->replaceUsesWith(callResult);
+        inst->removeAndDeallocate();
+    }
+
     void lowerGetTagForMappedSet(IRGetTagForMappedSet* inst)
     {
+        // For value-typed lookups (`ValueSet` destination), the typeflow
+        // specialization pass deliberately emits this inst with result type
+        // = the underlying value type (Int / Bool) rather than
+        // `TagType(ValueSet)`, so existing use sites at the call site
+        // continue to type-check. Detect that shape and lower via a switch
+        // returning the constant entries directly.
+        if (!as<IRSetTagType>(inst->getDataType()))
+        {
+            lowerGetTagForMappedSetForValueSet(inst, /*destSet=*/nullptr);
+            return;
+        }
+
         // `GetTagForMappedSet` turns into a integer mapping from
         // the unique ID of each input set element to the unique ID of the
         // corresponding element (as determined by witness table lookup) in the destination set.
@@ -554,132 +662,6 @@ struct TagOpsLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
-    // Lower a `lookupWitness` whose result is a plain value type (e.g.
-    // `Int` from `static const int`, `bool` from `static const bool`).
-    //
-    // Background: the typeflow pass refines value-typed lookups using
-    // `ValueSet` (the peer of `WitnessTableSet` / `FuncSet` / `TypeSet`
-    // / `GenericSet`), so they participate in the set machinery the
-    // same way every other lookup kind does.  Singleton / empty /
-    // unbounded cases are folded by the typeflow specialization pass
-    // directly; the multi-conformance dispatch case reaches this pass
-    // still carrying a runtime witness-table tag and needs a per-call
-    // dispatch function synthesized.  This routine handles that case.
-    //
-    // Every entry is a constant IR value, so we emit a switch over the
-    // witness-table tag that returns the correct entry directly.  The
-    // front-end currently restricts static-const requirements to `int`
-    // and `bool` (E30302), but this lowering is type-agnostic and any
-    // value-typed entry the front-end ever allows works the same way.
-    void lowerLookupWitnessForValue(IRLookupWitnessMethod* inst)
-    {
-        auto witnessTableOp = inst->getWitnessTable();
-        auto setTagType = as<IRSetTagType>(witnessTableOp->getDataType());
-        if (!setTagType)
-            return;
-
-        auto witnessTableSet = as<IRWitnessTableSet>(setTagType->getOperand(0));
-        if (!witnessTableSet)
-            return;
-
-        // Only handle value-type results; func/type/generic/witness-table
-        // results are handled by the typeflow specialization pass.
-        auto resultType = inst->getDataType();
-        if (as<IRFuncType>(resultType) || as<IRWitnessTableType>(resultType))
-            return;
-        if (resultType->getOp() == kIROp_GenericKind || resultType->getOp() == kIROp_TypeKind ||
-            resultType->getOp() == kIROp_TypeType)
-            return;
-
-        auto key = inst->getRequirementKey();
-
-        // Collect (tagID, entry) pairs from every witness table in the set.
-        // By the time lowerTagInsts runs, a WitnessTableSet always holds
-        // IRWitnessTables and each table carries an entry for every requirement
-        // key of its interface. A null table or missing entry here would
-        // indicate a compiler-internal bug in an earlier pass, not malformed
-        // user code — fail loud so regressions are caught close to the source.
-        List<UInt> caseTags;
-        List<IRInst*> caseEntries;
-        {
-            IRBuilder tagBuilder(module);
-            for (UInt i = 0; i < witnessTableSet->getCount(); i++)
-            {
-                auto table = as<IRWitnessTable>(witnessTableSet->getElement(i));
-                SLANG_ASSERT(table);
-
-                auto entry = findWitnessTableEntry(table, key);
-                SLANG_ASSERT(entry);
-
-                caseTags.add(getUniqueID(&tagBuilder, table));
-                caseEntries.add(entry);
-            }
-        }
-
-        if (caseEntries.getCount() == 0)
-            return;
-
-        // Build a dispatch function `(UInt tag) -> resultType` that returns
-        // the witness-table entry for `tag`.
-        IRBuilder funcBuilder(module);
-        auto funcType =
-            funcBuilder.getFuncType(List<IRType*>({funcBuilder.getUIntType()}), resultType);
-        auto dispatchFunc = funcBuilder.createFunc();
-        funcBuilder.setInsertInto(dispatchFunc);
-        dispatchFunc->setFullType(funcType);
-
-        auto entryBlock = funcBuilder.emitBlock();
-        funcBuilder.setInsertInto(entryBlock);
-        auto tagParam = funcBuilder.emitParam(funcBuilder.getUIntType());
-
-        // Default block: in a correctly-tagged program the default is never
-        // taken, but the IR requires a value return. Using the first case's
-        // entry is arbitrary-but-valid.
-        auto defaultBlock = funcBuilder.emitBlock();
-        funcBuilder.setInsertInto(defaultBlock);
-        funcBuilder.emitReturn(caseEntries[0]);
-
-        List<IRInst*> caseValues;
-        List<IRBlock*> caseBlocks;
-        for (Index i = 0; i < caseEntries.getCount(); i++)
-        {
-            auto caseBlock = funcBuilder.emitBlock();
-            funcBuilder.setInsertInto(caseBlock);
-            funcBuilder.emitReturn(caseEntries[i]);
-
-            caseValues.add(funcBuilder.getIntValue(funcBuilder.getUIntType(), caseTags[i]));
-            caseBlocks.add(caseBlock);
-        }
-
-        List<IRInst*> flattenedCaseArgs;
-        for (Index i = 0; i < caseValues.getCount(); i++)
-        {
-            flattenedCaseArgs.add(caseValues[i]);
-            flattenedCaseArgs.add(caseBlocks[i]);
-        }
-
-        auto unreachableBlock = funcBuilder.emitBlock();
-        funcBuilder.setInsertInto(unreachableBlock);
-        funcBuilder.emitUnreachable();
-
-        funcBuilder.setInsertInto(entryBlock);
-        funcBuilder.emitSwitch(
-            tagParam,
-            unreachableBlock,
-            defaultBlock,
-            flattenedCaseArgs.getCount(),
-            flattenedCaseArgs.getBuffer());
-
-        // Emit the call at the original site.
-        IRBuilder builder(module);
-        builder.setInsertBefore(inst);
-        auto callResult =
-            builder.emitCallInst(resultType, dispatchFunc, List<IRInst*>({witnessTableOp}));
-
-        inst->replaceUsesWith(callResult);
-        inst->removeAndDeallocate();
-    }
-
     void processInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -695,9 +677,6 @@ struct TagOpsLoweringContext : public InstPassBase
             break;
         case kIROp_GetTagOfElementInSet:
             lowerGetTagOfElementInSet(as<IRGetTagOfElementInSet>(inst));
-            break;
-        case kIROp_LookupWitnessMethod:
-            lowerLookupWitnessForValue(as<IRLookupWitnessMethod>(inst));
             break;
         default:
             break;
