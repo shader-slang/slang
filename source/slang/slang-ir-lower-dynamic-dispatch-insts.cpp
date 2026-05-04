@@ -507,13 +507,11 @@ struct TagOpsLoweringContext : public InstPassBase
             return dispatchFunc;
         }
 
-        auto module = srcSet->getModule();
-
         // Collect (witness-tag, value-entry) pairs.
         List<UInt> caseTags;
         List<IRInst*> caseEntries;
         {
-            IRBuilder tagBuilder(module);
+            IRBuilder tagBuilder(this->module);
             for (UInt i = 0; i < srcSet->getCount(); i++)
             {
                 auto table = as<IRWitnessTable>(srcSet->getElement(i));
@@ -527,7 +525,7 @@ struct TagOpsLoweringContext : public InstPassBase
         SLANG_RELEASE_ASSERT(caseEntries.getCount() > 0);
 
         // Build a dispatch function `(UInt) -> resultType`.
-        IRBuilder funcBuilder(module);
+        IRBuilder funcBuilder(this->module);
         auto funcType =
             funcBuilder.getFuncType(List<IRType*>({funcBuilder.getUIntType()}), resultType);
         dispatchFunc = funcBuilder.createFunc();
@@ -579,13 +577,12 @@ struct TagOpsLoweringContext : public InstPassBase
             cast<IRSetTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
         auto key = cast<IRStructKey>(inst->getOperand(1));
         auto resultType = inst->getDataType();
-        auto module = inst->getModule();
         auto dispatchFunc = getOrCreateValueSetDispatchFunc(srcSet, key, resultType);
 
         // Replace the inst with a call to the dispatch function. The
         // witness-tag operand has SetTagType but is treated as UInt at the
         // IR level after lowerTagTypes.
-        IRBuilder builder(module);
+        IRBuilder builder(this->module);
         builder.setInsertBefore(inst);
         auto callResult =
             builder.emitCallInst(resultType, dispatchFunc, List<IRInst*>({inst->getOperand(0)}));
