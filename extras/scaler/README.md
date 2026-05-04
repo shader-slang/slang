@@ -17,18 +17,22 @@ queue depth. Uses the [GitHub Actions Scale Set Client](https://github.com/actio
 │  scaler (Linux)                          │
 │   --labels=Linux,self-hosted,GPU         │
 │   --platform=linux                       │
-└────┬─────────────────────────┬───────────┘
-     │                         │
-     ▼                         ▼
-┌─────────────────┐    ┌─────────────────┐
-│ Windows T4 VMs  │    │ Linux T4 VMs    │
-│ (ephemeral)     │    │ (ephemeral)     │
-│ - 2-3 min start │    │ - 2-3 min start │
-│ - Scale to zero │    │ - Scale to zero │
-└─────────────────┘    └─────────────────┘
+│       │                                  │
+│  scaler (Linux SM80Plus)                 │
+│   --labels=Linux,self-hosted,SM80Plus    │
+│   --platform=linux                       │
+└────┬──────────────┬──────────────┬───────┘
+     │              │              │
+     ▼              ▼              ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│ Windows T4   │ │ Linux T4     │ │ Linux L4     │
+│ VMs          │ │ VMs          │ │ VMs          │
+│ - ephemeral  │ │ - ephemeral  │ │ - ephemeral  │
+│ - scale zero │ │ - scale zero │ │ - scale zero │
+└──────────────┘ └──────────────┘ └──────────────┘
 ```
 
-Two instances of the same binary run on one control VM, each targeting a
+Three instances of the same binary run on one control VM, each targeting a
 different platform with different instance templates and labels. Zones are
 selected dynamically based on GPU quota availability across US regions.
 
@@ -66,6 +70,19 @@ GOOS=linux GOARCH=amd64 go build -o scaler-linux ./cmd/scaler
   --gcp-zones=us-east1-c,us-east1-d,us-central1-a,us-west1-a \
   --gcp-instance-template=linux-gpu-runner \
   --max-runners=10
+
+# Linux SM80Plus GPU runners (L4 initially)
+./scaler \
+  --url=https://github.com/shader-slang/slang \
+  --name=linux-gpu-sm80plus-runners \
+  --token=ghp_... \
+  --labels=Linux,self-hosted,SM80Plus \
+  --platform=linux \
+  --gcp-zones=us-east1-d,us-east1-b,us-east1-c,us-central1-a,us-west1-a \
+  --gcp-instance-template=linux-gpu-runner-sm80plus-l4 \
+  --gcp-gpu-type=nvidia-l4 \
+  --vm-prefix=linux-sm80plus \
+  --max-runners=1
 ```
 
 ## Configuration
@@ -162,6 +179,7 @@ GOOS=linux GOARCH=amd64 go build -o scaler-linux ./cmd/scaler
 | `deploy/update-scaler.sh` | Update binary on existing host |
 | `deploy/scaler-windows.service` | systemd unit for Windows scaler |
 | `deploy/scaler-linux.service` | systemd unit for Linux scaler |
+| `deploy/scaler-linux-sm80plus.service` | systemd unit for Linux SM80Plus scaler |
 | `deploy/scaler.env.example` | Template for GitHub credentials |
 
 ## How It Works
@@ -197,6 +215,7 @@ runner registration via JIT config on each boot.
 - Control VM: e2-small (24/7)
 - Windows GPU test runners: n1-standard-8 + T4 (on-demand)
 - Linux GPU test runners: n1-standard-8 + T4 (on-demand)
+- Linux SM80Plus test runners: g2-standard-8 + L4 (on-demand, narrow capability job only)
 - Windows build runners: n1-standard-8, no GPU (on-demand)
 
 See [GCP pricing](https://cloud.google.com/compute/vm-instance-pricing) for current rates.

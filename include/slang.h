@@ -576,12 +576,13 @@ typedef uint32_t SlangSizeT;
     enum SlangSeverity : SlangSeverityIntegral
     {
         SLANG_SEVERITY_DISABLED = 0, /**< A message that is disabled, filtered out. */
-        SLANG_SEVERITY_NOTE,         /**< An informative message. */
-        SLANG_SEVERITY_WARNING,      /**< A warning, which indicates a possible problem. */
-        SLANG_SEVERITY_ERROR,        /**< An error, indicating that compilation failed. */
-        SLANG_SEVERITY_FATAL,    /**< An unrecoverable error, which forced compilation to abort. */
-        SLANG_SEVERITY_INTERNAL, /**< An internal error, indicating a logic error in the compiler.
-                                  */
+        SLANG_SEVERITY_NOTE = 1,     /**< An informative message. */
+        SLANG_SEVERITY_WARNING = 2,  /**< A warning, which indicates a possible problem. */
+        SLANG_SEVERITY_ERROR = 3,    /**< An error, indicating that compilation failed. */
+        SLANG_SEVERITY_FATAL = 4, /**< An unrecoverable error, which forced compilation to abort. */
+        SLANG_SEVERITY_INTERNAL =
+            5, /**< An internal error, indicating a logic error in the compiler.
+                */
     };
 
     typedef int SlangDiagnosticFlags;
@@ -595,10 +596,10 @@ typedef uint32_t SlangSizeT;
     enum SlangBindableResourceType : SlangBindableResourceIntegral
     {
         SLANG_NON_BINDABLE = 0,
-        SLANG_TEXTURE,
-        SLANG_SAMPLER,
-        SLANG_UNIFORM_BUFFER,
-        SLANG_STORAGE_BUFFER,
+        SLANG_TEXTURE = 1,
+        SLANG_SAMPLER = 2,
+        SLANG_UNIFORM_BUFFER = 3,
+        SLANG_STORAGE_BUFFER = 4,
     };
 
     /* NOTE! To keep binary compatibility care is needed with this enum!
@@ -612,47 +613,47 @@ typedef uint32_t SlangSizeT;
     typedef int SlangCompileTargetIntegral;
     enum SlangCompileTarget : SlangCompileTargetIntegral
     {
-        SLANG_TARGET_UNKNOWN,
-        SLANG_TARGET_NONE,
-        SLANG_GLSL,
-        SLANG_GLSL_VULKAN_DEPRECATED,          //< deprecated and removed: just use `SLANG_GLSL`.
-        SLANG_GLSL_VULKAN_ONE_DESC_DEPRECATED, //< deprecated and removed.
-        SLANG_HLSL,
-        SLANG_SPIRV,
-        SLANG_SPIRV_ASM,
-        SLANG_DXBC,
-        SLANG_DXBC_ASM,
-        SLANG_DXIL,
-        SLANG_DXIL_ASM,
-        SLANG_C_SOURCE,              ///< The C language
-        SLANG_CPP_SOURCE,            ///< C++ code for shader kernels.
-        SLANG_HOST_EXECUTABLE,       ///< Standalone binary executable (for hosting CPU/OS)
-        SLANG_SHADER_SHARED_LIBRARY, ///< A shared library/Dll for shader kernels (for hosting
-                                     ///< CPU/OS)
-        SLANG_SHADER_HOST_CALLABLE,  ///< A CPU target that makes the compiled shader code available
-                                     ///< to be run immediately
-        SLANG_CUDA_SOURCE,           ///< Cuda source
-        SLANG_PTX,                   ///< PTX
-        SLANG_CUDA_OBJECT_CODE,      ///< Object code that contains CUDA functions.
-        SLANG_OBJECT_CODE,     ///< Object code that can be used for later linking (kernel/shader)
-        SLANG_HOST_CPP_SOURCE, ///< C++ code for host library or executable.
-        SLANG_HOST_HOST_CALLABLE,  ///< Host callable host code (ie non kernel/shader)
-        SLANG_CPP_PYTORCH_BINDING, ///< C++ PyTorch binding code.
-        SLANG_METAL,               ///< Metal shading language
-        SLANG_METAL_LIB,           ///< Metal library
-        SLANG_METAL_LIB_ASM,       ///< Metal library assembly
-        SLANG_HOST_SHARED_LIBRARY, ///< A shared library/Dll for host code (for hosting CPU/OS)
-        SLANG_WGSL,                ///< WebGPU shading language
-        SLANG_WGSL_SPIRV_ASM,      ///< SPIR-V assembly via WebGPU shading language
-        SLANG_WGSL_SPIRV,          ///< SPIR-V via WebGPU shading language
+        SLANG_TARGET_UNKNOWN = 0,
+        SLANG_TARGET_NONE = 1,
+        SLANG_GLSL = 2,
+        SLANG_GLSL_VULKAN_DEPRECATED = 3, //< deprecated and removed: just use `SLANG_GLSL`.
+        SLANG_GLSL_VULKAN_ONE_DESC_DEPRECATED = 4, //< deprecated and removed.
+        SLANG_HLSL = 5,
+        SLANG_SPIRV = 6,
+        SLANG_SPIRV_ASM = 7,
+        SLANG_DXBC = 8,
+        SLANG_DXBC_ASM = 9,
+        SLANG_DXIL = 10,
+        SLANG_DXIL_ASM = 11,
+        SLANG_C_SOURCE = 12,              ///< The C language
+        SLANG_CPP_SOURCE = 13,            ///< C++ code for shader kernels.
+        SLANG_HOST_EXECUTABLE = 14,       ///< Standalone binary executable (for hosting CPU/OS)
+        SLANG_SHADER_SHARED_LIBRARY = 15, ///< A shared library/Dll for shader kernels (for hosting
+                                          ///< CPU/OS)
+        SLANG_SHADER_HOST_CALLABLE = 16,  ///< A CPU target that makes the compiled shader code
+                                          ///< available to be run immediately
+        SLANG_CUDA_SOURCE = 17,           ///< Cuda source
+        SLANG_PTX = 18,                   ///< PTX
+        SLANG_CUDA_OBJECT_CODE = 19,      ///< Object code that contains CUDA functions.
+        SLANG_OBJECT_CODE = 20, ///< Object code that can be used for later linking (kernel/shader)
+        SLANG_HOST_CPP_SOURCE = 21,     ///< C++ code for host library or executable.
+        SLANG_HOST_HOST_CALLABLE = 22,  ///< Host callable host code (ie non kernel/shader)
+        SLANG_CPP_PYTORCH_BINDING = 23, ///< C++ PyTorch binding code.
+        SLANG_METAL = 24,               ///< Metal shading language
+        SLANG_METAL_LIB = 25,           ///< Metal library
+        SLANG_METAL_LIB_ASM = 26,       ///< Metal library assembly
+        SLANG_HOST_SHARED_LIBRARY = 27, ///< A shared library/Dll for host code (for hosting CPU/OS)
+        SLANG_WGSL = 28,                ///< WebGPU shading language
+        SLANG_WGSL_SPIRV_ASM = 29,      ///< SPIR-V assembly via WebGPU shading language
+        SLANG_WGSL_SPIRV = 30,          ///< SPIR-V via WebGPU shading language
 
-        SLANG_HOST_VM,     ///< Bytecode that can be interpreted by the Slang VM
-        SLANG_CPP_HEADER,  ///< C++ header for shader kernels.
-        SLANG_CUDA_HEADER, ///< Cuda header
+        SLANG_HOST_VM = 31,     ///< Bytecode that can be interpreted by the Slang VM
+        SLANG_CPP_HEADER = 32,  ///< C++ header for shader kernels.
+        SLANG_CUDA_HEADER = 33, ///< Cuda header
 
-        SLANG_HOST_OBJECT_CODE, ///< Host object code
-        SLANG_HOST_LLVM_IR,     ///< Host LLVM IR assembly
-        SLANG_SHADER_LLVM_IR,   ///< Host LLVM IR assembly (kernel/shader)
+        SLANG_HOST_OBJECT_CODE = 34, ///< Host object code
+        SLANG_HOST_LLVM_IR = 35,     ///< Host LLVM IR assembly
+        SLANG_SHADER_LLVM_IR = 36,   ///< Host LLVM IR assembly (kernel/shader)
 
         SLANG_TARGET_COUNT_OF,
     };
@@ -664,32 +665,32 @@ typedef uint32_t SlangSizeT;
     enum SlangContainerFormat : SlangContainerFormatIntegral
     {
         /* Don't generate a container. */
-        SLANG_CONTAINER_FORMAT_NONE,
+        SLANG_CONTAINER_FORMAT_NONE = 0,
 
         /* Generate a container in the `.slang-module` format,
         which includes reflection information, compiled kernels, etc. */
-        SLANG_CONTAINER_FORMAT_SLANG_MODULE,
+        SLANG_CONTAINER_FORMAT_SLANG_MODULE = 1,
     };
 
     typedef int SlangPassThroughIntegral;
     enum SlangPassThrough : SlangPassThroughIntegral
     {
-        SLANG_PASS_THROUGH_NONE,
-        SLANG_PASS_THROUGH_FXC,
-        SLANG_PASS_THROUGH_DXC,
-        SLANG_PASS_THROUGH_GLSLANG,
-        SLANG_PASS_THROUGH_SPIRV_DIS,
-        SLANG_PASS_THROUGH_CLANG,         ///< Clang C/C++ compiler
-        SLANG_PASS_THROUGH_VISUAL_STUDIO, ///< Visual studio C/C++ compiler
-        SLANG_PASS_THROUGH_GCC,           ///< GCC C/C++ compiler
-        SLANG_PASS_THROUGH_GENERIC_C_CPP, ///< Generic C or C++ compiler, which is decided by the
-                                          ///< source type
-        SLANG_PASS_THROUGH_NVRTC,         ///< NVRTC Cuda compiler
-        SLANG_PASS_THROUGH_LLVM,          ///< LLVM 'compiler' - includes LLVM and Clang
-        SLANG_PASS_THROUGH_SPIRV_OPT,     ///< SPIRV-opt
-        SLANG_PASS_THROUGH_METAL,         ///< Metal compiler
-        SLANG_PASS_THROUGH_TINT,          ///< Tint WGSL compiler
-        SLANG_PASS_THROUGH_SPIRV_LINK,    ///< SPIRV-link
+        SLANG_PASS_THROUGH_NONE = 0,
+        SLANG_PASS_THROUGH_FXC = 1,
+        SLANG_PASS_THROUGH_DXC = 2,
+        SLANG_PASS_THROUGH_GLSLANG = 3,
+        SLANG_PASS_THROUGH_SPIRV_DIS = 4,
+        SLANG_PASS_THROUGH_CLANG = 5,         ///< Clang C/C++ compiler
+        SLANG_PASS_THROUGH_VISUAL_STUDIO = 6, ///< Visual studio C/C++ compiler
+        SLANG_PASS_THROUGH_GCC = 7,           ///< GCC C/C++ compiler
+        SLANG_PASS_THROUGH_GENERIC_C_CPP = 8, ///< Generic C or C++ compiler, which is decided by
+                                              ///< the source type
+        SLANG_PASS_THROUGH_NVRTC = 9,         ///< NVRTC Cuda compiler
+        SLANG_PASS_THROUGH_LLVM = 10,         ///< LLVM 'compiler' - includes LLVM and Clang
+        SLANG_PASS_THROUGH_SPIRV_OPT = 11,    ///< SPIRV-opt
+        SLANG_PASS_THROUGH_METAL = 12,        ///< Metal compiler
+        SLANG_PASS_THROUGH_TINT = 13,         ///< Tint WGSL compiler
+        SLANG_PASS_THROUGH_SPIRV_LINK = 14,   ///< SPIRV-link
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 
@@ -697,11 +698,11 @@ typedef uint32_t SlangSizeT;
     typedef int SlangArchiveTypeIntegral;
     enum SlangArchiveType : SlangArchiveTypeIntegral
     {
-        SLANG_ARCHIVE_TYPE_UNDEFINED,
-        SLANG_ARCHIVE_TYPE_ZIP,
-        SLANG_ARCHIVE_TYPE_RIFF, ///< Riff container with no compression
-        SLANG_ARCHIVE_TYPE_RIFF_DEFLATE,
-        SLANG_ARCHIVE_TYPE_RIFF_LZ4,
+        SLANG_ARCHIVE_TYPE_UNDEFINED = 0,
+        SLANG_ARCHIVE_TYPE_ZIP = 1,
+        SLANG_ARCHIVE_TYPE_RIFF = 2, ///< Riff container with no compression
+        SLANG_ARCHIVE_TYPE_RIFF_DEFLATE = 3,
+        SLANG_ARCHIVE_TYPE_RIFF_LZ4 = 4,
         SLANG_ARCHIVE_TYPE_COUNT_OF,
     };
 
@@ -762,8 +763,8 @@ typedef uint32_t SlangSizeT;
     enum SlangFloatingPointMode : SlangFloatingPointModeIntegral
     {
         SLANG_FLOATING_POINT_MODE_DEFAULT = 0,
-        SLANG_FLOATING_POINT_MODE_FAST,
-        SLANG_FLOATING_POINT_MODE_PRECISE,
+        SLANG_FLOATING_POINT_MODE_FAST = 1,
+        SLANG_FLOATING_POINT_MODE_PRECISE = 2,
     };
 
     /*!
@@ -773,8 +774,8 @@ typedef uint32_t SlangSizeT;
     enum SlangFpDenormalMode : SlangFpDenormalModeIntegral
     {
         SLANG_FP_DENORM_MODE_ANY = 0,
-        SLANG_FP_DENORM_MODE_PRESERVE,
-        SLANG_FP_DENORM_MODE_FTZ,
+        SLANG_FP_DENORM_MODE_PRESERVE = 1,
+        SLANG_FP_DENORM_MODE_FTZ = 2,
     };
 
     /*!
@@ -785,35 +786,35 @@ typedef uint32_t SlangSizeT;
     {
         SLANG_LINE_DIRECTIVE_MODE_DEFAULT =
             0,                              /**< Default behavior: pick behavior base on target. */
-        SLANG_LINE_DIRECTIVE_MODE_NONE,     /**< Don't emit line directives at all. */
-        SLANG_LINE_DIRECTIVE_MODE_STANDARD, /**< Emit standard C-style `#line` directives. */
-        SLANG_LINE_DIRECTIVE_MODE_GLSL, /**< Emit GLSL-style directives with file *number* instead
-                                           of name */
-        SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP, /**< Use a source map to track line mappings (ie no
-                                                 #line will appear in emitting source) */
+        SLANG_LINE_DIRECTIVE_MODE_NONE = 1, /**< Don't emit line directives at all. */
+        SLANG_LINE_DIRECTIVE_MODE_STANDARD = 2,   /**< Emit standard C-style `#line` directives. */
+        SLANG_LINE_DIRECTIVE_MODE_GLSL = 3,       /**< Emit GLSL-style directives with file *number*
+                                                       instead of name */
+        SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP = 4, /**< Use a source map to track line mappings (ie
+                                                     no #line will appear in emitting source) */
     };
 
     typedef int SlangSourceLanguageIntegral;
     enum SlangSourceLanguage : SlangSourceLanguageIntegral
     {
-        SLANG_SOURCE_LANGUAGE_UNKNOWN,
-        SLANG_SOURCE_LANGUAGE_SLANG,
-        SLANG_SOURCE_LANGUAGE_HLSL,
-        SLANG_SOURCE_LANGUAGE_GLSL,
-        SLANG_SOURCE_LANGUAGE_C,
-        SLANG_SOURCE_LANGUAGE_CPP,
-        SLANG_SOURCE_LANGUAGE_CUDA,
-        SLANG_SOURCE_LANGUAGE_SPIRV,
-        SLANG_SOURCE_LANGUAGE_METAL,
-        SLANG_SOURCE_LANGUAGE_WGSL,
-        SLANG_SOURCE_LANGUAGE_LLVM,
+        SLANG_SOURCE_LANGUAGE_UNKNOWN = 0,
+        SLANG_SOURCE_LANGUAGE_SLANG = 1,
+        SLANG_SOURCE_LANGUAGE_HLSL = 2,
+        SLANG_SOURCE_LANGUAGE_GLSL = 3,
+        SLANG_SOURCE_LANGUAGE_C = 4,
+        SLANG_SOURCE_LANGUAGE_CPP = 5,
+        SLANG_SOURCE_LANGUAGE_CUDA = 6,
+        SLANG_SOURCE_LANGUAGE_SPIRV = 7,
+        SLANG_SOURCE_LANGUAGE_METAL = 8,
+        SLANG_SOURCE_LANGUAGE_WGSL = 9,
+        SLANG_SOURCE_LANGUAGE_LLVM = 10,
         SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 
     typedef unsigned int SlangProfileIDIntegral;
     enum SlangProfileID : SlangProfileIDIntegral
     {
-        SLANG_PROFILE_UNKNOWN,
+        SLANG_PROFILE_UNKNOWN = 0,
     };
 
 
@@ -827,29 +828,29 @@ typedef uint32_t SlangSizeT;
     enum SlangMatrixLayoutMode : SlangMatrixLayoutModeIntegral
     {
         SLANG_MATRIX_LAYOUT_MODE_UNKNOWN = 0,
-        SLANG_MATRIX_LAYOUT_ROW_MAJOR,
-        SLANG_MATRIX_LAYOUT_COLUMN_MAJOR,
+        SLANG_MATRIX_LAYOUT_ROW_MAJOR = 1,
+        SLANG_MATRIX_LAYOUT_COLUMN_MAJOR = 2,
     };
 
     typedef SlangUInt32 SlangStageIntegral;
     enum SlangStage : SlangStageIntegral
     {
-        SLANG_STAGE_NONE,
-        SLANG_STAGE_VERTEX,
-        SLANG_STAGE_HULL,
-        SLANG_STAGE_DOMAIN,
-        SLANG_STAGE_GEOMETRY,
-        SLANG_STAGE_FRAGMENT,
-        SLANG_STAGE_COMPUTE,
-        SLANG_STAGE_RAY_GENERATION,
-        SLANG_STAGE_INTERSECTION,
-        SLANG_STAGE_ANY_HIT,
-        SLANG_STAGE_CLOSEST_HIT,
-        SLANG_STAGE_MISS,
-        SLANG_STAGE_CALLABLE,
-        SLANG_STAGE_MESH,
-        SLANG_STAGE_AMPLIFICATION,
-        SLANG_STAGE_DISPATCH,
+        SLANG_STAGE_NONE = 0,
+        SLANG_STAGE_VERTEX = 1,
+        SLANG_STAGE_HULL = 2,
+        SLANG_STAGE_DOMAIN = 3,
+        SLANG_STAGE_GEOMETRY = 4,
+        SLANG_STAGE_FRAGMENT = 5,
+        SLANG_STAGE_COMPUTE = 6,
+        SLANG_STAGE_RAY_GENERATION = 7,
+        SLANG_STAGE_INTERSECTION = 8,
+        SLANG_STAGE_ANY_HIT = 9,
+        SLANG_STAGE_CLOSEST_HIT = 10,
+        SLANG_STAGE_MISS = 11,
+        SLANG_STAGE_CALLABLE = 12,
+        SLANG_STAGE_MESH = 13,
+        SLANG_STAGE_AMPLIFICATION = 14,
+        SLANG_STAGE_DISPATCH = 15,
         //
         SLANG_STAGE_COUNT,
 
@@ -857,48 +858,57 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
+    typedef SlangUInt32 SlangScopeIntegral;
+    enum SlangScope : SlangScopeIntegral
+    {
+        SLANG_SCOPE_NONE,
+        SLANG_SCOPE_THREAD,
+        SLANG_SCOPE_WAVE,
+        SLANG_SCOPE_THREAD_GROUP,
+    };
+
     typedef SlangUInt32 SlangCooperativeMatrixUseIntegral;
     enum SlangCooperativeMatrixUse : SlangCooperativeMatrixUseIntegral
     {
-        SLANG_COOPERATIVE_MATRIX_USE_A,
-        SLANG_COOPERATIVE_MATRIX_USE_B,
-        SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR,
+        SLANG_COOPERATIVE_MATRIX_USE_A = 0,
+        SLANG_COOPERATIVE_MATRIX_USE_B = 1,
+        SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR = 2,
     };
 
     typedef SlangUInt32 SlangCooperativeVectorMatrixLayoutIntegral;
     enum SlangCooperativeVectorMatrixLayout : SlangCooperativeVectorMatrixLayoutIntegral
     {
-        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR,
-        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR,
-        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL,
-        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL,
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR = 0,
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR = 1,
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL = 2,
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL = 3,
     };
 
     typedef SlangUInt32 SlangDebugInfoLevelIntegral;
     enum SlangDebugInfoLevel : SlangDebugInfoLevelIntegral
     {
-        SLANG_DEBUG_INFO_LEVEL_NONE = 0, /**< Don't emit debug information at all. */
-        SLANG_DEBUG_INFO_LEVEL_MINIMAL,  /**< Emit as little debug information as possible, while
-                                            still supporting stack trackers. */
-        SLANG_DEBUG_INFO_LEVEL_STANDARD, /**< Emit whatever is the standard level of debug
-                                            information for each target. */
-        SLANG_DEBUG_INFO_LEVEL_MAXIMAL,  /**< Emit as much debug information as possible for each
-                                            target. */
+        SLANG_DEBUG_INFO_LEVEL_NONE = 0,     /**< Don't emit debug information at all. */
+        SLANG_DEBUG_INFO_LEVEL_MINIMAL = 1,  /**< Emit as little debug information as possible,
+                                                  while still supporting stack trackers. */
+        SLANG_DEBUG_INFO_LEVEL_STANDARD = 2, /**< Emit whatever is the standard level of debug
+                                                  information for each target. */
+        SLANG_DEBUG_INFO_LEVEL_MAXIMAL = 3,  /**< Emit as much debug information as possible for
+                                                  each target. */
     };
 
     /* Describes the debugging information format produced during a compilation. */
     typedef SlangUInt32 SlangDebugInfoFormatIntegral;
     enum SlangDebugInfoFormat : SlangDebugInfoFormatIntegral
     {
-        SLANG_DEBUG_INFO_FORMAT_DEFAULT, ///< Use the default debugging format for the target
-        SLANG_DEBUG_INFO_FORMAT_C7,  ///< CodeView C7 format (typically means debugging information
-                                     ///< is embedded in the binary)
-        SLANG_DEBUG_INFO_FORMAT_PDB, ///< Program database
+        SLANG_DEBUG_INFO_FORMAT_DEFAULT = 0, ///< Use the default debugging format for the target
+        SLANG_DEBUG_INFO_FORMAT_C7 = 1,      ///< CodeView C7 format (typically means debugging
+                                             ///< information is embedded in the binary)
+        SLANG_DEBUG_INFO_FORMAT_PDB = 2,     ///< Program database
 
-        SLANG_DEBUG_INFO_FORMAT_STABS, ///< Stabs
-        SLANG_DEBUG_INFO_FORMAT_COFF,  ///< COFF debug info
-        SLANG_DEBUG_INFO_FORMAT_DWARF, ///< DWARF debug info (we may want to support specifying the
-                                       ///< version)
+        SLANG_DEBUG_INFO_FORMAT_STABS = 3, ///< Stabs
+        SLANG_DEBUG_INFO_FORMAT_COFF = 4,  ///< COFF debug info
+        SLANG_DEBUG_INFO_FORMAT_DWARF = 5, ///< DWARF debug info (we may want to support specifying
+                                           ///< the version)
 
         SLANG_DEBUG_INFO_FORMAT_COUNT_OF,
     };
@@ -906,246 +916,261 @@ typedef uint32_t SlangSizeT;
     typedef SlangUInt32 SlangOptimizationLevelIntegral;
     enum SlangOptimizationLevel : SlangOptimizationLevelIntegral
     {
-        SLANG_OPTIMIZATION_LEVEL_NONE = 0, /**< Don't optimize at all. */
-        SLANG_OPTIMIZATION_LEVEL_DEFAULT,  /**< Default optimization level: balance code quality and
-                                              compilation time. */
-        SLANG_OPTIMIZATION_LEVEL_HIGH,     /**< Optimize aggressively. */
-        SLANG_OPTIMIZATION_LEVEL_MAXIMAL, /**< Include optimizations that may take a very long time,
-                                             or may involve severe space-vs-speed tradeoffs */
+        SLANG_OPTIMIZATION_LEVEL_NONE = 0,    /**< Don't optimize at all. */
+        SLANG_OPTIMIZATION_LEVEL_DEFAULT = 1, /**< Default optimization level: balance code quality
+                                                   and compilation time. */
+        SLANG_OPTIMIZATION_LEVEL_HIGH = 2,    /**< Optimize aggressively. */
+        SLANG_OPTIMIZATION_LEVEL_MAXIMAL = 3, /**< Include optimizations that may take a very long
+                                                   time, or may involve severe space-vs-speed
+                                                   tradeoffs */
     };
 
     enum SlangEmitSpirvMethod
     {
         SLANG_EMIT_SPIRV_DEFAULT = 0,
-        SLANG_EMIT_SPIRV_VIA_GLSL,
-        SLANG_EMIT_SPIRV_DIRECTLY,
+        SLANG_EMIT_SPIRV_VIA_GLSL = 1,
+        SLANG_EMIT_SPIRV_DIRECTLY = 2,
     };
 
     enum SlangEmitCPUMethod
     {
         SLANG_EMIT_CPU_DEFAULT = 0,
-        SLANG_EMIT_CPU_VIA_CPP,
-        SLANG_EMIT_CPU_VIA_LLVM,
+        SLANG_EMIT_CPU_VIA_CPP = 1,
+        SLANG_EMIT_CPU_VIA_LLVM = 2,
     };
 
     enum SlangDiagnosticColor
     {
-        SLANG_DIAGNOSTIC_COLOR_AUTO = 0, // Use color if output sink is a tty
-        SLANG_DIAGNOSTIC_COLOR_ALWAYS,   // Always use color
-        SLANG_DIAGNOSTIC_COLOR_NEVER,    // Never use color
+        SLANG_DIAGNOSTIC_COLOR_AUTO = 0,   // Use color if output sink is a tty
+        SLANG_DIAGNOSTIC_COLOR_ALWAYS = 1, // Always use color
+        SLANG_DIAGNOSTIC_COLOR_NEVER = 2,  // Never use color
     };
 
     // All compiler option names supported by Slang.
+    //
+    // IMPORTANT: ABI STABILITY POLICY FOR CompilerOptionName
+    //
+    // Every enumerator has an explicit integer value. Rules:
+    //   1. NEVER insert a new enumerator in the middle of the list.
+    //   2. NEVER remove an enumerator; rename to REMOVED_<Name> and keep the value.
+    //   3. NEVER reuse an integer value from a removed/deprecated entry.
+    //   4. NEW entries MUST be appended immediately before CountOf, assigning the next
+    //      sequential integer (equal to the preceding enumerator's value + 1).
+    //
+    // Violation of these rules silently breaks binary compatibility for any caller
+    // compiled against an older version of this header.
     namespace slang
     {
     enum class CompilerOptionName
     {
-        MacroDefine, // stringValue0: macro name;  stringValue1: macro value
-        DepFile,
-        EntryPointName,
-        Specialize,
-        Help,
-        HelpStyle,
-        Include, // stringValue: additional include path.
-        Language,
-        MatrixLayoutColumn,         // bool
-        MatrixLayoutRow,            // bool
-        ZeroInitialize,             // bool
-        IgnoreCapabilities,         // bool
-        RestrictiveCapabilityCheck, // bool
-        ModuleName,                 // stringValue0: module name.
-        Output,
-        Profile, // intValue0: profile
-        Stage,   // intValue0: stage
-        Target,  // intValue0: CodeGenTarget
-        Version,
-        WarningsAsErrors, // stringValue0: "all" or comma separated list of warning codes or names.
-        DisableWarnings,  // stringValue0: comma separated list of warning codes or names.
-        EnableWarning,    // stringValue0: warning code or name.
-        DisableWarning,   // stringValue0: warning code or name.
-        DumpWarningDiagnostics,
-        InputFilesRemain,
-        EmitIr,                        // bool
-        ReportDownstreamTime,          // bool
-        ReportPerfBenchmark,           // bool
-        ReportCheckpointIntermediates, // bool
-        SkipSPIRVValidation,           // bool
-        SourceEmbedStyle,
-        SourceEmbedName,
-        SourceEmbedLanguage,
-        DisableShortCircuit,            // bool
-        MinimumSlangOptimization,       // bool
-        DisableNonEssentialValidations, // bool
-        DisableSourceMap,               // bool
-        UnscopedEnum,                   // bool
-        PreserveParameters, // bool: preserve all resource parameters in the output code.
+        MacroDefine = 0, // stringValue0: macro name;  stringValue1: macro value
+        DepFile = 1,
+        EntryPointName = 2,
+        Specialize = 3,
+        Help = 4,
+        HelpStyle = 5,
+        Include = 6, // stringValue: additional include path.
+        Language = 7,
+        MatrixLayoutColumn = 8,          // bool
+        MatrixLayoutRow = 9,             // bool
+        ZeroInitialize = 10,             // bool
+        IgnoreCapabilities = 11,         // bool
+        RestrictiveCapabilityCheck = 12, // bool
+        ModuleName = 13,                 // stringValue0: module name.
+        Output = 14,
+        Profile = 15, // intValue0: profile
+        Stage = 16,   // intValue0: stage
+        Target = 17,  // intValue0: CodeGenTarget
+        Version = 18,
+        WarningsAsErrors = 19, // stringValue0: "all" or comma-separated list of
+                               // warning codes or names.
+        DisableWarnings = 20,  // stringValue0: comma separated list of warning codes or names.
+        EnableWarning = 21,    // stringValue0: warning code or name.
+        DisableWarning = 22,   // stringValue0: warning code or name.
+        DumpWarningDiagnostics = 23,
+        InputFilesRemain = 24,
+        EmitIr = 25,                        // bool
+        ReportDownstreamTime = 26,          // bool
+        ReportPerfBenchmark = 27,           // bool
+        ReportCheckpointIntermediates = 28, // bool
+        SkipSPIRVValidation = 29,           // bool
+        SourceEmbedStyle = 30,
+        SourceEmbedName = 31,
+        SourceEmbedLanguage = 32,
+        DisableShortCircuit = 33,            // bool
+        MinimumSlangOptimization = 34,       // bool
+        DisableNonEssentialValidations = 35, // bool
+        DisableSourceMap = 36,               // bool
+        UnscopedEnum = 37,                   // bool
+        PreserveParameters = 38, // bool: preserve all resource parameters in the output code.
+
         // Target
+        Capability = 39,                // intValue0: CapabilityName
+        DefaultImageFormatUnknown = 40, // bool
+        DisableDynamicDispatch = 41,    // bool
+        DisableSpecialization = 42,     // bool
+        FloatingPointMode = 43,         // intValue0: FloatingPointMode
+        DebugInformation = 44,          // intValue0: DebugInfoLevel
+        LineDirectiveMode = 45,
+        Optimization = 46, // intValue0: OptimizationLevel
+        Obfuscate = 47,    // bool
 
-        Capability,                // intValue0: CapabilityName
-        DefaultImageFormatUnknown, // bool
-        DisableDynamicDispatch,    // bool
-        DisableSpecialization,     // bool
-        FloatingPointMode,         // intValue0: FloatingPointMode
-        DebugInformation,          // intValue0: DebugInfoLevel
-        LineDirectiveMode,
-        Optimization, // intValue0: OptimizationLevel
-        Obfuscate,    // bool
+        VulkanBindShift = 48,      // intValue0 (higher 8 bits): kind; intValue0(lower bits): set;
+                                   // intValue1: shift
+        VulkanBindGlobals = 49,    // intValue0: index; intValue1: set
+        VulkanInvertY = 50,        // bool
+        VulkanUseDxPositionW = 51, // bool
+        VulkanUseEntryPointName = 52, // bool
+        VulkanUseGLLayout = 53,       // bool
+        VulkanEmitReflection = 54,    // bool
 
-        VulkanBindShift, // intValue0 (higher 8 bits): kind; intValue0(lower bits): set; intValue1:
-                         // shift
-        VulkanBindGlobals,       // intValue0: index; intValue1: set
-        VulkanInvertY,           // bool
-        VulkanUseDxPositionW,    // bool
-        VulkanUseEntryPointName, // bool
-        VulkanUseGLLayout,       // bool
-        VulkanEmitReflection,    // bool
+        GLSLForceScalarLayout = 55,   // bool
+        EnableEffectAnnotations = 56, // bool
 
-        GLSLForceScalarLayout,   // bool
-        EnableEffectAnnotations, // bool
-
-        EmitSpirvViaGLSL,     // bool (will be deprecated)
-        EmitSpirvDirectly,    // bool (will be deprecated)
-        SPIRVCoreGrammarJSON, // stringValue0: json path
-        IncompleteLibrary,    // bool, when set, will not issue an error when the linked program has
-                              // unresolved extern function symbols.
+        EmitSpirvViaGLSL = 57,     // bool (will be deprecated)
+        EmitSpirvDirectly = 58,    // bool (will be deprecated)
+        SPIRVCoreGrammarJSON = 59, // stringValue0: json path
+        IncompleteLibrary = 60, // bool, when set, will not issue an error when the linked program
+                                // has unresolved extern function symbols.
 
         // Downstream
-
-        CompilerPath,
-        DefaultDownstreamCompiler,
-        DownstreamArgs, // stringValue0: downstream compiler name. stringValue1: argument list, one
-                        // per line.
-        PassThrough,
+        CompilerPath = 61,
+        DefaultDownstreamCompiler = 62,
+        DownstreamArgs = 63, // stringValue0: downstream compiler name. stringValue1: argument list,
+                             // one per line.
+        PassThrough = 64,
 
         // Repro
-
-        DumpRepro,
-        DumpReproOnError,
-        ExtractRepro,
-        LoadRepro,
-        LoadReproDirectory,
-        ReproFallbackDirectory,
+        DumpRepro = 65,
+        DumpReproOnError = 66,
+        ExtractRepro = 67,
+        LoadRepro = 68,
+        LoadReproDirectory = 69,
+        ReproFallbackDirectory = 70,
 
         // Debugging
-
-        DumpAst,
-        DumpIntermediatePrefix,
-        DumpIntermediates, // bool
-        DumpIr,            // bool
-        DumpIrIds,
-        PreprocessorOutput,
-        OutputIncludes,
-        ReproFileSystem,
-        REMOVED_SerialIR, // deprecated and removed
-        SkipCodeGen,      // bool
-        ValidateIr,       // bool
-        VerbosePaths,
-        VerifyDebugSerialIr,
-        NoCodeGen, // Not used.
+        DumpAst = 71,
+        DumpIntermediatePrefix = 72,
+        DumpIntermediates = 73, // bool
+        DumpIr = 74,            // bool
+        DumpIrIds = 75,
+        PreprocessorOutput = 76,
+        OutputIncludes = 77,
+        ReproFileSystem = 78,
+        REMOVED_SerialIR = 79, // deprecated and removed; value must never be reused
+        SkipCodeGen = 80,      // bool
+        ValidateIr = 81,       // bool
+        VerbosePaths = 82,
+        VerifyDebugSerialIr = 83,
+        NoCodeGen = 84, // Not used.
 
         // Experimental
-
-        FileSystem,
-        Heterogeneous,
-        NoMangle,
-        NoHLSLBinding,
-        NoHLSLPackConstantBufferElements,
-        ValidateUniformity,
-        AllowGLSL,
-        EnableExperimentalPasses,
-        BindlessSpaceIndex, // int
-        SPIRVResourceHeapStride,
-        SPIRVSamplerHeapStride,
+        FileSystem = 85,
+        Heterogeneous = 86,
+        NoMangle = 87,
+        NoHLSLBinding = 88,
+        NoHLSLPackConstantBufferElements = 89,
+        ValidateUniformity = 90,
+        AllowGLSL = 91,
+        EnableExperimentalPasses = 92,
+        BindlessSpaceIndex = 93,      // int
+        SPIRVResourceHeapStride = 94, // int: byte stride for SPIRV resource descriptor heap
+        SPIRVSamplerHeapStride = 95,  // int: byte stride for SPIRV sampler descriptor heap
 
         // Internal
+        ArchiveType = 96,
+        CompileCoreModule = 97,
+        Doc = 98,
 
-        ArchiveType,
-        CompileCoreModule,
-        Doc,
+        IrCompression = 99, // deprecated; value must never be reused
 
-        IrCompression, //< deprecated
+        LoadCoreModule = 100,
+        ReferenceModule = 101,
+        SaveCoreModule = 102,
+        SaveCoreModuleBinSource = 103,
+        TrackLiveness = 104,
+        LoopInversion = 105, // bool, enable loop inversion optimization
 
-        LoadCoreModule,
-        ReferenceModule,
-        SaveCoreModule,
-        SaveCoreModuleBinSource,
-        TrackLiveness,
-        LoopInversion, // bool, enable loop inversion optimization
+        ParameterBlocksUseRegisterSpaces = 106,  // Deprecated; value must never be reused
+        LanguageVersion = 107,                   // intValue0: SlangLanguageVersion
+        TypeConformance = 108,                   // stringValue0: type conformance to link; format:
+                                                 // "<TypeName>:<IInterfaceName>[=<sequentialId>]",
+                                                 // e.g. "Impl:IFoo=3" or "Impl:IFoo".
+        EnableExperimentalDynamicDispatch = 109, // bool, experimental
+        EmitReflectionJSON = 110,                // bool
 
-        ParameterBlocksUseRegisterSpaces, // Deprecated
-        LanguageVersion,                  // intValue0: SlangLanguageVersion
-        TypeConformance, // stringValue0: additional type conformance to link, in the format of
-                         // "<TypeName>:<IInterfaceName>[=<sequentialId>]", for example
-                         // "Impl:IFoo=3" or "Impl:IFoo".
-        EnableExperimentalDynamicDispatch, // bool, experimental
-        EmitReflectionJSON,                // bool
+        CountOfParsableOptions = 111, // historical sentinel; value must not be reused
 
-        CountOfParsableOptions,
+        // Options added after the original set. Most have CLI flags; a few are
+        // API-only (marked below). All future additions belong after DiagnosticColor,
+        // immediately before CountOf.
+        DebugInformationFormat = 112,  // intValue0: DebugInfoFormat (derived from -g; no direct CLI
+                                       // flag)
+        VulkanBindShiftAll = 113,      // intValue0: kind; intValue1: shift (derived from
+                                       // -fvk-x-shift; no direct CLI flag)
+        GenerateWholeProgram = 114,    // bool
+        UseUpToDateBinaryModule = 115, // bool, when set, will only load precompiled modules
+                                       // if up-to-date with source. (API-only; no direct CLI flag)
+        EmbedDownstreamIR = 116,       // bool
+        ForceDXLayout = 117,           // bool
 
-        // Used in parsed options only.
-        DebugInformationFormat,  // intValue0: DebugInfoFormat
-        VulkanBindShiftAll,      // intValue0: kind; intValue1: shift
-        GenerateWholeProgram,    // bool
-        UseUpToDateBinaryModule, // bool, when set, will only load
-                                 // precompiled modules if it is up-to-date with its source.
-        EmbedDownstreamIR,       // bool
-        ForceDXLayout,           // bool
-
-        // Add this new option to the end of the list to avoid breaking ABI as much as possible.
         // Setting of EmitSpirvDirectly or EmitSpirvViaGLSL will turn into this option internally.
-        EmitSpirvMethod, // enum SlangEmitSpirvMethod
+        EmitSpirvMethod = 118, // enum SlangEmitSpirvMethod (derived; no direct CLI flag)
 
-        SaveGLSLModuleBinSource,
+        SaveGLSLModuleBinSource = 119,
 
-        SkipDownstreamLinking, // bool, experimental
-        DumpModule,
+        SkipDownstreamLinking = 120, // bool, experimental (API-only; no direct CLI flag)
+        DumpModule = 121,
 
-        GetModuleInfo,              // Print serialized module version and name
-        GetSupportedModuleVersions, // Print the min and max module versions this compiler supports
+        GetModuleInfo = 122,              // Print serialized module version and name
+        GetSupportedModuleVersions = 123, // Print the min and max module versions this compiler
+                                          // supports
 
-        EmitSeparateDebug, // bool
+        EmitSeparateDebug = 124, // bool
 
         // Floating point denormal handling modes
-        DenormalModeFp16,
-        DenormalModeFp32,
-        DenormalModeFp64,
+        DenormalModeFp16 = 125,
+        DenormalModeFp32 = 126,
+        DenormalModeFp64 = 127,
 
         // Bitfield options
-        UseMSVCStyleBitfieldPacking, // bool
+        UseMSVCStyleBitfieldPacking = 128, // bool
 
-        ForceCLayout, // bool
+        ForceCLayout = 129, // bool
 
-        ExperimentalFeature, // bool, enable experimental features
+        ExperimentalFeature = 130, // bool, enable experimental features
 
-        ReportDetailedPerfBenchmark, // bool, reports detailed compiler performance benchmark
-                                     // results
-        ValidateIRDetailed,          // bool, enable detailed IR validation
-        DumpIRBefore,                // string, pass name to dump IR before
-        DumpIRAfter,                 // string, pass name to dump IR after
+        ReportDetailedPerfBenchmark = 131, // bool, reports detailed compiler performance benchmark
+                                           // results
+        ValidateIRDetailed = 132,          // bool, enable detailed IR validation
+        DumpIRBefore = 133,                // string, pass name to dump IR before
+        DumpIRAfter = 134,                 // string, pass name to dump IR after
 
-        EmitCPUMethod,    // enum SlangEmitCPUMethod
-        EmitCPUViaCPP,    // bool
-        EmitCPUViaLLVM,   // bool
-        LLVMTargetTriple, // string
-        LLVMCPU,          // string
-        LLVMFeatures,     // string
+        EmitCPUMethod = 135,    // enum SlangEmitCPUMethod (derived; no direct CLI flag)
+        EmitCPUViaCPP = 136,    // bool
+        EmitCPUViaLLVM = 137,   // bool
+        LLVMTargetTriple = 138, // string
+        LLVMCPU = 139,          // string
+        LLVMFeatures = 140,     // string
 
-        EnableRichDiagnostics, // bool, enable the experimental rich diagnostics
+        EnableRichDiagnostics = 141, // bool, enable the experimental rich diagnostics
 
-        ReportDynamicDispatchSites, // bool
+        ReportDynamicDispatchSites = 142, // bool
 
-        EnableMachineReadableDiagnostics, // bool, enable machine-readable diagnostic output
-                                          // (implies EnableRichDiagnostics)
+        EnableMachineReadableDiagnostics = 143, // bool, enable machine-readable diagnostic output
+                                                // (implies EnableRichDiagnostics)
 
-        DiagnosticColor, // intValue0: SlangDiagnosticColor (always, never, auto)
+        DiagnosticColor = 144, // intValue0: SlangDiagnosticColor (always, never, auto)
+
+        // Add new options HERE, immediately before CountOf.
 
         CountOf,
     };
 
     enum class CompilerOptionValueKind
     {
-        Int,
-        String
+        Int = 0,
+        String = 1,
     };
 
     struct CompilerOptionValue
@@ -1553,8 +1578,8 @@ public:                                                              \
     typedef unsigned int SlangPathTypeIntegral;
     enum SlangPathType : SlangPathTypeIntegral
     {
-        SLANG_PATH_TYPE_DIRECTORY, /**< Path specified specifies a directory. */
-        SLANG_PATH_TYPE_FILE,      /**< Path specified is to a file. */
+        SLANG_PATH_TYPE_DIRECTORY = 0, /**< Path specified specifies a directory. */
+        SLANG_PATH_TYPE_FILE = 1,      /**< Path specified is to a file. */
     };
 
     /* Callback to enumerate the contents of of a directory in a ISlangFileSystemExt.
@@ -1566,10 +1591,10 @@ public:                                                              \
     /* Determines how paths map to files on the OS file system */
     enum class OSPathKind : uint8_t
     {
-        None,            ///< Paths do not map to the file system
-        Direct,          ///< Paths map directly to the file system
-        OperatingSystem, ///< Only paths gained via PathKind::OperatingSystem map to the operating
-                         ///< system file system
+        None = 0,            ///< Paths do not map to the file system
+        Direct = 1,          ///< Paths map directly to the file system
+        OperatingSystem = 2, ///< Only paths gained via PathKind::OperatingSystem map to the
+                             ///< operating system file system
     };
 
     /* Used to determine what kind of path is required from an input path */
@@ -1578,7 +1603,7 @@ public:                                                              \
         /// Given a path, returns a simplified version of that path.
         /// This typically means removing '..' and/or '.' from the path.
         /// A simplified path must point to the same object as the original.
-        Simplified,
+        Simplified = 0,
 
         /// Given a path, returns a 'canonical path' to the item.
         /// This may be the operating system 'canonical path' that is the unique path to the item.
@@ -1589,7 +1614,7 @@ public:                                                              \
         /// If the item the path specifies doesn't exist, the canonical path may not be returnable
         /// or be a path simplification.
         /// Not all file systems support canonical paths.
-        Canonical,
+        Canonical = 1,
 
         /// Given a path returns a path such that it is suitable to be displayed to the user.
         ///
@@ -1597,10 +1622,10 @@ public:                                                              \
         /// container as well as the path to the specific file.
         ///
         /// NOTE! The display path won't necessarily work on the file system to access the item
-        Display,
+        Display = 2,
 
         /// Get the path to the item on the *operating system* file system, if available.
-        OperatingSystem,
+        OperatingSystem = 3,
 
         CountOf,
     };
@@ -1780,17 +1805,17 @@ public:                                                              \
     typedef unsigned int SlangWriterChannelIntegral;
     enum SlangWriterChannel : SlangWriterChannelIntegral
     {
-        SLANG_WRITER_CHANNEL_DIAGNOSTIC,
-        SLANG_WRITER_CHANNEL_STD_OUTPUT,
-        SLANG_WRITER_CHANNEL_STD_ERROR,
+        SLANG_WRITER_CHANNEL_DIAGNOSTIC = 0,
+        SLANG_WRITER_CHANNEL_STD_OUTPUT = 1,
+        SLANG_WRITER_CHANNEL_STD_ERROR = 2,
         SLANG_WRITER_CHANNEL_COUNT_OF,
     };
 
     typedef unsigned int SlangWriterModeIntegral;
     enum SlangWriterMode : SlangWriterModeIntegral
     {
-        SLANG_WRITER_MODE_TEXT,
-        SLANG_WRITER_MODE_BINARY,
+        SLANG_WRITER_MODE_TEXT = 0,
+        SLANG_WRITER_MODE_BINARY = 1,
     };
 
     /** A stream typically of text, used for outputting diagnostic as well as other information.
@@ -1939,66 +1964,66 @@ public:                                                              \
     typedef unsigned int SlangTypeKindIntegral;
     enum SlangTypeKind : SlangTypeKindIntegral
     {
-        SLANG_TYPE_KIND_NONE,
-        SLANG_TYPE_KIND_STRUCT,
-        SLANG_TYPE_KIND_ARRAY,
-        SLANG_TYPE_KIND_MATRIX,
-        SLANG_TYPE_KIND_VECTOR,
-        SLANG_TYPE_KIND_SCALAR,
-        SLANG_TYPE_KIND_CONSTANT_BUFFER,
-        SLANG_TYPE_KIND_RESOURCE,
-        SLANG_TYPE_KIND_SAMPLER_STATE,
-        SLANG_TYPE_KIND_TEXTURE_BUFFER,
-        SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER,
-        SLANG_TYPE_KIND_PARAMETER_BLOCK,
-        SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER,
-        SLANG_TYPE_KIND_INTERFACE,
-        SLANG_TYPE_KIND_OUTPUT_STREAM,
-        SLANG_TYPE_KIND_MESH_OUTPUT,
-        SLANG_TYPE_KIND_SPECIALIZED,
-        SLANG_TYPE_KIND_FEEDBACK,
-        SLANG_TYPE_KIND_POINTER,
-        SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
-        SLANG_TYPE_KIND_ENUM,
+        SLANG_TYPE_KIND_NONE = 0,
+        SLANG_TYPE_KIND_STRUCT = 1,
+        SLANG_TYPE_KIND_ARRAY = 2,
+        SLANG_TYPE_KIND_MATRIX = 3,
+        SLANG_TYPE_KIND_VECTOR = 4,
+        SLANG_TYPE_KIND_SCALAR = 5,
+        SLANG_TYPE_KIND_CONSTANT_BUFFER = 6,
+        SLANG_TYPE_KIND_RESOURCE = 7,
+        SLANG_TYPE_KIND_SAMPLER_STATE = 8,
+        SLANG_TYPE_KIND_TEXTURE_BUFFER = 9,
+        SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER = 10,
+        SLANG_TYPE_KIND_PARAMETER_BLOCK = 11,
+        SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER = 12,
+        SLANG_TYPE_KIND_INTERFACE = 13,
+        SLANG_TYPE_KIND_OUTPUT_STREAM = 14,
+        SLANG_TYPE_KIND_MESH_OUTPUT = 15,
+        SLANG_TYPE_KIND_SPECIALIZED = 16,
+        SLANG_TYPE_KIND_FEEDBACK = 17,
+        SLANG_TYPE_KIND_POINTER = 18,
+        SLANG_TYPE_KIND_DYNAMIC_RESOURCE = 19,
+        SLANG_TYPE_KIND_ENUM = 20,
         SLANG_TYPE_KIND_COUNT,
     };
 
     typedef unsigned int SlangScalarTypeIntegral;
     enum SlangScalarType : SlangScalarTypeIntegral
     {
-        SLANG_SCALAR_TYPE_NONE,
-        SLANG_SCALAR_TYPE_VOID,
-        SLANG_SCALAR_TYPE_BOOL,
-        SLANG_SCALAR_TYPE_INT32,
-        SLANG_SCALAR_TYPE_UINT32,
-        SLANG_SCALAR_TYPE_INT64,
-        SLANG_SCALAR_TYPE_UINT64,
-        SLANG_SCALAR_TYPE_FLOAT16,
-        SLANG_SCALAR_TYPE_FLOAT32,
-        SLANG_SCALAR_TYPE_FLOAT64,
-        SLANG_SCALAR_TYPE_INT8,
-        SLANG_SCALAR_TYPE_UINT8,
-        SLANG_SCALAR_TYPE_INT16,
-        SLANG_SCALAR_TYPE_UINT16,
-        SLANG_SCALAR_TYPE_INTPTR,
-        SLANG_SCALAR_TYPE_UINTPTR,
-        SLANG_SCALAR_TYPE_BFLOAT16,
-        SLANG_SCALAR_TYPE_FLOAT_E4M3,
-        SLANG_SCALAR_TYPE_FLOAT_E5M2,
+        SLANG_SCALAR_TYPE_NONE = 0,
+        SLANG_SCALAR_TYPE_VOID = 1,
+        SLANG_SCALAR_TYPE_BOOL = 2,
+        SLANG_SCALAR_TYPE_INT32 = 3,
+        SLANG_SCALAR_TYPE_UINT32 = 4,
+        SLANG_SCALAR_TYPE_INT64 = 5,
+        SLANG_SCALAR_TYPE_UINT64 = 6,
+        SLANG_SCALAR_TYPE_FLOAT16 = 7,
+        SLANG_SCALAR_TYPE_FLOAT32 = 8,
+        SLANG_SCALAR_TYPE_FLOAT64 = 9,
+        SLANG_SCALAR_TYPE_INT8 = 10,
+        SLANG_SCALAR_TYPE_UINT8 = 11,
+        SLANG_SCALAR_TYPE_INT16 = 12,
+        SLANG_SCALAR_TYPE_UINT16 = 13,
+        SLANG_SCALAR_TYPE_INTPTR = 14,
+        SLANG_SCALAR_TYPE_UINTPTR = 15,
+        SLANG_SCALAR_TYPE_BFLOAT16 = 16,
+        SLANG_SCALAR_TYPE_FLOAT_E4M3 = 17,
+        SLANG_SCALAR_TYPE_FLOAT_E5M2 = 18,
     };
 
     // abstract decl reflection
     typedef unsigned int SlangDeclKindIntegral;
     enum SlangDeclKind : SlangDeclKindIntegral
     {
-        SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION,
-        SLANG_DECL_KIND_STRUCT,
-        SLANG_DECL_KIND_FUNC,
-        SLANG_DECL_KIND_MODULE,
-        SLANG_DECL_KIND_GENERIC,
-        SLANG_DECL_KIND_VARIABLE,
-        SLANG_DECL_KIND_NAMESPACE,
-        SLANG_DECL_KIND_ENUM,
+        SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION = 0,
+        SLANG_DECL_KIND_STRUCT = 1,
+        SLANG_DECL_KIND_FUNC = 2,
+        SLANG_DECL_KIND_MODULE = 3,
+        SLANG_DECL_KIND_GENERIC = 4,
+        SLANG_DECL_KIND_VARIABLE = 5,
+        SLANG_DECL_KIND_NAMESPACE = 6,
+        SLANG_DECL_KIND_ENUM = 7,
     };
 
 #ifndef SLANG_RESOURCE_SHAPE
@@ -2043,46 +2068,46 @@ public:                                                              \
     typedef unsigned int SlangResourceAccessIntegral;
     enum SlangResourceAccess : SlangResourceAccessIntegral
     {
-        SLANG_RESOURCE_ACCESS_NONE,
-        SLANG_RESOURCE_ACCESS_READ,
-        SLANG_RESOURCE_ACCESS_READ_WRITE,
-        SLANG_RESOURCE_ACCESS_RASTER_ORDERED,
-        SLANG_RESOURCE_ACCESS_APPEND,
-        SLANG_RESOURCE_ACCESS_CONSUME,
-        SLANG_RESOURCE_ACCESS_WRITE,
-        SLANG_RESOURCE_ACCESS_FEEDBACK,
+        SLANG_RESOURCE_ACCESS_NONE = 0,
+        SLANG_RESOURCE_ACCESS_READ = 1,
+        SLANG_RESOURCE_ACCESS_READ_WRITE = 2,
+        SLANG_RESOURCE_ACCESS_RASTER_ORDERED = 3,
+        SLANG_RESOURCE_ACCESS_APPEND = 4,
+        SLANG_RESOURCE_ACCESS_CONSUME = 5,
+        SLANG_RESOURCE_ACCESS_WRITE = 6,
+        SLANG_RESOURCE_ACCESS_FEEDBACK = 7,
         SLANG_RESOURCE_ACCESS_UNKNOWN = 0x7FFFFFFF,
     };
 
     typedef unsigned int SlangParameterCategoryIntegral;
     enum SlangParameterCategory : SlangParameterCategoryIntegral
     {
-        SLANG_PARAMETER_CATEGORY_NONE,
-        SLANG_PARAMETER_CATEGORY_MIXED,
-        SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER,
-        SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE,
-        SLANG_PARAMETER_CATEGORY_UNORDERED_ACCESS,
-        SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
-        SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT,
-        SLANG_PARAMETER_CATEGORY_SAMPLER_STATE,
-        SLANG_PARAMETER_CATEGORY_UNIFORM,
-        SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
-        SLANG_PARAMETER_CATEGORY_SPECIALIZATION_CONSTANT,
-        SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER,
+        SLANG_PARAMETER_CATEGORY_NONE = 0,
+        SLANG_PARAMETER_CATEGORY_MIXED = 1,
+        SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER = 2,
+        SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE = 3,
+        SLANG_PARAMETER_CATEGORY_UNORDERED_ACCESS = 4,
+        SLANG_PARAMETER_CATEGORY_VARYING_INPUT = 5,
+        SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT = 6,
+        SLANG_PARAMETER_CATEGORY_SAMPLER_STATE = 7,
+        SLANG_PARAMETER_CATEGORY_UNIFORM = 8,
+        SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT = 9,
+        SLANG_PARAMETER_CATEGORY_SPECIALIZATION_CONSTANT = 10,
+        SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER = 11,
 
         // HLSL register `space`, Vulkan GLSL `set`
-        SLANG_PARAMETER_CATEGORY_REGISTER_SPACE,
+        SLANG_PARAMETER_CATEGORY_REGISTER_SPACE = 12,
 
         // TODO: Ellie, Both APIs treat mesh outputs as more or less varying output,
         // Does it deserve to be represented here??
 
         // A parameter whose type is to be specialized by a global generic type argument
-        SLANG_PARAMETER_CATEGORY_GENERIC,
+        SLANG_PARAMETER_CATEGORY_GENERIC = 13,
 
-        SLANG_PARAMETER_CATEGORY_RAY_PAYLOAD,
-        SLANG_PARAMETER_CATEGORY_HIT_ATTRIBUTES,
-        SLANG_PARAMETER_CATEGORY_CALLABLE_PAYLOAD,
-        SLANG_PARAMETER_CATEGORY_SHADER_RECORD,
+        SLANG_PARAMETER_CATEGORY_RAY_PAYLOAD = 14,
+        SLANG_PARAMETER_CATEGORY_HIT_ATTRIBUTES = 15,
+        SLANG_PARAMETER_CATEGORY_CALLABLE_PAYLOAD = 16,
+        SLANG_PARAMETER_CATEGORY_SHADER_RECORD = 17,
 
         // An existential type parameter represents a "hole" that
         // needs to be filled with a concrete type to enable
@@ -2102,7 +2127,7 @@ public:                                                              \
         // we need to have a *single* concrete type for all the array
         // elements to be able to generate specialized code.
         //
-        SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM,
+        SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM = 18,
 
         // An existential object parameter represents a value
         // that needs to be passed in to provide data for some
@@ -2121,22 +2146,22 @@ public:                                                              \
         // element). This is consistent with the number of interface-type
         // "objects" that are being passed through to the shader.
         //
-        SLANG_PARAMETER_CATEGORY_EXISTENTIAL_OBJECT_PARAM,
+        SLANG_PARAMETER_CATEGORY_EXISTENTIAL_OBJECT_PARAM = 19,
 
         // The register space offset for the sub-elements that occupies register spaces.
-        SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE,
+        SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE = 20,
 
         // The input_attachment_index subpass occupancy tracker
-        SLANG_PARAMETER_CATEGORY_SUBPASS,
+        SLANG_PARAMETER_CATEGORY_SUBPASS = 21,
 
         // Metal tier-1 argument buffer element [[id]].
-        SLANG_PARAMETER_CATEGORY_METAL_ARGUMENT_BUFFER_ELEMENT,
+        SLANG_PARAMETER_CATEGORY_METAL_ARGUMENT_BUFFER_ELEMENT = 22,
 
         // Metal [[attribute]] inputs.
-        SLANG_PARAMETER_CATEGORY_METAL_ATTRIBUTE,
+        SLANG_PARAMETER_CATEGORY_METAL_ATTRIBUTE = 23,
 
         // Metal [[payload]] inputs
-        SLANG_PARAMETER_CATEGORY_METAL_PAYLOAD,
+        SLANG_PARAMETER_CATEGORY_METAL_PAYLOAD = 24,
 
         //
         SLANG_PARAMETER_CATEGORY_COUNT,
@@ -2180,22 +2205,22 @@ public:                                                              \
     {
         SLANG_BINDING_TYPE_UNKNOWN = 0,
 
-        SLANG_BINDING_TYPE_SAMPLER,
-        SLANG_BINDING_TYPE_TEXTURE,
-        SLANG_BINDING_TYPE_CONSTANT_BUFFER,
-        SLANG_BINDING_TYPE_PARAMETER_BLOCK,
-        SLANG_BINDING_TYPE_TYPED_BUFFER,
-        SLANG_BINDING_TYPE_RAW_BUFFER,
-        SLANG_BINDING_TYPE_COMBINED_TEXTURE_SAMPLER,
-        SLANG_BINDING_TYPE_INPUT_RENDER_TARGET,
-        SLANG_BINDING_TYPE_INLINE_UNIFORM_DATA,
-        SLANG_BINDING_TYPE_RAY_TRACING_ACCELERATION_STRUCTURE,
+        SLANG_BINDING_TYPE_SAMPLER = 1,
+        SLANG_BINDING_TYPE_TEXTURE = 2,
+        SLANG_BINDING_TYPE_CONSTANT_BUFFER = 3,
+        SLANG_BINDING_TYPE_PARAMETER_BLOCK = 4,
+        SLANG_BINDING_TYPE_TYPED_BUFFER = 5,
+        SLANG_BINDING_TYPE_RAW_BUFFER = 6,
+        SLANG_BINDING_TYPE_COMBINED_TEXTURE_SAMPLER = 7,
+        SLANG_BINDING_TYPE_INPUT_RENDER_TARGET = 8,
+        SLANG_BINDING_TYPE_INLINE_UNIFORM_DATA = 9,
+        SLANG_BINDING_TYPE_RAY_TRACING_ACCELERATION_STRUCTURE = 10,
 
-        SLANG_BINDING_TYPE_VARYING_INPUT,
-        SLANG_BINDING_TYPE_VARYING_OUTPUT,
+        SLANG_BINDING_TYPE_VARYING_INPUT = 11,
+        SLANG_BINDING_TYPE_VARYING_OUTPUT = 12,
 
-        SLANG_BINDING_TYPE_EXISTENTIAL_VALUE,
-        SLANG_BINDING_TYPE_PUSH_CONSTANT,
+        SLANG_BINDING_TYPE_EXISTENTIAL_VALUE = 13,
+        SLANG_BINDING_TYPE_PUSH_CONSTANT = 14,
 
         SLANG_BINDING_TYPE_MUTABLE_FLAG = 0x100,
 
@@ -2213,26 +2238,26 @@ public:                                                              \
     typedef SlangUInt32 SlangLayoutRulesIntegral;
     enum SlangLayoutRules : SlangLayoutRulesIntegral
     {
-        SLANG_LAYOUT_RULES_DEFAULT,
-        SLANG_LAYOUT_RULES_METAL_ARGUMENT_BUFFER_TIER_2,
-        SLANG_LAYOUT_RULES_DEFAULT_STRUCTURED_BUFFER,
-        SLANG_LAYOUT_RULES_DEFAULT_CONSTANT_BUFFER,
+        SLANG_LAYOUT_RULES_DEFAULT = 0,
+        SLANG_LAYOUT_RULES_METAL_ARGUMENT_BUFFER_TIER_2 = 1,
+        SLANG_LAYOUT_RULES_DEFAULT_STRUCTURED_BUFFER = 2,
+        SLANG_LAYOUT_RULES_DEFAULT_CONSTANT_BUFFER = 3,
     };
 
     typedef SlangUInt32 SlangModifierIDIntegral;
     enum SlangModifierID : SlangModifierIDIntegral
     {
-        SLANG_MODIFIER_SHARED,
-        SLANG_MODIFIER_NO_DIFF,
-        SLANG_MODIFIER_STATIC,
-        SLANG_MODIFIER_CONST,
-        SLANG_MODIFIER_EXPORT,
-        SLANG_MODIFIER_EXTERN,
-        SLANG_MODIFIER_DIFFERENTIABLE,
-        SLANG_MODIFIER_MUTATING,
-        SLANG_MODIFIER_IN,
-        SLANG_MODIFIER_OUT,
-        SLANG_MODIFIER_INOUT
+        SLANG_MODIFIER_SHARED = 0,
+        SLANG_MODIFIER_NO_DIFF = 1,
+        SLANG_MODIFIER_STATIC = 2,
+        SLANG_MODIFIER_CONST = 3,
+        SLANG_MODIFIER_EXPORT = 4,
+        SLANG_MODIFIER_EXTERN = 5,
+        SLANG_MODIFIER_DIFFERENTIABLE = 6,
+        SLANG_MODIFIER_MUTATING = 7,
+        SLANG_MODIFIER_IN = 8,
+        SLANG_MODIFIER_OUT = 9,
+        SLANG_MODIFIER_INOUT = 10,
     };
 
     typedef SlangUInt32 SlangImageFormatIntegral;
@@ -3842,8 +3867,8 @@ struct TargetDesc;
 
 enum class BuiltinModuleName
 {
-    Core,
-    GLSL
+    Core = 0,
+    GLSL = 1,
 };
 
 /** A global session for interaction with the Slang library.
@@ -4210,11 +4235,11 @@ struct SessionDesc
 
 enum class ContainerType
 {
-    None,
-    UnsizedArray,
-    StructuredBuffer,
-    ConstantBuffer,
-    ParameterBlock
+    None = 0,
+    UnsizedArray = 1,
+    StructuredBuffer = 2,
+    ConstantBuffer = 3,
+    ParameterBlock = 4,
 };
 
 struct SourceLocation
@@ -4487,6 +4512,111 @@ struct IMetadata : public ISlangCastable
     virtual const char* SLANG_MCALL getDebugBuildIdentifier() = 0;
 };
     #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
+
+struct CooperativeMatrixType
+{
+    // Component type `NONE` means this type is not valid.
+    SlangScalarType componentType = SLANG_SCALAR_TYPE_NONE;
+    SlangScope scope = SLANG_SCOPE_NONE;
+
+    uint32_t rowCount = 0;
+    uint32_t columnCount = 0;
+
+    SlangCooperativeMatrixUse use = SLANG_COOPERATIVE_MATRIX_USE_A;
+};
+
+struct CooperativeMatrixCombination
+{
+    // Number of rows of matrix A and the result.
+    uint32_t m = 0;
+    // Number of columns of matrix B and the result.
+    uint32_t n = 0;
+    // Shared inner dimension: columns of A and rows of B.
+    uint32_t k = 0;
+
+    SlangScalarType componentTypeA = SLANG_SCALAR_TYPE_NONE;
+    SlangScalarType componentTypeB = SLANG_SCALAR_TYPE_NONE;
+    SlangScalarType componentTypeC = SLANG_SCALAR_TYPE_NONE;
+    SlangScalarType componentTypeResult = SLANG_SCALAR_TYPE_NONE;
+
+    SlangBool saturate = false;
+    SlangScope scope = SLANG_SCOPE_NONE;
+};
+
+struct CooperativeVectorTypeUsageInfo
+{
+    SlangScalarType componentType = SLANG_SCALAR_TYPE_NONE;
+
+    // Maximum element count used for this component type in cooperative
+    // operations (e.g. MatMul).
+    uint32_t maxSize = 0;
+
+    // Whether this component type is used as an accumulation/storage type for
+    // cooperative training operations (e.g. outer-product accumulation and
+    // reduce-sum accumulation). This flag is independent of `maxSize`.
+    SlangBool usedForTrainingOp = false;
+};
+
+struct CooperativeVectorCombination
+{
+    SlangScalarType inputType = SLANG_SCALAR_TYPE_NONE;
+    SlangScalarType inputInterpretation = SLANG_SCALAR_TYPE_NONE;
+    // Number of logical elements packed into each physical input element.
+    // For example, this is 4 when four int8 values are packed into one uint32 input element.
+    uint32_t inputPackingFactor = 1;
+    SlangScalarType matrixInterpretation = SLANG_SCALAR_TYPE_NONE;
+    // `NONE` means the operation has no bias operand/matrix.
+    SlangScalarType biasInterpretation = SLANG_SCALAR_TYPE_NONE;
+    SlangScalarType resultType = SLANG_SCALAR_TYPE_NONE;
+    SlangBool transpose = false;
+};
+
+/** Cooperative matrix and vector metadata.
+
+This interface reports the cooperative matrix/vector type information that a compiled target uses,
+including cooperative matrix types, cooperative vector type-usage records, and certain type
+combinations required to execute some operations (like matrix multiplication).
+
+Applications can use this metadata to compare shader requirements against the capabilities exposed
+by the target API/driver (for example Vulkan cooperative matrix/vector property queries, or
+analogous APIs on other backends).
+
+Metadata is collected from the IR after target-specific lowering, so it only reflects cooperative
+types that survive as native constructs in the final output.  Targets that lower cooperative types
+into ordinary arrays will report empty lists.
+
+Lists are exposed using `get*Count()` plus `get*ByIndex()` methods, where the count returns the
+number of elements currently available and valid indices are in the range `[0, count)`.
+
+Cast from an `IMetadata*` using `castAs()`.
+*/
+struct ICooperativeTypesMetadata : public ISlangCastable
+{
+    SLANG_COM_INTERFACE(
+        0x64c4d536,
+        0xd949,
+        0x49c3,
+        {0x9f, 0xde, 0x3f, 0x0f, 0x9c, 0x6f, 0x01, 0x31})
+
+    virtual SLANG_NO_THROW SlangUInt SLANG_MCALL getCooperativeMatrixTypeCount() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getCooperativeMatrixTypeByIndex(SlangUInt index, CooperativeMatrixType* outType) = 0;
+
+    virtual SLANG_NO_THROW SlangUInt SLANG_MCALL getCooperativeMatrixCombinationCount() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCooperativeMatrixCombinationByIndex(
+        SlangUInt index,
+        CooperativeMatrixCombination* outCombination) = 0;
+
+    virtual SLANG_NO_THROW SlangUInt SLANG_MCALL getCooperativeVectorTypeCount() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getCooperativeVectorTypeByIndex(SlangUInt index, CooperativeVectorTypeUsageInfo* outType) = 0;
+
+    virtual SLANG_NO_THROW SlangUInt SLANG_MCALL getCooperativeVectorCombinationCount() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCooperativeVectorCombinationByIndex(
+        SlangUInt index,
+        CooperativeVectorCombination* outCombination) = 0;
+};
+    #define SLANG_UUID_ICooperativeTypesMetadata ICooperativeTypesMetadata::getTypeGuid()
 
 /** Compile result for storing and retrieving multiple output blobs.
     This is needed for features such as separate debug compilation which
@@ -4925,9 +5055,9 @@ struct SpecializationArg
 {
     enum class Kind : int32_t
     {
-        Unknown, /**< An invalid specialization argument. */
-        Type,    /**< Specialize to a type. */
-        Expr,    /**< An expression representing a type or value */
+        Unknown = 0, /**< An invalid specialization argument. */
+        Type = 1,    /**< Specialize to a type. */
+        Expr = 2,    /**< An expression representing a type or value */
     };
 
     /** The kind of specialization argument. */
