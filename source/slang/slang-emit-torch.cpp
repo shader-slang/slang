@@ -3,7 +3,6 @@
 
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
-#include "slang-mangled-lexer.h"
 
 #include <assert.h>
 
