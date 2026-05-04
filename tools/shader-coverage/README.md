@@ -291,4 +291,11 @@ slot in its own pipeline layout / root signature.
   wrong buffer. Not a coverage-feature defect; tracked at
   [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724).
   On Apple silicon, use Vulkan via MoltenVK.
+- **Entry-point uniform parameters can collide with the auto-allocated
+  coverage buffer.** The coverage pass's auto-allocator walks
+  module-scope globals only, so a shader that declares uniforms as
+  parameters of the entry-point function (HLSL-legacy `void main(uniform
+  Buf b, ...)` style) may end up sharing a register slot with
+  `__slang_coverage`. Workaround: declare uniforms at module scope
+  (modern Slang convention) — that path works correctly.
 
