@@ -299,6 +299,7 @@ static KeyCode getKeyCode(NSUInteger keyCode)
         deltaX *= 0.1;
         deltaY *= 0.1;
     }
+    SLANG_UNUSED(deltaX);
 
     int delta = (int)deltaY;
 

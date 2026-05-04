@@ -7981,7 +7981,7 @@ static bool _isCast(Parser* parser, Expr* expr)
             // want the interpretation of something in parentheses to be determined by something
             // as common as + or - whitespace.
 
-            if (const auto staticMemberExpr = dynamicCast<StaticMemberExpr>(expr))
+            if (const auto staticMemberExpr = dynamicCast<StaticMemberExpr>(expr); staticMemberExpr)
             {
                 // Apply the heuristic:
                 TokenReader::ParsingCursor cursor = parser->tokenReader.getCursor();
