@@ -140,4 +140,5 @@ int* integerArray = StackFrameAllocator.allocate<int>(10);
 
 Note that as Slang does not allow taking pointers to local variables, you can
 use `StackFrameAllocator` to allocate data on the stack to achieve the same end
-result.
+result. `StackFrameAllocator` does not support `alignedAllocate` and throws an
+error every time it is called.
