@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 interface IFoo
@@ -78,6 +78,16 @@ int dependentValueDefault<int A, int B = A>()
     return A * B;
 }
 
+int overloadedSize<T>()
+{
+    return sizeof(T);
+}
+
+int overloadedSize<T, U = int>()
+{
+    return sizeof(T) + sizeof(U);
+}
+
 struct MemberFuncs
 {
     int defaultedConstrainedType<T : IFoo = Foo1>()
@@ -133,6 +143,16 @@ struct MemberFuncs
     {
         return A * B;
     }
+
+    int overloadedSize<T>()
+    {
+        return sizeof(T);
+    }
+
+    int overloadedSize<T, U = int>()
+    {
+        return sizeof(T) + sizeof(U);
+    }
 }
 
 [numthreads(1, 1, 1)]
@@ -170,38 +190,42 @@ void computeMain()
     outputBuffer[14] = fullDefaultChain();
     // CHECK: 25
     outputBuffer[15] = dependentValueDefault<5>();
+    // CHECK: 4
+    outputBuffer[16] = overloadedSize<float>();
 
     MemberFuncs m;
     // CHECK: 4
-    outputBuffer[16] = m.defaultedTypeSingle();
+    outputBuffer[17] = m.defaultedTypeSingle();
     // CHECK: 8
-    outputBuffer[17] = m.defaultedTypeSingle<float2>();
+    outputBuffer[18] = m.defaultedTypeSingle<float2>();
     // CHECK: 64
-    outputBuffer[18] = m.defaultedTypeTwo<float4>();
+    outputBuffer[19] = m.defaultedTypeTwo<float4>();
     // CHECK: 256
-    outputBuffer[19] = m.defaultedTypeTwo<float4, float4>();
+    outputBuffer[20] = m.defaultedTypeTwo<float4, float4>();
     // CHECK: 10
-    outputBuffer[20] = m.defaultedValueSingle();
+    outputBuffer[21] = m.defaultedValueSingle();
     // CHECK: 8
-    outputBuffer[21] = m.defaultedValueSingle<8>();
+    outputBuffer[22] = m.defaultedValueSingle<8>();
     // CHECK: 160
-    outputBuffer[22] = m.defaultedValueTwo<16>();
+    outputBuffer[23] = m.defaultedValueTwo<16>();
     // CHECK: 256
-    outputBuffer[23] = m.defaultedValueTwo<16, 16>();
+    outputBuffer[24] = m.defaultedValueTwo<16, 16>();
     // CHECK: 12
-    outputBuffer[24] = m.defaultedConstrainedType();
+    outputBuffer[25] = m.defaultedConstrainedType();
     // CHECK: 16
-    outputBuffer[25] = m.defaultedConstrainedType<Foo2>();
+    outputBuffer[26] = m.defaultedConstrainedType<Foo2>();
     // CHECK: 1
-    outputBuffer[26] = m.defaultedTypeWithArg(42);
+    outputBuffer[27] = m.defaultedTypeWithArg(42);
     // CHECK: 0
-    outputBuffer[27] = m.defaultedTypeWithArg(42.0);
+    outputBuffer[28] = m.defaultedTypeWithArg(42.0);
     // CHECK: 16
-    outputBuffer[28] = m.dependentDefault<float4>();  // U defaults to float4
+    outputBuffer[29] = m.dependentDefault<float4>();  // U defaults to float4
     // CHECK: 16
-    outputBuffer[29] = m.inferredDependentDefaultChain(float4(0));
+    outputBuffer[30] = m.inferredDependentDefaultChain(float4(0));
     // CHECK: 4
-    outputBuffer[30] = m.fullDefaultChain();
+    outputBuffer[31] = m.fullDefaultChain();
     // CHECK: 25
-    outputBuffer[31] = m.dependentValueDefault<5>();
+    outputBuffer[32] = m.dependentValueDefault<5>();
+    // CHECK: 4
+    outputBuffer[33] = m.overloadedSize<float>();
 }
