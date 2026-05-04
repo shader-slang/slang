@@ -513,11 +513,9 @@ void instrumentCoverage(
     if (sink && explicitSpace >= 0 && explicitBinding >= 0)
     {
         auto kind = selectCoverageResourceKind(targetRequest);
-        if (auto colliding =
-                findCollidingParam(module, kind, explicitSpace, explicitBinding))
+        if (auto colliding = findCollidingParam(module, kind, explicitSpace, explicitBinding))
         {
-            sink->diagnose(
-                Diagnostics::CoverageBindingCollision{.location = colliding->sourceLoc});
+            sink->diagnose(Diagnostics::CoverageBindingCollision{.location = colliding->sourceLoc});
             return;
         }
     }
