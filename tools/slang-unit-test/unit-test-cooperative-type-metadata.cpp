@@ -319,7 +319,6 @@ static const char* const kCudaOptixCoopVecCaps[] = {"optix_coopvec"};
 
 static const CooperativeMetadataTargetDesc kCooperativeMatrixSubgroupTargets[] = {
     {"spirv", SLANG_SPIRV, "spirv_1_6", kSpirvCoopMatCaps, 1},
-    {"cuda", SLANG_CUDA_SOURCE, nullptr, nullptr, 0},
 };
 
 // HLSL cooperative matrix requires shader model 6.10 and does not currently support the

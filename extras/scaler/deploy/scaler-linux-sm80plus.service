@@ -13,14 +13,15 @@ ExecStart=/opt/scaler/scaler \
     --url=https://github.com/shader-slang/slang \
     --name=linux-gpu-sm80plus-runners \
     --labels=Linux,self-hosted,SM80Plus \
-    --max-runners=1 \
+    --max-runners=4 \
     --min-runners=0 \
     --gcp-project=slang-runners \
     --gcp-zones=us-east1-d,us-east1-b,us-east1-c,us-central1-a,us-west1-a \
     --gcp-instance-template=linux-gpu-runner-sm80plus-l4 \
     --gcp-gpu-type=nvidia-l4 \
     --platform=linux \
-    --vm-prefix=linux-sm80plus
+    --vm-prefix=linux-sm80plus \
+    --session-max-age=2h
 
 EnvironmentFile=/opt/scaler/scaler.env
 
