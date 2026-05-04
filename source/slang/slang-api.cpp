@@ -1164,10 +1164,24 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
         if (SLANG_FAILED(metadata->getEntryInfo(i, &entry)))
             return SLANG_FAIL;
         out << (i == 0 ? "" : ",");
-        out << "\n    {\"index\": " << (int64_t)i << ", \"file\": \"";
-        for (const char* p = entry.file; p && *p; ++p)
-            _appendCoverageManifestJsonEscaped(out, (unsigned char)*p);
-        out << "\", \"line\": " << (int64_t)entry.line << "}";
+        out << "\n    {\"index\": " << (int64_t)i << ", \"file\": ";
+        // Mirror the C++ API's nullable contract: `getEntryInfo`
+        // returns `entry.file == nullptr` for unattributable slots,
+        // so the JSON manifest emits `null` (not `""`) for the same
+        // case. A strict consumer that distinguishes "missing source"
+        // from "empty path" sees the same shape from both channels.
+        if (!entry.file)
+        {
+            out << "null";
+        }
+        else
+        {
+            out << "\"";
+            for (const char* p = entry.file; *p; ++p)
+                _appendCoverageManifestJsonEscaped(out, (unsigned char)*p);
+            out << "\"";
+        }
+        out << ", \"line\": " << (int64_t)entry.line << "}";
     }
     out << "\n  ]\n";
     out << "}\n";

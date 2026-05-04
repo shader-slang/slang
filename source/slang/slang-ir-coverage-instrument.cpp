@@ -510,12 +510,22 @@ void instrumentCoverage(
     // the user's value at face value, leaving DXC / spirv-val to
     // reject the resulting two-params-at-one-slot program with a
     // cryptic downstream error.
-    if (sink && explicitSpace >= 0 && explicitBinding >= 0)
+    //
+    // The collision check itself runs regardless of whether `sink` is
+    // available — correctness must not depend on diagnostic plumbing.
+    // The diagnostic emission is gated on `sink`, but the IR cleanup
+    // (drop queued counter ops, return without synthesizing) happens
+    // unconditionally so the resulting program is well-formed.
+    if (explicitSpace >= 0 && explicitBinding >= 0)
     {
         auto kind = selectCoverageResourceKind(targetRequest);
         if (auto colliding = findCollidingParam(module, kind, explicitSpace, explicitBinding))
         {
-            sink->diagnose(Diagnostics::CoverageBindingCollision{.location = colliding->sourceLoc});
+            if (sink)
+                sink->diagnose(
+                    Diagnostics::CoverageBindingCollision{.location = colliding->sourceLoc});
+            for (auto op : counterOps)
+                op->removeAndDeallocate();
             return;
         }
     }
