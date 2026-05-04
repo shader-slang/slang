@@ -4563,6 +4563,15 @@ err(
     span { loc = "location", message = "unresolved external symbol '~symbol:IRInst'." }
 )
 
+-- 451xx - Coverage instrumentation (-trace-coverage)
+
+warning(
+    "coverage-buffer-reserved-name",
+    45100,
+    "`__slang_coverage` is reserved by `-trace-coverage`",
+    span { loc = "location", message = "the global parameter name `__slang_coverage` is reserved by the `-trace-coverage` instrumentation. The IR coverage pass synthesizes its own buffer with this name; the user declaration here is silently shadowed and will not receive any counter writes. Either rename the user declaration or remove `-trace-coverage` from the compile." }
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(

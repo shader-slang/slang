@@ -5,6 +5,7 @@
 #include "compiler-core/slang-source-loc.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-target.h"
 
 #include <limits>
@@ -38,6 +39,27 @@ static LayoutResourceKind selectCoverageResourceKind(TargetRequest* targetReques
     if (isMetalTarget(targetRequest))
         return LayoutResourceKind::MetalBuffer;
     return LayoutResourceKind::DescriptorTableSlot;
+}
+
+// Locate a user-declared global parameter whose name hint matches
+// `__slang_coverage`. The IR coverage pass otherwise unconditionally
+// synthesizes its own buffer with that name, which would silently
+// shadow a user declaration; the caller surfaces a diagnostic when
+// this returns non-null.
+static IRGlobalParam* findUserDeclaredCoverageBuffer(IRModule* module)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto param = as<IRGlobalParam>(inst);
+        if (!param)
+            continue;
+        auto nameHint = param->findDecoration<IRNameHintDecoration>();
+        if (!nameHint)
+            continue;
+        if (nameHint->getName() == UnownedTerminatedStringSlice(kCoverageBufferName))
+            return param;
+    }
+    return nullptr;
 }
 
 // Pick a binding offset in space 0 that doesn't collide with any
@@ -400,6 +422,18 @@ void instrumentCoverage(
     if (counterOps.getCount() == 0)
         return;
 
+    // Surface a warning if the user has declared a global parameter
+    // named `__slang_coverage`. The IR coverage pass synthesizes its
+    // own buffer with that name and the user declaration is silently
+    // shadowed (no counter writes ever target it). Reserving the name
+    // explicitly avoids a class of confusing wrong-coverage outcomes.
+    if (sink)
+    {
+        if (auto userBuffer = findUserDeclaredCoverageBuffer(module))
+            sink->diagnose(
+                Diagnostics::CoverageBufferReservedName{.location = userBuffer->sourceLoc});
+    }
+
     int chosenSpace = -1;
     int chosenBinding = -1;
     auto buffer = synthesizeCoverageBuffer(
@@ -434,8 +468,6 @@ void instrumentCoverage(
 
     outMetadata.m_coverageBufferSpace = chosenSpace;
     outMetadata.m_coverageBufferBinding = chosenBinding;
-
-    SLANG_UNUSED(sink);
 
     CoverageInstrumenter instrumenter(
         module,
