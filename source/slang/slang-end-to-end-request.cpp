@@ -151,11 +151,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     if (m_passThrough != PassThroughMode::None &&
         getOptionSet().getBoolOption(CompilerOptionName::TraceCoverage))
     {
-        getSink()->diagnoseRaw(
-            Severity::Error,
-            UnownedStringSlice("-trace-coverage cannot be combined with -pass-through; "
-                               "pass-through bypasses the Slang IR pipeline and cannot "
-                               "emit coverage instrumentation."));
+        getSink()->diagnose(Diagnostics::CoveragePassThroughIncompatible{});
         return SLANG_FAIL;
     }
 

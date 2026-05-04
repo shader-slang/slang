@@ -6,4 +6,5 @@ void computeMain()
 {
 }
 
-//CHECK: -trace-coverage cannot be combined with -pass-through
+//CHECK: error[E45104]
+//CHECK-SAME: cannot be combined with `-pass-through`

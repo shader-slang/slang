@@ -4591,6 +4591,12 @@ err(
     "could not allocate a free binding slot for `__slang_coverage` — existing global parameters occupy too many slots in space 0"
 )
 
+err(
+    "coverage-pass-through-incompatible",
+    45104,
+    "`-trace-coverage` cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation"
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(
