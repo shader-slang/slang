@@ -124,13 +124,6 @@ struct AutoDiffSharedContext
     AutoDiffSharedContext(TargetProgram* targetProgram, IRModuleInst* inModuleInst);
 };
 
-// Returns true when `type` is IRRateQualifiedType wrapping IRConstExprRate.
-// Used to preserve constexpr-qualified params through autodiff wrapper synthesis.
-inline bool isConstExprRateQualifiedType(IRType* type)
-{
-    auto rqt = as<IRRateQualifiedType>(type);
-    return rqt && as<IRConstExprRate>(rqt->getRate());
-}
 
 struct DifferentiableTypeConformanceContext
 {
