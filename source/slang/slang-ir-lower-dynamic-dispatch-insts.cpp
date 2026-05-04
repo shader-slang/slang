@@ -1870,14 +1870,20 @@ struct ExistentialLoweringContext : public InstPassBase
         auto valueOutPtr = inst->getOperand(2);
 
         auto tupleType = as<IRTupleType>(obj->getDataType());
-        if (!tupleType || tupleType->getOperandCount() < 3)
+        // The 3-element shape (RTTI, WitnessTableIDVec, AnyValue) is what
+        // `lowerCreateExistentialObject` produces and is the only shape this
+        // pass is designed to consume. `lowerBoundInterfaceType` can produce
+        // a 4-element shape (RTTI, witnessTable, pseudoPtr, AnyValue) for
+        // out-of-line storage of bound-interface types, but those arise only
+        // from compiler-internal static specialization of an existential whose
+        // concrete type is statically known — a path that never produces an
+        // `IRExtractDynamicObject` since user-source `serializeDynamicObject`
+        // calls always operate on an opaque interface-typed value, not a
+        // bound-interface type. Reject any other shape explicitly so a future
+        // upstream-pass change that breaks this invariant surfaces here
+        // rather than silently mis-extracting field 2 of a 4-tuple.
+        if (!tupleType || tupleType->getOperandCount() != 3)
         {
-            // The existential was not lowered to the expected
-            // (RTTI, WitnessTableIDVec, AnyValue) tuple shape that
-            // `lowerCreateExistentialObject` produces. If we silently
-            // return false the inst survives into emission and shows
-            // up as an unhandled opcode with no useful context, so
-            // surface the upstream-pass invariant violation here.
             SLANG_UNEXPECTED("ExtractDynamicObject: operand was not lowered "
                              "to the expected 3-element existential tuple");
         }
