@@ -2081,7 +2081,6 @@ public:
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyConstraintRequirements(
-        Type* satisfyingType,
         DeclRef<ContainerDecl> requiredAssociatedTypeDeclRef,
         RefPtr<WitnessTable> witnessTable);
 

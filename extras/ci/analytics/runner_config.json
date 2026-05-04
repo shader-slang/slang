@@ -133,6 +133,24 @@
       "self_hosted": true
     }
   ],
+  "gpu_quota_metrics": [
+    {
+      "metric": "NVIDIA_T4_GPUS",
+      "name": "T4",
+      "regions": ["us-central1", "us-east1", "us-west1"]
+    },
+    {
+      "metric": "NVIDIA_L4_GPUS",
+      "name": "L4",
+      "regions": [
+        "us-central1",
+        "us-east1",
+        "us-west1",
+        "us-west4",
+        "europe-west1"
+      ]
+    }
+  ],
   "non_production_periods": {
     "runners": {}
   }

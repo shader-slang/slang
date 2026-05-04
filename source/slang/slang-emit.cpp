@@ -34,7 +34,6 @@
 #include "slang-ir-cleanup-void.h"
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-com-interface.h"
-#include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-cuda-immutable-load.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
