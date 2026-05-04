@@ -1700,8 +1700,8 @@ interface IAllocator<AddressSpace addrSpace>
     /// nullptr.
     ///
     /// The returned pointer is either `oldPtr` if the existing allocation was
-    /// extended, or a new pointer to a new allocation. Either way, you must not
-    /// manually call `free(oldPtr)` after calling this function.
+    /// extended, or a new pointer to a new allocation. If `oldPtr` was replaced
+    /// by a new pointer, the old one is automatically freed.
     ///
     /// @param oldPtr Pointer to an allocation that is either to be extended
     /// or reallocated.
@@ -1995,6 +1995,12 @@ public struct StackFrameAllocator: IAllocator<AddressSpace.Device>
         // Arbitrary-alignment allocas aren't really supported by C++, Cuda or
         // LLVM IR (alignment needs to be compile-time for LLVM IR).
         throw MemoryAllocationError.AlignmentIsTooLarge;
+    }
+
+    override void alignedFree(Ptr<void> data)
+    {
+        // Overridden to ensure that this is also a NOP. Stack allocations don't
+        // need manual deallocation.
     }
 }
 

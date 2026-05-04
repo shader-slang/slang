@@ -2179,7 +2179,9 @@ struct LLVMEmitter
                     ptrType->getValueType(),
                     getBufferLayoutRules(ptrType));
 
-                auto intType = builder->getIntType(types->getTypeBits(inst->getOperand(0)->getDataType()));
+                // Do size computation in size_t:
+                auto intType = builder->getIntType(builder->getPointerSizeInBits());
+                count = builder->emitCast(count, intType, false, false);
                 auto allocSize = builder->getConstantInt(intType, sizeAndAlignment.getStride());
                 allocSize = builder->emitBinaryOp(LLVMBinaryOp::Mul, allocSize, count);
 

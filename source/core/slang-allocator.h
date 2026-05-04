@@ -21,15 +21,15 @@ inline void* alignedAllocate(size_t size, size_t alignment)
     // sizeof(void*). malloc is required to have a minimum alignment of
     // alignof(max_align_t) >= sizeof(void*), so we can just use malloc if
     // the requested alignment is low enough.
-    if (alignment < alignof(max_align_t))
+    if (alignment <= alignof(max_align_t))
         return malloc(size);
     else
     {
-        size_t roundedSize = (size + alignment-1)&~(alignment-1);
+        size_t roundedSize = (size + alignment - 1) & ~(alignment - 1);
         return aligned_alloc(alignment, roundedSize);
     }
 #else
-    if (alignment < alignof(max_align_t))
+    if (alignment <= alignof(max_align_t))
         return malloc(size);
     else
     {
