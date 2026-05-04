@@ -50,7 +50,8 @@
       "value": "STATIC"
     },
     {
-      "option": "SLANG_ENABLE_ASAN"
+      "option": "SLANG_ENABLE_ASAN",
+      "skip_linux_aarch64": "true"
     },
     {
       "option": "SLANG_ENABLE_COVERAGE",

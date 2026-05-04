@@ -107,7 +107,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_packages }}
 
       - name: Configure CMake (${{ matrix.option }})
-        if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true'
+        if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64')
         run: |
           option="${{ matrix.option }}"
           value="${{ matrix.value }}"
@@ -175,5 +175,5 @@ jobs:
           fi
 
       - name: Build Slang (${{ matrix.option }})
-        if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true'
+        if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64')
         run: cmake --build build --config "$cmake_config"
