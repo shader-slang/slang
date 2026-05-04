@@ -143,6 +143,22 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         target->getOptionSet().inheritFrom(getOptionSet());
     m_frontEndReq->optionSet = getOptionSet();
 
+    // `-pass-through` bypasses the IR pipeline that emits coverage
+    // instrumentation, so the two flags are mutually exclusive.
+    // The check lives here (not in `OptionsParser::_parse`) so that
+    // C++ API callers using `setPassThrough()` are also covered —
+    // OptionsParser only runs for the slangc CLI path.
+    if (m_passThrough != PassThroughMode::None &&
+        getOptionSet().getBoolOption(CompilerOptionName::TraceCoverage))
+    {
+        getSink()->diagnoseRaw(
+            Severity::Error,
+            UnownedStringSlice("-trace-coverage cannot be combined with -pass-through; "
+                               "pass-through bypasses the Slang IR pipeline and cannot "
+                               "emit coverage instrumentation."));
+        return SLANG_FAIL;
+    }
+
     // We only do parsing and semantic checking if we *aren't* doing
     // a pass-through compilation.
     //

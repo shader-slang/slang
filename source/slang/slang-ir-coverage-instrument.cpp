@@ -336,7 +336,11 @@ static void collectCoverageCounterOps(IRModule* module, List<IRInst*>& out)
             visitFunc(func);
         else if (auto generic = as<IRGeneric>(inst))
         {
-            if (auto inner = as<IRFunc>(findGenericReturnVal(generic)))
+            // `findInnerMostGenericReturnVal` peels off all nested
+            // `IRGeneric` layers (multi-parameter generics lower to
+            // `Generic<T> { Generic<U> { Func } }`); a single layer
+            // would miss the function in those cases.
+            if (auto inner = as<IRFunc>(findInnerMostGenericReturnVal(generic)))
                 visitFunc(inner);
         }
     }

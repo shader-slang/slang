@@ -3714,20 +3714,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         }
 
-        // `-trace-coverage` instruments at the Slang IR level and has
-        // no meaning when the user asks for pass-through codegen
-        // (where the downstream compiler sees the original source
-        // directly). Reject the combination rather than silently
-        // producing an uninstrumented shader.
-        if (m_requestImpl->m_passThrough != PassThroughMode::None &&
-            linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage))
-        {
-            m_sink->diagnoseRaw(
-                Severity::Error,
-                UnownedStringSlice("-trace-coverage cannot be combined with -pass-through; "
-                                   "pass-through bypasses the Slang IR pipeline and cannot "
-                                   "emit coverage instrumentation."));
-        }
+        // (`-trace-coverage` + `-pass-through` rejection moved to
+        // `EndToEndCompileRequest::executeActionsInner` so that C++
+        // API callers using `setPassThrough()` are also covered;
+        // this option-parser path is CLI-only.)
 
         // If the user is requesting code generation via pass-through,
         // then any entry points they specify need to have a stage set,
