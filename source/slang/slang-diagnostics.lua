@@ -4579,6 +4579,12 @@ err(
     span { loc = "location", message = "the explicit `-trace-coverage-binding` slot collides with this global parameter; downstream code generation will emit two parameters at the same `(register, space)` and fail validation. Pick a free slot, or omit `-trace-coverage-binding` to let the IR pass auto-allocate." }
 )
 
+warning(
+    "coverage-target-not-supported",
+    45102,
+    "`-trace-coverage` is not supported on this target; coverage instrumentation skipped"
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(

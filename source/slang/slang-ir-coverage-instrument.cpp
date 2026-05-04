@@ -461,6 +461,24 @@ void instrumentCoverage(
     if (counterOps.getCount() == 0)
         return;
 
+    // WGSL requires the buffer's element type to be `atomic<u32>` for
+    // atomic ops; the IR coverage pass synthesizes a plain
+    // `RWStructuredBuffer<uint>` which lowers to `array<u32>` on WGSL
+    // and fails WGSL validation at the `atomicAdd` call. Until the
+    // synthesized type is wrapped in `Atomic<...>` for WGSL targets,
+    // skip instrumentation with a clear warning rather than emitting
+    // invalid WGSL. Other backends are unaffected. (For WebGPU
+    // workflows that need coverage today, `-target spirv` works via
+    // the SPIR-V → WebGPU path.)
+    if (isWGPUTarget(targetRequest))
+    {
+        if (sink)
+            sink->diagnose(Diagnostics::CoverageTargetNotSupported{});
+        for (auto op : counterOps)
+            op->removeAndDeallocate();
+        return;
+    }
+
     // Surface a warning if the user has declared a global parameter
     // named `__slang_coverage`. The IR coverage pass synthesizes its
     // own buffer with that name and the user declaration is silently

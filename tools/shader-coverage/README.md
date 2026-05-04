@@ -262,7 +262,8 @@ slot in its own pipeline layout / root signature.
 | D3D12 / HLSL | Supported | Supported | Supported |
 | CUDA | Supported | (no-op — backend uses uniform offsets) | (no-op) |
 | Metal (direct) | Compiles. End-to-end dispatch is unreliable due to a pre-existing slang-rhi Metal binding quirk ([shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724)) — not a coverage-feature defect. | (untested) | (untested) |
-| GLSL / WebGPU | Supported codegen | (untested) | (untested) |
+| GLSL | Supported codegen | (untested) | (untested) |
+| WGSL / WebGPU | **Not supported** — `-trace-coverage` emits a warning (E45102) and skips instrumentation. WGSL requires the synthesized counter buffer to use `atomic<u32>` element type, which the IR coverage pass does not yet produce. Use `-target spirv` for Vulkan-based WebGPU workflows as a workaround. | (n/a) | (n/a) |
 
 ### Format scope
 
