@@ -1774,20 +1774,26 @@ interface IAllocator<AddressSpace addrSpace>
 
 //@hidden:
 
-// Computes the size of `T[len]` (when `len` isn't known at compile-time as
-// otherwise you could simply use `sizeof<T[len]>()`), taking into account the
-// alignment requirements of `T` in the given layout. In Slang, it's possible
-// that sizeof(T) % alignof(T) != 0, so we may need to insert padding bytes
-// between entries in an array to achieve correct alignment.
 [ForceInline]
-size_t __arraySizeOf<T, L:IBufferDataLayout>(size_t len)
+size_t __strideOf<T, L:IBufferDataLayout>()
 {
-    if (len == 0)
+    return sizeof(T[2], L) - sizeof(T, L);
+}
+
+[ForceInline]
+[require(cpp_cuda_llvm)]
+internal size_t __getArrayMemoryAllocSize<T, L:IBufferDataLayout>(size_t count)
+    throws MemoryAllocationError
+{
+    size_t stride = __strideOf<T, L>();
+    if (stride == 0)
         return 0;
 
-    size_t unpaddedEntrySize = sizeof(T, L);
-    size_t paddedEntrySize = sizeof(T[2], L) - unpaddedEntrySize;
-    return paddedEntrySize * (len-1) + unpaddedEntrySize;
+    // Can't possibly have enough memory if the array size would overflow size_t.
+    if (count > size_t.maxValue / stride)
+        throw MemoryAllocationError.OutOfMemory;
+
+    return count * stride;
 }
 
 // Used as part of the default implementation of alignedAllocate.
@@ -1884,16 +1890,19 @@ public struct SystemHeapAllocator: IAllocator<AddressSpace.Device>
     static LayoutPtr<T, L> allocate<T, L:IBufferDataLayout = DefaultDataLayout>(size_t count = 1) throws MemoryAllocationError
     {
         Ptr<void> allocation;
+
+        size_t allocSize = try __getArrayMemoryAllocSize<T, L>(count);
+
         if (alignof(T, L) > alignof(Ptr<void>))
         {
             // malloc is only guaranteed to be aligned up to the maximum scalar
             // size, so if our data layout requires a larger alignment for e.g.
             // a vector, we have to do that ourselves.
-            allocation = try alignedAllocate(__arraySizeOf<T, L>(count), alignof(T, L));
+            allocation = try alignedAllocate(allocSize, alignof(T, L));
         }
         else
         {
-            allocation = __cpu_malloc(__arraySizeOf<T, L>(count));
+            allocation = __cpu_malloc(allocSize);
             if (allocation == nullptr && count != 0)
                 throw MemoryAllocationError.OutOfMemory;
         }
@@ -1928,7 +1937,9 @@ public struct SystemHeapAllocator: IAllocator<AddressSpace.Device>
         }
         else
         {
-            let newPtr = __cpu_realloc(Ptr<void>(oldPtr), __arraySizeOf<T, L>(oldCount), __arraySizeOf<T, L>(newCount));
+            size_t oldAllocSize = try __getArrayMemoryAllocSize<T, L>(oldCount);
+            size_t newAllocSize = try __getArrayMemoryAllocSize<T, L>(newCount);
+            let newPtr = __cpu_realloc(Ptr<void>(oldPtr), oldAllocSize, newAllocSize);
             if (newPtr == nullptr && newCount != 0)
                 throw MemoryAllocationError.OutOfMemory;
             return reinterpret<LayoutPtr<T, L>>(newPtr);
