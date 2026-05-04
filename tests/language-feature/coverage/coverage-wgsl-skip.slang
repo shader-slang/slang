@@ -12,6 +12,13 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl -entry main -trace-coverage -stage compute
 //CHECK: warning E45102
 
+// Verify the emitted WGSL is actually uninstrumented (the diagnostic
+// alone doesn't tell us this — silent instrumentation that happens
+// to match the warning would slip through).
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -trace-coverage -stage compute
+//WGSL-NOT: _slang_coverage
+//WGSL-NOT: atomicAdd
+
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(1, 1, 1)]

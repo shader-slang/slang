@@ -1,12 +1,12 @@
-// Regression test for the deferred-stripDebugInfo code path.
+// Regression test for `-trace-coverage` under `-g0` (no debug info).
 //
-// When `-trace-coverage` is on but `-g` is NOT set, the coverage pass
-// still needs source locations to resolve counter placeholders to
-// (file, line). The normal `stripDebugInfo` pass that runs under
-// `-g0` is deliberately deferred until AFTER the coverage pass has
-// consumed the locations. This test verifies the compile succeeds
-// under -g0 and the resulting C++ still contains counter increments
-// (and not placeholder IR ops).
+// Each `IncrementCoverageCounter` op carries the source position on
+// its standard `sourceLoc` field, not on a separate debug decoration.
+// `stripDebugInfo` removes named debug-location decorations but
+// leaves per-instruction `sourceLoc` intact, so coverage attribution
+// survives `-g0`. This test verifies the compile succeeds under
+// `-g0` and the resulting C++ still contains counter increments
+// (and not stale `IncrementCoverageCounter` IR ops).
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain -trace-coverage -g0
 

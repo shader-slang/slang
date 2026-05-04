@@ -1166,7 +1166,8 @@ typedef uint32_t SlangSizeT;
 
         TraceCoverage = 145, // bool: insert per-statement execution counters
         TraceCoverageBinding =
-            146, // int2: explicit (index, space) for the synthesized __slang_coverage buffer
+            146, // intValue0: register index; intValue1: register space — explicit
+                 //   binding for the synthesized __slang_coverage buffer
 
         CountOf,
     };
