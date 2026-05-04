@@ -60,10 +60,7 @@ if(SLANG_ENABLE_ASAN AND MSVC)
                 # /wd5072 suppresses "ASAN enabled without debug information
                 # emission" — external Release builds have no /Zi, and their
                 # /WX would turn C5072 into a fatal error otherwise.
-                target_compile_options(
-                    ${_t}
-                    PRIVATE /fsanitize=address /wd5072
-                )
+                target_compile_options(${_t} PRIVATE /fsanitize=address /wd5072)
             endif()
         endforeach()
     endfunction()

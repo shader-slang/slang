@@ -57,10 +57,7 @@ elseif(NOT SLANG_EMBED_CORE_MODULE)
     set(SLANG_COMPILER_EXTRA_DEPS generate_core_module_headers)
 elseif(SLANG_ENABLE_SLANGC)
     set(SLANG_COMPILER "$<TARGET_FILE:slangc>")
-    set(SLANG_COMPILER_DEPENDENCY
-        slangc
-        slang
-    )
+    set(SLANG_COMPILER_DEPENDENCY slangc slang)
     set(SLANG_COMPILER_EXTRA_DEPS)
 else()
     # When SLANG_ENABLE_SLANGC is OFF, slangc is not built as a target. Fall back
