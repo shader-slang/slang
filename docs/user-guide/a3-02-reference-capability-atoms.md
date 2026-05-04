@@ -179,6 +179,12 @@ Versions
 `cuda_sm_8_0`
 > cuda 8.0 and related capabilities of other targets.
 
+`cuda_sm_8_9`
+> cuda 8.9 (Ada Lovelace) and related capabilities of other targets.  Required
+> for PTX features that landed in PTX ISA 8.7 / SM 8.9, notably the
+> `mma.sync.m16n8k16` instruction with `.e4m3` / `.e5m2` floating-point inputs
+> (FP8 cooperative matrices).
+
 `cuda_sm_9_0`
 > cuda 9.0 and related capabilities of other targets.
 

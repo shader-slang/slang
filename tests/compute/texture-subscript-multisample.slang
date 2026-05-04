@@ -5,8 +5,8 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -mtl
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk
 
-//METAL_ERROR: error[E41402]: cannot write to multisampled texture
-//METALLIB: error[E41402]: cannot write to multisampled texture
+//METAL_ERROR: error[E41404]: cannot write to multisampled texture
+//METALLIB: error[E41404]: cannot write to multisampled texture
 
 //TEST_INPUT: RWTexture2D(format=RGBA8Sint, size=4, content = zero, sampleCount=two, mipMaps = 1):name outputTexture2DMS
 RWTexture2DMS<int4> outputTexture2DMS;

@@ -1,3 +1,20 @@
+# Coverage-CI test skiplist
+# =========================
+# This file uses slang-test's `-expected-failure-list` semantics: tests
+# listed here are expected to FAIL (not skipped). slang-test still runs
+# them and just reclassifies a failing exit as expected. That works for
+# the macOS entries below (cross-dylib exception RTTI mismatch returns a
+# clean failure), but it does NOT help when a test crashes the slang-test
+# process itself -- the runner dies before any classification step.
+#
+# Crash-mode skips therefore live elsewhere: as `-exclude-prefix`
+# arguments in `.github/workflows/ci-slang-coverage.yml`. As of writing:
+#   - slang-unit-test-tool/RecordReplayApiTypeOperations  (Windows / OCC)
+#   - tests/autodiff/global-param-hoisting                (Windows / OCC,
+#                                                          intermittent crash)
+# Update both this file and the workflow when adding a new coverage-only
+# skip.
+
 # macOS only: tests that throw and catch C++ exceptions across shared library
 # boundaries fail when running in-process (server-count=1) due to cross-dylib
 # exception RTTI mismatch. Coverage CI uses server-count=1 for profiling.
