@@ -4585,6 +4585,12 @@ warning(
     "`-trace-coverage` is not supported on this target; coverage instrumentation skipped"
 )
 
+err(
+    "coverage-binding-exhausted",
+    45103,
+    "could not allocate a free binding slot for `__slang_coverage` — existing global parameters occupy too many slots in space 0"
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(

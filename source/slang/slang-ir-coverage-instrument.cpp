@@ -191,15 +191,11 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     IRBuilder builder(module);
     builder.setInsertInto(module->getModuleInst());
 
-    IRType* uintType = builder.getUIntType();
-    IRInst* typeOperands[2] = {uintType, builder.getType(kIROp_DefaultBufferLayoutType)};
-    auto bufferType = (IRType*)builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
-
-    auto param = builder.createGlobalParam(bufferType);
-    builder.addNameHintDecoration(param, UnownedTerminatedStringSlice(kCoverageBufferName));
-
     auto kind = selectCoverageResourceKind(targetRequest);
 
+    // Resolve `(space, binding)` before allocating any IR so a
+    // failure (auto-allocator can't find a free slot) leaves no
+    // orphan inst behind.
     int space, binding;
     if (explicitSpace >= 0 && explicitBinding >= 0)
     {
@@ -210,7 +206,16 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     {
         space = 0;
         binding = pickFreeBindingForCoverage(module, kind);
+        if (binding < 0)
+            return nullptr;
     }
+
+    IRType* uintType = builder.getUIntType();
+    IRInst* typeOperands[2] = {uintType, builder.getType(kIROp_DefaultBufferLayoutType)};
+    auto bufferType = (IRType*)builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
+
+    auto param = builder.createGlobalParam(bufferType);
+    builder.addNameHintDecoration(param, UnownedTerminatedStringSlice(kCoverageBufferName));
 
     auto varLayout = createCoverageBufferVarLayout(builder, targetRequest, kind, space, binding);
     builder.addLayoutDecoration(param, varLayout);
@@ -519,6 +524,20 @@ void instrumentCoverage(
         explicitSpace,
         chosenSpace,
         chosenBinding);
+
+    // `synthesizeCoverageBuffer` returns nullptr when the
+    // auto-allocator can't find a free binding (existing globals
+    // occupy slots up to INT_MAX in space 0 — pathological but
+    // possible). Diagnose loudly and drop the queued counter ops so
+    // the rest of the compile still runs without coverage.
+    if (!buffer)
+    {
+        if (sink)
+            sink->diagnose(Diagnostics::CoverageBindingExhausted{});
+        for (auto op : counterOps)
+            op->removeAndDeallocate();
+        return;
+    }
 
     // Extend the program-scope layout so the buffer participates in
     // global-uniform packaging on targets that pack (CPU, CUDA). On
