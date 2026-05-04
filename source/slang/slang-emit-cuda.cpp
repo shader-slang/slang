@@ -3,7 +3,6 @@
 
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
-#include "slang-mangled-lexer.h"
 #include "slang-rich-diagnostics.h"
 
 #include <assert.h>
@@ -65,6 +64,15 @@ static UnownedStringSlice getOptixCoopVecMatrixLayoutName(int matrixLayout)
         SLANG_UNEXPECTED("invalid OptiX cooperative vector matrix layout");
     }
 }
+
+struct FragmentShape
+{
+    int m, n, k;
+
+    bool isValid() const { return m > 0 && n > 0 && k > 0; }
+};
+
+inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col);
 
 static CUDAExtensionTracker::BaseTypeFlags _findBaseTypesUsed(IRModule* module)
 {
@@ -329,9 +337,10 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
         }
     case kIROp_CoopMatrixType:
         {
-            // CUDA wmma require SM 7.5+
-            m_extensionTracker->requireSMVersion(SemanticVersion(7, 5));
-            return emitWMMAFragmentType(as<IRCoopMatrixType>(type), out);
+            auto coopType = as<IRCoopMatrixType>(type);
+            auto result = emitWMMAFragmentType(coopType, out);
+            m_extensionTracker->requireSMVersion(SemanticVersion(8, 0));
+            return result;
         }
     case kIROp_FloatE4M3Type:
         out << "__nv_fp8_e4m3";
@@ -1532,10 +1541,9 @@ static bool typeCheck(IROp op, uint32_t matrixUse)
     {
     case SLANG_COOPERATIVE_MATRIX_USE_A:
     case SLANG_COOPERATIVE_MATRIX_USE_B:
-        return op == kIROp_UInt8Type || op == kIROp_Int8Type || op == kIROp_HalfType ||
-               op == kIROp_BFloat16Type || op == kIROp_FloatE4M3Type || op == kIROp_FloatE5M2Type;
+        return op == kIROp_HalfType;
     case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR:
-        return op == kIROp_IntType || op == kIROp_HalfType || op == kIROp_FloatType;
+        return op == kIROp_HalfType || op == kIROp_FloatType;
     }
     return false;
 }
@@ -1555,80 +1563,19 @@ static UnownedStringSlice getMatrixUseName(uint32_t matrixUse)
     }
 }
 
-struct FragmentShape
-{
-    int m, n, k;
-
-    bool isValid() const { return m > 0 && n > 0 && k > 0; }
-};
-
 /*
- * Strict Shape Validation Strategy:
- * Users must provide exact dimensions that match one of the allowed WMMA shapes:
- *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16)
- *   - m8n32k16:  Matrix A (8x16),  Matrix B (16x32), Matrix C/D (8x32)
- *   - m32n8k16:  Matrix A (32x16), Matrix B (16x8),  Matrix C/D (32x8)
+ * Shape Validation Strategy:
+ * Maps CoopMat dimensions to the canonical MMA shape (m, n, k).
+ * Only m16n16k16 is supported (internally uses 2x mma.sync.m16n8k16).
  *
- * Note: k dimension is always 16 for all shapes.
+ * Supported shapes:
+ *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16)
  */
-inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col)
+inline FragmentShape computeShapeCombination(uint32_t /*matrixUse*/, uint32_t row, uint32_t col)
 {
-    switch (matrixUse)
-    {
-    case SLANG_COOPERATIVE_MATRIX_USE_A: // Matrix A: row=m, col=k
-        {
-            // k must always be 16
-            if (col != 16)
-            {
-                return {0, 0, 0}; // Invalid
-            }
-            // Check exact m values
-            switch (row)
-            {
-            case 16:
-                return {16, 16, 16};
-            case 8:
-                return {8, 32, 16};
-            case 32:
-                return {32, 8, 16};
-            default:
-                return {0, 0, 0}; // Invalid
-            }
-        }
-    case SLANG_COOPERATIVE_MATRIX_USE_B: // Matrix B: row=k, col=n
-        {
-            // k must always be 16
-            if (row != 16)
-            {
-                return {0, 0, 0}; // Invalid
-            }
-            // Check exact n values
-            switch (col)
-            {
-            case 16:
-                return {16, 16, 16};
-            case 32:
-                return {8, 32, 16};
-            case 8:
-                return {32, 8, 16};
-            default:
-                return {0, 0, 0}; // Invalid
-            }
-        }
-    case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR: // Matrix C/D: row=m, col=n
-    default:
-        {
-            // Check exact (m, n) combinations
-            if (row == 16 && col == 16)
-                return {16, 16, 16};
-            else if (row == 8 && col == 32)
-                return {8, 32, 16};
-            else if (row == 32 && col == 8)
-                return {32, 8, 16};
-            else
-                return {0, 0, 0}; // Invalid
-        }
-    }
+    if (row == 16 && col == 16)
+        return {16, 16, 16};
+    return {0, 0, 0};
 }
 
 SlangResult CUDASourceEmitter::emitWMMAFragmentType(
