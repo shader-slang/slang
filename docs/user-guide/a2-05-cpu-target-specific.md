@@ -14,7 +14,7 @@ There are two ways to emit CPU code: Through transpilation to C++ (default) and
 directly by LLVM IR (experimental, available via `-emit-cpu-via-llvm`). These
 methods have somewhat different limitations.
 
-It possible to JIT-execute Slang compute shaders on CPUs. JIT execution
+It is possible to JIT-execute Slang compute shaders on CPUs. JIT execution
 is only supported through the Slang API. It is available with both the C++ and
 LLVM IR compilation paths, see the examples for how to do this: [C++](https://github.com/shader-slang/slang/tree/master/examples/cpu-hello-world), [LLVM IR](https://github.com/shader-slang/slang/tree/master/examples/cpu-shader-llvm).
 
