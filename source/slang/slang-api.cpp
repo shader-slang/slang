@@ -1144,13 +1144,16 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
     out << "    \"element_type\": \"uint32\",\n";
     out << "    \"element_stride\": 4";
     slang::CoverageBufferInfo bufferInfo;
-    if (SLANG_SUCCEEDED(metadata->getBufferInfo(&bufferInfo)))
-    {
-        if (bufferInfo.space >= 0)
-            out << ",\n    \"space\": " << (int64_t)bufferInfo.space;
-        if (bufferInfo.binding >= 0)
-            out << ",\n    \"binding\": " << (int64_t)bufferInfo.binding;
-    }
+    // `bufferInfo.structSize` is set by the default constructor; a
+    // failure here is an internal-invariant violation, not a "fields
+    // unavailable" case. Bail rather than silently producing a
+    // manifest without binding info — hosts that rely on the binding
+    // would parse a partial sidecar without realizing it.
+    SLANG_RETURN_ON_FAIL(metadata->getBufferInfo(&bufferInfo));
+    if (bufferInfo.space >= 0)
+        out << ",\n    \"space\": " << (int64_t)bufferInfo.space;
+    if (bufferInfo.binding >= 0)
+        out << ",\n    \"binding\": " << (int64_t)bufferInfo.binding;
     out << "\n  },\n";
     out << "  \"entries\": [";
     for (uint32_t i = 0; i < counterCount; ++i)

@@ -220,7 +220,13 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     auto varLayout = createCoverageBufferVarLayout(builder, targetRequest, kind, space, binding);
     builder.addLayoutDecoration(param, varLayout);
 
-    outSpace = space;
+    // Metadata reports `space` as -1 on targets that have no
+    // space/set dimension (Metal uses `[[buffer(N)]]` only). The IR
+    // varLayout above still carries `space = 0` for Metal because the
+    // emitter walks the layout's RegisterSpace offset; the public
+    // `CoverageBufferInfo.space` is documented as -1 in those cases
+    // and hosts shouldn't see a bogus 0.
+    outSpace = isMetalTarget(targetRequest) ? -1 : space;
     outBinding = binding;
     return param;
 }
