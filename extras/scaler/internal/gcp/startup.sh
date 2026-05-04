@@ -25,13 +25,21 @@ RUNNER_SHA256="048024cd2c848eb6f14d5646d56c13a4def2ae7ee3ad12122bee960c56f3d271"
 # without labels and blocking the queue. Image hygiene is the canonical fix;
 # this is a runtime safety net so a single bad snapshot can't repeat that.
 for stray in /home/*/actions-runner; do
+  # Without `nullglob`, an unmatched glob expands to the literal pattern;
+  # the directory check below skips it.
   [ -d "$stray" ] || continue
   case "$stray" in
   /home/runner/actions-runner) continue ;;
   esac
   echo "Wiping stray actions-runner install: $stray"
+  # Stop and uninstall the runner service if it is registered. Run the two
+  # phases independently — `uninstall` must still be attempted even when
+  # `stop` fails (service not running, partially installed, etc.) so we do
+  # not leave a dangling systemd unit pointing at the directory we are about
+  # to delete.
   if [ -f "$stray/.runner" ] && [ -x "$stray/svc.sh" ]; then
-    (cd "$stray" && ./svc.sh stop 2>/dev/null && ./svc.sh uninstall 2>/dev/null) || true
+    (cd "$stray" && ./svc.sh stop 2>/dev/null) || true
+    (cd "$stray" && ./svc.sh uninstall 2>/dev/null) || true
   fi
   rm -rf "$stray"
 done
