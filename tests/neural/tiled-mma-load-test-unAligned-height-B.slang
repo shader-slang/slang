@@ -54,21 +54,7 @@ static const int SubgroupSize = 32;
 public struct TestShMemSize : ISharedMemorySize {
     public static const uint Bytes = (32 * 2) * sizeof(uint4);
 }
-typealias TestPool = SharedMemoryPool<TestShMemSize>;
 static const uint OffsetB = 0;
-
-void testLoadShB<TargetEnum Target, int K>(uint tid, uint tileIndex)
-{
-    half inputVector[MMAHelper<half, K, OutputSize, SubgroupSize, Target, TestShMemSize>.Uint4AlignedK] = {};
-    for (int i = 0; i < K; i++)
-    {
-        inputVector[i] = half(tid * 32 + i);
-    }
-
-    // This test only has one subgroup, so the subgroup index is always 0.
-    MMAHelper<half, K, OutputSize, SubgroupSize, Target, TestShMemSize>.loadVectorToShB(OffsetB, tileIndex, 0, inputVector);
-    GroupMemoryBarrierWithWaveSync();
-}
 
 void invalidateSharedMemory(uint tid, uint sharedMemOffset)
 {
@@ -84,7 +70,7 @@ void invalidateSharedMemory(uint tid, uint sharedMemOffset)
         if (index >= 32 * 2)
             break;
 
-        TestPool.data[sharedMemOffset + index] = uint4(0x3C003C00);
+        neural_unittest.writeSharedMemory<TestShMemSize>(sharedMemOffset + index, uint4(0x3C003C00));
     }
     GroupMemoryBarrierWithWaveSync();
 }
@@ -100,7 +86,7 @@ bool verifiedOutput<int K>(uint tid, uint sharedMemOffset, uint tileIndex)
     for (int i = 0; i < 2; i++)
     {
         uint indexInTile = tid * 2 + i;
-        uint4 values = TestPool.data[sharedMemOffset + indexInTile];
+        uint4 values = neural_unittest.readSharedMemory<TestShMemSize>(sharedMemOffset + indexInTile);
         uint4 element = values;
 
         for (int j = 0; j < 4; j++)
@@ -139,50 +125,18 @@ bool verifiedOutput<int K>(uint tid, uint sharedMemOffset, uint tileIndex)
 void Test<int K>(uint tid, uint tileIndex, int resIndex)
 {
     invalidateSharedMemory(tid, OffsetB);
-    __target_switch
-    {
-    case cuda:
-        testLoadShB<TargetEnum.CUDA, K>(tid, tileIndex);
-        break;
-    case spirv:
-        testLoadShB<TargetEnum.SPIR_V, K>(tid, tileIndex);
-        break;
-    }
-    // serialRead(tid, OffsetB);
+
+    half inputVector[K];
+    for (int i = 0; i < K; i++)
+        inputVector[i] = half(tid * 32 + i);
+
+    neural_unittest.testLoadShB<K, OutputSize, SubgroupSize, TestShMemSize, 1>(OffsetB, tileIndex, 0, inputVector);
 
     bool res = verifiedOutput<K>(tid, OffsetB, tileIndex);
     res = WaveActiveAllTrue(res);
 
     if (tid == 0)
         outputBuffer[resIndex] = res ? 1 : 0;
-}
-
-// This function is just used for debugging, not for verification. So keep it here.
-void serialRead(uint tid, uint sharedMemOffset)
-{
-    if (tid > 0)
-        return;
-
-    for (int id = 0; id < 32; id++)
-    {
-        printf("tid: %d\n", id);
-        for (int i = 0; i < 2; i++)
-        {
-            uint4 values = TestPool.data[sharedMemOffset + id * 2 + i];
-            uint4 element = values;
-            for (int j = 0; j < 4; j++)
-            {
-                uint value = element[j];
-                uint16_t a = (uint16_t)(value & 0xFFFF);
-                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
-
-                half aa = bit_cast<half>(a);
-                half bb = bit_cast<half>(b);
-                printf("%.1f %.1f ", float(aa), float(bb));
-            }
-        }
-        printf("\n");
-    }
 }
 
 [numthreads(1024, 1, 1)]

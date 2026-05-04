@@ -36,7 +36,7 @@ void computeMain(int id : SV_DispatchThreadID)
     // Cannot cast between different address spaces.
     // CHECK: error[E30080]: ambiguous conversion
     Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p7 = Ptr<float, Access::ReadWrite, AddressSpace::GroupShared>(rwPtr);
-    // CHECK: error[E30500]: too many initializers
+    // CHECK: error[E30523]: too many initializers
     Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p8 = Ptr<float, Access::ReadWrite, AddressSpace::GroupShared>(p1);
     // CHECK: error[E30019]:
     Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p9 = rwPtr;

@@ -12,11 +12,11 @@
 //CHK_VK:10
 //CHK_VK:4
 
-// https://docs.nvidia.com/cuda/parallel-thread-execution/#warp-level-matrix-fragment
+// m16n16k16 only (mma.sync.m16n8k16 register layout): 4 regs for half A/B, 8 regs for f32 accum
 //CHK_CUDA:8
-//CHK_CUDA:10
-//CHK_CUDA:10
-//CHK_CUDA:10
+//CHK_CUDA:8
+//CHK_CUDA:8
+//CHK_CUDA:8
 
 //TEST_INPUT:ubuffer(stride=4, count=4):out,name=outputBuffer
 RWStructuredBuffer<int32_t> outputBuffer;
@@ -34,19 +34,22 @@ void computeMain()
     case hlsl:
         outputBuffer[1] = CoopMat<half, MemoryScope.Subgroup, 16, 8, CoopMatMatrixUse.MatrixA>.GetLength();
         outputBuffer[2] = 0;// int8 it not supported by HLSL
+        outputBuffer[3] = CoopMat<half, MemoryScope.Subgroup, 16, 8, CoopMatMatrixUse.MatrixB>.GetLength();
 
     case spirv:
         outputBuffer[1] = CoopMat<half, MemoryScope.Subgroup, 16, 8, CoopMatMatrixUse.MatrixA>.GetLength();
         outputBuffer[2] = CoopMat<int8_t, MemoryScope.Subgroup, 16, 32, CoopMatMatrixUse.MatrixA>.GetLength();
+        outputBuffer[3] = CoopMat<half, MemoryScope.Subgroup, 16, 8, CoopMatMatrixUse.MatrixB>.GetLength();
 
     case cuda:
-        // for f16 type, with any shapes, each fragment of A and B is a vector of 8 f16x2 registers, each registers contains 2 elements.
-        outputBuffer[1] = CoopMat<half, MemoryScope.Subgroup, 8, 16, CoopMatMatrixUse.MatrixA>.GetLength();
+        // m16n16k16: 4 regs for half A (mma.sync.m16n8k16 layout), 2 elements per reg = 8
+        outputBuffer[1] = CoopMat<half, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixA>.GetLength();
 
-        // for int8 type, m32n8k16 shape, each fragment of A is a vector of 4 b32 registers, each registers contains 4 elements.
-        outputBuffer[2] = CoopMat<int8_t, MemoryScope.Subgroup, 32, 16, CoopMatMatrixUse.MatrixA>.GetLength();
+        // m16n16k16: 2 regs for int8 A, 4 elements per reg = 8
+        outputBuffer[2] = CoopMat<int8_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixA>.GetLength();
+
+        // m16n16k16: 4 regs for half B, 2 elements per reg = 8
+        outputBuffer[3] = CoopMat<half, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixB>.GetLength();
     }
-
-    outputBuffer[3] = CoopMat<half, MemoryScope.Subgroup, 16, 8, CoopMatMatrixUse.MatrixB>.GetLength();
 }
 
