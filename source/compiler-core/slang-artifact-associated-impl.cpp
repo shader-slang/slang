@@ -357,18 +357,29 @@ uint32_t ArtifactPostEmitMetadata::getCounterCount()
     return (uint32_t)m_coverageEntries.getCount();
 }
 
+// ABI versioning: minimum `structSize` we accept for the v1 shape of
+// `CoverageEntryInfo` / `CoverageBufferInfo`. These constants are
+// frozen at the offsets of the LAST field shipped in v1 (file+line for
+// the entry struct, space+binding for the buffer struct) and **must
+// not be updated when fields are added later** — that's the whole
+// point of `structSize` versioning. Newer callers with larger structs
+// pass through; older callers feeding a future v2+ implementation
+// will likewise be accepted, with the impl writing only the v1 fields
+// the caller has space for. (When v2 fields are added, write them
+// conditionally based on `outInfo->structSize >= offsetof(struct, newField)
+// + sizeof(newField)`.)
+static constexpr size_t kCoverageEntryInfoV1MinSize =
+    offsetof(slang::CoverageEntryInfo, line) + sizeof(uint32_t);
+static constexpr size_t kCoverageBufferInfoV1MinSize =
+    offsetof(slang::CoverageBufferInfo, binding) + sizeof(int32_t);
+
 SlangResult ArtifactPostEmitMetadata::getEntryInfo(
     uint32_t index,
     slang::CoverageEntryInfo* outInfo)
 {
     if (!outInfo)
         return SLANG_E_INVALID_ARG;
-    // ABI versioning: accept any caller whose `structSize` is at least
-    // the size of the fields we know how to write. A caller compiled
-    // against a newer header may pass a larger struct — we still fill
-    // only the fields we know about; trailing bytes (added in future
-    // revisions) are the caller's responsibility to zero-initialize.
-    if (outInfo->structSize < sizeof(slang::CoverageEntryInfo))
+    if (outInfo->structSize < kCoverageEntryInfoV1MinSize)
         return SLANG_E_INVALID_ARG;
     if (index >= (uint32_t)m_coverageEntries.getCount())
         return SLANG_E_INVALID_ARG;
@@ -386,8 +397,7 @@ SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* o
 {
     if (!outInfo)
         return SLANG_E_INVALID_ARG;
-    // ABI versioning: see comment in `getEntryInfo` above.
-    if (outInfo->structSize < sizeof(slang::CoverageBufferInfo))
+    if (outInfo->structSize < kCoverageBufferInfoV1MinSize)
         return SLANG_E_INVALID_ARG;
     outInfo->space = m_coverageBufferSpace;
     outInfo->binding = m_coverageBufferBinding;
