@@ -4582,17 +4582,15 @@ struct ICoverageTracingMetadata : public ISlangCastable
     /// sizeof(CoverageEntryInfo)`. Returns `SLANG_OK` on success,
     /// `SLANG_E_INVALID_ARG` for null `outInfo`, mismatched
     /// `structSize`, or out-of-range `index`.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryInfo(
-        uint32_t index,
-        CoverageEntryInfo* outInfo) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getEntryInfo(uint32_t index, CoverageEntryInfo* outInfo) = 0;
 
     /// Populate `outInfo` with the coverage buffer's binding info.
     /// The caller must pre-set `outInfo->structSize =
     /// sizeof(CoverageBufferInfo)`. Returns `SLANG_OK` on success,
     /// `SLANG_E_INVALID_ARG` for null `outInfo` or mismatched
     /// `structSize`.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(
-        CoverageBufferInfo* outInfo) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo* outInfo) = 0;
 };
     #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()
 
@@ -5213,6 +5211,26 @@ struct SlangGlobalSessionDesc
  * @return The created blob on success, or nullptr on failure.
  */
 SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t size);
+
+/* Serialize an `ICoverageTracingMetadata` artifact into the canonical
+ * `.coverage-mapping.json` shape. Same bytes that `slangc` writes
+ * alongside compiled output when `-trace-coverage` is on, available
+ * in-process for hosts compiling via the C++ API.
+ *
+ * The returned JSON is consumable by:
+ * - `slang-coverage-rt` (C library) for accumulation + LCOV emission
+ * - `tools/shader-coverage/slang-coverage-to-lcov.py` (Python)
+ * - any tool expecting the version-1 manifest format
+ *
+ * @param metadata The coverage metadata, obtained via
+ *                 `castAs<ICoverageTracingMetadata>` on the artifact's
+ *                 `IMetadata`. Must not be null.
+ * @param outBlob (out) The JSON bytes. Caller releases when done.
+ * @return `SLANG_OK` on success, `SLANG_E_INVALID_ARG` for null
+ *         arguments.
+ */
+SLANG_EXTERN_C SLANG_API SlangResult
+slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlangBlob** outBlob);
 
 /* Load a module from source code with size specification.
  *
