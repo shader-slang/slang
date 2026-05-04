@@ -31,11 +31,13 @@ void checkForOperatorShiftOverflowRecursive(IRInst* inst, DiagnosticSink* sink)
                         IRInst* lhs = opInst->getOperand(0);
                         IRType* lhsType = lhs->getDataType();
 
-                        // For vector types, check the element type — not the aggregate size.
+                        // For vector/matrix types, check the element type — not the aggregate size.
                         // e.g. uint8_t4 has 4-byte aggregate but 1-byte elements.
                         IRType* lhsElemType = lhsType;
                         if (auto vecType = as<IRVectorType>(lhsType))
                             lhsElemType = vecType->getElementType();
+                        else if (auto matType = as<IRMatrixType>(lhsType))
+                            lhsElemType = matType->getElementType();
 
                         IRSizeAndAlignment lhsSizeAlignment;
                         if (SLANG_FAILED(getNaturalSizeAndAlignment(
@@ -68,6 +70,8 @@ void checkForOperatorShiftOverflowRecursive(IRInst* inst, DiagnosticSink* sink)
                             IRType* rhsType = rhs->getDataType();
                             if (auto rhsVecType = as<IRVectorType>(rhsType))
                                 rhsType = rhsVecType->getElementType();
+                            else if (auto rhsMatType = as<IRMatrixType>(rhsType))
+                                rhsType = rhsMatType->getElementType();
                             IRSizeAndAlignment rhsSizeAlignment;
                             if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(
                                     nullptr,
