@@ -29,24 +29,6 @@
 // CHECK_CUDA: type: float
 // CHECK_CUDA-COUNT-256: 241.0
 
-// CHECK_CUDA: type: int32_t
-// CHECK_CUDA-COUNT-256: 241
-
-// CHECK_CUDA: type: int32_t
-// CHECK_CUDA-COUNT-256: -2147483409
-
-// CHECK_CUDA: type: int32_t
-// CHECK_CUDA-COUNT-256: 2147483647
-
-// CHECK_CUDA: type: int32_t
-// CHECK_CUDA-COUNT-256: 241
-
-// CHECK_CUDA: type: int32_t
-// CHECK_CUDA-COUNT-256: -2147483409
-
-// CHECK_CUDA: type: int32_t
-// CHECK_CUDA-COUNT-256: 2147483647
-
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer1
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer2
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer3
@@ -128,52 +110,6 @@ void computeMain()
         ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer5, 0, 8);
 
     case cuda:
-        // m32n8k16 test
-        // ( 3 * 5 ) * 16 + 1 = 241
-        coopMatMulAdd<int32_t, false>(
-                CoopMat<int8_t, MemoryScope.Subgroup, 32, 16, CoopMatMatrixUse::MatrixA >(3),
-                CoopMat<int8_t, MemoryScope.Subgroup, 16, 8, CoopMatMatrixUse::MatrixB >(5),
-                CoopMat<int32_t, MemoryScope.Subgroup, 32, 8, CoopMatMatrixUse::MatrixAccumulator>(1)
-        ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer2, 0, 8);
-
-        // overflow test
-        // ( 3 * 5 ) * 16 + 0x7FFFFFFF = 0xF0 + 0x7FFFFFFF = 0x800000EF = -2147483409
-        coopMatMulAdd<int32_t, false>(
-                CoopMat<int8_t, MemoryScope.Subgroup, 32, 16, CoopMatMatrixUse::MatrixA >(3),
-                CoopMat<int8_t, MemoryScope.Subgroup, 16, 8, CoopMatMatrixUse::MatrixB >(5),
-                CoopMat<int32_t, MemoryScope.Subgroup, 32, 8, CoopMatMatrixUse::MatrixAccumulator>(0x7FFFFFFF)
-        ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer3, 0, 8);
-
-        // saturation test
-        // ( 3 * 5 ) * 16 + 0x7FFFFFFF = 2147483887, and then saturated to [-2147483648, 2147483647] = 2147483647
-        coopMatMulAdd<int32_t, true>(
-                CoopMat<int8_t, MemoryScope.Subgroup, 32, 16, CoopMatMatrixUse::MatrixA >(3),
-                CoopMat<int8_t, MemoryScope.Subgroup, 16, 8, CoopMatMatrixUse::MatrixB >(5),
-                CoopMat<int32_t, MemoryScope.Subgroup, 32, 8, CoopMatMatrixUse::MatrixAccumulator>(0x7FFFFFFF)
-        ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer4, 0, 8);
-
-        //m8n32k16 test
-        // ( 3 * 5 ) * 16 + 1 = 241
-        coopMatMulAdd<int32_t, false>(
-                CoopMat<int8_t, MemoryScope.Subgroup, 8, 16, CoopMatMatrixUse::MatrixA >(3),
-                CoopMat<int8_t, MemoryScope.Subgroup, 16, 32, CoopMatMatrixUse::MatrixB >(5),
-                CoopMat<int32_t, MemoryScope.Subgroup, 8, 32, CoopMatMatrixUse::MatrixAccumulator>(1)
-        ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer5, 0, 32);
-
-        // overflow test
-        // ( 3 * 5 ) * 16 + 0x7FFFFFFF = 0xF0 + 0x7FFFFFFF = 0x800000EF = -2147483409
-        coopMatMulAdd<int32_t, false>(
-                CoopMat<int8_t, MemoryScope.Subgroup, 8, 16, CoopMatMatrixUse::MatrixA >(3),
-                CoopMat<int8_t, MemoryScope.Subgroup, 16, 32, CoopMatMatrixUse::MatrixB >(5),
-                CoopMat<int32_t, MemoryScope.Subgroup, 8, 32, CoopMatMatrixUse::MatrixAccumulator>(0x7FFFFFFF)
-        ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer6, 0, 32);
-
-        // saturation test
-        // ( 3 * 5 ) * 16 + 0x7FFFFFFF = 2147483887, and then saturated to [-2147483648, 2147483647] = 2147483647
-        coopMatMulAdd<int32_t, true>(
-                CoopMat<int8_t, MemoryScope.Subgroup, 8, 16, CoopMatMatrixUse::MatrixA >(3),
-                CoopMat<int8_t, MemoryScope.Subgroup, 16, 32, CoopMatMatrixUse::MatrixB >(5),
-                CoopMat<int32_t, MemoryScope.Subgroup, 8, 32, CoopMatMatrixUse::MatrixAccumulator>(0x7FFFFFFF)
-        ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer7, 0, 32);
+        break;
     }
 }

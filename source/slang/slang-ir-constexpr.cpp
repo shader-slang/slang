@@ -39,7 +39,7 @@ bool isConstExpr(IRType* fullType)
     if (auto rateQualifiedType = as<IRRateQualifiedType>(fullType))
     {
         auto rate = rateQualifiedType->getRate();
-        if (const auto constExprRate = as<IRConstExprRate>(rate))
+        if (const auto constExprRate = as<IRConstExprRate>(rate); constExprRate)
             return true;
     }
 

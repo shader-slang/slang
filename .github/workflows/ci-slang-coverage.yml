@@ -346,6 +346,20 @@ jobs:
           # Generate slangc compiler-only coverage report
           SLANGC_REPORT_OUTPUT=$($LLVM_COV report "$LIBSLANG" -instr-profile="$COVERAGE_DIR/slang-test.profdata" "${SLANGC_IGNORE_ARGS[@]}" 2>/dev/null || echo "")
 
+          # Persist the report text as artifacts. Downstream tools
+          # (merger / renderer with --auth-summary) need llvm-cov's
+          # authoritative per-file totals to match the published
+          # per-platform numbers — the LCOV alone has more BRDA / FN
+          # records than llvm-cov report counts post-collapse, so we
+          # can't reconstruct those totals from the LCOV side. Tiny
+          # files (~100-200 KB per OS, plain text), zero extra runtime.
+          if [[ -n "$REPORT_OUTPUT" ]]; then
+            echo "$REPORT_OUTPUT" > coverage-report.txt
+          fi
+          if [[ -n "$SLANGC_REPORT_OUTPUT" ]]; then
+            echo "$SLANGC_REPORT_OUTPUT" > coverage-report-slangc.txt
+          fi
+
           if [[ -n "$REPORT_OUTPUT" ]]; then
             TOTALS_LINE=$(echo "$REPORT_OUTPUT" | grep "^TOTAL" | head -1)
 
@@ -515,10 +529,15 @@ jobs:
         with:
           name: coverage-${{ inputs.os }}-${{ inputs.platform }}
           # coverage-html-slangc/ and libslang.* are Linux/macOS-only; the
-          # Cobertura XML and slangc LCOV are Windows-only. upload-artifact
-          # silently skips missing paths, so one path list works for all OSes.
+          # Cobertura XML and slangc LCOV are Windows-only;
+          # coverage-report*.txt are Linux/macOS-only (llvm-cov report
+          # text, not produced from OpenCppCoverage).
+          # upload-artifact silently skips missing paths, so one path
+          # list works for all OSes.
           path: |
             coverage-summary.json
+            coverage-report.txt
+            coverage-report-slangc.txt
             coverage-html/
             coverage-html-slangc/
             coverage-slangc.lcov

@@ -1312,7 +1312,7 @@ IRBlock* IRInsertLoc::getBlock() const
 IRInst* IRInsertLoc::getFunc() const
 {
     auto pp = getParent();
-    if (const auto block = as<IRBlock>(pp))
+    if (const auto block = as<IRBlock>(pp); block)
     {
         pp = pp->getParent();
     }
@@ -2882,7 +2882,7 @@ IRPtrTypeBase* IRBuilder::getPtrTypeWithAddressSpace(
     IRType* valueType,
     IRPtrTypeBase* ptrWithAddrSpace)
 {
-    if (ptrWithAddrSpace->hasAddressSpace())
+    if (ptrWithAddrSpace->hasAddressSpace() || ptrWithAddrSpace->getDataLayout())
         return (IRPtrTypeBase*)getPtrType(
             ptrWithAddrSpace->getOp(),
             valueType,
@@ -3357,6 +3357,11 @@ IRInst* IRBuilder::emitDebugBuildIdentifier(
 {
     IRInst* args[] = {getStringValue(buildIdentifier), getIntValue(getUIntType(), flags)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugBuildIdentifier, 2, args);
+}
+IRInst* IRBuilder::emitDebugCompilationUnit(IRInst* source)
+{
+    IRInst* args[] = {source};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugCompilationUnit, 1, args);
 }
 IRInst* IRBuilder::emitDebugLine(
     IRInst* source,
