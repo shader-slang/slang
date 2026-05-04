@@ -4927,7 +4927,7 @@ fatal(
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 
--- Metal (56101-56104)
+-- Metal and WGSL (56101-56105)
 
 err(
     "resource-types-in-constant-buffer-in-parameter-block-not-allowed-on-metal",
@@ -4955,6 +4955,13 @@ err(
     56104,
     "mesh output must be assigned as whole struct",
     span { loc = "location", message = "whole struct must be assiged to mesh output at once for Metal target." }
+)
+
+err(
+    "array-of-resource-type-not-supported-in-wgsl",
+    56105,
+    "array of resource types not supported in WGSL",
+    span { loc = "location", message = "arrays of resource types (e.g., 'StructuredBuffer', 'RWStructuredBuffer', 'ByteAddressBuffer') are not supported in WGSL." }
 )
 
 err(
