@@ -7,30 +7,14 @@
 import math;
 import physics;
 
-RWStructuredBuffer<float3> positions;
-RWStructuredBuffer<float3> velocities;
+RWStructuredBuffer<uint> outputBuffer;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void simulate(uint3 tid : SV_DispatchThreadID)
+void main(uint3 tid : SV_DispatchThreadID)
 {
     uint i = tid.x;
-    float3 pos = positions[i];
-    float3 vel = velocities[i];
-
-    vel = applyGravity(vel, 0.016);
-
-    if (pos.y < 0.0)
-    {
-        vel = reflectOffGround(vel, 0.8);
-        pos.y = 0.0;
-    }
-
-    vel = applyDrag(vel, 0.02);
-    pos = pos + vel * 0.016;
-
-    float3 dir = safeNormalize(vel);
-
-    positions[i] = pos;
-    velocities[i] = vel;
+    uint stepped = computeStep(i, 5);
+    uint damped = applyDamping(stepped, 2);
+    outputBuffer[i] = damped;
 }
