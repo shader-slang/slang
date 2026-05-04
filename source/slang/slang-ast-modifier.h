@@ -1028,6 +1028,13 @@ class UnscopedEnumAttribute : public Attribute
     FIDDLE(...)
 };
 
+// Used to detect conflicting explicit unscoped/scoped enum declarations.
+FIDDLE()
+class EnumClassAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 // Marks a enum to have `flags` semantics, where each enum case is a bitfield.
 FIDDLE()
 class FlagsAttribute : public Attribute

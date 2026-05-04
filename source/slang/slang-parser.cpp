@@ -5950,6 +5950,7 @@ static Decl* parseEnumDecl(Parser* parser)
     // TODO: diagnose this with a warning some day, and move
     // toward deprecating it.
     //
+    SourceLoc enumClassLoc = parser->tokenReader.peekLoc();
     bool isEnumClass = AdvanceIf(parser, "class");
     bool isUnscoped = false;
 
@@ -5986,6 +5987,16 @@ static Decl* parseEnumDecl(Parser* parser)
             {
                 addModifier(decl, parser->astBuilder->create<UnscopedEnumAttribute>());
             }
+
+            // If the enum was declared as an enum class, insert a modifier for
+            // conflicting unscoped/scoped enum detection.
+            if (isEnumClass && !genericParent)
+            {
+                auto enumClassAttr = parser->astBuilder->create<EnumClassAttribute>();
+                enumClassAttr->loc = enumClassLoc;
+                addModifier(decl, enumClassAttr);
+            }
+
             parseOptionalInheritanceClause(parser, decl);
             maybeParseGenericConstraints(parser, genericParent);
             parser->ReadToken(TokenType::LBrace);

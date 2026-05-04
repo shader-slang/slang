@@ -2803,6 +2803,14 @@ err(
     span { loc = "expr:Expr", message = "unexpected form for 'enum' tag value expression" }
 )
 
+err(
+    "conflicting-enum-scope-decl",
+    32004,
+    "conflicting scoped/unscoped declarations for an enum",
+    span { loc = "scopedLocation", message = "'class' keyword for '~decl:Decl' implies scoped enumeration" },
+    span { loc = "unscopedLocation", message = "conflicting attribute declaration" }
+)
+
 -- 303xx: interfaces and associated types
 
 err(

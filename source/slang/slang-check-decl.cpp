@@ -11268,6 +11268,18 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
 
     auto isEnumFlags = decl->hasModifier<FlagsAttribute>();
 
+    // Check for conflicting scoped/unscoped attributes
+    auto unscopedEnumAttr = decl->findModifier<UnscopedEnumAttribute>();
+    auto enumClassAttr = decl->findModifier<EnumClassAttribute>();
+    if (unscopedEnumAttr && enumClassAttr)
+    {
+        getSink()->diagnose(Diagnostics::ConflictingEnumScopeDecl{
+                .decl = decl,
+                .scopedLocation = enumClassAttr->loc,
+                .unscopedLocation = unscopedEnumAttr->loc
+            });
+    }
+
     // Check the enum cases in order.
     for (auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
     {
