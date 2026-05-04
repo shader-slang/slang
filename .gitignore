@@ -113,6 +113,7 @@ vkd3d-proton.cache.write
 /.claude/settings.local.json
 /.claude/worktrees/
 /issue-*/plan.*.md
+/issue-*/review-guide.md
 /issue-*/claude.log
 /issue-*/claude.*.json
 CLAUDE.local.md

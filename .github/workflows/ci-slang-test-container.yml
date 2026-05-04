@@ -137,7 +137,7 @@ jobs:
             sm80plus)
               # Keep L4/Blackwell cost bounded: run only the capability subset
               # that T4 cannot safely cover, not a second full Linux GPU suite.
-              test_roots=("tests/cooperative-matrix/" "tests/neural/")
+              test_roots=("tests/cooperative-matrix/" "tests/neural/" "slang-unit-test-tool/cooperativeMatrixSubgroupTypeMetadata.internal")
               slang_test_args+=("-api" "vk+cuda")
               ;;
             *)
