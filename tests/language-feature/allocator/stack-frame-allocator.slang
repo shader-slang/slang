@@ -90,8 +90,11 @@ void computeMain()
 
     // CHECK-NEXT: 1
     outputBuffer[6] = reallocTest<uint8_t>() ? 1 : 0;
+    // CHECK-NEXT: 1
     outputBuffer[7] = reallocTest<uint16_t>() ? 1 : 0;
+    // CHECK-NEXT: 1
     outputBuffer[8] = reallocTest<uint>() ? 1 : 0;
+    // CHECK-NEXT: 1
     outputBuffer[9] = reallocTest<uint64_t>() ? 1 : 0;
 
     // CHECK-NEXT: 1

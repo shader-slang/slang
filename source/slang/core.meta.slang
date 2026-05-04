@@ -1681,7 +1681,7 @@ interface IAllocator<AddressSpace addrSpace>
     Ptr<void, Access.ReadWrite, addrSpace>
         alignedAllocate(size_t bytes, uint alignment) throws MemoryAllocationError
     {
-        size_t allocCount = __alignedAllocPtrLength<addrSpace>(bytes, alignment);
+        size_t allocCount = try __alignedAllocPtrLength<addrSpace>(bytes, alignment);
         let unalignedPtr = try allocate<Ptr<void, Access.ReadWrite, addrSpace>, DefaultDataLayout>(allocCount);
         return __finalizeAlignedAlloc<addrSpace>(
             reinterpret<Ptr<void, Access.ReadWrite, addrSpace>>(unalignedPtr),
@@ -1798,10 +1798,15 @@ internal size_t __getArrayMemoryAllocSize<T, L:IBufferDataLayout>(size_t count)
 
 // Used as part of the default implementation of alignedAllocate.
 size_t __alignedAllocPtrLength<AddressSpace addrSpace>(size_t bytes, uint alignment)
+    throws MemoryAllocationError
 {
     size_t ptrSize = sizeof(Ptr<void, Access.ReadWrite, addrSpace>);
     size_t ptrAlign = alignof(Ptr<void, Access.ReadWrite, addrSpace>);
     size_t allocSize = bytes + ptrSize;
+
+    // Worst case allocSize = bytes + ptrSize + alignment + ptrSize - 1
+    if (bytes > size_t.maxValue - 2 * ptrSize - alignment + 1)
+        throw MemoryAllocationError.OutOfMemory;
 
     if (alignment > ptrAlign)
     {
@@ -1911,7 +1916,7 @@ public struct SystemHeapAllocator: IAllocator<AddressSpace.Device>
 
     static override Ptr<void> alignedAllocate(size_t bytes, uint alignment) throws MemoryAllocationError
     {
-        size_t allocCount = __alignedAllocPtrLength<AddressSpace.Device>(bytes, alignment);
+        size_t allocCount = try __alignedAllocPtrLength<AddressSpace.Device>(bytes, alignment);
         Ptr<void> allocation = __cpu_malloc(allocCount * sizeof(Ptr<void>));
         if (allocation == nullptr && allocCount != 0)
             throw MemoryAllocationError.OutOfMemory;
