@@ -1963,7 +1963,7 @@ err(
 
 err(
     "forward-reference-in-generic-default-initializer",
-    30119,
+    30122,
     "forward reference in generic default initializer",
     span { loc = "expr:Expr", message = "generic default initializer for parameter '~param:Decl' references parameter '~referenced:Decl' before it is declared" }
 )
