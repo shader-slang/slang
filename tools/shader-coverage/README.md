@@ -18,31 +18,43 @@ of the Slang compiler itself.
 
 ## Quick start
 
-Compile any `.slang` shader with `-trace-coverage`:
+Add `-trace-coverage` to any compile, in-process or via `slangc`:
 
 ```bash
+# Via slangc (writes a sidecar alongside the output file)
 slangc shader.slang -target spirv -stage compute -entry main \
     -trace-coverage -o shader.spv
-# Produces shader.spv plus shader.spv.coverage-mapping.json
+# -> shader.spv
+# -> shader.spv.coverage-mapping.json   (optional sidecar; see below)
 ```
 
 Every executable statement in the shader gets instrumented to
 increment a counter at runtime. The compiler synthesizes a
 `RWStructuredBuffer<uint> __slang_coverage` directly in the IR
 coverage pass — no AST decl, so it does not appear in Slang's
-public reflection. Hosts discover the buffer's `(set, binding)` via
-`slang::ICoverageTracingMetadata` (or the `.coverage-mapping.json`
-sidecar) and declare the slot in their own pipeline-layout / root-
-signature / descriptor-set machinery before binding the counter
-buffer at dispatch time. The same metadata tells the host how many
-counters to allocate and which source line each slot corresponds
-to.
+public reflection. Hosts discover the buffer's `(set, binding)`
+through `slang::ICoverageTracingMetadata` (queried in-process from
+the compiled artifact) and declare the slot in their own pipeline-
+layout / root-signature / descriptor-set machinery before binding
+the counter buffer at dispatch time. The same metadata tells the
+host how many counters to allocate and which source line each slot
+corresponds to.
+
+The `.coverage-mapping.json` sidecar is **optional** — it's a
+serialization of the same metadata for cross-process / offline
+workflows where the dispatch happens in a different program from
+the compile (typical for precompiled shader pipelines). In-process
+hosts that compile via the C++ API can ignore the sidecar entirely
+and read the metadata directly from the artifact.
 
 After the host dispatches the shader and reads the counter buffer
-back, [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py)
-or [`slang-coverage-rt`](../../source/slang-coverage-rt/) converts
-the snapshot to LCOV `.info` for `genhtml`, Codecov, VS Code
-Coverage Gutters, etc.
+back, the host can either consume the slot→source attribution
+directly or convert the snapshot to LCOV `.info` via
+[`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py). LCOV is
+consumable by `genhtml`, Codecov, VS Code Coverage Gutters, etc. A
+companion C helper library (`slang-coverage-rt`) and an end-to-end
+demo are queued as a follow-up PR for hosts that prefer a linked-in
+runtime over the Python converter.
 
 For the pipeline architecture, design rationale, and alternatives
 weighed, see
@@ -69,31 +81,33 @@ metadata reads run.
 
 ---
 
-## Accessing the manifest
+## Integration workflows
 
-Two paths, both carrying the same raw per-slot attribution data plus
-the coverage buffer's binding. A slot may have no real source file/line;
-that is preserved in metadata and filtered out later when exporting LCOV.
+Two equally supported paths, each suited to a different host
+architecture. Both expose the same data: counter count, per-slot
+`(file, line)`, and the coverage buffer's `(set, binding)`. A slot
+may have no real source file/line; that is preserved in the metadata
+and filtered out later when exporting LCOV.
 
-### `.coverage-mapping.json` sidecar (slangc CLI)
+### A. In-process compile (Slang C++ API)
 
-When slangc writes a compiled artifact to a file, it also writes
-`<output>.coverage-mapping.json` alongside whenever the artifact
-carries coverage tracing data. Consumable by the Python LCOV
-converter in this directory and any other external tool.
-
-```bash
-slangc shader.slang -target spirv -stage compute -entry main \
-    -trace-coverage -o shader.spv
-# -> shader.spv
-# -> shader.spv.coverage-mapping.json
+```
+shader.slang ── compile (C++ API) ──► in-memory artifact + IMetadata
+                                                 │
+                                       castAs<ICoverageTracingMetadata>
+                                       → (set, binding), slot→(file, line)
+                                                 ▼
+                                       host: allocate, bind, dispatch,
+                                             readback, consume directly
+                                             (own LCOV writer, telemetry,
+                                              dashboard, ...)
 ```
 
-### `slang::ICoverageTracingMetadata` (compile API)
-
-For hosts using the compile API directly (slang-rhi, slangpy, custom
-integrations), the same data is available on the artifact's
-`IMetadata`:
+For applications that compile shaders at runtime via the Slang C++
+API: query coverage data directly from the artifact's metadata. No
+sidecar file is created or read, and no extra runtime library is
+needed — the public metadata interface is everything you need to
+allocate, bind, and attribute counters.
 
 ```cpp
 ComPtr<slang::IMetadata> metadata;
@@ -111,55 +125,83 @@ coverage->getBufferInfo(&bufferInfo);
 for (uint32_t i = 0; i < n; ++i) {
     slang::CoverageEntryInfo entry;
     if (SLANG_SUCCEEDED(coverage->getEntryInfo(i, &entry))) {
-        // entry.file, entry.line
+        // entry.file, entry.line — match against your counter[i] readback
     }
 }
 ```
 
-Extensible: future revisions will add branch/function coverage and
-column data through the same interface.
+The host allocates a `uint32_t[n]` counter buffer, declares its slot
+in its own pipeline-layout / root-signature at the reported
+`(set, binding)`, dispatches the shader, reads the counters back,
+and consumes the attribution data however it likes — direct
+telemetry, a custom LCOV writer, a dashboard, etc.
 
-`slang-coverage-to-lcov.py` applies gcov/LCOV-style reporting rules at
-export time: entries without a real source file or with a non-positive
-line number are skipped instead of being written as synthetic `SF:` /
-`DA:` records.
+#### Producing the canonical manifest JSON in-process
 
----
+If a host wants the same `.coverage-mapping.json` bytes that `slangc`
+writes as a sidecar — for example to feed
+[`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py) without
+going through a file, or to ship the manifest to a separate
+analysis process — call `slang_writeCoverageManifestJson`:
 
-## Runtime flow
-
-```
-┌─────────────────┐  -trace-coverage      ┌──────────────────────┐
-│  shader.slang   │ ────────────────────► │  target code (spv/…) │
-└─────────────────┘                       └──────────────────────┘
-                                                   │
-                                    bind coverage  │
-                                    buffer, run    ▼
-                               ┌─────────────────────────────────┐
-                               │ Host program                    │
-                               │  · uint32 counters[N]           │
-                               │  · dispatch                     │
-                               │  · read UAV back                │
-                               └─────────────────────────────────┘
-                                                   │
-                                                   ▼
-                  slang-coverage-to-lcov.py  ┌─────────────┐
-                                             │ shader.lcov │
-                                             └─────────────┘
-                                                   │
-                                                   ▼
-                                    genhtml, Codecov, VS Code, ...
+```cpp
+ComPtr<ISlangBlob> manifest;
+slang_writeCoverageManifestJson(coverage, manifest.writeRef());
+// manifest->getBufferPointer() / getBufferSize() are the exact
+// bytes slangc would have written to <output>.coverage-mapping.json.
 ```
 
-The host reads the coverage buffer's `(set, binding)` from
-`slang::ICoverageTracingMetadata` (or the sidecar), declares the
-slot in its pipeline-layout / root-signature, allocates and binds a
-counter buffer at that slot, dispatches the shader, and reads the
-counter array back. Hosts on slang-rhi additionally have
-`ShaderProgramDesc::extraDescriptorBindings` and
-`IShaderObject::setExtraBinding` to streamline this; Tier-1 hosts
-on raw Vulkan / D3D12 / CUDA do the slot declaration directly in
-their native binding API.
+The output is byte-identical to slangc's sidecar, so anything that
+parses sidecar files (the Python LCOV converter, custom external
+tools, and the forthcoming `slang-coverage-rt` C library) accepts
+the in-memory bytes as well.
+
+### B. Precompiled with sidecar (slangc CLI)
+
+```
+shader.slang ── slangc -trace-coverage ──► shader.spv
+                                            shader.spv.coverage-mapping.json
+                                                       │
+                          (ship binary + sidecar — possibly later, possibly
+                          on a different machine, possibly without Slang linked)
+                                                       ▼
+                                       host: parse sidecar → (set, binding),
+                                             slot→(file, line)
+                                             allocate, bind, dispatch, readback
+                                             emit LCOV via
+                                             slang-coverage-to-lcov.py
+                                                       │
+                                                       ▼
+                                       LCOV → genhtml, Codecov, VS Code, ...
+```
+
+For workflows that compile offline and dispatch later — possibly on
+a different machine, possibly without Slang linked: when `slangc`
+writes a compiled artifact to a file with `-trace-coverage` on, it
+also writes `<output>.coverage-mapping.json` next to it.
+
+```bash
+slangc shader.slang -target spirv -stage compute -entry main \
+    -trace-coverage -o shader.spv
+# -> shader.spv
+# -> shader.spv.coverage-mapping.json
+```
+
+Hosts that aren't linked against Slang still get the data: the
+[`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py) Python
+script consumes this format today, and the fields match the
+in-process API one-for-one. A companion C helper library
+(`slang-coverage-rt`) for hosts that prefer a linked-in runtime
+ships in a follow-up PR.
+
+`slang-coverage-to-lcov.py` applies gcov/LCOV-style reporting rules
+at export time: entries without a real source file or with a
+non-positive line number are skipped instead of being written as
+synthetic `SF:` / `DA:` records.
+
+The metadata interface is extensible: future revisions add
+branch/function coverage and column data through the same API and
+sidecar shape.
 
 ---
 
@@ -207,32 +249,20 @@ coverage semantics.
 
 The compiler-side instrumentation (counter ops, buffer synthesis,
 metadata generation) works across all backends. End-to-end host
-dispatch additionally depends on the host's binding-declaration
-path; the slang-rhi `ExtraDescriptorBinding` API currently only
-implements Vulkan, with other backends scoped as follow-ups.
-Customers integrating directly against raw Vulkan / D3D12 / CUDA /
-etc. (Tier 1, the dominant customer profile) declare the slot via
-their native API and are not blocked by the slang-rhi rollout.
+dispatch is the host's responsibility — the host reads
+`(set, binding)` from `ICoverageTracingMetadata` and declares the
+slot in its own pipeline layout / root signature.
 
 ### Compiler instrumentation
 
 | Backend | Default `-trace-coverage` | `-trace-coverage-binding=N:0` | `-trace-coverage-binding=N:M` (M ≠ 0) |
 |---|---|---|---|
 | CPU | Supported | (no-op — backend uses uniform offsets) | (no-op) |
-| Vulkan (incl. MoltenVK on macOS) | Supported | Supported | Compiles correctly — slang-rhi multi-set follow-up pending for end-to-end |
-| D3D12 | Supported | Supported | Supported |
+| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported | Supported | Compiler-side decoration correct |
+| D3D12 / HLSL | Supported | Supported | Supported |
 | CUDA | Supported | (no-op — backend uses uniform offsets) | (no-op) |
-| Metal (direct) | Counter values unreliable due to a pre-existing slang-rhi binding quirk. Tracked at [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724). Use Vulkan via MoltenVK on Apple silicon. | (untested) | (untested) |
+| Metal (direct) | Compiles. End-to-end dispatch is unreliable due to a pre-existing slang-rhi Metal binding quirk ([shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724)) — not a coverage-feature defect. | (untested) | (untested) |
 | GLSL / WebGPU | Supported codegen | (untested) | (untested) |
-
-### End-to-end dispatch (slang-rhi-based hosts)
-
-| Backend | End-to-end dispatch via slang-rhi `ExtraDescriptorBinding` |
-|---|---|
-| Vulkan | Verified — `examples/shader-coverage-demo` produces real per-line LCOV |
-| D3D12 / Metal / CUDA / CPU / WGSL | Pending — same design extends per-backend; tracked as cross-repo follow-up |
-
-LCOV output is byte-identical across the verified cells.
 
 ### Format scope
 
@@ -248,24 +278,16 @@ LCOV output is byte-identical across the verified cells.
 
 ## Current limitations
 
-- **slang-rhi `ExtraDescriptorBinding` rollout is Vulkan-first.**
-  The Vulkan path is verified end-to-end via the demo; D3D12,
-  Metal, CUDA, CPU, and WGSL paths through slang-rhi need the
-  matching pipeline-layout merge code. Customers integrating
-  directly against raw graphics APIs (Tier 1) are not affected —
-  they declare the slot via their native API based on
-  `ICoverageTracingMetadata`.
-- **`-trace-coverage-binding=N:M` runtime status with `M != 0`**.
-  The compiler emits the correct `(set, register)` decoration on
-  every backend. D3D12 honors non-zero spaces end-to-end via
-  slang-rhi. Vulkan / WebGPU remain pending a slang-rhi follow-up:
-  their binding-data builder assumes ≤ 1 descriptor set per shader
-  object, so non-zero space mis-binds. Tracked at
-  [shader-slang/slang#10959](https://github.com/shader-slang/slang/issues/10959).
-- **Metal counter values** are unreliable due to a pre-existing
-  slang-rhi Metal binding/initialization quirk — atomic writes
-  appear to land in the wrong buffer. Not a coverage-feature bug;
-  tracked at
+- **`-trace-coverage-binding=N:M` with `M != 0`** — the compiler
+  emits the correct `(set, register)` decoration on every backend.
+  Whether the host's binding code routes that correctly depends on
+  the host. A pre-existing slang-rhi limitation around multi-
+  descriptor-set support is tracked at
+  [shader-slang/slang#10959](https://github.com/shader-slang/slang/issues/10959);
+  hosts using their own pipeline-layout code are unaffected.
+- **Metal end-to-end dispatch** — a pre-existing slang-rhi Metal
+  binding/initialization quirk causes atomic writes to land in the
+  wrong buffer. Not a coverage-feature defect; tracked at
   [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724).
   On Apple silicon, use Vulkan via MoltenVK.
 

@@ -381,91 +381,14 @@ SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact
     return SLANG_OK;
 }
 
-// Build a JSON blob describing the coverage tracing metadata for an
-// artifact, or an empty string if no coverage data was produced.
-static String _buildCoverageMappingJson(slang::ICoverageTracingMetadata* coverage)
-{
-    StringBuilder out;
-    out << "{\n";
-    out << "  \"version\": 1,\n";
-    uint32_t counterCount = coverage->getCounterCount();
-    out << "  \"counters\": " << (int64_t)counterCount << ",\n";
-    out << "  \"buffer\": {\n";
-    out << "    \"name\": \"__slang_coverage\",\n";
-    out << "    \"element_type\": \"uint32\",\n";
-    out << "    \"element_stride\": 4";
-    slang::CoverageBufferInfo bufferInfo;
-    if (SLANG_SUCCEEDED(coverage->getBufferInfo(&bufferInfo)))
-    {
-        if (bufferInfo.space >= 0)
-            out << ",\n    \"space\": " << (int64_t)bufferInfo.space;
-        if (bufferInfo.binding >= 0)
-            out << ",\n    \"binding\": " << (int64_t)bufferInfo.binding;
-    }
-    out << "\n  },\n";
-    out << "  \"entries\": [";
-    for (uint32_t i = 0; i < counterCount; ++i)
-    {
-        slang::CoverageEntryInfo entry;
-        if (SLANG_FAILED(coverage->getEntryInfo(i, &entry)))
-            continue;
-        out << (i == 0 ? "" : ",");
-        out << "\n    {\"index\": " << (int64_t)i << ", \"file\": \"";
-        auto file = entry.file;
-        // JSON escape: backslash, double-quote, and all control chars
-        // (U+0000..U+001F). Source paths may carry tabs / newlines
-        // from `#line` directives or synthetic locations.
-        for (const char* p = file; p && *p; ++p)
-        {
-            unsigned char uc = (unsigned char)*p;
-            switch (uc)
-            {
-            case '\\':
-                out << "\\\\";
-                break;
-            case '"':
-                out << "\\\"";
-                break;
-            case '\b':
-                out << "\\b";
-                break;
-            case '\f':
-                out << "\\f";
-                break;
-            case '\n':
-                out << "\\n";
-                break;
-            case '\r':
-                out << "\\r";
-                break;
-            case '\t':
-                out << "\\t";
-                break;
-            default:
-                if (uc < 0x20)
-                {
-                    char buf[8];
-                    snprintf(buf, sizeof(buf), "\\u%04x", (unsigned)uc);
-                    out << buf;
-                }
-                else
-                {
-                    out.appendChar((char)uc);
-                }
-                break;
-            }
-        }
-        out << "\", \"line\": " << (int64_t)entry.line << "}";
-    }
-    out << "\n  ]\n";
-    out << "}\n";
-    return out.toString();
-}
-
 // If the artifact carries coverage tracing metadata, write it to
 // `<path>.coverage-mapping.json` alongside the compiled code. Hosts
 // can read this sidecar to attribute runtime counter values back to
-// source `(file, line)` pairs.
+// source `(file, line)` pairs. The JSON content is produced by the
+// public `slang_writeCoverageManifestJson` API; both that API and
+// this sidecar writer emit byte-identical output, so customers
+// working in-process can pipe the API output through the same
+// downstream tooling that consumes the sidecar.
 SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
     const String& path,
     IArtifact* artifact)
@@ -475,9 +398,13 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
     auto coverage = findAssociatedRepresentation<slang::ICoverageTracingMetadata>(artifact);
     if (!coverage || coverage->getCounterCount() == 0)
         return SLANG_OK;
-    String json = _buildCoverageMappingJson(coverage);
+    ComPtr<ISlangBlob> jsonBlob;
+    SLANG_RETURN_ON_FAIL(slang_writeCoverageManifestJson(coverage, jsonBlob.writeRef()));
     String sidecarPath = path + ".coverage-mapping.json";
-    return File::writeAllText(sidecarPath, json);
+    return File::writeAllBytes(
+        sidecarPath,
+        jsonBlob->getBufferPointer(),
+        jsonBlob->getBufferSize());
 }
 
 SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArtifact* artifact)

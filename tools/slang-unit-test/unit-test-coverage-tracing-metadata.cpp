@@ -143,4 +143,31 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(coverage->getBufferInfo(&bufferInfo) == SLANG_OK);
     }
     SLANG_CHECK(coverage->getBufferInfo(nullptr) == SLANG_E_INVALID_ARG);
+
+    // Manifest serializer: produce JSON bytes and sanity-check the
+    // canonical fields are present. Detailed shape is covered by the
+    // existing tests on the slangc sidecar; what this assertion locks
+    // in is the in-process API path producing a non-empty,
+    // structurally valid manifest with the version-1 contract.
+    {
+        ComPtr<ISlangBlob> manifest;
+        SLANG_CHECK(slang_writeCoverageManifestJson(coverage, manifest.writeRef()) == SLANG_OK);
+        SLANG_CHECK(manifest != nullptr);
+        SLANG_CHECK(manifest->getBufferSize() > 0);
+        UnownedStringSlice json(
+            (const char*)manifest->getBufferPointer(),
+            manifest->getBufferSize());
+        SLANG_CHECK(json.indexOf(toSlice("\"version\": 1")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"counters\"")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("__slang_coverage")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"entries\"")) != -1);
+    }
+
+    // Argument validation on the serializer.
+    {
+        ComPtr<ISlangBlob> dummy;
+        SLANG_CHECK(
+            slang_writeCoverageManifestJson(nullptr, dummy.writeRef()) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(slang_writeCoverageManifestJson(coverage, nullptr) == SLANG_E_INVALID_ARG);
+    }
 }
