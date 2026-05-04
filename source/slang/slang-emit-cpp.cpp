@@ -1376,10 +1376,14 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
             // Memory-order operand (operand 2) is intentionally
             // ignored: the prelude helpers in `slang-cpp-prelude.h`
-            // hardcode relaxed ordering (`__ATOMIC_RELAXED` on
-            // GCC/Clang, `_InterlockedExchangeAdd` on MSVC). Other
-            // backends (SPIR-V/Metal/CUDA) map operand 2 to native
-            // ordering; CPU's coupling lives in the prelude.
+            // pick the strongest ordering each toolchain provides
+            // out-of-the-box — `__ATOMIC_RELAXED` on GCC/Clang
+            // (which honors operand 2's intent), and
+            // `_InterlockedExchangeAdd` on MSVC (sequentially
+            // consistent on the supported architectures, stronger
+            // than relaxed but still correct under concurrency).
+            // Other backends (SPIR-V/Metal/CUDA) map operand 2 to
+            // native ordering; CPU's coupling lives in the prelude.
             m_writer->emit(");\n");
             return true;
         }

@@ -4527,8 +4527,14 @@ at runtime without a separate sidecar file. The metadata is retrieved
 by calling `castAs` / `queryInterface` on the artifact-associated
 `IMetadata` object.
 
-Extensible: future iterations may add accessors for branch coverage,
-function coverage, or column information.
+Extensible without ABI breakage in two ways:
+  - tail-extending the `CoverageEntryInfo` / `CoverageBufferInfo`
+    structs (gated by their leading `structSize` field), or
+  - adding a derived `ICoverageTracingMetadataN` interface with a
+    new UUID, queryable through `castAs`.
+The vtable of `ICoverageTracingMetadata` itself is fixed; new
+methods would break ABI for callers compiled against the existing
+header.
 */
 /// Per-counter-slot attribution returned by
 /// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
