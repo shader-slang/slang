@@ -5173,6 +5173,13 @@ err(
     span { loc = "location", message = "Invalid shape ['~rowCount', '~colCount'] for cooperative matrix '~matrixUse'." }
 )
 
+err(
+    "cooperative-matrix-invalid-mma-type-combination",
+    50000,
+    "invalid type combination for cooperative matrix multiply-add",
+    span { loc = "location", message = "Invalid (A, B, C, D) element-type combination for cooperative matrix multiply-add: A='~aType', B='~bType', C='~cType', D='~dType'. The CUDA backend requires A and B to share the same element type and the accumulator family to match the input family (half -> half/float, bfloat16 -> float, int8/uint8 -> int, FloatE4M3/FloatE5M2 -> half/float)." }
+)
+
 fatal(
     "cooperative-matrix-unsupported-capture",
     51701,
