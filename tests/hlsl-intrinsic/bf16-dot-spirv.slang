@@ -23,9 +23,7 @@ void computeMain()
     vector<BFloat16, 4> a4 = vector<BFloat16, 4>(BFloat16(1.0), BFloat16(2.0), BFloat16(3.0), BFloat16(4.0));
     vector<BFloat16, 4> b4 = vector<BFloat16, 4>(BFloat16(0.5), BFloat16(0.5), BFloat16(1.0), BFloat16(1.0));
 
-    //SPV-DAG: OpDot %bfloat16
-    //SPV-DAG: OpDot %bfloat16
-    //SPV-DAG: OpDot %bfloat16
+    //SPV-COUNT-3: OpDot %bfloat16
     outBuf[0] = dot(a2, b2);
     outBuf[1] = dot(a3, b3);
     outBuf[2] = dot(a4, b4);

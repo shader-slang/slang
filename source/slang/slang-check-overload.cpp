@@ -13,14 +13,18 @@
 namespace Slang
 {
 
-// True for BFloat16/FloatE4M3/FloatE5M2 scalars or vectors of them.
+// True for BFloat16 / FP8 (FloatE4M3, FloatE5M2) scalars or vectors/matrices
+// of them. Modifier wrappers (e.g. inout) are unwrapped at each level.
 static bool _isStorageOnlyFloatType(Type* type)
 {
     if (!type)
         return false;
+    type = unwrapModifiedType(type);
     if (auto vecType = as<VectorExpressionType>(type))
-        type = vecType->getElementType();
-    return as<BFloat16Type>(type) || as<FloatE4M3Type>(type) || as<FloatE5M2Type>(type);
+        type = unwrapModifiedType(vecType->getElementType());
+    else if (auto matType = as<MatrixExpressionType>(type))
+        type = unwrapModifiedType(matType->getElementType());
+    return as<BFloat16Type>(type) || as<Fp8Type>(type);
 }
 
 // On overload-resolution failure, point users at the fp32-roundtrip pattern
@@ -3243,8 +3247,6 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         {
             // There were multiple applicable candidates, so we need to report them.
 
-            _maybeDiagnoseStorageOnlyFloatArithmetic(getSink(), expr);
-
             if (getOptionSet().shouldEmitRichDiagnostics() && funcName)
             {
                 // Use rich diagnostic system with variadic notes
@@ -3342,6 +3344,12 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                     }
                 }
             }
+            // Emit the storage-only-float hint *after* the primary error and
+            // candidate notes, so the user reads the error first. BFloat16 / FP8
+            // values implicitly convert to half/float/double, which routinely
+            // makes built-in arithmetic ambiguous on these types — exactly the
+            // scenario the hint is designed to explain.
+            _maybeDiagnoseStorageOnlyFloatArithmetic(getSink(), expr);
         }
 
         return CreateErrorExpr(expr);

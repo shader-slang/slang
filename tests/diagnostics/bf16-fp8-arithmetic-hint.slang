@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain
 
 // Regression test: when a user performs arithmetic on BFloat16/FloatE4M3/FloatE5M2
 // the compiler fails overload resolution (these types are not __BuiltinArithmeticType)
@@ -10,6 +10,7 @@ RWStructuredBuffer<BFloat16>               outBufBF16;
 RWStructuredBuffer<vector<BFloat16, 4>>    outBufBF16Vec;
 RWStructuredBuffer<FloatE4M3>              outBufE4M3;
 RWStructuredBuffer<FloatE5M2>              outBufE5M2;
+RWStructuredBuffer<float>                  outBufFloat;
 
 [numthreads(1,1,1)]
 void computeMain()
@@ -18,6 +19,8 @@ void computeMain()
     BFloat16 b = BFloat16(2.0);
     //CHECK: E40017
     outBufBF16[0] = a + b;
+    //CHECK: E40017
+    outBufBF16[1] = a / b;
 
     vector<BFloat16, 4> va = vector<BFloat16, 4>(BFloat16(1.0));
     vector<BFloat16, 4> vb = vector<BFloat16, 4>(BFloat16(2.0));
@@ -33,4 +36,9 @@ void computeMain()
     FloatE5M2 f = FloatE5M2(2.0);
     //CHECK: E40017
     outBufE5M2[0] = e - f;
+
+    // Mixed-operand sanity check: the explicit fp32 round-trip resolves cleanly
+    // (no overload failure, no E40017 hint expected). The earlier hints above
+    // are all that should appear in the output.
+    outBufFloat[0] = float(a) + 1.0f;
 }
