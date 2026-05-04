@@ -62,6 +62,45 @@ static IRGlobalParam* findUserDeclaredCoverageBuffer(IRModule* module)
     return nullptr;
 }
 
+// Locate a global parameter whose layout already occupies the given
+// `(space, binding)` pair for resource kind `kind`. Returns null if
+// no collision. Used by the explicit-binding path of
+// `instrumentCoverage` to reject `-trace-coverage-binding` values
+// that would emit two parameters at the same slot — DXC and
+// spirv-val both reject the resulting program with cryptic errors,
+// so a Slang-level diagnostic anchored at the colliding declaration
+// is more debuggable.
+static IRGlobalParam* findCollidingParam(
+    IRModule* module,
+    LayoutResourceKind kind,
+    int space,
+    int binding)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto param = as<IRGlobalParam>(inst);
+        if (!param)
+            continue;
+        auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
+        if (!layoutDecor)
+            continue;
+        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+        if (!varLayout)
+            continue;
+        UInt paramSpace = 0;
+        if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+            paramSpace = a->getOffset();
+        if ((int)paramSpace != space)
+            continue;
+        if (auto a = varLayout->findOffsetAttr(kind))
+        {
+            if ((int)a->getOffset() == binding)
+                return param;
+        }
+    }
+    return nullptr;
+}
+
 // Pick a binding offset in space 0 that doesn't collide with any
 // existing global param's offset for `kind`. Walks the module once
 // and returns max-occupied + 1, or 0 when nothing else claims a slot
@@ -432,6 +471,25 @@ void instrumentCoverage(
         if (auto userBuffer = findUserDeclaredCoverageBuffer(module))
             sink->diagnose(
                 Diagnostics::CoverageBufferReservedName{.location = userBuffer->sourceLoc});
+    }
+
+    // When the user explicitly pins the coverage buffer with
+    // `-trace-coverage-binding`, bail with an actionable diagnostic
+    // if the requested slot is already in use. The auto-allocation
+    // path already avoids collisions; the explicit path used to take
+    // the user's value at face value, leaving DXC / spirv-val to
+    // reject the resulting two-params-at-one-slot program with a
+    // cryptic downstream error.
+    if (sink && explicitSpace >= 0 && explicitBinding >= 0)
+    {
+        auto kind = selectCoverageResourceKind(targetRequest);
+        if (auto colliding =
+                findCollidingParam(module, kind, explicitSpace, explicitBinding))
+        {
+            sink->diagnose(
+                Diagnostics::CoverageBindingCollision{.location = colliding->sourceLoc});
+            return;
+        }
     }
 
     int chosenSpace = -1;

@@ -4572,6 +4572,13 @@ warning(
     span { loc = "location", message = "the global parameter name `__slang_coverage` is reserved by the `-trace-coverage` instrumentation. The IR coverage pass synthesizes its own buffer with this name; the user declaration here is silently shadowed and will not receive any counter writes. Either rename the user declaration or remove `-trace-coverage` from the compile." }
 )
 
+err(
+    "coverage-binding-collision",
+    45101,
+    "`-trace-coverage-binding` collides with an existing parameter",
+    span { loc = "location", message = "the explicit `-trace-coverage-binding` slot collides with this global parameter; downstream code generation will emit two parameters at the same `(register, space)` and fail validation. Pick a free slot, or omit `-trace-coverage-binding` to let the IR pass auto-allocate." }
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(
