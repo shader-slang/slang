@@ -5555,7 +5555,12 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         rowTypeLayout->type = rowType;
         rowTypeLayout->rules = rules;
-        rowTypeLayout->uniformAlignment = elementInfo.getUniformLayout().alignment;
+        // The row vector is an element of the matrix, so its alignment in this context is the
+        // matrix's array alignment (e.g. 16 bytes for std140 / HLSL constant buffers, where every
+        // row is aligned up to a 16-byte boundary).  Using the scalar element's alignment here
+        // would cause `getStride()` on the row vector to report the natural vector size (e.g. 12
+        // for a `float3`) instead of the matrix element stride (16).
+        rowTypeLayout->uniformAlignment = info.alignment;
 
         rowTypeLayout->uniformStride = colStride;
         rowTypeLayout->elementTypeLayout = elementTypeLayout;
