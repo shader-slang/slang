@@ -6,3 +6,4 @@
 
 tests/cooperative-matrix/
 tests/neural/
+slang-unit-test-tool/cooperativeMatrixSubgroupTypeMetadata.internal
