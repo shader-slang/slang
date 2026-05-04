@@ -8241,7 +8241,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     {
         // It's not automatically a failure to not have info, we just won't
         // be able to deduce types for operands
-        const auto opInfo = spirvInfo->opInfos.lookup(SpvOp(inst.opcode.knownValue));
+        const auto opcode = SpvOp(inst.opcode.knownValue);
+        const auto opInfo = spirvInfo->opInfos.lookup(opcode);
 
         if (opInfo && opInfo->numOperandTypes == 0 && inst.operands.getCount())
         {
@@ -8438,6 +8439,14 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
             };
 
             check(check, inst.operands[operandIndex]);
+        }
+
+        if (opcode == SpvOpTypeArray || opcode == SpvOpTypeRuntimeArray ||
+            opcode == SpvOpTypePointer)
+        {
+            getSink()->diagnose(Diagnostics::SpirvLayoutSensitiveTypeInAsm{
+                .opcode = inst.opcode.token.getContent(),
+                .location = inst.opcode.token.loc});
         }
     }
 

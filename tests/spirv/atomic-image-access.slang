@@ -13,12 +13,28 @@ RWStructuredBuffer<uint> resultBuffer;
 [vk::image_format("r32ui")]
 RWTexture2D<uint> tex;
 
+// CHECK-DAG: %[[UINT:[A-Za-z0-9_]+]] = OpTypeInt 32 0
+// CHECK-DAG: %[[IMAGE_PTR:[A-Za-z0-9_]+]] = OpTypePointer Image %[[UINT]]
+// CHECK-DAG: %[[ONE:[A-Za-z0-9_]+]] = OpConstant %[[UINT]] 1
+// CHECK-DAG: %[[TWO:[A-Za-z0-9_]+]] = OpConstant %[[UINT]] 2
+
 [numthreads(1,1,1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    // CHECK: OpImageTexelPointer
+    // CHECK: %[[ADD_PTR_0:[A-Za-z0-9_]+]] = OpImageTexelPointer %[[IMAGE_PTR]]
+    // CHECK: OpAtomicIAdd %[[UINT]] %[[ADD_PTR_0]] {{.*}} {{.*}} %[[ONE]]
     InterlockedAdd(tex[uint2(0, 0)], 1);
+
     uint oldVal;
-    InterlockedAdd(tex[uint2(0, 0)], 1, oldVal);
+    // CHECK: %[[ADD_PTR_1:[A-Za-z0-9_]+]] = OpImageTexelPointer %[[IMAGE_PTR]]
+    // CHECK: OpAtomicIAdd %[[UINT]] %[[ADD_PTR_1]] {{.*}} {{.*}} %[[ONE]]
+    InterlockedAdd(tex[uint2(1, 0)], 1, oldVal);
+
+    uint compareOldVal;
+    // CHECK: %[[COMPARE_PTR:[A-Za-z0-9_]+]] = OpImageTexelPointer %[[IMAGE_PTR]]
+    // CHECK: OpAtomicCompareExchange %[[UINT]] %[[COMPARE_PTR]] {{.*}} {{.*}} {{.*}} %[[TWO]] %[[ONE]]
+    InterlockedCompareExchange(tex[uint2(0, 0)], 1, 2, compareOldVal);
+
     resultBuffer[0] = oldVal;
+    resultBuffer[1] = compareOldVal;
 }

@@ -5752,12 +5752,20 @@ __intrinsic_op($(kIROp_GetUntypedBufferPtr))
 Ptr<uint[]> __getByteAddressBufferPtr(RWByteAddressBuffer buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
-[require(cpp_cuda, structuredbuffer)]
+[require(cpp_cuda_spirv, structuredbuffer)]
 LayoutPtr<T[], L> __getStructuredBufferPtr<T, L:IBufferDataLayout>(StructuredBuffer<T, L> buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
-[require(cpp_cuda, structuredbuffer)]
+[require(cpp_cuda_spirv, structuredbuffer)]
 LayoutPtr<T[], L> __getStructuredBufferPtr<T, L:IBufferDataLayout>(RWStructuredBuffer<T, L> buffer);
+
+__intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
+[require(spirv, structuredbuffer)]
+LayoutPtr<T, L> __getStructuredBufferElementPtr<T, L:IBufferDataLayout>(StructuredBuffer<T, L> buffer, uint element);
+
+__intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
+[require(spirv, structuredbuffer)]
+LayoutPtr<T, L> __getStructuredBufferElementPtr<T, L:IBufferDataLayout>(RWStructuredBuffer<T, L> buffer, uint element);
 
 /**
 Represents an opaque handle to a read-only structured buffer allocated in global memory.
@@ -20768,8 +20776,7 @@ float3 HitTriangleVertexPosition(uint index)
                 OpCapability RayTracingPositionFetchKHR;
                 OpExtension "SPV_KHR_ray_tracing";
                 OpExtension "SPV_KHR_ray_tracing_position_fetch";
-                %_ptr_Input_v3float = OpTypePointer Input $$float3;
-                %addr : %_ptr_Input_v3float = OpAccessChain builtin(HitTriangleVertexPositionsKHR:float3[3]) $index;
+                %addr : $$Ptr<float3, Access::Read, AddressSpace::VaryingInput> = OpAccessChain builtin(HitTriangleVertexPositionsKHR:float3[3]) $index;
                 result:$$float3 = OpLoad %addr;
             };
     }
@@ -28009,27 +28016,27 @@ struct CoopMat
     ///        or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
     [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
-        let matrixLayout : CoopMatMatrixLayout
-    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
+        let matrixLayout : CoopMatMatrixLayout,
+        L : IBufferDataLayout = DefaultDataLayout
+    >(RWStructuredBuffer<T, L> buffer, uint element, uint stride)
     {
         __store<matrixLayout>(buffer, element, stride);
     }
 
     [require(cuda_metal_spirv, cooperative_matrix)]
-    internal void __store<
-        let matrixLayout : CoopMatMatrixLayout
-    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    void __store<
+        let matrixLayout : CoopMatMatrixLayout,
+        L : IBufferDataLayout
+    >(RWStructuredBuffer<T, L> buffer, uint element, uint stride)
     {
-        let zero = 0;
-        let alignment = 16U;
         __target_switch
         {
         case spirv:
+            let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
+            let alignment = 16U;
             spirv_asm
             {
-                %storagePointerType = OpTypePointer StorageBuffer $$T;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+                OpCooperativeMatrixStoreKHR $pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28115,12 +28122,11 @@ struct CoopMat
         __target_switch
         {
         case spirv:
+            let pointer = __getAddress(data[element]);
             let alignment = 16U;
             spirv_asm
             {
-                %workgroupPointerType = OpTypePointer Workgroup $$T;
-                %pointer:%workgroupPointerType = OpAccessChain &data $element;
-                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+                OpCooperativeMatrixStoreKHR $pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28180,12 +28186,11 @@ struct CoopMat
         __target_switch
         {
         case spirv:
+            let pointer = __getAddress(data[element]);
             let alignment = 16U;
             spirv_asm
             {
-                %workgroupPointerType = OpTypePointer Workgroup $$U;
-                %pointer:%workgroupPointerType = OpAccessChain &data $element;
-                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+                OpCooperativeMatrixStoreKHR $pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28247,11 +28252,10 @@ struct CoopMat
     >(__ref groupshared vector<U, L>[V] data, uint element, uint stride)
     {
         let alignment = 16U;
+        let pointer = __getAddress(data[element]);
         spirv_asm
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$vector<U, L>;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            OpCooperativeMatrixStoreKHR $pointer $this $matrixLayout $stride Aligned !alignment;
         };
     }
 
@@ -28289,22 +28293,21 @@ $}
     [__NoSideEffect]
     [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
-        let matrixLayout : CoopMatMatrixLayout
+        let matrixLayout : CoopMatMatrixLayout,
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         uint stride)
     {
-        let zero = 0;
         let alignment = 16U;
         __target_switch
         {
         case spirv:
+            let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
             return spirv_asm
             {
-                %storagePointerType = OpTypePointer StorageBuffer $$T;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28401,12 +28404,11 @@ $}
         __target_switch
         {
         case spirv:
+            let pointer = __getAddress(data[element]);
             let alignment = 16U;
             return spirv_asm
             {
-                %workgroupPointerType = OpTypePointer Workgroup $$T;
-                %pointer:%workgroupPointerType = OpAccessChain &data $element;
-                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28467,12 +28469,11 @@ $}
         __target_switch
         {
         case spirv:
+            let pointer = __getAddress(data[element]);
             let alignment = 16U;
             return spirv_asm
             {
-                %workgroupPointerType = OpTypePointer Workgroup $$U;
-                %pointer:%workgroupPointerType = OpAccessChain &data $element;
-                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28535,11 +28536,10 @@ $}
     >(__constref groupshared vector<U, L>[V] data, uint element, uint stride)
     {
         let alignment = 16U;
+        let pointer = __getAddress(data[element]);
         return spirv_asm
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$vector<U, L>;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $pointer $matrixLayout $stride Aligned !alignment;
         };
     }
 
@@ -28690,9 +28690,10 @@ $}
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout)
     {
@@ -28702,14 +28703,15 @@ $}
     [require(cooperative_matrix_tensor_addressing)]
     static This __loadLayout<
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
         This ret;
@@ -28717,9 +28719,7 @@ $}
         {
             OpCapability CooperativeMatrixTensorAddressingNV;
             OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment None;
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $ret $tensorLayout Aligned !alignment None;
         };
     }
 
@@ -28745,9 +28745,10 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
@@ -28761,15 +28762,16 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
         This ret;
@@ -28777,9 +28779,7 @@ $}
         {
             OpCapability CooperativeMatrixTensorAddressingNV;
             OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView $tensorView;
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $ret $tensorLayout Aligned !alignment TensorView $tensorView;
         };
     }
 
@@ -28801,9 +28801,10 @@ $}
     static This Load<
         U,
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
@@ -28815,15 +28816,16 @@ $}
     static This __loadLayoutDecode<
         U,
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
         This ret;
@@ -28831,9 +28833,7 @@ $}
         {
             OpCapability CooperativeMatrixBlockLoadsNV;
             OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment DecodeFunc $decodeFunc;
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $ret $tensorLayout Aligned !alignment DecodeFunc $decodeFunc;
         };
     }
 
@@ -28862,9 +28862,10 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
@@ -28880,16 +28881,17 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
         This ret;
@@ -28898,9 +28900,7 @@ $}
             OpCapability CooperativeMatrixTensorAddressingNV;
             OpCapability CooperativeMatrixBlockLoadsNV;
             OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView|DecodeFunc $tensorView $decodeFunc;
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $ret $tensorLayout Aligned !alignment TensorView|DecodeFunc $tensorView $decodeFunc;
         };
     }
 
@@ -28923,14 +28923,15 @@ $}
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        RWStructuredBuffer<T> buffer,
+        RWStructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         __target_switch
         {
@@ -28939,9 +28940,7 @@ $}
             {
                 OpCapability CooperativeMatrixTensorAddressingNV;
                 OpExtension "SPV_NV_cooperative_matrix2";
-                %storagePointerType = OpTypePointer StorageBuffer $$T;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-                OpCooperativeMatrixStoreTensorNV %pointer $this $tensorLayout Aligned !alignment None;
+                OpCooperativeMatrixStoreTensorNV $pointer $this $tensorLayout Aligned !alignment None;
             };
         }
     }
@@ -28991,15 +28990,16 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        RWStructuredBuffer<T> buffer,
+        RWStructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         __target_switch
         {
@@ -29008,9 +29008,7 @@ $}
             {
                 OpCapability CooperativeMatrixTensorAddressingNV;
                 OpExtension "SPV_NV_cooperative_matrix2";
-                %storagePointerType = OpTypePointer StorageBuffer $$T;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-                OpCooperativeMatrixStoreTensorNV %pointer $this $tensorLayout Aligned !alignment TensorView $tensorView;
+                OpCooperativeMatrixStoreTensorNV $pointer $this $tensorLayout Aligned !alignment TensorView $tensorView;
             };
         }
     }
@@ -29150,6 +29148,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param N The number of columns in the matrix fragment.
 /// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
 /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param L The data layout of the StructuredBuffer.
 /// @param buffer The StructuredBuffer to load from.
 /// @param element The starting element index in the buffer.
 /// @param stride The stride in elements between consecutive rows or columns.
@@ -29162,9 +29161,10 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
-    let matrixLayout : CoopMatMatrixLayout
+    let matrixLayout : CoopMatMatrixLayout,
+    L : IBufferDataLayout = DefaultDataLayout
 >(
-    StructuredBuffer<T> buffer,
+    StructuredBuffer<T, L> buffer,
     uint element,
     uint stride)
 {
@@ -29179,6 +29179,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param N The number of columns in the matrix fragment.
 /// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
 /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param L The data layout of the RWStructuredBuffer.
 /// @param buffer The RWStructuredBuffer to load from.
 /// @param element The starting element index in the buffer.
 /// @param stride The stride in elements between consecutive rows or columns.
@@ -29191,9 +29192,10 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
-    let matrixLayout : CoopMatMatrixLayout
+    let matrixLayout : CoopMatMatrixLayout,
+    L : IBufferDataLayout = DefaultDataLayout
 >(
-    RWStructuredBuffer<T> buffer,
+    RWStructuredBuffer<T, L> buffer,
     uint element,
     uint stride)
 {
@@ -30019,19 +30021,17 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     }
 
     [require(cooperative_vector)]
-    void store(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+    void store<L : IBufferDataLayout = DefaultDataLayout>(RWStructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
         {
         case spirv:
-            let zero = 0;
+            let pointer = __getStructuredBufferPtr<T, L>(buffer);
             spirv_asm
             {
-                %runtimeArrayType = OpTypeRuntimeArray $$T;
-                %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero;
-                OpCooperativeVectorStoreNV %pointer $byteOffset16ByteAligned $this None;
+                OpCooperativeVectorStoreNV $pointer $byteOffset16ByteAligned $this None;
             };
+            return;
         default:
             for(int i = 0; i < N; ++i)
                 buffer[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
@@ -30168,18 +30168,15 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [__NoSideEffect]
     [require(cooperative_vector)]
-    static CoopVec<T, N> load(StructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+    static CoopVec<T, N> load<L : IBufferDataLayout = DefaultDataLayout>(StructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
         {
         case spirv:
-            let zero = 0;
+            let pointer = __getStructuredBufferPtr<T, L>(buffer);
             return spirv_asm
             {
-                %runtimeArrayType = OpTypeRuntimeArray $$T;
-                %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero;
-                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV %pointer $byteOffset16ByteAligned None;
+                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned None;
             };
         default:
             var vec = CoopVec<T, N>();
@@ -30192,18 +30189,15 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [__NoSideEffect]
     [require(cooperative_vector)]
-    static CoopVec<T, N> load(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+    static CoopVec<T, N> load<L : IBufferDataLayout = DefaultDataLayout>(RWStructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
         {
         case spirv:
-            let zero = 0;
+            let pointer = __getStructuredBufferPtr<T, L>(buffer);
             return spirv_asm
             {
-                %runtimeArrayType = OpTypeRuntimeArray $$T;
-                %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero;
-                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV %pointer $byteOffset16ByteAligned None;
+                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned None;
             };
         default:
             var vec = CoopVec<T, N>();
@@ -31387,14 +31381,14 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWByteAddres
 
 [ForceInline]
 [require(cooperative_vector)]
-CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(StructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType, L : IBufferDataLayout = DefaultDataLayout>(StructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
 
 [ForceInline]
 [require(cooperative_vector)]
-CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType, L : IBufferDataLayout = DefaultDataLayout>(RWStructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
@@ -32881,9 +32875,7 @@ struct DispatchNodeInputRecord
         case spirv:
             return spirv_asm
             {
-                %in_payload_t = OpTypeNodePayloadArrayAMDX $$T;
-                %in_payload_ptr_t = OpTypePointer NodePayloadAMDX %in_payload_t;
-                %var = OpVariable %in_payload_ptr_t NodePayloadAMDX;
+                %var : $$NodePayloadPtr<T> = OpVariable NodePayloadAMDX;
                 result : $$NodePayloadPtr<T> = OpAccessChain %var $index;
             };
         }

@@ -4451,6 +4451,10 @@ __generic<T : __BuiltinType>
     }
 }
 
+// Typed pointer to an image texel used by image atomic spirv_asm snippets.
+internal typealias __ImagePtr<T> =
+    Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::Image)>;
+
 ${
 {
     struct ImageTypeInfo
@@ -4667,8 +4671,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) %ptr Device None $data
                 };
             }
@@ -4690,8 +4693,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicExchange %ptr Device Relaxed $data
                 };
             }
@@ -4713,8 +4715,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
                 };
             }
@@ -4736,8 +4737,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
                 };
             }
@@ -4762,8 +4762,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicAnd %ptr Device Relaxed $data
                 };
             }
@@ -4784,8 +4783,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicOr %ptr Device Relaxed $data
                 };
             }
@@ -4807,8 +4805,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicXor %ptr Device Relaxed $data
                 };
             }
@@ -4829,8 +4826,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device Relaxed Relaxed $data $compare
                 };
             }
