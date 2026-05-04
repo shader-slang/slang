@@ -5745,10 +5745,9 @@ struct TypeFlowSpecializationContext
                 // with the original value type as its result type instead;
                 // lowerGetTagForMappedSet detects this and synthesizes a
                 // switch returning the actual constant for each witness tag.
-                IRType* resultType =
-                    as<IRValueSet>(thisInstInfo->getSet())
-                        ? inst->getDataType()
-                        : (IRType*)makeTagType(thisInstInfo->getSet());
+                IRType* resultType = as<IRValueSet>(thisInstInfo->getSet())
+                                         ? inst->getDataType()
+                                         : (IRType*)makeTagType(thisInstInfo->getSet());
 
                 auto newInst =
                     builder.emitIntrinsicInst(resultType, kIROp_GetTagForMappedSet, 2, operands);
