@@ -8,7 +8,7 @@ interface IInterface
     int doSomething();
 };
 
-//CHECK: error[E41011]: type does not fit in size required by interface
+//CHECK: error[E41019]: type does not fit in size required by interface
 //CHECK: type 'A' does not fit in the size required by its conforming interface.
 struct A : IInterface
 {

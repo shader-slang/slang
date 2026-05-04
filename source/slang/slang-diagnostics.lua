@@ -336,7 +336,7 @@ err("duplicate-output-paths-for-target", 81, "multiple output paths have been sp
 
 err("duplicate-dependency-output-paths", 82, "the -dep argument can only be specified once")
 
-err("unable-to-write-repro-file", 82, "unable to write repro file '~path'")
+err("unable-to-write-repro-file", 83, "unable to write repro file '~path'")
 
 err("unable-to-create-module-container", 86, "unable to create module container")
 
@@ -446,7 +446,7 @@ err(
 
 err(
     "expected-2-tokens-in-preprocessor-directive",
-    15102,
+    15104,
     "preprocessor parse error",
     span { loc = "location", message = "expected '~token1' or '~token2' in '~directive' directive" }
 )
@@ -561,7 +561,7 @@ err(
 
 err(
     "no-unique-identity",
-    15302,
+    15304,
     "no unique file identity",
     span { loc = "location", message = "`#include` handler didn't generate a unique identity for file '~path'" }
 )
@@ -767,7 +767,7 @@ err(
 
 err(
     "unexpected-token-expected-token-name",
-    20001,
+    20004,
     "unexpected token",
     span { loc = "location", message = "unexpected ~actualToken, expected '~expectedTokenName'" }
 )
@@ -781,56 +781,56 @@ err(
 
 err(
     "token-type-expected-but-eof",
-    0,
+    3,
     "unexpected end of file",
     span { loc = "location", message = "~tokenType expected but end of file encountered." }
 )
 
 err(
     "token-name-expected",
-    20001,
+    20006,
     "expected token",
     span { loc = "location", message = "\"~tokenName\" expected" }
 )
 
 err(
     "token-name-expected-but-eof2",
-    20001,
+    20007,
     "unexpected end of file",
     span { loc = "location", message = "\"~tokenName\" expected but end of file encountered." }
 )
 
 err(
     "token-type-expected",
-    20001,
+    20009,
     "expected token",
     span { loc = "location", message = "~tokenType expected" }
 )
 
 err(
     "token-type-expected-but-eof2",
-    20001,
+    20010,
     "unexpected end of file",
     span { loc = "location", message = "~tokenType expected but end of file encountered." }
 )
 
 err(
     "type-name-expected-but",
-    20001,
+    20011,
     "expected type name",
     span { loc = "location", message = "unexpected ~token, expected type name" }
 )
 
 err(
     "type-name-expected-but-eof",
-    20001,
+    20014,
     "expected type name",
     span { loc = "location", message = "type name expected but end of file encountered." }
 )
 
 err(
     "unexpected-eof",
-    20001,
+    20015,
     "unexpected end of file",
     span { loc = "location", message = "Unexpected end of file." }
 )
@@ -1153,7 +1153,7 @@ err(
 
 err(
     "non-addressable-type-in-structured-buffer",
-    30028,
+    30031,
     "non-addressable type cannot be used in StructuredBuffer",
     span { loc = "location", message = "'~type:Type' is non-addressable and cannot be used in StructuredBuffer" }
 )
@@ -1412,7 +1412,7 @@ err(
 
 err(
     "static-ref-to-this",
-    30102,
+    30120,
     "static function cannot refer to non-static member via `this`",
     span { loc = "location", message = "static function cannot refer to non-static member `~member:Name` via `this`" }
 )
@@ -1827,7 +1827,7 @@ err(
 
 err(
     "reading-from-write-only",
-    30101,
+    30119,
     "cannot read from writeonly",
     span { loc = "expr:Expr", message = "cannot read from writeonly, check modifiers." }
 )
@@ -1836,7 +1836,7 @@ err(
 
 err(
     "differentiable-member-should-have-corresponding-field-in-diff-type",
-    30102,
+    30121,
     "missing field in differential type",
     span { loc = "location", message = "differentiable member '~member:Name' should have a corresponding field in '~diffType:Type'. Use [DerivativeMember(...)] or mark as no_diff" }
 )
@@ -2091,14 +2091,14 @@ err(
 
 err(
     "use-of-undeclared-capability-of-interface-requirement",
-    36104,
+    36110,
     "capability incompatible with interface",
     span { loc = "decl:Decl", message = "'~decl' uses capability '~caps' that is incompatable with the interface requirement" }
 )
 
 err(
     "use-of-undeclared-capability-of-inheritance-decl",
-    36104,
+    36114,
     "capability incompatible with supertype",
     span { loc = "decl:Decl", message = "'~decl' uses capability '~caps' that is incompatable with the supertype" }
 )
@@ -2292,7 +2292,7 @@ err(
 
 err(
     "unknown-diagnostic-name",
-    31101,
+    31111,
     "unknown diagnostic",
     span { loc = "location", message = "unknown diagnostic '~diagnosticName'" }
 )
@@ -2394,7 +2394,7 @@ err(
 
 err(
     "interface-inheriting-com-must-be-com",
-    31124,
+    31126,
     "non-COM interface inheriting from COM interface",
     span { loc = "decl:Decl", message = "an interface type that inherits from a [COM] interface must itself be a [COM] interface" }
 )
@@ -2807,14 +2807,14 @@ err(
 
 err(
     "global-gen-param-in-global-scope-only",
-    30301,
+    30305,
     "type_param outside global scope",
     span { loc = "decl:Decl", message = "'type_param' can only be defined global scope." }
 )
 
 err(
     "static-const-requirement-must-be-int-or-bool",
-    30302,
+    30306,
     "invalid static const requirement type",
     span { loc = "decl:Decl", message = "'static const' requirement can only have int or bool type." }
 )
@@ -2842,7 +2842,7 @@ err(
 
 err(
     "non-method-interface-requirement-cannot-have-body",
-    30311,
+    30317,
     "interface requirement has body",
     span { loc = "decl:Decl", message = "non-method interface requirement cannot have a body." }
 )
@@ -2923,7 +2923,7 @@ warning(
 
 warning(
     "for-loop-terminates-in-fewer-iterations-than-max-iters",
-    30504,
+    30519,
     "MaxIters exceeds actual iterations",
     span { loc = "attr:Modifier", message = "the for loop is statically determined to terminate within ~iterations:Int iterations, which is less than what [MaxIters] specifies." }
 )
@@ -2946,14 +2946,14 @@ err(
 
 err(
     "switch-multiple-default",
-    30600,
+    30602,
     "multiple default cases in switch",
     span { loc = "stmt:Stmt", message = "multiple 'default' cases not allowed within a 'switch' statement" }
 )
 
 err(
     "switch-duplicate-cases",
-    30601,
+    30605,
     "duplicate cases in switch",
     span { loc = "stmt:Stmt", message = "duplicate cases not allowed within a 'switch' statement" }
 )
@@ -2976,7 +2976,7 @@ err(
 --
 warning(
     "link-time-constant-array-size",
-    31000,
+    31010,
     "Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work",
     span { loc = "decl:Decl" }
 )
@@ -3032,7 +3032,7 @@ fatal(
 --
 err(
     "generic-type-needs-args",
-    30400,
+    30408,
     "generic type '~type:Type' used without argument",
     span { loc = "typeExp:Expr", message = "generic type '~type' used without argument" }
 )
@@ -3066,7 +3066,7 @@ warning(
 
 err(
     "pack-param-must-be-last",
-    30500,
+    30522,
     "generic parameter after a variadic pack parameter is not allowed",
     span { loc = "param:Decl", message = "generic parameter '~param' cannot appear after a variadic pack parameter" }
 )
@@ -3119,21 +3119,21 @@ warning(
 
 err(
     "too-many-initializers",
-    30500,
+    30523,
     "too many initializers in initializer list",
     span { loc = "initList:Expr", message = "too many initializers (expected ~expected:int, got ~got:int)" }
 )
 
 err(
     "cannot-use-initializer-list-for-vector-of-unknown-size",
-    30502,
+    30517,
     "cannot use initializer list for vector of statically unknown size '~elementCount:Val'",
     span { loc = "initList:Expr", message = "cannot use initializer list for vector of statically unknown size '~elementCount'" }
 )
 
 err(
     "cannot-use-initializer-list-for-matrix-of-unknown-size",
-    30503,
+    30518,
     "cannot use initializer list for matrix of statically unknown size '~rowCount:Val' rows",
     span { loc = "initList:Expr", message = "cannot use initializer list for matrix of statically unknown size '~rowCount' rows" }
 )
@@ -3147,7 +3147,7 @@ err(
 
 err(
     "cannot-use-initializer-list-for-coop-vector-of-unknown-size",
-    30505,
+    30520,
     "cannot use initializer list for CoopVector of statically unknown size '~elementCount:Val'",
     span { loc = "initList:Expr", message = "cannot use initializer list for CoopVector of statically unknown size '~elementCount'" }
 )
@@ -3161,7 +3161,7 @@ standalone_note(
 
 warning(
     "interface-default-initializer",
-    30506,
+    30521,
     "initializing an interface variable with defaults is deprecated and may cause unexpected behavior",
     span { loc = "expr:Expr", message = "initializing an interface variable with defaults is deprecated and may cause unexpected behavior. Please provide a compatible initializer or leave the variable uninitialized" }
 )
@@ -3199,7 +3199,7 @@ err(
 
 err(
     "generic-value-parameter-must-have-type",
-    30623,
+    30625,
     "a generic value parameter must be given an explicit type",
     span { loc = "decl:Decl", message = "a generic value parameter must be given an explicit type" }
 )
@@ -3427,28 +3427,28 @@ err(
 --
 err(
     "non-set-accessor-must-not-have-params",
-    31101,
+    31112,
     "accessors other than 'set' must not have parameters",
     span { loc = "decl:Decl", message = "accessors other than 'set' must not have parameters" }
 )
 
 err(
     "set-accessor-may-not-have-more-than-one-param",
-    31102,
+    31108,
     "a 'set' accessor may not have more than one parameter",
     span { loc = "param:Decl", message = "a 'set' accessor may not have more than one parameter" }
 )
 
 err(
     "set-accessor-param-wrong-type",
-    31102,
+    31109,
     "'set' parameter type mismatch",
     span { loc = "param:Decl", message = "'set' parameter '~param' has type '~actualType:Type' which does not match the expected type '~expectedType:Type'" }
 )
 
 err(
     "accessor-does-not-satisfy-type-constraint-requirements",
-    31103,
+    31110,
     "accessor does not satisfy type constraint requirements",
     span { loc = "accessorDecl:Decl", message = "an accessor declaration does not satisfy type constraint requirements for ~requirementDecl:Decl" }
 )
@@ -3745,7 +3745,7 @@ err(
 
 err(
     "specialization-parameter-not-specialized",
-    38008,
+    38013,
     "no specialization argument was provided for specialization parameter",
     span { loc = "location", message = "no specialization argument was provided for specialization parameter" }
 )
@@ -3940,7 +3940,7 @@ err(
 
 err(
     "cannot-use-constref-on-differentiable-member-method",
-    38034,
+    38036,
     "'[constref]' on differentiable member method",
     span { loc = "attr:Modifier", message = "cannot use '[constref]' on a differentiable member method of a differentiable type." }
 )
@@ -4058,7 +4058,7 @@ err(
 
 err(
     "vector-with-invalid-element-count-encountered",
-    38203,
+    38206,
     "invalid vector element count",
     span { loc = "location", message = "vector has invalid element count '~count', valid values are between '~min' and '~max' inclusive" }
 )
@@ -4396,7 +4396,7 @@ warning(
 
 warning(
     "using-uninitialized-value",
-    41016,
+    41033,
     "use of uninitialized value",
     span { loc = "location", message = "use of uninitialized value of type '~typeName'" }
 )
@@ -4479,7 +4479,7 @@ err(
 
 err(
     "type-does-not-fit-any-value-size",
-    41011,
+    41019,
     "type does not fit in size required by interface",
     span { loc = "location", message = "type '~type:IRInst' does not fit in the size required by its conforming interface." }
 )
@@ -4574,7 +4574,7 @@ warning(
 
 warning(
     "expect-dynamic-uniform-value",
-    41201,
+    41203,
     "value must be dynamic uniform",
     span { loc = "location", message = "value stored at this location must be dynamic uniform, use `asDynamicUniform()` to silence this warning." }
 )
@@ -4623,7 +4623,7 @@ err(
 
 err(
     "multi-sampled-texture-does-not-allow-writes",
-    41402,
+    41404,
     "cannot write to multisampled texture",
     span { loc = "location", message = "cannot write to a multisampled texture with target '~target:CodeGenTarget'." }
 )
@@ -4927,7 +4927,7 @@ fatal(
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 
--- Metal (56101-56104)
+-- Metal and WGSL (56101-56105)
 
 err(
     "resource-types-in-constant-buffer-in-parameter-block-not-allowed-on-metal",
@@ -4955,6 +4955,13 @@ err(
     56104,
     "mesh output must be assigned as whole struct",
     span { loc = "location", message = "whole struct must be assiged to mesh output at once for Metal target." }
+)
+
+err(
+    "array-of-resource-type-not-supported-in-wgsl",
+    56105,
+    "array of resource types not supported in WGSL",
+    span { loc = "location", message = "arrays of resource types (e.g., 'StructuredBuffer', 'RWStructuredBuffer', 'ByteAddressBuffer') are not supported in WGSL." }
 )
 
 err(
@@ -5161,9 +5168,16 @@ err(
 
 err(
     "cooperative-matrix-invalid-shape",
-    50000,
+    50001,
     "invalid shape for cooperative matrix",
     span { loc = "location", message = "Invalid shape ['~rowCount', '~colCount'] for cooperative matrix '~matrixUse'." }
+)
+
+err(
+    "cooperative-matrix-invalid-mma-type-combination",
+    50002,
+    "invalid type combination for cooperative matrix multiply-add",
+    span { loc = "location", message = "Invalid (A, B, C, D) element-type combination for cooperative matrix multiply-add: A='~aType', B='~bType', C='~cType', D='~dType'. The CUDA backend requires A and B to share the same element type and the accumulator family to match the input family (half -> half/float, bfloat16 -> float, int8/uint8 -> int, FloatE4M3/FloatE5M2 -> half/float)." }
 )
 
 fatal(
