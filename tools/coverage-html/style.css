@@ -1,0 +1,236 @@
+/* Palette pulled from shader-slang.org:
+   primary teal #105f65, accent orange #F14D1B, success green #2c882c,
+   amber #ffc107, red #dc3545, body bg #fff, subtle gray #f8f9fa.
+   Tier cells use the categorical brand colors; rate bars use a
+   continuous HSL gradient (set per-row inline). */
+:root {
+  --slang-teal:   #105f65;
+  --slang-teal-hover: #0d4d52;
+  --slang-orange: #F14D1B;
+  --tier-hi:      #2c882c;
+  --tier-hi-bg:   #d6ebd5;
+  --tier-med:     #ffc107;
+  --tier-med-bg:  #fff3cd;
+  --tier-lo:      #dc3545;
+  --tier-lo-bg:   #f8d7da;
+  --row-bg:       #f8f9fa;
+  --row-bg-alt:   #ffffff;
+  --row-hover:    #e9ecef;
+  --text:         #212529;
+  --text-muted:   #6c757d;
+  --link:         #105f65;
+}
+
+body { color: var(--text); background-color: #fff;
+       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                    Roboto, Helvetica, Arial, sans-serif;
+       margin: 0; padding: 0 24px; }
+a:link, a:visited { color: var(--link); text-decoration: underline; }
+a:hover           { color: var(--slang-teal-hover); }
+a:active          { color: var(--slang-orange); }
+
+table.chrome { width: 100%; border-collapse: collapse; }
+td.title   { text-align: center; padding: 14px 0 10px; font-size: 22pt;
+             font-weight: 600; color: var(--slang-teal);
+             letter-spacing: 0.02em; }
+td.ruler   { background-color: var(--slang-teal); height: 3px; padding: 0; }
+
+/* Sticky page chrome: title + meta + metric cards stay visible
+   when the user scrolls. The data table's <thead> sticks directly
+   underneath at top: var(--chrome-h), measured by JS on page load. */
+div.topChrome { position: sticky; top: 0; z-index: 20;
+                background-color: #fff;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08); }
+table.chromeMeta { width: 100%; border-collapse: collapse;
+                   margin: 6px 0; }
+table.chromeMeta td { padding: 2px 8px; }
+
+/* Per-file summary cards. Wide flex row, one card per metric
+   (Lines / Functions / Branches), each showing the metric name,
+   the rate %, a thin progress bar and the hit/total counts on
+   one line. Replaces the old 4×N transposed grid that was tall
+   and narrow. */
+div.metricCards { display: flex; flex-wrap: wrap; gap: 12px;
+                  margin: 10px 0 12px; }
+div.metricCard  { flex: 1 1 240px; padding: 8px 14px;
+                  background-color: var(--row-bg-alt);
+                  border: 1px solid var(--row-bg);
+                  border-radius: 6px;
+                  display: flex; align-items: center; gap: 12px;
+                  font-size: 90%; }
+span.metricLabel { font-weight: 600; color: var(--text-muted);
+                   text-transform: uppercase; letter-spacing: 0.04em;
+                   font-size: 78%; min-width: 4.5em; }
+span.metricValue { font-size: 16pt; font-weight: 700;
+                   color: var(--text); min-width: 4em;
+                   text-align: right; }
+div.metricBarMini { flex: 1; height: 6px; min-width: 60px;
+                    background-color: #e0e3e6; border-radius: 3px;
+                    overflow: hidden; }
+div.metricBarFill { height: 100%; }
+span.metricCounts { color: var(--text-muted); white-space: nowrap;
+                    min-width: 5em; text-align: right; font-variant-numeric: tabular-nums; }
+
+td.headerItem        { text-align: right; padding-right: 6px; font-weight: 600;
+                       vertical-align: top; white-space: nowrap; color: var(--text-muted); }
+td.headerValue       { text-align: left; color: var(--slang-teal); font-weight: 600;
+                       white-space: nowrap; }
+td.headerCovTableHead { text-align: center; padding: 0 6px; white-space: nowrap;
+                        color: var(--text-muted); }
+td.headerCovTableEntry    { text-align: right; color: var(--text); font-weight: 600;
+                            padding-left: 12px; padding-right: 4px;
+                            background-color: var(--row-bg); white-space: nowrap; }
+
+/* Top-level index table: full window width with a small breathing
+   margin. Both the file-summary table and any embedded fnInner
+   share these column widths so the same metric column lines up
+   vertically across the file row and its expanded function rows. */
+table.indexTable { margin: 0 auto; width: 100%;
+                   border-collapse: collapse; }
+table.indexTable col.colFile   { width: 47%; }
+table.indexTable col.colLBar   { width: 9%; }
+table.indexTable col.colLRate  { width: 5%; }
+table.indexTable col.colLTotal { width: 4%; }
+table.indexTable col.colLHit   { width: 4%; }
+table.indexTable col.colFRate  { width: 5%; }
+table.indexTable col.colFTotal { width: 4%; }
+table.indexTable col.colFHit   { width: 4%; }
+table.indexTable col.colBRate  { width: 5%; }
+table.indexTable col.colBTotal { width: 4%; }
+table.indexTable col.colBHit   { width: 4%; }
+
+td.tableHead { text-align: center; color: #fff; background-color: var(--slang-teal);
+               font-size: 110%; font-weight: 600; padding: 4px 6px;
+               white-space: nowrap; letter-spacing: 0.02em; }
+
+/* Make the index table's <thead> sticky right under the chrome.
+   `--chrome-h` is set by the inline JS at page load to the
+   measured height of `div.topChrome` so the two sticky layers
+   stack without overlap. */
+table.indexTable thead    { position: sticky;
+                            top: var(--chrome-h, 200px);
+                            z-index: 10; }
+table.indexTable thead td { background-color: var(--slang-teal); }
+
+tr.fileSummary > td:not(.coverBar):not(.coverFile):not(.coverDirectory) {
+  text-align: right;
+}
+/* Zebra-stripe ONLY .fileSummary rows. Plain `:nth-child(odd)`
+   counts position among ALL siblings in the <tbody>, which mixes
+   dirHeader / fileSummary / fileFunctions and produces sporadic
+   striping. The CSS-Selectors-Level-4 `of S` form fixes the count
+   to the .fileSummary subset; baseline-widely-available in modern
+   evergreen browsers (Chromium/Firefox/Safari). */
+tr:nth-child(odd of tr.fileSummary) > td.coverFile,
+tr:nth-child(odd of tr.fileSummary) > td.coverNumDflt { background-color: var(--row-bg); }
+
+td.coverFile       { text-align: left; padding: 3px 20px 3px 10px;
+                     color: var(--link); background-color: var(--row-bg-alt);
+                     font-family: ui-monospace, SFMono-Regular, Menlo,
+                                  Monaco, Consolas, monospace;
+                     overflow-wrap: anywhere; }
+/* Directory rows: white background like file rows so they don't get
+   confused with the teal column-header. A 3 px teal stripe on the
+   left edge plus a teal chevron and bold dark-teal text mark them
+   as expandable parents. */
+td.coverDirectory  { text-align: left; padding: 4px 20px 4px 10px;
+                     color: var(--slang-teal);
+                     background-color: var(--row-bg-alt);
+                     border-left: 3px solid var(--slang-teal);
+                     font-family: ui-monospace, SFMono-Regular, Menlo,
+                                  Monaco, Consolas, monospace;
+                     font-weight: 700; }
+td.coverBar        { padding: 3px 10px; background-color: var(--row-bg-alt); }
+tr:nth-child(odd of tr.fileSummary) > td.coverBar { background-color: var(--row-bg); }
+span.coverBarOutline { display: inline-block; height: 10px; width: 100px;
+                       background-color: #cfd4d8; vertical-align: middle;
+                       line-height: 0; border-radius: 1px; overflow: hidden; }
+span.coverBarFill  { display: inline-block; height: 10px; vertical-align: top; }
+span.coverBarRest    { background-color: transparent; display: inline-block;
+                       height: 10px; vertical-align: top; }
+
+/* Rate cells use a continuous gradient background that matches
+   the progress-bar fill. The exact color is computed per-row and
+   set via inline `style="background-color: hsl(...)"`. The class
+   provides only the layout / typography. */
+td.coverPerCell { text-align: right; padding: 3px 10px;
+                  color: var(--text); font-weight: 700; }
+td.coverNumDflt { text-align: right; padding: 3px 10px;
+                  background-color: var(--row-bg-alt); white-space: nowrap; }
+
+td.footnote    { padding: 6px 10px; background-color: var(--row-bg);
+                 color: var(--text-muted); font-style: italic; font-size: 85%; }
+td.versionInfo { text-align: center; padding: 8px; color: var(--text-muted);
+                 font-size: 90%; }
+
+pre.sourceHeading { font-family: ui-monospace, SFMono-Regular, Menlo,
+                                 Monaco, Consolas, monospace;
+                    font-weight: 700; margin: 0; padding: 6px 0;
+                    color: var(--text-muted);
+                    background-color: #fff;
+                    border-bottom: 1px solid var(--row-bg);
+                    position: sticky;
+                    top: var(--chrome-h, 200px);
+                    z-index: 5; }
+pre.source        { font-family: ui-monospace, SFMono-Regular, Menlo,
+                                 Monaco, Consolas, monospace;
+                    margin-top: 2px; }
+span.lineNum      { background-color: #f1f3f5; display: inline-block;
+                    min-width: 6em; text-align: right; padding-right: 4px;
+                    color: var(--text-muted); }
+span.tlaGNC       { background-color: #d6ebd5; }
+span.tlaUNC       { background-color: #f8d7da; }
+
+td.coverFn        { text-align: left; padding: 2px 20px 2px 10px;
+                    color: var(--text);
+                    background-color: var(--row-bg-alt);
+                    font-family: ui-monospace, SFMono-Regular, Menlo,
+                                 Monaco, Consolas, monospace;
+                    word-break: break-all; font-size: 92%; }
+
+span.branchAll   { background-color: var(--tier-hi-bg);  color: var(--text); }
+span.branchPart  { background-color: var(--tier-med-bg); color: var(--text); }
+span.branchNone  { background-color: var(--tier-lo-bg);  color: var(--text); }
+
+/* Expand-chevrons. The placeholder variant reserves the same column
+   width on rows that have no functions, so the file-name column
+   stays vertically aligned across all rows. */
+span.fnToggle, span.fnTogglePlaceholder, span.dirToggle
+                 { display: inline-block; width: 1em;
+                   font-family: ui-monospace, SFMono-Regular, Menlo,
+                                Monaco, Consolas, monospace;
+                   user-select: none; margin-right: 4px; text-align: center; }
+span.fnToggle    { cursor: pointer; color: var(--slang-teal); }
+span.dirToggle   { cursor: pointer; color: var(--slang-teal); }
+span.fnTogglePlaceholder { color: transparent; }
+span.fnToggle:focus, span.dirToggle:focus { outline: 1px dotted var(--slang-orange); }
+tr.fileFunctions[hidden]  { display: none; }
+tr.fileSummary[hidden]    { display: none; }
+/* fileFunctions row's <td> matches the parent indexTable edges
+   (body padding already provides the 24px window inset).  A 3px
+   teal stripe on the left visually marks the expanded region. */
+tr.fileFunctions > td   { background-color: #fdfdfe; padding: 6px 0;
+                          border-left: 3px solid var(--slang-teal); }
+
+/* Embedded function table inside an expanded file row. The colgroup
+   widths mirror the parent indexTable so cells line up vertically
+   across the file row and its expanded function rows.
+   Cells inherit padding / font from their class-specific rules
+   above (coverPerHi/Med/Lo, coverNumDflt, coverBar, coverFn …) —
+   no generic `table.fnInner td` overrides — which is what makes
+   metric cells use the parent's sans-serif and 3px/10px padding,
+   while only the function name cell (td.coverFn) stays monospace. */
+table.fnInner   { border-collapse: collapse; margin: 0; width: 100%;
+                  table-layout: fixed; }
+table.fnInner td { overflow-wrap: break-word; }
+table.fnInner td.tableHead { font-family: -apple-system, BlinkMacSystemFont,
+                             "Segoe UI", Roboto, sans-serif; }
+/* fn-specific cols subdivide the parent's File column (47%) into
+   Name (43%) + Line (4%). The remaining cols reuse the parent's
+   classes so the line-coverage / fn / branch columns line up
+   vertically with the file-summary row above. */
+table.fnInner col.fnNameCol  { width: 43%; }
+table.fnInner col.fnLineCol  { width: 4%; }
+
+.sourceUnavailable { color: var(--slang-orange); font-style: italic;
+                     padding: 8px; }

@@ -71,7 +71,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     int val = 32;
 
     // IndirectReader: *source + offset = 32 + 10 = 42
-    var reader = makeReader(typeSelector[0], &val);
+    var reader = makeReader(typeSelector[0], __getAddress(val));
     // CHECK: 42
     outputBuffer[0] = dispatchRead(reader);
 

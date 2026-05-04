@@ -7,6 +7,7 @@ slang-unit-test-tool/replayRecord_gpu_printing.internal
 
 # CUDA tests require a GPU
 slang-unit-test-tool/cudaCodeGenBug.internal
+slang-unit-test-tool/cooperativeMatrixSubgroupTypeMetadata.internal
 
 # Vulkan gfx-unit-tests require a Vulkan-capable GPU
 gfx-unit-test-tool/bufferBarrierVulkan.internal
@@ -33,3 +34,6 @@ gfx-unit-test-tool/precompiledModuleVulkan.internal
 gfx-unit-test-tool/rootShaderParameterVulkan.internal
 gfx-unit-test-tool/samplerArrayVulkan.internal
 gfx-unit-test-tool/uint16BufferTestVulkan.internal
+
+# CPU gfx smoke imports the gfx module, which is not available on no-GPU hosted runners
+tests/cpu-program/gfx-smoke.slang (cpu)
