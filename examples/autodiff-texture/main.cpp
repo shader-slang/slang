@@ -372,8 +372,7 @@ struct AutoDiffTexture : public WindowedAppBase
         }
 
         int mipCount = 1 + Math::Log2Ceil(Math::Max(textureWidth, textureHeight));
-        SubresourceData initialData = {};
-        initialData.data = gLearningTexture =
+        gLearningTexture =
             createRenderTargetTexture(Format::RGBA32Float, textureWidth, textureHeight, mipCount);
         gLearningTextureSRV = createSRV(gLearningTexture);
         for (int i = 0; i < mipCount; i++)
@@ -518,8 +517,6 @@ struct AutoDiffTexture : public WindowedAppBase
 
     virtual void renderFrame(ITexture* texture) override
     {
-        static uint32_t frameCount = 0;
-        frameCount++;
         auto transformMatrix = getTransformMatrix();
         renderReferenceImage(transformMatrix);
 

@@ -46,9 +46,7 @@ vector<OutElTy, MatM> __slang_linalg_Mul(
         dx::linalg::MatrixUse::A,
         dx::linalg::MatrixScope::Thread>;
     MatTy mat = MatTy::template Load<LoadLayout>(matBuf, matOff, matStr);
-    return dx::linalg::Multiply<OutElTy>(
-        mat,
-        dx::linalg::MakeInterpretedVector<InputDT>(input));
+    return dx::linalg::Multiply<OutElTy>(mat, input);
 }
 
 template<
@@ -81,10 +79,7 @@ vector<OutElTy, MatM> __slang_linalg_MulAdd(
     MatTy mat = MatTy::template Load<LoadLayout>(matBuf, matOff, matStr);
     using BiasVecTy = vector<BiasElTy, BiasVecDim>;
     BiasVecTy biasVec = biasBuf.template Load<BiasVecTy>(biasOff);
-    return dx::linalg::MultiplyAdd<OutElTy>(
-        mat,
-        dx::linalg::MakeInterpretedVector<InputDT>(input),
-        biasVec);
+    return dx::linalg::MultiplyAdd<OutElTy>(mat, input, biasVec);
 }
 
 template<
@@ -103,13 +98,12 @@ void __slang_linalg_OuterProductAccumulate(
 {
     using AccTy = dx::linalg::Matrix<
         MatDT,
-        MatM * dx::linalg::__detail::ComponentTypeTraits<ElTy>::ElementsPerScalar,
-        MatN * dx::linalg::__detail::ComponentTypeTraits<ElTy>::ElementsPerScalar,
+        MatM,
+        MatN,
         dx::linalg::MatrixUse::Accumulator,
         dx::linalg::MatrixScope::Thread>;
-    AccTy acc =
-        dx::linalg::OuterProduct<MatDT, dx::linalg::MatrixScope::Thread>(a, b);
-    acc.InterlockedAccumulate(matBuf, matOff, uint(sizeof(ElTy)));
+    AccTy acc = dx::linalg::OuterProduct<MatDT>(a, b);
+    acc.InterlockedAccumulate(matBuf, matOff);
 }
 
 template<typename ElTy, uint N, typename BufTy>
