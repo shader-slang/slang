@@ -1,8 +1,10 @@
 # Linux GPU (Tesla T4) expected failures
 # These tests fail due to driver/hardware limitations on Tesla T4:
-# - CUDA cooperative matrix not supported on T4
 # - No VK_KHR_shader_subgroup_rotate support
 # - No sparse texture support
+#
+# SM 8.0+ cooperative-matrix / neural MMA tests are skipped on T4 via
+# tests/skip-list-gpu-t4.txt and covered by the SM80Plus tier instead.
 
 # Unit test - RecordReplay fails on Linux GPU runner
 slang-unit-test-tool/RecordReplay_cpu_hello_world.internal
@@ -10,34 +12,6 @@ slang-unit-test-tool/RecordReplay_cpu_hello_world.internal
 # Bug fix tests - T4 Vulkan validation issues
 tests/bugs/gh-4305.slang.4 (vk)
 tests/bugs/gh-4305.slang.5 (vk)
-
-# Cooperative matrix tests (CUDA) - T4 doesn't support cooperative matrix
-tests/cooperative-matrix/add.slang.1 (cuda)
-tests/cooperative-matrix/array.slang.1 (cuda)
-tests/cooperative-matrix/conversion-1.slang.1 (cuda)
-tests/cooperative-matrix/copyFrom.slang.1 (cuda)
-tests/cooperative-matrix/div.slang.1 (cuda)
-tests/cooperative-matrix/fill.slang.1 (cuda)
-tests/cooperative-matrix/inout.slang.1 (cuda)
-tests/cooperative-matrix/length.slang.1 (cuda)
-tests/cooperative-matrix/load-store-groupshared.slang.1 (cuda)
-tests/cooperative-matrix/load-store-pointer.slang.2 (cuda)
-tests/cooperative-matrix/load-store-rwbyteaddressbuffer.slang.2 (cuda)
-tests/cooperative-matrix/load-store-rwbyteaddressbuffer.slang.3 (cuda)
-tests/cooperative-matrix/load-store-rwstructuredbuffer.slang.2 (cuda)
-tests/cooperative-matrix/load-store-rwstructuredbuffer.slang.3 (cuda)
-tests/cooperative-matrix/mat-mul-add.slang.1 (cuda)
-tests/cooperative-matrix/mod1.slang.1 (cuda)
-tests/cooperative-matrix/mul.slang.1 (cuda)
-tests/cooperative-matrix/out.slang.1 (cuda)
-tests/cooperative-matrix/parameter.slang.1 (cuda)
-tests/cooperative-matrix/return.slang.1 (cuda)
-tests/cooperative-matrix/scalar-mul.slang.1 (cuda)
-tests/cooperative-matrix/struct.slang.1 (cuda)
-tests/cooperative-matrix/sub.slang.1 (cuda)
-tests/cooperative-matrix/subscript-in-func.slang.1 (cuda)
-tests/cooperative-matrix/subscript.slang.1 (cuda)
-tests/cooperative-matrix/unary_neg.slang.1 (cuda)
 
 # Partial resident texture tests (Vulkan) - T4 driver sparse texture issues
 tests/hlsl-intrinsic/texture/partial-resident-texture-combined.slang.1 (vk)

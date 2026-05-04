@@ -3,6 +3,7 @@ implementing neural;
 public enum LayoutType : uint32_t
 {
     Linear = 0,
+    Optimal = 1,
 }
 
 internal interface IStorageLayout
@@ -13,6 +14,22 @@ internal interface IStorageLayout
 public struct LinearLayout : IStorageLayout
 {
     internal static const LayoutType Layout = LayoutType.Linear;
+}
+
+/// Storage layout where the weight matrix is pre-tiled into cooperative-matrix-sized tiles.
+///
+/// The M x K weight matrix is divided into ceil(M/16) x ceil(K/16) tiles of 16x16 elements.
+/// **Both M and K must be multiples of 16.**
+/// Tiles are stored in row-major tile order:
+///   tile(tileRow, tileCol) at linear index = tileRow * numTileCols + tileCol
+/// Within each tile, elements are stored contiguously in row-major order:
+///   element(r, c) at offset r * 16 + c within the tile.
+///
+/// This layout enables loading weight tiles directly without shared-memory staging
+/// or zero-padding, and eliminates cross-warp synchronisation for matrix A.
+public struct OptimalLayout : IStorageLayout
+{
+    internal static const LayoutType Layout = LayoutType.Optimal;
 }
 
 /**
@@ -53,7 +70,6 @@ public interface IPointerLikeAddress<T> : IDifferentiablePtrType
     @param[in] index The element index.
     @param[in] value The value to add.
     */
-    [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(uint index, T value);
 
     /**
@@ -62,6 +78,21 @@ public interface IPointerLikeAddress<T> : IDifferentiablePtrType
     @param[in] value The vector of 2 values to add.
     */
     public void atomicAdd(uint index, vector<T, 2> value);
+
+    /// The underlying buffer type used by this address for cooperative matrix loads.
+    /// Buffer-backed addresses (e.g. BindlessAddress) use `RWStructuredBuffer<T>`,
+    /// which generates `OpAccessChain` on SPIR-V and avoids variable pointer requirements.
+    /// Pointer-backed addresses use `T*`.
+    associatedtype BufferType;
+
+    /// Returns the underlying buffer or pointer that backs this address.
+    [ForceInline]
+    internal BufferType getBuffer();
+
+    /// Returns the current element offset within the buffer.
+    /// For pointer-based addresses where the offset is baked into the pointer, returns 0.
+    [ForceInline]
+    internal uint getBaseIndex();
 
     /**
     Reads sequential elements starting from the given offset address, packed into a uint4.

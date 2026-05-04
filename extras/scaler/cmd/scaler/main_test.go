@@ -17,3 +17,35 @@ func TestParseCleanupIntervalInvalid(t *testing.T) {
 		t.Fatal("parseCleanupInterval should fail for invalid duration")
 	}
 }
+
+func TestParseSessionMaxAgeValid(t *testing.T) {
+	got, err := parseSessionMaxAge("2h")
+	if err != nil {
+		t.Fatalf("parseSessionMaxAge returned error: %v", err)
+	}
+	if got.String() != "2h0m0s" {
+		t.Fatalf("parseSessionMaxAge = %v, want 2h0m0s", got)
+	}
+}
+
+func TestParseSessionMaxAgeZero(t *testing.T) {
+	got, err := parseSessionMaxAge("0")
+	if err != nil {
+		t.Fatalf("parseSessionMaxAge returned error: %v", err)
+	}
+	if got != 0 {
+		t.Fatalf("parseSessionMaxAge = %v, want 0", got)
+	}
+}
+
+func TestParseSessionMaxAgeNegative(t *testing.T) {
+	if _, err := parseSessionMaxAge("-1s"); err == nil {
+		t.Fatal("parseSessionMaxAge should fail for negative durations")
+	}
+}
+
+func TestValidateSessionMaxAgeNegative(t *testing.T) {
+	if err := validateSessionMaxAge(-1); err == nil {
+		t.Fatal("validateSessionMaxAge should fail for negative durations")
+	}
+}

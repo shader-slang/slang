@@ -220,6 +220,12 @@ public:
     /// the singleton just to tear it down.
     SLANG_API static ReplayContext* tryGet();
 
+    /// Destroy the singleton instance if it exists, freeing all resources.
+    /// Thread-safe - uses a mutex to synchronize with get() and tryGet().
+    /// Safe to call when no singleton exists (no-op). After this call,
+    /// get() will lazily re-create a fresh instance if called again.
+    SLANG_API static void destroySingleton();
+
     /// Create an idle context.
     /// Will switch to Record mode if SLANG_RECORD_LAYER=1 is set.
     SLANG_API ReplayContext();

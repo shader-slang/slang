@@ -124,27 +124,37 @@ DataMismatchException::DataMismatchException(size_t offset, size_t size)
 // ReplayContext construction and low-level helpers
 // =============================================================================
 
-// Tracks the singleton in get() once it has been constructed, so that tryGet()
-// can observe construction from other threads without racing against a
-// concurrent get() call. Guarded by s_contextMutex to match the thread-safety
-// contract documented on get().
+// Singleton pointer and its mutex. Using heap allocation instead of a
+// function-local static so that destroySingleton() can fully release the
+// instance (including its STL container internals) before _CrtDumpMemoryLeaks()
+// runs in wmain(), preventing false leak reports in MSVC Debug builds when
+// CMAKE_MSVC_RUNTIME_LIBRARY is the default MultiThreadedDebugDLL (/MDd).
 static std::mutex s_contextMutex;
 static ReplayContext* s_contextInstance = nullptr;
 
 ReplayContext& ReplayContext::get()
 {
-    static ReplayContext s_instance;
-    {
-        std::lock_guard<std::mutex> lock(s_contextMutex);
-        s_contextInstance = &s_instance;
-    }
-    return s_instance;
+    std::lock_guard<std::mutex> lock(s_contextMutex);
+    if (!s_contextInstance)
+        s_contextInstance = new ReplayContext();
+    return *s_contextInstance;
 }
 
 ReplayContext* ReplayContext::tryGet()
 {
     std::lock_guard<std::mutex> lock(s_contextMutex);
     return s_contextInstance;
+}
+
+void ReplayContext::destroySingleton()
+{
+    ReplayContext* toDelete;
+    {
+        std::lock_guard<std::mutex> lock(s_contextMutex);
+        toDelete = s_contextInstance;
+        s_contextInstance = nullptr;
+    }
+    delete toDelete;
 }
 
 ReplayContext::ReplayContext()

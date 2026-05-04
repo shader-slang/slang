@@ -1762,6 +1762,8 @@ Result DeviceImpl::createTextureResource(
             m_api.vkMapMemory(m_device, uploadBuffer.m_memory, 0, bufferSize, 0, (void**)&dstData);
             uint8_t* dstDataStart;
             dstDataStart = dstData;
+            // TODO: PR #2244 (lucy96chen) - dstDataStart is set but never used.
+            SLANG_UNUSED(dstDataStart);
 
             Offset dstSubresourceOffset = 0;
             for (int i = 0; i < arraySize; ++i)

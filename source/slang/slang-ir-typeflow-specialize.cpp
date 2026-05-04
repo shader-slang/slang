@@ -207,6 +207,33 @@ IRInst* getInvalidExistentialSpecializationTarget(IRInst* specializedValue)
     return specializationBase;
 }
 
+// Returns true if a specialization argument transitively derives from an existential.
+// Traces through LookupWitnessMethod chains to find existential roots,
+// handling nested associated types (e.g. outer.Inner.Value) at any depth.
+static bool isSpecArgExistentialDerived(IRInst* inst, int depth = 0)
+{
+    if (depth > 16)
+        return false;
+    switch (inst->getOp())
+    {
+    case kIROp_InterfaceType:
+    case kIROp_ExtractExistentialType:
+    case kIROp_ExtractExistentialWitnessTable:
+    case kIROp_MakeExistential:
+        return true;
+    case kIROp_TypeEqualityWitness:
+        return as<IRInterfaceType>(inst->getOperand(0)) != nullptr;
+    case kIROp_LookupWitnessMethod:
+        return isSpecArgExistentialDerived(
+            as<IRLookupWitnessMethod>(inst)->getWitnessTable(),
+            depth + 1);
+    case kIROp_BuiltinCast:
+        return isSpecArgExistentialDerived(inst->getOperand(0), depth + 1);
+    default:
+        return false;
+    }
+}
+
 bool isInvalidExistentialSpecialization(IRInst* specializedValue)
 {
     if (specializedValue->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
@@ -267,20 +294,8 @@ bool isInvalidExistentialSpecialization(IRInst* specializedValue)
     for (UInt i = 0; i < specialize->getArgCount(); ++i)
     {
         auto arg = specialize->getArg(i);
-        switch (arg->getOp())
-        {
-        case kIROp_InterfaceType:
-        case kIROp_ExtractExistentialType:
-        case kIROp_ExtractExistentialWitnessTable:
-        case kIROp_MakeExistential:
+        if (isSpecArgExistentialDerived(arg))
             return true;
-        case kIROp_TypeEqualityWitness:
-            if (as<IRInterfaceType>(arg->getOperand(0)))
-                return true;
-            break;
-        default:
-            break;
-        }
     }
 
     return false;
@@ -815,7 +830,8 @@ bool isIntrinsic(IRInst* inst)
     // an intrinsic function, so this automatically implies
     // that this is not an intrinsic.
     //
-    if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(inst))
+    if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(inst);
+        existentialSpecializedFunc)
         return false;
 
     if (!func)
@@ -3341,6 +3357,98 @@ struct TypeFlowSpecializationContext
             return none();
 
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeLookupWitnessMethod");
+    }
+
+    // After specialization has lowered every dispatch site it could, walk any
+    // remaining `lookupWitnessMethod` insts whose witness-table operand is not
+    // a concrete `IRWitnessTable` and whose interface has no registered
+    // conformances.  Those insts will ICE in codegen ("Unhandled local inst
+    // lookupWitness") with no indication that the real problem is missing
+    // conformance registration.  Emit E50100 instead.  Catches transitively-
+    // nested cases (e.g. interface field inside a struct loaded from a
+    // `StructuredBuffer`) that the load-site check in `analyzeLoad` misses —
+    // see #9445.
+    //
+    // Skips lookups that have no uses: those are dead code that the
+    // downstream DCE pass will eliminate before codegen, so they cannot
+    // ICE. Imported library modules (e.g. slangpy's `sgl/device/print`)
+    // routinely produce such dead lookups inside generic / variadic helper
+    // functions whose `IPrintable arg` overload is never reached from the
+    // entry point that imports them. Diagnosing those was a regression
+    // against pre-PR behaviour where DCE simply removed them.
+    void diagnoseUnresolvedLookupWitnesses()
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            // Only diagnose lookups inside top-level functions
+            // that codegen actually emits as standalone callable
+            // bodies — shader entry points plus the various
+            // export decorations (CUDA kernels, DLL exports,
+            // extern-C, etc.). Those are the bodies that survive
+            // into codegen unchanged, so any unresolved lookup
+            // there will reach the unhandled-inst ICE the walker
+            // exists to prevent.
+            //
+            // Use the same `isEntryPoint(func)` predicate that
+            // `performDynamicInstLowering` uses to seed its work-
+            // list, so the walker's diagnostic coverage matches
+            // the lowering pass's coverage exactly.
+            //
+            // For non-entry-point helper functions, the typeflow
+            // pass cannot tell whether the helper is reachable
+            // (callers may exist but be themselves dead) or whether
+            // the helper is going to be inlined / DCE'd before
+            // codegen. Diagnosing those is a false positive — the
+            // canonical example is imported-library helpers like
+            // slangpy's `sgl/device/print.slang::write_arg(IPrintable)`
+            // whose `IPrintable arg` parameter is type-erased only
+            // inside the helper. The actual call sites supply
+            // concrete types via generic-pack expansion, but the
+            // pre-inlined helper body still contains an unresolved
+            // lookup at the moment the walker runs. If a real
+            // unresolved lookup escapes into codegen via a non-
+            // entry-point helper, the underlying ICE still fires
+            // and points at the same source location.
+            if (!isEntryPoint(func))
+                continue;
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    auto lookup = as<IRLookupWitnessMethod>(inst);
+                    if (!lookup)
+                        continue;
+                    if (!lookup->firstUse)
+                        continue;
+                    auto witnessTable = lookup->getWitnessTable();
+                    if (as<IRWitnessTable>(witnessTable))
+                        continue;
+                    auto witnessTableType = as<IRWitnessTableTypeBase>(witnessTable->getDataType());
+                    if (!witnessTableType)
+                        continue;
+                    auto interfaceType =
+                        as<IRInterfaceType>(witnessTableType->getConformanceType());
+                    if (!interfaceType || isComInterfaceType(interfaceType))
+                        continue;
+                    if (!diagnosedNoTypeConformancesInterfaces.add(interfaceType))
+                        continue;
+                    HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+                    collectExistentialTables(interfaceType, tables);
+                    if (tables.getCount() == 0)
+                    {
+                        StringBuilder typeStr;
+                        printDiagnosticArg(typeStr, interfaceType);
+                        sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                            .interfaceType = typeStr.produceString(),
+                            .location = lookup->sourceLoc});
+                    }
+                    module->getContainerPool().free(&tables);
+                }
+            }
+        }
     }
 
     // Check if an existential operand is an entry-point parameter of interface type
@@ -6928,7 +7036,7 @@ struct TypeFlowSpecializationContext
 
     bool specializeMakeDifferentialPair(IRInst* context, IRMakeDifferentialPair* inst)
     {
-        if (auto tupleType = as<IRTupleType>(tryGetInfo(context, inst)))
+        if (auto tupleType = as<IRTupleType>(tryGetInfo(context, inst)); tupleType)
         {
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
@@ -7857,6 +7965,18 @@ struct TypeFlowSpecializationContext
         //
         hasChanges |= performDynamicInstLowering();
 
+        // If lowering reported its own diagnostics, the IR is in a partially
+        // lowered state; don't pile cascade errors from the walker below.
+        if (sink->getErrorCount() > 0)
+            return hasChanges;
+
+        // Part 3: Diagnose unresolved dispatch sites.
+        //    Any `lookupWitnessMethod` that survived specialization with a
+        //    non-concrete witness-table operand would ICE in codegen.  If the
+        //    corresponding interface has no conformances registered, report
+        //    E50100 pointing the user at the real fix.
+        diagnoseUnresolvedLookupWitnesses();
+
         return hasChanges;
     }
 
@@ -7895,6 +8015,14 @@ struct TypeFlowSpecializationContext
     // Set of bit-cast instructions already diagnosed for unsupported
     // non-concrete result types during propagation.
     HashSet<IRInst*> diagnosedBitCasts;
+
+    // Set of interface types already diagnosed with E50100 "no type conformances"
+    // inside `diagnoseUnresolvedLookupWitnesses`, so a single missing conformance
+    // surfacing at multiple surviving `lookupWitnessMethod` sites fires at most
+    // one diagnostic.  Local to the post-specialization walker — `processModule`
+    // bails out on any Part-1 error before that walker runs, so there is no
+    // cross-phase deduplication to coordinate.
+    HashSet<IRInst*> diagnosedNoTypeConformancesInterfaces;
 
     // Emit error 33180 for an invalid existential specialization, deduplicating by `dedupKey`.
     // Returns true if the diagnostic was emitted (first time for this key).

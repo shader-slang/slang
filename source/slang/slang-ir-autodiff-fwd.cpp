@@ -324,7 +324,7 @@ struct ForwardDiffTranslationContext
     {
         auto primalVal = maybeCloneForPrimalInst(builder, origInst);
 
-        if (IRType* const diffType = differentiateType(builder, origInst->getFullType()))
+        if (IRType* const diffType = differentiateType(builder, origInst->getFullType()); diffType)
         {
             auto dzero = getDifferentialZeroOfType(builder, origInst->getFullType());
             if (dzero)
@@ -681,7 +681,8 @@ struct ForwardDiffTranslationContext
                 else
                 {
                     auto operandDataType = origConstruct->getOperand(ii)->getDataType();
-                    if (const auto diffOperandType = differentiateType(builder, operandDataType))
+                    if (const auto diffOperandType = differentiateType(builder, operandDataType);
+                        diffOperandType)
                     {
                         operandDataType =
                             (IRType*)findOrTranslatePrimalInst(builder, operandDataType);
@@ -1736,7 +1737,7 @@ struct ForwardDiffTranslationContext
                 diffAccessChain.add(key);
             }
         }
-        if (const auto diffType = differentiateType(builder, originalInst->getDataType()))
+        if (const auto diffType = differentiateType(builder, originalInst->getDataType()); diffType)
         {
             auto diffBase = findOrTranslateDiffInst(builder, origBase);
             if (!diffBase)
@@ -2134,7 +2135,7 @@ struct ForwardDiffTranslationContext
         List<IRParam*> params;
         for (auto param : firstBlock->getParams())
         {
-            if (const auto ptrType = as<IROutParamTypeBase>(param->getDataType()))
+            if (const auto ptrType = as<IROutParamTypeBase>(param->getDataType()); ptrType)
             {
                 params.add(param);
             }

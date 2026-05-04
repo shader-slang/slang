@@ -1,0 +1,9 @@
+# Skip list for Tesla T4 Linux GPU runners.
+# These directories contain SM 8.0+ cooperative-matrix / neural MMA coverage
+# that T4 cannot execute safely once CUDA coopmat uses mma.sync PTX.
+#
+# The SM80Plus tier runs these paths on L4 / Blackwell instead.
+
+tests/cooperative-matrix/
+tests/neural/
+slang-unit-test-tool/cooperativeMatrixSubgroupTypeMetadata.internal

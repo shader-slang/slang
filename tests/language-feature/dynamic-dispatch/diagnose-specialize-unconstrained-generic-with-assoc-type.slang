@@ -43,7 +43,7 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     ITransform obj = factory(dispatchThreadID.x);
-    var result = obj.transform(1.0);
+    let result = obj.transform(1.0);
     let processed = process(result);
 //CHECK:                   ^ cannot specialize generic with existential type
 //CHECK:                   ^ specializing 'process' with an existential type is not allowed. All generic arguments must be statically resolvable at compile time.

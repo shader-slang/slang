@@ -921,7 +921,7 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
             sb << "\n```\n";
             fillLoc(expr->loc);
         }
-        if (const auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr))
+        if (const auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr); higherOrderExpr)
         {
             String documentation;
             String signature = getExprDeclSignature(expr, &documentation, nullptr);
