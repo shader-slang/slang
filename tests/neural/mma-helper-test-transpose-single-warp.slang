@@ -38,9 +38,6 @@ uniform RWStructuredBuffer<DType>.Handle inputBuffer;
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-// // TEST_INPUT:ubuffer(stride=4, count=256):out, name=debugBuffer
-// RWStructuredBuffer<half> debugBuffer;
-
 static const int BatchSize = 32;
 static const int SubgroupSize = 32;
 
@@ -48,23 +45,15 @@ static const int SubgroupSize = 32;
 public struct TestShMemSize : ISharedMemorySize {
     public static const uint Bytes = (256 + 256) * sizeof(uint4);
 }
-typealias TestPool = SharedMemoryPool<TestShMemSize>;
-static const uint OffsetA = 0;
-static const uint OffsetB = 256;
 
 // Initialize the weight with the pattern:
 // each column is filled with -1 0 1 * column_index in a cycle.
 void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = false)
 {
-    // int scaleFactor = (tid % 3 == 0) ? -1 : ((tid % 3 == 1) ? 0 : 1);
-    int scaleFactor = 0;
     if (OutputSize <= BatchSize)
     {
         if (tid > OutputSize)
             return;
-
-        // InputSize mount of threads are enough to fill the input buffer
-        // int index = tid * InputSize + tid;
         int row = tid;
         int scaleFactor = (row % 3 == 0) ? -1 : ((row % 3 == 1) ? 0 : 1);
         for (int i = 0; i < InputSize; i++)
@@ -95,100 +84,20 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = fals
     }
 }
 
-DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, true>.Uint4AlignedK] testMatTransposeVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
-{
-    typealias Address = BindlessAddress<DType>;
-    Address address = Address(inputBuffer);
-
-    // Construct the input vector as follow:
-    // x = tid + 1
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, true>;
-    const int OutSize = MMA.Uint4AlignedK;
-    const int InSize = MMA.Uint4AlignedM;
-
-    DType inputVector[InSize] = {};
-
-    for (int i = 0; i < OutputSize; i++)
-    {
-        inputVector[i] = DType(tid + 1);
-    }
-
-    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, false>( inputVector, OffsetA, OffsetB, OffsetB, address, none);
-    return res;
-}
-
-// This function is just used for debugging, not for verification. So keep it here.
-void serialRead(uint tid, uint sharedMemOffset, uint rowOrColumnCount)
-{
-    GroupMemoryBarrierWithGroupSync();
-
-    if (tid > 0)
-        return;
-
-    int linearIndex = 0;
-    for (int id = 0; id < rowOrColumnCount; id++)
-    {
-        printf("tid: %d\n", id);
-        for (int i = 0; i < 8; i++)
-        {
-            uint4 values = TestPool.data[sharedMemOffset + id * 8 + i];
-            uint4 element = values;
-            for (int j = 0; j < 4; j++)
-            {
-                uint value = element[j];
-                uint16_t a = (uint16_t)(value & 0xFFFF);
-                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
-
-
-                half aa = bit_cast<half>(a);
-                half bb = bit_cast<half>(b);
-                // debugBuffer[linearIndex++] = aa;
-                // debugBuffer[linearIndex++] = bb;
-                printf("%.1f %.1f ", float(aa), float(bb));
-            }
-        }
-        printf("\n");
-    }
-}
-
-// This function is just used for debugging, not for verification. So keep it here.
-void serialReadA(uint tid)
-{
-    GroupMemoryBarrierWithGroupSync();
-
-    if (tid > 0)
-        return;
-
-    for (int i = 0; i < 64; i++)
-    {
-        printf("row: %d\n", i);
-        for (int j = 0; j < 64; j++)
-        {
-            printf("%.1f ", float(inputBuffer[i * 64 + j]));
-        }
-        printf("\n");
-    }
-}
-
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, true>.Uint4AlignedK] outputVector;
-    __target_switch
-    {
-    case cuda:
-        outputVector = testMatTransposeVecMul<InputSize, OutputSize, TargetEnum.CUDA>(tid);
-        break;
-    case spirv:
-        outputVector = testMatTransposeVecMul<InputSize, OutputSize, TargetEnum.SPIR_V>(tid);
-        break;
-    }
+    DType inputData[OutputSize];
+    for (int i = 0; i < OutputSize; i++)
+        inputData[i] = DType(tid + 1);
+
+    let output = neural_unittest.testMatVecMul<DType, InputSize, OutputSize, OutputSize, TestShMemSize, false, 1, true>(inputData, inputBuffer, none);
 
     bool res = true;
-    int scaleFactor = (OutputSize % 3 == 0 ) ? 0 : -1;
+    int scaleFactor = (OutputSize % 3 == 0) ? 0 : -1;
     for (int i = 0; i < InputSize; i++)
     {
         DType expected = DType(scaleFactor * (i + 1.0f) * (tid + 1.0f));
-        if (!equals(outputVector[i], expected))
+        if (!equals(output[i], expected))
         {
             res = false;
             break;

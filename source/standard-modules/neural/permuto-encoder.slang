@@ -1,5 +1,4 @@
 implementing neural;
-#include "common-def.slang"
 
 // =============================================================================
 // Permuto Encoder
@@ -29,10 +28,10 @@ public struct PermutoEncoder<T,
         public float shiftsPerDim[Dimensions];
     }
 
-    VISIBILITY_LEVEL struct Params
+    internal struct Params
     {
-        VISIBILITY_LEVEL float maxLevel;                // It's maxLevelRatio * MaxLevels, where maxLevelRatio is a user defined ratio
-        VISIBILITY_LEVEL PerLevelInfo levelInfo;        // Contains scale, offset, hashmap size, and per-dim scales/shifts
+        internal float maxLevel;                // It's maxLevelRatio * MaxLevels, where maxLevelRatio is a user defined ratio
+        internal PerLevelInfo levelInfo;        // Contains scale, offset, hashmap size, and per-dim scales/shifts
     }
 
     public struct HyperParameters
@@ -68,13 +67,11 @@ public struct PermutoEncoder<T,
     /// @param shiftsPerDim Per-dimension shifts [Dimensions].
     /// @param elevated Output elevated coordinates [Dimensions+1].
     [Differentiable]
-    static void permutoElevate<InArray>(
+    static void permutoElevate(
         InArray pos,
         no_diff in float scalesPerDim[Dimensions],
         no_diff in float shiftsPerDim[Dimensions],
         out float elevated[Dimensions + 1])
-            where InArray : IArrayAccessor<T>
-            where InArray : IDifferentiable
     {
         float sum = 0.0f;
         [ForceUnroll]
@@ -239,7 +236,7 @@ public struct PermutoEncoder<T,
     /// @param featureTableAddress Pointer-like address to the feature table for all levels
     /// @param encodedFeatures Output array of size MaxLevels * FeatureDimensionPerEntry. Results are written at offset currentLevelIndex * FeatureDimensionPerEntry.
     [Differentiable]
-    VISIBILITY_LEVEL static void encodePerLevel<Address>(
+    internal static void encodePerLevel<Address>(
         no_diff in Params params,
         InArray position,
         Address featureTableAddress,
@@ -344,7 +341,7 @@ public struct PermutoEncoder<T,
     /// @param log2PerLevelScale Log2 of the per-level scale factor
     /// @param seed Seed for the random shift generation
     /// @param levelInfo Output: the computed level info with all parameters
-    VISIBILITY_LEVEL static void prepareLevelInfo(
+    internal static void prepareLevelInfo(
         in uint currentLevel,
         in float baseScale,
         in float log2PerLevelScale,
