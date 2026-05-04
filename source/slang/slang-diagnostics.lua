@@ -5175,7 +5175,7 @@ err(
 
 err(
     "cooperative-matrix-invalid-mma-type-combination",
-    50000,
+    50002,
     "invalid type combination for cooperative matrix multiply-add",
     span { loc = "location", message = "Invalid (A, B, C, D) element-type combination for cooperative matrix multiply-add: A='~aType', B='~bType', C='~cType', D='~dType'. The CUDA backend requires A and B to share the same element type and the accumulator family to match the input family (half -> half/float, bfloat16 -> float, int8/uint8 -> int, FloatE4M3/FloatE5M2 -> half/float)." }
 )
