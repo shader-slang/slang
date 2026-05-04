@@ -2292,7 +2292,7 @@ err(
 
 err(
     "unknown-diagnostic-name",
-    31106,
+    31111,
     "unknown diagnostic",
     span { loc = "location", message = "unknown diagnostic '~diagnosticName'" }
 )
@@ -3427,7 +3427,7 @@ err(
 --
 err(
     "non-set-accessor-must-not-have-params",
-    31107,
+    31112,
     "accessors other than 'set' must not have parameters",
     span { loc = "decl:Decl", message = "accessors other than 'set' must not have parameters" }
 )
