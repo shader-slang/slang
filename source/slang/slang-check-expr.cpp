@@ -109,23 +109,48 @@ Expr* SemanticsVisitor::moveTemp(Expr* const& expr, F const& func)
 
 /// Execute `func` on a variable with the value of `expr`.
 ///
-/// If `expr` is just a reference to an immutable (e.g., `let`) variable
-/// then this might use the existing variable. Otherwise it will create
-/// a new variable to hold `expr`, using `moveTemp()`.
+/// If `expr` is just a reference to an immutable (or effectively immutable)
+/// variable then this will use the existing variable. Otherwise it will
+/// create a new variable to hold `expr`, using `moveTemp()`.
+///
+/// For `LetDecl` (immutable binding), we always reuse directly.
+///
+/// For `VarDecl` (mutable binding), we reuse directly only if the variable
+/// has not been reassigned since its declaration (single-assignment `var`).
+/// This ensures that existential openings on the same variable always produce
+/// the same `ExtractExistentialType` instance, so that associated types like
+/// `obj.Element` resolve consistently across multiple accesses.
+/// See https://github.com/shader-slang/slang/issues/10004.
+///
+/// When we reuse a `VarDecl` directly, we mark it with
+/// `ExistentialOpenedOnVarModifier` to track that it has been opened.
+/// If the variable is later reassigned, `VarReassignedModifier` is added,
+/// and subsequent calls to `maybeMoveTemp` will fall through to `moveTemp`.
 ///
 template<typename F>
 Expr* SemanticsVisitor::maybeMoveTemp(Expr* const& expr, F const& func)
 {
-    // TODO: Eventually this operation could consider any case where the
-    // input `expr` names an immutable "path": one that starts at an
-    // immutable binding and follows a (possibly empty) chain of accesses
-    // to immutable members.
-
     if (auto varExpr = as<VarExpr>(expr))
     {
         auto declRef = varExpr->declRef;
-        if (auto varDeclRef = declRef.as<LetDecl>())
-            return func(varDeclRef);
+        if (auto letDeclRef = declRef.as<LetDecl>())
+            return func(letDeclRef);
+        if (auto varDeclRef = declRef.as<VarDecl>())
+        {
+            auto varDecl = varDeclRef.getDecl();
+            // Skip module-level / non-local vars: they can belong to shared
+            // built-in modules (e.g. gl_Position in glsl.meta.slang), and
+            // modifier allocations tied to this compile's ASTBuilder would
+            // dangle after the compile finishes.
+            if (as<ModuleDecl>(varDecl->parentDecl))
+                return moveTemp(expr, func);
+            if (!varDecl->hasModifier<VarReassignedModifier>())
+            {
+                if (!varDecl->hasModifier<ExistentialOpenedOnVarModifier>())
+                    addModifier(varDecl, m_astBuilder->create<ExistentialOpenedOnVarModifier>());
+                return func(varDeclRef);
+            }
+        }
     }
 
     return moveTemp(expr, func);
@@ -3508,6 +3533,24 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     }
     auto right = maybeOpenRef(expr->right);
     expr->right = coerce(CoercionSite::Assignment, type, right, getSink());
+
+    // Track reassignment of `VarDecl`s for single-assignment detection.
+    // After reassignment, `maybeMoveTemp` will fall through to `moveTemp`
+    // (creating a fresh temporary) instead of reusing the variable directly.
+    if (auto varExpr = as<VarExpr>(expr->left))
+    {
+        if (auto varDecl = as<VarDecl>(varExpr->declRef.getDecl()))
+        {
+            // Skip module-level vars: they can be shared across compilations
+            // (e.g. glsl.meta.slang builtins) and must not be mutated with
+            // per-compile-arena modifiers.
+            if (!as<LetDecl>(varDecl) && !as<ModuleDecl>(varDecl->parentDecl))
+            {
+                if (!varDecl->hasModifier<VarReassignedModifier>())
+                    addModifier(varDecl, m_astBuilder->create<VarReassignedModifier>());
+            }
+        }
+    }
 
     if (!expr->left->type.isLeftValue)
     {

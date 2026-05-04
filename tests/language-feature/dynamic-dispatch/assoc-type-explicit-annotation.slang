@@ -1,14 +1,21 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target cpp -entry computeMain -stage compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<float> outputBuffer;
 
 //
-// Limitation: Explicit Type Annotation
+// Test: Explicit Type Annotation with Associated Types
 //
-// Using `IContainer obj = ...` instead of `let obj = ...` breaks associated type tracking.
-// Both declarations should be semantically equivalent, but the explicit annotation causes
-// the compiler to lose the connection between obj.Element and the methods on obj.
+// Using `IContainer obj = ...` should behave the same as `let obj = ...` for
+// associated type tracking. Both declarations bind the same existential value,
+// so obj.Element should resolve consistently.
+//
+// This was broken prior to #10004: the compiler created separate temporary
+// variables for each access to a non-let existential, causing the associated
+// type from obj.Element to differ from the return type of obj.get().
 //
 
 interface IContainer
@@ -48,24 +55,21 @@ IContainer makeContainer(int id)
         return FloatContainer(3.5);
 }
 
-RWStructuredBuffer<float> outputBuffer;
-
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 threadId: SV_DispatchThreadID)
 {
-    // Works: let with type inference
+    // Test 1: let with type inference — always worked
     {
         let obj = makeContainer(0);
         obj.Element x = obj.get();
-        outputBuffer[0] = obj.toFloat();  // OK
+        outputBuffer[0] = obj.toFloat();  // CHECK: 42.0
     }
 
-    // Broken: explicit IContainer annotation
-    // CHECK: error[E30019]
+    // Test 2: explicit IContainer annotation — fixed in #10004
     {
-        IContainer obj = makeContainer(0);
+        IContainer obj = makeContainer(1);
         obj.Element x = obj.get();
-        outputBuffer[1] = obj.toFloat();
+        outputBuffer[1] = obj.toFloat();  // CHECK: 3.5
     }
 }
