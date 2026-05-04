@@ -3231,7 +3231,14 @@ static bool _initExprContainsMutableGlobalRef(Expr* expr)
     if (auto matSwizzleExpr = as<MatrixSwizzleExpr>(expr))
         return _initExprContainsMutableGlobalRef(matSwizzleExpr->base);
     if (auto indexExpr = as<IndexExpr>(expr))
-        return _initExprContainsMutableGlobalRef(indexExpr->baseExpression);
+    {
+        if (_initExprContainsMutableGlobalRef(indexExpr->baseExpression))
+            return true;
+        for (auto idx : indexExpr->indexExprs)
+            if (_initExprContainsMutableGlobalRef(idx))
+                return true;
+        return false;
+    }
     if (auto declRefExpr = as<DeclRefExpr>(expr))
     {
         if (auto varDecl = as<VarDeclBase>(declRefExpr->declRef.getDecl()))
@@ -3306,13 +3313,16 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         if (!varDecl->val)
         {
             varDecl->val = _validateCircularVarDefinition(varDecl);
-            // If this is a global `static const` variable with scalar integer type and we still
-            // couldn't constant-fold its initializer (and no new error was emitted anywhere
-            // during init checking, e.g. for an undefined identifier, a circular definition, or
-            // a type error), the initializer references a non-constant expression. Diagnose this
-            // now rather than crashing in IR code generation.
-            if (isStaticConst && isGlobalDecl(varDecl) && isScalarIntegerType(varDecl->type) &&
-                !varDecl->val && getSink()->getErrorCount() == errorCountBeforeInitCheck &&
+            // If this is a global `static const` variable and we still couldn't constant-fold
+            // its initializer (and no new error was emitted during init checking, e.g. for an
+            // undefined identifier, a circular definition, or a type error), check whether the
+            // initializer references a mutable global. If so, diagnose now rather than crashing
+            // in IR code generation. Note: for non-integer types, _validateCircularVarDefinition
+            // always returns nullptr, so !varDecl->val is expected for non-constant expressions;
+            // _initExprContainsMutableGlobalRef distinguishes the crash-inducing case from
+            // other non-foldable expressions (e.g. function calls).
+            if (isStaticConst && isGlobalDecl(varDecl) && !varDecl->val &&
+                getSink()->getErrorCount() == errorCountBeforeInitCheck &&
                 _initExprContainsMutableGlobalRef(initExpr))
             {
                 getSink()->diagnose(Diagnostics::StaticConstGlobalNonConstantInit{.decl = varDecl});
