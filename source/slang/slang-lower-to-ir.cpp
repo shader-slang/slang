@@ -9035,10 +9035,8 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
     {
         maybeEmitDebugLine(context, &visitor, stmt, stmt->loc);
 
-        // Emit a coverage-counter op before each executable statement
-        // under `-trace-coverage`. Block/Seq/Empty wrappers don't get
-        // their own counter — they have no execution distinct from
-        // their children.
+        // Under `-trace-coverage`, emit a counter op before each executable
+        // statement (skip Block/Seq/Empty wrappers — no execution to count).
         if (context->traceCoverage && stmt->loc.isValid() && !as<EmptyStmt>(stmt) &&
             !as<BlockStmt>(stmt) && !as<SeqStmt>(stmt))
         {
