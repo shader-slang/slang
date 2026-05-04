@@ -49,7 +49,7 @@ private:
 
     bool containsOpaqueHandleTypeCached(IRType* type);
     bool containsOpaqueHandleTypeInternal(IRType* type, HashSet<IRType*>& visitedInCurrentCheck);
-    void validateStructuredBufferVariable(IRInst* inst);
+    void validateStructuredBufferVariable(IRType* type, SourceLoc loc);
 };
 
 void validateIRInst(IRValidateContext* context, IRInst* inst);
@@ -737,29 +737,31 @@ bool StructuredBufferValidationContext::containsOpaqueHandleTypeInternal(
     return false;
 }
 
-void StructuredBufferValidationContext::validateStructuredBufferVariable(IRInst* inst)
+// Recursively unwrap single-operand wrapper types (`Array`, `Ptr`,
+// `ParameterBlock`, `ConstantBuffer`, ...) looking for a `StructuredBuffer<T>`
+// at a declaration site. We don't descend into struct fields here, since every
+// `IRStructType` in Slang IR is hoisted to module scope, so the driver loop
+// visits each struct's fields directly, which means each call reduces to a
+// chain of unwraps without branching into multiple subtypes.
+void StructuredBufferValidationContext::validateStructuredBufferVariable(IRType* type, SourceLoc loc)
 {
-    IRType* type = inst->getDataType();
-
-    // Unwrap arrays if present
-    type = unwrapArrayAndPointers(type);
-
-    // Check if this is a structured buffer type
-    auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
-    if (!structuredBufferType)
-        return;
-
-    // Get the element type
-    auto elementType = structuredBufferType->getElementType();
-
-    // Check if the element type contains any resource/opaque handle types
-    if (containsOpaqueHandleTypeCached(elementType))
+    if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
     {
-        m_sink->diagnose(Diagnostics::CannotUseResourceTypeInStructuredBuffer{
-            .type = elementType,
-            .location = inst->sourceLoc});
-        m_hasErrors = true;
+        auto elementType = structuredBufferType->getElementType();
+        if (containsOpaqueHandleTypeCached(elementType))
+        {
+            m_sink->diagnose(Diagnostics::CannotUseResourceTypeInStructuredBuffer{
+                .type = elementType,
+                .location = loc});
+            m_hasErrors = true;
+        }
     }
+    else if (auto arrayType = as<IRArrayTypeBase>(type))
+        validateStructuredBufferVariable(arrayType->getElementType(), loc);
+    else if (auto ptrType = as<IRPtrTypeBase>(type))
+        validateStructuredBufferVariable(ptrType->getValueType(), loc);
+    else if (auto groupType = as<IRParameterGroupType>(type))
+        validateStructuredBufferVariable(groupType->getElementType(), loc);
 }
 
 bool StructuredBufferValidationContext::validate(IRModule* module)
@@ -768,18 +770,30 @@ bool StructuredBufferValidationContext::validate(IRModule* module)
     if (m_targetRequest && areResourceTypesBindlessOnTarget(m_targetRequest))
         return true;
 
-    // Iterate through all global instructions
+    // Visit every place a user can declare a StructuredBuffer: global
+    // parameters, struct fields (including those reached via a wrapper like
+    // `ParameterBlock<S>`, since `S` is itself a module-scope struct), and
+    // function parameters. Each decl site's type is then walked through any
+    // `Array`/`Ptr`/`ParameterGroup` wrappers down to a `StructuredBuffer<T>`.
+    // No recursion, no use-list walking.
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (auto globalVar = as<IRGlobalParam>(globalInst))
+        if (auto globalParam = as<IRGlobalParam>(globalInst))
         {
-            validateStructuredBufferVariable(globalVar);
+            validateStructuredBufferVariable(globalParam->getDataType(), globalParam->sourceLoc);
+        }
+        else if (auto structType = as<IRStructType>(globalInst))
+        {
+            for (auto field : structType->getFields())
+            {
+                validateStructuredBufferVariable(field->getFieldType(), field->sourceLoc);
+            }
         }
         else if (auto func = as<IRFunc>(globalInst))
         {
             for (auto param : func->getParams())
             {
-                validateStructuredBufferVariable(param);
+                validateStructuredBufferVariable(param->getDataType(), param->sourceLoc);
             }
         }
     }
