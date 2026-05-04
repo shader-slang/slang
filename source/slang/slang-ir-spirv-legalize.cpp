@@ -1096,7 +1096,49 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processRWStructuredBufferGetElementPtr(IRRWStructuredBufferGetElementPtr* gepInst)
     {
-        processGetElementPtrImpl(gepInst, gepInst->getBase(), gepInst->getIndex());
+        // If the base is already a Ptr, delegate to the generic path which
+        // propagates the base's address space.
+        auto base = gepInst->getBase();
+        if (as<IRPtrTypeBase>(base->getDataType()))
+        {
+            processGetElementPtrImpl(gepInst, base, gepInst->getIndex());
+            return;
+        }
+
+        // When the base is a structured-buffer resource type (e.g. the result
+        // of `SPIRVLoadDescriptorFromHeap`), the SPIR-V emit path forces the
+        // result pointer into the StorageBuffer (or Uniform, pre-1.4) storage
+        // class in `emitStructuredBufferGetElementPtr`.  Mirror that decision
+        // on the IR so downstream passes -- in particular processFieldAddress
+        // walking into a struct-typed element -- can propagate the address
+        // space to chained pointers.  Without this, a `things[i].field` chain
+        // on a `DescriptorHandle<RWStructuredBuffer<Struct>>` produces a
+        // `FieldAddress` whose result pointer still carries AddressSpace::Generic,
+        // which the emitter then treats as Function -- yielding invalid SPIR-V
+        // (issue #11027).
+        //
+        // The address-space choice here must stay in sync with the emitter's
+        // `emitStructuredBufferGetElementPtr` in slang-emit-spirv.cpp; both
+        // currently call `getStorageBufferAddressSpace()` (StorageBuffer on
+        // SPIR-V 1.4+, Uniform otherwise).
+        if (!as<IRHLSLStructuredBufferTypeBase>(base->getDataType()))
+            return;
+        auto oldResultType = as<IRPtrTypeBase>(gepInst->getDataType());
+        if (!oldResultType || oldResultType->hasAddressSpace())
+            return;
+        IRBuilder builder(m_sharedContext->m_irModule);
+        builder.setInsertBefore(gepInst);
+        auto newPtrType = builder.getPtrType(
+            oldResultType->getOp(),
+            oldResultType->getValueType(),
+            oldResultType->getAccessQualifier(),
+            getStorageBufferAddressSpace(),
+            oldResultType->getDataLayout());
+        IRInst* args[2] = {base, gepInst->getIndex()};
+        auto newInst = builder.emitIntrinsicInst(newPtrType, gepInst->getOp(), 2, args);
+        gepInst->replaceUsesWith(newInst);
+        gepInst->removeAndDeallocate();
+        addUsersToWorkList(newInst);
     }
 
     void processMeshOutputGetElementPtr(IRMeshOutputRef* gepInst)
