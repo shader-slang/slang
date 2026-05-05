@@ -20,6 +20,13 @@ namespace
 // matches the manifest / sidecar key that hosts read.
 static const char kCoverageBufferName[] = "__slang_coverage";
 
+// Well-known name of the synthesized coverage-hit thunk. Each
+// `IncrementCoverageCounter` op is rewritten to a single `Call` to
+// this helper; the helper performs the atomic increment on the slot.
+// Naming it explicitly (rather than letting Slang auto-mangle) keeps
+// the function recognizable in dumped IR / generated source.
+static const char kCoverageHitFuncName[] = "__slang_coverage_hit";
+
 // Choose the resource kind under which the coverage buffer is bound
 // for `target`. Each target family speaks a different vocabulary
 // for buffer slots, and parameter binding only routes a kind through
@@ -374,32 +381,97 @@ static bool resolveHumaneLoc(
     return true;
 }
 
+// Synthesize the coverage-hit thunk. Each `IncrementCoverageCounter`
+// op is rewritten to a single `Call(thunk, slot)` instead of expanding
+// inline to a 3-inst `(IntLit slot) + GEP + AtomicAdd` chain. After
+// generic specialization clones a function body N times for N
+// instantiations, only the 1-inst `Call` is duplicated per clone — not
+// the whole atomic-add sequence — saving ~2/3 of the coverage-related
+// IR insts in the linked module.
+//
+// `[ForceInline]` is essential, not optional: the helper's body is
+// trivial (one atomic) and inlining is what restores the final
+// emitted code to the same shape as the pre-thunk implementation.
+// Without it, GPU backends would leave a per-hit function call,
+// adding stack-budget / runtime cost on RT-shader workloads where
+// the call overhead is non-trivial.
+static IRFunc* synthesizeCoverageHitThunk(IRModule* module, IRGlobalParam* coverageBuffer)
+{
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+
+    auto uintType = builder.getUIntType();
+    auto intType = builder.getIntType();
+    auto voidType = builder.getVoidType();
+    auto uintPtrType = builder.getPtrType(uintType);
+
+    // Slot parameter is `int` to match what the pre-thunk
+    // implementation passed to `RWStructuredBufferGetElementPtr`. After
+    // `[ForceInline]` folds the body back into each call site, the
+    // emitted GEP keeps the same signed-index shape (`int(N)`) that
+    // existing snapshot tests were anchored against.
+    IRType* paramTypes[] = {intType};
+    auto funcType = builder.getFuncType(1, paramTypes, voidType);
+
+    auto thunk = builder.createFunc();
+    thunk->setFullType(funcType);
+    builder.addNameHintDecoration(thunk, UnownedTerminatedStringSlice(kCoverageHitFuncName));
+    builder.addForceInlineDecoration(thunk);
+
+    auto block = builder.createBlock();
+    thunk->addBlock(block);
+    builder.setInsertInto(block);
+
+    auto slotParam = builder.emitParam(intType);
+
+    // slotPtr = &__slang_coverage[slot]
+    IRInst* gepArgs[] = {coverageBuffer, slotParam};
+    auto slotPtr =
+        builder.emitIntrinsicInst(uintPtrType, kIROp_RWStructuredBufferGetElementPtr, 2, gepArgs);
+
+    // AtomicAdd(slotPtr, 1, relaxed). Each backend emitter lowers
+    // this to its native atomic-increment idiom (InterlockedAdd on
+    // HLSL, atomicAdd on GLSL, OpAtomicIAdd on SPIR-V, etc.).
+    IRInst* atomicArgs[] = {
+        slotPtr,
+        builder.getIntValue(uintType, 1),
+        builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
+    };
+    builder.emitIntrinsicInst(uintType, kIROp_AtomicAdd, 3, atomicArgs);
+
+    builder.emitReturn();
+    return thunk;
+}
+
 struct CoverageInstrumenter
 {
     IRModule* module;
     IRGlobalParam* coverageBuffer;
+    IRFunc* hitThunk;
     SourceManager* sourceManager;
     ArtifactPostEmitMetadata& outMetadata;
     IRType* uintType;
-    IRType* uintPtrType;
+    IRType* voidType;
     IRType* intType;
 
     CoverageInstrumenter(
         IRModule* m,
         IRGlobalParam* buf,
+        IRFunc* thunk,
         SourceManager* sm,
         ArtifactPostEmitMetadata& md)
-        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md)
+        : module(m), coverageBuffer(buf), hitThunk(thunk), sourceManager(sm), outMetadata(md)
     {
         IRBuilder tmpBuilder(module);
         uintType = tmpBuilder.getUIntType();
-        uintPtrType = tmpBuilder.getPtrType(uintType);
+        voidType = tmpBuilder.getVoidType();
         intType = tmpBuilder.getIntType();
     }
 
-    // Lower a single IncrementCoverageCounter op to an atomic add on
-    // `coverageBuffer[slot]`. Appends a metadata entry for `slot` and
-    // removes the op.
+    // Lower a single IncrementCoverageCounter op to a `Call(hitThunk,
+    // slot)` — a single IR inst per call site. The thunk itself
+    // performs the atomic add on `coverageBuffer[slot]`. Appends a
+    // metadata entry for `slot` and removes the op.
     void lowerCounterOp(IRInst* counterOp, UInt slot)
     {
         CoverageTracingEntry entry;
@@ -409,26 +481,8 @@ struct CoverageInstrumenter
         IRBuilder builder(module);
         builder.setInsertBefore(counterOp);
 
-        IRInst* getElemArgs[] = {
-            coverageBuffer,
-            builder.getIntValue(intType, (IRIntegerValue)slot),
-        };
-        IRInst* slotPtr = builder.emitIntrinsicInst(
-            uintPtrType,
-            kIROp_RWStructuredBufferGetElementPtr,
-            2,
-            getElemArgs);
-
-        // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
-        // backend emitter to its native atomic-increment idiom
-        // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
-        // SPIR-V, etc.). Correct under GPU concurrency.
-        IRInst* atomicArgs[] = {
-            slotPtr,
-            builder.getIntValue(uintType, 1),
-            builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
-        };
-        builder.emitIntrinsicInst(uintType, kIROp_AtomicAdd, 3, atomicArgs);
+        IRInst* slotArg = builder.getIntValue(intType, (IRIntegerValue)slot);
+        builder.emitCallInst(voidType, hitThunk, 1, &slotArg);
 
         // The counter op has void return type and, by construction, no uses.
         // Catch a future IR transform that takes a use of it before we reach
@@ -585,9 +639,17 @@ void instrumentCoverage(
     outMetadata.m_coverageBufferSpace = chosenSpace;
     outMetadata.m_coverageBufferBinding = chosenBinding;
 
+    // Synthesize the coverage-hit thunk after the buffer is in place.
+    // Each `IncrementCoverageCounter` op will be lowered to a single
+    // `Call(thunk, slot)` rather than expanding inline to a 3-inst
+    // atomic-add chain — see `synthesizeCoverageHitThunk` for the
+    // rationale and inlining requirement.
+    auto hitThunk = synthesizeCoverageHitThunk(module, buffer);
+
     CoverageInstrumenter instrumenter(
         module,
         buffer,
+        hitThunk,
         sink ? sink->getSourceManager() : nullptr,
         outMetadata);
     instrumenter.run(counterOps);
