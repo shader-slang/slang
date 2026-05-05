@@ -1,0 +1,24 @@
+name: Check Submodule Pointers
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
+
+# No top-level paths: filter — GitHub treats path-skipped jobs as "not run",
+# which breaks required-check gating. The script's --diff-base flag handles
+# the short-circuit when no submodule pointer changed.
+jobs:
+  check-submodules:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify submodule pins
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: ./extras/check-submodule-commits.sh --diff-base "$BASE_SHA"
