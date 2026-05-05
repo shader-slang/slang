@@ -2541,6 +2541,13 @@ err(
     span { loc = "attr", message = "cannot resolve overloaded functions for derivative-of attributes." }
 )
 
+err(
+    "public-custom-derivative-uses-non-exported-import",
+    31162,
+    "custom derivative uses non-exported import",
+    span { loc = "attr", message = "a publicly visible custom derivative cannot reference '~derivative:Decl' from a module that is imported but not re-exported with '__exported import'." }
+)
+
 
 -- Load semantic checking diagnostics (part 6) - Differentiation, Modifiers, GLSL/HLSL specifics, Interfaces, Control flow, Enums, Generics
 -- (inlined from slang-diagnostics-semantic-checking-6.lua)
