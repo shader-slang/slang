@@ -75,7 +75,7 @@ void computeMain(uint tid : SV_DispatchThreadID)
 }
 
 // HLSL:     void computeMain
-// HLSL:     {{0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?}}
+// HLSL-NOT: {{0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?,[[:space:]]*0(\.0)?f?}}
 
 // SPV:     OpEntryPoint
 // SPV-NOT: OpConstantComposite {{.*}} %float_0 %float_0 %float_0 %float_0 %float_0 %float_0 %float_0 %float_0
