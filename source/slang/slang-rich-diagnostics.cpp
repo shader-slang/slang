@@ -116,6 +116,21 @@ String codeGenTargetToPrintableString(CodeGenTarget target)
     return sb.produceString();
 }
 
+String declVisibilityToPrintableString(DeclVisibility visibility)
+{
+    switch (visibility)
+    {
+    case DeclVisibility::Public:
+        return "public";
+    case DeclVisibility::Internal:
+        return "internal";
+    case DeclVisibility::Private:
+        return "private";
+    default:
+        return "<unknown>";
+    }
+}
+
 // Generate member function implementations
 //
 // This section generates a function which goes from this specific diagnostic struct, for example:
@@ -261,6 +276,8 @@ String codeGenTargetToPrintableString(CodeGenTarget target)
           astNodeTypeToPrintableString($(base_expr))
 %           elseif ptype == "codegentarget" then
           codeGenTargetToPrintableString($(base_expr))
+%           elseif ptype == "declvisibility" then
+          declVisibilityToPrintableString($(base_expr))
 %           elseif ptype == "expr" or ptype == "stmt" or ptype == "val" then
           $(base_expr)
 %           else

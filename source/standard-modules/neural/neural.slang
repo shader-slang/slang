@@ -26,6 +26,11 @@ __include "inline-vector";
 __include "istorages";
 __include "bindless-storage";
 __include "accelerate-vector-coopmat";
+__include "WaveMatrix";
+__include "mma-linear-layout-help";
+__include "mma-tiled-cuda";
+__include "mma-tiled-vulkan";
+__include "mma-tiled-layout-helper";
 __include "vectorized-reader";
 __include "shared-memory-pool";
 __include "hash-function";
@@ -36,3 +41,13 @@ __include "iactivation";
 __include "activations";
 __include "ilayer";
 __include "layers";
+
+#ifdef UNIT_TEST
+__include "unit-test/unittest-mat-vec-mul";
+__include "unit-test/unittest-outerproduct-reduce";
+__include "unit-test/unittest-bias-reduce";
+__include "unit-test/unittest-mma-load";
+__include "unit-test/unittest-mma-backward";
+__include "unit-test/unittest-hash-function";
+__include "unit-test/unittest-permuto-encoder";
+#endif
