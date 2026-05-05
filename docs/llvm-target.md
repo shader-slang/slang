@@ -58,15 +58,23 @@ To cross-compile, you can use `-llvm-target-triple <target-triple>`. For now,
 you'll need to compile into an object file and use a compiler or linker to turn
 that into an executable, e.g. with `clang main.o -o main.exe`.
 
-Note that cross-compilation to a target architecture other than the host
-requires that Slang was built with `-DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM`
-against an LLVM that includes the desired backends in
-`LLVM_TARGETS_TO_BUILD`. The official Slang release packages bundle
-`libslang-llvm` built with only the host architecture's backend to keep the
-release size and build time manageable, so released binaries can only emit
-code for the host architecture. If you need cross-target LLVM code generation,
-build Slang from source against a system LLVM configured with the backends
-you need.
+Note that cross-compilation to a target architecture other than the host is
+not supported by released `libslang-llvm` binaries today. Two independent
+constraints apply:
+
+1. The `_initLLVM()` path in `source/slang-llvm/slang-llvm.cpp` only calls
+   `llvm::InitializeNativeTarget()` (and the matching asm printer/parser/
+   disassembler), so only the host backend is registered at runtime even
+   when `libslang-llvm` is linked against multiple LLVM backends.
+2. The official Slang release packages bundle `libslang-llvm` built with only
+   the host architecture's backend (`X86` on Linux/Windows x86_64, `AArch64`
+   on macOS arm64) to keep release size and LLVM build time manageable.
+
+If you need cross-target LLVM code generation, both constraints have to be
+addressed: build Slang from source with `-DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM`
+against an LLVM whose `LLVM_TARGETS_TO_BUILD` includes the desired backends,
+**and** patch `_initLLVM()` to register them (`InitializeAllTargets()` plus
+the corresponding asm/disassembler initializers).
 
 ## Application Binary Interface
 
