@@ -8,6 +8,11 @@
 //TEST:SIMPLE(filecheck=IR_BEFORE): -target spirv-asm -entry computeMain -stage compute -dump-ir-before removeRawDefaultConstructors
 //TEST:SIMPLE(filecheck=IR_AFTER):  -target spirv-asm -entry computeMain -stage compute -dump-ir-after removeRawDefaultConstructors
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -compute -entry computeMain -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-mtl -compute -entry computeMain -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -compute -entry computeMain -output-using-type -profile cs_6_0
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -output-using-type
 
 uniform RWStructuredBuffer<float> outBuf;
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outBuf
