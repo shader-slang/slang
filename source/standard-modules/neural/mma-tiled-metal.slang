@@ -414,6 +414,159 @@ internal struct TiledMMAMetal<T, int InputSize, int OutputSize, int SubgroupSize
     }
 
     // =========================================================================
+    // Outer product accumulate: weightGrad(M,K) += sum_lanes(dOut(M) * input(K)^T)
+    //
+    // This is the standard-module version of the benchmark's "Slang CoopMat
+    // direct" path. Each warp stages two 8-row dOut tiles and two 8-column input
+    // tiles into threadgroup memory, uses CoopMat MMA to sum across the 32 lanes,
+    // then each warp atomic-adds its own accumulator tile to global memory.
+    // =========================================================================
+
+    [ForceInline]
+    [require(metal, cooperative_matrix, subgroup_basic)]
+    internal static void outerProductAccumulate<U, Address>(
+        __constref WaveTangledVector<U, ShMemSize, OutputSize, SubgroupSize, SubgroupCount> inputVectorA,
+        __constref WaveTangledVector<U, ShMemSize, InputSize, SubgroupSize, SubgroupCount> inputVectorB,
+        Address weightAddress)
+        where U : __BuiltinFloatingPointType
+        where U.Differential == U
+        where Address : IPointerLikeAddress<U>
+    {
+        typealias OPAAMatrix = linalg.CoopMat<U, MemoryScope.Subgroup, MetalTile, MetalTile, linalg.CoopMatMatrixUse.MatrixA>;
+        typealias OPABMatrix = linalg.CoopMat<U, MemoryScope.Subgroup, MetalTile, MetalTile, linalg.CoopMatMatrixUse.MatrixB>;
+        typealias OPACMatrix = linalg.CoopMat<U, MemoryScope.Subgroup, MetalTile, MetalTile, linalg.CoopMatMatrixUse.MatrixAccumulator>;
+
+        static const int OPA_N_BLOCK = 2;
+        static const int TILES_M_ = OutputSize / MetalTile;
+        static const int TILES_K_ = InputSize / MetalTile;
+        static const int TILES_LANE_ = SubgroupSize / MetalTile;
+
+        static const int StageAElemsPerWarp = M_BLOCK * MetalTile * SubgroupSize;
+        static const int StageBElemsPerWarp = OPA_N_BLOCK * MetalTile * SubgroupSize;
+        static const int AccumElemsPerWarp = MetalTile * MetalTile;
+        static const int PerWarpElems = StageAElemsPerWarp + StageBElemsPerWarp + AccumElemsPerWarp;
+
+        uint lane = WaveGetLaneIndex();
+        uint warpId = WaveGetWaveIndex();
+        uint perWarpBase = warpId * uint(PerWarpElems);
+        uint stageABase = perWarpBase;
+        uint stageBBase = stageABase + uint(StageAElemsPerWarp);
+        uint accumBase = stageBBase + uint(StageBElemsPerWarp);
+
+        Ptr<U, Access::ReadWrite, AddressSpace::GroupShared> shmemPtr =
+            bit_cast<Ptr<U, Access::ReadWrite, AddressSpace::GroupShared>>(
+                __getAddress(ShMemPool.data[0]));
+
+        for (int mg = 0; mg < TILES_M_ / M_BLOCK; mg++)
+        {
+            for (int kg = 0; kg < TILES_K_ / OPA_N_BLOCK; kg++)
+            {
+                [ForceUnroll]
+                for (int mb = 0; mb < M_BLOCK; mb++)
+                {
+                    int m = mg * M_BLOCK + mb;
+                    [ForceUnroll]
+                    for (int row = 0; row < MetalTile; row++)
+                    {
+                        shmemPtr[stageABase + uint(mb * MetalTile * SubgroupSize + row * SubgroupSize) + lane] =
+                            inputVectorA.data[m * MetalTile + row];
+                    }
+                }
+
+                [ForceUnroll]
+                for (int kb = 0; kb < OPA_N_BLOCK; kb++)
+                {
+                    int kTile = kg * OPA_N_BLOCK + kb;
+                    [ForceUnroll]
+                    for (int col = 0; col < MetalTile; col++)
+                    {
+                        shmemPtr[stageBBase + uint(kb * MetalTile * SubgroupSize + col * SubgroupSize) + lane] =
+                            inputVectorB.data[kTile * MetalTile + col];
+                    }
+                }
+                GroupMemoryBarrierWithGroupSync();
+
+                OPACMatrix acc[M_BLOCK][OPA_N_BLOCK];
+                [ForceUnroll]
+                for (int mb = 0; mb < M_BLOCK; mb++)
+                    [ForceUnroll]
+                    for (int kb = 0; kb < OPA_N_BLOCK; kb++)
+                        acc[mb][kb].fill(U(0));
+
+                [ForceUnroll]
+                for (int laneTile = 0; laneTile < TILES_LANE_; laneTile++)
+                {
+                    OPAAMatrix matA[M_BLOCK];
+                    [ForceUnroll]
+                    for (int mb = 0; mb < M_BLOCK; mb++)
+                    {
+                        matA[mb] = OPAAMatrix.Load<linalg.CoopMatMatrixLayout.RowMajor>(
+                            shmemPtr + int(stageABase) + mb * MetalTile * SubgroupSize + laneTile * MetalTile,
+                            uint(SubgroupSize));
+                    }
+
+                    OPABMatrix matB[OPA_N_BLOCK];
+                    [ForceUnroll]
+                    for (int kb = 0; kb < OPA_N_BLOCK; kb++)
+                    {
+                        matB[kb] = OPABMatrix.Load<linalg.CoopMatMatrixLayout.ColumnMajor>(
+                            shmemPtr + int(stageBBase) + kb * MetalTile * SubgroupSize + laneTile * MetalTile,
+                            uint(SubgroupSize));
+                    }
+
+                    [ForceUnroll]
+                    for (int mb = 0; mb < M_BLOCK; mb++)
+                        [ForceUnroll]
+                        for (int kb = 0; kb < OPA_N_BLOCK; kb++)
+                            acc[mb][kb] = linalg.coopMatMulAdd<U, false>(matA[mb], matB[kb], acc[mb][kb]);
+                }
+
+                [ForceUnroll]
+                for (int mb = 0; mb < M_BLOCK; mb++)
+                {
+                    int m = mg * M_BLOCK + mb;
+                    [ForceUnroll]
+                    for (int kb = 0; kb < OPA_N_BLOCK; kb++)
+                    {
+                        int kTile = kg * OPA_N_BLOCK + kb;
+                        acc[mb][kb].Store<linalg.CoopMatMatrixLayout.RowMajor>(
+                            shmemPtr + int(accumBase), uint(MetalTile));
+                        GroupMemoryBarrierWithGroupSync();
+
+                        if (sizeof(U) == sizeof(half))
+                        {
+                            for (uint idx = lane; idx < uint(MetalTile * MetalTile / 2); idx += uint(SubgroupSize))
+                            {
+                                uint i = idx / uint(MetalTile / 2);
+                                uint j = idx % uint(MetalTile / 2);
+                                uint r = uint(m * MetalTile) + i;
+                                uint c = uint(kTile * MetalTile) + j * 2;
+                                weightAddress.atomicAdd(
+                                    r * uint(InputSize) + c,
+                                    vector<U, 2>(
+                                        shmemPtr[accumBase + i * uint(MetalTile) + j * 2],
+                                        shmemPtr[accumBase + i * uint(MetalTile) + j * 2 + 1]));
+                            }
+                        }
+                        else
+                        {
+                            for (uint idx = lane; idx < uint(MetalTile * MetalTile); idx += uint(SubgroupSize))
+                            {
+                                uint r = uint(m * MetalTile) + idx / uint(MetalTile);
+                                uint c = uint(kTile * MetalTile) + idx % uint(MetalTile);
+                                weightAddress.atomicAdd(
+                                    r * uint(InputSize) + c,
+                                    shmemPtr[accumBase + idx]);
+                            }
+                        }
+                        GroupMemoryBarrierWithGroupSync();
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
     // Bias reduce: dBias += sum(dOut) across lanes.
     //
     // Prototype Metal implementation using the simple wave-reduce strategy:
@@ -459,253 +612,4 @@ internal struct TiledMMAMetal<T, int InputSize, int OutputSize, int SubgroupSize
         }
     }
 
-    // // =========================================================================
-    // // Bias reduce: dBias += sum(dOut) across lanes via MMA with all-ones B
-    // // =========================================================================
-
-    // [ForceInline]
-    // [require(cooperative_matrix, subgroup_basic)]
-    // internal static void biasReduce<Address>(
-    //     MetalMatrixA<M, N> dOutA,
-    //     int subgroupId,
-    //     Address biasGradAddress,
-    //     uint shBase)
-    //     where Address : IPointerLikeAddress<T>
-    // {
-    //     typealias TileB = linalg.CoopMat<half, MemoryScope.Subgroup, MetalTile, MetalTile, linalg.CoopMatMatrixUse.MatrixB>;
-    //     typealias TileC = linalg.CoopMat<T, MemoryScope.Subgroup, MetalTile, MetalTile, linalg.CoopMatMatrixUse.MatrixAccumulator>;
-
-    //     const uint laneId = WaveGetLaneIndex();
-    //     const int subgroupCount = SubgroupCount;
-
-    //     static const int NOutputTiles = (M + MetalTile - 1) / MetalTile;
-    //     static const int NLaneTiles = (N + MetalTile - 1) / MetalTile;
-
-    //     TileB matOnes;
-    //     matOnes.fill(half(1));
-
-    //     // Shmem layout: tile store area + cross-warp reduction area
-    //     static const int TileStoreSize = MetalTile * MetalTile;
-    //     uint tempBase = shBase + uint(subgroupId) * uint(TileStoreSize);
-    //     uint crossWarpBase = shBase + uint(subgroupCount) * uint(TileStoreSize);
-
-    //     [ForceUnroll]
-    //     for (int ot = 0; ot < NOutputTiles; ot++)
-    //     {
-    //         TileC matC;
-    //         matC.fill(T(0));
-
-    //         [ForceUnroll]
-    //         for (int g = 0; g < NLaneTiles; g++)
-    //         {
-    //             int aIdx = dOutA.tileIdx(ot, g);
-    //             matC = linalg.coopMatMulAdd<T, false, half, half, T,
-    //                 MemoryScope.Subgroup, MetalTile, MetalTile, MetalTile>(dOutA.tiles[aIdx], matOnes, matC);
-    //         }
-
-    //         // Store tile to shmem, extract column 0, cross-warp reduce
-    //         Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> tilePtr =
-    //             __getAddress(ShMemPool.data[tempBase]);
-    //         matC.Store<linalg.CoopMatMatrixLayout.RowMajor>(tilePtr, uint(MetalTile));
-
-    //         if (laneId < uint(MetalTile))
-    //         {
-    //             // Column 0 of 8x8 tile: element at row=laneId, col=0
-    //             T val = ShMemPool.smemLoad<T>(tempBase, int(laneId) * MetalTile);
-    //             ShMemPool.smemStore(crossWarpBase, subgroupId * M + ot * MetalTile + int(laneId), val);
-    //         }
-    //     }
-
-    //     GroupMemoryBarrierWithGroupSync();
-
-    //     BaseMMA.crossWarpReduceAndAtomicWrite<T, Address, M, M / 2>(
-    //         crossWarpBase, subgroupId, subgroupCount, biasGradAddress);
-    // }
-
-    // // =========================================================================
-    // // Outer product: dW(M,K) += dOut(M,N) × input^T(N,K)
-    // // =========================================================================
-
-    // [ForceInline]
-    // [require(cooperative_matrix, subgroup_basic)]
-    // internal static void outerProductAccumulate<Address, int InputVecSize>(
-    //     MetalMatrixA<M, N> dOutA,
-    //     T inputArr[InputVecSize],
-    //     Address weightGradAddress,
-    //     uint shBase)
-    //     where Address : IPointerLikeAddress<T>
-    // {
-    //     const uint subgroupIndex = getWaveId();
-
-    //     static const int HalvesPerUint4 = sizeof(uint4) / sizeof(half);
-    //     static const int TileWidthUint4 = MetalTile / HalvesPerUint4;
-    //     static const int ShmemPerWarp = N * TileWidthUint4;
-    //     uint perWarpBase = shBase + subgroupIndex * uint(ShmemPerWarp);
-
-    //     MetalMatrixB<N, K> inputB;
-    //     inputB.fromVectorViaShMem<ShMemSize, T, InputVecSize, true>(inputArr, perWarpBase);
-
-    //     GroupMemoryBarrierWithWaveSync();
-
-    //     typealias OPResult = MetalMatrixC<T, M, K>;
-    //     OPResult dW = matMul(dOutA, inputB);
-
-    //     // Cross-warp reduction
-    //     if (SubgroupCount > 1)
-    //     {
-    //         static const int OPTileStride = OPResult.TileStride;
-    //         static const int OPTotalTiles = OPResult.TileCount;
-
-    //         for (int s = 1; s < SubgroupCount; s <<= 1)
-    //         {
-    //             uint subgroupOffset = (subgroupIndex / uint(s << 1)) * uint(OPTotalTiles * OPTileStride);
-    //             uint base = shBase + subgroupOffset;
-
-    //             if (subgroupIndex % uint(s << 1) == uint(s))
-    //                 dW.storeRaw<ShMemSize>(base);
-
-    //             GroupMemoryBarrierWithGroupSync();
-
-    //             if (subgroupIndex % uint(s << 1) == 0)
-    //             {
-    //                 if (subgroupIndex + uint(s) < uint(SubgroupCount))
-    //                 {
-    //                     OPResult other;
-    //                     other.loadRaw<ShMemSize>(base);
-    //                     dW = dW.add(other);
-    //                 }
-    //             }
-
-    //             GroupMemoryBarrierWithGroupSync();
-    //         }
-    //     }
-
-    //     // Store dW tiles to global via shmem + atomicAdd
-    //     if (subgroupIndex == 0)
-    //     {
-    //         static const linalg.CoopMatMatrixLayout RowMajor = linalg.CoopMatMatrixLayout.RowMajor;
-
-    //         [ForceUnroll]
-    //         for (uint i = 0; i < NTileRows; i++)
-    //         {
-    //             [ForceUnroll]
-    //             for (uint j = 0; j < NTileCols; j++)
-    //             {
-    //                 int tileIdx = int(j) * NTileRows + int(i);
-    //                 Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> tilePtr =
-    //                     __getAddress(ShMemPool.data[shBase + uint(j) * uint(MetalTile)]);
-    //                 dW.tiles[tileIdx].Store<RowMajor>(tilePtr, uint(MetalTile));
-    //             }
-    //             GroupMemoryBarrierWithWaveSync();
-
-    //             storeTileRowToGlobal<T, Address>(shBase, int(i), weightGradAddress);
-    //         }
-    //     }
-
-    //     GroupMemoryBarrierWithGroupSync();
-    // }
-
-    // // =========================================================================
-    // // Backward: orchestrates mmaTranspose + biasReduce + outerProductAccumulate
-    // // =========================================================================
-
-    // [ForceInline]
-    // [require(cooperative_matrix, subgroup_basic)]
-    // internal static WaveTangledVector<T.Differential, ShMemSize, InputSize, SubgroupSize, SubgroupCount>
-    // backward<Address, bool Bias = true>(
-    //     WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount> input,
-    //     WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount> dOut,
-    //     Address weightAddress,
-    //     Address weightGradAddress,
-    //     Address biasGradAddress)
-    //     where Address : IPointerLikeAddress<T>
-    // {
-    //     uint shBase = 0u;
-
-    //     typealias OutputVec = WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>;
-    //     typealias InputVecT = WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount>;
-    //     static const int PaddedM = OutputVec.Uint4AlignedInputSize;
-    //     static const int PaddedK = InputVecT.Uint4AlignedInputSize;
-
-    //     static const int HalvesPerUint4 = sizeof(uint4) / sizeof(half);
-    //     static const int TileWidthUint4 = MetalTile / HalvesPerUint4;
-    //     static const int ShmemPerWarp = N * TileWidthUint4;
-    //     uint perWarpBase = shBase + uint(getWaveId()) * uint(ShmemPerWarp);
-
-    //     MetalMatrixB<M, N> dOutB;
-    //     dOutB.fromVectorViaShMem<ShMemSize, T, PaddedM, false>(dOut.data, perWarpBase);
-
-    //     MetalMatrixA<M, N> dOutA;
-    //     dOutA.fromVectorViaShMem<ShMemSize, T, PaddedM, false>(dOut.data, perWarpBase);
-
-    //     // 1. Transpose MMA: dInput = W^T × dOut
-    //     typealias InputVecDiff = WaveTangledVector<T, ShMemSize, K, N, SubgroupCount>;
-    //     InputVecDiff dInput;
-    //     mmaTranspose<Address, InputVecDiff.Uint4AlignedInputSize>(dOutB, weightAddress, dInput.data, shBase);
-
-    //     GroupMemoryBarrierWithGroupSync();
-
-    //     // 2. Bias reduce
-    //     if (Bias)
-    //         biasReduce<Address>(dOutA, int(getWaveId()), biasGradAddress, shBase);
-
-    //     GroupMemoryBarrierWithGroupSync();
-
-    //     // 3. Outer product accumulate
-    //     outerProductAccumulate<Address, PaddedK>(dOutA, input.data, weightGradAddress, shBase);
-
-    //     return bit_cast<WaveTangledVector<T.Differential, ShMemSize, InputSize, SubgroupSize, SubgroupCount>>(dInput);
-    // }
-
-    // // Store one row of tiles from shmem to global using atomicAdd.
-    // [ForceInline]
-    // [require(cooperative_matrix, subgroup_basic)]
-    // internal static void storeTileRowToGlobal<U, Address>(
-    //     uint sharedMemoryOffset,
-    //     int tileRow,
-    //     Address weightAddress)
-    //         where U : __BuiltinFloatingPointType
-    //         where U.Differential == U
-    //         where Address : IPointerLikeAddress<U>
-    // {
-    //     const uint laneId = WaveGetLaneIndex();
-
-    //     static const int TotalElemsPerRow = NTileCols * TileSizeInElements;
-    //     static const int ItersPerLane = (TotalElemsPerRow + N - 1) / N;
-
-    //     if (sizeof(U) == 2)
-    //     {
-    //         static const int H2PerTile = TileSizeInElements / 2;
-    //         static const int TotalH2PerRow = NTileCols * H2PerTile;
-    //         static const int H2ItersPerLane = (TotalH2PerRow + N - 1) / N;
-
-    //         [ForceUnroll]
-    //         for (uint k = 0; k < H2ItersPerLane; k++)
-    //         {
-    //             int h2Idx = int(laneId) + int(k) * N;
-    //             int tileCol = h2Idx / H2PerTile;
-    //             int localH2 = h2Idx % H2PerTile;
-    //             int elemOffset = tileElementOffset(tileRow, tileCol) + localH2 * 2;
-
-    //             vector<U, 2> h2 = ShMemPool.smemLoad<vector<U, 2>>(sharedMemoryOffset, h2Idx);
-    //             let addr = weightAddress.getOffset(elemOffset);
-    //             addr.atomicAdd(0, h2);
-    //         }
-    //     }
-    //     else if (sizeof(U) == 4)
-    //     {
-    //         [ForceUnroll]
-    //         for (uint k = 0; k < ItersPerLane; k++)
-    //         {
-    //             int elemIdx = int(laneId) + int(k) * N;
-    //             int tileCol = elemIdx / TileSizeInElements;
-    //             int localElem = elemIdx % TileSizeInElements;
-    //             int elemOffset = tileElementOffset(tileRow, tileCol) + localElem;
-    //             int shmemIdx = tileCol * TileSizeInElements + localElem;
-
-    //             U val = ShMemPool.smemLoad<U>(sharedMemoryOffset, shmemIdx);
-    //             weightAddress.atomicAdd(uint(elemOffset), val);
-    //         }
-    //     }
-    // }
 }

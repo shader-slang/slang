@@ -58,10 +58,14 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
     float sf = 1.0f / float(WorkgroupSize);
-    DType inputData[PaddedInputSize];
+    typealias InputVec = WaveTangledVector<DType, TestShMemSize, PaddedInputSize, SubgroupSize, workgroupCount>;
+    typealias DOutVec = WaveTangledVector<DType, TestShMemSize, PaddedOutputSize, SubgroupSize, workgroupCount>;
+
+    InputVec inputData;
     for (int i = 0; i < PaddedInputSize; i++)
         inputData[i] = DType((i + 1) * (tid + 1) * sf);
-    DType dOutData[PaddedOutputSize];
+
+    DOutVec dOutData;
     for (int i = 0; i < PaddedOutputSize; i++)
         dOutData[i] = DType((PaddedOutputSize - i) * sf);
 
