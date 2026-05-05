@@ -2,15 +2,16 @@
 // `ParameterBlock<S>` / `ConstantBuffer<S>` wrapper used to bypass validation
 // and crash type legalization with `non-simple operand(s)`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=PB):    -target spirv -entry main_pb -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=CB):    -target spirv -entry main_cb -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=PBARR): -target spirv -entry main_pbarr -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=DUP):   -target spirv -entry main_dup -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=RW):    -target spirv -entry main_rw -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=FN):    -target spirv -entry main_fn -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=DEEP):  -target spirv -entry main_deep -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=GEN):   -target spirv -entry main_gen -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=NEG):   -target spirv -entry main_neg -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT): -target spirv -entry main_direct -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=PB):     -target spirv -entry main_pb -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CB):     -target spirv -entry main_cb -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=PBARR):  -target spirv -entry main_pbarr -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=DUP):    -target spirv -entry main_dup -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=RW):     -target spirv -entry main_rw -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=FN):     -target spirv -entry main_fn -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=DEEP):   -target spirv -entry main_deep -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=GEN):    -target spirv -entry main_gen -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=NEG):    -target spirv -entry main_neg -stage compute
 
 RWStructuredBuffer<float> output;
 
@@ -66,6 +67,24 @@ struct WithoutResource
 {
     float a;
     float b;
+}
+
+// Resource directly as the StructuredBuffer element, reached through
+// ParameterBlock (no intermediate user struct around the resource).
+struct PBDirect
+{
+    StructuredBuffer<Texture2D> buf;
+}
+//DIRECT: resource type in StructuredBuffer
+//DIRECT: 'Texture2D' cannot contain resource or opaque handle types
+
+ParameterBlock<PBDirect> pbDirect;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main_direct(uint3 tid : SV_DispatchThreadID)
+{
+    output[0] = pbDirect.buf[0].Load(int3(tid.xy, 0)).x;
 }
 
 // ParameterBlock<S> wrapper.

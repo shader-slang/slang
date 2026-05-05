@@ -741,23 +741,29 @@ void StructuredBufferValidationContext::validateStructuredBufferVariable(
     IRType* type,
     SourceLoc loc)
 {
-    if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+    while (type)
     {
-        auto elementType = structuredBufferType->getElementType();
-        if (containsOpaqueHandleTypeCached(elementType))
+        if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
         {
-            m_sink->diagnose(Diagnostics::CannotUseResourceTypeInStructuredBuffer{
-                .type = elementType,
-                .location = loc});
-            m_hasErrors = true;
+            auto elementType = structuredBufferType->getElementType();
+            if (containsOpaqueHandleTypeCached(elementType))
+            {
+                m_sink->diagnose(Diagnostics::CannotUseResourceTypeInStructuredBuffer{
+                    .type = elementType,
+                    .location = loc});
+                m_hasErrors = true;
+            }
+            return;
         }
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
+            type = arrayType->getElementType();
+        else if (auto ptrType = as<IRPtrTypeBase>(type))
+            type = ptrType->getValueType();
+        else if (auto groupType = as<IRParameterGroupType>(type))
+            type = groupType->getElementType();
+        else
+            return;
     }
-    else if (auto arrayType = as<IRArrayTypeBase>(type))
-        validateStructuredBufferVariable(arrayType->getElementType(), loc);
-    else if (auto ptrType = as<IRPtrTypeBase>(type))
-        validateStructuredBufferVariable(ptrType->getValueType(), loc);
-    else if (auto groupType = as<IRParameterGroupType>(type))
-        validateStructuredBufferVariable(groupType->getElementType(), loc);
 }
 
 bool StructuredBufferValidationContext::validate(IRModule* module)
@@ -767,9 +773,13 @@ bool StructuredBufferValidationContext::validate(IRModule* module)
         return true;
 
     // Walking module-scope `IRStructType`s reaches every field exactly once
-    // (struct types are hoisted to module scope), so a `StructuredBuffer<T>`
-    // declared inside a `ParameterBlock<S>` is validated even though no
-    // global param has it as a top-level type.
+    // (concrete struct types are hoisted to module scope after
+    // `specializeModule`), so a `StructuredBuffer<T>` declared inside a
+    // `ParameterBlock<S>` is validated even though no global param has it as
+    // a top-level type. Struct types parented under an `IRGeneric` (i.e.
+    // unspecialized) are intentionally skipped, since a `StructuredBuffer<T>`
+    // whose `T` is a generic type parameter has no concrete element type to
+    // validate.
     for (auto globalInst : module->getGlobalInsts())
     {
         if (auto globalParam = as<IRGlobalParam>(globalInst))
