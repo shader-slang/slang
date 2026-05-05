@@ -1,6 +1,11 @@
 {
   "label_groups": [
     {
+      "labels": ["Linux", "self-hosted", "SM80Plus"],
+      "name": "Linux SM80Plus GPU (GCP)",
+      "self_hosted": true
+    },
+    {
       "labels": ["Linux", "self-hosted", "GPU"],
       "name": "Linux GPU (GCP)",
       "self_hosted": true
@@ -93,6 +98,11 @@
   ],
   "runner_name_prefixes": [
     {
+      "prefix": "linux-sm80plus-",
+      "name": "Linux SM80Plus GPU (GCP)",
+      "self_hosted": true
+    },
+    {
       "prefix": "linux-runner-",
       "name": "Linux GPU (GCP)",
       "self_hosted": true
@@ -121,6 +131,24 @@
       "prefix": "gpu-scaler-host",
       "name": "Scale Set Host",
       "self_hosted": true
+    }
+  ],
+  "gpu_quota_metrics": [
+    {
+      "metric": "NVIDIA_T4_GPUS",
+      "name": "T4",
+      "regions": ["us-central1", "us-east1", "us-west1"]
+    },
+    {
+      "metric": "NVIDIA_L4_GPUS",
+      "name": "L4",
+      "regions": [
+        "us-central1",
+        "us-east1",
+        "us-west1",
+        "us-west4",
+        "europe-west1"
+      ]
     }
   ],
   "non_production_periods": {

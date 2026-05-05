@@ -6,10 +6,12 @@
 // enumerating specialization parameters, and validating
 // attempts to specialize shader code.
 
+#include "../core/slang-type-text-util.h"
 #include "slang-lookup.h"
 #include "slang-parameter-binding.h"
 #include "slang-profile.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -282,6 +284,68 @@ static void validateSystemValueSemanticForType(
     }
 }
 
+// Check if a system value semantic name is per-primitive in mesh shaders.
+// These semantics must only appear in OutputPrimitives (or 'out primitives') parameters.
+static bool isPerPrimitiveMeshSemantic(UnownedStringSlice semanticName)
+{
+    return semanticName.caseInsensitiveEquals(toSlice("sv_cullprimitive")) ||
+           semanticName.caseInsensitiveEquals(toSlice("sv_primitiveid")) ||
+           semanticName.caseInsensitiveEquals(toSlice("sv_rendertargetarrayindex")) ||
+           semanticName.caseInsensitiveEquals(toSlice("sv_viewportarrayindex")) ||
+           semanticName.caseInsensitiveEquals(toSlice("sv_shadingrate"));
+}
+
+// Recursively check struct fields for per-primitive mesh shader semantics.
+// Emits a diagnostic if any per-primitive semantic is found in a vertex/index output.
+static void validateNoPerPrimitiveSemanticsInType(
+    DiagnosticSink* sink,
+    Type* type,
+    ASTBuilder* astBuilder,
+    HashSet<Type*>& seenTypes)
+{
+    if (!type)
+        return;
+    if (seenTypes.contains(type))
+        return;
+    seenTypes.add(type);
+
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return;
+
+    auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
+    if (!structDeclRef)
+        return;
+
+    for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+    {
+        auto fieldDecl = fieldDeclRef.getDecl();
+
+        // Recurse into nested struct types, unwrapping conditional and array wrappers first
+        if (auto fieldVarDecl = as<VarDeclBase>(fieldDecl))
+        {
+            Type* fieldType = unwrapConditionalType(fieldVarDecl->getType());
+            while (auto arrayType = as<ArrayExpressionType>(fieldType))
+                fieldType = unwrapConditionalType(arrayType->getElementType());
+            validateNoPerPrimitiveSemanticsInType(sink, fieldType, astBuilder, seenTypes);
+        }
+
+        // Check if this field has a per-primitive system value semantic
+        auto semantic = fieldDecl->findModifier<HLSLSimpleSemantic>();
+        if (!semantic)
+            continue;
+
+        auto name = semantic->name.getContent();
+        if (isPerPrimitiveMeshSemantic(name))
+        {
+            sink->diagnose(Diagnostics::PerPrimitiveSemanticInVertexOutput{
+                .semantic = String(name),
+                .location = fieldDecl->loc});
+        }
+    }
+}
+
+
 // Validate system value semantics on a declaration recursively.
 // and validates any SV_ semantic against the SemanticDecl definitions in core module.
 static void validateSystemValueSemantic(
@@ -331,6 +395,27 @@ static void validateSystemValueSemantic(
     if (auto meshOutputType = as<MeshOutputType>(type))
     {
         auto elementType = meshOutputType->getElementType();
+        // If this is a vertex or index output, validate that no per-primitive semantics are used.
+        // Per-primitive semantics must only appear in OutputPrimitives / 'out primitives'.
+        if (stage == Stage::Mesh && !as<PrimitivesType>(meshOutputType))
+        {
+            if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
+            {
+                if (isPerPrimitiveMeshSemantic(semantic->name.getContent()))
+                {
+                    sink->diagnose(Diagnostics::PerPrimitiveSemanticInVertexOutput{
+                        .semantic = String(semantic->name.getContent()),
+                        .location = decl->loc});
+                }
+            }
+
+            HashSet<Type*> seenTypes;
+            validateNoPerPrimitiveSemanticsInType(
+                sink,
+                unwrapConditionalType(elementType),
+                visitor->getASTBuilder(),
+                seenTypes);
+        }
         type = unwrapConditionalType(elementType);
         direction = SemanticDirection::Output;
     }
@@ -693,6 +778,327 @@ bool isBuiltinParameterType(Type* type)
     return true;
 }
 
+// Returns true if `type` is declared with `__intrinsic_type(op)` for the given
+// IR opcode. Used to detect intrinsic types such as `CoopMat` and `CoopVec`
+// which have no dedicated AST type class but carry an `IntrinsicTypeModifier`.
+static bool isIntrinsicTypeWithOp(Type* type, IROp op)
+{
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return false;
+    auto decl = declRefType->getDeclRef().getDecl();
+    if (!decl)
+        return false;
+
+    auto modifier = decl->findModifier<IntrinsicTypeModifier>();
+    if (!modifier)
+        return false;
+    return IROp(modifier->irOp) == op;
+}
+
+// Describes a rule for types that are invalid as entry-point varying parameters/return types.
+struct EntryPointVaryingTypeRule
+{
+    // Returns true if this type matches the rule (i.e., is invalid).
+    bool (*matches)(Type* type);
+
+    // Human-readable reason string for the diagnostic.
+    const char* reason;
+
+    // If non-null, this rule only applies when the target matches this predicate.
+    // When null, the rule applies to all targets.
+    bool (*targetPredicate)(CodeGenTarget target);
+
+    // If non-null, this rule only applies when the stage matches this predicate.
+    // When null, the rule applies to all stages for which the parameter/return
+    // can be a varying (see `canHaveVaryingInput` in `validateEntryPoint`).
+    bool (*stagePredicate)(Stage stage);
+};
+
+static bool _matchDifferentialPairType(Type* type)
+{
+    // Match both `DifferentialPair<T>` and `DifferentialPtrPair<T>` (the
+    // backward-mode autodiff ptr-pair type). They are represented by
+    // distinct AST classes but share the same varying-type restriction.
+    return as<DifferentialPairType>(type) != nullptr ||
+           as<DifferentialPtrPairType>(type) != nullptr;
+}
+
+static bool _matchAtomicType(Type* type)
+{
+    return as<AtomicType>(type) != nullptr;
+}
+
+static bool _matchCoopVectorType(Type* type)
+{
+    // `CoopVec` is declared in the core module as a struct carrying
+    // `__intrinsic_type(kIROp_CoopVectorType)`. Detect it via that modifier
+    // to stay consistent with how `_matchCoopMatrixType` handles `CoopMat`.
+    return isIntrinsicTypeWithOp(type, kIROp_CoopVectorType);
+}
+
+static bool _matchCoopMatrixType(Type* type)
+{
+    return isIntrinsicTypeWithOp(type, kIROp_CoopMatrixType);
+}
+
+static bool _matchVectorBoolType(Type* type)
+{
+    auto vecType = as<VectorExpressionType>(type);
+    if (!vecType)
+        return false;
+    auto elemType = as<BasicExpressionType>(vecType->getElementType());
+    if (!elemType)
+        return false;
+    return elemType->getBaseType() == BaseType::Bool;
+}
+
+static bool _matchMatrixWithOutOfRangeDimensions(Type* type)
+{
+    // Row and column counts outside the 1..4 range break downstream codegen
+    // (issue #9450). Only the entry-point varying site is restricted here;
+    // the constructed type itself is not rejected, so targets that can
+    // support larger matrices internally are unaffected.
+    auto matType = as<MatrixExpressionType>(type);
+    if (!matType)
+        return false;
+    auto isOutOfRange = [](IntVal* v)
+    {
+        if (auto cv = as<ConstantIntVal>(v))
+        {
+            auto n = cv->getValue();
+            return n < 1 || n > 4;
+        }
+        return false;
+    };
+    return isOutOfRange(matType->getRowCount()) || isOutOfRange(matType->getColumnCount());
+}
+
+// True for stages that use interface-block-style varyings in SPIR-V/GLSL
+// (i.e. the stages where the failure modes in issues #9446/#9448/#9449/#9452
+// were reproduced). Ray-tracing payload/attribute stages and the compute
+// stages do not use interface blocks and place fewer restrictions on the
+// varying type, so we avoid diagnosing those stages.
+//
+// Note: `Amplification` (task) shaders output via `TaskPayloadWorkgroupEXT`
+// rather than interface blocks, so they are not included here. `Mesh` shader
+// varying outputs *do* lower to interface blocks in SPIR-V, so it is.
+static bool _isInterfaceBlockVaryingStage(Stage stage)
+{
+    switch (stage)
+    {
+    case Stage::Vertex:
+    case Stage::Fragment:
+    case Stage::Geometry:
+    case Stage::Hull:
+    case Stage::Domain:
+    case Stage::Mesh:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
+    // `DifferentialPair`/`DifferentialPtrPair` are autodiff wrapper types with
+    // no defined meaning at an inter-stage interface. Issue #9429 shows they
+    // crash the backend on every stage where they participate as varyings.
+    {_matchDifferentialPairType,
+     "DifferentialPair/DifferentialPtrPair is not a valid varying type",
+     nullptr,
+     nullptr},
+
+    // `Atomic<T>` is a storage-class wrapper, not a value type that can be
+    // passed across a shader interface. Issue #9443.
+    {_matchAtomicType, "Atomic is not a valid varying type", nullptr, nullptr},
+
+    // `CoopVec` and `CoopMat` generate invalid SPIR-V when placed into an
+    // interface block. Ray-tracing payload/attribute stages tolerate them,
+    // so we restrict the rule to interface-block varying stages
+    // (issues #9446, #9448, #9449).
+    {_matchCoopVectorType,
+     "CoopVec is not a valid varying type for this stage",
+     nullptr,
+     _isInterfaceBlockVaryingStage},
+    {_matchCoopMatrixType,
+     "CoopMat is not a valid varying type for this stage",
+     nullptr,
+     _isInterfaceBlockVaryingStage},
+
+    // `vector<bool>` produces invalid SPIR-V on interface-block stages
+    // (issue #9452). Compute and ray-tracing payload stages accept it in
+    // practice; only diagnose where the failure actually occurs.
+    {_matchVectorBoolType,
+     "vector<bool> is not a valid SPIR-V varying type for this stage",
+     isSPIRV,
+     _isInterfaceBlockVaryingStage},
+
+    // `matrix<T, R, C>` with row/column count outside 1..4 breaks downstream
+    // codegen on the interface-block stages (issue #9450).
+    {_matchMatrixWithOutOfRangeDimensions,
+     "matrix row and column counts must be between 1 and 4 inclusive",
+     nullptr,
+     _isInterfaceBlockVaryingStage},
+};
+
+struct VaryingTypeValidationContext
+{
+    ASTBuilder* astBuilder;
+    DiagnosticSink* sink;
+    Name* entryPointName;
+    SourceLoc loc;
+    const char* direction;
+    const char* context;
+    ArrayView<CodeGenTarget> targets;
+    Stage stage;
+    HashSet<Type*> seenTypes;
+    UInt recursionDepth = 0;
+    bool reportedNestingLimit = false;
+};
+
+// Recursively walks a type and checks it against the varying type rules.
+// Returns true if any error was found.
+static bool validateVaryingType(VaryingTypeValidationContext& ctx, Type* type)
+{
+    if (!type)
+        return false;
+
+    if (as<ErrorType>(type))
+        return false;
+
+    // Guard against deeply / infinitely nested generic struct types. The
+    // `seenTypes` set catches self-referential types that reuse the same
+    // `Type*` pointer, but generic instantiations such as
+    // `struct LoopField<each T> { LoopField<T, int> next; }` produce a fresh
+    // `Type*` at every level and would otherwise recurse unboundedly.
+    if (ctx.recursionDepth >= kMaxTypeNestingDepth)
+    {
+        if (!ctx.reportedNestingLimit)
+        {
+            ctx.reportedNestingLimit = true;
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location = ctx.loc;
+            ctx.sink->diagnose(diag);
+        }
+        return true;
+    }
+    struct DepthGuard
+    {
+        UInt& depth;
+        DepthGuard(UInt& d)
+            : depth(d)
+        {
+            ++depth;
+        }
+        ~DepthGuard() { --depth; }
+    } depthGuard(ctx.recursionDepth);
+
+    // Unwrap ModifiedType
+    if (auto modType = as<ModifiedType>(type))
+        return validateVaryingType(ctx, modType->getBase());
+
+    for (const auto& rule : kEntryPointVaryingTypeRules)
+    {
+        if (!rule.matches(type))
+            continue;
+
+        // A rule may scope itself to a subset of stages (e.g. only
+        // interface-block stages). If so, skip when the entry point's stage
+        // is outside that set.
+        if (rule.stagePredicate && !rule.stagePredicate(ctx.stage))
+            continue;
+
+        if (rule.targetPredicate)
+        {
+            bool anyTargetMatches = false;
+            String matchedTargetName;
+            for (auto target : ctx.targets)
+            {
+                if (rule.targetPredicate(target))
+                {
+                    anyTargetMatches = true;
+                    matchedTargetName =
+                        TypeTextUtil::getCompileTargetName(SlangCompileTarget(target));
+                    break;
+                }
+            }
+            if (!anyTargetMatches)
+                continue;
+
+            ctx.sink->diagnose(Diagnostics::InvalidEntryPointVaryingTypeForTarget{
+                .type = type,
+                .direction = ctx.direction,
+                .context = ctx.context,
+                .entryPoint = ctx.entryPointName,
+                .target = matchedTargetName,
+                .reason = rule.reason,
+                .location = ctx.loc});
+        }
+        else
+        {
+            ctx.sink->diagnose(Diagnostics::InvalidEntryPointVaryingType{
+                .type = type,
+                .direction = ctx.direction,
+                .context = ctx.context,
+                .entryPoint = ctx.entryPointName,
+                .reason = rule.reason,
+                .location = ctx.loc});
+        }
+        return true;
+    }
+
+    // Recurse into array element type.
+    // Note: `ArrayExpressionType` inherits from `DeclRefType` (its decl is the
+    // builtin `Array` struct), so this check must come before the struct-field
+    // recursion below to avoid iterating the internal fields of `Array`.
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return validateVaryingType(ctx, arrayType->getElementType());
+
+    // Recurse through geometry-shader stream output wrappers
+    // (`PointStream`/`LineStream`/`TriangleStream<T>`) and mesh-shader output
+    // wrappers (`Vertices`/`Indices`/`Primitives<T>`). Like arrays, these are
+    // `DeclRefType`s whose decl is an empty `struct`, so without an explicit
+    // unwrap the struct-field recursion below would walk zero fields and miss
+    // an invalid inner varying type such as `TriangleStream<BadStruct>`.
+    if (auto streamType = as<HLSLStreamOutputType>(type))
+        return validateVaryingType(ctx, streamType->getElementType());
+    if (auto meshOutputType = as<MeshOutputType>(type))
+        return validateVaryingType(ctx, meshOutputType->getElementType());
+
+    // Recurse into struct fields
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
+        if (structDeclRef)
+        {
+            if (ctx.seenTypes.contains(type))
+                return false;
+            ctx.seenTypes.add(type);
+
+            bool foundError = false;
+            // Iterate the struct's fields through the DeclRef so that generic
+            // type parameter substitutions are applied to each field's type.
+            // Without this, `struct Wrapper<T> { T x; }` used as
+            // `Wrapper<DifferentialPair<float>>` would not be caught.
+            for (auto fieldDeclRef :
+                 getFields(ctx.astBuilder, structDeclRef, MemberFilterStyle::Instance))
+            {
+                auto fieldType = getType(ctx.astBuilder, fieldDeclRef);
+                if (validateVaryingType(ctx, fieldType))
+                    foundError = true;
+            }
+            return foundError;
+        }
+    }
+
+    // We deliberately do not recurse into vector/matrix element types: the
+    // type system requires those element types to be scalar, and any scalar
+    // element restriction (e.g. `vector<bool>`, `matrix<uint64_t, ...>`) is
+    // expressed as a whole-type rule in `kEntryPointVaryingTypeRules` above.
+
+    return false;
+}
+
 bool doStructFieldsHaveSemanticImpl(Type* type, HashSet<Type*>& seenTypes)
 {
     auto declRefType = as<DeclRefType>(type);
@@ -792,6 +1198,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // NOTE: Varying-parameter / return-type validation happens *after* the
+    // auto-uniform classification below, so that parameters auto-marked
+    // `uniform` on non-varying stages (e.g. `compute`) are skipped rather
+    // than being diagnosed as if they were varyings.
+
     // Every entry point needs to have a stage specified either via
     // command-line/API options, or via an explicit `[shader("...")]` attribute.
     //
@@ -855,6 +1266,61 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             }
 
             attr->patchConstantFuncDecl = patchConstantFuncDeclRef.getDecl();
+        }
+    }
+    else if (stage == Stage::Geometry)
+    {
+        bool hasOutputStream = false;
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            if (as<HLSLStreamOutputType>(param->getType()))
+            {
+                hasOutputStream = true;
+                break;
+            }
+        }
+        if (!hasOutputStream)
+        {
+            sink->diagnose(Diagnostics::GeometryShaderMissingOutputStream{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+        if (!entryPointFuncDecl->findModifier<MaxVertexCountAttribute>())
+        {
+            sink->diagnose(Diagnostics::GeometryShaderMissingMaxVertexCount{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+    }
+    else if (stage == Stage::Mesh)
+    {
+        // A mesh shader must declare both an output topology and the
+        // pair of mesh outputs (vertices + indices); otherwise the
+        // generated SPIR-V is invalid (issue #9444). The geometry-shader
+        // checks above are the equivalent precedent.
+        if (!entryPointFuncDecl->findModifier<OutputTopologyAttribute>())
+        {
+            sink->diagnose(Diagnostics::MeshShaderMissingOutputTopology{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+        bool hasVerticesOutput = false;
+        bool hasIndicesOutput = false;
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            auto meshOutputType = as<MeshOutputType>(param->getType());
+            if (!meshOutputType)
+                continue;
+            if (as<VerticesType>(meshOutputType))
+                hasVerticesOutput = true;
+            else if (as<IndicesType>(meshOutputType))
+                hasIndicesOutput = true;
+        }
+        if (!hasVerticesOutput || !hasIndicesOutput)
+        {
+            sink->diagnose(Diagnostics::MeshShaderMissingOutputs{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
         }
     }
     else if (stage == Stage::Compute)
@@ -1065,6 +1531,66 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         {
             sink->diagnose(
                 Diagnostics::NonUniformEntryPointParameterTreatedAsUniform{.param = param});
+        }
+    }
+
+    // Validate that varying parameter/return types are legal. Runs after the
+    // auto-uniform classification above so that parameters that will end up
+    // being treated as uniform on non-varying stages are not diagnosed.
+    {
+        List<CodeGenTarget> targets;
+        for (auto target : linkage->targets)
+            targets.add(target->getTarget());
+
+        auto astBuilder = linkage->getASTBuilder();
+
+        // Validate return type as varying output
+        if (returnType)
+        {
+            VaryingTypeValidationContext ctx;
+            ctx.astBuilder = astBuilder;
+            ctx.sink = sink;
+            ctx.entryPointName = entryPointName;
+            ctx.loc = entryPointFuncDecl->loc;
+            ctx.direction = "output";
+            ctx.context = "return type";
+            ctx.targets = targets.getArrayView();
+            ctx.stage = stage;
+            validateVaryingType(ctx, returnType);
+        }
+
+        // Validate each parameter that would be treated as varying. Parameters
+        // that were auto-marked uniform by the loop above are skipped here.
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            if (param->hasModifier<HLSLUniformModifier>())
+                continue;
+            if (isUniformParameterType(param->getType()))
+                continue;
+
+            VaryingTypeValidationContext ctx;
+            ctx.astBuilder = astBuilder;
+            ctx.sink = sink;
+            ctx.entryPointName = entryPointName;
+            ctx.loc = param->loc;
+            // Note: `InOutModifier` inherits from `OutModifier`, so it must be
+            // checked first to avoid mislabeling `inout` parameters as "output".
+            ctx.direction = param->hasModifier<InOutModifier>() ? "input/output"
+                            : param->hasModifier<OutModifier>() ? "output"
+                            : param->hasModifier<RefModifier>() ? "input/output"
+                                                                : "input";
+
+            StringBuilder contextSb;
+            auto paramName = param->getName();
+            if (paramName)
+                contextSb << "parameter '" << paramName->text << "'";
+            else
+                contextSb << "parameter";
+            String contextStr = contextSb.produceString();
+            ctx.context = contextStr.getBuffer();
+            ctx.targets = targets.getArrayView();
+            ctx.stage = stage;
+            validateVaryingType(ctx, param->getType());
         }
     }
 

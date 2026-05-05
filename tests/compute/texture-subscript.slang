@@ -6,7 +6,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -mtl
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk
 
-//METAL-NOT: error[E41402]
+//METAL-NOT: error[E41404]
 //METALLIB: @computeMain
 
 //CUDA: CUsurfObject outputTexture1D_{{[0-9]+}};
