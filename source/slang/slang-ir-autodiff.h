@@ -124,6 +124,7 @@ struct AutoDiffSharedContext
     AutoDiffSharedContext(TargetProgram* targetProgram, IRModuleInst* inModuleInst);
 };
 
+
 struct DifferentiableTypeConformanceContext
 {
     AutoDiffSharedContext* sharedContext;
@@ -385,8 +386,23 @@ struct DifferentiableTypeConformanceContext
                 paramTypes.add((IRType*)bwdContextType);
                 for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
                 {
+                    // Use getParamType() directly here: innerFnType is the primal function's
+                    // declared IRFuncType, constructed during AST-to-IR lowering via
+                    // maybeGetConstExprType(), which preserves @ConstExpr rate qualifiers on
+                    // the stored operands. This is safe; the "IRFuncType operands may not carry
+                    // rate qualifiers" caution in rev.cpp/unzip.cpp applies to function types
+                    // reconstructed during autodiff synthesis passes, not to the original
+                    // declared type.
+                    auto rawParamType = innerFnType->getParamType(i);
+                    // Constexpr params are non-differentiable but must be preserved so the
+                    // generated backward wrapper can forward them to the user-provided derivative.
+                    if (isConstExprRateQualifiedType(rawParamType))
+                    {
+                        paramTypes.add(rawParamType);
+                        continue;
+                    }
                     const auto& [paramDirection, paramType] =
-                        splitParameterDirectionAndType(innerFnType->getParamType(i));
+                        splitParameterDirectionAndType(rawParamType);
                     if (auto diffValueType = tryGetDifferentiableValueType(paramType))
                     {
                         // If the parameter type is a differentiable value type, we replace it with

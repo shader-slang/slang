@@ -149,6 +149,13 @@ inline bool isScalarIntegerType(IRType* type)
     return getTypeStyle(type->getOp()) == kIROp_IntType;
 }
 
+// Returns true when `type` is an IRRateQualifiedType wrapping IRConstExprRate.
+inline bool isConstExprRateQualifiedType(IRType* type)
+{
+    auto rqt = as<IRRateQualifiedType>(type);
+    return rqt && as<IRConstExprRate>(rqt->getRate());
+}
+
 // No side effect can take place through a value of a "Value" type.
 bool isValueType(IRInst* type);
 

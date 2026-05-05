@@ -548,6 +548,19 @@ struct FunctionParameterSpecializationContext
 
     void getCallInfoForArg(CallSpecializationInfo& ioInfo, IRInst* oldArg)
     {
+        // Literal constants (int/float/bool): bake directly into the specialized callee.
+        // No new call-site argument is needed; the literal value becomes the key.
+        switch (oldArg->getOp())
+        {
+        case kIROp_IntLit:
+        case kIROp_FloatLit:
+        case kIROp_BoolLit:
+            ioInfo.key.vals.add(oldArg);
+            return;
+        default:
+            break;
+        }
+
         // The base case we care about is when the original
         // argument is a global shader parameter.
         //
@@ -815,6 +828,18 @@ struct FunctionParameterSpecializationContext
         // The logic here parallels `gatherCallInfoForArg`,
         // and only differs in what information it is gathering.
         //
+        // Literal constants: return the literal directly so it becomes the inline
+        // replacement for the parameter in the specialized function body.
+        switch (oldArg->getOp())
+        {
+        case kIROp_IntLit:
+        case kIROp_FloatLit:
+        case kIROp_BoolLit:
+            return oldArg;
+        default:
+            break;
+        }
+
         // As before, the base case is when we have a global
         // shader parameter.
         //
@@ -1198,6 +1223,50 @@ bool specializeFunctionCalls(
     context.condition = condition;
 
     return context.processModule();
+}
+
+// Specialization condition for constexpr-qualified parameters.
+// Clones the callee with the literal value baked in so that static_assert and
+// other compile-time checks remain evaluable after autodiff wrapper synthesis.
+struct ConstExprFunctionCallSpecializeCondition : FunctionCallSpecializeCondition
+{
+    bool doesParamWantSpecialization(IRParam* param, IRInst* /*arg*/, IRCall* /*call*/) override
+    {
+        // Use getFullType() not getDataType(): getDataType() strips the @ConstExpr rate qualifier.
+        auto rqt = as<IRRateQualifiedType>(param->getFullType());
+        return rqt && as<IRConstExprRate>(rqt->getRate());
+    }
+
+    bool isParamSuitableForSpecialization(IRParam* /*param*/, IRInst* arg) override
+    {
+        switch (arg->getOp())
+        {
+        case kIROp_IntLit:
+        case kIROp_FloatLit:
+        case kIROp_BoolLit:
+            return true;
+        default:
+            return false;
+        }
+    }
+};
+
+bool specializeConstExprFunctionCalls(IRModule* module, CodeGenContext* codeGenContext)
+{
+    ConstExprFunctionCallSpecializeCondition condition;
+    bool anyChanged = false;
+    // Iterate to a fixed point, but cap iterations to guard against pathological
+    // cases (e.g. recursive constexpr helpers that produce a new distinct literal
+    // each iteration).  64 rounds is far more than any realistic shader needs;
+    // if we haven't converged by then, bail out rather than hang the compiler.
+    static constexpr int kMaxIters = 64;
+    for (int iter = 0; iter < kMaxIters; ++iter)
+    {
+        if (!specializeFunctionCalls(codeGenContext, module, &condition))
+            break;
+        anyChanged = true;
+    }
+    return anyChanged;
 }
 
 } // namespace Slang

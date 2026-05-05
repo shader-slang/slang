@@ -34,6 +34,7 @@
 #include "slang-ir-cleanup-void.h"
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-com-interface.h"
+#include "slang-ir-constexpr.h"
 #include "slang-ir-cuda-immutable-load.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
@@ -106,6 +107,7 @@
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
+#include "slang-ir-specialize-function-call.h"
 #include "slang-ir-specialize-matrix-layout.h"
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-specialize-stage-switch.h"
@@ -1195,6 +1197,24 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+
+    // Re-run constexpr propagation for newly generated autodiff wrapper functions.
+    // These didn't exist when propagateConstExpr ran during IR lowering, so
+    // static_assert on constexpr params in backward derivatives requires a second pass.
+    //
+    // The gate on `requiredLoweringPassSet.autodiff` is intentional: this pass exists
+    // to handle constexpr-param calls that appear *inside synthesized autodiff wrappers*
+    // (which are created during finalizeAutoDiffPass).  Non-autodiff code with constexpr
+    // params is handled earlier by specializeHigherOrderParameters; running this pass
+    // unconditionally on non-autodiff modules would be harmless but wasteful.
+    if (requiredLoweringPassSet.autodiff)
+    {
+        SLANG_PASS(propagateConstExpr, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+        SLANG_PASS(specializeConstExprFunctionCalls, codeGenContext);
+    }
+
     if (requiredLoweringPassSet.matrixSwizzleStore)
         SLANG_PASS(lowerMatrixSwizzleStores);
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);

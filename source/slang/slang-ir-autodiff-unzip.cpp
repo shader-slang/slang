@@ -402,13 +402,28 @@ struct UnzippingContext
         // func)
         //
 
+        // Collect actual IRParam nodes as the authoritative source for full types (including
+        // rate qualifiers that IRFuncType operands may not carry).
+        auto baseFuncType = cast<IRFuncType>(baseFn->getFullType());
+        ShortList<IRParam*, 8> baseFuncParams;
+        if (auto baseFuncInst = as<IRGlobalValueWithParams>(getResolvedInstForDecorations(baseFn)))
+        {
+            for (auto param : baseFuncInst->getParams())
+                baseFuncParams.add(param);
+        }
+
         List<IRInst*> propFuncArgs;
         propFuncArgs.add(fullContextVal);
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
         {
             auto arg = mixedCall->getArg(ii);
+            auto rawParamType = (ii < (UIndex)baseFuncParams.getCount())
+                                    ? baseFuncParams[ii]->getFullType()
+                                    : baseFuncType->getParamType(ii);
             if (isMixedDifferentialInst(arg))
                 propFuncArgs.add(lookupDiffInst(arg));
+            else if (isConstExprRateQualifiedType(rawParamType))
+                propFuncArgs.add(arg); // pass constexpr literal/param directly
             else
                 propFuncArgs.add(diffBuilder->getVoidValue());
         }
@@ -417,12 +432,18 @@ struct UnzippingContext
         // of each param type & result type.
         //
         List<IRType*> fwdPropFuncParamTypes;
-        auto baseFuncType = cast<IRFuncType>(baseFn->getFullType());
         fwdPropFuncParamTypes.add(fullContextVal->getDataType());
         for (UIndex ii = 0; ii < baseFuncType->getParamCount(); ii++)
         {
-            const auto& [paramDirection, paramType] =
-                splitParameterDirectionAndType(baseFuncType->getParamType(ii));
+            auto rawParamType = (ii < (UIndex)baseFuncParams.getCount())
+                                    ? baseFuncParams[ii]->getFullType()
+                                    : baseFuncType->getParamType(ii);
+            if (isConstExprRateQualifiedType(rawParamType))
+            {
+                fwdPropFuncParamTypes.add(rawParamType);
+                continue;
+            }
+            const auto& [paramDirection, paramType] = splitParameterDirectionAndType(rawParamType);
             if (auto diffType = diffTypeContext.tryGetDifferentiableValueType(paramType))
             {
                 fwdPropFuncParamTypes.add(
