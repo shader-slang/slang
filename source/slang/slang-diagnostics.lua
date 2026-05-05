@@ -306,7 +306,11 @@ err(
     "no specified '-target' option matches the output path '~path', which implies the '~format' format"
 )
 
-err("unknown-command-line-value", 62, "unknown value for option. Valid values are '~validValues'")
+err(
+    "unknown-command-line-value",
+    62,
+    "unknown value for option '~option'. Valid values are '~validValues'"
+)
 
 err("unknown-help-category", 63, "unknown help category")
 
@@ -2541,6 +2545,13 @@ err(
     span { loc = "attr", message = "cannot resolve overloaded functions for derivative-of attributes." }
 )
 
+err(
+    "public-custom-derivative-uses-non-exported-import",
+    31162,
+    "custom derivative uses non-exported import",
+    span { loc = "attr", message = "a publicly visible custom derivative cannot reference '~derivative:Decl' from a module that is imported but not re-exported with '__exported import'." }
+)
+
 
 -- Load semantic checking diagnostics (part 6) - Differentiation, Modifiers, GLSL/HLSL specifics, Interfaces, Control flow, Enums, Generics
 -- (inlined from slang-diagnostics-semantic-checking-6.lua)
@@ -3996,6 +4007,20 @@ err(
     38046,
     "geometry shader missing [maxvertexcount] attribute",
     span { loc = "location", message = "geometry shader entry point '~entryPoint:Name' must have a '[maxvertexcount(N)]' attribute" }
+)
+
+err(
+    "mesh-shader-missing-output-topology",
+    38047,
+    "mesh shader missing [outputtopology] attribute",
+    span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must have an '[outputtopology(\"point\"|\"line\"|\"triangle\")]' attribute" }
+)
+
+err(
+    "mesh-shader-missing-outputs",
+    38048,
+    "mesh shader missing OutputVertices/OutputIndices output",
+    span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must declare both an 'OutputVertices' and an 'OutputIndices' output parameter" }
 )
 
 err(
