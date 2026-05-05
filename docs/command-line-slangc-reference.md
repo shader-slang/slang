@@ -1657,6 +1657,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cuda_sm_6_0` 
 * `cuda_sm_7_0` 
 * `cuda_sm_8_0` 
+* `cuda_sm_8_9` 
 * `cuda_sm_9_0` 
 * `atomic_reduce` 
 * `atomic_bfloat16` 
