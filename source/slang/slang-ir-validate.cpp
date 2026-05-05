@@ -737,13 +737,9 @@ bool StructuredBufferValidationContext::containsOpaqueHandleTypeInternal(
     return false;
 }
 
-// Recursively unwrap single-operand wrapper types (`Array`, `Ptr`,
-// `ParameterBlock`, `ConstantBuffer`, ...) looking for a `StructuredBuffer<T>`
-// at a declaration site. We don't descend into struct fields here, since every
-// `IRStructType` in Slang IR is hoisted to module scope, so the driver loop
-// visits each struct's fields directly, which means each call reduces to a
-// chain of unwraps without branching into multiple subtypes.
-void StructuredBufferValidationContext::validateStructuredBufferVariable(IRType* type, SourceLoc loc)
+void StructuredBufferValidationContext::validateStructuredBufferVariable(
+    IRType* type,
+    SourceLoc loc)
 {
     if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
     {
@@ -770,12 +766,10 @@ bool StructuredBufferValidationContext::validate(IRModule* module)
     if (m_targetRequest && areResourceTypesBindlessOnTarget(m_targetRequest))
         return true;
 
-    // Visit every place a user can declare a StructuredBuffer: global
-    // parameters, struct fields (including those reached via a wrapper like
-    // `ParameterBlock<S>`, since `S` is itself a module-scope struct), and
-    // function parameters. Each decl site's type is then walked through any
-    // `Array`/`Ptr`/`ParameterGroup` wrappers down to a `StructuredBuffer<T>`.
-    // No recursion, no use-list walking.
+    // Walking module-scope `IRStructType`s reaches every field exactly once
+    // (struct types are hoisted to module scope), so a `StructuredBuffer<T>`
+    // declared inside a `ParameterBlock<S>` is validated even though no
+    // global param has it as a top-level type.
     for (auto globalInst : module->getGlobalInsts())
     {
         if (auto globalParam = as<IRGlobalParam>(globalInst))
