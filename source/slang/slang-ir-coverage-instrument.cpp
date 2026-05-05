@@ -454,6 +454,14 @@ struct CoverageInstrumenter
     IRType* voidType;
     IRType* intType;
 
+    // Dedup map for same-line slot sharing: every counter op resolving
+    // to the same `(file, line)` reuses the first slot allocated for
+    // that pair. Keyed on a `file + ":" + line` string for portability
+    // across `Dictionary` implementations. Counter ops with an
+    // unresolvable source location are not deduped — they each get a
+    // unique slot, since attribution can't tell them apart anyway.
+    Dictionary<String, UInt> slotByLineKey;
+
     CoverageInstrumenter(
         IRModule* m,
         IRGlobalParam* buf,
@@ -468,15 +476,47 @@ struct CoverageInstrumenter
         intType = tmpBuilder.getIntType();
     }
 
-    // Lower a single IncrementCoverageCounter op to a `Call(hitThunk,
-    // slot)` — a single IR inst per call site. The thunk itself
-    // performs the atomic add on `coverageBuffer[slot]`. Appends a
-    // metadata entry for `slot` and removes the op.
-    void lowerCounterOp(IRInst* counterOp, UInt slot)
+    // Resolve `counterOp`'s source position and assign it a slot,
+    // either by reusing an existing slot for the same `(file, line)`
+    // or by allocating a new one. Appends a new metadata entry on a
+    // miss; returns the slot index in either case.
+    UInt assignSlot(IRInst* counterOp)
     {
         CoverageTracingEntry entry;
-        resolveHumaneLoc(sourceManager, counterOp, entry.file, entry.line);
+        bool valid = resolveHumaneLoc(sourceManager, counterOp, entry.file, entry.line);
+
+        if (valid)
+        {
+            StringBuilder keyBuilder;
+            keyBuilder << entry.file << ":" << entry.line;
+            String key = keyBuilder.toString();
+            UInt existing = 0;
+            if (slotByLineKey.tryGetValue(key, existing))
+                return existing;
+
+            UInt slot = (UInt)outMetadata.m_coverageEntries.getCount();
+            outMetadata.m_coverageEntries.add(entry);
+            slotByLineKey.add(key, slot);
+            return slot;
+        }
+
+        // Unresolvable location: each such op gets a fresh slot. The
+        // metadata entry is empty (`file == ""`, `line == 0`); the
+        // host-side LCOV converter filters these out of line-oriented
+        // output.
+        UInt slot = (UInt)outMetadata.m_coverageEntries.getCount();
         outMetadata.m_coverageEntries.add(entry);
+        return slot;
+    }
+
+    // Lower a single IncrementCoverageCounter op to a `Call(hitThunk,
+    // slot)` — a single IR inst per call site. The thunk itself
+    // performs the atomic add on `coverageBuffer[slot]`. Slot is
+    // resolved via `assignSlot` (which may reuse a slot for an
+    // already-seen source line) and the op is removed.
+    void lowerCounterOp(IRInst* counterOp)
+    {
+        UInt slot = assignSlot(counterOp);
 
         IRBuilder builder(module);
         builder.setInsertBefore(counterOp);
@@ -493,14 +533,20 @@ struct CoverageInstrumenter
 
     void run(List<IRInst*> const& counterOps)
     {
+        // Best-case reservation: every op gets its own slot. Worst
+        // case the buffer grows by less due to same-line dedup; the
+        // over-reservation is harmless.
         outMetadata.m_coverageEntries.reserve(counterOps.getCount());
-        // Each counter op gets its own slot: the op's identity IS the
-        // UID, and we assign a consecutive index in traversal order.
-        // Multiple ops on the same source line get distinct slots; the
-        // LCOV converter aggregates per (file, line) at the host side
-        // via summation.
-        for (UInt slot = 0; slot < (UInt)counterOps.getCount(); ++slot)
-            lowerCounterOp(counterOps[slot], slot);
+
+        // Multiple ops resolving to the same `(file, line)` share a
+        // counter slot. Net effect: same per-statement firing in the
+        // emitted code (each op still triggers an atomic-add), but
+        // the buffer holds one slot per source line instead of one
+        // per statement, and the metadata holds one entry per line.
+        // The LCOV converter already aggregates by `(file, line)` on
+        // the host, so the user-visible report is unchanged.
+        for (auto op : counterOps)
+            lowerCounterOp(op);
     }
 };
 
