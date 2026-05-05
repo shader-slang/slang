@@ -2171,15 +2171,19 @@ Result linkAndOptimizeIR(
     SLANG_PASS(eliminateMultiLevelBreak, targetProgram);
 
     // `eliminateMultiLevelBreak` invokes `legalizeDefUse`, which can hoist a
-    // local var out of an inner control-flow region and emit a raw
-    // `kIROp_DefaultConstruct` + `Store` pair. For most targets, strip the
-    // pair when the raw default only feeds stores; D3D/HLSL is stricter about
-    // possibly-uninitialized locals, so materialize the default there instead.
-    SLANG_PASS(
-        removeRawDefaultConstructors,
-        isD3DTarget(targetRequest)
-            ? RawDefaultConstructStoreMode::MaterializeStoreOnlyDefaultConstructs
-            : RawDefaultConstructStoreMode::StripStoreOnlyDefaultConstructs);
+    // local var out of an inner control-flow region and emit a
+    // `kIROp_DefaultConstruct` + `Store` pair to make the value defined on
+    // entry. When the user's subsequent code unconditionally overwrites the
+    // var (typical for output-buffer accumulators inside `[ForceUnroll]`
+    // loops), this pair is dead and bloats codegen with a full zero-fill of
+    // the var's storage. Stripping it here removes that overhead before
+    // downstream simplification / SSA-out / codegen runs. (The pass is also
+    // run earlier for SPIRV / CPU-via-LLVM, but those calls run before
+    // `legalizeDefUse` produces these new `DefaultConstruct` insts.) Running
+    // this call unconditionally is safe because `removeRawDefaultConstructors`
+    // only removes dead default-init store patterns and materializes
+    // non-store uses when possible.
+    SLANG_PASS(removeRawDefaultConstructors);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
     {

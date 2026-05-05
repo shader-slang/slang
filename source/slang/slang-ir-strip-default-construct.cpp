@@ -10,13 +10,10 @@ namespace Slang
 
 struct RemoveDefaultConstructInsts : InstPassBase
 {
-    RemoveDefaultConstructInsts(IRModule* module, RawDefaultConstructStoreMode storeMode)
+    RemoveDefaultConstructInsts(IRModule* module)
         : InstPassBase(module)
-        , m_storeMode(storeMode)
     {
     }
-
-    RawDefaultConstructStoreMode m_storeMode;
 
     void processModule()
     {
@@ -25,12 +22,6 @@ struct RemoveDefaultConstructInsts : InstPassBase
             kIROp_DefaultConstruct,
             [&](IRDefaultConstruct* defaultConstruct)
             {
-                if (m_storeMode == RawDefaultConstructStoreMode::MaterializeStoreOnlyDefaultConstructs)
-                {
-                    defaultConstructsToReEmit.add(defaultConstruct);
-                    return;
-                }
-
                 List<IRInst*> instsToRemove;
                 for (auto use = defaultConstruct->firstUse; use; use = use->nextUse)
                 {
@@ -78,9 +69,9 @@ struct RemoveDefaultConstructInsts : InstPassBase
     }
 };
 
-void removeRawDefaultConstructors(IRModule* module, RawDefaultConstructStoreMode storeMode)
+void removeRawDefaultConstructors(IRModule* module)
 {
-    RemoveDefaultConstructInsts(module, storeMode).processModule();
+    RemoveDefaultConstructInsts(module).processModule();
 }
 
 } // namespace Slang
