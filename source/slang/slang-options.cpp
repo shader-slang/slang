@@ -1384,6 +1384,10 @@ struct OptionsParser
 
     CommandOptions* m_cmdOptions = nullptr;
     CommandLineContext* m_cmdLineContext = nullptr;
+
+    // Tracks the currently-being-parsed option name (e.g. "-line-directive-mode")
+    // so that diagnostics like UnknownCommandLineValue can mention it.
+    String m_currentOptionName;
 };
 
 int OptionsParser::addTranslationUnit(SlangSourceLanguage language, Stage impliedStage)
@@ -1862,7 +1866,9 @@ SlangResult OptionsParser::_getValue(
         StringBuilder buf;
         StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), buf);
 
-        m_sink->diagnose(Diagnostics::UnknownCommandLineValue{.validValues = buf});
+        m_sink->diagnose(Diagnostics::UnknownCommandLineValue{
+            .option = m_currentOptionName,
+            .validValues = buf});
         return SLANG_FAIL;
     }
 
@@ -1916,7 +1922,8 @@ SlangResult OptionsParser::_getValue(
     StringBuilder buf;
     StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), buf);
 
-    m_sink->diagnose(Diagnostics::UnknownCommandLineValue{.validValues = buf});
+    m_sink->diagnose(
+        Diagnostics::UnknownCommandLineValue{.option = m_currentOptionName, .validValues = buf});
     return SLANG_FAIL;
 }
 
@@ -2366,6 +2373,12 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             return SLANG_FAIL;
         }
 
+        // Use the canonical first-listed name for the option rather than
+        // the raw argument token. For prefix-style options like `-O3` /
+        // `-g2`, `argValue` includes the suffix; the canonical name
+        // (e.g. `-O`, `-g`) is what the user is supposed to recognise.
+        m_currentOptionName = m_cmdOptions->getFirstNameForOption(optionIndex);
+
         const auto optionKind = OptionKind(m_cmdOptions->getOptionAt(optionIndex).userValue);
 
         switch (optionKind)
@@ -2453,8 +2466,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     colorValue = SLANG_DIAGNOSTIC_COLOR_AUTO;
                 else
                 {
-                    m_sink->diagnose(
-                        Diagnostics::UnknownCommandLineValue{.validValues = "always, never, auto"});
+                    m_sink->diagnose(Diagnostics::UnknownCommandLineValue{
+                        .option = m_currentOptionName,
+                        .validValues = "always, never, auto"});
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.set(optionKind, (int)colorValue);
