@@ -159,6 +159,11 @@ option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
 option(SLANG_ENABLE_SLANGI "Enable Slang interpreter target" ON)
 option(SLANG_ENABLE_SLANGRT "Enable runtime target" ON)
 option(
+    SLANG_ENABLE_SHADER_COVERAGE_RT
+    "Enable the host-side shader-coverage helper library (slang-coverage-rt)"
+    ON
+)
+option(
     SLANG_ENABLE_SLANG_GLSLANG
     "Enable glslang dependency and slang-glslang wrapper target"
     ON
@@ -580,6 +585,7 @@ fetch_or_build_slang_llvm()
 
 add_subdirectory(source/core)
 add_subdirectory(source/slang-rt)
+add_subdirectory(source/slang-coverage-rt)
 add_subdirectory(source/compiler-core)
 add_subdirectory(source/slang-wasm)
 add_subdirectory(source/slang-glslang)

@@ -34,7 +34,8 @@
 	url = https://github.com/bkaradzic/metal-cpp
 [submodule "external/slang-rhi"]
 	path = external/slang-rhi
-	url = https://github.com/shader-slang/slang-rhi.git
+	url = https://github.com/jvepsalainen-nv/slang-rhi.git
+	branch = feature/extra-descriptor-bindings
 [submodule "external/WindowsToolchain"]
 	path = external/WindowsToolchain
 	url = https://github.com/MarkSchofield/WindowsToolchain/

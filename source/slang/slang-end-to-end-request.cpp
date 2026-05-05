@@ -381,6 +381,32 @@ SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact
     return SLANG_OK;
 }
 
+// If the artifact carries coverage tracing metadata, write it to
+// `<path>.coverage-mapping.json` alongside the compiled code. Hosts
+// can read this sidecar to attribute runtime counter values back to
+// source `(file, line)` pairs. The JSON content is produced by the
+// public `slang_writeCoverageManifestJson` API; both that API and
+// this sidecar writer emit byte-identical output, so customers
+// working in-process can pipe the API output through the same
+// downstream tooling that consumes the sidecar.
+SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
+    const String& path,
+    IArtifact* artifact)
+{
+    if (!artifact || path.getLength() == 0)
+        return SLANG_OK;
+    auto coverage = findAssociatedRepresentation<slang::ICoverageTracingMetadata>(artifact);
+    if (!coverage || coverage->getCounterCount() == 0)
+        return SLANG_OK;
+    ComPtr<ISlangBlob> jsonBlob;
+    SLANG_RETURN_ON_FAIL(slang_writeCoverageManifestJson(coverage, jsonBlob.writeRef()));
+    String sidecarPath = path + ".coverage-mapping.json";
+    return File::writeAllBytes(
+        sidecarPath,
+        jsonBlob->getBufferPointer(),
+        jsonBlob->getBufferSize());
+}
+
 SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArtifact* artifact)
 {
     // We don't have to do anything if there is no artifact
@@ -756,6 +782,8 @@ void EndToEndCompileRequest::generateOutput()
                     // If we are compiling separate debug info, check for the additional
                     // SPIRV artifact and write that if needed.
                     _maybeWriteDebugArtifact(targetProgram, path, artifact);
+
+                    _maybeWriteCoverageMapping(path, artifact);
                 }
             }
             else
@@ -772,6 +800,8 @@ void EndToEndCompileRequest::generateOutput()
                         // If we are compiling separate debug info, check for the additional
                         // SPIRV artifact and write that if needed.
                         _maybeWriteDebugArtifact(targetProgram, path, artifact);
+
+                        _maybeWriteCoverageMapping(path, artifact);
                     }
                 }
             }
