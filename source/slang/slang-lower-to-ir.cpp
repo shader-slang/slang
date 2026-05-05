@@ -1,6 +1,7 @@
 // lower.cpp
 #include "slang-lower-to-ir.h"
 
+#include "../core/slang-char-encode.h"
 #include "../core/slang-char-util.h"
 #include "../core/slang-hash.h"
 #include "../core/slang-performance-profiler.h"
@@ -8965,6 +8966,83 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
     return debugSourceInst;
 }
 
+static bool _getDebugSourceLine(
+    IRInst* debugSourceInst,
+    IRIntegerValue oneBasedLine,
+    UnownedStringSlice& outLine)
+{
+    auto debugSource = as<IRDebugSource>(debugSourceInst);
+    if (!debugSource || oneBasedLine <= 0)
+        return false;
+
+    auto source = as<IRStringLit>(debugSource->getSource());
+    if (!source)
+        return false;
+
+    UnownedStringSlice remaining = source->getStringSlice();
+    if (remaining.getLength() == 0)
+        return false;
+
+    UnownedStringSlice line;
+    for (IRIntegerValue lineCounter = 1; lineCounter <= oneBasedLine; ++lineCounter)
+    {
+        if (!StringUtil::extractLine(remaining, line))
+            return false;
+    }
+
+    outLine = line;
+    return true;
+}
+
+static IRIntegerValue _getDebugSourceLineMaxColumn(
+    IRInst* debugSourceInst,
+    IRIntegerValue oneBasedLine)
+{
+    UnownedStringSlice line;
+    if (!_getDebugSourceLine(debugSourceInst, oneBasedLine, line))
+        return 0;
+
+    // SPIRV-Tools validates DebugLine columns against the embedded DebugSource text, with the
+    // maximum accepted column being one past the final character on the source line.
+    return IRIntegerValue(UTF8Util::calcCodePointCount(line) + 1);
+}
+
+static void _clampDebugLineColumns(
+    IRInst* debugSourceInst,
+    IRIntegerValue line,
+    IRIntegerValue& colStart,
+    IRIntegerValue& colEnd)
+{
+    const IRIntegerValue maxColumn = _getDebugSourceLineMaxColumn(debugSourceInst, line);
+    if (maxColumn <= 0)
+        return;
+
+    if (colStart < 1)
+        colStart = 1;
+    if (colStart > maxColumn)
+        colStart = maxColumn;
+
+    if (colEnd < colStart)
+        colEnd = colStart;
+    if (colEnd > maxColumn)
+        colEnd = maxColumn;
+}
+
+static HumaneSourceLoc _getDebugHumaneLoc(
+    SourceManager* sourceManager,
+    IRInst* debugSourceInst,
+    SourceLoc loc)
+{
+    auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
+
+    IRIntegerValue colStart = humaneLoc.column;
+    IRIntegerValue colEnd = colStart;
+    _clampDebugLineColumns(debugSourceInst, humaneLoc.line, colStart, colEnd);
+    humaneLoc.column = colStart;
+
+    return humaneLoc;
+}
+
 void maybeEmitDebugLine(
     IRGenContext* context,
     StmtLoweringVisitor* visitor,
@@ -8989,7 +9067,10 @@ void maybeEmitDebugLine(
         return;
 
     auto sourceManager = context->getLinkage()->getSourceManager();
-    auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
+    auto humaneLoc = _getDebugHumaneLoc(sourceManager, debugSourceInst, loc);
+    IRIntegerValue colStart = humaneLoc.column;
+    IRIntegerValue colEnd = humaneLoc.column + 1;
+    _clampDebugLineColumns(debugSourceInst, humaneLoc.line, colStart, colEnd);
 
     if (visitor)
         visitor->startBlockIfNeeded(stmt);
@@ -8997,8 +9078,8 @@ void maybeEmitDebugLine(
         debugSourceInst,
         humaneLoc.line,
         humaneLoc.line,
-        humaneLoc.column,
-        humaneLoc.column + 1);
+        colStart,
+        colEnd);
 }
 
 void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
@@ -9012,7 +9093,7 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
         return;
 
     auto sourceManager = context->getLinkage()->getSourceManager();
-    auto humaneLoc = sourceManager->getHumaneLoc(inst->sourceLoc, SourceLocType::Emit);
+    auto humaneLoc = _getDebugHumaneLoc(sourceManager, debugSourceInst, inst->sourceLoc);
 
     context->irBuilder
         ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
@@ -10962,14 +11043,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     // Create a debug variable for this let declaration
                     auto builder = context->irBuilder;
-                    auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(
-                        decl->loc,
-                        SourceLocType::Emit);
-
                     // Find the debug source for this file
                     IRInst* debugSourceInst = getOrEmitDebugSource(context, decl->loc);
                     if (debugSourceInst)
                     {
+                        auto humaneLoc = _getDebugHumaneLoc(
+                            context->getLinkage()->getSourceManager(),
+                            debugSourceInst,
+                            decl->loc);
                         auto debugVar = builder->emitDebugVar(
                             varType,
                             debugSourceInst,
