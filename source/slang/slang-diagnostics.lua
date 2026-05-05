@@ -4542,7 +4542,7 @@ warning(
 
 warning(
     "operator-shift-on-narrow-type",
-    41033,
+    41034,
     "left shift on narrow integer type",
     span { loc = "location", message = "left shift on narrow integer type '~lhsType:IRInst'; unlike C/C++, Slang does not promote narrow integers before shifting. If a wider result is needed, cast the left operand to a wider type first (e.g., uint(x) << n)." }
 )
