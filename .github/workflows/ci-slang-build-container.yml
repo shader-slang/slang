@@ -9,12 +9,17 @@ on:
       runs-on:
         required: true
         type: string
+      timeout-minutes:
+        description: "Per-job timeout. Default 120m fits cached LLVM + Slang. Pass 180 when LLVM-build paths are touched and the GCS cache will miss."
+        required: false
+        type: number
+        default: 120
 
 jobs:
   # Uses nvidia/cuda container for CUDA support.
   build:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 120
+    timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
       id-token: write # Required for Workload Identity
       contents: read
