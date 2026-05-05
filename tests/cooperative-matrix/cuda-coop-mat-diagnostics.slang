@@ -26,9 +26,9 @@
 
 // CHECK_TYPE: error 50000: unsupported element type for cooperative matrix
 
-// CHECK_SHAPE: error 50000: invalid shape for cooperative matrix
+// CHECK_SHAPE: error 50001: invalid shape for cooperative matrix
 
-// CHECK_COMBO: error 50000: invalid type combination for cooperative matrix multiply-add
+// CHECK_COMBO: error 50002: invalid type combination for cooperative matrix multiply-add
 
 using namespace linalg;
 
