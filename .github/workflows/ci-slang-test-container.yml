@@ -139,7 +139,6 @@ jobs:
               # that T4 cannot safely cover, not a second full Linux GPU suite.
               test_roots=("tests/cooperative-matrix/" "tests/neural/" "slang-unit-test-tool/cooperativeMatrixSubgroupTypeMetadata.internal")
               slang_test_args+=("-api" "vk+cuda")
-              slang_test_args+=("-expected-failure-list" "tests/expected-failure-sm80-gpu.txt")
               ;;
             *)
               echo "::error::unknown gpu-tier '${{ inputs.gpu-tier }}' (expected t4 or sm80plus)"
