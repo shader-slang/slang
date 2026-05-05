@@ -75,8 +75,27 @@ jobs:
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
 
+      # TEMPORARY: enable core-dump capture on Linux to investigate the
+      # SIGILL in slang-test on the linux-cpu job (seen 2026-05-04 PR #10977
+      # and 2026-05-05 PR #11053, both crashing right after
+      # tests/autodiff/global-param-hoisting.slang.1 (vk)). Remove once root-caused.
+      - name: Enable core dumps (Linux)
+        if: inputs.os == 'linux'
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/cores"
+          # Override Ubuntu's default apport pipe so cores land as plain files.
+          sudo sysctl -w kernel.core_pattern="$GITHUB_WORKSPACE/cores/core.%e.%p"
+          sudo sysctl -w kernel.core_uses_pid=1
+          ulimit -c unlimited
+          # Make sure gdb is installed for the post-run extraction step.
+          sudo apt-get install -y --no-install-recommends gdb
+
       - name: Test Slang
         run: |
+          # Inherit unlimited core size for any child processes (slang-test,
+          # test-servers, etc.). No-op on non-Linux runners.
+          ulimit -c unlimited || true
           # Fail fast on mutually exclusive inputs — both would accumulate
           # -api filters and produce an empty test partition.
           if [[ "${{ inputs.cpu-only }}" == "true" && "${{ inputs.gpu-api-only }}" == "true" ]]; then
@@ -175,6 +194,49 @@ jobs:
             via_glsl_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
           fi
           "$bin_dir/slang-test" "${via_glsl_args[@]}"
+
+      # TEMPORARY: extract gdb backtraces from any cores produced above and
+      # upload both backtraces and raw cores as artifacts. Paired with
+      # "Enable core dumps (Linux)". Remove once the SIGILL is root-caused.
+      - name: Capture core dumps (Linux)
+        if: always() && inputs.os == 'linux'
+        shell: bash
+        run: |
+          shopt -s nullglob
+          cores=("$GITHUB_WORKSPACE/cores"/core.*)
+          if [ "${#cores[@]}" -eq 0 ]; then
+            echo "No core dumps captured."
+            exit 0
+          fi
+          echo "Captured ${#cores[@]} core dump(s):"
+          ls -lh "${cores[@]}"
+          mkdir -p "$GITHUB_WORKSPACE/cores/backtraces"
+          for c in "${cores[@]}"; do
+            name=$(basename "$c")
+            # Pull the executable name out of core.<exe>.<pid>.
+            exe_name=${name#core.}
+            exe_name=${exe_name%.*}
+            exe_path="$bin_dir/$exe_name"
+            if [ ! -x "$exe_path" ]; then
+              # Fall back to whatever gdb finds in the core itself.
+              exe_path=""
+            fi
+            bt_file="$GITHUB_WORKSPACE/cores/backtraces/$name.bt.txt"
+            echo "=== Backtrace for $name (exe=$exe_path) ===" | tee "$bt_file"
+            gdb -batch \
+              -ex "set pagination off" \
+              -ex "thread apply all bt full" \
+              ${exe_path:+"$exe_path"} "$c" 2>&1 | tee -a "$bt_file" || true
+          done
+
+      - name: Upload core dumps and backtraces
+        if: always() && inputs.os == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cores-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}${{ inputs.artifact-suffix }}
+          path: cores/
+          if-no-files-found: ignore
+          retention-days: 7
 
   # Run slang-rhi tests when:
   # 1. full-gpu-tests is enabled AND
