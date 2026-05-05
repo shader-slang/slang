@@ -230,7 +230,11 @@ if(SLANG_ENABLE_GFX)
     set_target_properties(copy-gfx-slang-modules PROPERTIES FOLDER generators)
     # gfx owns this dependency (not slang-test) so the module files are
     # copied even when SLANG_ENABLE_TESTS=OFF, e.g. in release builds.
-    add_dependencies(gfx copy-gfx-slang-modules)
+    # The custom command's destination uses $<TARGET_FILE_DIR:slangc>,
+    # so the dependency is only meaningful when slangc is being built.
+    if(TARGET slangc)
+        add_dependencies(gfx copy-gfx-slang-modules)
+    endif()
     install(
         FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
         DESTINATION ${runtime_subdir}
