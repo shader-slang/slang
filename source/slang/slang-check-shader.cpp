@@ -1268,6 +1268,37 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             attr->patchConstantFuncDecl = patchConstantFuncDeclRef.getDecl();
         }
     }
+    else if (stage == Stage::Mesh)
+    {
+        bool hasVerticesOutput = false;
+        bool hasIndicesOutput = false;
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            auto paramType = param->getType();
+            if (as<VerticesType>(paramType) || param->findModifier<HLSLVerticesModifier>())
+                hasVerticesOutput = true;
+            if (as<IndicesType>(paramType) || param->findModifier<HLSLIndicesModifier>())
+                hasIndicesOutput = true;
+        }
+        if (!hasVerticesOutput)
+        {
+            sink->diagnose(Diagnostics::MeshShaderMissingVerticesOutput{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+        if (!hasIndicesOutput)
+        {
+            sink->diagnose(Diagnostics::MeshShaderMissingIndicesOutput{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+        if (!entryPointFuncDecl->findModifier<OutputTopologyAttribute>())
+        {
+            sink->diagnose(Diagnostics::MeshShaderMissingOutputTopology{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+    }
     else if (stage == Stage::Geometry)
     {
         bool hasOutputStream = false;

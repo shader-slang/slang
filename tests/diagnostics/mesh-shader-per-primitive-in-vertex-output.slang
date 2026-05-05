@@ -58,8 +58,13 @@ struct MeshOutput2 {
     uint Viewport : SV_ViewportArrayIndex;
     uint Rate : SV_ShadingRate;
 };
+
+struct SimpleVertex {
+    float4 pos : SV_Position;
+};
+
 [outputtopology("triangle")]
 [numthreads(1, 1, 1)]
-void msmain_indices(out indices IndexWithPrimSemantic triangles[3], out primitives MeshOutput2 vertices[9]) {
+void msmain_indices(out indices IndexWithPrimSemantic triangles[3], out vertices SimpleVertex verts[9], out primitives MeshOutput2 prims[9]) {
     SetMeshOutputCounts(6, 2);
 }
