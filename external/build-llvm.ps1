@@ -122,6 +122,7 @@ if ($config -eq 'Debug')
     $msvcRuntimeLib = "MultiThreadedDebug"
 }
 $cmakeArgumentsForSlang = @(
+    # Don't build unnecessary things
     "-DLLVM_BUILD_LLVM_C_DYLIB=0"
     "-DLLVM_INCLUDE_BENCHMARKS=0"
     "-DLLVM_INCLUDE_DOCS=0"
@@ -134,10 +135,20 @@ $cmakeArgumentsForSlang = @(
     "-DCLANG_ENABLE_ARCMT=0"
     "-DCLANG_INCLUDE_DOCS=0"
     "-DCLANG_INCLUDE_TESTS=0"
+    # Requirements for Slang
     "-DLLVM_ENABLE_PROJECTS=clang"
     "-DLLVM_TARGETS_TO_BUILD=$llvmTargets"
     "-DLLVM_BUILD_TOOLS=0"
-    "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>"
+    # Narrow the distribution to just the libraries/headers Slang links against.
+    # Using install-distribution (below) with this list avoids `ninja all`, which
+    # would otherwise compile the Clang Static Analyzer and other unused pieces
+    # despite CLANG_ENABLE_STATIC_ANALYZER=0 (llvm/llvm-project#117705).
+    "-DLLVM_DISTRIBUTION_COMPONENTS=clang-libraries;clang-headers;clang-cmake-exports;llvm-libraries;llvm-headers;cmake-exports"
+    # Get LLVM to use the static linked version of the msvc runtime.
+    # CMAKE_MSVC_RUNTIME_LIBRARY is resolved at configure time with the
+    # single-config generator, so we set it from $msvcRuntimeLib directly
+    # rather than via a $<CONFIG:Debug> generator expression.
+    "-DCMAKE_MSVC_RUNTIME_LIBRARY=$msvcRuntimeLib"
     "-DLLVM_USE_CRT_RELEASE=MT"
     "-DLLVM_USE_CRT_DEBUG=MTd"
 )
@@ -146,19 +157,29 @@ $buildDir = Join-Path $sourceDir "build"
 New-Item -Path $buildDir -ItemType Directory -Force
 $myScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $toolchainFile = Join-Path $myScriptDir "WindowsToolchain\Windows.MSVC.toolchain.cmake"
-cmake -S $sourceDir\llvm -B $buildDir $cmakeArgumentsForSlang + $extraArguments -G "Ninja" --toolchain $toolchainFile
+# Use the single-config Ninja generator rather than Ninja Multi-Config because
+# LLVM_DISTRIBUTION_COMPONENTS (used above) is not compatible with
+# multi-configuration generators.
+cmake -S $sourceDir\llvm -B $buildDir `
+    -G "Ninja" `
+    "-DCMAKE_BUILD_TYPE=$config" `
+    "-DCMAKE_INSTALL_PREFIX=$installPrefix" `
+    --toolchain $toolchainFile `
+    @cmakeArgumentsForSlang `
+    @extraArguments
 
-# Build LLVM
+# Build and install LLVM
 Msg "##########################################################"
-Msg "# Building LLVM in $buildDir"
+Msg "# Building and installing LLVM into $installPrefix"
 Msg "##########################################################"
-cmake --build $buildDir -j --config $config
-
-# Install LLVM
-Msg "##########################################################"
-Msg "# Installing LLVM to $installPrefix"
-Msg "##########################################################"
-cmake --install $buildDir --prefix $installPrefix --config $config
+# install-distribution builds and installs exactly the components listed in
+# LLVM_DISTRIBUTION_COMPONENTS (set at configure time). This is LLVM's
+# supported mechanism for producing a trimmed toolchain — see
+# https://llvm.org/docs/BuildingADistribution.html. It avoids `ninja all`,
+# which would otherwise compile the Clang Static Analyzer and other unused
+# pieces despite CLANG_ENABLE_STATIC_ANALYZER=0
+# (llvm/llvm-project#117705).
+cmake --build $buildDir -j --target install-distribution
 
 Msg "##########################################################"
 Msg "LLVM installed in $installPrefix"
