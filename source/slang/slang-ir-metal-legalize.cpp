@@ -251,7 +251,6 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
 
 static void legalizeSubpassInputsForMetal(
     IRModule* module,
-    TargetProgram* targetProgram,
     DiagnosticSink* sink,
     List<EntryPointInfo>& entryPoints)
 {
@@ -412,7 +411,7 @@ void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, Diagnost
         }
     }
 
-    legalizeSubpassInputsForMetal(module, targetProgram, sink, entryPoints);
+    legalizeSubpassInputsForMetal(module, sink, entryPoints);
 
     legalizeEntryPointVaryingParamsForMetal(module, sink, entryPoints);
 

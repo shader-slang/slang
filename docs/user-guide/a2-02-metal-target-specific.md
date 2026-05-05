@@ -270,6 +270,34 @@ tex[coord] = float2(1,2);  // Automatically expanded to float4(1,2,0,0)
 
 Since Metal doesn't support conservative rasterization, SV_InnerCoverage is always false.
 
+## SubpassInput
+
+Slang supports `SubpassInput` and `SubpassInputMS` on Metal, lowered to Metal's framebuffer fetch. The `[[vk::input_attachment_index(N)]]` attribute maps to Metal's `[[color(N)]]` fragment input, allowing a fragment shader to read the current value in the render target without a separate render pass.
+
+```slang
+[[vk::input_attachment_index(0)]] SubpassInput<float4> color;
+[[vk::input_attachment_index(1)]] SubpassInput<float4> depth;
+
+[shader("fragment")]
+float4 main() : SV_Target
+{
+    return color.SubpassLoad() + depth.SubpassLoad();
+}
+```
+
+This generates a Metal fragment function with `[[color(N)]]` parameters:
+
+```cpp
+[[fragment]] pixelOutput main(float4 color [[color(0)]], float4 depth [[color(1)]])
+```
+
+### Restrictions
+
+- **Fragment stage only.** `SubpassInput` can only be used in fragment entry points.
+- **Direct entry-point parameters only.** `SubpassInput` cannot be placed inside a `ParameterBlock`. It must be a global-scope declaration directly referenced by the entry point.
+- **No cross-function references.** `SubpassInput` cannot be accessed from `[noinline]` helper functions. The compiler inlines `SubpassLoad` calls into the entry point during legalization, so only `[ForceInline]` (the default) helpers work.
+- **`SubpassInputMS` per-sample limitation.** Metal does not support per-sample reads. When using `SubpassInputMS`, the sample index passed to `SubpassLoad` is ignored and the resolved value is returned. The compiler emits warning E56107 at each call site where a sample index is provided.
+
 ## Address Space Assignment
 
 Metal requires explicit address space qualifiers. Slang automatically assigns appropriate address spaces:

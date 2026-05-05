@@ -2719,24 +2719,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
 
-    case kIROp_SubpassLoad:
-        {
-            auto subpassLoad = as<IRSubpassLoad>(inst);
-            auto outer = getInfo(EmitOp::General);
-            emitOperand(subpassLoad->getSubpassInput(), leftSide(outer, getInfo(EmitOp::Postfix)));
-            if (auto sample = subpassLoad->getSample())
-            {
-                m_writer->emit(".SubpassLoad(");
-                emitOperand(sample, getInfo(EmitOp::General));
-                m_writer->emit(")");
-            }
-            else
-            {
-                m_writer->emit(".SubpassLoad()");
-            }
-        }
-        break;
-
     case kIROp_Call:
         {
             emitCallExpr((IRCall*)inst, outerPrec);
