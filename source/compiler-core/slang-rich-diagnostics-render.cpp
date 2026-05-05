@@ -311,9 +311,16 @@ private:
                 if (view)
                 {
                     line.sourceAvailable = true;
+                    // Retrieve the source line using the *physical* line index
+                    // (derived from the raw SourceLoc offset), not the humane line
+                    // number. The humane line may have been remapped by a #line
+                    // directive and would index the wrong line in the file.
+                    auto physicalOffset = view->getRange().getOffset(span.startLoc);
+                    auto physicalLineIndex =
+                        view->getSourceFile()->calcLineIndexFromOffset(physicalOffset);
                     // Get the line content and trim end-of-line characters and trailing whitespace
                     UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
-                        view->getSourceFile()->getLineAtIndex(span.line - 1));
+                        view->getSourceFile()->getLineAtIndex(physicalLineIndex));
                     // Trim trailing whitespace but preserve leading whitespace (indentation)
                     line.content = UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
                 }
@@ -783,8 +790,10 @@ String renderDiagnosticMachineReadable(
             SourceView* view = sm->findSourceView(span.range.begin);
             if (view)
             {
-                UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
-                    view->getSourceFile()->getLineAtIndex(beginLoc.line - 1));
+                auto offset = view->getRange().getOffset(span.range.begin);
+                auto lineIdx = view->getSourceFile()->calcLineIndexFromOffset(offset);
+                UnownedStringSlice rawLine =
+                    StringUtil::trimEndOfLine(view->getSourceFile()->getLineAtIndex(lineIdx));
                 UnownedStringSlice lineContent =
                     UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
                 if (lineContent.getLength() > 0 && beginLoc.column > 0 &&
