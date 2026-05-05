@@ -1,15 +1,18 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv
+// Regression test for #10688: a `StructuredBuffer<T>` reached through a
+// `ParameterBlock<S>` / `ConstantBuffer<S>` wrapper used to bypass validation
+// and crash type legalization with `non-simple operand(s)`.
 
-// A StructuredBuffer whose element contains a resource type is invalid even
-// when the StructuredBuffer is reached through a ParameterBlock or
-// ConstantBuffer wrapper (regression test for issue #10688). Previously the
-// validator only inspected the top-level type of each global parameter, so
-// these cases slipped through and crashed type legalization.
-//
-// We assert on message text only (not column) because the diagnostic source
-// loc is recovered by walking the StructuredBuffer type's IR use list to a
-// declaration site, and the exact column depends on IRBuilder source-loc
-// bookkeeping during lowering.
+//DIAGNOSTIC_TEST:SIMPLE(diag=PB):    -target spirv -entry main_pb -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CB):    -target spirv -entry main_cb -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=PBARR): -target spirv -entry main_pbarr -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=DUP):   -target spirv -entry main_dup -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=RW):    -target spirv -entry main_rw -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=FN):    -target spirv -entry main_fn -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=DEEP):  -target spirv -entry main_deep -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=GEN):   -target spirv -entry main_gen -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=NEG):   -target spirv -entry main_neg -stage compute
+
+RWStructuredBuffer<float> output;
 
 struct WithTexture
 {
@@ -47,88 +50,177 @@ struct WithFnParam
     float weight;
 }
 
-// A struct whose StructuredBuffer element type contains no resource. Wrapping
-// it in ParameterBlock must NOT trigger the resource-in-StructuredBuffer
-// diagnostic. Acts as a negative case alongside the positive ones above; if
-// the new module-wide walk over-fires, this would surface as an extra
-// diagnostic carrying 'WithoutResource', which the test would not match.
+struct WithDeep
+{
+    Texture2D image;
+    float weight;
+}
+
+struct WithGeneric
+{
+    Texture2D image;
+    float weight;
+}
+
 struct WithoutResource
 {
     float a;
     float b;
 }
 
+// ParameterBlock<S> wrapper.
 struct PB
 {
-    StructuredBuffer<WithTexture> badBuffer;
+    StructuredBuffer<WithTexture> b;
+}
+//PB: resource type in StructuredBuffer
+//PB: 'WithTexture' cannot contain resource or opaque handle types
+
+ParameterBlock<PB> pb;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main_pb()
+{
+    output[0] = pb.b[0].scale;
 }
 
+// ConstantBuffer<S> wrapper.
 struct CB
 {
-    StructuredBuffer<WithSampler> badBuffer;
+    StructuredBuffer<WithSampler> b;
+}
+//CB: resource type in StructuredBuffer
+//CB: 'WithSampler' cannot contain resource or opaque handle types
+
+ConstantBuffer<CB> cb;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main_cb()
+{
+    output[0] = cb.b[0].pad;
 }
 
-// Array-of-StructuredBuffer reached through a ParameterBlock: the validator
-// must also walk through array wrappers to find the declaration site.
+// Array-of-StructuredBuffer through ParameterBlock.
 struct PBArr
 {
     StructuredBuffer<WithArrayed> arr[4];
 }
+//PBARR: resource type in StructuredBuffer
+//PBARR: 'WithArrayed' cannot contain resource or opaque handle types
 
-// ParameterBlock wrapping an OK StructuredBuffer (no resource in element).
-// Must not produce a resource-in-StructuredBuffer diagnostic.
+ParameterBlock<PBArr> pbArr;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main_pbarr()
+{
+    output[0] = pbArr.arr[0][0].bias;
+}
+
+// Two decl sites sharing one interned `StructuredBuffer<WithDuplicate>` type.
+StructuredBuffer<WithDuplicate> dup1;
+//DUP: resource type in StructuredBuffer
+//DUP: 'WithDuplicate' cannot contain resource or opaque handle types
+StructuredBuffer<WithDuplicate> dup2;
+//DUP: resource type in StructuredBuffer
+//DUP: 'WithDuplicate' cannot contain resource or opaque handle types
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main_dup()
+{
+    output[0] = dup1[0].weight + dup2[0].weight;
+}
+
+// RWStructuredBuffer.
+RWStructuredBuffer<WithRW> rwBad;
+//RW: resource type in StructuredBuffer
+//RW: 'WithRW' cannot contain resource or opaque handle types
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main_rw()
+{
+    rwBad[0].weight = 1;
+}
+
+// Function parameter (and the global feeding it).
+StructuredBuffer<WithFnParam> fnSbInput;
+//FN: resource type in StructuredBuffer
+//FN: 'WithFnParam' cannot contain resource or opaque handle types
+
+float useFnSb(StructuredBuffer<WithFnParam> fnSb)
+//FN: resource type in StructuredBuffer
+//FN: 'WithFnParam' cannot contain resource or opaque handle types
+{
+    return fnSb[0].weight;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main_fn()
+{
+    output[0] = useFnSb(fnSbInput);
+}
+
+// Depth-2 nesting: bad field is two struct hops below the decl site.
+struct Leaf
+{
+    StructuredBuffer<WithDeep> buf;
+}
+//DEEP: resource type in StructuredBuffer
+//DEEP: 'WithDeep' cannot contain resource or opaque handle types
+
+struct MidA
+{
+    Leaf leaf;
+}
+
+struct MidB
+{
+    MidA a;
+}
+
+ParameterBlock<MidB> deep;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main_deep()
+{
+    output[0] = deep.a.leaf.buf[0].weight;
+}
+
+// Generic specialization: the validator walks `GS<WithGeneric>` after
+// `specializeModule` produces it as a concrete struct type.
+struct GS<T>
+{
+    StructuredBuffer<T> buf;
+}
+//GEN: resource type in StructuredBuffer
+//GEN: 'WithGeneric' cannot contain resource or opaque handle types
+
+ParameterBlock<GS<WithGeneric>> genericCase;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main_gen()
+{
+    output[0] = genericCase.buf[0].weight;
+}
+
+// Negative case: no annotations under `NEG`, so any diagnostic fails the test.
 struct PBOk
 {
     StructuredBuffer<WithoutResource> okBuffer;
 }
 
-ParameterBlock<PB> pb;
-ConstantBuffer<CB> cb;
-ParameterBlock<PBArr> pbArr;
 ParameterBlock<PBOk> pbOk;
 
-// Two global parameters that share the same offending StructuredBuffer<T>
-// type. Slang IR interns types, so both `dup1` and `dup2` reference the same
-// `StructuredBuffer<WithDuplicate>` inst. The validator must report both
-// declaration sites (one diagnostic per decl site), not just the first one
-// it finds in the type's use list.
-StructuredBuffer<WithDuplicate> dup1;
-StructuredBuffer<WithDuplicate> dup2;
-
-// RWStructuredBuffer<T> with a resource-bearing element: covers the RW arm
-// of IRHLSLStructuredBufferTypeBase, which the previous test only exercised
-// via `output` (a non-resource RW buffer).
-RWStructuredBuffer<WithRW> rwBad;
-
-RWStructuredBuffer<float> output;
-
-// Global parameter feeding the function-parameter case below. Declared at
-// global scope so the function call is well-typed even with our offending
-// element struct.
-StructuredBuffer<WithFnParam> fnSbInput;
-
-// Function parameter (non-entry function) whose type is a StructuredBuffer
-// with resource-bearing elements. Exercises the IRParam decl-site arm of the
-// use-list walk and locks in that the matcher accepts function params.
-float useFnSb(StructuredBuffer<WithFnParam> fnSb)
-{
-    return fnSb[0].weight;
-}
-
+[shader("compute")]
 [numthreads(1, 1, 1)]
-void computeMain(uint3 tid : SV_DispatchThreadID)
+void main_neg()
 {
-    output[tid.x] = pb.badBuffer[0].scale + cb.badBuffer[0].pad
-                  + pbArr.arr[0][0].bias + pbOk.okBuffer[0].a
-                  + dup1[0].weight + dup2[0].weight
-                  + rwBad[0].weight + useFnSb(fnSbInput);
+    output[0] = pbOk.okBuffer[0].a;
 }
-
-//CHECK: StructuredBuffer element type 'WithTexture' cannot contain resource or opaque handle types
-//CHECK: StructuredBuffer element type 'WithSampler' cannot contain resource or opaque handle types
-//CHECK: StructuredBuffer element type 'WithArrayed' cannot contain resource or opaque handle types
-//CHECK: StructuredBuffer element type 'WithDuplicate' cannot contain resource or opaque handle types
-//CHECK: StructuredBuffer element type 'WithDuplicate' cannot contain resource or opaque handle types
-//CHECK: StructuredBuffer element type 'WithRW' cannot contain resource or opaque handle types
-//CHECK: StructuredBuffer element type 'WithFnParam' cannot contain resource or opaque handle types
-//CHECK: StructuredBuffer element type 'WithFnParam' cannot contain resource or opaque handle types
