@@ -4006,6 +4006,20 @@ err(
 )
 
 err(
+    "mesh-shader-missing-output-topology",
+    38047,
+    "mesh shader missing [outputtopology] attribute",
+    span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must have an '[outputtopology(\"point\"|\"line\"|\"triangle\")]' attribute" }
+)
+
+err(
+    "mesh-shader-missing-outputs",
+    38048,
+    "mesh shader missing OutputVertices/OutputIndices output",
+    span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must declare both an 'OutputVertices' and an 'OutputIndices' output parameter" }
+)
+
+err(
     "invalid-entry-point-varying-type",
     38050,
     "type cannot be used as entry-point varying parameter or return type",
