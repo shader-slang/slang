@@ -34,6 +34,7 @@
 #include "slang-ir-cleanup-void.h"
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-com-interface.h"
+#include "slang-ir-coverage-instrument.h"
 #include "slang-ir-cuda-immutable-load.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
@@ -542,6 +543,9 @@ void calcRequiredLoweringPassSet(
         if (!isScalarOrVectorType(inst->getFullType()))
             result.nonVectorCompositeSelect = true;
         break;
+    case kIROp_IncrementCoverageCounter:
+        result.coverageTracing = true;
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -930,6 +934,13 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // Create the post-emit metadata object up-front so that IR passes
+    // that need to record reportable data (e.g. `instrumentCoverage`'s
+    // slot → source mapping) can write into it directly. `collectMetadata`
+    // later fills in binding / exported-function fields.
+    auto metadata = new ArtifactPostEmitMetadata;
+    outLinkedIR.metadata = metadata;
+
     // For now, only emit the debug build identifier if separate debug info is enabled
     // and only if there are targets.
     // TODO: We will ultimately need to change this to always emit the instruction.
@@ -1013,6 +1024,46 @@ Result linkAndOptimizeIR(
     // can assume that all ordinary/uniform data is strictly
     // passed using constant buffers.
     //
+    // Shader coverage instrumentation. The pass synthesizes
+    // `__slang_coverage` as an `IRGlobalParam` directly in the
+    // linked program IR, extends the program-scope var layout, and
+    // rewrites counter ops to atomic adds. Runs BEFORE
+    // `collectGlobalUniformParameters` so the synthesized buffer
+    // gets packed into `GlobalParams` alongside user globals on
+    // targets that pack ordinary uniforms (CPU, CUDA).
+    //
+    // Counter ops carry source position on their built-in `sourceLoc`,
+    // so this pass is independent of debug-info state. It writes its
+    // slot → source mapping into `metadata`, exposed to hosts via
+    // ICoverageTracingMetadata.
+    if (requiredLoweringPassSet.coverageTracing)
+    {
+        // Pull explicit binding values from `-trace-coverage-binding`
+        // here; pass -1 for either side to request auto-allocation in
+        // the synthesis routine.
+        int explicitBinding = -1;
+        int explicitSpace = -1;
+        auto& opts = codeGenContext->getTargetReq()->getOptionSet();
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
+        {
+            if (values->getCount() > 0)
+            {
+                explicitBinding = (int)(*values)[0].intValue;
+                explicitSpace = (int)(*values)[0].intValue2;
+            }
+        }
+        SLANG_PASS(
+            instrumentCoverage,
+            sink,
+            codeGenContext->shouldTraceCoverage(),
+            explicitBinding,
+            explicitSpace,
+            targetRequest,
+            outLinkedIR.globalScopeVarLayout,
+            *metadata);
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+    }
+
     SLANG_PASS(collectGlobalUniformParameters, outLinkedIR.globalScopeVarLayout, target);
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
@@ -2282,9 +2333,6 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
 
-    auto metadata = new ArtifactPostEmitMetadata;
-    outLinkedIR.metadata = metadata;
-
     // Runs after target-specific lowering so it only captures cooperative types that remain
     // as native constructs visible to the driver (see ICooperativeTypesMetadata docs).
     {
@@ -2305,8 +2353,6 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(collectMetadata, *metadata);
-
-    outLinkedIR.metadata = metadata;
 
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);

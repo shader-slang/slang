@@ -4595,6 +4595,40 @@ err(
     span { loc = "location", message = "unresolved external symbol '~symbol:IRInst'." }
 )
 
+-- 451xx - Coverage instrumentation (-trace-coverage)
+
+warning(
+    "coverage-buffer-reserved-name",
+    45100,
+    "`__slang_coverage` is reserved by `-trace-coverage`",
+    span { loc = "location", message = "the global parameter name `__slang_coverage` is reserved by the `-trace-coverage` instrumentation. The IR coverage pass synthesizes its own buffer with this name; the user declaration here is silently shadowed and will not receive any counter writes. Either rename the user declaration or remove `-trace-coverage` from the compile." }
+)
+
+err(
+    "coverage-binding-collision",
+    45101,
+    "`-trace-coverage-binding` collides with an existing parameter",
+    span { loc = "location", message = "the explicit `-trace-coverage-binding` slot collides with this global parameter; downstream code generation will emit two parameters at the same `(register, space)` and fail validation. Pick a free slot, or omit `-trace-coverage-binding` to let the IR pass auto-allocate." }
+)
+
+warning(
+    "coverage-target-not-supported",
+    45102,
+    "`-trace-coverage` is not supported on this target; coverage instrumentation skipped"
+)
+
+err(
+    "coverage-binding-exhausted",
+    45103,
+    "could not allocate a free binding slot for `__slang_coverage` — existing global parameters occupy too many slots in space 0"
+)
+
+err(
+    "coverage-pass-through-incompatible",
+    45104,
+    "`-trace-coverage` cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation"
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(
