@@ -77,12 +77,16 @@ runs:
         # ClangConfig.cmake via CMake's standard subdirectory search. Use $PWD
         # so the path resolves inside the current shell (container or host).
         # On Windows Git Bash, convert the path with `cygpath -m` so CMake sees
-        # "C:/..." instead of "/c/...".
+        # "C:/..." instead of "/c/...", and use `;` as the path separator
+        # (CMake's documented separator on Windows; `:` would split drive
+        # letters like `C:/` mid-path).
         LLVM_INSTALL="$PWD/build/llvm-project-install"
+        PATH_SEP=":"
         if command -v cygpath >/dev/null; then
           LLVM_INSTALL="$(cygpath -m "$LLVM_INSTALL")"
+          PATH_SEP=";"
         fi
-        echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}" >> $GITHUB_ENV
+        echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+${PATH_SEP}${CMAKE_PREFIX_PATH}}" >> $GITHUB_ENV
         echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> $GITHUB_ENV
         echo "Clang_DIR=${LLVM_INSTALL}/lib/cmake/clang" >> $GITHUB_ENV
 
@@ -102,8 +106,10 @@ runs:
         # inside the current shell (container or host). On Windows Git Bash,
         # convert to Windows-style ("C:/...") so CMake interprets it correctly.
         LLVM_INSTALL="$PWD/build/llvm-project-install"
+        PATH_SEP=":"
         if command -v cygpath >/dev/null; then
           LLVM_INSTALL="$(cygpath -m "$LLVM_INSTALL")"
+          PATH_SEP=";"
         fi
 
         ./external/build-llvm.sh \
@@ -125,7 +131,7 @@ runs:
 
         # Set environment variables for CMake. See matching comment in the
         # download step above.
-        echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}" >> $GITHUB_ENV
+        echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+${PATH_SEP}${CMAKE_PREFIX_PATH}}" >> $GITHUB_ENV
         echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> $GITHUB_ENV
         echo "Clang_DIR=${LLVM_INSTALL}/lib/cmake/clang" >> $GITHUB_ENV
 
