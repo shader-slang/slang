@@ -46,8 +46,11 @@ runs:
       shell: bash
       run: |
         # Cache key includes targets so different target sets get separate entries.
+        # Canonicalize: split on `;`, strip whitespace, sort, dedupe, rejoin
+        # with `-`. Makes "X86;AArch64" and "AArch64;X86" hit the same cache,
+        # and tolerates stray whitespace that CMake itself would accept.
         # Keep in sync with the identical computation in the "Upload LLVM to GCS" step below.
-        TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" | tr ';' '-')"
+        TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" | tr ';' '\n' | tr -d '[:blank:]' | grep -v '^$' | sort -u | paste -sd'-' -)"
         LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${TARGETS_SLUG}-${{ inputs.llvm-hash }}"
         PUBLIC_URL="https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
 
@@ -150,7 +153,7 @@ runs:
       shell: bash
       run: |
         # Keep in sync with the identical computation in the "Download LLVM from GCS" step above.
-        TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" | tr ';' '-')"
+        TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" | tr ';' '\n' | tr -d '[:blank:]' | grep -v '^$' | sort -u | paste -sd'-' -)"
         LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${TARGETS_SLUG}-${{ inputs.llvm-hash }}"
         GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
         LLVM_DIR="$PWD/build/llvm-project-install"
