@@ -49,9 +49,9 @@ local function find_similar(target, candidates, max_distance)
 end
 
 -- Set to false to enable uniqueness checking for diagnostic codes.
--- Currently set to true to allow duplicate codes during the transition period.
+-- All duplicate codes have been resolved; uniqueness is now enforced.
 -- See: https://github.com/shader-slang/slang/issues/6736
-local allow_duplicate_diagnostic_codes = true
+local allow_duplicate_diagnostic_codes = false
 
 -- Enforce that diagnostics sharing a numeric code have the same severity.
 --
@@ -630,8 +630,12 @@ local function process_diagnostics(diagnostics_table)
         seen_names[diag.name] = i
       end
 
+      -- Codes that are intentionally shared: negative sentinels (-1) and
+      -- catch-all placeholders (39999, 99999) must be excluded from uniqueness checks.
+      local is_intentional_duplicate = diag.code < 0 or diag.code == 39999 or diag.code == 99999
+
       if seen_codes[diag.code] then
-        if not allow_duplicate_diagnostic_codes then
+        if not allow_duplicate_diagnostic_codes and not is_intentional_duplicate then
           table.insert(all_errors, diagnostic_name .. " has duplicate code " .. diag.code)
         end
         local prev = diagnostics_table[seen_codes[diag.code]]
