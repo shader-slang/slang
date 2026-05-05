@@ -203,9 +203,16 @@ jobs:
         shell: bash
         run: |
           shopt -s nullglob
+          # Drop known-benign cores from intentional unit-test crashes (test-process
+          # exercises subprocess management; gfx-smoke fails to load a GPU driver
+          # on the GitHub-hosted runner). Keeps the artifact lean so the slang-test
+          # cores we actually care about are easy to find.
+          for benign in test-process gfx-smoke; do
+            rm -f "$GITHUB_WORKSPACE/cores/core.$benign".*
+          done
           cores=("$GITHUB_WORKSPACE/cores"/core.*)
           if [ "${#cores[@]}" -eq 0 ]; then
-            echo "No core dumps captured."
+            echo "No interesting core dumps captured."
             exit 0
           fi
           echo "Captured ${#cores[@]} core dump(s):"
@@ -223,9 +230,18 @@ jobs:
             fi
             bt_file="$GITHUB_WORKSPACE/cores/backtraces/$name.bt.txt"
             echo "=== Backtrace for $name (exe=$exe_path) ===" | tee "$bt_file"
+            # Run a richer gdb inspection: registers, faulting instruction,
+            # disassembly around $pc, shared-library map (so we can correlate
+            # the faulting RIP to a JITed mmap region), and process mappings.
             gdb -batch \
               -ex "set pagination off" \
+              -ex "set print pretty on" \
               -ex "thread apply all bt full" \
+              -ex "info registers" \
+              -ex "x/i \$pc" \
+              -ex "x/16i \$pc-32" \
+              -ex "info sharedlibrary" \
+              -ex "maintenance info sections" \
               ${exe_path:+"$exe_path"} "$c" 2>&1 | tee -a "$bt_file" || true
           done
 
