@@ -175,6 +175,31 @@ msg "##########################################################"
 # (llvm/llvm-project#117705).
 cmake --build "$build_dir" -j --target install-distribution
 
+# Sanity-check that the install tree actually contains the per-target
+# codegen libraries we asked for. install-distribution only installs what
+# the named components transitively pull in; if upstream LLVM ever
+# regroups components and drops LLVM<TARGET>CodeGen out of the libraries
+# component, the install would silently produce a libslang-llvm that
+# cannot emit code for the requested target. Catch that here rather than
+# at first use.
+msg "##########################################################"
+msg "# Verifying installed LLVM codegen libraries"
+msg "##########################################################"
+missing_codegen=()
+IFS=';' read -ra requested_targets <<<"$llvm_targets"
+for target in "${requested_targets[@]}"; do
+  # Library extension varies by platform (.a on Unix, .lib on Windows);
+  # match by stem only.
+  if ! find "$install_prefix" -type f \
+    \( -name "libLLVM${target}CodeGen.*" -o -name "LLVM${target}CodeGen.lib" \) \
+    -print -quit | grep -q .; then
+    missing_codegen+=("$target")
+  fi
+done
+if [ "${#missing_codegen[@]}" -gt 0 ]; then
+  fail "LLVM install at $install_prefix is missing codegen libraries for: ${missing_codegen[*]}. The LLVM_DISTRIBUTION_COMPONENTS list in this script likely needs updating."
+fi
+
 msg "##########################################################"
 msg "LLVM installed in $install_prefix"
 msg "Please add $install_prefix to CMAKE_PREFIX_PATH"
