@@ -32,12 +32,24 @@ jobs:
           fi
 
           shouldRun=true
-          # Touching the LLVM build script or the cache action invalidates the
-          # GCS cache key, forcing a from-source rebuild on every build job.
-          # The Windows from-source build does not fit in the default 120m
-          # budget, so callers extend the per-job timeout when this is true.
-          # Default to true if the diff fails (better to grant headroom than
-          # cancel halfway through a real LLVM rebuild).
+          # Touching anything that affects the LLVM fetch/build/install
+          # pipeline can force a from-source rebuild. The Windows from-source
+          # build does not fit in the default 120m budget, so callers extend
+          # the per-job timeout when this is true. Default to true if the
+          # diff fails (better to grant headroom than cancel halfway through
+          # a real LLVM rebuild). Includes:
+          #   - external/build-llvm.{sh,ps1}        invalidates the GCS
+          #                                         cache key directly via
+          #                                         hashFiles(...)
+          #   - .github/actions/setup-llvm-from-gcs cache key construction
+          #                                         and the build/restore
+          #                                         steps
+          #   - .github/actions/common-setup        LLVM env-var setup
+          #                                         (CMAKE_PREFIX_PATH,
+          #                                         LLVM_DIR, Clang_DIR,
+          #                                         cygpath handling) that
+          #                                         can break configures
+          #                                         even when the cache hits
           llvmTouched=true
           if files="$(git diff --name-only $BASE...HEAD)"; then
             # Git diff succeeded, check if non-documentation files were changed
@@ -47,7 +59,7 @@ jobs:
               echo "Only documentation files changed, skipping remaining steps"
               shouldRun=false
             fi
-            if echo "$files" | grep -qE '^(external/build-llvm\.(sh|ps1)$|\.github/actions/setup-llvm-from-gcs/)'; then
+            if echo "$files" | grep -qE '^(external/build-llvm\.(sh|ps1)$|\.github/actions/(setup-llvm-from-gcs|common-setup)/)'; then
               llvmTouched=true
             else
               llvmTouched=false
