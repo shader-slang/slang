@@ -2541,6 +2541,13 @@ err(
     span { loc = "attr", message = "cannot resolve overloaded functions for derivative-of attributes." }
 )
 
+err(
+    "public-custom-derivative-uses-non-exported-import",
+    31162,
+    "custom derivative uses non-exported import",
+    span { loc = "attr", message = "a publicly visible custom derivative cannot reference '~derivative:Decl' from a module that is imported but not re-exported with '__exported import'." }
+)
+
 
 -- Load semantic checking diagnostics (part 6) - Differentiation, Modifiers, GLSL/HLSL specifics, Interfaces, Control flow, Enums, Generics
 -- (inlined from slang-diagnostics-semantic-checking-6.lua)
@@ -5185,6 +5192,13 @@ err(
     50001,
     "invalid shape for cooperative matrix",
     span { loc = "location", message = "Invalid shape ['~rowCount', '~colCount'] for cooperative matrix '~matrixUse'." }
+)
+
+err(
+    "cooperative-matrix-invalid-mma-type-combination",
+    50002,
+    "invalid type combination for cooperative matrix multiply-add",
+    span { loc = "location", message = "Invalid (A, B, C, D) element-type combination for cooperative matrix multiply-add: A='~aType', B='~bType', C='~cType', D='~dType'. The CUDA backend requires A and B to share the same element type and the accumulator family to match the input family (half -> half/float, bfloat16 -> float, int8/uint8 -> int, FloatE4M3/FloatE5M2 -> half/float)." }
 )
 
 fatal(
