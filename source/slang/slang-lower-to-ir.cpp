@@ -9074,12 +9074,8 @@ void maybeEmitDebugLine(
 
     if (visitor)
         visitor->startBlockIfNeeded(stmt);
-    context->irBuilder->emitDebugLine(
-        debugSourceInst,
-        humaneLoc.line,
-        humaneLoc.line,
-        colStart,
-        colEnd);
+    context->irBuilder
+        ->emitDebugLine(debugSourceInst, humaneLoc.line, humaneLoc.line, colStart, colEnd);
 }
 
 void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
