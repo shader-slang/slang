@@ -5,6 +5,7 @@
 // Test that SubpassInputMS emits a warning on Metal and still compiles.
 
 // METAL-DAG: color(0)
+// METAL-NOT: {{\.read\(.*,.*\)}}
 // METALLIB: framebuffer_fetch
 // DIAG: warning[E56107]
 

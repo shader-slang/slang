@@ -265,7 +265,7 @@ static void legalizeSubpassInputsForMetal(
         }
     }
 
-    IRFunc* entryPointToFix = nullptr;
+    ShortList<IRFunc*> entryPointsToFix;
     for (auto globalParam : subpassGlobals)
     {
         auto subpassType = as<IRSubpassInputType>(globalParam->getDataType());
@@ -353,17 +353,21 @@ static void legalizeSubpassInputsForMetal(
             {
                 sink->diagnose(Diagnostics::SubpassInputUsedOutsideEntryPoint{
                     .location = getDiagnosticPos(user)});
-                IRBuilder localBuilder(user);
-                localBuilder.setInsertBefore(user);
-                use->set(localBuilder.emitPoison(subpassType));
+                if (auto resultType = user->getDataType())
+                {
+                    IRBuilder localBuilder(user);
+                    localBuilder.setInsertBefore(user);
+                    user->replaceUsesWith(localBuilder.emitPoison(resultType));
+                }
+                user->removeAndDeallocate();
                 continue;
             }
 
             if (user->getOp() == kIROp_SubpassLoad)
             {
-                // For SubpassInputMS, the sample operand is silently dropped
-                // since Metal framebuffer fetch doesn't support per-sample reads.
-                // The unused sample operand will be cleaned up by DCE.
+                // Metal framebuffer fetch doesn't support per-sample reads,
+                // so the sample operand (if present) is dropped here.
+                // If the sample value has no other uses, DCE will remove it.
                 user->replaceUsesWith(newParam);
                 user->removeAndDeallocate();
                 continue;
@@ -372,11 +376,12 @@ static void legalizeSubpassInputsForMetal(
         }
 
         globalParam->removeAndDeallocate();
-        entryPointToFix = entryPointFunc;
+        if (entryPointsToFix.indexOf(entryPointFunc) == -1)
+            entryPointsToFix.add(entryPointFunc);
     }
 
-    if (entryPointToFix)
-        fixUpFuncType(entryPointToFix);
+    for (auto func : entryPointsToFix)
+        fixUpFuncType(func);
 }
 
 void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
