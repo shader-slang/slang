@@ -4,6 +4,7 @@ public enum TargetEnum : uint32_t
 {
     CUDA = 0,
     SPIR_V = 1,
+    Metal = 2,
 }
 
 public enum ExecutionMode : uint32_t
