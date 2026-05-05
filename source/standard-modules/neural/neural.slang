@@ -30,6 +30,7 @@ __include "WaveMatrix";
 __include "mma-linear-layout-help";
 __include "mma-tiled-cuda";
 __include "mma-tiled-vulkan";
+__include "mma-tiled-metal";
 __include "mma-tiled-layout-helper";
 __include "vectorized-reader";
 __include "shared-memory-pool";

@@ -17,7 +17,6 @@ implementing neural;
 // Cooperative matrix is only supported by CUDA and SPIR-V
 // WaveTangledVector is a vector type that emulates the Cooperative Vector type by using Cooperative Matrix feature which is
 // supported by CUDA and SPIR-V.
-// [require(cooperative_matrix, subgroup_basic, cuda_metal_spirv)]
 [require(cuda_metal_spirv, cooperative_matrix, subgroup_basic)]
 public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int SubgroupSize, int SubgroupCount> : IVector<T>
     where T : __BuiltinFloatingPointType
@@ -38,11 +37,12 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     public int getCount() { return N; }
 
     [ForceInline]
-    public __init() { data = {}; }
+    public __init() {}
 
     [ForceInline]
     public __init(T value)
     {
+        [ForceUnroll]
         for (int i = 0; i < N; i++)
             this.data[i] = value;
         cleanPaddingData();
@@ -51,6 +51,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     [ForceInline]
     public __init(T[Size] inData)
     {
+        [ForceUnroll]
         for (int i = 0; i < N; i++)
             this.data[i] = inData[i];
         cleanPaddingData();
@@ -68,6 +69,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     [ForceInline]
     public __init<InputArray : IArray<T>>(InputArray inData)
     {
+        [ForceUnroll]
         for (int i = 0; i < N; i++)
             this.data[i] = inData[i];
         cleanPaddingData();
@@ -79,6 +81,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     {
         const int elementCountPerUint4 = sizeof(uint4) / sizeof(DTypeMatC);
         const int alignedSize = ((N + (elementCountPerUint4 - 1)) / elementCountPerUint4) * elementCountPerUint4;
+        [ForceUnroll]
         for (int i = N; i < alignedSize; i++)
             this.data[i] = T(0.0f);
     }

@@ -42,7 +42,7 @@ internal struct TiledMMAHelper<T, int InputSize, int OutputSize, int SubgroupSiz
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
     internal static WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>
     forward<Address, bool Bias = false>(
-        WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount> input,
+        __constref WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount> input,
         Address weightAddress,
         Optional<Address> biasAddress)
         where Address : IPointerLikeAddress<T>
