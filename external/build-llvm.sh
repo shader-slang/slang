@@ -112,6 +112,11 @@ done
 [ -n "$config" ] || fail "please set --config"
 [ -n "$install_prefix" ] || fail "please set --install-prefix"
 
+msvc_runtime_lib=MultiThreaded
+if [ "$config" = "Debug" ]; then
+  msvc_runtime_lib=MultiThreadedDebug
+fi
+
 msg "##########################################################"
 msg "# Fetching LLVM from $repo at $branch"
 msg "##########################################################"
@@ -145,8 +150,12 @@ cmake_arguments_for_slang=(
   # would otherwise compile the Clang Static Analyzer and other unused pieces
   # despite CLANG_ENABLE_STATIC_ANALYZER=0 (llvm/llvm-project#117705).
   "-DLLVM_DISTRIBUTION_COMPONENTS=clang-libraries;clang-headers;clang-cmake-exports;llvm-libraries;llvm-headers;cmake-exports"
-  # Get LLVM to use the static linked version of the msvc runtime
-  "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>"
+  # Get LLVM to use the static linked version of the msvc runtime.
+  # CMAKE_MSVC_RUNTIME_LIBRARY is resolved at configure time with the
+  # single-config generator, so we set it from $msvc_runtime_lib directly
+  # rather than via a $<CONFIG:Debug> generator expression (mirrors the
+  # equivalent inlining in build-llvm.ps1).
+  "-DCMAKE_MSVC_RUNTIME_LIBRARY=$msvc_runtime_lib"
   "-DLLVM_USE_CRT_RELEASE=MT"
   "-DLLVM_USE_CRT_DEBUG=MTd"
 )

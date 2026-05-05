@@ -181,6 +181,28 @@ Msg "##########################################################"
 # (llvm/llvm-project#117705).
 cmake --build $buildDir -j --target install-distribution
 
+# Sanity-check that the install tree actually contains the per-target
+# codegen libraries we asked for. Mirrors the equivalent check in
+# build-llvm.sh: install-distribution only installs what the named
+# components transitively pull in, so if upstream LLVM ever regroups
+# components and drops LLVM<TARGET>CodeGen out of the libraries
+# component, fail loudly here rather than at first use.
+Msg "##########################################################"
+Msg "# Verifying installed LLVM codegen libraries"
+Msg "##########################################################"
+$missingCodegen = @()
+foreach ($target in ($llvmTargets -split ';')) {
+    $hit = Get-ChildItem -Path $installPrefix -Recurse -File -ErrorAction SilentlyContinue `
+        -Include "LLVM${target}CodeGen.lib", "libLLVM${target}CodeGen.*" |
+        Select-Object -First 1
+    if (-not $hit) {
+        $missingCodegen += $target
+    }
+}
+if ($missingCodegen.Count -gt 0) {
+    Fail "LLVM install at $installPrefix is missing codegen libraries for: $($missingCodegen -join ', '). The LLVM_DISTRIBUTION_COMPONENTS list in this script likely needs updating."
+}
+
 Msg "##########################################################"
 Msg "LLVM installed in $installPrefix"
 Msg "Please add $installPrefix to CMAKE_PREFIX_PATH"
