@@ -146,6 +146,8 @@ jobs:
           compiler: ${{ inputs.os == 'linux' && 'gcc' || inputs.compiler }}
           platform: ${{ inputs.platform }}
           llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          # Build only the host backend; coverage runs are single-platform.
+          llvm-targets: ${{ inputs.platform == 'aarch64' && 'AArch64' || 'X86' }}
           build-if-missing: "true"
           github-token: ${{ github.token }}
 

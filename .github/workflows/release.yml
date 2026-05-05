@@ -112,7 +112,10 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
           build-llvm: ${{matrix.build-slang-llvm}}
-          llvm-targets: ${{matrix.llvm-targets || 'X86;ARM;AArch64'}}
+          # Every matrix entry with `build-slang-llvm: true` must declare
+          # `llvm-targets` explicitly. We deliberately don't default it here:
+          # a silent fallback would hide a too-wide build for a new entry.
+          llvm-targets: ${{matrix.llvm-targets}}
 
       - name: Build slang generators
         run: |

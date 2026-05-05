@@ -26,6 +26,11 @@ on:
         required: false
         type: boolean
         default: true
+      llvm-targets:
+        description: "Semicolon-separated LLVM target architectures (e.g. X86, AArch64). Required when build-llvm is true."
+        required: false
+        type: string
+        default: ""
       server-count:
         required: false
         type: number
@@ -99,6 +104,7 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
           build-llvm: ${{ inputs.build-llvm }}
+          llvm-targets: ${{ inputs.llvm-targets }}
 
       # Don't need to check this on every config
       - name: Check Stable Names Table

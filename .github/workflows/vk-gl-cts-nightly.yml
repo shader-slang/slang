@@ -55,6 +55,7 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
           build-llvm: true
+          llvm-targets: "X86"
       - name: Build Slang
         run: |
           # Prepare ccache launcher arguments if ccache is available
