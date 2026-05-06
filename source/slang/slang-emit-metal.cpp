@@ -141,13 +141,23 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     if (!layout)
         return;
 
+    // `DescriptorHandle<T>` is bindless on Metal and has the layout of the
+    // underlying resource `T` (see slang-ir-layout.cpp:403-412).  Unwrap the
+    // handle so the per-kind `as<>` tests below match the resource type that
+    // actually drives Metal's entry-point attribute choice.  Without this,
+    // `RWStructuredBuffer<T>.Handle` parameters fell through and received no
+    // `[[buffer(n)]]`, so Metal's declaration-order implicit slots diverged
+    // from Slang reflection (issue #11066).
+    IRType* paramType = param->getDataType();
+    if (auto handleType = as<IRDescriptorHandleType>(paramType))
+        paramType = handleType->getResourceType();
+
     for (auto rr : layout->getOffsetAttrs())
     {
         switch (rr->getResourceKind())
         {
         case LayoutResourceKind::MetalTexture:
-            if (as<IRTextureTypeBase>(param->getDataType()) ||
-                as<IRTextureBufferType>(param->getDataType()))
+            if (as<IRTextureTypeBase>(paramType) || as<IRTextureBufferType>(paramType))
             {
                 m_writer->emit(" [[texture(");
                 m_writer->emit(rr->getOffset());
@@ -155,11 +165,10 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::MetalBuffer:
-            if (as<IRPtrTypeBase>(param->getDataType()) ||
-                as<IRHLSLStructuredBufferTypeBase>(param->getDataType()) ||
-                as<IRByteAddressBufferTypeBase>(param->getDataType()) ||
-                as<IRUniformParameterGroupType>(param->getDataType()) ||
-                as<IRRaytracingAccelerationStructureType>(param->getDataType()))
+            if (as<IRPtrTypeBase>(paramType) || as<IRHLSLStructuredBufferTypeBase>(paramType) ||
+                as<IRByteAddressBufferTypeBase>(paramType) ||
+                as<IRUniformParameterGroupType>(paramType) ||
+                as<IRRaytracingAccelerationStructureType>(paramType))
             {
                 m_writer->emit(" [[buffer(");
                 m_writer->emit(rr->getOffset());
@@ -167,7 +176,7 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::SamplerState:
-            if (as<IRSamplerStateTypeBase>(param->getDataType()))
+            if (as<IRSamplerStateTypeBase>(paramType))
             {
                 m_writer->emit(" [[sampler(");
                 m_writer->emit(rr->getOffset());
