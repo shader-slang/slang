@@ -336,12 +336,18 @@ it would just be a convoluted way to download a prebuilt binary.
 
 #### Building LLVM from source with `external/build-llvm.sh`
 
-Slang ships a helper script at `external/build-llvm.sh` that fetches and
-builds an LLVM install suitable for `USE_SYSTEM_LLVM`. It is intended for CI
-(it's the same script the release workflow uses when seeding the GCS cache)
-but can also be run locally to get a predictable LLVM tree.
+`USE_SYSTEM_LLVM` requires an LLVM install on disk that exposes
+`LLVMConfig.cmake` and `ClangConfig.cmake`. You can satisfy that requirement
+several ways: a distro package (e.g. `apt install llvm-21-dev clang-21`), a
+prebuilt LLVM toolchain you've built yourself for unrelated reasons, or a
+fresh build produced specifically for Slang. **You do not need
+`external/build-llvm.sh` if you already have a suitable LLVM install** —
+just point `CMAKE_PREFIX_PATH` (or `LLVM_DIR`/`Clang_DIR`) at it.
 
-The script builds a deliberately **minimal** LLVM tree:
+Slang ships `external/build-llvm.sh` (and `external/build-llvm.ps1`) as a
+convenience for the case where you don't already have one. It's the same
+script the release workflow uses when seeding the GCS cache, so it produces
+exactly the LLVM tree Slang's release CI consumes:
 
 - Only the LLVM/Clang libraries and headers that `slang-llvm` links against
   are compiled and installed. It does this by setting
@@ -354,14 +360,12 @@ The script builds a deliberately **minimal** LLVM tree:
   where `CLANG_ENABLE_STATIC_ANALYZER=OFF` does not actually prevent those
   sources from being compiled under `ninja all`.
 - LLVM backends default to `X86;ARM;AArch64`. Pass `--targets "X86"` (or a
-  different semicolon-separated list) to narrow this further. Note that this
-  limits the architectures `libslang-llvm` can emit code for; see
-  [llvm-target.md](llvm-target.md) for the cross-compilation implications.
+  different semicolon-separated list) if you only need a single backend.
 - Benchmarks, docs, examples, tests, and the DIA SDK are disabled.
 
-If you need a fuller LLVM install (for example to run `scan-build` or to
-cross-compile with additional backends), build LLVM yourself with the flags
-you need and point `CMAKE_PREFIX_PATH` / `Clang_DIR` at that install.
+If you need a fuller LLVM install (for example to run `scan-build`), build
+LLVM yourself with the flags you need and point `CMAKE_PREFIX_PATH` /
+`Clang_DIR` at that install instead.
 
 ### Cross compiling
 
