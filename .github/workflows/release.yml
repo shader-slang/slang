@@ -69,25 +69,18 @@ jobs:
             }
 
           - { build-slang-llvm: false }
-          - {
-              os: linux,
-              platform: x86_64,
-              build-slang-llvm: true,
-              llvm-targets: "X86",
-            }
+          - { os: linux, platform: x86_64, build-slang-llvm: true }
           - {
               os: windows,
               platform: x86_64,
               arch: amd64,
               build-slang-llvm: true,
-              llvm-targets: "X86",
             }
           - {
               os: macos,
               platform: aarch64,
               arch: arm64,
               build-slang-llvm: true,
-              llvm-targets: "AArch64",
             }
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
@@ -112,10 +105,6 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
           build-llvm: ${{matrix.build-slang-llvm}}
-          # Every matrix entry with `build-slang-llvm: true` must declare
-          # `llvm-targets` explicitly. We deliberately don't default it here:
-          # a silent fallback would hide a too-wide build for a new entry.
-          llvm-targets: ${{matrix.llvm-targets}}
 
       - name: Build slang generators
         run: |

@@ -26,15 +26,6 @@ on:
         required: false
         type: boolean
         default: true
-      llvm-targets:
-        # Required when build-llvm is true; setup-llvm-from-gcs fails loudly
-        # on empty. The default is "" rather than a sensible architecture so
-        # a too-wide build is never silent — see the equivalent comment in
-        # release.yml's matrix entries.
-        description: "Semicolon-separated LLVM target architectures (e.g. X86, AArch64). Required when build-llvm is true; declare explicitly so a too-wide build is never silent."
-        required: false
-        type: string
-        default: ""
       server-count:
         required: false
         type: number
@@ -108,7 +99,6 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
           build-llvm: ${{ inputs.build-llvm }}
-          llvm-targets: ${{ inputs.llvm-targets }}
 
       # Don't need to check this on every config
       - name: Check Stable Names Table

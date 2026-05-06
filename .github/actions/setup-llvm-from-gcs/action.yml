@@ -12,8 +12,9 @@ inputs:
     description: "Hash of build-llvm.sh for cache key"
     required: true
   llvm-targets:
-    description: "Semicolon-separated LLVM target architectures to build (e.g. X86, X86;AArch64). Required: callers must declare explicitly so a too-wide build is never silent."
-    required: true
+    description: "Semicolon-separated LLVM target architectures to build. Defaults to the cross-architecture set so libslang-llvm can emit code for all of them."
+    required: false
+    default: "X86;ARM;AArch64"
   build-if-missing:
     description: "Build LLVM if not found in GCS"
     required: false
@@ -30,17 +31,6 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Validate llvm-targets
-      shell: bash
-      run: |
-        # `required: true` on the input only produces a warning when missing,
-        # so enforce it here. An empty value would yield a misleading cache
-        # key and a failing CMake configure.
-        if [ -z "${{ inputs.llvm-targets }}" ]; then
-          echo "::error::setup-llvm-from-gcs: 'llvm-targets' is required (e.g. 'X86' or 'X86;AArch64'). The caller must declare the target set explicitly."
-          exit 1
-        fi
-
     - name: Download LLVM from GCS
       id: download
       shell: bash

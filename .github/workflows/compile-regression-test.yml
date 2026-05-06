@@ -70,7 +70,6 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
           build-llvm: true
-          llvm-targets: "X86"
       - name: Build Slang
         run: |
           cmake --preset default --fresh \

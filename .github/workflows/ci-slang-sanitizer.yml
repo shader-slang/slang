@@ -97,7 +97,6 @@ jobs:
           compiler: gcc
           platform: x86_64
           llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
-          llvm-targets: "X86"
           build-if-missing: "true"
           github-token: ${{ github.token }}
 

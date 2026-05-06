@@ -72,11 +72,6 @@ jobs:
       platform: wasm
       config: release
       runs-on: '["ubuntu-22.04"]'
-      # The wasm Slang build configures with SLANG_SLANG_LLVM_FLAVOR=DISABLE
-      # and never links against libslang-llvm, but common-setup still fetches
-      # the LLVM prebuilt by default. Use the host-x86_64 target set so the
-      # cache key collides with the regular linux-x86_64 jobs above.
-      llvm-targets: "X86"
 
   # Sanitizer build+test (blocking via check-ci, runs on every PR)
   sanitizer-linux-clang-x86_64:
@@ -97,7 +92,6 @@ jobs:
       platform: aarch64
       config: debug
       runs-on: '["macos-latest"]'
-      llvm-targets: "AArch64"
 
   build-macos-release-clang-aarch64:
     needs: [filter]
@@ -109,7 +103,6 @@ jobs:
       platform: aarch64
       config: release
       runs-on: '["macos-latest"]'
-      llvm-targets: "AArch64"
 
   # Linux ARM64 builds (GitHub-hosted)
   build-linux-debug-gcc-aarch64:
@@ -123,7 +116,6 @@ jobs:
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
       warnings-as-errors: false
-      llvm-targets: "AArch64"
 
   build-linux-release-gcc-aarch64:
     needs: [filter]
@@ -136,7 +128,6 @@ jobs:
       config: release
       runs-on: '["ubuntu-24.04-arm"]'
       warnings-as-errors: false
-      llvm-targets: "AArch64"
 
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
@@ -149,7 +140,6 @@ jobs:
       platform: x86_64
       config: debug
       runs-on: '["Windows", "self-hosted", "build"]'
-      llvm-targets: "X86"
 
   build-windows-release-cl-x86_64-gpu:
     needs: [filter]
@@ -161,7 +151,6 @@ jobs:
       platform: x86_64
       config: release
       runs-on: '["Windows", "self-hosted", "build"]'
-      llvm-targets: "X86"
 
   # Linux tests (self-hosted GPU runner, containerized)
   test-linux-debug-gcc-x86_64:

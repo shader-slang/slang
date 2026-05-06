@@ -17,8 +17,9 @@ inputs:
     default: true
     required: false
   llvm-targets:
-    description: "Semicolon-separated LLVM target architectures to build (e.g. X86, X86;AArch64). Required when build-llvm is true; passed through to setup-llvm-from-gcs which enforces non-empty."
+    description: "Semicolon-separated LLVM target architectures to build. Defaults to setup-llvm-from-gcs's own default (cross-architecture set)."
     required: false
+    default: "X86;ARM;AArch64"
   min-disk-gb:
     description: "Minimum required free disk space in GB"
     default: "3"
