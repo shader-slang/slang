@@ -4,7 +4,7 @@
 // Complementary test for unscoped-enum.slang and unscoped-enum-negative.slang. This just verifies that
 // the scoped enums work.
 
-#if !DEFAULT_UNSCOPED
+#if DEFAULT_UNSCOPED
 
 // default is scoped enums, so we need to use 'class' to make it scoped
 enum class Fruit
