@@ -7,7 +7,7 @@ RWStructuredBuffer<float> outputBuffer;
 public interface IFoo
 {
     [Differentiable]
-    uint read();
+    float read();
 }
 
 //TEST_INPUT: type_conformance Foo:IFoo = 1;
