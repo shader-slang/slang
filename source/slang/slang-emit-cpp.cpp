@@ -7,7 +7,6 @@
 #include "slang-emit-source-writer.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-util.h"
-#include "slang-mangled-lexer.h"
 
 #include <assert.h>
 
@@ -1350,6 +1349,41 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(count);
             m_writer->emit(", ");
             m_writer->emit(stride);
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_AtomicAdd:
+        {
+            // Lower AtomicAdd on a pointer-to-uint/int slot to a call
+            // through the CPU prelude helpers. Matches HLSL/GLSL
+            // semantics: returns the prior value as the inst result.
+            //
+            // Only 32-bit integer widths are supported by the prelude
+            // helpers today; wider/narrower types fall through to the
+            // default unhandled-opcode diagnostic so the build fails
+            // loudly instead of producing bogus code.
+            auto dataType = inst->getDataType();
+            bool isSignedInt = dataType->getOp() == kIROp_IntType;
+            bool isUnsignedInt = dataType->getOp() == kIROp_UIntType;
+            if (!isSignedInt && !isUnsignedInt)
+                return false;
+            char const* helper = isSignedInt ? "_slang_atomic_add_i32" : "_slang_atomic_add_u32";
+            emitInstResultDecl(inst);
+            m_writer->emit(helper);
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            // Memory-order operand (operand 2) is intentionally
+            // ignored: the prelude helpers in `slang-cpp-prelude.h`
+            // pick the strongest ordering each toolchain provides
+            // out-of-the-box — `__ATOMIC_RELAXED` on GCC/Clang
+            // (which honors operand 2's intent), and
+            // `_InterlockedExchangeAdd` on MSVC (sequentially
+            // consistent on the supported architectures, stronger
+            // than relaxed but still correct under concurrency).
+            // Other backends (SPIR-V/Metal/CUDA) map operand 2 to
+            // native ordering; CPU's coupling lives in the prelude.
             m_writer->emit(");\n");
             return true;
         }

@@ -74,18 +74,7 @@ static const int TileSize = (InputSize / 8) * 16;
 public struct TestShMemSize : ISharedMemorySize {
     public static const uint Bytes = (TileSize * 2) * sizeof(uint4);
 }
-typealias TestPool = SharedMemoryPool<TestShMemSize>;
 static const uint OffsetA = 0;
-
-void testLoadShA<TargetEnum Target, int M>(uint tid, uint tileIndex)
-{
-    typealias Address = BindlessAddress<half>;
-
-    Address address = Address(inputBuffer);
-
-    MMAHelper<half, InputSize, M, SubgroupSize, Target, TestShMemSize, true>.loadShA<half, Address>(OffsetA, tileIndex, address);
-    GroupMemoryBarrierWithWaveSync();
-}
 
 void invalidateSharedMemory(uint tid, uint sharedMemOffset)
 {
@@ -101,7 +90,7 @@ void invalidateSharedMemory(uint tid, uint sharedMemOffset)
         if (index >= TileSize * 2)
             break;
 
-        TestPool.data[sharedMemOffset + index] = uint4(0x3C003C00);
+        neural_unittest.writeSharedMemory<TestShMemSize>(sharedMemOffset + index, uint4(0x3C003C00));
     }
     GroupMemoryBarrierWithWaveSync();
 }
@@ -128,7 +117,7 @@ bool verifiedOutput<int M>(uint tid, uint size, uint sharedMemOffset, uint tileI
         for (int i = 0; i < NumVectorsPerColumn; i++)
         {
             uint indexInTile = tid * NumVectorsPerColumn + i;
-            uint4 values = TestPool.data[sharedMemOffset + indexInTile];
+            uint4 values = neural_unittest.readSharedMemory<TestShMemSize>(sharedMemOffset + indexInTile);
             uint4 element = values;
             if (indexInTile / NumVectorsPerColumn + tileIndex * WMMA_TileWidth >= M)
             {
@@ -172,7 +161,7 @@ bool verifiedOutput<int M>(uint tid, uint size, uint sharedMemOffset, uint tileI
             if (indexInTile >= TileSize * 2)
                 break;
 
-            uint4 values = TestPool.data[sharedMemOffset + indexInTile];
+            uint4 values = neural_unittest.readSharedMemory<TestShMemSize>(sharedMemOffset + indexInTile);
             if (!values.equals(uint4(0x3C003C00)))
             {
                 return false;
@@ -186,54 +175,13 @@ bool verifiedOutput<int M>(uint tid, uint size, uint sharedMemOffset, uint tileI
 void Test<int M>(uint tid, int tileIndex, int resIndex)
 {
     invalidateSharedMemory(tid, OffsetA);
-    __target_switch
-    {
-    case cuda:
-        testLoadShA<TargetEnum.CUDA, M>(tid, tileIndex);
-        break;
-    case spirv:
-        testLoadShA<TargetEnum.SPIR_V, M>(tid, tileIndex);
-        break;
-    }
-    // serialRead(tid, OffsetA);
+    neural_unittest.testLoadShA<InputSize, M, SubgroupSize, TestShMemSize, true, 1>(OffsetA, tileIndex, inputBuffer);
 
     bool res = verifiedOutput<M>(tid, M, OffsetA, tileIndex);
     res = WaveActiveAllTrue(res);
 
     if (tid == 0)
         outputBuffer[resIndex] = res ? 1 : 0;
-}
-
-// This function is just used for debugging, not for verification. So keep it here.
-// This function is just used for debugging, not for verification. So keep it here.
-void serialRead(uint tid, uint sharedMemOffset)
-{
-    GroupMemoryBarrierWithWaveSync();
-
-    if (tid > 0)
-        return;
-
-    // In transpose mode, tile is in column major, and each length is AlignedK length
-    for (int id = 0; id < 32; id++)
-    {
-        printf("col: %d\n", id);
-        for (int i = 0; i < 4; i++)
-        {
-            uint4 values = TestPool.data[sharedMemOffset + id * 4 + i];
-            uint4 element = values;
-            for (int j = 0; j < 4; j++)
-            {
-                uint value = element[j];
-                uint16_t a = (uint16_t)(value & 0xFFFF);
-                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
-
-                half aa = bit_cast<half>(a);
-                half bb = bit_cast<half>(b);
-                printf("%.1f %.1f ", float(aa), float(bb));
-            }
-        }
-        printf("\n");
-    }
 }
 
 [numthreads(1024, 1, 1)]
