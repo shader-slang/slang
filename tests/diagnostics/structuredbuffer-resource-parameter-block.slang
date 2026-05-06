@@ -76,7 +76,7 @@ struct PBDirect
     StructuredBuffer<Texture2D> buf;
 }
 //DIRECT: resource type in StructuredBuffer
-//DIRECT: 'Texture2D' cannot contain resource or opaque handle types
+//DIRECT: 'Texture2D' must not be a resource type or contain an opaque handle type
 
 ParameterBlock<PBDirect> pbDirect;
 
@@ -93,7 +93,7 @@ struct PB
     StructuredBuffer<WithTexture> b;
 }
 //PB: resource type in StructuredBuffer
-//PB: 'WithTexture' cannot contain resource or opaque handle types
+//PB: 'WithTexture' must not be a resource type or contain an opaque handle type
 
 ParameterBlock<PB> pb;
 
@@ -110,7 +110,7 @@ struct CB
     StructuredBuffer<WithSampler> b;
 }
 //CB: resource type in StructuredBuffer
-//CB: 'WithSampler' cannot contain resource or opaque handle types
+//CB: 'WithSampler' must not be a resource type or contain an opaque handle type
 
 ConstantBuffer<CB> cb;
 
@@ -127,7 +127,7 @@ struct PBArr
     StructuredBuffer<WithArrayed> arr[4];
 }
 //PBARR: resource type in StructuredBuffer
-//PBARR: 'WithArrayed' cannot contain resource or opaque handle types
+//PBARR: 'WithArrayed' must not be a resource type or contain an opaque handle type
 
 ParameterBlock<PBArr> pbArr;
 
@@ -141,10 +141,10 @@ void main_pbarr()
 // Two decl sites sharing one interned `StructuredBuffer<WithDuplicate>` type.
 StructuredBuffer<WithDuplicate> dup1;
 //DUP: resource type in StructuredBuffer
-//DUP: 'WithDuplicate' cannot contain resource or opaque handle types
+//DUP: 'WithDuplicate' must not be a resource type or contain an opaque handle type
 StructuredBuffer<WithDuplicate> dup2;
 //DUP: resource type in StructuredBuffer
-//DUP: 'WithDuplicate' cannot contain resource or opaque handle types
+//DUP: 'WithDuplicate' must not be a resource type or contain an opaque handle type
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -156,7 +156,7 @@ void main_dup()
 // RWStructuredBuffer.
 RWStructuredBuffer<WithRW> rwBad;
 //RW: resource type in StructuredBuffer
-//RW: 'WithRW' cannot contain resource or opaque handle types
+//RW: 'WithRW' must not be a resource type or contain an opaque handle type
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -168,11 +168,11 @@ void main_rw()
 // Function parameter (and the global feeding it).
 StructuredBuffer<WithFnParam> fnSbInput;
 //FN: resource type in StructuredBuffer
-//FN: 'WithFnParam' cannot contain resource or opaque handle types
+//FN: 'WithFnParam' must not be a resource type or contain an opaque handle type
 
 float useFnSb(StructuredBuffer<WithFnParam> fnSb)
 //FN: resource type in StructuredBuffer
-//FN: 'WithFnParam' cannot contain resource or opaque handle types
+//FN: 'WithFnParam' must not be a resource type or contain an opaque handle type
 {
     return fnSb[0].weight;
 }
@@ -190,7 +190,7 @@ struct Leaf
     StructuredBuffer<WithDeep> buf;
 }
 //DEEP: resource type in StructuredBuffer
-//DEEP: 'WithDeep' cannot contain resource or opaque handle types
+//DEEP: 'WithDeep' must not be a resource type or contain an opaque handle type
 
 struct MidA
 {
@@ -218,7 +218,7 @@ struct GS<T>
     StructuredBuffer<T> buf;
 }
 //GEN: resource type in StructuredBuffer
-//GEN: 'WithGeneric' cannot contain resource or opaque handle types
+//GEN: 'WithGeneric' must not be a resource type or contain an opaque handle type
 
 ParameterBlock<GS<WithGeneric>> genericCase;
 

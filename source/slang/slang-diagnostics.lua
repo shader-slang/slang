@@ -4099,7 +4099,7 @@ err(
     "cannot-use-resource-type-in-structured-buffer",
     38204,
     "resource type in StructuredBuffer",
-    span { loc = "location", message = "StructuredBuffer element type '~type:IRInst' cannot contain resource or opaque handle types" }
+    span { loc = "location", message = "StructuredBuffer element type '~type:IRInst' must not be a resource type or contain an opaque handle type" }
 )
 
 err(
