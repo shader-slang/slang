@@ -50,6 +50,15 @@ public struct FFLayer<
     public static const int ParameterCount =
         OutputVector.Size * InputVector.Size + (HasBias ? OutputVector.Size : 0);
 
+    static const int PaddedOutputSize = ((OutputVector.Size + 15) / 16) * 16;
+    static const int PaddedInputSize = ((InputVector.Size + 15) / 16) * 16;
+
+    public static const int StorageSize =
+        ((Layout.Layout == LayoutType.Optimal)
+            ? (PaddedOutputSize / 16) * (PaddedInputSize / 16) * 256
+            : OutputVector.Size * InputVector.Size)
+        + (HasBias ? OutputVector.Size : 0);
+
     /// Activation function instance (stores any activation-specific parameters).
     internal Activation activation;
 
@@ -62,7 +71,7 @@ public struct FFLayer<
 
     public static int nextOffset(int baseOffset)
     {
-        return baseOffset + ParameterCount;
+        return baseOffset + StorageSize;
     }
 
     /// Forward evaluation: y = Activation(W*x + b).
@@ -78,7 +87,7 @@ public struct FFLayer<
         OutputVector y;
         if(HasBias)
         {
-            let biasAddr = parameterAddr.getOffset(OutputVector.Size * InputVector.Size);
+            let biasAddr = parameterAddr.getOffset(StorageSize - OutputVector.Size);
             y = input.linearTransform<A, Layout, OutputVector>(parameterAddr, biasAddr);
         }
         else

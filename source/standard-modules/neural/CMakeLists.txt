@@ -4,6 +4,9 @@
 
 glob_append(neural_shader_sources "*.slang")
 
+# Unit test sources (not copied to build output, resolved via -I at compile time)
+glob_append(neural_unittest_sources "unit-test/*.slang")
+
 # Set output directories for build tree
 # Files go under a "slang/" subdirectory so that `import slang.neural;` resolves
 # to <standard-module-dir>/slang/neural.slang-module at runtime.
@@ -77,13 +80,15 @@ else()
 endif()
 
 # Build neural.slang-module and output to the output directory
+# Pass -I to source dir so that __include "unit-test/..." resolves without copying.
 add_custom_command(
     OUTPUT ${neural_module_file}
     COMMAND
-        ${SLANG_COMPILER} ${NEURAL_MODULE_DEFINES} neural.slang -o
-        ${SLANG_NEURAL_MODULE_FILE_NAME}
+        ${SLANG_COMPILER} ${NEURAL_MODULE_DEFINES} -I ${CMAKE_CURRENT_SOURCE_DIR}
+        neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
     DEPENDS
         ${neural_copied_files}
+        ${neural_unittest_sources}
         ${SLANG_COMPILER_DEPENDENCY}
         ${SLANG_COMPILER_EXTRA_DEPS}
     WORKING_DIRECTORY ${neural_output_dir}
