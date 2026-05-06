@@ -108,8 +108,28 @@ jobs:
           # Display environment configuration
           print-env-info
 
+      # TEMPORARY: enable core-dump capture (see PR #11056). Remove once the
+      # crashes we're chasing are root-caused. Container runs --user root with
+      # CAP_SYSLOG, so sysctl is allowed; kernel.core_pattern is a host-global
+      # setting on self-hosted runners, which is why we save+restore it.
+      - name: Enable core dumps
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/cores"
+          sysctl -n kernel.core_pattern > "$GITHUB_WORKSPACE/.core_pattern.original"
+          sysctl -w kernel.core_pattern="$GITHUB_WORKSPACE/cores/core.%e.%p"
+          sysctl -w kernel.core_uses_pid=1
+          ulimit -c unlimited
+          # gdb is needed for the post-test extraction step.
+          if ! command -v gdb >/dev/null 2>&1; then
+            apt-get update && apt-get install -y --no-install-recommends gdb
+          fi
+
       - name: Test Slang
         run: |
+          # Inherit unlimited core size for any child processes.
+          ulimit -c unlimited || true
+
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
 
@@ -179,6 +199,67 @@ jobs:
             -expected-failure-list tests/expected-failure-github.txt \
             -expected-failure-list tests/expected-failure-linux.txt \
             -expected-failure-list tests/expected-failure-linux-gpu.txt
+
+      # TEMPORARY: extract gdb backtraces from any cores produced above and
+      # upload them as an artifact. Paired with "Enable core dumps".
+      - name: Capture core dumps
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          # Drop known-benign cores from intentional unit-test crashes.
+          for benign in test-process gfx-smoke; do
+            rm -f "$GITHUB_WORKSPACE/cores/core.$benign".*
+          done
+          cores=("$GITHUB_WORKSPACE/cores"/core.*)
+          if [ "${#cores[@]}" -eq 0 ]; then
+            echo "No interesting core dumps captured."
+            exit 0
+          fi
+          echo "Captured ${#cores[@]} core dump(s):"
+          ls -lh "${cores[@]}"
+          mkdir -p "$GITHUB_WORKSPACE/cores/backtraces"
+          for c in "${cores[@]}"; do
+            name=$(basename "$c")
+            exe_name=${name#core.}
+            exe_name=${exe_name%.*}
+            exe_path="$bin_dir/$exe_name"
+            if [ ! -x "$exe_path" ]; then
+              exe_path=""
+            fi
+            bt_file="$GITHUB_WORKSPACE/cores/backtraces/$name.bt.txt"
+            echo "=== Backtrace for $name (exe=$exe_path) ===" | tee "$bt_file"
+            gdb -batch \
+              -ex "set pagination off" \
+              -ex "set print pretty on" \
+              -ex "thread apply all bt full" \
+              -ex "info registers" \
+              -ex "x/i \$pc" \
+              -ex "x/16i \$pc-32" \
+              -ex "info sharedlibrary" \
+              -ex "maintenance info sections" \
+              ${exe_path:+"$exe_path"} "$c" 2>&1 | tee -a "$bt_file" || true
+          done
+
+      - name: Upload core dumps and backtraces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cores-linux-x86_64-gcc-${{ inputs.config }}-${{ inputs.gpu-tier }}
+          path: cores/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Restore the original host-global core_pattern. Self-hosted runners
+      # are persistent, so leaving our pattern set would leak captures into
+      # unrelated jobs scheduled on the same host.
+      - name: Restore core_pattern
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$GITHUB_WORKSPACE/.core_pattern.original" ]; then
+            sysctl -w "kernel.core_pattern=$(cat "$GITHUB_WORKSPACE/.core_pattern.original")" || true
+          fi
 
       - name: GPU post-test diagnostics
         if: failure()
@@ -281,18 +362,91 @@ jobs:
           # Display environment configuration
           print-env-info
 
+      # TEMPORARY: enable core-dump capture (see PR #11056). Mirrors the
+      # test-slang job; same host-global core_pattern caveat.
+      - name: Enable core dumps
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/cores"
+          sysctl -n kernel.core_pattern > "$GITHUB_WORKSPACE/.core_pattern.original"
+          sysctl -w kernel.core_pattern="$GITHUB_WORKSPACE/cores/core.%e.%p"
+          sysctl -w kernel.core_uses_pid=1
+          ulimit -c unlimited
+          if ! command -v gdb >/dev/null 2>&1; then
+            apt-get update && apt-get install -y --no-install-recommends gdb
+          fi
+
       - name: Run slang-rhi tests
         run: |
+          ulimit -c unlimited || true
           export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
           "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
 
       - name: Run slang-rhi tests (OptiX 8.0)
         run: |
+          ulimit -c unlimited || true
           "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80000 -tc="ray-tracing-*.cuda"
 
       - name: Run slang-rhi tests (OptiX 8.1)
         run: |
+          ulimit -c unlimited || true
           "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
+
+      # TEMPORARY: extract gdb backtraces from any cores and upload as artifact.
+      - name: Capture core dumps
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for benign in test-process gfx-smoke; do
+            rm -f "$GITHUB_WORKSPACE/cores/core.$benign".*
+          done
+          cores=("$GITHUB_WORKSPACE/cores"/core.*)
+          if [ "${#cores[@]}" -eq 0 ]; then
+            echo "No interesting core dumps captured."
+            exit 0
+          fi
+          echo "Captured ${#cores[@]} core dump(s):"
+          ls -lh "${cores[@]}"
+          mkdir -p "$GITHUB_WORKSPACE/cores/backtraces"
+          for c in "${cores[@]}"; do
+            name=$(basename "$c")
+            exe_name=${name#core.}
+            exe_name=${exe_name%.*}
+            exe_path="$bin_dir/$exe_name"
+            if [ ! -x "$exe_path" ]; then
+              exe_path=""
+            fi
+            bt_file="$GITHUB_WORKSPACE/cores/backtraces/$name.bt.txt"
+            echo "=== Backtrace for $name (exe=$exe_path) ===" | tee "$bt_file"
+            gdb -batch \
+              -ex "set pagination off" \
+              -ex "set print pretty on" \
+              -ex "thread apply all bt full" \
+              -ex "info registers" \
+              -ex "x/i \$pc" \
+              -ex "x/16i \$pc-32" \
+              -ex "info sharedlibrary" \
+              -ex "maintenance info sections" \
+              ${exe_path:+"$exe_path"} "$c" 2>&1 | tee -a "$bt_file" || true
+          done
+
+      - name: Upload core dumps and backtraces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cores-linux-x86_64-gcc-${{ inputs.config }}-rhi
+          path: cores/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Restore core_pattern
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$GITHUB_WORKSPACE/.core_pattern.original" ]; then
+            sysctl -w "kernel.core_pattern=$(cat "$GITHUB_WORKSPACE/.core_pattern.original")" || true
+          fi
 
       - name: GPU post-test diagnostics
         if: failure()
