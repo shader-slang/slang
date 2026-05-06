@@ -1028,6 +1028,13 @@ SlangResult LLVMDownstreamCompiler::compile(
                             "-avx512vp2intersect",
                             "-avx512fp16",
                             "-avx512bf16",
+                            // Knights Landing (KNL) — Xeon Phi only.
+                            "-avx512er",
+                            "-avx512pf",
+                            // Knights Mill (KNM) — Xeon Phi only. LLVM uses
+                            // the underscore spelling for these two.
+                            "-avx512_4fmaps",
+                            "-avx512_4vnniw",
                         });
                     }
                     jitBuilder.setJITTargetMachineBuilder(std::move(*expectJTMB));
