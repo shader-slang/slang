@@ -103,6 +103,9 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     auto* coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
         slang::ICoverageTracingMetadata::getTypeGuid());
     SLANG_CHECK(coverage != nullptr);
+    auto* syntheticResources = (slang::ISyntheticResourceMetadata*)metadata->castAs(
+        slang::ISyntheticResourceMetadata::getTypeGuid());
+    SLANG_CHECK(syntheticResources != nullptr);
 
     // The shader has multiple instrumented statements (for loop, if,
     // else, assignments, writeback) — expect at least several slots.
@@ -143,6 +146,111 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(coverage->getBufferInfo(&bufferInfo) == SLANG_OK);
     }
     SLANG_CHECK(coverage->getBufferInfo(nullptr) == SLANG_E_INVALID_ARG);
+
+    // Synthetic resource metadata: coverage should surface one hidden
+    // mutable structured buffer resource that hosts can use as a
+    // binding helper bridge.
+    {
+        const uint32_t resourceCount = syntheticResources->getResourceCount();
+        SLANG_CHECK(resourceCount > 0);
+
+        bool foundCoverageResource = false;
+        for (uint32_t i = 0; i < resourceCount; ++i)
+        {
+            slang::SyntheticResourceInfo info;
+            SLANG_CHECK(syntheticResources->getResourceInfo(i, &info) == SLANG_OK);
+            if (info.featureTag && UnownedStringSlice(info.featureTag) == toSlice("coverage"))
+            {
+                foundCoverageResource = true;
+                SLANG_CHECK(info.id != 0);
+                SLANG_CHECK(info.bindingType == slang::BindingType::MutableRawBuffer);
+                SLANG_CHECK(info.arraySize == 1);
+                SLANG_CHECK(info.scope == slang::SyntheticResourceScope::Global);
+                SLANG_CHECK(info.access == slang::SyntheticResourceAccess::ReadWrite);
+                SLANG_CHECK(info.entryPointIndex == -1);
+                SLANG_CHECK(info.debugName != nullptr);
+                SLANG_CHECK(UnownedStringSlice(info.debugName) == toSlice("__slang_coverage"));
+
+                // Descriptor-facing binding info should be available
+                // even when the resource is hidden from ordinary
+                // reflection. For the current CPU source target, the
+                // metadata should also expose the concrete
+                // marshaling location in the generated global params
+                // payload.
+                SLANG_CHECK(info.binding >= 0);
+                SLANG_CHECK(info.space >= -1);
+                SLANG_CHECK(info.uniformOffset >= 0);
+                SLANG_CHECK(info.uniformStride > 0);
+
+                uint32_t lookedUpIndex = ~0u;
+                SLANG_CHECK(syntheticResources->findResourceIndexByID(info.id, &lookedUpIndex) == SLANG_OK);
+                SLANG_CHECK(lookedUpIndex == i);
+
+                slang::SyntheticResourceDescriptorBindingInfo descriptorInfo;
+                SLANG_CHECK(
+                    syntheticResources->getResourceDescriptorBindingInfo(i, &descriptorInfo) ==
+                    SLANG_OK);
+                SLANG_CHECK(descriptorInfo.binding == info.binding);
+                SLANG_CHECK(descriptorInfo.space == info.space);
+
+                slang::SyntheticResourceUniformBindingInfo uniformInfo;
+                SLANG_CHECK(
+                    syntheticResources->getResourceUniformBindingInfo(i, &uniformInfo) ==
+                    SLANG_OK);
+                SLANG_CHECK(uniformInfo.uniformOffset == info.uniformOffset);
+                SLANG_CHECK(uniformInfo.uniformStride == info.uniformStride);
+            }
+        }
+        SLANG_CHECK(foundCoverageResource);
+    }
+
+    {
+        uint32_t index = 0;
+        SLANG_CHECK(syntheticResources->findResourceIndexByID(0, &index) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(syntheticResources->findResourceIndexByID(1, nullptr) == SLANG_E_INVALID_ARG);
+    }
+    {
+        slang::SyntheticResourceDescriptorBindingInfo info;
+        SLANG_CHECK(
+            syntheticResources->getResourceDescriptorBindingInfo(
+                syntheticResources->getResourceCount(),
+                &info) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(
+            syntheticResources->getResourceDescriptorBindingInfo(0, nullptr) ==
+            SLANG_E_INVALID_ARG);
+        info.structSize = 0;
+        SLANG_CHECK(
+            syntheticResources->getResourceDescriptorBindingInfo(0, &info) ==
+            SLANG_E_INVALID_ARG);
+    }
+    {
+        slang::SyntheticResourceUniformBindingInfo info;
+        SLANG_CHECK(
+            syntheticResources->getResourceUniformBindingInfo(
+                syntheticResources->getResourceCount(),
+                &info) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(
+            syntheticResources->getResourceUniformBindingInfo(0, nullptr) ==
+            SLANG_E_INVALID_ARG);
+        info.structSize = 0;
+        SLANG_CHECK(
+            syntheticResources->getResourceUniformBindingInfo(0, &info) ==
+            SLANG_E_INVALID_ARG);
+    }
+
+    {
+        slang::SyntheticResourceInfo info;
+        SLANG_CHECK(
+            syntheticResources->getResourceInfo(
+                syntheticResources->getResourceCount(),
+                &info) == SLANG_E_INVALID_ARG);
+    }
+    SLANG_CHECK(syntheticResources->getResourceInfo(0, nullptr) == SLANG_E_INVALID_ARG);
+    {
+        slang::SyntheticResourceInfo info;
+        info.structSize = 0;
+        SLANG_CHECK(syntheticResources->getResourceInfo(0, &info) == SLANG_E_INVALID_ARG);
+    }
 
     // Manifest serializer: produce JSON bytes and sanity-check the
     // canonical fields are present. Detailed shape is covered by the

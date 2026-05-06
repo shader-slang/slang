@@ -4601,6 +4601,165 @@ struct ICoverageTracingMetadata : public ISlangCastable
 };
     #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()
 
+/** Generic metadata for compiler-synthesized bindable resources.
+
+This metadata is intended for features that inject hidden resources
+into the compiled program interface without surfacing them through the
+ordinary public reflection model. Shader coverage is the first
+consumer: its synthesized `__slang_coverage` buffer is reported here
+so hosts can discover how to bind it even though it is not part of
+normal `ProgramLayout` reflection.
+
+The metadata is retrieved by calling `castAs` / `queryInterface` on the
+artifact-associated `IMetadata` object. Like coverage metadata, this
+interface is ABI-stable by design:
+
+  - `SyntheticResourceInfo` may grow by tail extension guarded by its
+    leading `structSize`, or
+  - a future `ISyntheticResourceMetadataN` may be added with a new UUID.
+*/
+enum class SyntheticResourceScope : uint32_t
+{
+    /// One shared resource bound at program/global scope.
+    Global = 0,
+
+    /// A resource scoped to one linked entry point.
+    EntryPoint = 1,
+};
+
+enum class SyntheticResourceAccess : uint32_t
+{
+    Read = 0,
+    Write = 1,
+    ReadWrite = 2,
+};
+
+struct SyntheticResourceInfo
+{
+    size_t structSize = sizeof(SyntheticResourceInfo);
+
+    /// Stable synthetic resource identifier within the compiled
+    /// program. Hosts should use this to correlate metadata and
+    /// runtime binding helpers.
+    uint32_t id = 0;
+
+    /// The Slang binding kind represented by this synthetic
+    /// resource.
+    BindingType bindingType = BindingType::Unknown;
+
+    /// Number of logical resources in the synthetic binding. Most
+    /// current instrumentation resources are scalar (`1`).
+    uint32_t arraySize = 1;
+
+    /// Whether the resource is global/root-scoped or attached to a
+    /// specific entry point.
+    SyntheticResourceScope scope = SyntheticResourceScope::Global;
+
+    /// Intended access pattern for the resource.
+    SyntheticResourceAccess access = SyntheticResourceAccess::Read;
+
+    /// Entry point index when `scope == EntryPoint`, else `-1`.
+    int32_t entryPointIndex = -1;
+
+    /// Descriptor-facing location for backends that bind synthetic
+    /// resources via `(space, binding)`. Either field may be `-1`
+    /// when not applicable for the target.
+    int32_t space = -1;
+    int32_t binding = -1;
+
+    /// CPU/CUDA-style marshaling location in generated uniform /
+    /// wrapper parameter data, in bytes, or `-1` if unavailable for
+    /// the target.
+    int32_t uniformOffset = -1;
+
+    /// Byte stride between adjacent logical elements when
+    /// `arraySize > 1`, or 0 when not applicable / unavailable.
+    int32_t uniformStride = 0;
+
+    /// Optional stable debug name for the synthetic resource. The
+    /// returned pointer is valid for the lifetime of the metadata
+    /// object.
+    const char* debugName = nullptr;
+
+    /// Optional feature tag (for example `"coverage"`) identifying
+    /// the instrumentation system that introduced the resource. The
+    /// returned pointer is valid for the lifetime of the metadata
+    /// object.
+    const char* featureTag = nullptr;
+};
+
+struct SyntheticResourceDescriptorBindingInfo
+{
+    size_t structSize = sizeof(SyntheticResourceDescriptorBindingInfo);
+
+    /// Descriptor-facing location for backends that bind synthetic
+    /// resources via `(space, binding)`. Either field may be `-1`
+    /// when not applicable for the target.
+    int32_t space = -1;
+    int32_t binding = -1;
+};
+
+struct SyntheticResourceUniformBindingInfo
+{
+    size_t structSize = sizeof(SyntheticResourceUniformBindingInfo);
+
+    /// CPU/CUDA-style marshaling location in generated uniform /
+    /// wrapper parameter data, in bytes, or `-1` if unavailable for
+    /// the target.
+    int32_t uniformOffset = -1;
+
+    /// Byte stride between adjacent logical elements when
+    /// `arraySize > 1`, or 0 when not applicable / unavailable.
+    int32_t uniformStride = 0;
+};
+
+struct ISyntheticResourceMetadata : public ISlangCastable
+{
+    SLANG_COM_INTERFACE(
+        0x47a33723,
+        0x181b,
+        0x4d2b,
+        {0xb8, 0x9e, 0x21, 0x54, 0x95, 0xbb, 0x38, 0x8b})
+
+    /// Number of synthetic bindable resources reported by this
+    /// metadata object.
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL getResourceCount() = 0;
+
+    /// Populate `outInfo` with the metadata for synthetic resource
+    /// `index`. The caller must pre-set `outInfo->structSize =
+    /// sizeof(SyntheticResourceInfo)`. Returns `SLANG_OK` on success,
+    /// `SLANG_E_INVALID_ARG` for null `outInfo`, mismatched
+    /// `structSize`, or out-of-range `index`.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getResourceInfo(uint32_t index, SyntheticResourceInfo* outInfo) = 0;
+
+    /// Look up the resource index for a stable synthetic resource
+    /// identifier. Returns `SLANG_OK` on success and
+    /// `SLANG_E_INVALID_ARG` for null `outIndex` or unknown `id`.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    findResourceIndexByID(uint32_t id, uint32_t* outIndex) = 0;
+
+    /// Query the descriptor-facing `(space, binding)` location for
+    /// synthetic resource `index`. The caller must pre-set
+    /// `outInfo->structSize =
+    /// sizeof(SyntheticResourceDescriptorBindingInfo)`. Returns
+    /// `SLANG_OK` on success, `SLANG_E_INVALID_ARG` for null
+    /// `outInfo`, mismatched `structSize`, or out-of-range `index`.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getResourceDescriptorBindingInfo(
+        uint32_t index,
+        SyntheticResourceDescriptorBindingInfo* outInfo) = 0;
+
+    /// Query the CPU/CUDA-style marshaling location for synthetic
+    /// resource `index`. The caller must pre-set
+    /// `outInfo->structSize = sizeof(SyntheticResourceUniformBindingInfo)`.
+    /// Returns `SLANG_OK` on success, `SLANG_E_INVALID_ARG` for null
+    /// `outInfo`, mismatched `structSize`, or out-of-range `index`.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getResourceUniformBindingInfo(
+        uint32_t index,
+        SyntheticResourceUniformBindingInfo* outInfo) = 0;
+};
+    #define SLANG_UUID_ISyntheticResourceMetadata ISyntheticResourceMetadata::getTypeGuid()
+
 struct CooperativeMatrixType
 {
     // Component type `NONE` means this type is not valid.

@@ -1072,6 +1072,13 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.coverageTracing)
     {
         SLANG_PASS(
+            finalizeCoverageInstrumentationMetadata,
+            codeGenContext->shouldTraceCoverage(),
+            targetRequest,
+            *metadata);
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+
+        SLANG_PASS(
             preserveCoverageBindingForMaterialization,
             codeGenContext->shouldTraceCoverage());
         validateIRModuleIfEnabled(codeGenContext, irModule);

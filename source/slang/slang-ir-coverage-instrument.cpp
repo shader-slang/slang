@@ -3,6 +3,7 @@
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "compiler-core/slang-source-loc.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
@@ -20,12 +21,45 @@ namespace
 // matches the manifest / sidecar key that hosts read.
 static const char kCoverageBufferName[] = "__slang_coverage";
 static const char kGlobalParamsName[] = "globalParams";
+static const char kCoverageFeatureTag[] = "coverage";
+static const uint32_t kCoverageSyntheticResourceID = 1;
 
 static bool hasNameHint(IRInst* inst, UnownedTerminatedStringSlice expectedName)
 {
     if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
         return nameHint->getName() == expectedName;
     return false;
+}
+
+static SyntheticResourceRecord* findSyntheticResourceRecordById(
+    ArtifactPostEmitMetadata& metadata,
+    uint32_t id)
+{
+    for (auto& record : metadata.m_syntheticResources)
+    {
+        if (record.id == id)
+            return &record;
+    }
+    return nullptr;
+}
+
+static SyntheticResourceRecord& getOrAddCoverageSyntheticResourceRecord(
+    ArtifactPostEmitMetadata& metadata)
+{
+    if (auto existing = findSyntheticResourceRecordById(metadata, kCoverageSyntheticResourceID))
+        return *existing;
+
+    SyntheticResourceRecord record;
+    record.id = kCoverageSyntheticResourceID;
+    record.bindingType = slang::BindingType::MutableRawBuffer;
+    record.arraySize = 1;
+    record.scope = slang::SyntheticResourceScope::Global;
+    record.access = slang::SyntheticResourceAccess::ReadWrite;
+    record.entryPointIndex = -1;
+    record.debugName = kCoverageBufferName;
+    record.featureTag = kCoverageFeatureTag;
+    metadata.m_syntheticResources.add(record);
+    return metadata.m_syntheticResources.getLast();
 }
 
 // Choose the resource kind under which the coverage buffer is bound
@@ -102,6 +136,22 @@ static IRStructField* findStructFieldByName(
         {
             if (auto genericStructType = as<IRStructType>(findInnerMostGenericReturnVal(generic)))
                 return findStructFieldByName(genericStructType, expectedName);
+        }
+    }
+
+    return nullptr;
+}
+
+static IRStructField* findStructFieldByKey(
+    IRType* type,
+    IRStructKey* expectedKey)
+{
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (field->getKey() == expectedKey)
+                return field;
         }
     }
 
@@ -617,6 +667,111 @@ struct CoverageMaterializer
     }
 };
 
+static bool tryGetCoverageUniformBindingInfo(
+    IRModule* module,
+    TargetRequest* targetRequest,
+    int32_t& outUniformOffset,
+    int32_t& outUniformStride)
+{
+    outUniformOffset = -1;
+    outUniformStride = 0;
+
+    auto bufferReference = CoverageMaterializer::resolveBufferReference(module);
+    if (!bufferReference.isValid())
+        return false;
+
+    auto tryFillFromNaturalFieldLayout = [&](IRStructField* field)
+    {
+        if (!field || !targetRequest)
+            return false;
+
+        IRIntegerValue naturalOffset = 0;
+        if (SLANG_FAILED(getNaturalOffset(targetRequest, field, &naturalOffset)))
+            return false;
+
+        IRSizeAndAlignment fieldSizeAlignment;
+        if (SLANG_FAILED(
+                getNaturalSizeAndAlignment(targetRequest, field->getFieldType(), &fieldSizeAlignment)))
+        {
+            return false;
+        }
+
+        if (fieldSizeAlignment.size == IRSizeAndAlignment::kIndeterminateSize)
+            return false;
+
+        outUniformOffset = (int32_t)naturalOffset;
+        outUniformStride = (int32_t)fieldSizeAlignment.getStride();
+        return true;
+    };
+
+    auto tryFillFromVarLayout = [&](IRVarLayout* varLayout)
+    {
+        if (!varLayout)
+            return false;
+
+        if (auto uniformOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::Uniform))
+            outUniformOffset = (int32_t)uniformOffsetAttr->getOffset();
+
+        if (auto uniformSizeAttr = varLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::Uniform))
+            outUniformStride = (int32_t)uniformSizeAttr->getFiniteSize();
+
+        return outUniformOffset >= 0;
+    };
+
+    if (bufferReference.directBuffer)
+    {
+        if (targetRequest && (isCPUTarget(targetRequest) || isCUDATarget(targetRequest)))
+        {
+            IRSizeAndAlignment fieldSizeAlignment;
+            if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(
+                    targetRequest,
+                    bufferReference.directBuffer->getDataType(),
+                    &fieldSizeAlignment)) &&
+                fieldSizeAlignment.size != IRSizeAndAlignment::kIndeterminateSize)
+            {
+                outUniformOffset = 0;
+                outUniformStride = (int32_t)fieldSizeAlignment.getStride();
+                return true;
+            }
+        }
+
+        if (auto layoutDecor = bufferReference.directBuffer->findDecoration<IRLayoutDecoration>())
+            return tryFillFromVarLayout(as<IRVarLayout>(layoutDecor->getLayout()));
+        return false;
+    }
+
+    IRType* wrapperValueType = bufferReference.wrapperParam->getDataType();
+    if (auto parameterGroupType = as<IRParameterGroupType>(wrapperValueType))
+        wrapperValueType = cast<IRType>(parameterGroupType->getOperand(0));
+
+    if (auto field = findStructFieldByKey(wrapperValueType, bufferReference.wrapperFieldKey))
+    {
+        if (tryFillFromNaturalFieldLayout(field))
+            return true;
+    }
+
+    auto wrapperLayoutDecor = bufferReference.wrapperParam->findDecoration<IRLayoutDecoration>();
+    if (!wrapperLayoutDecor)
+        return false;
+
+    auto wrapperVarLayout = as<IRVarLayout>(wrapperLayoutDecor->getLayout());
+    if (!wrapperVarLayout)
+        return false;
+
+    auto structTypeLayout = findScopeStructTypeLayout(wrapperVarLayout);
+    if (!structTypeLayout)
+        return false;
+
+    for (auto fieldLayoutAttr : structTypeLayout->getFieldLayoutAttrs())
+    {
+        if (fieldLayoutAttr->getFieldKey() != bufferReference.wrapperFieldKey)
+            continue;
+        return tryFillFromVarLayout(fieldLayoutAttr->getLayout());
+    }
+
+    return false;
+}
+
 } // anonymous namespace
 
 void prepareCoverageInstrumentation(
@@ -751,12 +906,39 @@ void prepareCoverageInstrumentation(
 
     outMetadata.m_coverageBufferSpace = chosenSpace;
     outMetadata.m_coverageBufferBinding = chosenBinding;
+    auto& syntheticResource = getOrAddCoverageSyntheticResourceRecord(outMetadata);
+    syntheticResource.space = chosenSpace;
+    syntheticResource.binding = chosenBinding;
+    syntheticResource.uniformOffset = -1;
+    syntheticResource.uniformStride = 0;
 
     CoverageInstrumenter instrumenter(
         module,
         sink ? sink->getSourceManager() : nullptr,
         outMetadata);
     instrumenter.run(counterOps);
+}
+
+void finalizeCoverageInstrumentationMetadata(
+    IRModule* module,
+    bool enabled,
+    TargetRequest* targetRequest,
+    ArtifactPostEmitMetadata& outMetadata)
+{
+    if (!enabled)
+        return;
+
+    auto record = findSyntheticResourceRecordById(outMetadata, kCoverageSyntheticResourceID);
+    if (!record)
+        return;
+
+    int32_t uniformOffset = -1;
+    int32_t uniformStride = 0;
+    if (tryGetCoverageUniformBindingInfo(module, targetRequest, uniformOffset, uniformStride))
+    {
+        record->uniformOffset = uniformOffset;
+        record->uniformStride = uniformStride;
+    }
 }
 
 void preserveCoverageBindingForMaterialization(IRModule* module, bool enabled)

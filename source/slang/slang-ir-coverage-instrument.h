@@ -48,6 +48,16 @@ void prepareCoverageInstrumentation(
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata);
 
+// Finalize coverage-related synthetic resource metadata after global
+// uniform packing has run. This updates any backend-independent
+// marshaling fields (for example CPU/CUDA uniform offsets) that can
+// only be determined from the post-packing IR layout.
+void finalizeCoverageInstrumentationMetadata(
+    IRModule* module,
+    bool enabled,
+    TargetRequest* targetRequest,
+    ArtifactPostEmitMetadata& outMetadata);
+
 // Preserve the synthesized coverage binding while coverage remains in
 // compact marker form. This should run after
 // `collectGlobalUniformParameters`, before simplification/DCE can drop
