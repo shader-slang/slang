@@ -4,6 +4,9 @@
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1
 
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1
+
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
 
@@ -42,19 +45,20 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
-    DType inputData[OutputSize];
+    typealias InputVec = WaveTangledVector<DType, TestShMemSize, PaddedOutputSize, SubgroupSize, 2>;
+    InputVec inputData = InputVec(DType(0));
+    DType inputValue = DType(WaveGetLaneIndex() + 1 + tid / 32);
     for (int i = 0; i < OutputSize; i++)
-        inputData[i] = DType(tid + 1);
+        inputData[i] = inputValue;
 
-    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 2, true>(
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedOutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 2, true>(
         inputData, inputBuffer, none);
 
     bool res = true;
     int scaleFactor = (OutputSize % 3 == 0) ? 0 : -1;
     for (int i = 0; i < InputSize; i++)
     {
-        int intVal = (i + 1) * (tid + 1);
-        DType expected = DType(scaleFactor) * DType(intVal);
+        DType expected = DType(scaleFactor) * DType(i + 1) * inputValue;
         if (!equals(output[i], expected))
         {
             res = false;
@@ -69,8 +73,11 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 
 [numthreads(BatchSize, 1, 1)]
 [shader("compute")]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
 {
+    if (gid.x != 0)
+        return;
+
     {
         fillWeightMatrixTiled<3, 5, 16, 16, false>(tid);
         AllMemoryBarrierWithGroupSync();
@@ -101,9 +108,9 @@ void computeMain(uint tid : SV_DispatchThreadID)
         test<17, 64>(tid, 4);
     }
 
-    // BUFFER: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
+    // BUFFER: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
 }

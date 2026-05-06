@@ -8,9 +8,9 @@
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=32
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=64
 
-// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=16
-// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=32
-// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=64
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=16 -xslang -DTEST_METAL=1
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=32 -xslang -DTEST_METAL=1
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=64 -xslang -DTEST_METAL=1
 
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=16
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=32
@@ -23,6 +23,10 @@
 #pragma warning(disable: 41017)
 import slang.neural;
 import common;
+
+#ifndef TEST_METAL
+#define TEST_METAL 0
+#endif
 
 // TEST_INPUT: ubuffer(data=[0], stride=4, count=1):out, name=resultBuffer
 RWStructuredBuffer<uint> resultBuffer;
@@ -48,7 +52,11 @@ static const int TotalShMemSizeA = ShMemSizeA * workgroupCount;
 static const int TotalShMemSizeB = ShMemSizeB * workgroupCount * sizeof(DType)/sizeof(half);
 
 public struct TestShMemSize : ISharedMemorySize {
+#if TEST_METAL
+    public static const uint Bytes = 32768;
+#else
     public static const uint Bytes = (TotalShMemSizeA + TotalShMemSizeB) * sizeof(uint4);
+#endif
 }
 
 static const int TileSize = 16;
@@ -138,9 +146,12 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
 
 [shader("compute")]
 [numthreads(WorkgroupSize, 1, 1)]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
 {
+    if (gid.x != 0)
+        return;
+
     setBufferOneValue<TEST_SIZE * TEST_SIZE, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
     test<TEST_SIZE, TEST_SIZE>(tid, 0);
-    // BUFFER: 1
+    // BUFFER: {{^}}1{{$}}
 }

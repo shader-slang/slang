@@ -118,6 +118,17 @@ public int tiledWeightOffset(int row, int col)
     {
     case cuda:  return rowMajorToNativeMatB(col, row);
     case spirv: return row * 16 + col;
+    case metal: return row * 16 + col;
+    }
+}
+
+public int tiledWeightOffset<int RowStride>(int row, int col)
+{
+    __target_switch
+    {
+    case cuda:  return rowMajorToNativeMatB(col, row);
+    case spirv: return row * 16 + col;
+    case metal: return row * RowStride + col;
     }
 }
 
@@ -131,6 +142,17 @@ public int tiledDWeightOffset(int row, int col)
     {
     case cuda:  return rowMajorToNativeMatC(row, col);
     case spirv: return row * 16 + col;
+    case metal: return row * 16 + col;
+    }
+}
+
+public int tiledDWeightOffset<int RowStride>(int row, int col)
+{
+    __target_switch
+    {
+    case cuda:  return rowMajorToNativeMatC(row, col);
+    case spirv: return row * 16 + col;
+    case metal: return row * RowStride + col;
     }
 }
 
@@ -198,6 +220,8 @@ public void convertTiledToNativeB<T, int PaddedRows, int PaddedCols, int Workgro
         AllMemoryBarrierWithGroupSync();
     }
     case spirv:
+        break;
+    case metal:
         break;
     }
 }
@@ -289,6 +313,8 @@ public void convertNativeToRowMajorTiled<T, int PaddedRows, int PaddedCols, int 
     }
     case spirv:
         break;
+    case metal:
+        break;
     }
 }
 
@@ -368,6 +394,18 @@ public void fillTransposeWeightTiled<T, int Rows, int Cols, int WorkgroupSize, b
             }
         }
     }
+    case metal:
+    {
+        static const int NumRowIters = (Rows + WorkgroupSize - 1) / WorkgroupSize;
+        for (int iter = 0; iter < NumRowIters; iter++)
+        {
+            int row = iter * WorkgroupSize + tid;
+            if (row >= Rows) break;
+            int scaleFactor = (row % 3 == 0) ? -1 : ((row % 3 == 1) ? 0 : 1);
+            for (int col = 0; col < Cols; col++)
+                buffer[row * PaddedCols + col] = T(scaleFactor * (col + 1));
+        }
+    }
     }
 }
 
@@ -416,7 +454,7 @@ public void fillForwardWeightTiled<T, int InputSize, int OutputSize, int Workgro
         AllMemoryBarrierWithGroupSync();
         convertTiledToNativeB<T, PaddedK, PaddedM, WorkgroupSize>(tid, buffer);
     }
-    default:
+    case spirv:
     {
         static const int TotalElements = PaddedK * PaddedM;
         static const int NumClearIters = (TotalElements + WorkgroupSize - 1) / WorkgroupSize;
@@ -443,6 +481,28 @@ public void fillForwardWeightTiled<T, int InputSize, int OutputSize, int Workgro
                 int offset = (tileRow * NTileCols + tileCol) * (TileSize * TileSize) + localRow * TileSize + localCol;
                 buffer[offset] = fillValue;
             }
+        }
+        AllMemoryBarrierWithGroupSync();
+    }
+    case metal:
+    {
+        static const int TotalElements = PaddedK * PaddedM;
+        static const int NumClearIters = (TotalElements + WorkgroupSize - 1) / WorkgroupSize;
+        for (int iter = 0; iter < NumClearIters; iter++)
+        {
+            int idx = iter * WorkgroupSize + tid;
+            if (idx < TotalElements)
+                buffer[idx] = T(0);
+        }
+        AllMemoryBarrierWithGroupSync();
+
+        static const int NumRowIters = (OutputSize + WorkgroupSize - 1) / WorkgroupSize;
+        for (int iter = 0; iter < NumRowIters; iter++)
+        {
+            int row = iter * WorkgroupSize + tid;
+            if (row >= OutputSize) break;
+            for (int col = 0; col < InputSize; col++)
+                buffer[row * PaddedK + col] = fillValue;
         }
         AllMemoryBarrierWithGroupSync();
     }

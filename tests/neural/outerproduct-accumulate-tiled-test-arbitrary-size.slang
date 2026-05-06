@@ -5,6 +5,8 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0
 
+//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_METAL=1
+
 //TEST:SIMPLE(filecheck=SPV): -target spirv -entry computeMain -stage compute -DTEST_HALF=1 -experimental-feature
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
@@ -13,6 +15,10 @@
 #pragma warning(disable: 41017)
 import slang.neural;
 import common;
+
+#ifndef TEST_METAL
+#define TEST_METAL 0
+#endif
 
 // TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4, count=4):out, name=resultBuffer
 RWStructuredBuffer<uint> resultBuffer;
@@ -38,7 +44,11 @@ static const int TotalShMemSizeA = ShMemSizeA * workgroupCount;
 static const int TotalShMemSizeB = ShMemSizeB * workgroupCount * (sizeof(DType) / sizeof(half));
 
 public struct TestShMemSize : ISharedMemorySize {
+#if TEST_METAL
+    public static const uint Bytes = 32768;
+#else
     public static const uint Bytes = (TotalShMemSizeA + TotalShMemSizeB) * sizeof(uint4);
+#endif
 }
 
 static const int TileSize = 16;
@@ -71,7 +81,15 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
 
     neural_unittest.testOuterProductAccumulateTiled<DType, PaddedInputSize, PaddedOutputSize, TestShMemSize, workgroupCount>(inputData, dOutData, outputBuffer);
 
-    convertNativeToRowMajorTiled<DType, PaddedOutputSize, PaddedInputSize, WorkgroupSize>(tid, outputBuffer);
+    __target_switch
+    {
+    case cuda:
+        convertNativeToRowMajorTiled<DType, PaddedOutputSize, PaddedInputSize, WorkgroupSize>(tid, outputBuffer);
+    case spirv:
+        convertNativeToRowMajorTiled<DType, PaddedOutputSize, PaddedInputSize, WorkgroupSize>(tid, outputBuffer);
+    case metal:
+        {}
+    }
 
     int subgroupIndex = tid / SubgroupSize;
     if (subgroupIndex != 0)
@@ -98,11 +116,19 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
         for (int j = 0; j < InputSize; j++)
         {
             DType expected = DType(startVal * scaleFactor * (j + 1));
-            DType actual = outputBuffer[tiledOffset<NTileCols>(rowIdx, j)];
+            DType actual;
+            __target_switch
+            {
+            case cuda:
+                actual = outputBuffer[tiledOffset<NTileCols>(rowIdx, j)];
+            case spirv:
+                actual = outputBuffer[tiledOffset<NTileCols>(rowIdx, j)];
+            case metal:
+                actual = outputBuffer[rowIdx * PaddedInputSize + j];
+            }
             if (abs(expected - actual) > errorThreshold)
             {
                 res = false;
-                printf("tid: %d, rowIdx: %d, j: %d, expected: %.4f, actual: %.4f\n", tid, rowIdx, j, float(expected), float(actual));
                 break;
             }
         }
@@ -121,15 +147,18 @@ void clearTiledBuffer<int PaddedSize, int WorkgroupSize>(uint tid)
 
 [shader("compute")]
 [numthreads(WorkgroupSize, 1, 1)]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
 {
+    if (gid.x != 0)
+        return;
+
     // 3x15 → padded to 16x16
     {
         clearTiledBuffer<16, WorkgroupSize>(tid);
         test<3, 15>(tid, 0);
         AllMemoryBarrierWithGroupSync();
     }
-    // BUFFER: 1
+    // BUFFER: {{^}}1{{$}}
 
     // 20x30 → padded to 32x32
     {
@@ -137,7 +166,7 @@ void computeMain(uint tid : SV_DispatchThreadID)
         test<20, 30>(tid, 1);
         AllMemoryBarrierWithGroupSync();
     }
-    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: {{^}}1{{$}}
 
     // 49x17 → padded to 64x32
     {
@@ -145,7 +174,7 @@ void computeMain(uint tid : SV_DispatchThreadID)
         test<49, 17>(tid, 2);
         AllMemoryBarrierWithGroupSync();
     }
-    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: {{^}}1{{$}}
 
     // 33x9 → padded to 48x16
     {
@@ -153,7 +182,7 @@ void computeMain(uint tid : SV_DispatchThreadID)
         test<33, 9>(tid, 3);
         AllMemoryBarrierWithGroupSync();
     }
-    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: {{^}}1{{$}}
 }
 
 //SPV: OpEntryPoint
