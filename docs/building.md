@@ -350,18 +350,20 @@ script the release workflow uses when seeding the GCS cache, so it produces
 exactly the LLVM tree Slang's release CI consumes:
 
 - Only the LLVM/Clang libraries and headers that `slang-llvm` links against
-  are compiled and installed. It does this by setting
+  are compiled and installed. We do this by setting
   `LLVM_DISTRIBUTION_COMPONENTS` and building LLVM's `install-distribution`
-  target instead of the default `ninja all`. This skips the Clang Static
-  Analyzer (~180 sources), `opt`/`llc` and other LLVM tools, tests, examples,
-  and components Slang does not use. Dropping the Static Analyzer is a
-  deliberate workaround for
-  [llvm/llvm-project#117705](https://github.com/llvm/llvm-project/issues/117705),
-  where `CLANG_ENABLE_STATIC_ANALYZER=OFF` does not actually prevent those
-  sources from being compiled under `ninja all`.
+  target instead of the default `ninja all` — which builds LLVM's tools
+  (`opt`, `llc`, `clang`, …), tests, examples, and benchmarks even with the
+  corresponding `LLVM_BUILD_TOOLS=OFF` / `CLANG_ENABLE_STATIC_ANALYZER=OFF`
+  / etc. flags set (see
+  [llvm/llvm-project#117705](https://github.com/llvm/llvm-project/issues/117705)
+  for one example of an off-switch that doesn't take effect under
+  `ninja all`). Building the `install-distribution` target sidesteps that
+  whole category of issues by only building what we explicitly listed.
 - LLVM backends default to `X86;ARM;AArch64`. Pass `--targets "X86"` (or a
   different semicolon-separated list) if you only need a single backend.
-- Benchmarks, docs, examples, tests, and the DIA SDK are disabled.
+- Benchmarks, docs, examples, tests, and the DIA SDK are disabled at the
+  CMake-flag level too, as defense-in-depth.
 
 If you need a fuller LLVM install (for example to run `scan-build`), build
 LLVM yourself with the flags you need and point `CMAKE_PREFIX_PATH` /

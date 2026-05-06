@@ -140,9 +140,9 @@ $cmakeArgumentsForSlang = @(
     "-DLLVM_TARGETS_TO_BUILD=$llvmTargets"
     "-DLLVM_BUILD_TOOLS=0"
     # Narrow the distribution to just the libraries/headers Slang links against.
-    # Using install-distribution (below) with this list avoids `ninja all`, which
-    # would otherwise compile the Clang Static Analyzer and other unused pieces
-    # despite CLANG_ENABLE_STATIC_ANALYZER=0 (llvm/llvm-project#117705).
+    # Used in combination with the install-distribution target (below) instead
+    # of `ninja all`, which would otherwise build LLVM tools, tests, examples,
+    # and benchmarks we don't need.
     "-DLLVM_DISTRIBUTION_COMPONENTS=clang-libraries;clang-headers;clang-cmake-exports;llvm-libraries;llvm-headers;cmake-exports"
     # Get LLVM to use the static linked version of the msvc runtime.
     # CMAKE_MSVC_RUNTIME_LIBRARY is resolved at configure time with the
@@ -175,10 +175,13 @@ Msg "##########################################################"
 # install-distribution builds and installs exactly the components listed in
 # LLVM_DISTRIBUTION_COMPONENTS (set at configure time). This is LLVM's
 # supported mechanism for producing a trimmed toolchain — see
-# https://llvm.org/docs/BuildingADistribution.html. It avoids `ninja all`,
-# which would otherwise compile the Clang Static Analyzer and other unused
-# pieces despite CLANG_ENABLE_STATIC_ANALYZER=0
-# (llvm/llvm-project#117705).
+# https://llvm.org/docs/BuildingADistribution.html. We use it instead of
+# `ninja all` because `ninja all` honors neither LLVM_BUILD_TOOLS=0 nor
+# CLANG_ENABLE_STATIC_ANALYZER=OFF reliably (see
+# llvm/llvm-project#117705), so it builds tools, tests, examples, and
+# analyzer sources we don't need. install-distribution sidesteps that
+# whole class of "off switches that don't switch off" by only building
+# what we listed.
 cmake --build $buildDir -j --target install-distribution
 
 # Sanity-check that the install tree actually contains the per-target
