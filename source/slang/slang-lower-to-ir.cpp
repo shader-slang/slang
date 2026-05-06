@@ -13518,13 +13518,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto instanceAttr = as<InstanceAttribute>(modifier))
             {
-                IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), instanceAttr);
-                getBuilder()->addDecoration(irFunc, kIROp_InstanceDecoration, intLit);
+                auto builder = getBuilder();
+                builder->addDecoration(
+                    irFunc,
+                    kIROp_InstanceDecoration,
+                    builder->getIntValue(builder->getIntType(), instanceAttr->value));
             }
             else if (auto maxVertCountAttr = as<MaxVertexCountAttribute>(modifier))
             {
-                IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), maxVertCountAttr);
-                getBuilder()->addDecoration(irFunc, kIROp_MaxVertexCountDecoration, intLit);
+                auto builder = getBuilder();
+                builder->addDecoration(
+                    irFunc,
+                    kIROp_MaxVertexCountDecoration,
+                    builder->getIntValue(builder->getIntType(), maxVertCountAttr->value));
             }
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
             {
