@@ -415,6 +415,11 @@ static IRFunc* synthesizeCoverageHitThunk(IRModule* module, IRGlobalParam* cover
 
     auto thunk = builder.createFunc();
     thunk->setFullType(funcType);
+    // Tag the thunk with a dedicated decoration (rather than relying on the
+    // name hint) so the post-`performForceInlining` verifier can identify
+    // it unambiguously, even if user code declares a function with the same
+    // reserved-looking name.
+    builder.addDecoration(thunk, kIROp_CoverageThunkDecoration);
     builder.addNameHintDecoration(thunk, UnownedTerminatedStringSlice(kCoverageHitFuncName));
     builder.addForceInlineDecoration(thunk);
 
@@ -456,11 +461,26 @@ struct CoverageInstrumenter
 
     // Dedup map for same-line slot sharing: every counter op resolving
     // to the same `(file, line)` reuses the first slot allocated for
-    // that pair. Keyed on a `file + ":" + line` string for portability
-    // across `Dictionary` implementations. Counter ops with an
-    // unresolvable source location are not deduped — they each get a
-    // unique slot, since attribution can't tell them apart anyway.
-    Dictionary<String, UInt> slotByLineKey;
+    // that pair. Keyed on a struct rather than a stringified
+    // `file + ":" + line` to (a) skip the per-op `StringBuilder`
+    // allocation and (b) avoid any path-with-colon ambiguity. Counter
+    // ops with an unresolvable source location are not deduped — they
+    // each get a unique slot, since attribution can't tell them apart
+    // anyway.
+    struct FileLineKey
+    {
+        String file;
+        uint32_t line;
+        bool operator==(const FileLineKey& other) const
+        {
+            return line == other.line && file == other.file;
+        }
+        HashCode getHashCode() const
+        {
+            return combineHash(Slang::getHashCode(file), Slang::getHashCode(line));
+        }
+    };
+    Dictionary<FileLineKey, UInt> slotByLineKey;
 
     CoverageInstrumenter(
         IRModule* m,
@@ -490,9 +510,7 @@ struct CoverageInstrumenter
 
         if (valid)
         {
-            StringBuilder keyBuilder;
-            keyBuilder << entry.file << ":" << entry.line;
-            String key = keyBuilder.toString();
+            FileLineKey key{entry.file, entry.line};
             UInt existing = 0;
             if (slotByLineKey.tryGetValue(key, existing))
                 return existing;
@@ -704,24 +722,28 @@ void instrumentCoverage(
     instrumenter.run(counterOps);
 }
 
-void verifyCoverageThunkInlined(IRModule* module)
+void verifyAndRemoveCoverageThunk(IRModule* module)
 {
     for (auto inst : module->getModuleInst()->getChildren())
     {
         auto func = as<IRFunc>(inst);
         if (!func)
             continue;
-        auto nameHint = func->findDecoration<IRNameHintDecoration>();
-        if (!nameHint)
-            continue;
-        if (nameHint->getName() != UnownedTerminatedStringSlice(kCoverageHitFuncName))
+        if (!func->findDecoration<IRCoverageThunkDecoration>())
             continue;
 
-        // Found the thunk. After `performForceInlining` the thunk
-        // should have zero remaining uses; any surviving use means
-        // a `Call` site escaped inlining and a per-hit function-call
-        // frame would appear in emitted code.
+        // Found the thunk. After `performForceInlining` it should
+        // have zero remaining uses; any surviving use means a `Call`
+        // site escaped inlining and a per-hit function-call frame
+        // would appear in emitted code.
         SLANG_RELEASE_ASSERT(!func->hasUses());
+
+        // Remove the now-dead thunk explicitly. Downstream global-DCE
+        // would also eliminate it today, but doing so here makes the
+        // contract independent of which simplification passes happen
+        // to run after this point — important for minimal-optimization
+        // builds that may skip simplifyIR.
+        func->removeAndDeallocate();
         return;
     }
 }

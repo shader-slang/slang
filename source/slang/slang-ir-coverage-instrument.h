@@ -46,19 +46,28 @@ void instrumentCoverage(
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata);
 
-// Defensive invariant: after `[ForceInline]` inlining has run, the
-// synthesized `__slang_coverage_hit` thunk must have no surviving
-// call sites. Each backend used by Slang honors `[ForceInline]` and
-// folds the thunk's atomic-add body back into each call site at emit
-// time, preserving the "byte-identical to pre-thunk emit" contract
-// documented in `docs/design/shader-coverage.md`. If a backend ever
-// stops honoring the decoration (or a target-specific pass strips
-// it after instrumentation), an extra per-coverage-hit function-call
-// frame would appear in emitted code; this check catches that
-// regression in IR rather than as a per-target emit-output check.
+// Defensive invariant + cleanup: after `[ForceInline]` inlining has
+// run, the synthesized `__slang_coverage_hit` thunk must have no
+// surviving call sites. Each backend used by Slang honors
+// `[ForceInline]` and folds the thunk's atomic-add body back into
+// each call site at emit time, preserving the "byte-identical to
+// pre-thunk emit" contract documented in
+// `docs/design/shader-coverage.md`. If a backend ever stops honoring
+// the decoration (or a target-specific pass strips it after
+// instrumentation), an extra per-coverage-hit function-call frame
+// would appear in emitted code; this check catches that regression
+// in IR rather than as a per-target emit-output check.
+//
+// On success the now-zero-use thunk is also removed from the module
+// so its dead body cannot leak into emitted source on backends that
+// do not (or no longer) run a downstream global-DCE pass.
+//
+// The thunk is identified by `IRCoverageThunkDecoration`, not by
+// name hint — user code is free to declare a function with the same
+// reserved-looking name without colliding with this verifier.
 //
 // No-op when the coverage pass did not run (no thunk in the module).
-void verifyCoverageThunkInlined(IRModule* module);
+void verifyAndRemoveCoverageThunk(IRModule* module);
 
 } // namespace Slang
 

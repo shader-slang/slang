@@ -1949,6 +1949,15 @@ local insts = {
 				},
 			},
 			{
+				CoverageThunk = {
+					-- Identifies the synthesized `__slang_coverage_hit` thunk created by the coverage
+					-- instrumentation pass. Matched by a dedicated decoration (rather than name hint)
+					-- so the post-`performForceInlining` verifier never collides with a user-declared
+					-- function that happens to share the thunk's reserved name.
+					struct_name = "CoverageThunkDecoration",
+				},
+			},
+			{
 				AllowPreTranslationInlining = {
 					-- This decoration indicates the callee should be inlined after translation passes,
 					-- Typically, this is because the callee has non-trivial values associated with it that need to be preserved 

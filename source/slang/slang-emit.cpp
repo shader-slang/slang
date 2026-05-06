@@ -2212,7 +2212,7 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(performForceInlining);
 
-    SLANG_PASS(verifyCoverageThunkInlined);
+    SLANG_PASS(verifyAndRemoveCoverageThunk);
 
     if (emitSpirvDirectly)
     {

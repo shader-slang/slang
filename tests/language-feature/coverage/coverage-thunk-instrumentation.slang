@@ -24,6 +24,17 @@
 // first pass only constrains text after its final positive match.)
 //TEST:SIMPLE(filecheck=NOTHUNK):-target cpp -stage compute -entry computeMain -trace-coverage
 
+// Cross-target NOTHUNK regressions. The `[ForceInline]` contract is
+// load-bearing on every backend used by Slang — if any of them stops
+// honoring the decoration on the synthesized thunk, a per-coverage-hit
+// function-call frame would appear in emitted code (a stack-budget
+// risk on RT shaders). These passes assert no `__slang_coverage_hit`
+// symbol survives in HLSL / GLSL / Metal / SPIR-V emit.
+//TEST:SIMPLE(filecheck=HLSL_NOTHUNK):-target hlsl -stage compute -entry computeMain -trace-coverage
+//TEST:SIMPLE(filecheck=GLSL_NOTHUNK):-target glsl -stage compute -entry computeMain -trace-coverage
+//TEST:SIMPLE(filecheck=METAL_NOTHUNK):-target metal -stage compute -entry computeMain -trace-coverage
+//TEST:SIMPLE(filecheck=SPIRV_NOTHUNK):-target spirv-asm -stage compute -entry computeMain -trace-coverage
+
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
 
@@ -48,10 +59,14 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-NOT: _slang_atomic_add_u32{{.*}}_slang_coverage
 
 // The thunk should be fully inlined, so no `_slang_coverage_hit`
-// call survives in the CPU output. If this NOTHUNK-NOT triggers,
-// either `[ForceInline]` regressed or the inlining pass stopped
-// honoring it — both indicate the thunk is leaking into emit.
-// Run as a separate filecheck pass so the directive scans the whole
-// emitted output (a CHECK-NOT after CHECK-COUNT only covers text
-// past the final positive match).
-//NOTHUNK-NOT: _slang_coverage_hit{{[ \t]*\(}}
+// symbol survives in any target's emitted output. If any of these
+// fires, either `[ForceInline]` regressed or the inlining pass
+// stopped honoring it — both indicate the thunk is leaking into
+// emit. Each runs as its own filecheck pass so the directive scans
+// the whole emitted output (a CHECK-NOT after CHECK-COUNT only
+// covers text past the final positive match).
+//NOTHUNK-NOT: __slang_coverage_hit
+//HLSL_NOTHUNK-NOT: __slang_coverage_hit
+//GLSL_NOTHUNK-NOT: __slang_coverage_hit
+//METAL_NOTHUNK-NOT: __slang_coverage_hit
+//SPIRV_NOTHUNK-NOT: __slang_coverage_hit
