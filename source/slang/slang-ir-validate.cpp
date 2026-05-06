@@ -772,14 +772,12 @@ bool StructuredBufferValidationContext::validate(IRModule* module)
     if (m_targetRequest && areResourceTypesBindlessOnTarget(m_targetRequest))
         return true;
 
-    // Walking module-scope `IRStructType`s reaches every field exactly once
-    // (concrete struct types are hoisted to module scope after
-    // `specializeModule`), so a `StructuredBuffer<T>` declared inside a
-    // `ParameterBlock<S>` is validated even though no global param has it as
-    // a top-level type. Struct types parented under an `IRGeneric` (i.e.
-    // unspecialized) are intentionally skipped, since a `StructuredBuffer<T>`
-    // whose `T` is a generic type parameter has no concrete element type to
-    // validate.
+    // `getGlobalInsts()` only yields direct children of the module. That is
+    // sufficient by the time this pass runs (after `specializeModule`),
+    // because concrete struct types have already been hoisted to module
+    // scope. Any unspecialized `IRStructType` parented under an `IRGeneric`
+    // is unreachable from here, which is fine since its
+    // `StructuredBuffer<T>` fields have no concrete `T` to validate yet.
     for (auto globalInst : module->getGlobalInsts())
     {
         if (auto globalParam = as<IRGlobalParam>(globalInst))
