@@ -35,11 +35,6 @@ on:
         required: false
         type: string
         default: ""
-      timeout-minutes:
-        description: "Per-job timeout. Default 120m fits cached LLVM + Slang. Pass 180 when LLVM-build paths are touched and the GCS cache will miss (Windows from-source LLVM alone is ~2h25m on windows-latest)."
-        required: false
-        type: number
-        default: 120
       server-count:
         required: false
         type: number
@@ -53,7 +48,9 @@ on:
 jobs:
   build:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: ${{ inputs.timeout-minutes }}
+    # 180m accommodates a from-source LLVM rebuild when the GCS cache key
+    # changes (e.g. an LLVM version bump). Cached runs take well under 60m.
+    timeout-minutes: 180
     permissions:
       id-token: write # Required for Workload Identity
       contents: read
