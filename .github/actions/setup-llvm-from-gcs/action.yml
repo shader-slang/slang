@@ -73,9 +73,15 @@ runs:
         tar -xzf /tmp/llvm-prebuilt.tar.gz -C build/llvm-project-install
         rm /tmp/llvm-prebuilt.tar.gz
 
+        # If the cached tarball is corrupt or missing the cmake-config tree we
+        # link against, treat it as a cache miss and let the from-source
+        # build step recover. Failing hard would block the build on a stale
+        # cache entry that the next master push will overwrite anyway.
         if [ ! -d "build/llvm-project-install/lib/cmake/clang" ]; then
-          echo "::error::Downloaded LLVM prebuilt is missing build/llvm-project-install/lib/cmake/clang/; cache entry ${LLVM_KEY} is invalid or stale."
-          exit 1
+          echo "⚠️  Downloaded LLVM prebuilt is missing build/llvm-project-install/lib/cmake/clang/ — treating as cache miss"
+          rm -rf build/llvm-project-install
+          echo "cache-hit=false" >> $GITHUB_OUTPUT
+          exit 0
         fi
 
         echo "cache-hit=true" >> $GITHUB_OUTPUT
