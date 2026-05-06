@@ -1105,6 +1105,102 @@ bool SemanticsVisitor::isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scop
             if (s->containerDecl == parentContainer)
                 return true;
         }
+
+        auto parentAggTypeDecl = as<AggTypeDeclBase>(parentContainer);
+        if (!parentAggTypeDecl)
+            return false;
+
+        // If the decl isn't in the same syntactic container as the scope, we still need to
+        // consider extensions that apply to the same type.
+        //
+        // An `ExtensionDecl` is represented as its own `AggTypeDeclBase`, but extension members
+        // are semantically members of the type being extended. For private access, that means
+        // `extension S { private ... }` should be visible from `S` and from other extensions that
+        // apply to `S`, even though the declaration's parent is the extension node rather than the
+        // original `S` declaration.
+        //
+        struct ContainerTargetTypeResolver
+        {
+            SemanticsVisitor* visitor;
+            ASTBuilder* astBuilder;
+
+            Type* getTargetTypeForContainer(AggTypeDeclBase* containerDecl)
+            {
+                if (auto extensionDecl = as<ExtensionDecl>(containerDecl))
+                {
+                    auto extensionDeclRef =
+                        visitor->getDefaultDeclRef(extensionDecl).as<ExtensionDecl>();
+                    if (!extensionDeclRef)
+                        return nullptr;
+
+                    auto targetType = getTargetType(astBuilder, extensionDeclRef);
+                    if (auto targetDeclRefType = as<DeclRefType>(targetType))
+                    {
+                        if (auto targetCallableDeclRef =
+                                targetDeclRefType->getDeclRef().as<CallableDecl>())
+                        {
+                            // Auto-diff synthesizes derivative members as extensions on a
+                            // function-as-type. When that function is a member of an aggregate,
+                            // private access should still be governed by the member function's
+                            // owning aggregate, not by the synthetic function type itself.
+                            //
+                            // The callable can itself be declared in an extension, so resolve the
+                            // parent aggregate through this helper recursively rather than using
+                            // the extension declaration as the semantic container.
+                            if (auto parentAggTypeDecl =
+                                    getParentAggTypeDeclBase(targetCallableDeclRef.getDecl()))
+                            {
+                                return getTargetTypeForContainer(parentAggTypeDecl);
+                            }
+                        }
+                    }
+
+                    return targetType;
+                }
+
+                return DeclRefType::create(astBuilder, visitor->getDefaultDeclRef(containerDecl));
+            }
+        };
+
+        ContainerTargetTypeResolver targetTypeResolver = {this, m_astBuilder};
+
+        auto privateDeclContainerType =
+            targetTypeResolver.getTargetTypeForContainer(parentAggTypeDecl);
+        if (!privateDeclContainerType)
+            return false;
+
+        auto doesContainerTargetTypeMatch = [&](AggTypeDeclBase* scopeAggTypeDecl) -> bool
+        {
+            auto scopeContainerType =
+                targetTypeResolver.getTargetTypeForContainer(scopeAggTypeDecl);
+            if (!scopeContainerType)
+                return false;
+
+            if (privateDeclContainerType->equals(scopeContainerType))
+                return true;
+
+            if (auto parentExtensionDecl = as<ExtensionDecl>(parentAggTypeDecl))
+            {
+                if (applyExtensionToType(parentExtensionDecl, scopeContainerType))
+                    return true;
+            }
+
+            return false;
+        };
+
+        // Walk the lexical scope chain looking for an enclosing aggregate/extension and compare
+        // its semantic type with the declaration's semantic type.
+        // `applyExtensionToType` handles generic extensions whose target can be specialized to the
+        // current scope's aggregate type.
+        //
+        for (auto s = scope; s; s = s->parent)
+        {
+            if (auto scopeAggTypeDecl = as<AggTypeDeclBase>(s->containerDecl))
+            {
+                if (doesContainerTargetTypeMatch(scopeAggTypeDecl))
+                    return true;
+            }
+        }
         return false;
     }
     return false;
@@ -3736,6 +3832,9 @@ static Expr* convertHigherOrderExprToLookup(
         resultExpr->baseFunction = convertHigherOrderExprToLookup(visitor, hofExpr);
     }
 
+    if (visitor->IsErrorExpr(resultExpr->baseFunction))
+        return visitor->CreateErrorExpr(resultExpr);
+
     if (auto declRefExpr = as<DeclRefExpr>(resultExpr->baseFunction))
     {
         auto callableDeclRef = declRefExpr->declRef.as<CallableDecl>()
@@ -3753,6 +3852,13 @@ static Expr* convertHigherOrderExprToLookup(
             LookupMask::Default,
             LookupOptions::NoDeref);
         result = visitor->resolveOverloadedLookup(result);
+        bool diagnosed = false;
+        result =
+            visitor->filterLookupResultByVisibilityAndDiagnose(result, resultExpr->loc, diagnosed);
+        result = visitor->filterLookupResultByCheckedOptionalAndDiagnose(
+            result,
+            resultExpr->loc,
+            diagnosed);
 
         if (result.isValid() && !result.isOverloaded())
         {
@@ -3775,11 +3881,23 @@ static Expr* convertHigherOrderExprToLookup(
 
             return lookupResultExpr;
         }
+        else if (result.isOverloaded())
+        {
+            auto overloadedExpr = visitor->getASTBuilder()->create<OverloadedExpr>();
+            overloadedExpr->loc = resultExpr->loc;
+            visitor->diagnoseAmbiguousReference(overloadedExpr, result);
+            return visitor->CreateErrorExpr(resultExpr);
+        }
         else
         {
-            visitor->getSink()->diagnose(
-                Diagnostics::InternalCompilerError{.location = resultExpr->loc});
-            return resultExpr;
+            if (!diagnosed && !visitor->IsErrorExpr(resultExpr->baseFunction))
+            {
+                visitor->getSink()->diagnose(Diagnostics::NoMemberOfNameInType{
+                    .name = lookupName,
+                    .type = funcAsType,
+                    .expr = resultExpr});
+            }
+            return visitor->CreateErrorExpr(resultExpr);
         }
     }
     else
@@ -3869,7 +3987,16 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                             //
                             // An argument can be made that transformation shouldn't apply to
                             // the ref scenario in general.
-                            if (implicitCastExpr && as<OutParamTypeBase>(paramType) &&
+                            // Only fall back to the implicit-cast-as-lvalue
+                            // mechanism if the inner expression is itself an
+                            // l-value: writing back the result of the call only
+                            // makes sense if we have somewhere to write back to.
+                            // Without this check, passing a literal (e.g.
+                            // `foo(0)` for `inout uint`) would survive the
+                            // front end and ICE during IR lowering.
+                            if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1 &&
+                                as<OutParamTypeBase>(paramType) &&
+                                implicitCastExpr->arguments[0]->type.isLeftValue &&
                                 _canLValueCoerce(
                                     implicitCastExpr->arguments[0]->type,
                                     implicitCastExpr->type))
@@ -3948,7 +4075,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                     .arg = argExpr});
 
 
-                                if (implicitCastExpr)
+                                if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1)
                                 {
                                     // Try and determine reason for failure
                                     if (as<RefParamType>(paramType))
@@ -4013,9 +4140,12 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
-            if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
+            if (!IsErrorExpr(invoke))
             {
-                invoke->functionExpr = convertHigherOrderExprToLookup(this, higherOrderInvoke);
+                if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
+                {
+                    invoke->functionExpr = convertHigherOrderExprToLookup(this, higherOrderInvoke);
+                }
             }
         }
     }
@@ -4865,6 +4995,9 @@ static Expr* _checkHigherOrderInvokeExpr(
     expr->baseFunction = subVisitor.dispatchExpr(expr->baseFunction, subVisitor);
     expr->baseFunction =
         subVisitor.maybeResolveOverloadedExpr(expr->baseFunction, LookupMask::Function, nullptr);
+
+    if (semantics->IsErrorExpr(expr->baseFunction))
+        return semantics->CreateErrorExpr(expr);
 
     auto astBuilder = semantics->getASTBuilder();
 
