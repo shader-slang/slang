@@ -39,7 +39,7 @@ bool isConstExpr(IRType* fullType)
     if (auto rateQualifiedType = as<IRRateQualifiedType>(fullType))
     {
         auto rate = rateQualifiedType->getRate();
-        if (const auto constExprRate = as<IRConstExprRate>(rate))
+        if (const auto constExprRate = as<IRConstExprRate>(rate); constExprRate)
             return true;
     }
 
@@ -195,6 +195,61 @@ IRLoop* isLoopPhi(IRParam* param)
         }
     }
     return nullptr;
+}
+
+// Returns true when every use of `value` as a *value operand* is as a phi
+// argument of an `IRLoop` or `IRUnconditionalBranch`.  Such "feeder" instructions
+// exist only to deliver a value to a loop phi (the loop's initial value or the
+// loop-back value); when the phi in question cannot actually be `constexpr`,
+// the root cause lives at a downstream *consumer* of the phi and diagnosing at
+// the feeder points the user at loop syntax that isn't the real bug.  See
+// `validateConstExpr` and #11018.
+//
+// If `value` has any non-phi-feeder use, this returns false and we let
+// `validateConstExpr` emit at `value->sourceLoc` as usual.
+bool isOnlyUsedAsLoopPhiFeeder(IRInst* value)
+{
+    if (!value || !value->firstUse)
+        return false;
+    bool anyFeederUse = false;
+    for (auto use = value->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        // An `IRLoop` is also an `IRUnconditionalBranch`, but its phi args start
+        // at operand index 3 (after target/break/continue blocks).  A plain
+        // `IRUnconditionalBranch` has phi args starting at operand 1.
+        bool isArgUse = false;
+        if (auto loop = as<IRLoop>(user))
+        {
+            auto args = loop->getArgs();
+            auto argCount = loop->getArgCount();
+            for (UInt i = 0; i < argCount; ++i)
+            {
+                if (args[i].get() == value)
+                {
+                    isArgUse = true;
+                    break;
+                }
+            }
+        }
+        else if (auto branch = as<IRUnconditionalBranch>(user))
+        {
+            auto args = branch->getArgs();
+            auto argCount = branch->getArgCount();
+            for (UInt i = 0; i < argCount; ++i)
+            {
+                if (args[i].get() == value)
+                {
+                    isArgUse = true;
+                    break;
+                }
+            }
+        }
+        if (!isArgUse)
+            return false;
+        anyFeederUse = true;
+    }
+    return anyFeederUse;
 }
 
 bool opCanBeConstExprByBackwardPass(IRInst* value)
@@ -525,8 +580,18 @@ void validateConstExpr(PropagateConstExprContext* context, IRGlobalValueWithCode
         {
             if (isConstExpr(ii))
             {
-                // For an instruction that must be `constexpr`, we need
-                // to ensure that its argumenst are all `constexpr`
+                // For an instruction that must be `constexpr`, we need to ensure that its
+                // operands are all `constexpr`.  When backward propagation marks a whole
+                // chain of instructions as requiring `constexpr` because a single demand
+                // site (e.g. a call with a `constexpr` parameter) is rooted in a runtime
+                // value, the chain can contain "feeder" instructions whose only purpose is
+                // to deliver a value to a loop phi (the loop-init and loop-back insts).
+                // Diagnosing at such feeder `ii`s points the user at loop syntax
+                // (`-width`, `++y`) that isn't the true constexpr violation -- the true
+                // violation is at a downstream consumer of the phi, and we'll diagnose
+                // there separately.  Suppress feeder diagnostics to avoid the misleading
+                // cascade described in #11018.
+                const bool iiIsLoopPhiFeeder = isOnlyUsedAsLoopPhiFeeder(ii);
 
                 UInt argCount = ii->getOperandCount();
                 for (UInt aa = 0; aa < argCount; ++aa)
@@ -539,10 +604,9 @@ void validateConstExpr(PropagateConstExprContext* context, IRGlobalValueWithCode
                         {
                             if (IRLoop* loopInst = isLoopPhi(param))
                             {
-                                // If the param is a phi node in a loop that
-                                // does not depend on non-constexpr values, we
-                                // can make it constexpr by force unrolling the
-                                // loop, if the loop is unrollable.
+                                // If the param is a phi node in a loop that does not
+                                // depend on non-constexpr values, we can make it constexpr
+                                // by force unrolling the loop, if the loop is unrollable.
                                 if (isUnrollableLoop(loopInst))
                                 {
                                     if (!loopInst->findDecoration<IRForceUnrollDecoration>())
@@ -559,6 +623,15 @@ void validateConstExpr(PropagateConstExprContext* context, IRGlobalValueWithCode
                     }
                     if (shouldDiagnose)
                     {
+                        if (iiIsLoopPhiFeeder)
+                        {
+                            // See the comment above: this instruction exists only to feed
+                            // a loop phi, so diagnosing at its source location would point
+                            // the user at loop syntax rather than at the real constexpr
+                            // demand.  A downstream consumer will surface the same
+                            // violation with a more accurate source location.
+                            break;
+                        }
 
                         // Diagnose the failure.
 

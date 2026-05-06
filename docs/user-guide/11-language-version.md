@@ -32,6 +32,9 @@ Slang language version 2025 brings these changes on top of the legacy language:
 
 - All declarations have `internal` visibility.
 - A `module` declaration is required at the start of each module.
+- Modifier `volatile` has been deprecated in Slang. See GitHub issue
+  [#10614](https://github.com/shader-slang/slang/issues/10614) for details. The modifier is still accepted
+  in GLSL source code for compatibility reasons.
 
 ## Slang 2026
 
@@ -39,3 +42,6 @@ Slang language version 2026 brings these changes on top of Slang 2025:
 
 - Comma expression is removed when it is used inside a parenthesis. The expression `(a, b)` no longer evaluates to have `b`'s type as in C/C++. Instead, `(a,b)` means `makeTuple(a,b)` and returns a tuple consisting of `a` and `b`. See [SP#027](https://github.com/shader-slang/spec/blob/main/proposals/027-tuple-syntax.md) for details.
 - Users must explicitly opt in to enable dynamic dispatch with the `dyn` keyword. More rigorous validations are enabled to make sure dynamic dispatch is not triggered accidentally. See [SP#024](https://github.com/shader-slang/spec/blob/main/proposals/024-any-dyn-types.md) for details.
+- Modifier `volatile` has been removed from Slang. See GitHub issue
+  [#10614](https://github.com/shader-slang/slang/issues/10614) for details. The modifier is still accepted
+  in GLSL source code for compatibility reasons.

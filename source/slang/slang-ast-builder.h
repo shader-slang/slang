@@ -384,7 +384,7 @@ public:
                 break;
             }
         }
-        else if (auto directDeclRef = as<DirectDeclRef>(parent.declRefBase))
+        else if (auto directDeclRef = as<DirectDeclRef>(parent.declRefBase); directDeclRef)
         {
             return makeDeclRef(memberDecl);
         }

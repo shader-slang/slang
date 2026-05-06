@@ -292,9 +292,15 @@ Will require 3 times as many steps as the earlier scalar example just using a si
 
 ## WaveGetLaneIndex
 
-'WaveGetLaneIndex' defaults to `(threadIdx.x & SLANG_CUDA_WARP_MASK)`. Depending on how the kernel is launched this could be incorrect. There are other ways to get lane index, for example using inline assembly. This mechanism though is apparently slower than the simple method used here. There is support for using the asm mechanism in the CUDA prelude using the `SLANG_USE_ASM_LANE_ID` preprocessor define to enable the feature.
+`WaveGetLaneIndex` computes the lane index by linearizing the thread index across all dimensions and masking to the warp size:
 
-There is potential to calculate the lane id using the [numthreads] markup in Slang/HLSL, but that also requires some assumptions of how that maps to a lane index.
+```
+((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & SLANG_CUDA_WARP_MASK
+```
+
+This handles multi-dimensional thread blocks correctly as long as the linearized thread index maps to consecutive warp lanes, which is the standard CUDA thread-to-lane mapping.
+
+Alternatively, defining `SLANG_USE_ASM_LANE_ID` before including the CUDA prelude switches to an inline PTX assembly implementation (`mov.u32 %0, %laneid`). The assembly version is always correct regardless of launch configuration, but is slower than the arithmetic default.
 
 ## Unsupported Intrinsics
 

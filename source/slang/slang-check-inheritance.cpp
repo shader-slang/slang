@@ -8,6 +8,134 @@
 
 namespace Slang
 {
+UInt SharedSemanticsContext::getDeclExtensionEpoch(Decl* decl) const
+{
+    if (!decl)
+        return 0;
+
+    if (auto epoch = m_mapDeclToExtensionEpoch.tryGetValue(decl))
+        return *epoch;
+
+    return 0;
+}
+
+void SharedSemanticsContext::bumpDeclExtensionEpoch(Decl* decl)
+{
+    if (!decl)
+        return;
+
+    m_mapDeclToExtensionEpoch[decl] = getDeclExtensionEpoch(decl) + 1;
+}
+
+bool SharedSemanticsContext::_isInheritanceInfoCacheEntryUpToDate(
+    InheritanceInfoCacheEntry const& entry) const
+{
+    for (auto const& stamp : entry.dependencyEpochs)
+    {
+        if (getDeclExtensionEpoch(stamp.decl) != stamp.epoch)
+            return false;
+    }
+
+    return true;
+}
+
+void SharedSemanticsContext::_collectInheritanceInfoDependencyEpochs(
+    Decl* subjectDecl,
+    InheritanceInfo const& info,
+    List<DeclExtensionEpochStamp>& outDependencyEpochs) const
+{
+    outDependencyEpochs.clear();
+
+    auto addDependency = [&](Decl* decl)
+    {
+        if (!decl)
+            return;
+
+        for (auto const& stamp : outDependencyEpochs)
+        {
+            if (stamp.decl == decl)
+                return;
+        }
+
+        DeclExtensionEpochStamp stamp;
+        stamp.decl = decl;
+        stamp.epoch = getDeclExtensionEpoch(decl);
+        outDependencyEpochs.add(stamp);
+    };
+
+    // Always depend on the subject declaration itself. This ensures a cache entry
+    // for `T` gets revalidated when a new extension that directly targets `T` is
+    // registered, even if the previous inheritance info happened to be empty.
+    addDependency(subjectDecl);
+
+    for (auto facet : info.facets)
+    {
+        addDependency(facet->getDeclRef().getDecl());
+    }
+}
+
+UInt SharedSemanticsContext::_getInheritanceInfoCacheGeneration(
+    Type* type,
+    InheritanceCircularityInfo* circularityInfo)
+{
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        _getInheritanceInfo(declRefType->getDeclRef(), declRefType, circularityInfo);
+        if (auto entry = m_mapDeclRefToInheritanceInfo.tryGetValue(declRefType->getDeclRef()))
+            return entry->generation;
+        return 0;
+    }
+
+    getInheritanceInfo(type, circularityInfo);
+    if (auto entry = m_mapTypeToInheritanceInfo.tryGetValue(type))
+        return entry->generation;
+    return 0;
+}
+
+bool SharedSemanticsContext::tryGetSubtypeWitnessFromCache(
+    Type* sub,
+    Type* sup,
+    SubtypeWitness*& outWitness)
+{
+    auto pair = TypePair{sub, sup};
+    auto cachedEntry = m_mapTypePairToSubtypeWitness.tryGetValue(pair);
+    if (!cachedEntry)
+        return false;
+
+    auto entry = *cachedEntry;
+
+    UInt currentSubTypeGeneration = _getInheritanceInfoCacheGeneration(sub);
+    UInt currentSuperTypeGeneration = _getInheritanceInfoCacheGeneration(sup);
+    if (entry.subTypeGeneration != currentSubTypeGeneration ||
+        entry.superTypeGeneration != currentSuperTypeGeneration)
+    {
+        m_mapTypePairToSubtypeWitness.remove(pair);
+        return false;
+    }
+
+    outWitness = entry.witness;
+    return true;
+}
+
+void SharedSemanticsContext::cacheSubtypeWitness(Type* sub, Type* sup, SubtypeWitness*& outWitness)
+{
+    auto pair = TypePair{sub, sup};
+    UInt subTypeGeneration = _getInheritanceInfoCacheGeneration(sub);
+    UInt superTypeGeneration = _getInheritanceInfoCacheGeneration(sup);
+
+    // A zero generation means one of the endpoint inheritance entries is still
+    // being recomputed. In that state we don't want to pin a subtype answer to a
+    // stale or incomplete inheritance snapshot.
+    if (!subTypeGeneration || !superTypeGeneration)
+        return;
+
+    SubtypeWitnessCacheEntry entry;
+    entry.witness = outWitness;
+    entry.subTypeGeneration = subTypeGeneration;
+    entry.superTypeGeneration = superTypeGeneration;
+    m_mapTypePairToSubtypeWitness[pair] = entry;
+}
+
 InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     Type* type,
     InheritanceCircularityInfo* circularityInfo)
@@ -20,20 +148,35 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
         return _getInheritanceInfo(declRefType->getDeclRef(), declRefType, circularityInfo);
 
     // Non ordinary types are cached on m_mapTypeToInheritanceInfo.
+    // Each entry also snapshots the extension epochs of the declarations that
+    // contributed facets to it, so we can validate lazily after new extensions
+    // are registered instead of eagerly purging the whole cache.
     if (auto found = m_mapTypeToInheritanceInfo.tryGetValue(type))
-        return *found;
+    {
+        if (found->isComputing)
+            return found->info;
 
-    // Note: we install a null pointer into the dictionary to act
-    // as a sentinel during the processing of calculating the inheritnace
-    // info. If we encounter this sentinel value during the calcuation,
-    // it means that there was some kind of circular dependency in the
-    // inheritance graph, and we need to avoid crashing or going
-    // into an infinite loop in such cases.
-    //
-    m_mapTypeToInheritanceInfo[type] = InheritanceInfo();
+        if (_isInheritanceInfoCacheEntryUpToDate(*found))
+            return found->info;
+    }
+
+    // Mark the entry as in-progress before recursing so we can break cycles
+    // during inheritance calculation without re-entering the same work.
+    {
+        auto& entry = m_mapTypeToInheritanceInfo[type];
+        entry.info = InheritanceInfo();
+        entry.dependencyEpochs.clear();
+        entry.generation = 0;
+        entry.isComputing = true;
+    }
 
     auto info = _calcInheritanceInfo(type, circularityInfo);
-    m_mapTypeToInheritanceInfo[type] = info;
+
+    auto& entry = m_mapTypeToInheritanceInfo[type];
+    entry.info = info;
+    _collectInheritanceInfoDependencyEpochs(nullptr, info, entry.dependencyEpochs);
+    entry.generation = m_nextInheritanceInfoCacheGeneration++;
+    entry.isComputing = false;
 
     return info;
 }
@@ -85,19 +228,31 @@ InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     // possible.
 
     if (auto found = m_mapDeclRefToInheritanceInfo.tryGetValue(declRef))
-        return *found;
+    {
+        if (found->isComputing)
+            return found->info;
 
-    // Note: we install a null pointer into the dictionary to act
-    // as a sentinel during the processing of calculating the inheritnace
-    // info. If we encounter this sentinel value during the calcuation,
-    // it means that there was some kind of circular dependency in the
-    // inheritance graph, and we need to avoid crashing or going
-    // into an infinite loop in such cases.
-    //
-    m_mapDeclRefToInheritanceInfo[declRef] = InheritanceInfo();
+        if (_isInheritanceInfoCacheEntryUpToDate(*found))
+            return found->info;
+    }
+
+    // Mark the entry as in-progress before recursing so we can break cycles
+    // during inheritance calculation without re-entering the same work.
+    {
+        auto& entry = m_mapDeclRefToInheritanceInfo[declRef];
+        entry.info = InheritanceInfo();
+        entry.dependencyEpochs.clear();
+        entry.generation = 0;
+        entry.isComputing = true;
+    }
 
     auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo);
-    m_mapDeclRefToInheritanceInfo[declRef] = info;
+
+    auto& entry = m_mapDeclRefToInheritanceInfo[declRef];
+    entry.info = info;
+    _collectInheritanceInfoDependencyEpochs(declRef.getDecl(), info, entry.dependencyEpochs);
+    entry.generation = m_nextInheritanceInfoCacheGeneration++;
+    entry.isComputing = false;
 
     getSession()->m_typeDictionarySize = Math::Max(
         getSession()->m_typeDictionarySize,

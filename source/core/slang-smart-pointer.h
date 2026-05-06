@@ -6,13 +6,19 @@
 #include "slang-type-traits.h"
 #include "slang.h"
 
+#include <atomic>
+
 namespace Slang
 {
 // Base class for all reference-counted objects
+#if SLANG_VC
+#pragma warning(push)
+#pragma warning(disable : 4251)
+#endif
 class SLANG_RT_API RefObject
 {
 private:
-    UInt referenceCount;
+    std::atomic<UInt> referenceCount;
 
 public:
     RefObject()
@@ -29,29 +35,34 @@ public:
 
     virtual ~RefObject() {}
 
-    UInt addReference() { return ++referenceCount; }
+    UInt addReference() { return referenceCount.fetch_add(1, std::memory_order_relaxed) + 1; }
 
-    UInt decreaseReference() { return --referenceCount; }
+    UInt decreaseReference() { return referenceCount.fetch_sub(1, std::memory_order_acq_rel) - 1; }
 
     UInt releaseReference()
     {
-        SLANG_ASSERT(referenceCount != 0);
-        if (--referenceCount == 0)
+        UInt oldCount = referenceCount.fetch_sub(1, std::memory_order_acq_rel);
+        SLANG_ASSERT(oldCount != 0);
+        if (oldCount == 1)
         {
             delete this;
             return 0;
         }
-        return referenceCount;
+        return oldCount - 1;
     }
 
     bool isUniquelyReferenced()
     {
-        SLANG_ASSERT(referenceCount != 0);
-        return referenceCount == 1;
+        UInt count = referenceCount.load(std::memory_order_acquire);
+        SLANG_ASSERT(count != 0);
+        return count == 1;
     }
 
-    UInt debugGetReferenceCount() { return referenceCount; }
+    UInt debugGetReferenceCount() { return referenceCount.load(std::memory_order_relaxed); }
 };
+#if SLANG_VC
+#pragma warning(pop)
+#endif
 
 SLANG_FORCE_INLINE void addReference(RefObject* obj)
 {

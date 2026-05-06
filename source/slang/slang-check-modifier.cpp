@@ -814,7 +814,7 @@ Modifier* SemanticsVisitor::validateAttribute(
             addModifier(attr->attributeDecl, targetModifier);
         }
     }
-    else if (const auto unrollAttr = as<UnrollAttribute>(attr))
+    else if (const auto unrollAttr = as<UnrollAttribute>(attr); unrollAttr)
     {
         // Check has an argument. We need this because default behavior is to give an error
         // if an attribute has arguments, but not handled explicitly (and the default param will
@@ -848,7 +848,7 @@ Modifier* SemanticsVisitor::validateAttribute(
             maxItersAttrs->value = checkLinkTimeConstantIntVal(attr->args[0]);
         }
     }
-    else if (const auto userDefAttr = as<UserDefinedAttribute>(attr))
+    else if (const auto userDefAttr = as<UserDefinedAttribute>(attr); userDefAttr)
     {
         // check arguments against attribute parameters defined in attribClassDecl
         Index paramIndex = 0;
@@ -1090,7 +1090,8 @@ Modifier* SemanticsVisitor::validateAttribute(
             return nullptr;
         }
     }
-    else if (const auto derivativeMemberAttr = as<DerivativeMemberAttribute>(attr))
+    else if (const auto derivativeMemberAttr = as<DerivativeMemberAttribute>(attr);
+             derivativeMemberAttr)
     {
         auto varDecl = as<VarDeclBase>(attrTarget);
         if (!varDecl)
@@ -1112,6 +1113,36 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
 
         deprecatedAttr->message = message;
+    }
+    else if (auto removedSinceAttr = as<RemovedSinceAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 2);
+
+        auto sinceVersion = checkConstantIntVal(attr->args[0]);
+        if (sinceVersion == nullptr)
+        {
+            return nullptr;
+        }
+
+        const int32_t kMinVersion = -1;
+        const int32_t kMaxVersion = 9999;
+        if ((sinceVersion->getValue() < kMinVersion) || (sinceVersion->getValue() > kMaxVersion))
+        {
+            getSink()->diagnose(Diagnostics::RemovedSinceBadVersion{
+                .minVersion = kMinVersion,
+                .maxVersion = kMaxVersion,
+                .location = removedSinceAttr->loc});
+            return nullptr;
+        }
+
+        String message;
+        if (!checkLiteralStringVal(attr->args[1], &message))
+        {
+            return nullptr;
+        }
+
+        removedSinceAttr->sinceVersion = int32_t(sinceVersion->getValue());
+        removedSinceAttr->message = message;
     }
     else if (auto knownBuiltinAttr = as<KnownBuiltinAttribute>(attr))
     {
@@ -1298,7 +1329,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
         {
             // We didn't have enough arguments for the
             // number of parameters declared.
-            if (const auto defaultArg = paramDecl->initExpr)
+            if (const auto defaultArg = paramDecl->initExpr; defaultArg)
             {
                 // The attribute declaration provided a default,
                 // so we should use that.
@@ -1823,7 +1854,7 @@ Modifier* SemanticsVisitor::checkModifier(
         }
     }
 
-    if (const auto externModifier = as<ExternModifier>(m))
+    if (const auto externModifier = as<ExternModifier>(m); externModifier)
     {
         if (auto varDecl = as<VarDeclBase>(syntaxNode))
         {

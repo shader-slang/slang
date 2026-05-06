@@ -27,12 +27,28 @@ list(
 )
 list(TRANSFORM SLANG_FIDDLE_OUTPUTS PREPEND "${SLANG_FIDDLE_OUTPUT_DIR}/")
 
+#
+# slang-fiddle is a many-input / many-output generator that uses
+# `writeAllTextIfChanged()` to avoid touching outputs whose content has
+# not changed. CMake's add_custom_command(OUTPUT …) treats every listed
+# output as an up-to-date marker: if any single output is older than the
+# command's dependencies, it re-runs the command. Because fiddle leaves
+# unchanged outputs alone, those output mtimes stay older than the
+# generator binary itself, so CMake re-runs fiddle on every build, and
+# downstream link steps re-link.
+#
+# Drive the rule from a stamp file we touch unconditionally; list the
+# generated source files via BYPRODUCTS so dependants still see them
+# but their (stale) mtimes are not used as up-to-date markers.
+set(SLANG_FIDDLE_STAMP "${SLANG_FIDDLE_OUTPUT_DIR}/.fiddle.stamp")
 add_custom_command(
-    OUTPUT ${SLANG_FIDDLE_OUTPUTS}
+    OUTPUT ${SLANG_FIDDLE_STAMP}
+    BYPRODUCTS ${SLANG_FIDDLE_OUTPUTS}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_FIDDLE_OUTPUT_DIR}
     COMMAND
         slang-fiddle -i "${SLANG_FIDDLE_INPUT_DIR}/" -o
         "${SLANG_FIDDLE_OUTPUT_DIR}/" ${SLANG_FIDDLE_INPUT_FILE_NAMES}
+    COMMAND ${CMAKE_COMMAND} -E touch ${SLANG_FIDDLE_STAMP}
     DEPENDS ${SLANG_FIDDLE_INPUTS} ${SLANG_FIDDLE_LUA_INPUTS} slang-fiddle
     WORKING_DIRECTORY ${slang_SOURCE_DIR}
     VERBATIM
@@ -41,7 +57,7 @@ add_library(
     slang-fiddle-output
     INTERFACE
     EXCLUDE_FROM_ALL
-    ${SLANG_FIDDLE_OUTPUTS}
+    ${SLANG_FIDDLE_STAMP}
 )
 set_target_properties(slang-fiddle-output PROPERTIES FOLDER generated)
 target_include_directories(

@@ -395,6 +395,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     slang::IComponentType** outSpecializedComponentType,
     ISlangBlob** outDiagnostics)
 {
+    // Specialization still walks and mutates linkage-owned front-end state, so keep it
+    // serialized with other component-type front-end operations.
+    std::lock_guard<std::recursive_mutex> lock(getLinkage()->getComponentTypeOperationMutex());
+
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
     DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
 
@@ -456,6 +460,10 @@ RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 SLANG_NO_THROW SlangResult SLANG_MCALL
 ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob** outDiagnostics)
 {
+    // Linking mutates the same shared linkage state as specialization/layout and is not yet part
+    // of the parallel backend-only execution model.
+    std::lock_guard<std::recursive_mutex> lock(getLinkage()->getComponentTypeOperationMutex());
+
     // TODO: It should be possible for `fillRequirements` to fail,
     // in cases where we have a dependency that can't be automatically
     // resolved.
@@ -680,9 +688,13 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
     if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
         return nullptr;
     ComPtr<IArtifact> artifact;
-    if (m_targetArtifacts.tryGetValue(targetIndex, artifact))
     {
-        return artifact.get();
+        // Parallel backend requests can race this lookup, so guard the shared artifact cache.
+        std::lock_guard<std::mutex> lock(m_cacheMutex);
+        if (m_targetArtifacts.tryGetValue(targetIndex, artifact))
+        {
+            return artifact.get();
+        }
     }
     try
     {
@@ -719,6 +731,12 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
                                           ->getTargetArtifact(targetIndex, outDiagnostics);
                 if (targetArtifact)
                 {
+                    // Another thread may have published the artifact while we were doing the
+                    // link above, so only commit the first cache entry.
+                    std::lock_guard<std::mutex> lock(m_cacheMutex);
+                    ComPtr<IArtifact> existingArtifact;
+                    if (m_targetArtifacts.tryGetValue(targetIndex, existingArtifact))
+                        return existingArtifact.get();
                     m_targetArtifacts[targetIndex] = targetArtifact;
                 }
                 return targetArtifact;
@@ -734,8 +752,16 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
 
         IArtifact* targetArtifact = targetProgram->getOrCreateWholeProgramResult(&sink);
         sink.getBlobIfNeeded(outDiagnostics);
-        m_targetArtifacts[targetIndex] = ComPtr<IArtifact>(targetArtifact);
-        return targetArtifact;
+        artifact = ComPtr<IArtifact>(targetArtifact);
+        {
+            // Publish the whole-program artifact only once and avoid racing the cache map.
+            std::lock_guard<std::mutex> lock(m_cacheMutex);
+            ComPtr<IArtifact> existingArtifact;
+            if (m_targetArtifacts.tryGetValue(targetIndex, existingArtifact))
+                return existingArtifact.get();
+            m_targetArtifacts[targetIndex] = artifact;
+        }
+        return artifact.get();
     }
     catch (const Exception& e)
     {
@@ -1164,10 +1190,26 @@ ConstantIntVal* ComponentType::tryFoldIntVal(IntVal* intVal)
 TargetProgram* ComponentType::getTargetProgram(TargetRequest* target)
 {
     RefPtr<TargetProgram> targetProgram;
-    if (!m_targetPrograms.tryGetValue(target, targetProgram))
     {
-        targetProgram = new TargetProgram(this, target);
-        m_targetPrograms[target] = targetProgram;
+        // Multiple entry-point compile threads can race creation of the per-target wrapper.
+        std::lock_guard<std::mutex> lock(m_cacheMutex);
+        if (m_targetPrograms.tryGetValue(target, targetProgram))
+            return targetProgram;
+    }
+
+    // Constructing a TargetProgram can cascade into shared front-end work, so serialize it with
+    // other component-type operations.
+    std::lock_guard<std::recursive_mutex> operationLock(
+        getLinkage()->getComponentTypeOperationMutex());
+
+    {
+        // Re-check under the cache lock so only one TargetProgram is published per target.
+        std::lock_guard<std::mutex> lock(m_cacheMutex);
+        if (!m_targetPrograms.tryGetValue(target, targetProgram))
+        {
+            targetProgram = new TargetProgram(this, target);
+            m_targetPrograms[target] = targetProgram;
+        }
     }
     return targetProgram;
 }

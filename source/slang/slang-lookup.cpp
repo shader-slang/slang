@@ -53,36 +53,36 @@ bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
         }
     }
     // type declarations
-    if (const auto aggTypeDecl = as<AggTypeDecl>(decl))
+    if (const auto aggTypeDecl = as<AggTypeDecl>(decl); aggTypeDecl)
     {
         return int(mask) & int(LookupMask::type);
     }
-    else if (const auto simpleTypeDecl = as<SimpleTypeDecl>(decl))
+    else if (const auto simpleTypeDecl = as<SimpleTypeDecl>(decl); simpleTypeDecl)
     {
         return int(mask) & int(LookupMask::type);
     }
     // function declarations
-    else if (const auto funcDecl = as<FunctionDeclBase>(decl))
+    else if (const auto funcDecl = as<FunctionDeclBase>(decl); funcDecl)
     {
         return (int(mask) & int(LookupMask::Function)) != 0;
     }
     // attribute declaration
-    else if (const auto attrDecl = as<AttributeDecl>(decl))
+    else if (const auto attrDecl = as<AttributeDecl>(decl); attrDecl)
     {
         return (int(mask) & int(LookupMask::Attribute)) != 0;
     }
     // syntax declaration
-    else if (const auto syntaxDecl = as<SyntaxDecl>(decl))
+    else if (const auto syntaxDecl = as<SyntaxDecl>(decl); syntaxDecl)
     {
         return (int(mask) & int(LookupMask::SyntaxDecl)) != 0;
     }
-    else if (const auto fileDecl = as<FileDecl>(decl))
+    else if (const auto fileDecl = as<FileDecl>(decl); fileDecl)
     {
         // FileDecls should never be discovered via name lookups.
         return false;
     }
     // semantic declaration
-    else if (const auto semanticDecl = as<SemanticDecl>(decl))
+    else if (const auto semanticDecl = as<SemanticDecl>(decl); semanticDecl)
     {
         return (int(mask) & int(LookupMask::Semantic)) != 0;
     }

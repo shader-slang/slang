@@ -32,7 +32,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     float4 a = float4(1,2,3,4);
     float f1 = reduceAdd(a);
-    memset(Ptr<void>(&a), 0, 8);
+    memset(Ptr<void>(__getAddress(a)), 0, 8);
     float f2 = reduceAdd(a);
 
     // CHECK: 10.0

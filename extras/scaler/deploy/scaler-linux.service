@@ -18,7 +18,8 @@ ExecStart=/opt/scaler/scaler \
     --gcp-project=slang-runners \
     --gcp-zones=us-east1-c,us-east1-d,us-central1-a,us-west1-a \
     --gcp-instance-template=linux-gpu-runner \
-    --platform=linux
+    --platform=linux \
+    --session-max-age=2h
 
 EnvironmentFile=/opt/scaler/scaler.env
 

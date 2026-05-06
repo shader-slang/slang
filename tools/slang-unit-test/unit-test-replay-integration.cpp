@@ -314,3 +314,121 @@ SLANG_UNIT_TEST(replayContextFindLatestFolder)
     ctx().reset();
     ctx().setReplayDirectory(".slang-replays");
 }
+
+// =============================================================================
+// getSessionDescDigest: stream verification
+// Verify the recorded stream contains the expected signature and SessionDesc.
+// =============================================================================
+
+SLANG_UNIT_TEST(replayContextRecordGetSessionDescDigestCall)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().setMode(Mode::Record);
+
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    SlangGlobalSessionDesc globalDesc = {};
+    globalDesc.apiVersion = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, globalSession.writeRef())));
+
+    slang::SessionDesc sessionDesc = {};
+    Slang::ComPtr<ISlangBlob> digestBlob;
+    SlangResult digestResult =
+        globalSession->getSessionDescDigest(&sessionDesc, digestBlob.writeRef());
+    SLANG_CHECK(SLANG_SUCCEEDED(digestResult));
+    SLANG_CHECK(digestBlob != nullptr);
+
+    ctx().switchToPlayback();
+
+    // Skip past the slang_createGlobalSession2 call:
+    // signature + this handle + global desc + output handle + result
+    const char* signature = nullptr;
+    ctx().record(RecordFlag::Input, signature);
+    SLANG_CHECK(signature != nullptr);
+    SLANG_CHECK(strcmp(signature, "slang_createGlobalSession2") == 0);
+    uint64_t thisHandle = 0;
+    ctx().recordHandle(RecordFlag::Input, thisHandle);
+    SlangGlobalSessionDesc readGlobalDesc = {};
+    ctx().record(RecordFlag::Input, readGlobalDesc);
+    SLANG_CHECK(readTypeIdFromStream(ctx().getStream()) == TypeId::ObjectHandle);
+    uint64_t globalContextHandle = 0;
+    ctx().getStream().read(&globalContextHandle, sizeof(globalContextHandle));
+    SlangResult createResult;
+    ctx().record(RecordFlag::None, createResult);
+
+    // Now read the getSessionDescDigest call:
+    // - signature
+    // - this handle
+    // - input SessionDesc
+    // - output blob (hash)
+    // - return value
+    ctx().record(RecordFlag::Input, signature);
+    SLANG_CHECK(signature != nullptr);
+    SLANG_CHECK(strstr(signature, "getSessionDescDigest") != nullptr);
+    ctx().recordHandle(RecordFlag::Input, thisHandle);
+    SLANG_CHECK(thisHandle == globalContextHandle);
+    slang::SessionDesc readDesc = {};
+    ctx().record(RecordFlag::Input, readDesc);
+    SLANG_CHECK(readDesc.targetCount == sessionDesc.targetCount);
+    SLANG_CHECK(readDesc.searchPathCount == sessionDesc.searchPathCount);
+
+    // Read output blob (recorded as content hash). recordBlobByHash detaches
+    // a new ComPtr into the raw pointer during playback, so we need to adopt
+    // ownership to avoid leaking the blob.
+    ISlangBlob* readBlobRaw = nullptr;
+    ctx().record(RecordFlag::Output, readBlobRaw);
+    Slang::ComPtr<ISlangBlob> readBlob;
+    readBlob.attach(readBlobRaw);
+    SLANG_CHECK(readBlob != nullptr);
+
+    // Read return value
+    SlangResult readResult;
+    ctx().record(RecordFlag::None, readResult);
+    SLANG_CHECK(readResult == SLANG_OK);
+
+    SLANG_CHECK(ctx().getStream().atEnd());
+    ctx().disable();
+}
+
+// =============================================================================
+// getSessionDescDigest: end-to-end replay via executeAll()
+// This is the test that would crash before the PREPARE_POINTER_INPUT fix,
+// because callWithDefaults passes nullptr for the SessionDesc* parameter.
+// =============================================================================
+
+SLANG_UNIT_TEST(replayContextGetSessionDescDigestPlayback)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().setMode(Mode::Record);
+
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    SlangGlobalSessionDesc globalDesc = {};
+    globalDesc.apiVersion = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, globalSession.writeRef())));
+
+    slang::SessionDesc sessionDesc = {};
+    Slang::ComPtr<ISlangBlob> digestBlob;
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(globalSession->getSessionDescDigest(&sessionDesc, digestBlob.writeRef())));
+    SLANG_CHECK(digestBlob != nullptr);
+
+    size_t recordedDigestSize = digestBlob->getBufferSize();
+    SLANG_CHECK(recordedDigestSize > 0);
+
+    ctx().switchToPlayback();
+    SLANG_CHECK(ctx().isPlayback());
+
+    // This calls through the proxy with default (null) arguments;
+    // PREPARE_POINTER_INPUT ensures the null SessionDesc* is patched
+    // to valid storage before RECORD_INPUT dereferences it.
+    ctx().executeAll();
+
+    // Confirm the whole recorded stream was consumed. A partial replay
+    // (e.g. getSessionDescDigest silently skipped) would otherwise go unnoticed.
+    SLANG_CHECK(ctx().getStream().atEnd());
+
+    ctx().disable();
+}

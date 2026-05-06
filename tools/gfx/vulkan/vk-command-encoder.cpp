@@ -488,6 +488,8 @@ void ResourceCommandEncoder::uploadTextureData(
         dstData += uploadBufferOffset;
         uint8_t* dstDataStart;
         dstDataStart = dstData;
+        // TODO: PR #2244 (lucy96chen) - dstDataStart is set but never used.
+        SLANG_UNUSED(dstDataStart);
 
         Offset dstSubresourceOffset = 0;
         for (GfxIndex i = 0; i < subResourceRange.layerCount; ++i)

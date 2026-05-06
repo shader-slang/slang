@@ -113,13 +113,40 @@ set(glsl_module_generated_header_dir
 )
 set(glsl_module_generated_header ${glsl_module_generated_header} PARENT_SCOPE)
 
+# When SLANG_EMBED_CORE_MODULE=OFF, slang-without-embedded-core-module is an ALIAS
+# for slang, whose DLL (slang-compiler.dll) is placed in bin/ rather than generators/.
+# slang-bootstrap.exe lives in generators/, and the Windows DLL loader searches the
+# EXE directory first, so it cannot find slang-compiler.dll across directories.
+# Pre-copy slang-compiler.dll into the generators/ directory before invoking
+# slang-bootstrap so the loader finds it in the expected location.
+if(NOT SLANG_EMBED_CORE_MODULE AND WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED")
+    set(bootstrap_pre_copy_command
+        COMMAND
+        ${CMAKE_COMMAND}
+        -E
+        copy_if_different
+        "$<TARGET_FILE:slang>"
+        "$<TARGET_FILE_DIR:slang-bootstrap>/$<TARGET_FILE_NAME:slang>"
+    )
+    set(bootstrap_extra_deps slang)
+else()
+    set(bootstrap_pre_copy_command "")
+    set(bootstrap_extra_deps "")
+endif()
+
 add_custom_command(
-    OUTPUT ${core_module_generated_header} ${glsl_module_generated_header}
+    OUTPUT
+        ${core_module_generated_header}
+        ${glsl_module_generated_header}
+        ${bootstrap_pre_copy_command}
     COMMAND
         slang-bootstrap -archive-type riff-lz4 -save-core-module-bin-source
         ${core_module_generated_header} -save-glsl-module-bin-source
         ${glsl_module_generated_header}
-    DEPENDS slang-bootstrap slang-without-embedded-core-module
+    DEPENDS
+        slang-bootstrap
+        slang-without-embedded-core-module
+        ${bootstrap_extra_deps}
     VERBATIM
 )
 # Add a target so that we can depend on the above step when we create the glsl

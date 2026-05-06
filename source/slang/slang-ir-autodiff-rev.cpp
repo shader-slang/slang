@@ -775,7 +775,8 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
         {
             // inout diff-pair or in diff-ptr-pair
             if (auto bwdDiffParamPtrType =
-                    as<IRPtrTypeBase>(bwdDiffFuncType->getParamType(bwdDiffParamIdx)))
+                    as<IRPtrTypeBase>(bwdDiffFuncType->getParamType(bwdDiffParamIdx));
+                bwdDiffParamPtrType)
             {
                 if (auto applyParamPtrType = as<IRPtrTypeBase>(applyParamType))
                 {

@@ -174,7 +174,18 @@ struct ShaderBindingRange
     }
 };
 
-class ArtifactPostEmitMetadata : public ComBaseObject, public IArtifactPostEmitMetadata
+/// One counter slot → (file, line) mapping entry for coverage tracing.
+/// Populated by `instrumentCoverage` when `-trace-coverage` is active.
+struct CoverageTracingEntry
+{
+    String file;
+    uint32_t line = 0;
+};
+
+class ArtifactPostEmitMetadata : public ComBaseObject,
+                                 public IArtifactPostEmitMetadata,
+                                 public slang::ICoverageTracingMetadata,
+                                 public slang::ICooperativeTypesMetadata
 {
 public:
     typedef ArtifactPostEmitMetadata ThisType;
@@ -201,6 +212,33 @@ public:
 
     SLANG_NO_THROW virtual const char* SLANG_MCALL getDebugBuildIdentifier() SLANG_OVERRIDE;
 
+    // ICoverageTracingMetadata
+    SLANG_NO_THROW virtual uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL
+    getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
+        SLANG_OVERRIDE;
+
+    // ICooperativeTypesMetadata
+    SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeMatrixTypeCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getCooperativeMatrixTypeByIndex(
+        SlangUInt index,
+        slang::CooperativeMatrixType* outType) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeMatrixCombinationCount()
+        SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getCooperativeMatrixCombinationByIndex(
+        SlangUInt index,
+        slang::CooperativeMatrixCombination* outCombination) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeVectorTypeCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getCooperativeVectorTypeByIndex(
+        SlangUInt index,
+        slang::CooperativeVectorTypeUsageInfo* outType) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeVectorCombinationCount()
+        SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getCooperativeVectorCombinationByIndex(
+        SlangUInt index,
+        slang::CooperativeVectorCombination* outCombination) SLANG_OVERRIDE;
+
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 
@@ -211,7 +249,17 @@ public:
 
     List<ShaderBindingRange> m_usedBindings;
     List<String> m_exportedFunctionMangledNames;
+    List<slang::CooperativeMatrixType> m_cooperativeMatrixTypes;
+    List<slang::CooperativeMatrixCombination> m_cooperativeMatrixCombinations;
+    List<slang::CooperativeVectorTypeUsageInfo> m_cooperativeVectorTypes;
+    List<slang::CooperativeVectorCombination> m_cooperativeVectorCombinations;
     String m_debugBuildIdentifier;
+
+    // Coverage tracing data, populated by `instrumentCoverage` when
+    // `-trace-coverage` is active. Empty otherwise.
+    List<CoverageTracingEntry> m_coverageEntries;
+    int32_t m_coverageBufferSpace = -1;
+    int32_t m_coverageBufferBinding = -1;
 };
 
 } // namespace Slang
