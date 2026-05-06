@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -g -warnings-disable 38052
 
 // This is a minimal repro for issue 8920
 
