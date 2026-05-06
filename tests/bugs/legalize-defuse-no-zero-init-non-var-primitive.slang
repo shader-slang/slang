@@ -2,11 +2,10 @@
 //
 // This test drives the non-`IRVar` path in `legalizeDefUse` with a primitive
 // `float` value produced inside loop control flow that gets rewritten by
-// `eliminateMultiLevelBreak`. The path seeds a temp var with raw
-// `kIROp_DefaultConstruct`, which `removeRawDefaultConstructors` must strip.
+// `eliminateMultiLevelBreak`. The path must create the temp var without a
+// dead default-init store.
 
-//TEST:SIMPLE(filecheck=IR_BEFORE): -target spirv-asm -entry computeMain -stage compute -dump-ir-before removeRawDefaultConstructors
-//TEST:SIMPLE(filecheck=IR_AFTER):  -target spirv-asm -entry computeMain -stage compute -dump-ir-after removeRawDefaultConstructors
+//TEST:SIMPLE(filecheck=IR): -target spirv-asm -entry computeMain -stage compute -dump-ir-after eliminateMultiLevelBreak
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -compute -entry computeMain -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-mtl -compute -entry computeMain -output-using-type
@@ -45,5 +44,5 @@ void computeMain(uint tid : SV_DispatchThreadID)
     // BUF: 5.0
 }
 
-// IR_BEFORE: defaultConstruct
-// IR_AFTER-NOT: defaultConstruct
+// IR: ### AFTER eliminateMultiLevelBreak:
+// IR-NOT: defaultConstruct

@@ -14,10 +14,9 @@ struct RemoveDefaultConstructInsts : InstPassBase
         : InstPassBase(module)
     {
     }
-
     void processModule()
     {
-        List<IRInst*> defaultConstructsToReEmit;
+        List<IRInst*> structDefaultConstructs;
         processInstsOfType<IRDefaultConstruct>(
             kIROp_DefaultConstruct,
             [&](IRDefaultConstruct* defaultConstruct)
@@ -29,13 +28,8 @@ struct RemoveDefaultConstructInsts : InstPassBase
                         instsToRemove.add(use->getUser());
                     else
                     {
-                        // Re-emit any `DefaultConstruct` that has a non-store
-                        // use, regardless of its data type. For struct/array
-                        // types this expands to `MakeStruct`/`MakeArray`; for
-                        // primitive types it produces an `IRConstant` zero.
-                        // Either way, downstream codegen can handle the result
-                        // without requiring native `DefaultConstruct` support.
-                        defaultConstructsToReEmit.add(defaultConstruct);
+                        if (as<IRStructType>(defaultConstruct->getDataType()))
+                            structDefaultConstructs.add(defaultConstruct);
                         return; // Ignore this inst if there are non-store
                                 // uses.
                     }
@@ -47,24 +41,18 @@ struct RemoveDefaultConstructInsts : InstPassBase
                 defaultConstruct->removeAndDeallocate();
             });
 
-        // TODO: Consider splitting this into a dedicated re-materialization
-        // pass, separate from the pure "strip raw default constructors"
-        // behavior above.
+        // TODO: clean this up (should either rename the pass, or put this in its own pass)
+        // or preferably make sure that when intermediate context types are turned into structs,
+        // they have the defualt construct re-emitted.
+        //
         IRBuilder builder(module);
-        for (auto defaultConstruct : defaultConstructsToReEmit)
+        for (auto structDefaultConstruct : structDefaultConstructs)
         {
-            builder.setInsertBefore(defaultConstruct);
+            builder.setInsertBefore(structDefaultConstruct);
 
-            // Re-emit the default construct in materialized form (e.g.
-            // MakeStruct/MakeArray/constant) when possible. For types that
-            // cannot yet be materialized at this stage, this may still fall
-            // back to raw `DefaultConstruct`, matching existing behavior.
-            IRInst* replacement = builder.emitDefaultConstruct(defaultConstruct->getDataType());
-            if (replacement)
-            {
-                defaultConstruct->replaceUsesWith(replacement);
-                defaultConstruct->removeAndDeallocate();
-            }
+            // Re-emit the default construct, which will create a MakeStruct instead.
+            structDefaultConstruct->replaceUsesWith(
+                builder.emitDefaultConstruct(structDefaultConstruct->getDataType()));
         }
     }
 };

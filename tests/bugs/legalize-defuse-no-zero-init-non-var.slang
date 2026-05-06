@@ -6,8 +6,7 @@
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SPV):  -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly
-//TEST:SIMPLE(filecheck=IR_BEFORE): -target spirv-asm -entry computeMain -stage compute -dump-ir-before removeRawDefaultConstructors
-//TEST:SIMPLE(filecheck=IR_AFTER):  -target spirv-asm -entry computeMain -stage compute -dump-ir-after removeRawDefaultConstructors
+//TEST:SIMPLE(filecheck=IR):   -target spirv-asm -entry computeMain -stage compute -dump-ir-after eliminateMultiLevelBreak
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -compute -entry computeMain -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-mtl -compute -entry computeMain -output-using-type
@@ -80,5 +79,5 @@ void computeMain(uint tid : SV_DispatchThreadID)
 // SPV:     OpEntryPoint
 // SPV-NOT: OpConstantComposite {{.*}} %float_0 %float_0 %float_0 %float_0 %float_0 %float_0 %float_0 %float_0
 
-// IR_BEFORE: %OutVec{{.*}}= defaultConstruct
-// IR_AFTER-NOT: defaultConstruct
+// IR: ### AFTER eliminateMultiLevelBreak:
+// IR-NOT: defaultConstruct

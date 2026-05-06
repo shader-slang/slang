@@ -2694,7 +2694,6 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                 // instead of before the `if`. This situation can occur in the IR if
                 // the original code is lowered from a `do-while` loop.
                 //
-                bool shouldInitializeVar = false;
                 if (loopHeaderBlockMap.containsKey(commonDominator))
                 {
                     bool shouldMoveToHeader = false;
@@ -2715,7 +2714,6 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                     if (shouldMoveToHeader)
                     {
                         commonDominator = loopHeaderBlockMap[commonDominator];
-                        shouldInitializeVar = true;
                     }
                 }
 
@@ -2726,33 +2724,6 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                     // common dominator.
                     if (var->getParent() != commonDominator)
                         var->insertBefore(commonDominator->getTerminator());
-
-                    if (shouldInitializeVar)
-                    {
-                        // Emit a `kIROp_DefaultConstruct` directly rather than
-                        // the fully expanded form (`MakeStruct(MakeArray(...))`).
-                        // The expanded form materializes a literal zero array
-                        // for every element of an aggregate, which (for
-                        // targets where this pass's output is the final IR)
-                        // bloats codegen with dead zero-stores when user code
-                        // unconditionally overwrites the value. The
-                        // `removeRawDefaultConstructors` pass strips the
-                        // single `kIROp_DefaultConstruct` + its sole `Store`
-                        // use when all uses are stores. This relies on
-                        // `legalizeDefUse` preserving the invariant that
-                        // later user stores dominate any loads.
-                        // Audit note: this hoist path is the only current
-                        // use in this file where default-init is introduced as
-                        // a dominance placeholder that is expected to become
-                        // dead. Other `emitDefaultConstruct(...)` call sites
-                        // initialize semantically observable values.
-                        IRBuilder builder(func);
-                        builder.setInsertAfter(var);
-                        builder.emitStore(
-                            var,
-                            builder.emitDefaultConstructRaw(
-                                as<IRPtrTypeBase>(var->getDataType())->getValueType()));
-                    }
                 }
                 else if (shouldDuplicateInstAtUseSite(inst, target))
                 {
@@ -2795,13 +2766,9 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                 {
                     // For all other insts, we need to create a local var for it,
                     // and replace all uses with a load from the local var.
-                    // See comment above re: `emitDefaultConstructRaw`; this is
-                    // the same dominance-placeholder pattern.
                     IRBuilder builder(func);
                     builder.setInsertBefore(commonDominator->getTerminator());
                     IRVar* tempVar = builder.emitVar(inst->getFullType());
-                    auto defaultVal = builder.emitDefaultConstructRaw(inst->getFullType());
-                    builder.emitStore(tempVar, defaultVal);
 
                     traverseUses(
                         inst,

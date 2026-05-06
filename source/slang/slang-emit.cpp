@@ -2023,10 +2023,8 @@ Result linkAndOptimizeIR(
 
     switch (target)
     {
-    // On targets that don't support default initialization, remove 'raw'
-    // default construct insts because our code-gen has no way to emit them.
-    // Keep this target-gated early run because earlier passes can also
-    // introduce raw `DefaultConstruct` before `eliminateMultiLevelBreak`.
+    // On targets that don't support default initialization, remove 'raw' default construct
+    // insts because our code-gen will not have any way to emit them.
     //
     case CodeGenTarget::SPIRV:
         if (targetProgram->shouldEmitSPIRVDirectly())
@@ -2169,21 +2167,6 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(eliminateMultiLevelBreak, targetProgram);
-
-    // `eliminateMultiLevelBreak` invokes `legalizeDefUse`, which can hoist a
-    // local var out of an inner control-flow region and emit a
-    // `kIROp_DefaultConstruct` + `Store` pair to make the value defined on
-    // entry. When the user's subsequent code unconditionally overwrites the
-    // var (typical for output-buffer accumulators inside `[ForceUnroll]`
-    // loops), this pair is dead and bloats codegen with a full zero-fill of
-    // the var's storage. Stripping it here removes that overhead before
-    // downstream simplification / SSA-out / codegen runs. (The pass is also
-    // run earlier for SPIRV / CPU-via-LLVM, but those calls run before
-    // `legalizeDefUse` produces these new `DefaultConstruct` insts.) Running
-    // this call unconditionally is safe because `removeRawDefaultConstructors`
-    // only removes dead default-init store patterns and materializes
-    // non-store uses when possible.
-    SLANG_PASS(removeRawDefaultConstructors);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
