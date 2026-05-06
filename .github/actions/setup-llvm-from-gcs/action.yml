@@ -31,17 +31,26 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Compute cache key
+      id: cache-key
+      shell: bash
+      run: |
+        # Canonicalize llvm-targets: split on `;`, strip whitespace, lowercase
+        # so the slug is case-insensitive (X86 vs x86 hit the same cache),
+        # sort, dedupe, rejoin with `-`. Makes "X86;AArch64" and "AArch64;X86"
+        # equivalent, tolerates stray whitespace, and avoids producing slugs
+        # that contain mixed case.
+        TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" \
+          | tr ';' '\n' | tr -d '[:blank:]' | tr 'A-Z' 'a-z' \
+          | grep -v '^$' | sort -u | paste -sd'-' -)"
+        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${TARGETS_SLUG}-${{ inputs.llvm-hash }}"
+        echo "llvm-key=${LLVM_KEY}" >> "$GITHUB_OUTPUT"
+
     - name: Download LLVM from GCS
       id: download
       shell: bash
       run: |
-        # Cache key includes targets so different target sets get separate entries.
-        # Canonicalize: split on `;`, strip whitespace, sort, dedupe, rejoin
-        # with `-`. Makes "X86;AArch64" and "AArch64;X86" hit the same cache,
-        # and tolerates stray whitespace that CMake itself would accept.
-        # Keep in sync with the identical computation in the "Upload LLVM to GCS" step below.
-        TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" | tr ';' '\n' | tr -d '[:blank:]' | grep -v '^$' | sort -u | paste -sd'-' -)"
-        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${TARGETS_SLUG}-${{ inputs.llvm-hash }}"
+        LLVM_KEY="${{ steps.cache-key.outputs.llvm-key }}"
         PUBLIC_URL="https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
 
         echo "🔍 Checking for LLVM prebuilt: ${PUBLIC_URL}"
@@ -142,9 +151,7 @@ runs:
       if: steps.download.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
       shell: bash
       run: |
-        # Keep in sync with the identical computation in the "Download LLVM from GCS" step above.
-        TARGETS_SLUG="$(echo "${{ inputs.llvm-targets }}" | tr ';' '\n' | tr -d '[:blank:]' | grep -v '^$' | sort -u | paste -sd'-' -)"
-        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${TARGETS_SLUG}-${{ inputs.llvm-hash }}"
+        LLVM_KEY="${{ steps.cache-key.outputs.llvm-key }}"
         GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
         LLVM_DIR="$PWD/build/llvm-project-install"
         if command -v cygpath >/dev/null; then
