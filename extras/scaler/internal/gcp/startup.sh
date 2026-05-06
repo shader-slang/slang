@@ -7,11 +7,42 @@
 #
 # Steps:
 # 1. Removes any pre-existing runner service from the base image
-# 2. Reads the JIT config from GCP instance metadata
-# 3. Starts the GitHub Actions runner as the correct user
-# 4. Shuts down the VM when the job completes
+# 2. Updates the preinstalled GitHub Actions runner if it is stale
+# 3. Reads the JIT config from GCP instance metadata
+# 4. Starts the GitHub Actions runner as the correct user
+# 5. Shuts down the VM when the job completes
 
 set -euo pipefail
+
+RUNNER_VERSION="2.334.0"
+RUNNER_SHA256="048024cd2c848eb6f14d5646d56c13a4def2ae7ee3ad12122bee960c56f3d271"
+
+# Defense in depth: wipe stray actions-runner installs that may be baked into
+# the base image under user accounts other than the canonical "runner" user.
+# A May 2026 SM80Plus outage was caused by /home/<engineer>/actions-runner/
+# leaking into the snapshot — the runner-detection loop below picked it up
+# and ran the GitHub Actions runner under the engineer's account, registering
+# without labels and blocking the queue. Image hygiene is the canonical fix;
+# this is a runtime safety net so a single bad snapshot can't repeat that.
+for stray in /home/*/actions-runner; do
+  # Without `nullglob`, an unmatched glob expands to the literal pattern;
+  # the directory check below skips it.
+  [ -d "$stray" ] || continue
+  case "$stray" in
+  /home/runner/actions-runner) continue ;;
+  esac
+  echo "Wiping stray actions-runner install: $stray"
+  # Stop and uninstall the runner service if it is registered. Run the two
+  # phases independently — `uninstall` must still be attempted even when
+  # `stop` fails (service not running, partially installed, etc.) so we do
+  # not leave a dangling systemd unit pointing at the directory we are about
+  # to delete.
+  if [ -f "$stray/.runner" ] && [ -x "$stray/svc.sh" ]; then
+    (cd "$stray" && ./svc.sh stop 2>/dev/null) || true
+    (cd "$stray" && ./svc.sh uninstall 2>/dev/null) || true
+  fi
+  rm -rf "$stray"
+done
 
 # Find the runner directory and its owner
 RUNNER_DIR=""
@@ -48,6 +79,15 @@ log "=== Linux GPU Runner Startup ==="
 log "Runner directory: $RUNNER_DIR"
 log "Runner user: $RUNNER_USER"
 
+fail_update_and_shutdown() {
+  log "ERROR: $1"
+  if [ -n "${runner_archive:-}" ]; then
+    rm -f "$runner_archive" || true
+  fi
+  shutdown -h now
+  exit 1
+}
+
 # Step 0: Remove any pre-existing runner service from the base image.
 log "Removing pre-existing runner service (if any)..."
 if systemctl list-units --type=service --all 2>/dev/null | grep -q "actions.runner"; then
@@ -66,6 +106,50 @@ for f in .runner .credentials .credentials_rsaparams .runner_migrated; do
     log "  Removed $f"
   fi
 done
+
+runner_version() {
+  if [ -x "$RUNNER_DIR/bin/Runner.Listener" ]; then
+    sudo -u "$RUNNER_USER" "$RUNNER_DIR/bin/Runner.Listener" --version 2>/dev/null | head -n 1 | tr -d '\r'
+  fi
+}
+
+current_runner_version="$(runner_version || true)"
+if [ -z "$current_runner_version" ]; then
+  current_runner_version="unknown"
+fi
+log "Current Actions runner version: $current_runner_version"
+
+if [ "$current_runner_version" != "$RUNNER_VERSION" ]; then
+  log "Updating Actions runner to v${RUNNER_VERSION}..."
+  if ! runner_archive="$(mktemp /tmp/actions-runner.XXXXXX.tar.gz)"; then
+    fail_update_and_shutdown "Failed to create temporary Actions runner archive"
+  fi
+  runner_url="https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+
+  if ! curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 "$runner_url" -o "$runner_archive"; then
+    fail_update_and_shutdown "Failed to download Actions runner v${RUNNER_VERSION}"
+  fi
+
+  if ! printf '%s  %s\n' "$RUNNER_SHA256" "$runner_archive" | sha256sum -c - >/dev/null 2>&1; then
+    fail_update_and_shutdown "Actions runner v${RUNNER_VERSION} checksum verification failed"
+  fi
+
+  if ! chown "$RUNNER_USER":"$RUNNER_USER" "$runner_archive"; then
+    fail_update_and_shutdown "Failed to change owner for Actions runner v${RUNNER_VERSION} archive"
+  fi
+
+  if ! sudo -u "$RUNNER_USER" tar xzf "$runner_archive" -C "$RUNNER_DIR"; then
+    fail_update_and_shutdown "Failed to extract Actions runner v${RUNNER_VERSION}"
+  fi
+  rm -f "$runner_archive" || true
+  runner_archive=""
+
+  updated_runner_version="$(runner_version || true)"
+  log "Actions runner version after update: ${updated_runner_version:-unknown}"
+  if [ "${updated_runner_version:-}" != "$RUNNER_VERSION" ]; then
+    fail_update_and_shutdown "Runner version mismatch after update (expected ${RUNNER_VERSION}, got ${updated_runner_version:-unknown})"
+  fi
+fi
 
 # Step 0.5: Ensure NVIDIA GPU devices are initialized.
 # On fresh boot, the kernel module may not be loaded yet. Running nvidia-smi

@@ -1312,7 +1312,7 @@ IRBlock* IRInsertLoc::getBlock() const
 IRInst* IRInsertLoc::getFunc() const
 {
     auto pp = getParent();
-    if (const auto block = as<IRBlock>(pp))
+    if (const auto block = as<IRBlock>(pp); block)
     {
         pp = pp->getParent();
     }
@@ -2882,7 +2882,7 @@ IRPtrTypeBase* IRBuilder::getPtrTypeWithAddressSpace(
     IRType* valueType,
     IRPtrTypeBase* ptrWithAddrSpace)
 {
-    if (ptrWithAddrSpace->hasAddressSpace())
+    if (ptrWithAddrSpace->hasAddressSpace() || ptrWithAddrSpace->getDataLayout())
         return (IRPtrTypeBase*)getPtrType(
             ptrWithAddrSpace->getOp(),
             valueType,
@@ -2978,6 +2978,44 @@ IRFuncType* IRBuilder::getFuncType(
     UInt counts[3] = {1, paramCount, 1};
     IRInst** lists[3] = {(IRInst**)&resultType, (IRInst**)paramTypes, (IRInst**)&attribute};
     return (IRFuncType*)createIntrinsicInst(nullptr, kIROp_FuncType, 3, counts, lists);
+}
+
+UInt IRFuncType::getParamCount()
+{
+    // A well-formed `IRFuncType` always has at least the result-type
+    // operand at index 0; the zero-operand check is purely defensive
+    // for malformed or partially-constructed IR.
+    auto count = getOperandCount();
+    if (count == 0)
+        return 0;
+    UInt n = count - 1;
+    if (n > 0 && as<IRAttr>(getOperand(count - 1)))
+        --n;
+    return n;
+}
+
+IRType* IRFuncType::getParamType(UInt index)
+{
+    // Bounds-checked against the (attribute-stripped) parameter count
+    // so attributed function types don't accidentally expose a trailing
+    // attribute as if it were a parameter.
+    SLANG_ASSERT(index < getParamCount());
+    return (IRType*)getOperand(1 + index);
+}
+
+IROperandList<IRType> IRFuncType::getParamTypes()
+{
+    IRUse* end = getOperands() + getOperandCount();
+    if (end != getOperands() + 1 && as<IRAttr>((end - 1)->get()))
+        --end;
+    return IROperandList<IRType>(getOperands() + 1, end);
+}
+
+IRAttr* IRFuncType::getAttr()
+{
+    if (getOperandCount() == 0)
+        return nullptr;
+    return as<IRAttr>(getOperand(getOperandCount() - 1));
 }
 
 IRType* IRBuilder::getBindExistentialsType(
@@ -3221,7 +3259,7 @@ IRCompilerDictionaryEntry* IRBuilder::fetchCompilerDictionaryEntry(
 
 void IRBuilder::setCompilerDictionaryEntryValue(IRCompilerDictionaryEntry* entry, IRInst* valueInst)
 {
-    if (auto existingVal = entry->getValue())
+    if (auto existingVal = entry->getValue(); existingVal)
     {
         // Invalid.
         SLANG_UNEXPECTED("Translation entry already exists");
@@ -3252,7 +3290,7 @@ void IRBuilder::addCompilerDictionaryEntry(
     }
 
     auto entry = _getCompilerDictionaryEntry(keyVals);
-    if (auto existingVal = entry->getValue())
+    if (auto existingVal = entry->getValue(); existingVal)
     {
         // Invalid.
         SLANG_UNEXPECTED("Translation entry already exists");
@@ -3358,6 +3396,11 @@ IRInst* IRBuilder::emitDebugBuildIdentifier(
     IRInst* args[] = {getStringValue(buildIdentifier), getIntValue(getUIntType(), flags)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugBuildIdentifier, 2, args);
 }
+IRInst* IRBuilder::emitDebugCompilationUnit(IRInst* source)
+{
+    IRInst* args[] = {source};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugCompilationUnit, 1, args);
+}
 IRInst* IRBuilder::emitDebugLine(
     IRInst* source,
     IRIntegerValue lineStart,
@@ -3373,6 +3416,11 @@ IRInst* IRBuilder::emitDebugLine(
         getIntValue(getUIntType(), colEnd)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugLine, 5, args);
 }
+IRInst* IRBuilder::emitIncrementCoverageCounter()
+{
+    return emitIntrinsicInst(getVoidType(), kIROp_IncrementCoverageCounter, 0, nullptr);
+}
+
 IRInst* IRBuilder::emitDebugVar(
     IRType* type,
     IRInst* source,

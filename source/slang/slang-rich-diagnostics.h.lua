@@ -59,6 +59,7 @@ local cpp_type_map = {
 	capabilityatomlist = "List<CapabilityAtom>",
 	astnodetype = "ASTNodeType",
 	codegentarget = "CodeGenTarget",
+	declvisibility = "DeclVisibility",
 }
 function M.getCppType(lua_type)
 	local mapped = cpp_type_map[lua_type]
