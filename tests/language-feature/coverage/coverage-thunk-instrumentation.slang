@@ -17,6 +17,13 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain -trace-coverage
 
+// Second pass: a negative-only prefix scans the entire emitted
+// output, catching a stray `_slang_coverage_hit` symbol regardless of
+// whether it appears before, between, or after the atomic-add matches
+// the first pass anchors to. (A trailing negative directive in the
+// first pass only constrains text after its final positive match.)
+//TEST:SIMPLE(filecheck=NOTHUNK):-target cpp -stage compute -entry computeMain -trace-coverage
+
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
 
@@ -41,7 +48,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-NOT: _slang_atomic_add_u32{{.*}}_slang_coverage
 
 // The thunk should be fully inlined, so no `_slang_coverage_hit`
-// call survives in the CPU output. If this CHECK-NOT triggers,
+// call survives in the CPU output. If this NOTHUNK-NOT triggers,
 // either `[ForceInline]` regressed or the inlining pass stopped
 // honoring it — both indicate the thunk is leaking into emit.
-//CHECK-NOT: _slang_coverage_hit{{[ \t]*\(}}
+// Run as a separate filecheck pass so the directive scans the whole
+// emitted output (a CHECK-NOT after CHECK-COUNT only covers text
+// past the final positive match).
+//NOTHUNK-NOT: _slang_coverage_hit{{[ \t]*\(}}

@@ -400,20 +400,21 @@ it catches inlining regressions on the CPU path. Other targets do
 not have an equivalent assertion today — adding one per backend is a
 follow-up.
 
-### Slot dedup and `getEntryCount` behavior
+### Slot dedup and `getCounterCount` behavior
 
 Counter-slot assignment dedupes by `(file, line)`. Hosts auto-sizing
-their `__slang_coverage` buffer from
-`getBufferInfo().elementCount` get smaller allocations on shaders
-with multi-statement source lines (the intended outcome). The
-LCOV / gcov reporting pipeline already aggregates by `(file, line)`
-on the host, so the user-visible coverage report is unchanged.
+their `__slang_coverage` buffer from `getCounterCount()` get smaller
+allocations on shaders with multi-statement source lines (the
+intended outcome). `getBufferInfo()` reports binding location only
+(`space` + `binding`) and is unaffected by dedup. The LCOV / gcov
+reporting pipeline already aggregates by `(file, line)` on the host,
+so the user-visible coverage report is unchanged.
 
-`ICoverageTracingMetadata::getEntryCount()` returns the count of
+`ICoverageTracingMetadata::getCounterCount()` returns the count of
 unique `(file, line)` pairs, **not** the count of executable
 statements. Hosts that hardcode a slot count or assume "N statements
 → N slots" would break — but no such pattern is supported by the
-public API contract, and the existing `getEntryCount()` API
+public API contract, and the existing `getCounterCount()` API
 explicitly leaves the buffer-sizing question to the host.
 
 Counter ops with unresolvable source locations (synthetic statements

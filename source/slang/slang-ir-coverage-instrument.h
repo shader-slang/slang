@@ -46,6 +46,20 @@ void instrumentCoverage(
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata);
 
+// Defensive invariant: after `[ForceInline]` inlining has run, the
+// synthesized `__slang_coverage_hit` thunk must have no surviving
+// call sites. Each backend used by Slang honors `[ForceInline]` and
+// folds the thunk's atomic-add body back into each call site at emit
+// time, preserving the "byte-identical to pre-thunk emit" contract
+// documented in `docs/design/shader-coverage.md`. If a backend ever
+// stops honoring the decoration (or a target-specific pass strips
+// it after instrumentation), an extra per-coverage-hit function-call
+// frame would appear in emitted code; this check catches that
+// regression in IR rather than as a per-target emit-output check.
+//
+// No-op when the coverage pass did not run (no thunk in the module).
+void verifyCoverageThunkInlined(IRModule* module);
+
 } // namespace Slang
 
 #endif // SLANG_IR_COVERAGE_INSTRUMENT_H

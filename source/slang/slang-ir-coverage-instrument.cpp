@@ -482,7 +482,10 @@ struct CoverageInstrumenter
     // miss; returns the slot index in either case.
     UInt assignSlot(IRInst* counterOp)
     {
-        CoverageTracingEntry entry;
+        // Value-initialize so the unresolvable-loc path appends a
+        // well-defined zero entry even if `CoverageTracingEntry`'s
+        // in-class field initializers ever change.
+        CoverageTracingEntry entry = {};
         bool valid = resolveHumaneLoc(sourceManager, counterOp, entry.file, entry.line);
 
         if (valid)
@@ -699,6 +702,28 @@ void instrumentCoverage(
         sink ? sink->getSourceManager() : nullptr,
         outMetadata);
     instrumenter.run(counterOps);
+}
+
+void verifyCoverageThunkInlined(IRModule* module)
+{
+    for (auto inst : module->getModuleInst()->getChildren())
+    {
+        auto func = as<IRFunc>(inst);
+        if (!func)
+            continue;
+        auto nameHint = func->findDecoration<IRNameHintDecoration>();
+        if (!nameHint)
+            continue;
+        if (nameHint->getName() != UnownedTerminatedStringSlice(kCoverageHitFuncName))
+            continue;
+
+        // Found the thunk. After `performForceInlining` the thunk
+        // should have zero remaining uses; any surviving use means
+        // a `Call` site escaped inlining and a per-hit function-call
+        // frame would appear in emitted code.
+        SLANG_RELEASE_ASSERT(!func->hasUses());
+        return;
+    }
 }
 
 } // namespace Slang
