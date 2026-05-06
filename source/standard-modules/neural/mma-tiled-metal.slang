@@ -414,6 +414,46 @@ internal struct TiledMMAMetal<T, int InputSize, int OutputSize, int SubgroupSize
     }
 
     // =========================================================================
+    // Backward: compute dInput, accumulate dBias and dWeight.
+    //
+    //   1. dInput = W^T * dOut via `mmaTranspose`
+    //   2. dBias += sum_lanes(dOut) via `sumReduceRows`
+    //   3. dWeight += dOut * input^T via `outerProductAccumulate`
+    //
+    // All three phases reuse ShMemPool.data. Full-group barriers between phases
+    // make the reuse explicit because bias/outer-product communicate across
+    // warps through threadgroup memory.
+    // =========================================================================
+
+    [ForceInline]
+    [require(metal, cooperative_matrix, subgroup_basic)]
+    internal static WaveTangledVector<T.Differential, ShMemSize, InputSize, SubgroupSize, SubgroupCount>
+    backward<Address, bool Bias = true>(
+        WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount> input,
+        WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount> dOut,
+        Address weightAddress,
+        Address weightGradAddress,
+        Address biasGradAddress)
+        where Address : IPointerLikeAddress<T>
+    {
+        let dInput = mmaTranspose<Address>(dOut, weightAddress);
+
+        GroupMemoryBarrierWithGroupSync();
+
+        if (Bias)
+        {
+            sumReduceRows<T, Address, WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>>(
+                0u, dOut, int(getWaveId()), biasGradAddress);
+        }
+
+        GroupMemoryBarrierWithGroupSync();
+
+        outerProductAccumulate<T, Address>(dOut, input, weightGradAddress);
+
+        return bit_cast<WaveTangledVector<T.Differential, ShMemSize, InputSize, SubgroupSize, SubgroupCount>>(dInput);
+    }
+
+    // =========================================================================
     // Outer product accumulate: weightGrad(M,K) += sum_lanes(dOut(M) * input(K)^T)
     //
     // This is the standard-module version of the benchmark's "Slang CoopMat

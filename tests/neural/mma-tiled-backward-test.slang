@@ -2,6 +2,7 @@
 // VK half disabled: backward pass uses half atomics for bias/weight gradient accumulation,
 // which requires VK_EXT_shader_atomic_float16 not available on our test GPUs.
 // DISABLED-TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1
+//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature -xslang -DTEST_HALF=0
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature -xslang -DTEST_HALF=1
 
@@ -15,18 +16,21 @@ typealias DType = half;
 typealias DType = float;
 #endif
 
+struct TestBuffers
+{
+    RWStructuredBuffer<DType>.Handle weightBuffer;
+    RWStructuredBuffer<DType>.Handle weightGradBuffer;
+    RWStructuredBuffer<DType>.Handle biasGradBuffer;
+}
+
 // Weight matrix in tiled layout (read by transpose MMA)
 // 2x size needed: convertTiledToNativeB uses the second half as scratch space.
-// TEST_INPUT: set weightBuffer = ubuffer(stride=4, count=8192)
-uniform RWStructuredBuffer<DType>.Handle weightBuffer;
-
+// TEST_INPUT: set buffers.weightBuffer = ubuffer(stride=4, count=8192)
 // Weight gradient (written by outer product)
-// TEST_INPUT: set weightGradBuffer = ubuffer(stride=4, count=4096)
-uniform RWStructuredBuffer<DType>.Handle weightGradBuffer;
-
+// TEST_INPUT: set buffers.weightGradBuffer = ubuffer(stride=4, count=4096)
 // Bias gradient (written by bias reduce)
-// TEST_INPUT: set biasGradBuffer = ubuffer(stride=4, count=64)
-uniform RWStructuredBuffer<DType>.Handle biasGradBuffer;
+// TEST_INPUT: set buffers.biasGradBuffer = ubuffer(stride=4, count=64)
+ParameterBlock<TestBuffers> buffers;
 
 // TEST_INPUT:ubuffer(stride=4, count=3):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -47,7 +51,7 @@ void clearWeightBuffer<int PaddedSize>(uint tid)
     {
         int index = iter * BatchSize + tid;
         if (index < TotalElements)
-            weightBuffer[index] = DType(0);
+            buffers.weightBuffer[index] = DType(0);
     }
 }
 
@@ -61,7 +65,7 @@ void clearGradBuffers<int PaddedSize>(uint tid)
     {
         int index = iter * BatchSize + tid;
         if (index < TotalElements)
-            weightGradBuffer[index] = DType(0);
+            buffers.weightGradBuffer[index] = DType(0);
     }
 
     static const int BiasIters = (PaddedSize + BatchSize - 1) / BatchSize;
@@ -70,12 +74,14 @@ void clearGradBuffers<int PaddedSize>(uint tid)
     {
         int index = iter * BatchSize + tid;
         if (index < PaddedSize)
-            biasGradBuffer[index] = DType(0);
+            buffers.biasGradBuffer[index] = DType(0);
     }
 }
 
-// Write identity matrix in tiled layout.
-// On CUDA, also converts from row-major tiled to native fragment layout.
+// Write identity matrix in the layout expected by the active backend.
+// CUDA/Vulkan use row-major 16x16 tiled layout. CUDA then converts that
+// temporary row-major tiled data to native fragment layout. Metal uses plain
+// row-major weights.
 void identityWeightTiled<int Size, int PaddedSize>(uint tid)
 {
     static const int TileSize = 16;
@@ -84,25 +90,44 @@ void identityWeightTiled<int Size, int PaddedSize>(uint tid)
     clearWeightBuffer<PaddedSize>(tid);
     AllMemoryBarrierWithGroupSync();
 
-    static const int NumDiagIters = (Size + BatchSize - 1) / BatchSize;
-    [ForceUnroll]
-    for (int iter = 0; iter < NumDiagIters; iter++)
+    __target_switch
     {
-        int row = iter * BatchSize + tid;
-        if (row >= Size)
-            break;
-        int tileRow = row / TileSize;
-        int tileCol = row / TileSize;
-        int localRow = row % TileSize;
-        int localCol = row % TileSize;
-        int tileIndex = tileRow * NTileCols + tileCol;
-        int offset = tileIndex * TileSize * TileSize + localRow * TileSize + localCol;
-        weightBuffer[offset] = DType(1);
-    }
-    AllMemoryBarrierWithGroupSync();
+    case metal:
+        {
+            static const int NumDiagIters = (Size + BatchSize - 1) / BatchSize;
+            [ForceUnroll]
+            for (int iter = 0; iter < NumDiagIters; iter++)
+            {
+                int row = iter * BatchSize + tid;
+                if (row >= Size)
+                    break;
+                buffers.weightBuffer[row * PaddedSize + row] = DType(1);
+            }
+            AllMemoryBarrierWithGroupSync();
+        }
+    default:
+        {
+            static const int NumDiagIters = (Size + BatchSize - 1) / BatchSize;
+            [ForceUnroll]
+            for (int iter = 0; iter < NumDiagIters; iter++)
+            {
+                int row = iter * BatchSize + tid;
+                if (row >= Size)
+                    break;
+                int tileRow = row / TileSize;
+                int tileCol = row / TileSize;
+                int localRow = row % TileSize;
+                int localCol = row % TileSize;
+                int tileIndex = tileRow * NTileCols + tileCol;
+                int offset = tileIndex * TileSize * TileSize + localRow * TileSize + localCol;
+                buffers.weightBuffer[offset] = DType(1);
+            }
+            AllMemoryBarrierWithGroupSync();
 
-    convertTiledToNativeB<DType, PaddedSize, PaddedSize, BatchSize>(tid, weightBuffer);
-    AllMemoryBarrierWithGroupSync();
+            convertTiledToNativeB<DType, PaddedSize, PaddedSize, BatchSize>(tid, buffers.weightBuffer);
+            AllMemoryBarrierWithGroupSync();
+        }
+    }
 }
 
 void test<int Size>(uint tid, int resIndex)
@@ -122,7 +147,7 @@ void test<int Size>(uint tid, int resIndex)
 
     // W = identity → dInput = W^T * dOut = dOut
     let dInput = neural_unittest.testTiledBackward<DType, Size, Size, TestShMemSize, 1>(
-        inputData, dOutData, weightBuffer, weightGradBuffer, biasGradBuffer);
+        inputData, dOutData, buffers.weightBuffer, buffers.weightGradBuffer, buffers.biasGradBuffer);
 
     bool res = true;
     for (int i = 0; i < Size; i++)
@@ -142,8 +167,11 @@ void test<int Size>(uint tid, int resIndex)
 
 [numthreads(BatchSize, 1, 1)]
 [shader("compute")]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
 {
+    if (gid.x != 0)
+        return;
+
     // 16x16
     {
         identityWeightTiled<16, 16>(tid);
@@ -162,7 +190,7 @@ void computeMain(uint tid : SV_DispatchThreadID)
         test<64>(tid, 2);
     }
 
-    // BUFFER: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
+    // BUFFER: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
 }

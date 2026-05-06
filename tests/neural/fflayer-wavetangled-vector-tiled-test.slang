@@ -5,10 +5,15 @@
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -emit-spirv-directly
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature -xslang -DTEST_POINTER=1 -xslang -DWARP_COUNT=1
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -xslang -DTEST_METAL=1
 
 #pragma warning(disable: 41017)
 import slang.neural;
 import common;
+
+#ifndef TEST_METAL
+#define TEST_METAL 0
+#endif
 
 #ifndef WARP_COUNT
 #define WARP_COUNT 1
@@ -20,11 +25,10 @@ import common;
 
 typealias ElementType = float;
 
-//TEST_INPUT: set parametersFloat = ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0], stride=4)
-uniform RWStructuredBuffer<float>.Handle parametersFloat;
-
-//TEST_INPUT: set parameters = ubuffer(stride=4, count=258)
-//TEST_INPUT: set dParameters = ubuffer(stride=4, count=258)
+//TEST_INPUT: set parametersPtr = ubuffer(stride=4, count=258)
+//TEST_INPUT: set dParametersPtr = ubuffer(stride=4, count=258)
+//TEST_INPUT: set buffers.parameters = ubuffer(stride=4, count=258)
+//TEST_INPUT: set buffers.dParameters = ubuffer(stride=4, count=258)
 
 static const int BiasOffset = 256;
 static const int ParamBufferSize = 258;
@@ -33,13 +37,24 @@ typealias Layout = OptimalLayout;
 //TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
 
+uniform ElementType* parametersPtr;
+uniform ElementType* dParametersPtr;
+
+struct TestBuffers
+{
+    RWStructuredBuffer<ElementType>.Handle parameters;
+    RWStructuredBuffer<ElementType>.Handle dParameters;
+}
+
+ParameterBlock<TestBuffers> buffers;
+
 #if TEST_POINTER
-    uniform ElementType* parameters;
-    uniform ElementType* dParameters;
+    #define parameters parametersPtr
+    #define dParameters dParametersPtr
     typealias Address = PointerAddress<ElementType>;
 #else
-    uniform RWStructuredBuffer<ElementType>.Handle parameters;
-    uniform RWStructuredBuffer<ElementType>.Handle dParameters;
+    #define parameters buffers.parameters
+    #define dParameters buffers.dParameters
     typealias Address = BindlessAddress<ElementType>;
 #endif
 
@@ -49,7 +64,13 @@ static const int SubgroupSize = 32;
 static const int WarpCount = WARP_COUNT;
 static const int BatchSize = WarpCount * SubgroupSize;
 
-typealias ShMemSize = SharedMemorySize<ElementType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, WarpCount>;
+#if TEST_METAL
+#define TEST_TARGET TargetEnum.Metal
+#else
+#define TEST_TARGET TargetEnum.CUDA
+#endif
+
+typealias ShMemSize = SharedMemorySize<ElementType, TEST_TARGET, ExecutionMode.Training, SubgroupSize, WarpCount>;
 typealias ShMemSizeLayer1 = ShMemSize.OfLayer1<InputSize, OutputSize>;
 typealias InVec = WaveTangledVector<ElementType, ShMemSizeLayer1, InputSize, SubgroupSize, WarpCount>;
 typealias OutVec = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, SubgroupSize, WarpCount>;
@@ -99,6 +120,7 @@ void testFFLayerBackward(int tid, int resIndex)
     let dOutput = OutVec(1.0);
 
     bwd_diff(computeLayerOutput)(paramAddrPair, inputPair, layer, dOutput);
+    AllMemoryBarrierWithGroupSync();
 
     // dInput = W^T * dOutput = [6, 8, 10, 12]
     bool isPassed = true;
@@ -162,31 +184,39 @@ void setupParameters(uint tid)
             parameters[i] = ElementType(0.0);
 
         for (int col = 0; col < InputSize; col++)
-            parameters[tiledWeightOffset(0, col)] = ElementType(parametersFloat[col]);
+            parameters[tiledWeightOffset(0, col)] = ElementType(col + 1);
 
         for (int col = 0; col < InputSize; col++)
-            parameters[tiledWeightOffset(1, col)] = ElementType(parametersFloat[InputSize + col]);
+            parameters[tiledWeightOffset(1, col)] = ElementType(InputSize + col + 1);
 
-        parameters[256] = ElementType(parametersFloat[8]);
-        parameters[257] = ElementType(parametersFloat[9]);
+        parameters[256] = ElementType(9);
+        parameters[257] = ElementType(10);
     }
 }
 
 [shader("compute")]
 [numthreads(BatchSize, 1, 1)]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
 {
+    if (gid.x != 0)
+        return;
+
+    uint lane = WaveGetLaneIndex();
+    uint wave = WaveGetWaveIndex();
+    if (lane >= uint(SubgroupSize) || wave >= uint(WarpCount))
+        return;
+
     setupParameters(tid);
     AllMemoryBarrierWithGroupSync();
 
     testFFLayerParameterCount(tid, 0);
-    // BUFFER: 1
+    // BUFFER: {{^}}1{{$}}
 
     testFFLayerForward(tid, 1);
-    // BUFFER: 1
+    // BUFFER-NEXT: {{^}}1{{$}}
 
     cleanupDParameters(tid);
     AllMemoryBarrierWithGroupSync();
     testFFLayerBackward(tid, 2);
-    // BUFFER: 1
+    // BUFFER-NEXT: {{^}}1{{$}}
 }

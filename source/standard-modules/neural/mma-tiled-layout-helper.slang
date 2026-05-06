@@ -3,6 +3,7 @@
 // Routes forward and backward to backend-specific implementations:
 //   CUDA:   TiledMMACuda / MMAHelperNew (WaveMatrix register ops)
 //   Vulkan: TiledMMAVulkan (WaveMatrix + shmem, CoopMat.Load)
+//   Metal:  TiledMMAMetal (8x8 simdgroup_matrix, row-major weights)
 //
 // InputSize and OutputSize must be tile-aligned (multiples of 16).
 // Callers with arbitrary sizes should pad via PadToTile before instantiation.
@@ -32,14 +33,15 @@ internal struct TiledMMAHelper<T, int InputSize, int OutputSize, int SubgroupSiz
     static const int K = BaseMMA.K;
 
     // =========================================================================
-    // Forward MMA: dispatches to CUDA or Vulkan backend.
+    // Forward MMA: dispatches to CUDA, Vulkan, or Metal backend.
     //
     // CUDA:   TiledMMACuda.forward (MMAHelperNew, register-based, zero shmem)
     // Vulkan: TiledMMAVulkan.forward (WaveMatrix + shmem, CoopMat.Load)
+    // Metal:  TiledMMAMetal.forward (8x8 simdgroup_matrix + shmem staging)
     // =========================================================================
 
     [ForceInline]
-    [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
+    [require(cooperative_matrix, subgroup_basic, cuda_metal_spirv)]
     internal static WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>
     forward<Address, bool Bias = false>(
         __constref WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount> input,
@@ -57,18 +59,23 @@ internal struct TiledMMAHelper<T, int InputSize, int OutputSize, int SubgroupSiz
             typealias Vulkan = TiledMMAVulkan<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, TransposeA, SubgroupCount>;
             return Vulkan.forward<Address, Bias>(
                 input, weightAddress, biasAddress);
+        case metal:
+            typealias Metal = TiledMMAMetal<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, TransposeA, SubgroupCount>;
+            return Metal.forward<Address, Bias>(
+                input, weightAddress, biasAddress);
         }
     }
 
     // =========================================================================
-    // Unified backward: dispatches to CUDA or Vulkan backend.
+    // Unified backward: dispatches to CUDA, Vulkan, or Metal backend.
     //
     // CUDA:   TiledMMACuda (WaveMatrix register ops, shuffles, ChangeMajor)
     // Vulkan: TiledMMAVulkan (WaveMatrix + shmem, CoopMat.Load, no register transforms)
+    // Metal:  TiledMMAMetal (mmaTranspose + biasReduce + direct outer-product)
     // =========================================================================
 
     [ForceInline]
-    [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
+    [require(cooperative_matrix, subgroup_basic, cuda_metal_spirv)]
     internal static WaveTangledVector<T.Differential, ShMemSize, InputSize, SubgroupSize, SubgroupCount>
     backward<Address, OutputVector, bool Bias = true>(
         WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount> input,
@@ -95,6 +102,10 @@ internal struct TiledMMAHelper<T, int InputSize, int OutputSize, int SubgroupSiz
         case spirv:
             typealias Vulkan = TiledMMAVulkan<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, TransposeA, SubgroupCount>;
             return Vulkan.backward<Address, Bias>(
+                input, dOutConcrete, weightAddress, weightGradConcrete, biasGradConcrete);
+        case metal:
+            typealias Metal = TiledMMAMetal<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, TransposeA, SubgroupCount>;
+            return Metal.backward<Address, Bias>(
                 input, dOutConcrete, weightAddress, weightGradConcrete, biasGradConcrete);
         }
     }

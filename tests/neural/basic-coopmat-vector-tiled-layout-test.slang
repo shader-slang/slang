@@ -10,9 +10,16 @@
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_POINTER=1
 
+// Metal tests — bindless address path.
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=0 -xslang -DTEST_METAL=1
+
 #pragma warning(disable: 41017)
 import slang.neural;
 import common;
+
+#ifndef TEST_METAL
+#define TEST_METAL 0
+#endif
 
 #if TEST_HALF
 typealias ElementType = half;
@@ -32,24 +39,33 @@ RWStructuredBuffer<uint> testResult;
 //
 // Bias = {9, 10} stored separately at offset 256.
 
-// Float source for parameter initialization
-//TEST_INPUT: set parametersFloat = ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0], stride=4)
-uniform RWStructuredBuffer<float> parametersFloat;
-
 // Tiled layout weight buffer: 258 elements (one 16x16 tile + 2 bias).
 // Use stride=4 so the buffer is large enough for both half (258*2=516B) and float (258*4=1032B).
-//TEST_INPUT: set parameters = ubuffer(stride=4, count=258)
+//TEST_INPUT: set parametersPtr = ubuffer(stride=4, count=258)
+//TEST_INPUT: set buffers.parameters = ubuffer(stride=4, count=258)
 
 // Tiled layout dW buffer (same layout as parameters).
-//TEST_INPUT: set dParameters = ubuffer(stride=4, count=258)
+//TEST_INPUT: set dParametersPtr = ubuffer(stride=4, count=258)
+//TEST_INPUT: set buffers.dParameters = ubuffer(stride=4, count=258)
+
+uniform ElementType* parametersPtr;
+uniform ElementType* dParametersPtr;
+
+struct TestBuffers
+{
+    RWStructuredBuffer<ElementType>.Handle parameters;
+    RWStructuredBuffer<ElementType>.Handle dParameters;
+}
+
+ParameterBlock<TestBuffers> buffers;
 
 #if TEST_POINTER
-    uniform ElementType* parameters;
-    uniform ElementType* dParameters;
+    #define parameters parametersPtr
+    #define dParameters dParametersPtr
     typealias Address = PointerAddress<ElementType>;
 #else
-    uniform RWStructuredBuffer<ElementType>.Handle parameters;
-    uniform RWStructuredBuffer<ElementType>.Handle dParameters;
+    #define parameters buffers.parameters
+    #define dParameters buffers.dParameters
     typealias Address = BindlessAddress<ElementType>;
 #endif
 
@@ -59,7 +75,13 @@ static const int BatchSize = 32;
 static const int SubgroupSize = 32;
 static const int workgroupCount = BatchSize / SubgroupSize;
 
-typealias ShMemSize = SharedMemorySize<ElementType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, workgroupCount>;
+#if TEST_METAL
+#define TEST_TARGET TargetEnum.Metal
+#else
+#define TEST_TARGET TargetEnum.CUDA
+#endif
+
+typealias ShMemSize = SharedMemorySize<ElementType, TEST_TARGET, ExecutionMode.Training, SubgroupSize, workgroupCount>;
 typealias ShMemSizeLayer1 = ShMemSize.OfLayer1<InputSize, OutputSize>;
 
 void setupParameters(uint tid)
@@ -70,14 +92,15 @@ void setupParameters(uint tid)
             parameters[i] = ElementType(0.0);
 
         for (int col = 0; col < InputSize; col++)
-            parameters[tiledWeightOffset(0, col)] = ElementType(parametersFloat[col]);
+            parameters[tiledWeightOffset(0, col)] = ElementType(col + 1);
 
         for (int col = 0; col < InputSize; col++)
-            parameters[tiledWeightOffset(1, col)] = ElementType(parametersFloat[InputSize + col]);
+            parameters[tiledWeightOffset(1, col)] = ElementType(InputSize + col + 1);
 
-        parameters[256] = ElementType(parametersFloat[8]);
-        parameters[257] = ElementType(parametersFloat[9]);
+        parameters[256] = ElementType(9);
+        parameters[257] = ElementType(10);
     }
+
 }
 
 void cleanupDParameters(uint tid)
@@ -110,9 +133,6 @@ void ForwardTestWithoutBias(int tid, int resIndex)
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
-        if (!isPassed)
-            printf("ForwardTestWithoutBias FAIL: got [%f, %f], expected [30, 70]\n",
-                float(outputVec[0]), float(outputVec[1]));
         testResult[resIndex] = isPassed ? 1 : 0;
     }
 }
@@ -138,9 +158,6 @@ void ForwardTestWithBias(int tid, int resIndex)
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
-        if (!isPassed)
-            printf("ForwardTestWithBias FAIL: got [%f, %f], expected [39, 80]\n",
-                float(outputVec[0]), float(outputVec[1]));
         testResult[resIndex] = isPassed ? 1 : 0;
     }
 }
@@ -190,6 +207,7 @@ void BackwardTestWithoutBias(int tid, int resIndex)
 
     // Backward: dInput = W^T * dOutput = [[1,5],[2,6],[3,7],[4,8]] * [1,1] = [6, 8, 10, 12]
     bwd_diff(MatVecMul<InVectorType, OutVectorType>)(dPair, weightDiffPair, dRes);
+    AllMemoryBarrierWithGroupSync();
 
     isPassed = isPassed &&
         equals(dPair.d[0], ElementType(6.0)) && equals(dPair.d[1], ElementType(8.0)) &&
@@ -206,8 +224,6 @@ void BackwardTestWithoutBias(int tid, int resIndex)
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
-        if (!isPassed)
-            printf("BackwardTestWithoutBias FAIL\n");
         testResult[resIndex] = isPassed ? 1 : 0;
     }
 }
@@ -239,6 +255,7 @@ void BackwardTestWithBias(int tid, int resIndex)
 
     // Backward: dInput = W^T * dOutput = [6, 8, 10, 12]
     bwd_diff(MatVecMulAdd<InVectorType, OutVectorType>)(dPair, weightDiffPair, biasDiffPair, dOutput);
+    AllMemoryBarrierWithGroupSync();
 
     isPassed = isPassed &&
         equals(dPair.d[0], ElementType(6.0)) && equals(dPair.d[1], ElementType(8.0)) &&
@@ -258,32 +275,38 @@ void BackwardTestWithBias(int tid, int resIndex)
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
-        if (!isPassed)
-            printf("BackwardTestWithBias FAIL\n");
         testResult[resIndex] = isPassed ? 1 : 0;
     }
 }
 
 [shader("compute")]
 [numthreads(BatchSize, 1, 1)]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
 {
+    if (gid.x != 0)
+        return;
+
+    uint lane = WaveGetLaneIndex();
+    uint wave = WaveGetWaveIndex();
+    if (lane >= uint(SubgroupSize) || wave >= uint(workgroupCount))
+        return;
+
     setupParameters(tid);
     AllMemoryBarrierWithGroupSync();
 
     ForwardTestWithoutBias(tid, 0);
-    // BUFFER: 1
+    // BUFFER: {{^}}1{{$}}
 
     ForwardTestWithBias(tid, 1);
-    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: {{^}}1{{$}}
 
     cleanupDParameters(tid);
     AllMemoryBarrierWithGroupSync();
     BackwardTestWithoutBias(tid, 2);
-    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: {{^}}1{{$}}
 
     cleanupDParameters(tid);
     AllMemoryBarrierWithGroupSync();
     BackwardTestWithBias(tid, 3);
-    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: {{^}}1{{$}}
 }
