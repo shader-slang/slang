@@ -828,5 +828,6 @@ return {
 	["SpecializeExistentialsInType"] = 852,
 	["assumeAddress"] = 853,
 	["DebugCompilationUnit"] = 854,
-	["SetBase.ValueSet"] = 855
+	["IncrementCoverageCounter"] = 855,
+	["SetBase.ValueSet"] = 856
 }

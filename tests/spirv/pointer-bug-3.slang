@@ -2,7 +2,7 @@
 
 [[vk::push_constant]] float4 *positions;
 [shader("vertex")]
-float4 main()
+float4 main() : SV_Position
 {
     return positions[0];
 }
