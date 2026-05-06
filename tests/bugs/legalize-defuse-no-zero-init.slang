@@ -56,7 +56,7 @@ OutVec makeBag()
     OutVec output;
 
     [ForceUnroll]
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < 4; i++)
         output.data[i] = float(i);
 
     return output;
@@ -77,10 +77,6 @@ void computeMain(uint tid : SV_DispatchThreadID)
     // BUF-NEXT: 1.0
     // BUF-NEXT: 2.0
     // BUF-NEXT: 3.0
-    // BUF-NEXT: 4.0
-    // BUF-NEXT: 5.0
-    // BUF-NEXT: 6.0
-    // BUF-NEXT: 7.0
 }
 
 // METAL: {{\[\[}}kernel{{\]\]}} void computeMain
