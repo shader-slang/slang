@@ -159,7 +159,7 @@ public int tiledDWeightOffset<int RowStride>(int row, int col)
 // Convert a row-major 16x16 tile to MatB native register layout.
 // MatB packs vertically: same column (gid), adjacent rows (tid*2, tid*2+1).
 public void convertTileRowMajorToNativeB<T>(
-    uint tid, int srcTileOffset, int dstOffset,
+    uint tid, int tileOffset,
     RWStructuredBuffer<T>.Handle buffer)
     where T : __BuiltinFloatingPointType
 {
@@ -168,16 +168,18 @@ public void convertTileRowMajorToNativeB<T>(
     int tidLocal = int(tid) & 3;
 
     T b[8];
-    b[0] = buffer[srcTileOffset + (tidLocal*2)   * S + gid];
-    b[1] = buffer[srcTileOffset + (tidLocal*2+1) * S + gid];
-    b[2] = buffer[srcTileOffset + (tidLocal*2+8) * S + gid];
-    b[3] = buffer[srcTileOffset + (tidLocal*2+9) * S + gid];
-    b[4] = buffer[srcTileOffset + (tidLocal*2)   * S + gid + 8];
-    b[5] = buffer[srcTileOffset + (tidLocal*2+1) * S + gid + 8];
-    b[6] = buffer[srcTileOffset + (tidLocal*2+8) * S + gid + 8];
-    b[7] = buffer[srcTileOffset + (tidLocal*2+9) * S + gid + 8];
+    b[0] = buffer[tileOffset + (tidLocal*2)   * S + gid];
+    b[1] = buffer[tileOffset + (tidLocal*2+1) * S + gid];
+    b[2] = buffer[tileOffset + (tidLocal*2+8) * S + gid];
+    b[3] = buffer[tileOffset + (tidLocal*2+9) * S + gid];
+    b[4] = buffer[tileOffset + (tidLocal*2)   * S + gid + 8];
+    b[5] = buffer[tileOffset + (tidLocal*2+1) * S + gid + 8];
+    b[6] = buffer[tileOffset + (tidLocal*2+8) * S + gid + 8];
+    b[7] = buffer[tileOffset + (tidLocal*2+9) * S + gid + 8];
 
-    int nativeBase = dstOffset + int(tid) * 8;
+    AllMemoryBarrierWithWaveSync();
+
+    int nativeBase = tileOffset + int(tid) * 8;
     [ForceUnroll]
     for (int i = 0; i < 8; i++)
         buffer[nativeBase + i] = b[i];
@@ -185,7 +187,8 @@ public void convertTileRowMajorToNativeB<T>(
 
 // Convert all tiles in a PaddedRows x PaddedCols tiled matrix from
 // row-major tiled layout to native MatB register layout (CUDA only).
-// Uses TempOffset = PaddedRows*PaddedCols as scratch space in the same buffer.
+// The first warp converts each tile in-place, using registers to hold all
+// source elements before writing the native layout back over the tile.
 public void convertTiledToNativeB<T, int PaddedRows, int PaddedCols, int WorkgroupSize>(
     uint tid, RWStructuredBuffer<T>.Handle buffer)
     where T : __BuiltinFloatingPointType
@@ -199,23 +202,11 @@ public void convertTiledToNativeB<T, int PaddedRows, int PaddedCols, int Workgro
         static const int NTileCols = PaddedCols / TileSize;
         static const int TotalTiles = NTileRows * NTileCols;
         static const int TileElements = TileSize * TileSize;
-        static const int TotalElements = PaddedRows * PaddedCols;
-        static const int TempOffset = TotalElements;
 
         if (tid < 32)
         {
             for (int t = 0; t < TotalTiles; t++)
-                convertTileRowMajorToNativeB<T>(tid, t * TileElements, TempOffset + t * TileElements, buffer);
-        }
-        AllMemoryBarrierWithGroupSync();
-
-        static const int CopyIters = (TotalElements + WorkgroupSize - 1) / WorkgroupSize;
-        [ForceUnroll]
-        for (int iter = 0; iter < CopyIters; iter++)
-        {
-            int index = iter * WorkgroupSize + tid;
-            if (index < TotalElements)
-                buffer[index] = buffer[TempOffset + index];
+                convertTileRowMajorToNativeB<T>(tid, t * TileElements, buffer);
         }
         AllMemoryBarrierWithGroupSync();
     }
