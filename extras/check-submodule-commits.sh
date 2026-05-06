@@ -174,8 +174,8 @@ declare -i CHECKED=0
 declare -i SKIPPED=0
 
 for name in "${SUBMODULE_NAMES[@]}"; do
-  path="$(git config -f .gitmodules "submodule.${name}.path")"
-  url="$(git config -f .gitmodules "submodule.${name}.url")"
+  path="$(git config -f .gitmodules --default '' "submodule.${name}.path")"
+  url="$(git config -f .gitmodules --default '' "submodule.${name}.url")"
   branch_override="$(git config -f .gitmodules --default '' "submodule.${name}.branch")"
   skip_pin_check="$(git config -f .gitmodules --default '' "submodule.${name}.slang-skip-pin-check")"
 
