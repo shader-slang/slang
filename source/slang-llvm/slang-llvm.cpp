@@ -1002,7 +1002,10 @@ SlangResult LLVMDownstreamCompiler::compile(
                     JITTargetMachineBuilder::detectHost();
                 if (expectJTMB)
                 {
-                    if (expectJTMB->getTargetTriple().isX86_64() && !_hostSupportsAVX512())
+                    // Use getArch() comparison rather than Triple::isX86_64() —
+                    // the latter is only available in newer LLVM headers (>= 22).
+                    if (expectJTMB->getTargetTriple().getArch() == llvm::Triple::x86_64 &&
+                        !_hostSupportsAVX512())
                     {
                         // Cover every AVX-512 family feature LLVM exposes for
                         // x86_64. LLVM's subtarget table generally implies the
