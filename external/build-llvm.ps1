@@ -106,6 +106,16 @@ if (-not $sourceDir) { Fail "please set --source-dir" }
 if (-not $config) { Fail "please set --config" }
 if (-not $installPrefix) { Fail "please set --install-prefix" }
 
+$llvmTargetList = @(
+    $llvmTargets -split ';' |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ }
+)
+if ($llvmTargetList.Count -eq 0) {
+    Fail "please set --targets to at least one LLVM target"
+}
+$llvmTargets = $llvmTargetList -join ';'
+
 # Fetch LLVM from the repo
 Msg "##########################################################"
 Msg "# Fetching LLVM from $repo at $branch"
@@ -194,7 +204,7 @@ Msg "##########################################################"
 Msg "# Verifying installed LLVM codegen libraries"
 Msg "##########################################################"
 $missingCodegen = @()
-foreach ($target in ($llvmTargets -split ';')) {
+foreach ($target in $llvmTargetList) {
     $hit = Get-ChildItem -Path $installPrefix -Recurse -File -ErrorAction SilentlyContinue `
         -Include "LLVM${target}CodeGen.lib", "libLLVM${target}CodeGen.*" |
         Select-Object -First 1

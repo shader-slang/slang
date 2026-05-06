@@ -112,6 +112,22 @@ done
 [ -n "$config" ] || fail "please set --config"
 [ -n "$install_prefix" ] || fail "please set --install-prefix"
 
+normalized_targets=()
+IFS=';' read -ra requested_targets <<<"$llvm_targets"
+for target in "${requested_targets[@]}"; do
+  target=${target//[[:space:]]/}
+  if [ -n "$target" ]; then
+    normalized_targets+=("$target")
+  fi
+done
+if [ "${#normalized_targets[@]}" -eq 0 ]; then
+  fail "please set --targets to at least one LLVM target"
+fi
+llvm_targets=$(
+  IFS=';'
+  printf '%s' "${normalized_targets[*]}"
+)
+
 msvc_runtime_lib=MultiThreaded
 if [ "$config" = "Debug" ]; then
   msvc_runtime_lib=MultiThreadedDebug
@@ -198,8 +214,7 @@ msg "##########################################################"
 msg "# Verifying installed LLVM codegen libraries"
 msg "##########################################################"
 missing_codegen=()
-IFS=';' read -ra requested_targets <<<"$llvm_targets"
-for target in "${requested_targets[@]}"; do
+for target in "${normalized_targets[@]}"; do
   # Library extension varies by platform (.a on Unix, .lib on Windows);
   # match by stem only.
   if ! find "$install_prefix" -type f \
