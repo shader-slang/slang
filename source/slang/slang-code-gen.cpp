@@ -1387,6 +1387,11 @@ bool CodeGenContext::shouldReportDynamicDispatchSites()
         CompilerOptionName::ReportDynamicDispatchSites);
 }
 
+bool CodeGenContext::shouldTraceCoverage()
+{
+    return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::TraceCoverage);
+}
+
 bool CodeGenContext::shouldDumpIntermediates()
 {
     return getTargetProgram()->getOptionSet().shouldDumpIntermediates();
