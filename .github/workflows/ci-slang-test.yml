@@ -233,6 +233,14 @@ jobs:
           # Inherit unlimited core size for any child processes (slang-test,
           # test-servers, etc.). No-op on non-Linux runners.
           ulimit -c unlimited || true
+          # TEMPORARY: have slang-llvm dump every JIT module's IR so we can
+          # inspect per-function `target-features` attributes for the SIGILL
+          # investigation in #11062. Remove with the rest of the debug
+          # machinery once root-caused.
+          if [[ "${{ inputs.os }}" == "linux" ]]; then
+            mkdir -p "$GITHUB_WORKSPACE/llvm-ir"
+            export SLANG_LLVM_DUMP_IR_DIR="$GITHUB_WORKSPACE/llvm-ir"
+          fi
           # Fail fast on mutually exclusive inputs — both would accumulate
           # -api filters and produce an empty test partition.
           if [[ "${{ inputs.cpu-only }}" == "true" && "${{ inputs.gpu-api-only }}" == "true" ]]; then
@@ -388,6 +396,44 @@ jobs:
         with:
           name: cores-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}${{ inputs.artifact-suffix }}
           path: cores/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # TEMPORARY: also upload the dumped LLVM IR so we can grep for
+      # `target-features` attributes (#11062). Remove with the rest of the
+      # debug machinery.
+      - name: Filter and upload LLVM IR dumps
+        if: always() && inputs.os == 'linux'
+        shell: bash
+        run: |
+          if [ ! -d "$GITHUB_WORKSPACE/llvm-ir" ]; then
+            echo "No LLVM IR dump directory; nothing to do."
+            exit 0
+          fi
+          echo "::group::IR file count and total size"
+          count=$(find "$GITHUB_WORKSPACE/llvm-ir" -name 'slang-llvm-*.ll' | wc -l)
+          echo "files: $count"
+          du -sh "$GITHUB_WORKSPACE/llvm-ir" 2>/dev/null || true
+          echo "::endgroup::"
+          echo "::group::AVX-512 feature mentions across all dumped IR"
+          grep -lE 'avx512[a-z0-9]*' "$GITHUB_WORKSPACE/llvm-ir"/*.ll 2>/dev/null \
+            | head -10 || echo "(none — IR has no AVX-512 attributes)"
+          echo "::endgroup::"
+          echo "::group::Sample target-features attributes (first match per file, up to 5)"
+          for f in "$GITHUB_WORKSPACE"/llvm-ir/*.ll; do
+            [ -f "$f" ] || continue
+            line=$(grep -m1 'target-features' "$f" | head -c 400 || true)
+            if [ -n "$line" ]; then
+              printf '%s:\n  %s\n' "$(basename "$f")" "$line"
+            fi
+          done | head -50
+          echo "::endgroup::"
+      - name: Upload LLVM IR dumps
+        if: always() && inputs.os == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: llvm-ir-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}${{ inputs.artifact-suffix }}
+          path: llvm-ir/
           if-no-files-found: ignore
           retention-days: 7
 
