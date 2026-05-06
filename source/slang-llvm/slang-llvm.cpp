@@ -41,6 +41,7 @@
 #include "llvm/ExecutionEngine/JITLink/JITLinkMemoryManager.h"
 #include "llvm/ExecutionEngine/JITSymbol.h"
 #include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
+#include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 #include "llvm/IR/LLVMContext.h"
@@ -903,6 +904,46 @@ SlangResult LLVMDownstreamCompiler::compile(
                 // Create the JIT
 
                 LLJITBuilder jitBuilder;
+
+                // Disable AVX-512 in the JIT TargetMachine on x86_64. LLVM's
+                // host detection has been observed to enable AVX-512 features
+                // on CPUs that then SIGILL on those instructions (intermittent
+                // crashes on the GitHub-hosted Linux CPU test runners — AMD
+                // EPYC 7763, no AVX-512 in CPUID, yet kmovd / vmovss-with-mask
+                // shows up in JIT-allocated memory and faults).
+                //
+                // This is the targeted fix for #11062. A more nuanced version
+                // (only subtract when our own CPUID probe says the host
+                // genuinely lacks AVX-512) is in #11070; this PR is the
+                // simpler stop-bleed: turn AVX-512 off in the JIT
+                // unconditionally, accept the perf cost on capable hosts, and
+                // get the merge queue back to green immediately.
+                Expected<JITTargetMachineBuilder> expectJTMB =
+                    JITTargetMachineBuilder::detectHost();
+                if (expectJTMB && expectJTMB->getTargetTriple().getArch() == llvm::Triple::x86_64)
+                {
+                    expectJTMB->addFeatures({
+                        "-avx512f",
+                        "-avx512cd",
+                        "-avx512dq",
+                        "-avx512bw",
+                        "-avx512vl",
+                        "-avx512vbmi",
+                        "-avx512vbmi2",
+                        "-avx512vnni",
+                        "-avx512bitalg",
+                        "-avx512vpopcntdq",
+                        "-avx512ifma",
+                        "-avx512vp2intersect",
+                        "-avx512fp16",
+                        "-avx512bf16",
+                        "-avx512er",
+                        "-avx512pf",
+                        "-avx512_4fmaps",
+                        "-avx512_4vnniw",
+                    });
+                    jitBuilder.setJITTargetMachineBuilder(std::move(*expectJTMB));
+                }
 
                 Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = jitBuilder.create();
                 if (!expectJit)
