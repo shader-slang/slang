@@ -241,11 +241,11 @@ void emitType(ManglingContext* context, Type* type)
         emitRaw(context, "t");
         emitQualifiedName(context, thisType->getInterfaceDeclRef(), true);
     }
-    else if (const auto errorType = dynamicCast<ErrorType>(type))
+    else if (const auto errorType = dynamicCast<ErrorType>(type); errorType)
     {
         emitRaw(context, "E");
     }
-    else if (const auto bottomType = dynamicCast<BottomType>(type))
+    else if (const auto bottomType = dynamicCast<BottomType>(type); bottomType)
     {
         emitRaw(context, "B");
     }
@@ -343,7 +343,7 @@ void emitVal(ManglingContext* context, Val* val)
     {
         emitType(context, type);
     }
-    else if (const auto witness = dynamicCast<Witness>(val))
+    else if (const auto witness = dynamicCast<Witness>(val); witness)
     {
         // We don't emit witnesses as part of a mangled
         // name, because the way that the front-end

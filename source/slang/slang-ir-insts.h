@@ -2603,6 +2603,12 @@ struct IRDebugBuildIdentifier : IRInst
 };
 
 FIDDLE()
+struct IRDebugCompilationUnit : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
 struct IRDebugLine : IRInst
 {
     FIDDLE(leafInst())
@@ -3486,6 +3492,7 @@ $(type_info.return_type) $(type_info.method_name)(
         bool isIncludedFile);
     IRInst* emitDebugBuildIdentifier(UnownedStringSlice buildIdentifier, IRIntegerValue flags);
     IRInst* emitDebugBuildIdentifier(IRInst* debugBuildIdentifier);
+    IRInst* emitDebugCompilationUnit(IRInst* source);
     IRInst* emitDebugLine(
         IRInst* source,
         IRIntegerValue lineStart,
@@ -3499,6 +3506,12 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* col,
         IRInst* argIndex = nullptr);
     IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue);
+    // Emit an IncrementCoverageCounter op. The coverage instrumentation
+    // IR pass later rewrites each occurrence into an atomic add on a
+    // synthesized counter buffer. Source position is carried on the
+    // standard per-instruction `sourceLoc` field (no operands), so the
+    // op is independent of debug-info state.
+    IRInst* emitIncrementCoverageCounter();
     IRInst* emitDebugInlinedAt(
         IRInst* line,
         IRInst* col,

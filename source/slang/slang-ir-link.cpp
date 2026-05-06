@@ -2235,6 +2235,10 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                 // but we still need to keep it around if it is in the IR.
                 cloneValue(context, inst);
                 break;
+            case kIROp_DebugCompilationUnit:
+                // DebugCompilationUnit references a DebugSource; clone it along with source.
+                cloneValue(context, inst);
+                break;
             }
         }
     }

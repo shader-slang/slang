@@ -9,6 +9,7 @@
 
 // CHECK610: dx::linalg::Multiply<
 // CHECK610: dx::linalg::MultiplyAdd<
+// CHECK610-NOT: MakeInterpretedVector
 
 RWStructuredBuffer<int32_t> outputBuffer;
 ByteAddressBuffer input;

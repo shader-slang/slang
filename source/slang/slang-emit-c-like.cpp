@@ -2,6 +2,7 @@
 #include "slang-emit-c-like.h"
 
 #include "../compiler-core/slang-name.h"
+#include "../core/slang-char-util.h"
 #include "../core/slang-stable-hash.h"
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
@@ -20,7 +21,6 @@
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
-#include "slang-mangled-lexer.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
@@ -3221,6 +3221,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugFunction:
     case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugCompilationUnit:
         break;
 
     case kIROp_Unmodified:
@@ -5234,6 +5235,7 @@ void CLikeSourceEmitter::ensureGlobalInst(
     case kIROp_DebugValue:
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugCompilationUnit:
         return;
     default:
         break;
