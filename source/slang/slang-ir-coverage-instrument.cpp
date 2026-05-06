@@ -19,6 +19,14 @@ namespace
 // Well-known buffer name. Surfaced via `IRNameHintDecoration` and
 // matches the manifest / sidecar key that hosts read.
 static const char kCoverageBufferName[] = "__slang_coverage";
+static const char kGlobalParamsName[] = "globalParams";
+
+static bool hasNameHint(IRInst* inst, UnownedTerminatedStringSlice expectedName)
+{
+    if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
+        return nameHint->getName() == expectedName;
+    return false;
+}
 
 // Choose the resource kind under which the coverage buffer is bound
 // for `target`. Each target family speaks a different vocabulary
@@ -53,19 +61,57 @@ static IRGlobalParam* findUserDeclaredCoverageBuffer(IRModule* module)
         auto param = as<IRGlobalParam>(inst);
         if (!param)
             continue;
-        auto nameHint = param->findDecoration<IRNameHintDecoration>();
-        if (!nameHint)
-            continue;
-        if (nameHint->getName() == UnownedTerminatedStringSlice(kCoverageBufferName))
+        if (hasNameHint(param, UnownedTerminatedStringSlice(kCoverageBufferName)))
             return param;
     }
+    return nullptr;
+}
+
+static IRGlobalParam* findGlobalParamByName(
+    IRModule* module,
+    UnownedTerminatedStringSlice expectedName)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto param = as<IRGlobalParam>(inst))
+        {
+            if (hasNameHint(param, expectedName))
+                return param;
+        }
+    }
+    return nullptr;
+}
+
+static IRStructField* findStructFieldByName(
+    IRType* type,
+    UnownedTerminatedStringSlice expectedName)
+{
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (hasNameHint(field->getKey(), expectedName))
+                return field;
+        }
+        return nullptr;
+    }
+
+    if (auto specialize = as<IRSpecialize>(type))
+    {
+        if (auto generic = as<IRGeneric>(specialize->getBase()))
+        {
+            if (auto genericStructType = as<IRStructType>(findInnerMostGenericReturnVal(generic)))
+                return findStructFieldByName(genericStructType, expectedName);
+        }
+    }
+
     return nullptr;
 }
 
 // Locate a global parameter whose layout already occupies the given
 // `(space, binding)` pair for resource kind `kind`. Returns null if
 // no collision. Used by the explicit-binding path of
-// `instrumentCoverage` to reject `-trace-coverage-binding` values
+// `prepareCoverageInstrumentation` to reject `-trace-coverage-binding` values
 // that would emit two parameters at the same slot — DXC and
 // spirv-val both reject the resulting program with cryptic errors,
 // so a Slang-level diagnostic anchored at the colliding declaration
@@ -377,19 +423,73 @@ static bool resolveHumaneLoc(
 struct CoverageInstrumenter
 {
     IRModule* module;
-    IRGlobalParam* coverageBuffer;
     SourceManager* sourceManager;
     ArtifactPostEmitMetadata& outMetadata;
-    IRType* uintType;
-    IRType* uintPtrType;
     IRType* intType;
 
     CoverageInstrumenter(
         IRModule* m,
-        IRGlobalParam* buf,
         SourceManager* sm,
         ArtifactPostEmitMetadata& md)
-        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md)
+        : module(m), sourceManager(sm), outMetadata(md)
+    {
+        IRBuilder tmpBuilder(module);
+        intType = tmpBuilder.getIntType();
+    }
+
+    // Assign a stable slot to `counterOp`, record the slot->source
+    // mapping in metadata, and attach the slot to the marker as an IR
+    // decoration so later cloning/specialization passes preserve it.
+    void assignSlot(IRInst* counterOp, UInt slot)
+    {
+        CoverageTracingEntry entry;
+        resolveHumaneLoc(sourceManager, counterOp, entry.file, entry.line);
+        outMetadata.m_coverageEntries.add(entry);
+
+        IRBuilder builder(module);
+        builder.addDecoration(
+            counterOp,
+            kIROp_CoverageSlotDecoration,
+            builder.getIntValue(intType, (IRIntegerValue)slot));
+    }
+
+    void run(List<IRInst*> const& counterOps)
+    {
+        outMetadata.m_coverageEntries.reserve(counterOps.getCount());
+        // Each counter op gets its own slot: the op's identity IS the
+        // UID, and we assign a consecutive index in traversal order.
+        // Multiple ops on the same source line get distinct slots; the
+        // LCOV converter aggregates per (file, line) at the host side
+        // via summation.
+        for (UInt slot = 0; slot < (UInt)counterOps.getCount(); ++slot)
+            assignSlot(counterOps[slot], slot);
+    }
+};
+
+struct CoverageMaterializer
+{
+    struct BufferReference
+    {
+        IRGlobalParam* directBuffer = nullptr;
+        IRGlobalParam* wrapperParam = nullptr;
+        IRStructKey* wrapperFieldKey = nullptr;
+        IRType* wrapperFieldType = nullptr;
+        bool wrapperIsParameterGroup = false;
+
+        bool isValid() const
+        {
+            return directBuffer || (wrapperParam && wrapperFieldKey && wrapperFieldType);
+        }
+    };
+
+    IRModule* module;
+    BufferReference bufferReference;
+    IRType* uintType;
+    IRType* uintPtrType;
+    IRType* intType;
+
+    CoverageMaterializer(IRModule* m, BufferReference const& bufferRef)
+        : module(m), bufferReference(bufferRef)
     {
         IRBuilder tmpBuilder(module);
         uintType = tmpBuilder.getUIntType();
@@ -397,20 +497,93 @@ struct CoverageInstrumenter
         intType = tmpBuilder.getIntType();
     }
 
-    // Lower a single IncrementCoverageCounter op to an atomic add on
-    // `coverageBuffer[slot]`. Appends a metadata entry for `slot` and
-    // removes the op.
-    void lowerCounterOp(IRInst* counterOp, UInt slot)
+    static BufferReference resolveBufferReference(IRModule* module)
     {
-        CoverageTracingEntry entry;
-        resolveHumaneLoc(sourceManager, counterOp, entry.file, entry.line);
-        outMetadata.m_coverageEntries.add(entry);
+        BufferReference result;
+
+        if (auto directBuffer =
+                findGlobalParamByName(module, UnownedTerminatedStringSlice(kCoverageBufferName)))
+        {
+            result.directBuffer = directBuffer;
+            return result;
+        }
+
+        auto wrapperParam =
+            findGlobalParamByName(module, UnownedTerminatedStringSlice(kGlobalParamsName));
+        if (!wrapperParam)
+            return result;
+
+        IRType* wrapperValueType = wrapperParam->getDataType();
+        if (auto parameterGroupType = as<IRParameterGroupType>(wrapperValueType))
+        {
+            result.wrapperIsParameterGroup = true;
+            wrapperValueType = cast<IRType>(parameterGroupType->getOperand(0));
+        }
+
+        auto field =
+            findStructFieldByName(wrapperValueType, UnownedTerminatedStringSlice(kCoverageBufferName));
+        if (!field)
+            return result;
+
+        result.wrapperParam = wrapperParam;
+        result.wrapperFieldKey = field->getKey();
+        result.wrapperFieldType = field->getFieldType();
+        return result;
+    }
+
+    static IRInst* getOwningGlobalForKeepAlive(BufferReference const& bufferReference)
+    {
+        if (bufferReference.directBuffer)
+            return bufferReference.directBuffer;
+        return bufferReference.wrapperParam;
+    }
+
+    static void removeKeepAliveDecorations(IRInst* value)
+    {
+        while (auto keepAlive = value->findDecoration<IRKeepAliveDecoration>())
+            keepAlive->removeAndDeallocate();
+    }
+
+    IRInst* emitCoverageBufferValue(IRBuilder& builder)
+    {
+        if (bufferReference.directBuffer)
+            return bufferReference.directBuffer;
+
+        SLANG_ASSERT(bufferReference.isValid());
+        if (bufferReference.wrapperIsParameterGroup)
+        {
+            auto fieldPtrType = builder.getPtrType(bufferReference.wrapperFieldType);
+            auto fieldAddr = builder.emitFieldAddress(
+                fieldPtrType,
+                bufferReference.wrapperParam,
+                bufferReference.wrapperFieldKey);
+            return builder.emitLoad(bufferReference.wrapperFieldType, fieldAddr);
+        }
+
+        return builder.emitFieldExtract(
+            bufferReference.wrapperFieldType,
+            bufferReference.wrapperParam,
+            bufferReference.wrapperFieldKey);
+    }
+
+    void lowerCounterOp(IRInst* counterOp)
+    {
+        auto slotDecoration = counterOp->findDecoration<IRCoverageSlotDecoration>();
+        SLANG_ASSERT(slotDecoration);
+        if (!slotDecoration)
+        {
+            counterOp->removeAndDeallocate();
+            return;
+        }
+
+        UInt slot = (UInt)slotDecoration->getSlotValue();
 
         IRBuilder builder(module);
         builder.setInsertBefore(counterOp);
+        auto coverageBufferValue = emitCoverageBufferValue(builder);
 
         IRInst* getElemArgs[] = {
-            coverageBuffer,
+            coverageBufferValue,
             builder.getIntValue(intType, (IRIntegerValue)slot),
         };
         IRInst* slotPtr = builder.emitIntrinsicInst(
@@ -439,20 +612,14 @@ struct CoverageInstrumenter
 
     void run(List<IRInst*> const& counterOps)
     {
-        outMetadata.m_coverageEntries.reserve(counterOps.getCount());
-        // Each counter op gets its own slot: the op's identity IS the
-        // UID, and we assign a consecutive index in traversal order.
-        // Multiple ops on the same source line get distinct slots; the
-        // LCOV converter aggregates per (file, line) at the host side
-        // via summation.
-        for (UInt slot = 0; slot < (UInt)counterOps.getCount(); ++slot)
-            lowerCounterOp(counterOps[slot], slot);
+        for (auto op : counterOps)
+            lowerCounterOp(op);
     }
 };
 
 } // anonymous namespace
 
-void instrumentCoverage(
+void prepareCoverageInstrumentation(
     IRModule* module,
     DiagnosticSink* sink,
     bool enabled,
@@ -587,10 +754,64 @@ void instrumentCoverage(
 
     CoverageInstrumenter instrumenter(
         module,
-        buffer,
         sink ? sink->getSourceManager() : nullptr,
         outMetadata);
     instrumenter.run(counterOps);
+}
+
+void preserveCoverageBindingForMaterialization(IRModule* module, bool enabled)
+{
+    if (!enabled)
+        return;
+
+    List<IRInst*> counterOps;
+    collectCoverageCounterOps(module, counterOps);
+    if (counterOps.getCount() == 0)
+        return;
+
+    auto bufferReference = CoverageMaterializer::resolveBufferReference(module);
+    if (!bufferReference.isValid())
+        return;
+
+    auto keepAliveTarget = CoverageMaterializer::getOwningGlobalForKeepAlive(bufferReference);
+    if (!keepAliveTarget || keepAliveTarget->findDecoration<IRKeepAliveDecoration>())
+        return;
+
+    IRBuilder builder(module);
+    builder.addKeepAliveDecoration(keepAliveTarget);
+}
+
+void materializeCoverageInstrumentation(
+    IRModule* module,
+    DiagnosticSink* sink,
+    bool enabled)
+{
+    SLANG_UNUSED(sink);
+
+    List<IRInst*> counterOps;
+    collectCoverageCounterOps(module, counterOps);
+
+    if (!enabled || counterOps.getCount() == 0)
+    {
+        for (auto op : counterOps)
+            op->removeAndDeallocate();
+        return;
+    }
+
+    auto bufferReference = CoverageMaterializer::resolveBufferReference(module);
+    SLANG_ASSERT(bufferReference.isValid());
+    if (!bufferReference.isValid())
+    {
+        for (auto op : counterOps)
+            op->removeAndDeallocate();
+        return;
+    }
+
+    if (auto keepAliveTarget = CoverageMaterializer::getOwningGlobalForKeepAlive(bufferReference))
+        CoverageMaterializer::removeKeepAliveDecorations(keepAliveTarget);
+
+    CoverageMaterializer materializer(module, bufferReference);
+    materializer.run(counterOps);
 }
 
 } // namespace Slang

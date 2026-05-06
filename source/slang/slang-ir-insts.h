@@ -888,6 +888,14 @@ struct IRCounterBufferDecoration : IRDecoration
 };
 
 FIDDLE()
+struct IRCoverageSlotDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+    IRIntLit* getSlotLit() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntegerValue getSlotValue() { return getSlotLit()->getValue(); }
+};
+
+FIDDLE()
 struct IRStageAccessDecoration : public IRDecoration
 {
     FIDDLE(baseInst())

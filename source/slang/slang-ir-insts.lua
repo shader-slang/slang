@@ -2237,6 +2237,15 @@ local insts = {
 					operands = { { "counterBuffer" } },
 				},
 			},
+			{
+				CoverageSlotDecoration = {
+					-- Internal slot assignment for `IncrementCoverageCounter`.
+					-- Assigned early, survives specialization/cloning, and is
+					-- consumed by the later coverage materialization pass.
+					struct_name = "CoverageSlotDecoration",
+					operands = { { "slot", "IRIntLit" } },
+				},
+			},
 			{ RequireSPIRVDescriptorIndexingExtensionDecoration = {} },
 			{
 				spirvOpDecoration = {

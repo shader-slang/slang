@@ -935,7 +935,7 @@ Result linkAndOptimizeIR(
         return SLANG_FAIL;
 
     // Create the post-emit metadata object up-front so that IR passes
-    // that need to record reportable data (e.g. `instrumentCoverage`'s
+    // that need to record reportable data (e.g. coverage preparation's
     // slot → source mapping) can write into it directly. `collectMetadata`
     // later fills in binding / exported-function fields.
     auto metadata = new ArtifactPostEmitMetadata;
@@ -1024,18 +1024,20 @@ Result linkAndOptimizeIR(
     // can assume that all ordinary/uniform data is strictly
     // passed using constant buffers.
     //
-    // Shader coverage instrumentation. The pass synthesizes
+    // Shader coverage preparation. This early pass synthesizes
     // `__slang_coverage` as an `IRGlobalParam` directly in the
     // linked program IR, extends the program-scope var layout, and
-    // rewrites counter ops to atomic adds. Runs BEFORE
-    // `collectGlobalUniformParameters` so the synthesized buffer
-    // gets packed into `GlobalParams` alongside user globals on
-    // targets that pack ordinary uniforms (CPU, CUDA).
+    // assigns one slot per `IncrementCoverageCounter` marker without
+    // materializing the runtime atomic operations yet. It runs BEFORE
+    // `collectGlobalUniformParameters` so the synthesized buffer gets
+    // packed into `GlobalParams` alongside user globals on targets
+    // that pack ordinary uniforms (CPU, CUDA).
     //
     // Counter ops carry source position on their built-in `sourceLoc`,
-    // so this pass is independent of debug-info state. It writes its
-    // slot → source mapping into `metadata`, exposed to hosts via
-    // ICoverageTracingMetadata.
+    // so preparation is independent of debug-info state. It writes
+    // its slot → source mapping into `metadata`, exposed to hosts via
+    // ICoverageTracingMetadata. A later pass materializes the runtime
+    // atomic form after specialization-heavy transforms have run.
     if (requiredLoweringPassSet.coverageTracing)
     {
         // Pull explicit binding values from `-trace-coverage-binding`
@@ -1053,7 +1055,7 @@ Result linkAndOptimizeIR(
             }
         }
         SLANG_PASS(
-            instrumentCoverage,
+            prepareCoverageInstrumentation,
             sink,
             codeGenContext->shouldTraceCoverage(),
             explicitBinding,
@@ -1066,6 +1068,14 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(collectGlobalUniformParameters, outLinkedIR.globalScopeVarLayout, target);
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    if (requiredLoweringPassSet.coverageTracing)
+    {
+        SLANG_PASS(
+            preserveCoverageBindingForMaterialization,
+            codeGenContext->shouldTraceCoverage());
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+    }
 
     SLANG_PASS(checkEntryPointDecorations, target, sink);
 
@@ -1708,6 +1718,19 @@ Result linkAndOptimizeIR(
     SLANG_PASS(specializeArrayParameters, codeGenContext);
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    // Shader coverage materialization. At this point the main
+    // specialization/cloning-heavy passes have already run, so we can
+    // lower the marker ops into the final runtime atomic form with
+    // less retained coverage-related IR state.
+    if (requiredLoweringPassSet.coverageTracing)
+    {
+    SLANG_PASS(
+        materializeCoverageInstrumentation,
+        sink,
+        codeGenContext->shouldTraceCoverage());
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+    }
 
     // Process `static_assert` after the specialization is done.
     // Some information for `static_assert` is available only after the specialization.
