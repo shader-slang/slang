@@ -17299,7 +17299,7 @@ static void checkDerivativeAttribute(
                     visibility);
 
                 // Force conformance checking for BwdCallable.operator() on this context.
-                visitor->checkAggTypeConformance(synContextStruct.getDecl());
+                visitor->ensureDecl(synContextStruct, DeclCheckState::ReadyForConformances);
             }
         }
     }
