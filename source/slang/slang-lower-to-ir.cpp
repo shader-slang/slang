@@ -616,6 +616,12 @@ struct IRGenContext
 
     DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
 
+    // Shader-coverage instrumentation. When true, each lowered
+    // statement is preceded by an IncrementCoverageCounter op, which a
+    // later IR pass rewrites into an atomic counter write on a
+    // synthesized buffer.
+    bool traceCoverage = false;
+
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
 
@@ -9028,6 +9034,16 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
     try
     {
         maybeEmitDebugLine(context, &visitor, stmt, stmt->loc);
+
+        // Under `-trace-coverage`, emit a counter op before each executable
+        // statement (skip Block/Seq/Empty wrappers — no execution to count).
+        if (context->traceCoverage && stmt->loc.isValid() && !as<EmptyStmt>(stmt) &&
+            !as<BlockStmt>(stmt) && !as<SeqStmt>(stmt))
+        {
+            visitor.startBlockIfNeeded(stmt);
+            context->irBuilder->emitIncrementCoverageCounter();
+        }
+
         visitor.dispatch(stmt);
     }
     // Don't emit any context message for an explicit `AbortCompilationException`
@@ -14256,6 +14272,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     context->irBuilder = builder;
     context->debugInfoLevel = compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel();
+    context->traceCoverage =
+        compileRequest->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage);
 
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {

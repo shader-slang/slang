@@ -209,24 +209,35 @@ struct CleanUpVoidContext
         case kIROp_FuncType:
             {
                 auto funcType = as<IRFuncType>(inst);
-                List<IRInst*> newOperands;
-                for (UInt i = 1; i < funcType->getOperandCount(); i++)
+                // Walk only the actual parameter types (the
+                // `IRFuncType` accessors skip a trailing `IRAttr`
+                // operand such as `IRFuncThrowTypeAttr` that
+                // attributed function types carry). Reading raw
+                // operands here would mistake the attribute for a
+                // parameter and rebuild the type without it.
+                List<IRType*> newParamTypes;
+                for (auto paramType : funcType->getParamTypes())
                 {
-                    auto operand = funcType->getOperand(i);
-                    if (operand->getOp() == kIROp_VoidType)
+                    if (paramType->getOp() == kIROp_VoidType)
                     {
                         continue;
                     }
-                    newOperands.add(operand);
+                    newParamTypes.add(paramType);
                 }
-                if (newOperands.getCount() != (Index)funcType->getParamCount())
+                if (newParamTypes.getCount() != (Index)funcType->getParamCount())
                 {
                     IRBuilder builder(module);
                     builder.setInsertBefore(funcType);
-                    auto newFuncType = builder.getFuncType(
-                        newOperands.getCount(),
-                        (IRType**)newOperands.getBuffer(),
-                        funcType->getResultType());
+                    auto attr = funcType->getAttr();
+                    auto newFuncType = attr ? builder.getFuncType(
+                                                  newParamTypes.getCount(),
+                                                  newParamTypes.getBuffer(),
+                                                  funcType->getResultType(),
+                                                  attr)
+                                            : builder.getFuncType(
+                                                  newParamTypes.getCount(),
+                                                  newParamTypes.getBuffer(),
+                                                  funcType->getResultType());
                     if (newFuncType != funcType)
                     {
                         funcType->replaceUsesWith(newFuncType);
