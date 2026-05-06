@@ -5990,7 +5990,7 @@ static Decl* parseEnumDecl(Parser* parser)
 
             // If the enum was declared as an enum class, insert a modifier for
             // conflicting unscoped/scoped enum detection.
-            if (isEnumClass && !genericParent)
+            if (isEnumClass)
             {
                 auto enumClassAttr = parser->astBuilder->create<EnumClassAttribute>();
                 enumClassAttr->loc = enumClassLoc;

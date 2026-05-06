@@ -2,17 +2,18 @@
 //
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
+// we'll also test the generic enums for completeness, even if they're not
+// quite yet fully supported
 [UnscopedEnum]
 /*CHECK:
  ^^^^^^^^^^^^ conflicting attribute declaration
 */
-enum class TestEnum
+enum class GenericEnum<T>
 /*CHECK:
      ^^^^^ conflicting scoped/unscoped declarations for an enum
-     ^^^^^ 'class' keyword for 'TestEnum' implies scoped enumeration
+     ^^^^^ 'class' keyword for 'GenericEnum' implies scoped enumeration
 */
 {
-    Value1,
 }
 
 [numthreads(1,1,1)]
