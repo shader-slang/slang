@@ -188,8 +188,12 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Execute kmovd %eax, %k1 in a child"
-          # The exact instruction we observed crashing in the cores. Run in
-          # a forked child so SIGILL doesn't terminate the whole job.
+          # The exact instruction we observed crashing in the cores. Use the
+          # raw VEX encoding via .byte so this assembles even on toolchains
+          # that don't have AVX-512 enabled by default (system gcc on
+          # GitHub-hosted ubuntu often won't accept "%k1" without -mavx512f).
+          # Run in a forked child so SIGILL doesn't terminate the whole job.
+          # `kmovd %eax, %k1` -> C5 FB 92 C8 (verified with llvm-mc)
           cat >/tmp/avx512.c <<'EOF'
           #include <stdio.h>
           #include <stdlib.h>
@@ -199,7 +203,7 @@ jobs:
               pid_t p = fork();
               if (p < 0) { perror("fork"); return 2; }
               if (p == 0) {
-                  __asm__ volatile("kmovd %%eax, %%k1" : : : "k1");
+                  __asm__ volatile(".byte 0xc5,0xfb,0x92,0xc8"); /* kmovd %eax, %k1 */
                   fputs("kmovd executed cleanly\n", stdout);
                   fflush(stdout);
                   _exit(0);
@@ -220,8 +224,7 @@ jobs:
               return 3;
           }
           EOF
-          cc -O0 -o /tmp/avx512 /tmp/avx512.c
-          /tmp/avx512
+          cc -O0 -o /tmp/avx512 /tmp/avx512.c && /tmp/avx512 || true
           echo "kmovd probe exit code: $?"
           echo "::endgroup::"
 

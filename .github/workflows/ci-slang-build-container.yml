@@ -60,6 +60,61 @@ jobs:
           echo "=== Disk space after cleanup ==="
           df -h /host_root || true
 
+      # TEMPORARY: gather AVX-512 detection ground truth on this build
+      # runner. The test runner runs the same probe; comparing the two tells
+      # us whether the build host and test host see the same CPU features.
+      # If clang on the build host detects AVX-512 but the test host doesn't
+      # support it, that explains the SIGILL in #11062.
+      # Remove once #11062 is fixed.
+      - name: CPUID / AVX-512 probe (build runner)
+        run: |
+          echo "::group::Build runner identity"
+          uname -a
+          if [ -r /proc/sys/kernel/random/boot_id ]; then
+            printf 'boot_id=%s\n' "$(cat /proc/sys/kernel/random/boot_id)"
+          fi
+          echo "::endgroup::"
+
+          echo "::group::AVX-512 family flags reported in /proc/cpuinfo"
+          grep -oE 'avx512[a-z0-9]*' /proc/cpuinfo | sort -u || echo "(none)"
+          echo "::endgroup::"
+
+          echo "::group::CPUID leaf 7, sub 0 (raw)"
+          cat >/tmp/cpuid.c <<'EOF'
+          #include <stdio.h>
+          #include <stdint.h>
+          static void cpuid_count(uint32_t leaf, uint32_t sub,
+                                  uint32_t *a, uint32_t *b,
+                                  uint32_t *c, uint32_t *d) {
+              __asm__ volatile("cpuid"
+                  : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
+                  : "a"(leaf), "c"(sub));
+          }
+          int main(void) {
+              uint32_t a, b, c, d;
+              cpuid_count(7, 0, &a, &b, &c, &d);
+              printf("EAX=0x%08x EBX=0x%08x ECX=0x%08x EDX=0x%08x\n", a, b, c, d);
+              printf("  AVX-512F   (EBX bit 16): %s\n", (b & (1u<<16)) ? "yes" : "no");
+              printf("  AVX-512DQ  (EBX bit 17): %s\n", (b & (1u<<17)) ? "yes" : "no");
+              printf("  AVX-512CD  (EBX bit 28): %s\n", (b & (1u<<28)) ? "yes" : "no");
+              printf("  AVX-512BW  (EBX bit 30): %s\n", (b & (1u<<30)) ? "yes" : "no");
+              printf("  AVX-512VL  (EBX bit 31): %s\n", (b & (1u<<31)) ? "yes" : "no");
+              return 0;
+          }
+          EOF
+          cc -O0 -o /tmp/cpuid /tmp/cpuid.c && /tmp/cpuid || echo "(cpuid probe failed)"
+          echo "::endgroup::"
+
+          echo "::group::clang sees this CPU as"
+          if command -v clang >/dev/null 2>&1; then
+            clang --version | head -1
+            clang -E -x c /dev/null -march=native -### 2>&1 \
+              | tr ' ' '\n' \
+              | grep -E '^-(target-cpu|target-feature|march|mcpu)' \
+              | sort -u || true
+          fi
+          echo "::endgroup::"
+
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
