@@ -3179,7 +3179,7 @@ warning(
 
 err(
     "interface-default-initializer-error",
-    30515,
+    30524,
     "cannot initialize an interface variable with defaults",
     span { loc = "expr:Expr", message = "initializing an interface variable with defaults is not supported. Please provide a compatible initializer or leave the variable uninitialized" }
 )
