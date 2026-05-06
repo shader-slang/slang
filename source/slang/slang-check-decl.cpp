@@ -17297,6 +17297,9 @@ static void checkDerivativeAttribute(
                         fullCtxType),
                     false,
                     visibility);
+
+                // Force conformance checking for BwdCallable.operator() on this context.
+                visitor->checkAggTypeConformance(synContextStruct.getDecl());
             }
         }
     }
