@@ -6,7 +6,7 @@
 
 #if DEFAULT_UNSCOPED
 
-// default is scoped enums, so we need to use 'class' to make it scoped
+// default is unscoped enums, so we need to use 'class' to make it scoped
 enum class Fruit
 {
     Orange, Apple
