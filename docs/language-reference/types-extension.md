@@ -126,7 +126,7 @@ void main(uint3 id : SV_DispatchThreadID)
 }
 ```
 
-> ⚠️ **Warning:** When an extension and the base structure contain a member with the same signature, it is
+> ⚠️ **Warning:** When an extension and the base type contain a member with the same signature, it is
 > currently undefined which member takes effect. ([Issue #9660](https://github.com/shader-slang/slang/issues/9660))
 
 
@@ -274,7 +274,7 @@ void main(uint3 threadId : SV_DispatchThreadID)
 
     output[3] = TestEnum.Three.requiredFunc(); // -3
 
-    output[4] = tmp[4];           // 56 * 5 = 224
+    output[4] = tmp[4];           // 56 * 4 = 224
     output[5] = (int)(TestEnum.Two(0.5));  // 1
 
     tmp = TestEnum(AnotherEnum.SomeValue); // 42 * 2
