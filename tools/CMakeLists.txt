@@ -216,10 +216,9 @@ if(SLANG_ENABLE_GFX)
     # directory. So even if slang-test is not built, the gfx modules are still available.
     # The destination expands $<TARGET_FILE_DIR:slangc>, so the entire
     # custom target / dependency / install block only makes sense when
-    # slangc is being built. Without this guard, configures with
-    # SLANG_ENABLE_GFX=ON and SLANG_ENABLE_SLANGC=OFF would emit build
-    # rules referencing a non-existent target and fail at generator time.
-    if(TARGET slangc)
+    # slangc is being built. source/slangc is added after tools/ in the
+    # top-level CMakeLists, so guard on the option rather than TARGET slangc.
+    if(SLANG_ENABLE_SLANGC)
         set(modules_dest_dir $<TARGET_FILE_DIR:slangc>)
         add_custom_target(
             copy-gfx-slang-modules
