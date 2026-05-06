@@ -1935,6 +1935,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return getTypeLayoutRuleForBuffer(m_targetProgram, ptrType);
     }
 
+    // SPIR-V pointer types require a concrete pointee. Emit IR void* as uint*
+    // for OpTypePointer emission and pointer-stride computation, while leaving
+    // the source IR type intact so emitDebugType reports the original void* in
+    // debug info.
+    IRType* getSpvPointerValueType(IRPtrTypeBase* ptrType)
+    {
+        auto valueType = ptrType->getValueType();
+        if (as<IRVoidType>(valueType))
+        {
+            IRBuilder builder(m_irModule);
+            return builder.getUIntType();
+        }
+        return valueType;
+    }
+
     IRIntegerValue getArrayElementStrideValue(IRArrayTypeBase* arrayType, IRTypeLayoutRules* rule)
     {
         auto elementType = arrayType->getElementType();
@@ -1963,7 +1978,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             storageClass != SpvStorageClassStorageBuffer)
             return 0;
 
-        auto valueType = ptrType->getValueType();
+        auto valueType = getSpvPointerValueType(ptrType);
         auto rule = getPointerArrayStrideLayoutRule(ptrType, valueType);
 
         if (auto arrayType = as<IRUnsizedArrayType>(valueType))
@@ -2368,7 +2383,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     break;
                 }
 
-                auto valueType = ptrType->getValueType();
+                auto valueType = getSpvPointerValueType(ptrType);
 
                 // Check for 8/16-bit storage capabilities when emitting pointer types
                 requireCapabilitiesForType(valueType, storageClass);
@@ -2378,14 +2393,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     (!m_mapIRInstToSpvInst.containsKey(valueType) && as<IRStructType>(valueType) &&
                      storageClass == SpvStorageClassPhysicalStorageBuffer);
                 SpvId valueTypeId;
-                if (as<IRVoidType>(valueType))
-                {
-                    // Emit void* as uint*.
-                    IRBuilder builder(valueType);
-                    builder.setInsertBefore(valueType);
-                    valueTypeId = getID(ensureInst(builder.getUIntType()));
-                }
-                else if (useForwardDeclaration)
+                if (useForwardDeclaration)
                 {
                     valueTypeId = getIRInstSpvID(valueType);
                 }
