@@ -360,7 +360,7 @@ Disable short-circuiting for "&amp;&amp;" and "||" operations
 
 <a id="unscoped-enum"></a>
 ### -unscoped-enum
-Treat enums types as unscoped by default. 
+Treat enum types as unscoped by default. (Note: enum class remains scoped.) 
 
 
 <a id="preserve-params"></a>
