@@ -4,6 +4,9 @@
 
 //CHECK-DAG: [[ORIGINAL_FILE:%[0-9]+]] = OpString "tests/spirv/debug-line-column-clamp-original.slang"
 //CHECK-DAG: [[ORIGINAL_SOURCE:%[0-9]+]] = {{.*}} DebugSource [[ORIGINAL_FILE]]
+// Original line 5 is "\t{" (one tab followed by one brace), so column 3 is the
+// one-past-the-line column. The generated line below is "    {" (four spaces
+// followed by one brace), so its column 5 source location must clamp to 3.
 //CHECK: DebugLine [[ORIGINAL_SOURCE]] %uint_5 %uint_5 %uint_3 %uint_3
 
 #line 1 "tests/spirv/debug-line-column-clamp-original.slang"
