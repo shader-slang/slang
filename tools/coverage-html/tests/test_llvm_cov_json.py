@@ -135,6 +135,19 @@ class SegmentBoundaryTests(unittest.TestCase):
         hits = self._walk(segments)
         self.assertEqual(hits, {5: 7})
 
+    def test_five_element_segments_accepted(self):
+        # LLVM versions predating IsGapRegion (~March 2020) emit only
+        # five fields per segment. The walker should treat the missing
+        # is_gap_region as False rather than dropping the segment.
+        segments = [
+            [1, 1, 3, True, True],
+            [5, 1, 0, False, False],  # closing marker, also 5-element
+        ]
+        hits = self._walk(segments)
+        for ln in range(1, 5):
+            self.assertEqual(hits.get(ln), 3, f"line {ln}")
+        self.assertNotIn(5, hits)
+
     def test_deactivating_segment_skipped(self):
         segments = [
             [10, 1, 0, False, False, False],  # has_count=False

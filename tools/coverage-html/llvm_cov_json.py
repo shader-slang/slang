@@ -198,12 +198,15 @@ def _line_hits_from_segments(
     n = len(segments)
     for i in range(n):
         seg = segments[i]
-        if len(seg) < 6:
+        # Required fields: line, col, count, has_count, is_region_entry.
+        # is_gap_region was added in LLVM (~March 2020) so older
+        # exports emit only five fields; treat absent as False.
+        if len(seg) < 5:
             continue
         line = int(seg[_SEG_LINE])
         count = int(seg[_SEG_COUNT])
         has_count = bool(seg[_SEG_HAS_COUNT])
-        is_gap = bool(seg[_SEG_IS_GAP])
+        is_gap = bool(seg[_SEG_IS_GAP]) if len(seg) > _SEG_IS_GAP else False
         if not has_count or is_gap:
             continue
         # Half-open end: next segment's line excluded so it doesn't

@@ -1280,7 +1280,10 @@ def _load_records(path: str) -> List[FileRecord]:
 def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="slang-coverage-html",
-        description="Render an LCOV .info coverage file to static HTML.",
+        description=(
+            "Render an LCOV (.info / .lcov) or llvm-cov JSON "
+            "(.json) coverage file to static HTML."
+        ),
     )
     p.add_argument(
         "input",

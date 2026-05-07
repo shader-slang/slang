@@ -147,11 +147,16 @@ def load(path: str) -> List[FileRecord]:
     """
     lower = path.lower()
     if lower.endswith(".json") or lower.endswith(".json.gz"):
-        raise SystemExit(
+        # Match the renderer's exit-2 contract for "wrong kind of
+        # input file" errors so CI / scripting callers can grep on
+        # a single code across both tools.
+        print(
             f"slang-coverage-merge: {path}: JSON coverage exports are "
             f"not supported as merger input. Pass the LCOV variant of "
-            f"this artifact instead."
+            f"this artifact instead.",
+            file=sys.stderr,
         )
+        raise SystemExit(2)
     if lower.endswith(".gz"):
         path = _gunzip_to_temp(path)
     return parse_lcov(path, warn_prefix=GENERATOR_NAME)
