@@ -141,13 +141,8 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     if (!layout)
         return;
 
-    // `DescriptorHandle<T>` is bindless on Metal and has the layout of the
-    // underlying resource `T` (see slang-ir-layout.cpp:403-412).  Unwrap the
-    // handle so the per-kind `as<>` tests below match the resource type that
-    // actually drives Metal's entry-point attribute choice.  Without this,
-    // `RWStructuredBuffer<T>.Handle` parameters fell through and received no
-    // `[[buffer(n)]]`, so Metal's declaration-order implicit slots diverged
-    // from Slang reflection (issue #11066).
+    // DescriptorHandle<T> is bindless on Metal and has T's layout, so unwrap
+    // it before the per-kind type tests below.
     IRType* paramType = param->getDataType();
     if (auto handleType = as<IRDescriptorHandleType>(paramType))
         paramType = handleType->getResourceType();
