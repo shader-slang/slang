@@ -41,6 +41,7 @@
 #include "llvm/ExecutionEngine/JITLink/JITLinkMemoryManager.h"
 #include "llvm/ExecutionEngine/JITSymbol.h"
 #include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
+#include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 #include "llvm/IR/LLVMContext.h"
@@ -79,6 +80,12 @@
 // For memset_pattern functions
 // https://www.unix.com/man-page/osx/3/memset_pattern16/
 #include <string.h>
+#endif
+
+// For __cpuidex / _xgetbv used by the AVX-512 host-feature probe below.
+// On GCC/Clang the inline-asm fallback is used instead.
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+#include <intrin.h>
 #endif
 
 #if SLANG_WINDOWS_FAMILY
@@ -172,6 +179,83 @@ public:
 
     Desc m_desc;
 };
+
+// Defensive AVX-512 detection on x86_64. Returns true iff the running CPU is
+// confirmed to support AVX-512F at the OS-XSAVE level (CPUID leaf 7 EBX bit
+// 16 set AND XCR0 bits 5/6/7 all set, matching the standard AVX-512
+// detection sequence).
+//
+// We do this in addition to LLVM's `JITTargetMachineBuilder::detectHost()`
+// because LLVM's host detection can pick a CPU model name (e.g. derived from
+// brand string or family) whose subtarget table enables AVX-512 features
+// even when the runtime CPU does not. When the JIT then lowers IR to machine
+// code, late codegen passes can emit AVX-512 instructions based on the
+// TargetMachine subtarget rather than per-function `target-features` attrs.
+// This causes SIGILL on hosts where AVX-512 is genuinely absent
+// (https://github.com/shader-slang/slang/issues/11062). Calling this helper
+// before configuring the JIT lets us subtract the AVX-512 family from the
+// detected features only when the host can't safely run them.
+static bool _hostSupportsAVX512()
+{
+#if defined(__x86_64__) || defined(_M_X64)
+    // CPUID leaf 1, ECX bit 27 = OSXSAVE (OS supports XSAVE/xgetbv). Must hold
+    // before executing xgetbv at all.
+    uint32_t ecx1 = 0;
+#if defined(_MSC_VER)
+    {
+        int regs1[4] = {0, 0, 0, 0};
+        __cpuidex(regs1, 1, 0);
+        ecx1 = (uint32_t)regs1[2];
+    }
+#else
+    {
+        uint32_t eax = 0, ebx = 0, edx = 0;
+        __asm__ volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx1), "=d"(edx) : "a"(1u), "c"(0u));
+        (void)eax;
+        (void)ebx;
+        (void)edx;
+    }
+#endif
+    if ((ecx1 & (1u << 27)) == 0)
+        return false;
+
+    // XCR0 bits 5/6/7 (opmask, ZMM_Hi256, Hi16_ZMM) must all be set for the
+    // OS to have enabled AVX-512 register state in XSAVE.
+    uint64_t xcr0 = 0;
+#if defined(_MSC_VER)
+    xcr0 = _xgetbv(0);
+#else
+    {
+        uint32_t xa = 0, xd = 0;
+        __asm__ volatile("xgetbv" : "=a"(xa), "=d"(xd) : "c"(0u));
+        xcr0 = ((uint64_t)xd << 32) | xa;
+    }
+#endif
+    if ((xcr0 & 0xe0ull) != 0xe0ull)
+        return false;
+
+    // CPUID leaf 7, sub-leaf 0: EBX bit 16 = AVX-512F.
+    uint32_t ebx7 = 0;
+#if defined(_MSC_VER)
+    {
+        int regs7[4] = {0, 0, 0, 0};
+        __cpuidex(regs7, 7, 0);
+        ebx7 = (uint32_t)regs7[1];
+    }
+#else
+    {
+        uint32_t eax = 0, ecx = 0, edx = 0;
+        __asm__ volatile("cpuid" : "=a"(eax), "=b"(ebx7), "=c"(ecx), "=d"(edx) : "a"(7u), "c"(0u));
+        (void)eax;
+        (void)ecx;
+        (void)edx;
+    }
+#endif
+    return (ebx7 & (1u << 16)) != 0;
+#else
+    return false;
+#endif
+}
 
 static void _ensureSufficientStack() {}
 
@@ -903,6 +987,61 @@ SlangResult LLVMDownstreamCompiler::compile(
                 // Create the JIT
 
                 LLJITBuilder jitBuilder;
+
+                // Defensive AVX-512 gating on x86_64. LLVM's JITTargetMachineBuilder
+                // host detection can leave AVX-512 features enabled on CPUs where
+                // those instructions actually fault at runtime (e.g. AMD EPYC 7763
+                // on GitHub-hosted runners, where CPUID reports no AVX-512 yet
+                // late LLVM codegen passes still emit kmov / vmovss-with-mask).
+                // Build the JTMB explicitly, then if our own CPUID/XCR0 probe says
+                // AVX-512 is not safely usable, subtract the family from the
+                // detected features. AVX2/BMI2/etc remain untouched, so AVX-512-
+                // capable hosts still get the full AVX-512 feature set.
+                // See https://github.com/shader-slang/slang/issues/11062.
+                Expected<JITTargetMachineBuilder> expectJTMB =
+                    JITTargetMachineBuilder::detectHost();
+                if (expectJTMB)
+                {
+                    // Use getArch() comparison rather than Triple::isX86_64() —
+                    // the latter is only available in newer LLVM headers (>= 22).
+                    if (expectJTMB->getTargetTriple().getArch() == llvm::Triple::x86_64 &&
+                        !_hostSupportsAVX512())
+                    {
+                        // Cover every AVX-512 family feature LLVM exposes for
+                        // x86_64. LLVM's subtarget table generally implies the
+                        // base feature (avx512f) for the higher extensions, so
+                        // disabling -avx512f alone usually suffices, but we
+                        // list the family explicitly to be defensive against
+                        // version-specific implication tables.
+                        expectJTMB->addFeatures({
+                            "-avx512f",
+                            "-avx512cd",
+                            "-avx512dq",
+                            "-avx512bw",
+                            "-avx512vl",
+                            "-avx512vbmi",
+                            "-avx512vbmi2",
+                            "-avx512vnni",
+                            "-avx512bitalg",
+                            "-avx512vpopcntdq",
+                            "-avx512ifma",
+                            "-avx512vp2intersect",
+                            "-avx512fp16",
+                            "-avx512bf16",
+                            // Knights Landing (KNL) — Xeon Phi only.
+                            "-avx512er",
+                            "-avx512pf",
+                            // Knights Mill (KNM) — Xeon Phi only. LLVM uses
+                            // the underscore spelling for these two.
+                            "-avx512_4fmaps",
+                            "-avx512_4vnniw",
+                        });
+                    }
+                    jitBuilder.setJITTargetMachineBuilder(std::move(*expectJTMB));
+                }
+                // If detectHost() failed, fall through and let LLJITBuilder do its
+                // own default detection — preserves prior behaviour on platforms
+                // where this code path can't determine host info.
 
                 Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = jitBuilder.create();
                 if (!expectJit)
