@@ -61,6 +61,7 @@
 #include "slang-ir-late-require-capability.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
+#include "slang-ir-legalize-cuda-surface-format.h"
 #include "slang-ir-legalize-binary-operator.h"
 #include "slang-ir-legalize-composite-select.h"
 #include "slang-ir-legalize-empty-array.h"
@@ -1959,6 +1960,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
         {
+            SLANG_PASS(legalizeCUDASurfaceFormat, codeGenContext->getSink());
             SLANG_PASS(legalizeEntryPointVaryingParamsForCUDA, codeGenContext->getSink());
         }
         break;
