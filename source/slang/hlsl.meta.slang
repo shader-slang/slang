@@ -3849,7 +3849,6 @@ vector<T.Element,4> __texture_gather_offset(
         __intrinsic_asm "$0.gather($1, $2, $3, metal::component($4))";
     case spirv:
         return spirv_asm {
-            OpCapability ImageGatherExtended;
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
             result:$$vector<T.Element,4> = OpImageGather %sampledImage $location $component Offset $offset;
         };
@@ -3903,7 +3902,6 @@ vector<T.Element,4> __texture_gather_offset(
         __intrinsic_asm "textureGatherOffset($0, $1, $2, $3)";
     case spirv:
         return spirv_asm {
-            OpCapability ImageGatherExtended;
             result:$$vector<T.Element,4> = OpImageGather $sampler $location $component Offset $offset;
         };
     }
