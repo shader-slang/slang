@@ -11,6 +11,10 @@ design, including why IR-time buffer synthesis is paired with post-
 emit coverage metadata for binding-info propagation, see
 [`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md).
 
+For the host-facing binding contract used by `slang-rhi` and direct
+hosts, see
+[`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).
+
 Not to be confused with `tools/coverage/`, which measures C++ coverage
 of the Slang compiler itself.
 
@@ -58,7 +62,9 @@ runtime over the Python converter.
 
 For the pipeline architecture, design rationale, and alternatives
 weighed, see
-[`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md).
+[`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md)
+and
+[`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).
 
 ## Pinning the coverage buffer at an explicit slot
 
@@ -298,4 +304,3 @@ slot in its own pipeline layout / root signature.
   Buf b, ...)` style) may end up sharing a register slot with
   `__slang_coverage`. Workaround: declare uniforms at module scope
   (modern Slang convention) — that path works correctly.
-

@@ -4,6 +4,10 @@ Shader Coverage Design
 This document describes the shader coverage implementation in Slang
 and the role of the main pieces in the pipeline.
 
+For the host-facing binding contract for hidden synthetic coverage
+resources, see
+[`shader-coverage-host-interface.md`](./shader-coverage-host-interface.md).
+
 Overview
 --------
 
@@ -57,6 +61,9 @@ coverage — some slots may not map to a real source file and line,
 and that fact is preserved in the metadata and JSON sidecar. The
 LCOV conversion step then applies gcov-style reporting rules by
 filtering those entries out of line-oriented output.
+
+The host-side interface design built on top of these channels lives in
+[`shader-coverage-host-interface.md`](./shader-coverage-host-interface.md).
 
 ### Buffer synthesis at IR-pass time
 
