@@ -11496,17 +11496,6 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
 
         enumConformanceDecl->setCheckState(DeclCheckState::DefinitionChecked);
     }
-}
-
-void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
-{
-    SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
-
-    auto enumType = DeclRefType::create(m_astBuilder, makeDeclRef(decl));
-
-    auto tagType = decl->tagType;
-
-    auto isEnumFlags = decl->hasModifier<FlagsAttribute>();
 
     // Check for conflicting scoped/unscoped attributes
     auto unscopedEnumAttr = decl->findModifier<UnscopedEnumAttribute>();
@@ -11518,6 +11507,17 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
             .classLocation = enumClassModifier->loc,
             .modifier = unscopedEnumAttr});
     }
+}
+
+void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
+{
+    SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
+
+    auto enumType = DeclRefType::create(m_astBuilder, makeDeclRef(decl));
+
+    auto tagType = decl->tagType;
+
+    auto isEnumFlags = decl->hasModifier<FlagsAttribute>();
 
     // Check the enum cases in order.
     for (auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
