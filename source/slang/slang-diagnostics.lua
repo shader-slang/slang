@@ -2821,6 +2821,21 @@ err(
     span { loc = "expr:Expr", message = "unexpected form for 'enum' tag value expression" }
 )
 
+err(
+    "conflicting-enum-scope-decl",
+    32004,
+    "conflicting scoped/unscoped declarations for an enum",
+    span { loc = "classLocation", message = "'class' keyword for '~decl:Decl' specifies a scoped enumeration" },
+    span { loc = "modifier:Modifier", message = "'~modifier:Modifier' specifies an unscoped enumeration" }
+)
+
+err(
+    "anonymous-scoped-enum",
+    32005,
+    "anonymous scoped enum is not allowed",
+    span { loc = "classLocation", message = "'class' keyword specifies a scoped enumeration" }
+)
+
 -- 303xx: interfaces and associated types
 
 err(

@@ -1022,8 +1022,18 @@ class CallAttribute : public Attribute
 };
 // `[call]`
 
+// Determines whether the enum declaration is scoped (no attribute) or unscoped
+// (attribute present)
 FIDDLE()
 class UnscopedEnumAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+// Marker for enum class declarations, used to detect conflicting explicit
+// unscoped/scoped enum declarations. This attribute has no further semantics.
+FIDDLE()
+class EnumClassModifier : public Modifier
 {
     FIDDLE(...)
 };

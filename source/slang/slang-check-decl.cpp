@@ -11496,6 +11496,17 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
 
         enumConformanceDecl->setCheckState(DeclCheckState::DefinitionChecked);
     }
+
+    // Check for conflicting scoped/unscoped attributes
+    auto unscopedEnumAttr = decl->findModifier<UnscopedEnumAttribute>();
+    auto enumClassModifier = decl->findModifier<EnumClassModifier>();
+    if (unscopedEnumAttr && enumClassModifier)
+    {
+        getSink()->diagnose(Diagnostics::ConflictingEnumScopeDecl{
+            .decl = decl,
+            .classLocation = enumClassModifier->loc,
+            .modifier = unscopedEnumAttr});
+    }
 }
 
 void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)

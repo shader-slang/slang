@@ -590,7 +590,7 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::UnscopedEnum,
          "-unscoped-enum",
          nullptr,
-         "Treat enums types as unscoped by default."},
+         "Treat enum types as unscoped by default. (Note: enum class remains scoped.)"},
         {OptionKind::PreserveParameters,
          "-preserve-params",
          nullptr,
