@@ -23964,6 +23964,34 @@ struct HitObject
             }
         }
     }
+
+    /// Returns the world-space vertex positions of the triangle that was hit.
+    /// Valid if the hit object represents a triangle hit.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_ray_tracing_position_fetch)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    [ForceInline]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    void GetTriangleVertexPositions(out float3 positions[3])
+    {
+        __target_switch
+        {
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetIntersectionTriangleVertexPositionsEXT($0, $1)";
+        case spirv:
+            typedef float3[3] float3Arr3;
+            positions = spirv_asm
+            {
+                OpExtension "SPV_KHR_ray_tracing_position_fetch";
+                OpCapability RayTracingPositionFetchKHR;
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result: $$float3Arr3 = OpHitObjectGetIntersectionTriangleVertexPositionsEXT &this;
+            };
+        }
+    }
+
         /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
     [require(cuda_hlsl, ser_raygen_closesthit_miss)]
