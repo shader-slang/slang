@@ -2933,11 +2933,11 @@ __generic<T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>
 __intrinsic_op(0)
 __prefix Ref<T, access, addrSpace> operator*(Ptr<T, access, addrSpace, L> value);
 
-// TODO: [require(cpu)]. This cannot be done yet since this change breaks slangpy
 __generic<T>
 __intrinsic_op(0)
 [KnownBuiltin( $((int)KnownBuiltinDeclName::OperatorAddressOf))]
 [require(cpp_cuda_spirv_llvm)]
+[RemovedSince(-1, "the '&' operator for taking addresses is no longer supported in Slang")]
 __prefix Ptr<T, Access::ReadWrite, AddressSpace::Device> operator&(__ref T value);
 
 __generic<$(ptrTypeParameterList), TInt : __BuiltinIntegerType>
