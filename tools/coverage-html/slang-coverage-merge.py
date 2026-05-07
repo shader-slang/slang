@@ -55,6 +55,7 @@ from lcov_io import (  # noqa: E402
     write_lcov,
     write_llvm_cov_report,
 )
+from llvm_cov_json import is_json_input  # noqa: E402
 
 GENERATOR_NAME = "slang-coverage-merge"
 
@@ -136,7 +137,26 @@ def _gunzip_to_temp(gz_path: str, suffix: str = ".lcov") -> str:
 
 
 def load(path: str) -> List[FileRecord]:
-    """Parse a possibly-gzipped LCOV file into FileRecords."""
+    """Parse a possibly-gzipped LCOV file into FileRecords.
+
+    JSON inputs (`llvm-cov export -format=json`) are rejected: the
+    merger collapses to LCOV records and gzipped LCOV files are the
+    only shape that survives the existing aggregation rules. To merge
+    a JSON export across OSes, render each per-OS JSON to its own HTML
+    and merge at the LCOV layer separately, or feed an LCOV converted
+    from the JSON in upstream.
+    """
+    if is_json_input(path):
+        # Match the renderer's exit-2 contract for "wrong kind of
+        # input file" errors so CI / scripting callers can grep on
+        # a single code across both tools.
+        print(
+            f"slang-coverage-merge: {path}: JSON coverage exports are "
+            f"not supported as merger input. Pass the LCOV variant of "
+            f"this artifact instead.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
     if path.lower().endswith(".gz"):
         path = _gunzip_to_temp(path)
     return parse_lcov(path, warn_prefix=GENERATOR_NAME)

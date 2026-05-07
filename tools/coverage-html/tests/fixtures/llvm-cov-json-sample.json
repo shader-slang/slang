@@ -1,0 +1,95 @@
+{
+  "version": "2.0.1",
+  "type": "llvm.coverage.json.export",
+  "data": [
+    {
+      "files": [
+        {
+          "filename": "src/foo.cpp",
+          "branches": [
+            [10, 5, 10, 15, 7, 0, 0, 0, 4],
+            [12, 5, 12, 15, 4, 3, 0, 0, 4],
+            [14, 5, 14, 15, 0, 0, 0, 0, 4]
+          ],
+          "expansions": [],
+          "mcdc_records": [],
+          "segments": [
+            [1, 1, 5, true, true, false],
+            [3, 1, 5, true, true, false],
+            [4, 20, 0, false, false, false],
+            [5, 1, 5, true, true, false],
+            [8, 1, 0, true, true, false],
+            [9, 1, 5, true, true, false],
+            [16, 1, 0, false, false, false]
+          ],
+          "summary": {
+            "branches": {"count": 6, "covered": 3, "notcovered": 3, "percent": 50.0},
+            "functions": {"count": 2, "covered": 2, "percent": 100.0},
+            "instantiations": {"count": 2, "covered": 2, "percent": 100.0},
+            "lines": {"count": 12, "covered": 9, "percent": 75.0},
+            "mcdc": {"count": 0, "covered": 0, "notcovered": 0, "percent": 0},
+            "regions": {"count": 8, "covered": 6, "notcovered": 2, "percent": 75.0}
+          }
+        },
+        {
+          "filename": "src/bar.cpp",
+          "branches": [],
+          "expansions": [],
+          "mcdc_records": [],
+          "segments": [
+            [1, 1, 0, true, true, false],
+            [4, 1, 0, false, false, false]
+          ],
+          "summary": {
+            "branches": {"count": 0, "covered": 0, "notcovered": 0, "percent": 0},
+            "functions": {"count": 1, "covered": 0, "percent": 0.0},
+            "instantiations": {"count": 1, "covered": 0, "percent": 0.0},
+            "lines": {"count": 4, "covered": 0, "percent": 0.0},
+            "mcdc": {"count": 0, "covered": 0, "notcovered": 0, "percent": 0},
+            "regions": {"count": 1, "covered": 0, "notcovered": 1, "percent": 0.0}
+          }
+        }
+      ],
+      "functions": [
+        {
+          "branches": [],
+          "count": 5,
+          "filenames": ["src/foo.cpp"],
+          "name": "_Z3fooi",
+          "regions": [
+            [1, 1, 6, 1, 5, 0, 0, 0],
+            [10, 5, 10, 15, 5, 0, 0, 4]
+          ]
+        },
+        {
+          "branches": [],
+          "count": 5,
+          "filenames": ["src/foo.cpp"],
+          "name": "_Z3barv",
+          "regions": [
+            [9, 1, 16, 1, 5, 0, 0, 0],
+            [12, 5, 12, 15, 4, 0, 0, 4],
+            [14, 5, 14, 15, 0, 0, 0, 4]
+          ]
+        },
+        {
+          "branches": [],
+          "count": 0,
+          "filenames": ["src/bar.cpp"],
+          "name": "_Z6unusedv",
+          "regions": [
+            [1, 1, 4, 1, 0, 0, 0, 0]
+          ]
+        }
+      ],
+      "totals": {
+        "branches": {"count": 6, "covered": 3, "notcovered": 3, "percent": 50.0},
+        "functions": {"count": 3, "covered": 2, "percent": 66.66666666666667},
+        "instantiations": {"count": 3, "covered": 2, "percent": 66.66666666666667},
+        "lines": {"count": 16, "covered": 9, "percent": 56.25},
+        "mcdc": {"count": 0, "covered": 0, "notcovered": 0, "percent": 0},
+        "regions": {"count": 9, "covered": 6, "notcovered": 3, "percent": 66.66666666666667}
+      }
+    }
+  ]
+}

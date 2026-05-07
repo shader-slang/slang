@@ -194,6 +194,19 @@ if [[ "$COVERAGE_LCOV" = "1" ]]; then
   echo "LCOV report generated: $LCOV_FILE"
 fi
 
+# Generate llvm-cov JSON export (optional). The JSON form is the
+# preferred input to slang-coverage-html for the LLVM-coverage path
+# because it carries regions natively and matches `llvm-cov report`
+# without the LCOV+--auth-summary patching dance.
+if [[ "$COVERAGE_JSON" = "1" ]]; then
+  JSON_FILE="${COVERAGE_JSON_FILE:-$REPO_ROOT/coverage.json}"
+  echo
+  echo "Generating llvm-cov JSON export..."
+  $LLVM_COV export "$LIBSLANG" \
+    -instr-profile="$COVERAGE_DIR"/slang-test.profdata >"$JSON_FILE"
+  echo "JSON report generated: $JSON_FILE"
+fi
+
 echo
 echo "Coverage data files:"
 echo "  - $COVERAGE_DIR/slang-test.profdata (merged profile data)"
@@ -204,6 +217,9 @@ if [[ "$COVERAGE_HTML" = "1" ]]; then
 fi
 if [[ "$COVERAGE_LCOV" = "1" ]]; then
   echo "  - ${COVERAGE_LCOV_FILE:-$REPO_ROOT/coverage.lcov} (LCOV format for CI tools)"
+fi
+if [[ "$COVERAGE_JSON" = "1" ]]; then
+  echo "  - ${COVERAGE_JSON_FILE:-$REPO_ROOT/coverage.json} (llvm-cov JSON export)"
 fi
 
 # Clean up raw profraw files to save space (only in normal mode)
