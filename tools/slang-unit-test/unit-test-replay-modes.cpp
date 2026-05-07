@@ -394,22 +394,36 @@ SLANG_UNIT_TEST(replayContextSyncModeWritesToStream)
 
 SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
 {
-    // Simulate the leaked-state cases the old skip-on-active guard protected
-    // against: a recording in flight, plus residual handle/object state.
+    // Force a known-clean entry state. This test runs amid other replay tests
+    // in the same process, and any prior test that left the stream in reading
+    // mode (e.g. Mode::Playback) would make our setMode(Record) + record()
+    // setup throw before REPLAY_TEST executes.
+    ReplayContext::get().reset();
+
+    // Simulate the leaked-state case the old skip-on-active guard protected
+    // against: a non-Idle mode plus dirty data on both the main and reference
+    // streams. switchToSync() copies the main stream into the reference stream,
+    // so after the second record() the singleton is in Mode::Sync with both
+    // streams holding bytes.
     ReplayContext::get().setMode(Mode::Record);
     int32_t leakedValue = 7;
+    ReplayContext::get().record(RecordFlag::None, leakedValue);
+    ReplayContext::get().switchToSync();
     ReplayContext::get().record(RecordFlag::None, leakedValue);
     SLANG_CHECK(ReplayContext::get().isActive());
     SLANG_CHECK(ReplayContext::get().getStream().getSize() > 0);
 
     // Now run the standard per-test setup. ScopedReplayContext's ctor must
-    // force the singleton back to a clean Mode::Idle with empty streams.
+    // force the singleton back to its post-reset() state.
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     SLANG_CHECK(ctx().getMode() == Mode::Idle);
     SLANG_CHECK(!ctx().isActive());
     SLANG_CHECK(ctx().getStream().getSize() == 0);
+    SLANG_CHECK(!ctx().hasCallIndex());
+    SLANG_CHECK(ctx().getNextHandle() == kFirstValidHandle);
+    SLANG_CHECK(ctx().getCurrentThisHandle() == kNullHandle);
 
     // And a normal record/playback cycle still works after recovery.
     ctx().setMode(Mode::Record);
