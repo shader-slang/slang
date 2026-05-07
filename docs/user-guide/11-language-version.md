@@ -45,3 +45,5 @@ Slang language version 2026 brings these changes on top of Slang 2025:
 - Modifier `volatile` has been removed from Slang. See GitHub issue
   [#10614](https://github.com/shader-slang/slang/issues/10614) for details. The modifier is still accepted
   in GLSL source code for compatibility reasons.
+- Interface-typed variables can no longer be default-initialized. See GitHub issue
+  [#9191](https://github.com/shader-slang/slang/issues/9191) for details.
