@@ -17,11 +17,13 @@ class ArtifactPostEmitMetadata;
 // decoration (UAV register for D3D, descriptor binding for Khronos),
 // extends the program-scope var layout so the buffer participates in
 // `collectGlobalUniformParameters` packaging on targets that need it
-// (CPU, CUDA), assigns one counter slot per `IncrementCoverageCounter`
-// op, and rewrites each op into an atomic add on its slot. The pass
-// writes the resulting `(slot → file, line)` mapping and the chosen
-// buffer binding into `outMetadata` so hosts can query it via
-// `ICoverageTracingMetadata`.
+// (CPU, CUDA), assigns counter slots deduplicated by `(file, line)`
+// — multiple `IncrementCoverageCounter` ops on the same source line
+// share one slot — and rewrites each op into a `Call` to a synthesized
+// `[ForceInline]` `__slang_coverage_hit` thunk that performs the
+// atomic add on its slot. The pass writes the resulting
+// `(slot → file, line)` mapping and the chosen buffer binding into
+// `outMetadata` so hosts can query it via `ICoverageTracingMetadata`.
 //
 // `explicitBinding` / `explicitSpace` are the values supplied by
 // `-trace-coverage-binding`; pass `-1` for either to request auto-

@@ -28,12 +28,17 @@
 // load-bearing on every backend used by Slang — if any of them stops
 // honoring the decoration on the synthesized thunk, a per-coverage-hit
 // function-call frame would appear in emitted code (a stack-budget
-// risk on RT shaders). These passes assert no `__slang_coverage_hit`
-// symbol survives in HLSL / GLSL / Metal / SPIR-V emit.
+// risk on RT shaders, where CUDA/OptiX is the dominant backend).
+// These passes assert no `__slang_coverage_hit` symbol survives in
+// HLSL / GLSL / Metal / SPIR-V / CUDA emit, plus the LLVM-based CPU
+// path (separate pipeline that maps `IRForceInlineDecoration` to
+// `SLANG_LLVM_FUNC_ATTR_ALWAYSINLINE`).
 //TEST:SIMPLE(filecheck=HLSL_NOTHUNK):-target hlsl -stage compute -entry computeMain -trace-coverage
 //TEST:SIMPLE(filecheck=GLSL_NOTHUNK):-target glsl -stage compute -entry computeMain -trace-coverage
 //TEST:SIMPLE(filecheck=METAL_NOTHUNK):-target metal -stage compute -entry computeMain -trace-coverage
 //TEST:SIMPLE(filecheck=SPIRV_NOTHUNK):-target spirv-asm -stage compute -entry computeMain -trace-coverage
+//TEST:SIMPLE(filecheck=CUDA_NOTHUNK):-target cuda -stage compute -entry computeMain -trace-coverage
+//TEST:SIMPLE(filecheck=LLVM_NOTHUNK):-target llvm-shader-ir -stage compute -entry computeMain -trace-coverage
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
@@ -70,3 +75,5 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //GLSL_NOTHUNK-NOT: __slang_coverage_hit
 //METAL_NOTHUNK-NOT: __slang_coverage_hit
 //SPIRV_NOTHUNK-NOT: __slang_coverage_hit
+//CUDA_NOTHUNK-NOT: __slang_coverage_hit
+//LLVM_NOTHUNK-NOT: __slang_coverage_hit
