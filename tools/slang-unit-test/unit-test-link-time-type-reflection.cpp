@@ -252,6 +252,195 @@ SLANG_UNIT_TEST(linkTimeConditionalReflection)
     SLANG_CHECK(spirvStr.indexOf(toSlice("Location 2")) == -1);
 }
 
+// Test for issue #10749: Link-time type specialization of a struct member results in segfault.
+// When an extern struct is used as a direct member of another struct, computing the type layout
+// should not crash.
+
+SLANG_UNIT_TEST(linkTimeTypeReflectionStructMember)
+{
+    const char* userSourceBody = R"(
+        interface IAccelerationStructure { int getType(); }
+        extern struct AccelerationStructure : IAccelerationStructure;
+
+        struct Scene {
+            AccelerationStructure accelStruct;
+        }
+
+        ParameterBlock<Scene> gScene;
+
+        [numthreads(1,1,1)]
+        [shader("compute")]
+        void computeMain() {
+            int x = gScene.accelStruct.getType();
+        }
+    )";
+
+    String moduleName = "linkTimeStructMember_Compute";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        moduleName.getBuffer(),
+        (moduleName + ".slang").getBuffer(),
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    String configModuleSource = "import " + moduleName + ";\n" + R"(
+        struct HWAccelerationStructure : IAccelerationStructure {
+            uint bufferHandle;
+            int getType() { return 1; }
+        }
+        export struct AccelerationStructure : IAccelerationStructure = HWAccelerationStructure;
+    )";
+    auto configModule = session->loadModuleFromSourceString(
+        "config",
+        "config.slang",
+        configModuleSource.getBuffer(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(configModule != nullptr);
+
+    slang::IComponentType* components[] = {module, configModule};
+
+    ComPtr<slang::IComponentType> compositeProgram;
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(compositeProgram != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+
+    // This getLayout() call triggered the segfault in lookupExternDeclRefType.
+    auto programLayout = linkedProgram->getLayout();
+    SLANG_CHECK(programLayout != nullptr);
+
+    auto var0 = programLayout->getParameterByIndex(0);
+    SLANG_CHECK(var0 != nullptr);
+
+    // The Scene struct should have a valid layout with the resolved AccelerationStructure type.
+    auto typeLayout = var0->getTypeLayout();
+    SLANG_CHECK(typeLayout != nullptr);
+
+    // Also test the findTypeByName + getTypeLayout path which passes programLayout=nullptr.
+    auto sceneType = programLayout->findTypeByName("Scene");
+    SLANG_CHECK(sceneType != nullptr);
+    if (sceneType)
+    {
+        auto sceneLayout = programLayout->getTypeLayout(sceneType);
+        SLANG_CHECK(sceneLayout != nullptr);
+    }
+}
+
+// Test for issue #10749 (variant with associated types): More closely matches the user's actual
+// code pattern where the extern struct implements an interface with an associated type.
+
+SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberAssocType)
+{
+    const char* userSourceBody = R"(
+        interface IRayQuery { int status(); }
+        interface IAccelerationStructure {
+            associatedtype RayQueryImpl : IRayQuery;
+            RayQueryImpl trace();
+        }
+        extern struct SceneAS : IAccelerationStructure;
+
+        struct Scene {
+            SceneAS as;
+        }
+
+        ParameterBlock<Scene> gScene;
+
+        [numthreads(1,1,1)]
+        [shader("compute")]
+        void computeMain() {
+            let rq = gScene.as.trace();
+        }
+    )";
+
+    String moduleName = "linkTimeStructMemberAssoc_Compute";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        moduleName.getBuffer(),
+        (moduleName + ".slang").getBuffer(),
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    String configModuleSource = "import " + moduleName + ";\n" + R"(
+        struct HWRayQuery : IRayQuery { int status() { return 1; } }
+        struct HWAccelerationStructure : IAccelerationStructure {
+            RaytracingAccelerationStructure rtAS;
+            typealias RayQueryImpl = HWRayQuery;
+            RayQueryImpl trace() { HWRayQuery rq; return rq; }
+        }
+        export struct SceneAS : IAccelerationStructure = HWAccelerationStructure;
+    )";
+    auto configModule = session->loadModuleFromSourceString(
+        "config",
+        "config.slang",
+        configModuleSource.getBuffer(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(configModule != nullptr);
+
+    slang::IComponentType* components[] = {module, configModule};
+
+    ComPtr<slang::IComponentType> compositeProgram;
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(compositeProgram != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+
+    auto programLayout = linkedProgram->getLayout();
+    SLANG_CHECK(programLayout != nullptr);
+
+    // Also test getTypeLayout() on the Scene type directly via findTypeByName +
+    // getTypeLayout. This code path passes programLayout=nullptr to
+    // getInitialLayoutContextForTarget, which can crash in buildExternTypeMap when
+    // it dereferences programLayout.
+    if (programLayout)
+    {
+        auto sceneType = programLayout->findTypeByName("Scene");
+        SLANG_CHECK(sceneType != nullptr);
+        if (sceneType)
+        {
+            auto sceneLayout = programLayout->getTypeLayout(sceneType);
+            SLANG_CHECK(sceneLayout != nullptr);
+        }
+    }
+}
+
 // Test that loading a module that defines an `export` type, but not linking with the module should
 // not affect the type layout.
 
