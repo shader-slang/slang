@@ -3579,6 +3579,13 @@ standalone_note(
     span { loc = "location" }
 )
 
+standalone_note(
+    "bfloat16-fp8-storage-type-hint",
+    40017,
+    "BFloat16, FloatE4M3, and FloatE5M2 are storage/interchange types; arithmetic and most math functions are not supported on them directly. Convert to 'float' first, e.g. 'BFloat16(float(a) + float(b))'. Directly supported operations include conversions, 'bit_cast', and (for BFloat16) 'dot'",
+    span { loc = "location" }
+)
+
 err(
     "case-outside-switch",
     39999,

@@ -13,6 +13,34 @@
 namespace Slang
 {
 
+// True for BFloat16 / FP8 (FloatE4M3, FloatE5M2) scalars or vectors/matrices
+// of them. Modifier wrappers (e.g. inout) are unwrapped at each level.
+static bool _isStorageOnlyFloatType(Type* type)
+{
+    if (!type)
+        return false;
+    type = unwrapModifiedType(type);
+    if (auto vecType = as<VectorExpressionType>(type))
+        type = unwrapModifiedType(vecType->getElementType());
+    else if (auto matType = as<MatrixExpressionType>(type))
+        type = unwrapModifiedType(matType->getElementType());
+    return as<BFloat16Type>(type) || as<Fp8Type>(type);
+}
+
+// On overload-resolution failure, point users at the fp32-roundtrip pattern
+// when any arg is a storage-only float type.
+static void _maybeDiagnoseStorageOnlyFloatArithmetic(DiagnosticSink* sink, InvokeExpr* expr)
+{
+    for (auto arg : expr->arguments)
+    {
+        if (arg && _isStorageOnlyFloatType(arg->type))
+        {
+            sink->diagnose(Diagnostics::Bfloat16Fp8StorageTypeHint{.location = expr->loc});
+            return;
+        }
+    }
+}
+
 bool isFreeFormTypePackParam(SemanticsVisitor* visitor, Type* type, ParamDecl* paramDecl)
 {
     if (auto declRef = isDeclRefTypeOf<GenericTypePackParamDecl>(type))
@@ -3213,6 +3241,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 getSink()->diagnose(
                     Diagnostics::NoApplicableWithArgs{.args = argsList, .expr = expr});
             }
+            _maybeDiagnoseStorageOnlyFloatArithmetic(getSink(), expr);
         }
         else
         {
@@ -3315,6 +3344,12 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                     }
                 }
             }
+            // Emit the storage-only-float hint *after* the primary error and
+            // candidate notes, so the user reads the error first. BFloat16 / FP8
+            // values implicitly convert to half/float/double, which routinely
+            // makes built-in arithmetic ambiguous on these types — exactly the
+            // scenario the hint is designed to explain.
+            _maybeDiagnoseStorageOnlyFloatArithmetic(getSink(), expr);
         }
 
         return CreateErrorExpr(expr);
