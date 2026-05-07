@@ -1316,6 +1316,35 @@ struct CUDASurfaceFormatLegalizer
             }
         }
 
+        // Case 3: Entry point function parameters.
+        // For CUDA compute, entry point params are NOT promoted to globals,
+        // so we must look inside entry point functions.
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            if (!func->findDecoration<IREntryPointDecoration>())
+                continue;
+
+            for (auto param = func->getFirstParam(); param; param = param->getNextParam())
+            {
+                IRTextureTypeBase* texType = nullptr;
+                if (auto t = as<IRTextureTypeBase>(param->getDataType()))
+                    texType = t;
+                else if (auto arrayType = as<IRArrayTypeBase>(param->getDataType()))
+                    texType = as<IRTextureTypeBase>(arrayType->getElementType());
+
+                if (texType)
+                {
+                    ImageFormat format = getEffectiveFormat(param);
+                    if (format != ImageFormat::unknown && needsConversion(param, format))
+                        directTextures.add(
+                            KeyValuePair<IRInst*, ImageFormat>(param, format));
+                }
+            }
+        }
+
         for (auto& pair : directTextures)
             processTexture(pair.key, pair.value);
         for (auto& pair : structFieldTextures)
