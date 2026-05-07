@@ -378,6 +378,13 @@ static bool resolveHumaneLoc(
         return false;
     outFile = humane.pathInfo.foundPath;
     outLine = (uint32_t)humane.line;
+    // Synthetic source views (e.g. token-paste / macro-synthesized
+    // locations) can carry a positive line with an empty file path.
+    // Treat those as unresolvable so the escape hatch in `assignSlot`
+    // gives each one a fresh slot — otherwise `("", line)` keys would
+    // collapse unrelated synthetic origins onto a single counter.
+    if (outFile.getLength() == 0)
+        return false;
     return true;
 }
 
