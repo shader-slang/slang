@@ -1774,6 +1774,12 @@ struct TypeFlowSpecializationContext
         case kIROp_BitCast:
             diagnoseUnsupportedBitCast(inst);
             return;
+        case kIROp_ExtractDynamicObject:
+            // ExtractDynamicObject has no meaningful result info of its own:
+            // it writes outputs via its pointer operands.  Let operand info
+            // propagate through the normal Store/Load paths after
+            // specializeExtractDynamicObject rewrites this inst.
+            return;
         case kIROp_Load:
         case kIROp_RWStructuredBufferLoad:
         case kIROp_StructuredBufferLoad:
@@ -5725,6 +5731,8 @@ struct TypeFlowSpecializationContext
             return specializeMakeTuple(context, inst);
         case kIROp_CreateExistentialObject:
             return specializeCreateExistentialObject(context, as<IRCreateExistentialObject>(inst));
+        case kIROp_ExtractDynamicObject:
+            return specializeExtractDynamicObject(context, as<IRExtractDynamicObject>(inst));
         case kIROp_RWStructuredBufferLoad:
         case kIROp_StructuredBufferLoad:
             return specializeStructuredBufferLoad(context, inst);
@@ -7235,6 +7243,168 @@ struct TypeFlowSpecializationContext
         return false;
     }
 
+    // Inverse of `specializeCreateExistentialObject`.  Rewrites
+    //   extractDynamicObject obj, typeIDOutPtr, valueOutPtr
+    // into an extraction of the witness-table tag (converted to the sequential
+    // ID the caller supplied to `createDynamicObject`) and the packed any-value
+    // payload reinterpreted as the user's storage type `U`, storing each into
+    // its respective out parameter pointer.
+    bool specializeExtractDynamicObject(IRInst* context, IRExtractDynamicObject* inst)
+    {
+        SLANG_UNUSED(context);
+
+        auto obj = inst->getOperand(0);
+        auto typeIDOutPtr = inst->getOperand(1);
+        auto valueOutPtr = inst->getOperand(2);
+
+        auto taggedUnionType = as<IRTaggedUnionType>(obj->getDataType());
+        if (!taggedUnionType)
+        {
+            // Operand has not been specialized yet; wait for the next round.
+            return false;
+        }
+
+        // All validation happens before any IR emission so a bail-out after the
+        // diagnostic leaves the IR unchanged — no orphaned stores, no duplicate
+        // diagnostics on a re-visit.
+        auto valuePtrType = as<IRPtrTypeBase>(valueOutPtr->getDataType());
+        if (!valuePtrType)
+            return false;
+        auto valueType = valuePtrType->getValueType();
+
+        // typeIDOutPtr must also be a pointer; a non-pointer here would mean
+        // the caller is mis-shaped and the subsequent emitStore would emit
+        // invalid IR.  Bail out so the caller error path is exercised instead.
+        if (!as<IRPtrTypeBase>(typeIDOutPtr->getDataType()))
+            return false;
+
+        auto tableSet = taggedUnionType->getWitnessTableSet();
+        if (tableSet->getCount() == 0)
+        {
+            // No concrete conformances known; the existential value is unusable
+            // in this state.  Wait for a later round to resolve it.
+            return false;
+        }
+        auto firstTable = as<IRWitnessTable>(tableSet->getElement(0));
+        if (!firstTable)
+        {
+            // Set entry was not a concrete witness table (e.g. unbounded or an
+            // unresolved placeholder); keep the inst intact so later passes can
+            // retry once specialization has progressed further.
+            return false;
+        }
+        auto interfaceType = as<IRInterfaceType>(firstTable->getConformanceType());
+        if (!interfaceType)
+            return false;
+
+        // Determine the packed-value type without emitting the
+        // `GetValueFromTaggedUnion` yet — we need it only for the size check
+        // below.  Mirrors `IRBuilder::emitGetValueFromTaggedUnion`.
+        auto typeSet = taggedUnionType->getTypeSet();
+        IRType* packedType = nullptr;
+        {
+            IRBuilder typeBuilder(module);
+            packedType = typeSet->isSingleton()
+                             ? (IRType*)typeSet->getElement(0)
+                             : (IRType*)typeBuilder.getUntaggedUnionType((IRType*)typeSet);
+        }
+
+        // Validate that the user-chosen storage type matches the interface's
+        // any-value payload size; a mismatch would silently truncate or leave
+        // trailing bytes undefined, defeating the serialize/deserialize pair.
+        // `inst->removeAndDeallocate(); return true;` after diagnosing so we
+        // don't get re-visited and emit a duplicate error.
+        //
+        // The `> 0` guards intentionally skip the diagnostic when either size
+        // is indeterminate (returns 0 from `getAnyValueSize`).  This happens
+        // for types whose layout is still being computed in earlier IR
+        // rounds; bailing out here lets a later round catch it once both
+        // sizes are known, rather than producing a false positive.
+        //
+        // A side-effect is that legitimately zero-sized types (e.g. an empty
+        // struct) also bypass the diagnostic. That is acceptable: a zero-sized
+        // type cannot meaningfully serialize an interface payload anyway, and
+        // any downstream use of the resulting bytes is governed by the
+        // payload-encoding rules of the target. The narrow risk is a silent
+        // mismatch where one side is a zero-sized type and the other side has
+        // a known non-zero size, which is not currently expressible in source
+        // (the front-end rejects empty-struct payloads at semantic-check
+        // time). Revisit if the front-end starts permitting empty payloads.
+        if (auto targetReq = targetProgram ? targetProgram->getTargetReq() : nullptr)
+        {
+            auto anyValueSize = getAnyValueSize(packedType, targetReq);
+            auto userSize = getAnyValueSize(valueType, targetReq);
+            if (anyValueSize > 0 && userSize > 0 && anyValueSize != userSize)
+            {
+                sink->diagnose(Diagnostics::SerializeDynamicObjectSizeMismatch{
+                    .valueType = valueType,
+                    .valueSize = userSize,
+                    .interfaceType = interfaceType,
+                    .anyValueSize = anyValueSize,
+                    .location = inst->sourceLoc});
+                // Operands 1 and 2 are classified as `Store` by the
+                // uninit-value analysis. If we just removed the inst,
+                // downstream passes wouldn't re-classify and any later
+                // load from these pointers would silently see
+                // uninitialized memory in error-recovery mode. Emit
+                // well-defined poison values (0 typeID, default-
+                // constructed payload) so subsequent uses are at
+                // least defined.
+                IRBuilder bailBuilder(inst);
+                bailBuilder.setInsertBefore(inst);
+                bailBuilder.emitStore(
+                    typeIDOutPtr,
+                    bailBuilder.getIntValue(bailBuilder.getUIntType(), 0));
+                bailBuilder.emitStore(valueOutPtr, bailBuilder.emitDefaultConstruct(valueType));
+                inst->removeAndDeallocate();
+                return true;
+            }
+        }
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+
+        // Pull the witness-table tag out of the tagged union and convert it to
+        // the globally consistent sequential ID expected by the caller.
+        auto tag = builder.emitGetTagFromTaggedUnion(obj);
+        IRInst* seqIDArgs[] = {interfaceType, tag};
+        auto seqID = builder.emitIntrinsicInst(
+            builder.getUIntType(),
+            kIROp_GetSequentialIDFromTag,
+            2,
+            seqIDArgs);
+        builder.emitStore(typeIDOutPtr, seqID);
+
+        // Extract the packed payload and reinterpret it as the user-chosen
+        // storage type behind `valueOutPtr`.
+        //
+        // Invariant: `emitGetValueFromTaggedUnion` returns an
+        // `IRUntaggedUnionType` for multi-conformance and the concrete
+        // struct type for the singleton case. The parallel fallback
+        // `lowerExtractDynamicObject` (in slang-ir-lower-dynamic-dispatch
+        // -insts.cpp) operates on a different IR shape — a packed tuple
+        // whose value field is `IRAnyValueType` — so its branch
+        // condition checks `IRAnyValueType` rather than
+        // `IRUntaggedUnionType`. Keep the branch conditions in sync
+        // with the upstream producer in each path; if either producer
+        // changes the type kind it emits, both branches need updating.
+        auto packedValue = builder.emitGetValueFromTaggedUnion(obj);
+
+        IRInst* unpackedValue = nullptr;
+        if (as<IRUntaggedUnionType>(packedValue->getDataType()))
+        {
+            unpackedValue = builder.emitUnpackAnyValue(valueType, packedValue);
+        }
+        else
+        {
+            unpackedValue = builder.emitReinterpret(valueType, packedValue);
+        }
+        builder.emitStore(valueOutPtr, unpackedValue);
+
+        inst->removeAndDeallocate();
+        return true;
+    }
+
     bool specializeCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)
     {
         // A CreateExistentialObject uses an user-provided ID to create an object.
@@ -8174,6 +8344,7 @@ struct TypeFlowSpecializationContext
         SpecializationContext* specContext,
         bool shouldReportDynamicDispatchSites)
         : module(module)
+        , targetProgram(target)
         , sink(sink)
         , shouldReportDynamicDispatchSites(shouldReportDynamicDispatchSites)
         , specContext(specContext)
@@ -8183,9 +8354,10 @@ struct TypeFlowSpecializationContext
 
 
     // Basic context
-    IRModule* module;
-    DiagnosticSink* sink;
-    bool shouldReportDynamicDispatchSites;
+    IRModule* module = nullptr;
+    TargetProgram* targetProgram = nullptr;
+    DiagnosticSink* sink = nullptr;
+    bool shouldReportDynamicDispatchSites = false;
 
     // Set of parameters already diagnosed for ref/constref interface issues,
     // to avoid emitting duplicate diagnostics per call edge.

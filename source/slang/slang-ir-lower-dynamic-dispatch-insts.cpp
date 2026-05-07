@@ -1876,6 +1876,96 @@ struct ExistentialLoweringContext : public InstPassBase
         }
     }
 
+    bool lowerExtractDynamicObject(IRExtractDynamicObject* inst)
+    {
+        // Fallback when the type-flow specialization pass did not remove
+        // `ExtractDynamicObject`.  At this point the operand's existential
+        // type has been lowered to the (RTTI, WitnessTableIDVec, AnyValue)
+        // tuple that `lowerCreateExistentialObject` produces: we recover
+        // the sequential witness-table ID from the first element of the
+        // ID vector (tuple field 1), and forward the packed any-value
+        // payload into the user's raw storage (tuple field 2).
+
+        IRBuilder builder(module);
+        builder.setInsertBefore(inst);
+
+        auto obj = inst->getOperand(0);
+        auto typeIDOutPtr = inst->getOperand(1);
+        auto valueOutPtr = inst->getOperand(2);
+
+        auto tupleType = as<IRTupleType>(obj->getDataType());
+        // The 3-element shape (RTTI, WitnessTableIDVec, AnyValue) is what
+        // `lowerCreateExistentialObject` produces and is the only shape this
+        // pass is designed to consume. `lowerBoundInterfaceType` can produce
+        // a 4-element shape (RTTI, witnessTable, pseudoPtr, AnyValue) for
+        // out-of-line storage of bound-interface types, but those arise only
+        // from compiler-internal static specialization of an existential whose
+        // concrete type is statically known — a path that never produces an
+        // `IRExtractDynamicObject` since user-source `serializeDynamicObject`
+        // calls always operate on an opaque interface-typed value, not a
+        // bound-interface type. Reject any other shape explicitly so a future
+        // upstream-pass change that breaks this invariant surfaces here
+        // rather than silently mis-extracting field 2 of a 4-tuple.
+        if (!tupleType || tupleType->getOperandCount() != 3)
+        {
+            SLANG_UNEXPECTED("ExtractDynamicObject: operand was not lowered "
+                             "to the expected 3-element existential tuple");
+        }
+
+        auto witnessTableIDVecType = as<IRType>(tupleType->getOperand(1));
+        auto packedValueType = as<IRType>(tupleType->getOperand(2));
+        if (!witnessTableIDVecType || !packedValueType)
+        {
+            // Tuple shape matched the operand count, but the type
+            // operands are not IRTypes — same upstream-pass invariant
+            // violation as above, surface it explicitly rather than
+            // letting it leak into emission.
+            SLANG_UNEXPECTED("ExtractDynamicObject: existential tuple field "
+                             "1 or 2 was not an IRType");
+        }
+
+        auto valuePtrType = as<IRPtrTypeBase>(valueOutPtr->getDataType());
+        if (!valuePtrType)
+            return false;
+        auto valueType = valuePtrType->getValueType();
+
+        // Note on size-mismatch: `specializeExtractDynamicObject` in the
+        // type-flow pass is the primary site where storage-size validation
+        // (E41206) fires.  This fallback path runs only when specialization
+        // has lowered the existential to the full tuple form rather than a
+        // tagged union.  At that point the tuple's AnyValue field already
+        // encodes the interface's any-value payload, and any mismatch would
+        // have been diagnosed upstream.
+
+        auto witnessTableIDVec = builder.emitGetTupleElement(witnessTableIDVecType, obj, (UInt)1);
+        auto packedValue = builder.emitGetTupleElement(packedValueType, obj, (UInt)2);
+
+        auto seqID = builder.emitElementExtract(witnessTableIDVec, IRIntegerValue(0));
+        builder.emitStore(typeIDOutPtr, seqID);
+
+        // Invariant: `packedValueType` is `IRAnyValueType` here because the
+        // upstream `lowerCreateExistentialObject` lays out the existential
+        // tuple's value field via `emitPackAnyValue`. The parallel
+        // specialization path in `slang-ir-typeflow-specialize.cpp`
+        // (`specializeExtractDynamicObject`) operates on a different
+        // upstream — `emitGetValueFromTaggedUnion`, which returns
+        // `IRUntaggedUnionType` for multi-conformance and the concrete
+        // struct for the singleton case — so its branch condition checks
+        // `IRUntaggedUnionType` rather than `IRAnyValueType`. Keep the
+        // branch conditions in sync with the upstream producer in each
+        // path; if either producer changes the type kind it emits, both
+        // branches need updating.
+        IRInst* unpackedValue = nullptr;
+        if (as<IRAnyValueType>(packedValueType))
+            unpackedValue = builder.emitUnpackAnyValue(valueType, packedValue);
+        else
+            unpackedValue = builder.emitReinterpret(valueType, packedValue);
+        builder.emitStore(valueOutPtr, unpackedValue);
+
+        inst->removeAndDeallocate();
+        return true;
+    }
+
     bool lowerCreateExistentialObject(IRCreateExistentialObject* inst)
     {
         // Turn an instruction of the form `IRCreateExistentialObject(witnessTableID, value)`
@@ -2047,6 +2137,11 @@ struct ExistentialLoweringContext : public InstPassBase
                 case kIROp_CreateExistentialObject:
                     // Should have been removed during tagged-union lowering.
                     lowerCreateExistentialObject(cast<IRCreateExistentialObject>(inst));
+                    break;
+                case kIROp_ExtractDynamicObject:
+                    // Should have been removed during tagged-union lowering; mirrors
+                    // `CreateExistentialObject` fallback above.
+                    lowerExtractDynamicObject(cast<IRExtractDynamicObject>(inst));
                     break;
                 case kIROp_GetValueFromBoundInterface:
                     lowerGetValueFromBoundInterface(cast<IRGetValueFromBoundInterface>(inst));
