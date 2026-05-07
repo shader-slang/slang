@@ -135,20 +135,7 @@ static BaseType _getBaseTypeFromScalarType(SlangScalarType type)
 
 static IRFormatDecoration* _findImageFormatDecoration(IRInst* resourceInst)
 {
-    // JS(TODO):
-    // There could perhaps be other situations, that need to be covered
-
-    // If this is a load, we need to get the decoration from the field key
-    if (IRLoad* load = as<IRLoad>(resourceInst))
-    {
-        if (IRFieldAddress* fieldAddress = as<IRFieldAddress>(load->getOperand(0)))
-        {
-            IRInst* field = fieldAddress->getField();
-            return field->findDecoration<IRFormatDecoration>();
-        }
-    }
-    // Otherwise just try on the instruction
-    return resourceInst->findDecoration<IRFormatDecoration>();
+    return findImageFormatDecoration(resourceInst);
 }
 
 // Returns true if dataType and imageFormat are compatible - that they have the same representation,

@@ -535,6 +535,15 @@ bool areKnownEqualShapeElements(IRInst* left, IRInst* right);
 
 IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> elements);
 
+// Find the IRFormatDecoration on a resource instruction, traversing through
+// IRLoad -> IRFieldAddress chains for struct member textures.
+IRFormatDecoration* findImageFormatDecoration(IRInst* resourceInst);
+
+// Find the IR instruction that owns the IRFormatDecoration for a resource.
+// Returns the field key for struct member textures, or the instruction itself
+// for globals. Returns nullptr if no format decoration is found.
+IRInst* findFormatDecorationOwner(IRInst* resourceInst);
+
 } // namespace Slang
 
 #endif

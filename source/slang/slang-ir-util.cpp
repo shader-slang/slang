@@ -3327,4 +3327,37 @@ IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> eleme
     return builder.emitMakeValuePack(resultType, elements.getCount(), elements.getBuffer());
 }
 
+IRFormatDecoration* findImageFormatDecoration(IRInst* resourceInst)
+{
+    // If this is a load, we need to get the decoration from the field key
+    if (IRLoad* load = as<IRLoad>(resourceInst))
+    {
+        if (IRFieldAddress* fieldAddress = as<IRFieldAddress>(load->getOperand(0)))
+        {
+            IRInst* field = fieldAddress->getField();
+            return field->findDecoration<IRFormatDecoration>();
+        }
+    }
+    // Otherwise just try on the instruction
+    return resourceInst->findDecoration<IRFormatDecoration>();
+}
+
+IRInst* findFormatDecorationOwner(IRInst* resourceInst)
+{
+    if (auto load = as<IRLoad>(resourceInst))
+    {
+        if (auto fieldAddress = as<IRFieldAddress>(load->getOperand(0)))
+        {
+            if (auto fieldKey = fieldAddress->getField())
+            {
+                if (fieldKey->findDecoration<IRFormatDecoration>())
+                    return fieldKey;
+            }
+        }
+    }
+    if (resourceInst->findDecoration<IRFormatDecoration>())
+        return resourceInst;
+    return nullptr;
+}
+
 } // namespace Slang
