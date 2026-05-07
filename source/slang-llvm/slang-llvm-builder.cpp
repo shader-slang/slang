@@ -2296,10 +2296,9 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 
     std::unique_ptr<llvm::orc::LLJIT> jit;
     {
-        llvm::orc::LLJITBuilder jitBuilder;
-        disableAVX512ForJIT(jitBuilder);
-
-        llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = jitBuilder.create();
+        // Construct the LLJIT with AVX-512 disabled in the JIT TargetMachine;
+        // see #11062 and the docstring for createAVX512SafeLLJIT.
+        llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = createAVX512SafeLLJIT();
 
         if (!expectJit)
         {
