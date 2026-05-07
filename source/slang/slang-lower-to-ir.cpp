@@ -3026,6 +3026,10 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
             if (op != kIROp_Invalid)
                 builder->addDecoration(inst, op);
         }
+        else if (as<PerPrimitiveModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRGLSLPrimitivesRateDecoration>(inst);
+        }
         // TODO: what are other modifiers we need to propagate through?
     }
     if (auto t = composeGetters<IRMeshOutputType>(
