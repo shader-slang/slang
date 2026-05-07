@@ -1,6 +1,9 @@
 #include "slang-llvm-jit-shared-library.h"
 
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/TargetParser/Triple.h"
 
 namespace slang_llvm
 {
@@ -11,12 +14,19 @@ void disableAVX512ForJIT(llvm::orc::LLJITBuilder& jitBuilder)
         llvm::orc::JITTargetMachineBuilder::detectHost();
     if (!expectJTMB)
     {
-        // detectHost() can fail in principle (e.g. unsupported triple). Consume
-        // the Error so the Expected destructor doesn't fire report_fatal_error
-        // in LLVM builds compiled with LLVM_ENABLE_ABI_BREAKING_CHECKS, and
-        // leave the LLJITBuilder at its default — at that point we've already
-        // lost in interesting ways and any host-CPU mismatch is out of our hands.
-        llvm::consumeError(expectJTMB.takeError());
+        // detectHost() failed (e.g. unsupported triple). Consume the Error so
+        // the Expected destructor doesn't fire report_fatal_error in LLVM
+        // builds with LLVM_ENABLE_ABI_BREAKING_CHECKS, log a hint that a
+        // future SIGILL recurrence here points back to this branch, and
+        // leave the LLJITBuilder at its default. The default will run
+        // detectHost() again inside LLJIT::Create, so if that path produces
+        // a JTMB with AVX-512 enabled on a CPU that can't execute it, the
+        // SIGILL we're trying to neutralise will reappear. Practically
+        // unreachable on the GH-hosted x86_64-linux runners we care about
+        // (#11062), but worth flagging if it ever does fire.
+        llvm::errs() << "slang-llvm: JITTargetMachineBuilder::detectHost() failed: "
+                     << llvm::toString(expectJTMB.takeError())
+                     << " — leaving LLJITBuilder at default; #11062 mitigation will not apply\n";
         return;
     }
     if (expectJTMB->getTargetTriple().getArch() != llvm::Triple::x86_64)

@@ -14,6 +14,10 @@ namespace slang_llvm
 /// LLJIT construction sites in slang-llvm (the downstream compiler in
 /// slang-llvm.cpp and the IR builder in slang-llvm-builder.cpp) call this so
 /// the policy stays in one place. See https://github.com/shader-slang/slang/issues/11062.
+///
+/// TODO(#11070): remove once the CPUID+xgetbv-based defensive probe lands.
+/// That follow-up only subtracts AVX-512 when the host genuinely can't run
+/// it, restoring AVX-512 codegen on capable hosts.
 void disableAVX512ForJIT(llvm::orc::LLJITBuilder& jitBuilder);
 
 /* This implementation uses atomic ref counting to ensure the shared libraries lifetime can outlive
