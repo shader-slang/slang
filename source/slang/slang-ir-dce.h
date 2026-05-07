@@ -22,7 +22,7 @@ struct IRDeadCodeEliminationOptions
 /// types that are unused, functions that are never called,
 /// etc.
 /// Returns true if changed.
-bool eliminateDeadCode(
+SLANG_INTERNAL_TEST_API bool eliminateDeadCode(
     IRModule* module,
     IRDeadCodeEliminationOptions const& options = IRDeadCodeEliminationOptions());
 
