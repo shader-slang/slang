@@ -2,16 +2,16 @@
 //
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
-// we'll also test the generic enums for completeness, even if they're not
+// test the generic enums for completeness, even if they're not
 // quite yet fully supported
 [UnscopedEnum]
 /*CHECK:
- ^^^^^^^^^^^^ conflicting attribute declaration
+ ^^^^^^^^^^^^ 'UnscopedEnum' specifies an unscoped enumeration
 */
 enum class GenericEnum<T>
 /*CHECK:
      ^^^^^ conflicting scoped/unscoped declarations for an enum
-     ^^^^^ 'class' keyword for 'GenericEnum' implies scoped enumeration
+     ^^^^^ 'class' keyword for 'GenericEnum' specifies a scoped enumeration
 */
 {
 }

@@ -11484,8 +11484,8 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
     {
         getSink()->diagnose(Diagnostics::ConflictingEnumScopeDecl{
             .decl = decl,
-            .scopedLocation = enumClassAttr->loc,
-            .unscopedLocation = unscopedEnumAttr->loc});
+            .classLocation = enumClassAttr->loc,
+            .modifier = unscopedEnumAttr});
     }
 
     // Check the enum cases in order.

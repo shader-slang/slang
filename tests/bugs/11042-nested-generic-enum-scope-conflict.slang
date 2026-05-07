@@ -9,14 +9,12 @@
 struct GenericContainer<T>
 {
     [UnscopedEnum]
-    /*CHECK:
-     ^^^^^^^^^^^^ conflicting attribute declaration
-    */
+/*CHECK:
+     ^^^^^^^^^^^^ 'UnscopedEnum' specifies an unscoped enumeration
+*/
     enum class NestedEnum
-    /*CHECK:
-         ^^^^^ conflicting scoped/unscoped declarations for an enum
-         ^^^^^ 'class' keyword for 'NestedEnum' implies scoped enumeration
-    */
+//CHECK: ^^^^^ conflicting scoped/unscoped declarations for an enum
+//CHECK: ^^^^^ 'class' keyword for 'NestedEnum' specifies a scoped enumeration
     {
     }
 }

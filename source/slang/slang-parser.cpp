@@ -5970,7 +5970,17 @@ static Decl* parseEnumDecl(Parser* parser)
     {
         decl->nameAndLoc.name = generateName(parser);
         decl->nameAndLoc.loc = decl->loc;
-        isUnscoped = true;
+
+        if (!isEnumClass)
+        {
+            isUnscoped = true;
+        }
+        else
+        {
+            // enum class cannot be anonymous
+            parser->sink->diagnose(Diagnostics::AnonymousScopedEnum{
+                    .classLocation = enumClassLoc});
+        }
     }
     else
     {
