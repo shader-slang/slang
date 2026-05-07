@@ -238,7 +238,7 @@ Since `resolveTextureFormat` does NOT run for CUDA, these two sources may not be
 
 **Coordinate scaling** (**critical invariant**): The raw-typed call must use correct byte-addressing. `$E` first checks for an `IRFormatDecoration` and, if found, uses `getImageFormatInfo(format).sizeInBytes`. If no decoration is found, it falls back to computing size from the element type via `_calcBackingElementSizeInBytes()` (slang-intrinsic-expand.cpp:196-220). **After the IR pass removes the format decoration AND rewrites the element type to the raw storage type, `$E` falls through to the element-type path.** This produces the correct byte size — `sizeof(uchar4) = 4` for `rgba8`, `sizeof(uint8_t) = 1` for `r8`, etc. **The element type rewrite is therefore load-bearing for `$E` correctness, not just `$C`.** If the pass removes the decoration but fails to rewrite the element type (e.g., leaves it as `float4` for `r8`), `$E` would compute `sizeof(float4) = 16` instead of the correct `1`, causing incorrect address scaling. **The pass MUST rewrite the element type before removing the format decoration.**
 
-**Removing format decoration**: After lowering, remove the `IRFormatDecoration` from the texture variable. This ensures `$C` sees no format mismatch and emits the plain function name (no `_convert` suffix). `$E` computes the correct byte size from the raw type.
+**Removing format decoration** (**critical**): After lowering, remove the `IRFormatDecoration` from the **owner node that `_findImageFormatDecoration()` found it on** — which may be the texture variable itself, or the struct field key when the texture is a struct member (accessed via `IRLoad(IRFieldAddress(...))`). Removing from the wrong node leaves the decoration alive and causes `$C` to still emit `_convert`, producing a call to a now-deleted prelude function. The pass needs a helper `findFormatDecorationOwner(IRInst* resourceInst) -> IRInst*` (returning the field key or the resource inst itself) and must call `decoration->removeFromParent()` on the result.
 
 #### Format Conversion Functions (generated as IR)
 
@@ -331,6 +331,12 @@ struct CUDASurfaceFormatLegalizer {
     // IRFormatDecoration (via IRLoad→IRFieldAddress traversal) and the texture
     // type's format operand. Decoration takes priority.
     ImageFormat getEffectiveFormat(IRInst* resourceInst);
+
+    // Return the IRInst that owns the IRFormatDecoration for this resource
+    // (field key for struct-member textures, or the resource inst itself).
+    // Returns nullptr if no decoration is present.
+    // Used to remove the decoration after lowering.
+    IRInst* findFormatDecorationOwner(IRInst* resourceInst);
 
     // Check if a call is a CUDA surface read/write intrinsic
     bool isSurfaceReadCall(IRCall* call, IRInst*& outTexture);
@@ -578,7 +584,7 @@ The second approach is more robust — the emitter already scans for half types.
    b. Rewrite tex type: elementType = uchar4 (raw storage for rgba8)
    c. Rewrite call: surf2Dread_intrinsic(%tex_raw, %coord) → uchar4
    d. Insert decode: uitofp + mul(1/255) per channel → float4
-   e. Remove IRFormatDecoration from tex
+   e. Remove IRFormatDecoration from its owner (tex var or field key)
 6. CUDA emission:
    - $C: no format decoration → no suffix → "surf2Dread"
    - $T0: element type = uchar4 → "surf2Dread<uchar4>"
@@ -610,6 +616,7 @@ The second approach is more robust — the emitter already scans for half types.
 - [ ] Channel count mismatch works: `[format("r8")] RWTexture2D<float4>` reads `(x, 0, 0, 1)`
 - [ ] Channel count mismatch works: `[format("rg16f")] RWTexture2D<float4>` reads `(x, y, 0, 1)`
 - [ ] Format on struct field members detected correctly (`IRLoad`→`IRFieldAddress` chain)
+- [ ] Format decoration removed from field key (not texture var) for struct-member textures — no `_convert` suffix emitted after pass runs on struct-member texture
 - [ ] `RWTexture2D<unorm float4>` (inferred format, no explicit `[format]`) triggers conversion
 - [ ] Element type rewrite + decoration removal ordering is correct (type rewrite first)
 
