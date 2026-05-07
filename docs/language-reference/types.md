@@ -6,6 +6,7 @@ Slang types:
 * [Structures](types-struct.md) and [Classes](types-class.md)
   * [Extensions](types-extension.md)
 * [Array Types](types-array.md)
+* [Optional Types](types-optional.md)
 * [Pointers](types-pointer.md)
 * [Interfaces](types-interface.md)
 * [Special Types](types-special.md)

@@ -2018,6 +2018,79 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    // Optional<T> can be implicitly cast to Optional<U> when T is coercible to U.
+    if (auto fromOptType = as<OptionalType>(fromType))
+    {
+        if (auto toOptType = as<OptionalType>(toType))
+        {
+            Type* fromInner = fromOptType->getValueType();
+            Type* toInner = toOptType->getValueType();
+
+            if (!fromInner->equals(toInner))
+            {
+                // Create a synthetic VarDecl of type fromInner as a placeholder for the
+                // extracted inner value. We build innerVarExpr here (even in cost-probe mode)
+                // because the inner _coerce call needs a properly-typed fromExpr; passing
+                // nullptr would risk a null-deref in the ExplicitRefType path.
+                auto innerVarDecl = getASTBuilder()->create<VarDecl>();
+                innerVarDecl->nameAndLoc.name = getName("__optInner");
+                innerVarDecl->type.type = fromInner;
+
+                auto innerVarExpr = getASTBuilder()->create<VarExpr>();
+                innerVarExpr->type = QualType(fromInner);
+                innerVarExpr->loc = fromExpr ? fromExpr->loc : SourceLoc();
+                innerVarExpr->declRef = makeDeclRef(innerVarDecl);
+
+                // Cost probe: suppress diagnostics on failure.
+                ConversionCost innerCost = kConversionCost_None;
+                bool innerCoercible = _coerce(
+                    site,
+                    toInner,
+                    nullptr,
+                    QualType(fromInner),
+                    innerVarExpr,
+                    nullptr,
+                    &innerCost,
+                    nullptr);
+
+                if (innerCoercible)
+                {
+                    if (outCost)
+                    {
+                        // +1 so that Optional<T>->Optional<U> (with T!=U) costs more than an
+                        // exact Optional<T>->Optional<T> match (cost 0), while still ranking
+                        // below any direct non-Optional conversion.
+                        *outCost = innerCost + 1;
+                    }
+                    if (outToExpr)
+                    {
+                        Expr* innerCoercedExpr = nullptr;
+                        bool ok = _coerce(
+                            site,
+                            toInner,
+                            &innerCoercedExpr,
+                            QualType(fromInner),
+                            innerVarExpr,
+                            sink,
+                            nullptr,
+                            nullptr);
+                        SLANG_ASSERT(ok && innerCoercedExpr);
+
+                        auto castExpr = getASTBuilder()->create<CastOptionalExpr>();
+                        castExpr->loc = fromExpr->loc;
+                        castExpr->type = QualType(toType);
+                        castExpr->checked = true;
+                        castExpr->valueArg = fromExpr;
+                        castExpr->innerVarDecl = innerVarDecl;
+                        castExpr->innerCoercedExpr = innerCoercedExpr;
+                        *outToExpr = castExpr;
+                    }
+                    return true;
+                }
+            }
+        }
+    }
+
     // A enum type can be converted into its underlying tag type.
     if (auto enumDecl = isEnumType(fromType))
     {

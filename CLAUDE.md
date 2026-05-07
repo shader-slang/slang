@@ -323,6 +323,26 @@ Use the `/repro-remix` skill or see `extras/repro-remix.md`.
 - The enum values starting with `kIROp_` are defined in a generated file, `build/source/slang/fiddle/slang-ir-insts-enum.h.fiddle`
 - `FIDDLE()` and `FIDDLE(...)` statements in AST node declarations indicate that additional source is generated and included from `build/source/slang/fiddle`, providing static type system and reflection metadata, visitor support, and serialization support.
 
+### Adding a new AST expression node
+
+When adding a new `Expr` subclass (e.g. `FooExpr`) to `source/slang/slang-ast-expr.h`:
+
+1. Declare with `FIDDLE()` / `FIDDLE(...)` macros (required for code generation).
+2. Register in the visitor dispatch table in `source/slang/slang-check-impl.h` — find the block of `CASE(MakeOptionalExpr)` macros and add `CASE(FooExpr)`.
+3. Add `visitFooExpr` to `ExprVisitor` in `source/slang/slang-visitor.h` (follow the pattern of any nearby visitor).
+4. Add IR lowering (`visitFooExpr`) in `source/slang/slang-lower-to-ir.cpp`.
+5. Add a type-checking visitor stub in `source/slang/slang-check-decl.cpp`.
+6. Add an AST-iterator stub in `source/slang/slang-ast-iterator.h`.
+7. Add an LSP-lookup stub in `source/slang/slang-language-server-ast-lookup.cpp`.
+8. Optionally add a pretty-printer case in `source/slang/slang-ast-print.cpp`.
+9. After all edits, do a full build — the FIDDLE system regenerates dispatch glue automatically.
+
+### Type coercion system
+
+The coercion entry point is `SemanticsVisitor::_coerce()` in `source/slang/slang-check-conversion.cpp`. It follows a two-phase pattern: when `outToExpr == nullptr` it is a cost-probe (just compute `*outCost`); when `outToExpr != nullptr` it also constructs the AST expression. Always gate expression construction behind `if (outToExpr)`. Coercion costs are `ConversionCost` enum values defined in `source/slang/slang-ast-support-types.h`. The standard library `__implicit_conversion` attribute (in `source/slang/core.meta.slang`) is how user-visible implicit constructors expose themselves to the coercion system.
+
+**Synthetic VarDecl pattern for deferred inner conversions**: When a coercion expression needs to reference a value that only exists at IR lowering time (e.g., an extracted inner value from a conditional branch), create a synthetic `VarDecl` in the AST as a placeholder, build the inner conversion expression referencing that VarDecl, and store both in the AST node. In `visitXxxExpr` in `slang-lower-to-ir.cpp`, emit the IR value and call `context->setValue(syntheticVarDecl, LoweredValInfo::simple(irValue))` before lowering the inner expression — `emitDeclRef` / `visitVarExpr` uses `findLoweredDecl()` (walking `env->mapDeclToValue`) to resolve it.
+
 ### Git commit message
 
 - Don't mention Claude on the commit message

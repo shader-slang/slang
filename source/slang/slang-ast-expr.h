@@ -607,6 +607,29 @@ class MakeOptionalExpr : public Expr
     FIDDLE() Expr* typeExpr = nullptr;
 };
 
+/// Represents an implicit coercion from Optional<T> to Optional<U>
+/// where T is implicitly coercible to U.
+///
+/// During IR lowering, this emits an if-else guarded by optionalHasValue:
+///   - true branch:  getOptionalValue(valueArg) -> coerce to U -> makeOptionalValue
+///   - false branch: makeOptionalNone
+///
+/// `innerVarDecl` is a synthetic VarDecl of type T. During IR lowering,
+/// `context->setValue(innerVarDecl, extractedInnerValue)` is called before
+/// lowering `innerCoercedExpr`, so that VarExpr references to innerVarDecl
+/// resolve to the extracted inner value.
+FIDDLE()
+class CastOptionalExpr : public Expr
+{
+    FIDDLE(...)
+    /// The source Optional<T> expression.
+    FIDDLE() Expr* valueArg = nullptr;
+    /// Synthetic placeholder VarDecl of type T (inner type of source Optional).
+    FIDDLE() VarDecl* innerVarDecl = nullptr;
+    /// Coercion expression from T to U, built referencing innerVarDecl.
+    FIDDLE() Expr* innerCoercedExpr = nullptr;
+};
+
 /// A cast of a value to the same type, with different modifiers.
 ///
 /// The type being cast to is stored as this expression's `type`.
