@@ -100,7 +100,8 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
     // Use a stack buffer to avoid heap allocation on the assertion path, which could
     // mask the original failure if the heap is corrupted.
     char locMsg[1024];
-    snprintf(locMsg, sizeof(locMsg), "%s(%d): %s", basename, line, message);
+    const char* safeMessage = message ? message : "unknown assert";
+    snprintf(locMsg, sizeof(locMsg), "%s(%d): %s", basename, line, safeMessage);
     handleSignal(SignalType::AssertFailure, locMsg);
 }
 
