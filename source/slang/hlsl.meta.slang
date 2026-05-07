@@ -618,6 +618,27 @@ extension vector<int64_t,2>:ITexelElement
     __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
 }
 
+
+//@public:
+// All texture types implement this interface.
+[sealed]
+[builtin]
+interface ITexture
+{
+    associatedtype TexelElement : ITexelElement;
+    associatedtype TextureShape : __ITextureShape;
+    static const bool isArrayTexture;
+    static const bool isMultisample;
+    static const int multisampleCount;
+    static const int accessMode;
+    static const bool isShadowTexture;
+    static const bool isCombinedTextureSampler;
+    static const int storageFormat;
+    static const int coordDimensions;
+    static const int gradDimensions;
+    static const int offsetDimensions;
+}
+
 //@public:
 /// A parameterized type that represents all flavors of texture types supported by the Slang language.
 /// Please note that this type is not intended to be used directly in user code, and not all combinations
@@ -786,6 +807,22 @@ struct _Texture<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let is
 }
 
 //@hidden:
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> : ITexture
+{
+    typealias TexelElement = T;
+    typealias TextureShape = Shape;
+    static const bool isArrayTexture = isArray == 1;
+    static const bool isMultisample = isMS == 1;
+    static const int multisampleCount = sampleCount;
+    static const int accessMode = access;
+    static const bool isShadowTexture = isShadow == 1;
+    static const bool isCombinedTextureSampler = isCombined == 1;
+    static const int storageFormat = format;
+    static const int coordDimensions = Shape.dimensions + isArray;
+    static const int gradDimensions = Shape.dimensions;
+    static const int offsetDimensions = Shape.planeDimensions;
+}
 
 // Returns true when the stage supports implicit derivatives on the
 // target. This must match with capability `implicit_derivatives_sampling`.
@@ -1103,6 +1140,241 @@ void __wgsl_check_texture_type_texel_offset()
 }
 
 //@public:
+/// Declaration of texel reading functionality for the LLVM target, allowing the
+/// user to define this texture operation.
+///
+/// @param T Texture type.
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param location Texel coordinate. If this is an array texture, the last coordinate is the array index.
+/// @param levelOrSampleIndex If `T.isMultisample`, this is the sample index. Otherwise, it is the LOD level.
+/// @return The fetched texel.
+[ForceInline]
+[require(llvm)]
+extern T.TexelElement llvmTextureLoad<T:ITexture>(
+    T tex,
+    vector<int, T.coordDimensions> location,
+    int levelOrSampleIndex)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureLoad to use Load() on LLVM targets!");
+    return {};
+}
+
+/// Declaration of texel writing functionality for the LLVM target, allowing the
+/// user to define this texture operation. This function always writes to LOD
+/// level 0.
+///
+/// @param T Texture type.
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param location Texel coordinate. If this is an array texture, the last coordinate is the array index.
+/// @param newValue New value to write to the texel.
+/// @param sampleIndex Sample index in multisample textures. Ignore it if `!T.isMultisample`.
+[ForceInline]
+[require(llvm)]
+extern void llvmTextureStore<T:ITexture>(
+    T tex,
+    vector<int, T.coordDimensions> location,
+    T.TexelElement newValue,
+    int sampleIndex)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureStore to use Store() on LLVM targets!");
+}
+
+
+/// Declaration of texture dimension querying functionality for the LLVM target,
+/// allowing the user to define this texture operation.
+///
+/// @param T Texture type.
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param mipLevel The LOD level to query the sizes for.
+/// @param width Width of the texture, in texels.
+/// @param height Height of the texture, in texels. Unused if the texture is 1D.
+/// @param elements Number of array elements in the texture. Unused if the texture is not an array.
+/// @param depth Depth of the texture. Unused if the texture is not 3D.
+/// @param numberOfLevels Number of LOD levels in the texture.
+/// @param numberOfSamples Number of Multisample samples in the texture.
+[ForceInline]
+[require(llvm)]
+extern void llvmTextureGetDimensions<T:ITexture>(
+    T tex,
+    int mipLevel,
+    out int width,
+    out int height,
+    out int elements,
+    out int depth,
+    out int numberOfLevels,
+    out int numberOfSamples)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureGetDimensions to use GetDimensions() on LLVM targets!");
+    // Silence the warning about these being uninitialized.
+    width = 0;
+    height = 0;
+    elements = 0;
+    depth = 0;
+    numberOfLevels = 0;
+    numberOfSamples = 0;
+}
+
+/// Declaration of texture sampling functionality for the LLVM target,
+/// allowing the user to define this texture operation. This variant takes an
+/// explicit LOD level.
+///
+/// @param T Texture type.
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param sam Sampler that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param location Texture coordinate. If this is an array texture, the last coordinate is the array index.
+/// @param level The LOD level to sample from.
+/// @param offset An integer offset applied to the resolved texel coordinates.
+/// @return The sampled texel value.
+[ForceInline]
+[require(llvm)]
+extern T.TexelElement llvmTextureSampleLevel<T:ITexture>(
+    T tex,
+    SamplerState sam,
+    vector<float, T.coordDimensions> location,
+    float level,
+    vector<int, T.offsetDimensions> offset)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureSampleLevel to use SampleLevel*() on LLVM targets!");
+    return {};
+}
+
+/// Declaration of texture sampling functionality for the LLVM target,
+/// allowing the user to define this texture operation. This variant takes
+/// texture coordinate gradients, allowing for anisotropic filtering and
+/// automatic LOD level computation.
+///
+/// @param T Texture type.
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param sam Sampler that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param location Texture coordinate. If this is an array texture, the last coordinate is the array index.
+/// @param gradX Texture gradient on the X axis
+/// @param gradY Texture gradient on the Y axis
+/// @param offset An integer offset applied to the resolved texel coordinates.
+/// @param bias LOD bias, added to the selected LOD level.
+/// @param lodClamp The selected LOD level must be greater than or equal to this value.
+/// @return The sampled texel value.
+[ForceInline]
+[require(llvm)]
+extern T.TexelElement llvmTextureSampleGrad<T:ITexture>(
+    T tex,
+    SamplerState sam,
+    vector<float, T.coordDimensions> location,
+    vector<float, T.gradDimensions> gradX,
+    vector<float, T.gradDimensions> gradY,
+    vector<int, T.offsetDimensions> offset,
+    float bias,
+    float lodClamp)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureSampleGrad to use Sample*() on LLVM targets!");
+    return {};
+}
+
+/// Declaration of texture compare sampling functionality for the LLVM target,
+/// allowing the user to define this texture operation. This variant takes an
+/// explicit LOD level.
+///
+/// @param T Texture type.
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param sam Sampler that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param location Texture coordinate. If this is an array texture, the last coordinate is the array index.
+/// @param compareValue The value to compare to.
+/// @param level The LOD level to sample from.
+/// @param offset An integer offset applied to the resolved texel coordinates.
+/// @return A value between 0 and 1.
+[ForceInline]
+[require(llvm)]
+extern float llvmTextureSampleCmpLevel<T:ITexture>(
+    T tex,
+    SamplerComparisonState sam,
+    vector<float, T.coordDimensions> location,
+    float compareValue,
+    float level,
+    vector<int, T.offsetDimensions> offset)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureSampleCmpLevel to use SampleCmpLevel*() on LLVM targets!");
+    return 0.0;
+}
+
+/// Declaration of texture compare functionality for the LLVM target,
+/// allowing the user to define this texture operation. This variant takes
+/// texture coordinate gradients, allowing for anisotropic filtering and
+/// automatic LOD level computation.
+///
+/// @param T Texture type.
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param sam Sampler that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param location Texture coordinate. If this is an array texture, the last coordinate is the array index.
+/// @param compareValue The value to compare to.
+/// @param gradX Texture gradient on the X axis
+/// @param gradY Texture gradient on the Y axis
+/// @param offset An integer offset applied to the resolved texel coordinates.
+/// @param bias LOD bias, added to the selected LOD level.
+/// @param lodClamp The selected LOD level must be greater than or equal to this value.
+/// @return A value between 0 and 1.
+[ForceInline]
+[require(llvm)]
+extern float llvmTextureSampleCmpGrad<T:ITexture>(
+    T tex,
+    SamplerComparisonState sam,
+    vector<float, T.coordDimensions> location,
+    float compareValue,
+    vector<float, T.gradDimensions> gradX,
+    vector<float, T.gradDimensions> gradY,
+    vector<int, T.offsetDimensions> offset,
+    float bias,
+    float lodClamp)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureSampleCmpGrad to use SampleCmp*() on LLVM targets!");
+    return 0.0;
+}
+
+/// Declaration of texture gather functionality for the LLVM target,
+/// allowing the user to define this texture operation.
+///
+/// @param T Texture type.
+/// @param Channel Channel index to gather from.
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param sam Sampler that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param location Texture coordinate. If this is an array texture, the last coordinate is the array index.
+/// @param offset An integer offset applied to the resolved texel coordinates.
+/// @return The four gathered values.
+[ForceInline]
+[require(llvm)]
+extern vector<T.TexelElement.Element, 4> llvmTextureGather<T:ITexture, let Channel:int>(
+    T tex,
+    SamplerState sam,
+    vector<float, T.coordDimensions> location,
+    vector<int, T.offsetDimensions> offset)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureGather to use Gather*() on LLVM targets!");
+    return {};
+}
+
+/// Declaration of texture gather functionality for the LLVM target,
+/// allowing the user to define this texture operation.
+///
+/// @param T Texture type.
+/// @param Channel Channel index to gather from.
+/// @param tex Texture that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param sam Sampler that can be converted into an arbitrary pointer type with `bit_cast`.
+/// @param location Texture coordinate. If this is an array texture, the last coordinate is the array index.
+/// @param compareValue The value to compare to.
+/// @param offset An integer offset applied to the resolved texel coordinates.
+/// @return The four gathered values, between 0 and 1.
+[ForceInline]
+[require(llvm)]
+extern vector<T.TexelElement.Element, 4> llvmTextureGatherCmp<T:ITexture, let Channel:int>(
+    T tex,
+    SamplerComparisonState sam,
+    vector<float, T.coordDimensions> location,
+    T.TexelElement.Element compareValue,
+    vector<int, T.offsetDimensions> offset)
+{
+    static_assert(false, "You need to export an implementation for llvmTextureGatherCmp to use GatherCmp*() on LLVM targets!");
+    return {};
+}
+
+//@public:
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
@@ -1210,7 +1482,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     ///@see `SampleBias`, `SampleLevel`, `SampleLevelZero`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`, `SampleCmpBias`, `SampleCmpGrad`.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location)
     {
         __requireComputeDerivative();
@@ -1223,6 +1495,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().Sample(__getSampler(), location);
             case cpp:
             case metal:
+            case llvm:
                 return __getTexture().Sample(__getSampler(), location);
             case glsl:
                 __intrinsic_asm "$ctexture($0, $1)$z";
@@ -1268,7 +1541,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -1281,6 +1554,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().Sample(__getSampler(), location, offset);
             case cpp:
             case metal:
+            case llvm:
                 return __getTexture().Sample(__getSampler(), location, offset);
             case glsl:
                 __intrinsic_asm "$ctextureOffsetClampARB($0, $1, $2)$z";
@@ -1299,7 +1573,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_clamp_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_llvm, texture_sm_4_1_clamp_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __requireComputeDerivative();
@@ -1312,6 +1586,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().Sample(__getSampler(), location, offset, clamp);
             case cpp:
             case metal:
+            case llvm:
                 return __getTexture().Sample(__getSampler(), location, offset, clamp);
             case glsl:
                 __intrinsic_asm "$ctextureOffsetClampARB($0, $1, $2, $3)$z";
@@ -1359,7 +1634,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias)
     {
         __requireComputeDerivative();
@@ -1372,6 +1647,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().SampleBias(__getSampler(), location, bias);
             case cpp:
             case metal:
+            case llvm:
                 return __getTexture().SampleBias(__getSampler(), location, bias);
             case glsl:
                 __intrinsic_asm "$ctexture($0, $1, $2)$z";
@@ -1389,7 +1665,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -1402,6 +1678,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().SampleBias(__getSampler(), location, bias, offset);
             case cpp:
             case metal:
+            case llvm:
                 return __getTexture().SampleBias(__getSampler(), location, bias, offset);
             case glsl:
                 __intrinsic_asm "$ctextureOffset($0, $1, $3, $2)$z";
@@ -1447,7 +1724,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl_llvm, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __requireComputeDerivative();
@@ -1472,6 +1749,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue);
         case metal:
+        case llvm:
             return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue);
         case spirv:
             return spirv_asm
@@ -1485,7 +1763,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl_llvm, texture_shadowlod)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -1525,7 +1803,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl_llvm, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -1546,6 +1824,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, offset);
         case metal:
+        case llvm:
             return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, offset);
         case spirv:
             return spirv_asm
@@ -1589,7 +1868,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl_llvm, texture_shadowlod)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1641,7 +1920,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(glsl_hlsl_metal_spirv_llvm, texture_sm_4_1)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level)
     {
         __target_switch
@@ -1689,6 +1968,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpLevel(__getComparisonSampler(), location, compareValue, level);
         case metal:
+        case llvm:
             return __getTexture().SampleCmpLevel(__getComparisonSampler(), location, compareValue, level);
         case spirv:
             return spirv_asm
@@ -1700,7 +1980,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_llvm, texture_shadowlod)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1720,6 +2000,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpLevel(__getComparisonSampler(), location, compareValue, level, offset);
         case metal:
+        case llvm:
             return __getTexture().SampleCmpLevel(__getComparisonSampler(), location, compareValue, level, offset);
         case spirv:
             return spirv_asm
@@ -1758,7 +2039,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv_llvm, texture_shadowgrad)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
@@ -1774,12 +2055,14 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Grad $gradX $gradY;
             };
+        case llvm:
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv_llvm, texture_shadowgrad)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
@@ -1796,6 +2079,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
             };
+        case llvm:
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, offset);
         }
     }
 
@@ -1830,7 +2115,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv_llvm, texture_shadowgrad)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
     {
         __requireComputeDerivative();
@@ -1846,12 +2131,14 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue Bias $bias;
             };
+        case llvm:
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv_llvm, texture_shadowgrad)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
@@ -1868,6 +2155,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset $bias $offset;
             };
+        case llvm:
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, offset);
         }
     }
 
@@ -1902,7 +2191,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
@@ -1914,6 +2203,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY);
             case cpp:
             case metal:
+            case llvm:
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY);
             case glsl:
                 __intrinsic_asm "$ctextureGrad($0, $1, $2, $3)$z";
@@ -1930,8 +2220,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
-    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0)]
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
         {
@@ -1942,6 +2232,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset);
             case cpp:
             case metal:
+            case llvm:
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset);
             case glsl:
                 __intrinsic_asm "$ctextureGradOffset($0, $1, $2, $3, $4)$z";
@@ -1959,8 +2250,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_clamp_fragment)]
-    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
+    [require(cpp_glsl_hlsl_metal_spirv_llvm, texture_sm_4_1_clamp_fragment)]
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp)
     {
         __target_switch
         {
@@ -1971,6 +2262,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset, lodClamp);
             case cpp:
             case metal:
+            case llvm:
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset, lodClamp);
             case glsl:
             __intrinsic_asm "$ctextureGradOffsetClampARB($0, $1, $2, $3, $4, $5)$z";
@@ -1987,7 +2279,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(hlsl_spirv, sm_5_0)]
-    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp, out uint status)
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp, out uint status)
     {
         __target_switch
         {
@@ -2015,7 +2307,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level)
     {
         __target_switch
@@ -2027,6 +2319,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().SampleLevel(__getSampler(), location, level);
             case cpp:
             case metal:
+            case llvm:
                 return __getTexture().SampleLevel(__getSampler(), location, level);
             case glsl:
                 __intrinsic_asm "$ctextureLod($0, $1, $2)$z";
@@ -2074,7 +2367,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -2086,6 +2379,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().SampleLevel(__getSampler(), location, level, offset);
             case cpp:
             case metal:
+            case llvm:
                 return __getTexture().SampleLevel(__getSampler(), location, level, offset);
             case glsl:
                 __intrinsic_asm "$ctextureLodOffset($0, $1, $2, $3)$z";
@@ -2148,7 +2442,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     ///@see `Sample`, `SampleBias`, `SampleLevel`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`, `GL_NV_compute_shader_derivatives`.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0)]
     T SampleLevelZero(vector<float, Shape.dimensions+isArray> location)
     {
         __target_switch
@@ -2167,7 +2461,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0)]
     T SampleLevelZero(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -2393,7 +2687,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     //@public:
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
     {
         __requireComputeDerivative();
@@ -2490,13 +2784,24 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     }
                 }
                 __intrinsic_asm "textureSample($0, $1, $2)$z";
+            case llvm:
+                // TODO: This should ideally use ddx & ddy for the gradients,
+                // but we can't implement those yet in the current state of the
+                // LLVM emitter. Which is why they're hardcoded as zero here :/
+                return llvmTextureSampleGrad(
+                    this, s, location, 
+                    vector<float, Shape.dimensions>(0.0),
+                    vector<float, Shape.dimensions>(0.0),
+                    vector<int, Shape.planeDimensions>(0),
+                    0.0f,
+                    0.0f);
         }
     }
 
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -2553,13 +2858,19 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     }
                 }
                 __intrinsic_asm "textureSample($0, $1, $2, $3)$z";
+            case llvm:
+                return llvmTextureSampleGrad(
+                    this, s, location, 
+                    vector<float, Shape.dimensions>(0.0),
+                    vector<float, Shape.dimensions>(0.0),
+                    offset, 0.0f, 0.0f);
         }
     }
 
     [__readNone]
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_llvm, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __requireComputeDerivative();
@@ -2602,6 +2913,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|ConstOffset|MinLod $offset $clamp;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case llvm:
+                return llvmTextureSampleGrad(
+                    this, s, location, 
+                    vector<float, Shape.dimensions>(0.0),
+                    vector<float, Shape.dimensions>(0.0),
+                    offset, 0.0f, clamp);
         }
     }
 
@@ -2640,7 +2957,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias)
     {
         __requireComputeDerivative();
@@ -2701,12 +3018,19 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     }
                 }
                 __intrinsic_asm "textureSampleBias($0, $1, $2, $3)$z";
+            case llvm:
+                return llvmTextureSampleGrad(
+                    this, s, location, 
+                    vector<float, Shape.dimensions>(0.0),
+                    vector<float, Shape.dimensions>(0.0),
+                    vector<int, Shape.planeDimensions>(0),
+                    bias, 0.0f);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -2762,6 +3086,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     }
                 }
                 __intrinsic_asm "textureSampleBias($0, $1, $2, $3, $4)$z";
+            case llvm:
+                return llvmTextureSampleGrad(
+                    this, s, location, 
+                    vector<float, Shape.dimensions>(0.0),
+                    vector<float, Shape.dimensions>(0.0),
+                    offset, bias, 0.0f);
         }
     }
 
@@ -2798,7 +3128,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl_llvm, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __requireComputeDerivative();
@@ -2846,12 +3176,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 }
             }
             __intrinsic_asm "textureSampleCompare($0, $1, $2, $3)";
+        case llvm:
+            return llvmTextureSampleCmpGrad(
+                this, s, location, compareValue,
+                vector<float, Shape.dimensions>(0.0),
+                vector<float, Shape.dimensions>(0.0),
+                vector<int, Shape.planeDimensions>(0), 0.0f, 0.0f);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl_llvm, texture_shadowlod)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -2884,7 +3220,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl_llvm, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -2926,6 +3262,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 }
             }
             __intrinsic_asm "textureSampleCompare($0, $1, $2, $3, $4)";
+        case llvm:
+            return llvmTextureSampleCmpGrad(
+                this, s, location, compareValue,
+                vector<float, Shape.dimensions>(0.0),
+                vector<float, Shape.dimensions>(0.0),
+                offset, 0.0f, 0.0f);
         }
     }
 
@@ -2961,7 +3303,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl_llvm, texture_shadowlod)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -3009,7 +3351,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_llvm, texture_shadowlod)]
     float SampleCmpLevel(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level)
     {
         __target_switch
@@ -3063,12 +3405,16 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Lod $level;
             };
+        case llvm:
+            return llvmTextureSampleCmpLevel(
+                this, s, location, compareValue, level,
+                vector<int, Shape.planeDimensions>(0));
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_llvm, texture_shadowlod)]
     float SampleCmpLevel(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -3095,6 +3441,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Lod|ConstOffset $level $offset;
             };
+        case llvm:
+            return llvmTextureSampleCmpLevel(this, s, location, compareValue, level, offset);
         }
     }
 
@@ -3128,7 +3476,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv_llvm, texture_shadowgrad)]
     float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
@@ -3145,12 +3493,16 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Grad $gradX $gradY;
             };
+        case llvm:
+            return llvmTextureSampleCmpGrad(
+                this, s, location, compareValue, gradX, gradY,
+                vector<int, Shape.planeDimensions>(0), 0.0f, 0.0f);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv_llvm, texture_shadowgrad)]
     float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
@@ -3168,6 +3520,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
             };
+        case llvm:
+            return llvmTextureSampleCmpGrad(this, s, location, compareValue, gradX, gradY, offset, 0.0f, 0.0f);
         }
     }
 
@@ -3203,7 +3557,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv_llvm, texture_shadowgrad)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
     {
         __requireComputeDerivative();
@@ -3220,12 +3574,19 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue Bias $bias;
             };
+        case llvm:
+            return llvmTextureSampleCmpGrad(
+                this, s, location, compareValue,
+                vector<float, Shape.dimensions>(0.0),
+                vector<float, Shape.dimensions>(0.0),
+                vector<int, Shape.planeDimensions>(0),
+                bias, 0.0f);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv_llvm, texture_shadowgrad)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
@@ -3243,6 +3604,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
             };
+        case llvm:
+            return llvmTextureSampleCmpGrad(
+                this, s, location, compareValue,
+                vector<float, Shape.dimensions>(0.0),
+                vector<float, Shape.dimensions>(0.0),
+                offset, bias, 0.0f);
         }
     }
 
@@ -3278,7 +3645,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
@@ -3340,13 +3707,15 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     }
                 }
                 __intrinsic_asm "textureSampleGrad($0, $1, $2, $3, $4)$z";
+            case llvm:
+                return llvmTextureSampleGrad(this, s, location, gradX, gradY, vector<int, Shape.planeDimensions>(0), 0.0f, 0.0f);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
-    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0)]
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
         {
@@ -3402,14 +3771,16 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     }
                 }
                 __intrinsic_asm "textureSampleGrad($0, $1, $2, $3, $4, $5)$z";
+            case llvm:
+                return llvmTextureSampleGrad(this, s, location, gradX, gradY, offset, 0.0f, 0.0f);
         }
     }
 
     [__readNone]
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
-    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
+    [require(cpp_glsl_hlsl_metal_spirv_llvm, texture_sm_4_0)]
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp)
     {
         __target_switch
         {
@@ -3451,13 +3822,15 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case llvm:
+                return llvmTextureSampleGrad(this, s, location, gradX, gradY, offset, 0.0f, lodClamp);
         }
     }
 
     [__readNone]
     [ForceInline]
     [require(hlsl_spirv, sm_5_0)]
-    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp, out uint status)
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp, out uint status)
     {
         __target_switch
         {
@@ -3486,7 +3859,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
     {
         __target_switch
@@ -3581,12 +3954,14 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     }
                 }
                 __intrinsic_asm "textureSampleLevel($0, $1, $2, $3)$z";
+            case llvm:
+                return llvmTextureSampleLevel(this, s, location, level, vector<int, Shape.planeDimensions>(0));
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_0)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -3643,6 +4018,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     }
                 }
                 __intrinsic_asm "textureSampleLevel($0, $1, $2, $3, $4)$z";
+            case llvm:
+                return llvmTextureSampleLevel(this, s, location, level, offset);
         }
     }
 
@@ -4190,7 +4567,7 @@ ${
         const char* componentArg = (isShadow ? "" : componentArgString[componentId]);
 $}
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl_llvm, texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
@@ -4216,6 +4593,8 @@ $}
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
                 "Gather is supported only for 2D and 3D textures");
             return __texture_gather$(compareFunc)(this $(samplerArg), location $(compareArg) $(componentArg));
+        case llvm:
+            return llvmTextureGather$(compareFunc)<This $(componentArgString[componentId])>(this $(getSampler), location $(compareArg), vector<int, Shape.planeDimensions>(0));
         }
     }
 
@@ -4237,7 +4616,7 @@ $}
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl_llvm, texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
@@ -4265,6 +4644,8 @@ $}
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
                 "Gather is supported only for 2D and 3D textures");
             return __texture_gather$(compareFunc)_offset(this $(samplerArg), location $(compareArg), offset $(componentArg));
+        case llvm:
+            return llvmTextureGather$(compareFunc)<This $(componentArgString[componentId])>(this $(getSampler), location $(compareArg), offset);
         }
     }
 
@@ -4354,7 +4735,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 //@public:
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location)
     {
         __target_switch
@@ -4501,12 +4882,17 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
             }
             return __default<T>();
+        case llvm:
+            const int lodLoc = Shape.dimensions+isArray;
+            let coord = __vectorReshape<Shape.dimensions+isArray>(location);
+            let lod = location[lodLoc];
+            return llvmTextureLoad(this, coord, lod);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_spirv_llvm, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -4539,6 +4925,13 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                         __truncate $$T result __sampledType(T) %sampled;
                     };
                 }
+        case llvm:
+            const int lodLoc = Shape.dimensions+isArray;
+            let coord =
+                __vectorReshape<Shape.dimensions+isArray>(location) +
+                __vectorReshape<Shape.dimensions+isArray>(offset);
+            let lod = location[lodLoc];
+            return llvmTextureLoad(this, coord, lod);
         }
     }
 
@@ -4595,7 +4988,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_1_samplerless)]
         get
         {
             __target_switch
@@ -4605,6 +4998,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                     __intrinsic_asm ".operator[]";
                 case metal:
                 case cuda:
+                case llvm:
                     return Load(__makeVector(location, 0));
                 case glsl:
                     if (isCombined == 0)
@@ -4647,7 +5041,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 //@public:
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
     {
         __target_switch
@@ -4709,12 +5103,14 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
 
                 __intrinsic_asm "textureLoad($0, $1, $2)$z";
+            case llvm:
+                return llvmTextureLoad(this, location, sampleIndex);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv_wgsl, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_spirv_wgsl_llvm, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions + isArray + 1> locationAndSampleIndex)
     {
         return Load(__vectorReshape<Shape.dimensions + isArray>(locationAndSampleIndex), locationAndSampleIndex[Shape.dimensions + isArray]);
@@ -4722,7 +5118,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_spirv_llvm, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -4752,6 +5148,9 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                         __truncate $$T result __sampledType(T) %sampled;
                     };
                 }
+            case llvm:
+                let coord = location + __vectorReshape<Shape.dimensions+isArray>(offset);
+                return llvmTextureLoad(this, coord, sampleIndex);
         }
     }
 
@@ -4805,7 +5204,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+        [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_1_samplerless)]
         get
         {
             __target_switch
@@ -4816,6 +5215,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 case metal:
                 case spirv:
                 case wgsl:
+                case llvm:
                     return Load(location, 0);
                 case glsl:
                     if (isCombined == 0)
@@ -4828,7 +5228,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+        [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_1_samplerless)]
         get
         {
             __target_switch
@@ -4839,6 +5239,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 case metal:
                 case spirv:
                 case wgsl:
+                case llvm:
                     return Load(location, sampleIndex);
                 case glsl:
                     if (isCombined == 0)
@@ -4873,7 +5274,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
     $}
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location)
     {
         __target_switch
@@ -4998,12 +5399,14 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                     }
                 }
                 __intrinsic_asm "textureLoad($0, $1)$z";
+            case llvm:
+                return llvmTextureLoad(this, location, 0);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_spirv_llvm, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location, vector<int, Shape.dimensions+isArray> offset)
     {
         __target_switch
@@ -5019,6 +5422,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                     %sampled:__sampledType(T) = OpImageRead $this $location ConstOffset $offset;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case llvm:
+                let coord = location + offset;
+                return llvmTextureLoad(this, coord, 0);
         }
     }
 
@@ -5146,6 +5552,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
             if (T is float2) __intrinsic_asm "textureStore($0, $1, vec4<f32>($2, 0, 1))";
             if (T is float3) __intrinsic_asm "textureStore($0, $1, vec4<f32>($2, 1))";
             __intrinsic_asm "textureStore($0, $1, $2)";
+        case llvm:
+            llvmTextureStore(this, location, newValue, 0);
         }
     }
 
@@ -5157,7 +5565,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_1)]
         get
         {
             __target_switch
@@ -5170,13 +5578,14 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                 case cuda:
                 case metal:
                 case wgsl:
+                case llvm:
                     return Load(location);
             }
         }
 
         [nonmutating]
         [ForceInline]
-        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_1)]
         set(T newValue)
         {
             Store(location, newValue);
@@ -5211,7 +5620,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_compute_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl_llvm, texture_sm_4_1_compute_fragment)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
     {
         __target_switch
@@ -5259,12 +5668,14 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, $(access), isShadow, isCombined, format>();
 
                 __intrinsic_asm "textureLoad($0, $1, $2)$z";
+            case llvm:
+                return llvmTextureLoad(this, location, sampleIndex);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]
+    [require(cpp_glsl_hlsl_spirv_llvm, texture_sm_4_1_compute_fragment)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, vector<int, Shape.dimensions+isArray> offset)
     {
         __target_switch
@@ -5280,6 +5691,9 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
                     %sampled:__sampledType(T) = OpImageRead $this $location ConstOffset|Sample $offset $sampleIndex;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case llvm:
+                let coord = location + offset;
+                return llvmTextureLoad(this, coord, sampleIndex);
         }
     }
 
@@ -5308,7 +5722,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_spirv_wgsl, texture_sm_4_1_compute_fragment)]
+        [require(cpp_glsl_hlsl_spirv_wgsl_llvm, texture_sm_4_1_compute_fragment)]
         get
         {
             __target_switch
@@ -5319,13 +5733,14 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
                 case glsl:
                 case spirv:
                 case wgsl:
+                case llvm:
                     return Load(location, sampleIndex);
             }
         }
 
         [nonmutating]
         [ForceInline]
-        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]
+        [require(cpp_glsl_hlsl_spirv_llvm, texture_sm_4_1_compute_fragment)]
         set(T newValue)
         {
             __target_switch
@@ -5340,6 +5755,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
                     {
                         OpImageWrite $this $location __convertTexel(newValue) Sample $sampleIndex;
                     };
+                case llvm:
+                    llvmTextureStore(this, location, newValue, sampleIndex);
             }
         }
 

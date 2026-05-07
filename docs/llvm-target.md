@@ -70,14 +70,65 @@ If you specify a different layout with flags like `-fvk-use-c-layout` or
 `-fvk-use-scalar-layout`, all structure and array types on the stack and heap
 will follow those layout rules.
 
-### Types and resources
+### Special type memory layouts
 
 * `StructuredBuffer` and `ByteAddressBuffer` are stored as `{ Type* data; intptr_t size; }`,
-where `size` is the number of elements in `data`.
+  where `size` is the number of elements in `data`.
+
+* `Texture` and `SamplerState` types are stored as opaque pointers. Combined
+  image samplers (`Sampler2D` etc.) are `{ void* texture; void* sampler; }`.
 
 * Vectors are passed as LLVM vector types; there's no direct equivalent in standard C or C++.
 
 * Matrix types are lowered into arrays of vectors. Column and row major matrices are supported as normal.
+
+### Textures
+
+In the LLVM target, texture types are fully user-defined and user-implemented,
+but they still use the familiar `RWTexture2D<T>`, `Texture2D<T>`, etc. types and
+their member functions.
+
+The core module treats these types as opaque pointers. It never attempts to
+dereference them in any way, so you can define them as anything as long as it's
+pointer-sized (like `uint2` on a 64-bit target). It is possible to use `bit_cast`
+to convert the texture and sampler types to whatever concrete type.
+
+The core module forward-declares all texture operations, for example:
+
+```slang
+extern T.TexelElement llvmTextureLoad<T:ITexture>(T tex, vector<int, T.coordDimensions> location, int levelOrSampleIndex);
+```
+
+Which the user must then implement if they wish to use the related functionality:
+
+```slang
+// Must be defined in a user module before compiling to IR or object code.
+export T.TexelElement llvmTextureLoad<T:ITexture>(
+    T tex,
+    vector<int, T.coordDimensions> location,
+    int levelOrSampleIndex)
+{
+    if (T is RWTexture2D<float4>)
+    {
+        MyCPUTextureType* type = bit_cast<MyCPUTextureType*>(tex);
+        float4 texel = loadFromMyTextureType(type, int2(location[0], location[1]), levelOrSampleIndex);
+        // This cast is a no-op, but necessary due to how generic type-checking operates.
+        return (texel as T.TexelElement).value;
+    }
+    return {};
+}
+```
+
+[Check out all `llvmTexture*` functions from the docs](https://docs.shader-slang.org/en/latest/search.html?q=llvmTexture)
+to see what you need to implement to get all texture functionality. You can get
+away with only implementing the functions you need. You can use the `ITexture`
+interface to observe at compile time what kind of texture is being used.
+
+Note that this doesn't mean that you'd actually have to write your texture
+sampling functionality in Slang (although you can if you want to). You can use
+these `llvmTexture*` functions as routers that just call the relevant external
+C functions, forwarding the opaque texture pointers to them. This way, you don't
+need your concrete texture type to be available to Slang at all.
 
 ### Aggregate parameters
 
@@ -100,7 +151,7 @@ In other words, aggregate parameters are turned into pointers and aggregate
 return values are turned into an additional pointer-typed parameter at the end
 of the parameter list.
 
-### C foreign functions
+### FFI / C foreign functions
 
 Due to the aggregate parameter passing limitation of LLVM, calling arbitrary C
 functions from Slang is complicated, and a hypothetical binding generator would
@@ -153,11 +204,10 @@ implement in LLVM. Support for them may be added later.
 
 ### Missing types
 
-* No texture or sampler types.
 * No acceleration structures.
 
-These are missing due to limitation of scope for the initial implementation,
-and may be added later.
+These are missing due to limitation of scope for the implementation, and may be
+added soon.
 
 ## Gotchas
 
