@@ -5,6 +5,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -1170,10 +1171,24 @@ struct CUDASurfaceFormatLegalizer
         }
     }
 
+    // Emit a diagnostic for unsupported packed texture formats.
+    void diagnoseUnsupportedFormat(ImageFormat format, IRInst* inst)
+    {
+        const auto& info = getImageFormatInfo(format);
+        m_sink->diagnose(
+            Diagnostics::UnsupportedCudaTextureFormat{.format = info.name, .location = inst->sourceLoc});
+    }
+
     // Process a single direct global texture param: find all its surface calls,
     // rewrite types and calls, then remove the format decoration.
     void processTexture(IRInst* textureInst, ImageFormat format)
     {
+        if (getConversionKind(format) == FormatConversionKind::Packed)
+        {
+            diagnoseUnsupportedFormat(format, textureInst);
+            return;
+        }
+
         IRType* storageType = getStorageType(format);
         if (!storageType)
             return;
@@ -1201,12 +1216,15 @@ struct CUDASurfaceFormatLegalizer
     // struct field key. Access pattern: fieldKey -> get_field_addr -> load -> call.
     void processStructFieldTexture(IRInst* fieldKey, ImageFormat format)
     {
-        IRType* storageType = getStorageType(format);
-        if (!storageType)
+        if (getConversionKind(format) == FormatConversionKind::Packed)
         {
-            fprintf(stderr, "[CUDASurfaceFormat] No storage type for format\n");
+            diagnoseUnsupportedFormat(format, fieldKey);
             return;
         }
+
+        IRType* storageType = getStorageType(format);
+        if (!storageType)
+            return;
 
         List<IRCall*> readsToRewrite;
         List<IRCall*> writesToRewrite;

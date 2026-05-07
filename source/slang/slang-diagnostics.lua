@@ -4983,6 +4983,13 @@ err(
 )
 
 err(
+    "unsupported-cuda-texture-format",
+    55210,
+    "unsupported CUDA texture format",
+    span { loc = "location", message = "texture format '~format' is not supported for CUDA surface read/write operations. Packed formats (rgb10_a2, rgb10_a2ui, r11f_g11f_b10f) require manual conversion." }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",
