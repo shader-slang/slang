@@ -577,6 +577,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             // index).
                             IRBuilder builder(getElement);
                             builder.setInsertBefore(user);
+                            auto index = getElement->getIndex();
+                            auto indexValue = index;
+                            const bool isNonUniformIndex =
+                                index->getOp() == kIROp_NonUniformResourceIndex ||
+                                index->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                                    nullptr;
+                            if (index->getOp() == kIROp_NonUniformResourceIndex)
+                                indexValue = index->getOperand(0);
                             auto newAddr = builder.emitElementAddress(
                                 builder.getPtrType(
                                     innerElementType,
@@ -584,7 +592,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                     addressSpace,
                                     dataLayout),
                                 inst,
-                                getElement->getIndex());
+                                indexValue);
+                            if (isNonUniformIndex)
+                            {
+                                // Preserve non-uniform provenance on the rewritten access chain
+                                // without mutating the shared index SSA that other uses may rely on.
+                                if (!newAddr->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+                                {
+                                    builder.addSPIRVNonUniformResourceDecoration(newAddr);
+                                }
+                            }
                             user->replaceUsesWith(newAddr);
                             user->removeAndDeallocate();
                             return;

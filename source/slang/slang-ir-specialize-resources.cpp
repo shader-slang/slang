@@ -64,6 +64,9 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         if (isKhronosTarget(targetRequest))
         {
             if (targetProgram->getOptionSet().shouldEmitSPIRVDirectly())
+                // Direct SPIR-V relies on this earlier specialization step to
+                // rewrite resource-typed helper calls before emission; the
+                // emitter no longer mirrors non-uniform state across calls.
                 return isIllegalSPIRVParameterType(type, isArray);
             else
                 return isIllegalGLSLParameterType(type);

@@ -63,6 +63,7 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         case kIROp_FieldAddress:
         case kIROp_FieldExtract:
         case kIROp_Load:
+        case kIROp_CastDynamicResource:
             {
                 auto base = arg->getOperand(0);
 
@@ -642,6 +643,14 @@ struct FunctionParameterSpecializationContext
             auto oldBase = oldArg->getOperand(0);
             getCallInfoForArg(ioInfo, oldBase);
         }
+        else if (oldArg->getOp() == kIROp_CastDynamicResource)
+        {
+            auto oldBase = oldArg->getOperand(0);
+            // Bindless resource arguments may pass through CastDynamicResource
+            // before reaching a specialized helper, so keep walking through the
+            // cast when forming the specialization key.
+            getCallInfoForArg(ioInfo, oldBase);
+        }
         else if (oldArg->getOp() == kIROp_CastDescriptorHandleToResource)
         {
             // We are accessing a resource from a bindless handle.
@@ -928,6 +937,21 @@ struct FunctionParameterSpecializationContext
             auto builder = getBuilder();
             builder->setInsertInto(ioInfo.newBodyInsts);
             auto newVal = builder->emitLoad(oldArg->getFullType(), newPtr);
+
+            return newVal;
+        }
+        else if (oldArg->getOp() == kIROp_CastDynamicResource)
+        {
+            auto oldBase = oldArg->getOperand(0);
+            auto newBase = getSpecializedValueForArg(ioInfo, oldBase);
+
+            auto builder = getBuilder();
+            builder->setInsertInto(ioInfo.newBodyInsts);
+            IRInst* newOperands[] = {newBase};
+            // Rebuild the cast in the specialized clone so downstream
+            // legalization still sees the original dynamic-resource shape.
+            auto newVal =
+                builder->emitIntrinsicInst(oldArg->getFullType(), kIROp_CastDynamicResource, 1, newOperands);
 
             return newVal;
         }
