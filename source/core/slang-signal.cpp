@@ -86,8 +86,8 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
 #endif
     }
 
-    // Strip directory prefix for readability. Note: the full path is still baked into
-    // the binary's read-only data by the compiler; this only affects the printed output.
+    // Strip any remaining directory prefix for readability (the build system already
+    // maps the source root away via -fmacro-prefix-map / /d1trimfile).
     const char* basename = file ? file : "unknown";
     if (file)
     {
