@@ -21,8 +21,6 @@ enum class SignalType
 [[noreturn]] void handleSignal(SignalType type, char const* message);
 
 // Special handler for assertions that can optionally return based on environment variable.
-// `file` and `line` should be __FILE__ / __LINE__ at the assertion site; the basename of
-// `file` is prepended to the diagnostic message.
 // Pass isReleaseAssert=true for assertions that should fire even in release-assert-only mode.
 void handleAssert(char const* message, char const* file, int line, bool isReleaseAssert);
 

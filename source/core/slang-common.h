@@ -358,7 +358,8 @@ public:
 
 //
 // Assertions abort in debug builds, but inform the compiler of true
-// assumptions in release builds
+// assumptions in release builds. __FILE__ / __LINE__ are captured at
+// the call site and prepended (as basename only) to the failure message.
 //
 #ifdef _DEBUG
 #define SLANG_ASSERT(VALUE)                                           \
