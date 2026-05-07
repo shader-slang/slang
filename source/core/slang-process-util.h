@@ -11,6 +11,8 @@ struct ExecuteResult
 {
     typedef int ResultCode;
 
+    ExecuteResult() { init(); }
+
     void init()
     {
         resultCode = 0;
@@ -19,7 +21,7 @@ struct ExecuteResult
         debugLayer = String();
     }
 
-    ResultCode resultCode;
+    ResultCode resultCode = 0;
     String standardOutput;
     String standardError;
     String debugLayer;

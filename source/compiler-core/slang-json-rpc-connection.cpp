@@ -72,7 +72,50 @@ JSONValue JSONRPCConnection::getCurrentMessageId()
     return JSONRPCUtil::getId(&m_container, m_jsonRoot);
 }
 
-void JSONRPCConnection::disconnect()
+static void _waitForTermination(
+    Process* process,
+    Int timeOutInMs,
+    JSONRPCConnection::DisconnectPollFunc pollFunc,
+    void* userData)
+{
+    if (!pollFunc)
+    {
+        process->waitForTermination(timeOutInMs);
+        return;
+    }
+
+    const Int kPollIntervalMs = 50;
+
+    if (timeOutInMs < 0)
+    {
+        pollFunc(userData);
+        while (!process->waitForTermination(kPollIntervalMs))
+        {
+            pollFunc(userData);
+        }
+        pollFunc(userData);
+        return;
+    }
+
+    Int remainingMs = timeOutInMs;
+    while (remainingMs > 0 && !process->isTerminated())
+    {
+        pollFunc(userData);
+        const Int waitMs = (remainingMs > kPollIntervalMs) ? kPollIntervalMs : remainingMs;
+        if (process->waitForTermination(waitMs))
+        {
+            pollFunc(userData);
+            return;
+        }
+        remainingMs -= waitMs;
+    }
+
+    pollFunc(userData);
+    process->waitForTermination(0);
+    pollFunc(userData);
+}
+
+void JSONRPCConnection::disconnect(DisconnectPollFunc pollFunc, void* userData)
 {
     if (m_process)
     {
@@ -84,7 +127,7 @@ void JSONRPCConnection::disconnect()
                 if (SLANG_SUCCEEDED(sendCall(UnownedStringSlice::fromLiteral("quit"))))
                 {
                     // Wait for termination
-                    m_process->waitForTermination(m_terminationTimeOutInMs);
+                    _waitForTermination(m_process, m_terminationTimeOutInMs, pollFunc, userData);
                 }
             }
 
@@ -92,7 +135,7 @@ void JSONRPCConnection::disconnect()
             {
                 // Send SIGTERM and wait for graceful shutdown
                 m_process->terminate(0);
-                m_process->waitForTermination(m_terminationTimeOutInMs);
+                _waitForTermination(m_process, m_terminationTimeOutInMs, pollFunc, userData);
             }
 
             // Okay just kill it then

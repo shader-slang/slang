@@ -2,6 +2,11 @@
 
 #include "slang-process.h"
 #include "slang-string-util.h"
+#include "slang-test-diagnostics.h"
+
+#include <chrono>
+#include <stdio.h>
+#include <stdlib.h>
 
 namespace Slang
 {
@@ -341,6 +346,13 @@ struct SleepState
 
 SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
 {
+    const bool rpcDiagnosticsEnabled = isTestRpcDiagnosticEnabled();
+    std::chrono::steady_clock::time_point startTime;
+    if (rpcDiagnosticsEnabled)
+    {
+        startTime = std::chrono::steady_clock::now();
+    }
+
     m_readResult = SLANG_OK;
 
     int64_t startTick = 0;
@@ -368,6 +380,13 @@ SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
         // We timed out
         if (timeOutInTicks >= 0 && int64_t(Process::getClockTick()) - startTick >= timeOutInTicks)
         {
+            if (rpcDiagnosticsEnabled)
+            {
+                fprintf(
+                    stderr,
+                    "[RPC-TIMEOUT] waitForResult timed out after %lldms\n",
+                    (long long)timeOutInMs);
+            }
             break;
         }
 
@@ -378,6 +397,24 @@ SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
         else
         {
             sleepState.reset();
+        }
+    }
+
+    if (rpcDiagnosticsEnabled && m_readState == ReadState::Done)
+    {
+        auto endTime = std::chrono::steady_clock::now();
+        auto duration =
+            std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+        fprintf(
+            stderr,
+            "[RPC-WAIT] waitForResult completed in %lldms (thread=%zu)\n",
+            (long long)duration,
+            getCurrentThreadDiagnosticId());
+
+        // Warn if wait took more than 1 second
+        if (duration > 1000)
+        {
+            fprintf(stderr, "[RPC-WARNING] Slow RPC wait: %lldms\n", (long long)duration);
         }
     }
 
@@ -406,6 +443,13 @@ void HTTPPacketConnection::consumeContent()
 
 SlangResult HTTPPacketConnection::write(const void* content, size_t sizeInBytes)
 {
+    const bool rpcDiagnosticsEnabled = isTestRpcDiagnosticEnabled();
+    std::chrono::steady_clock::time_point startTime;
+    if (rpcDiagnosticsEnabled)
+    {
+        startTime = std::chrono::steady_clock::now();
+    }
+
     // Write the header
     {
         HTTPHeader header;
@@ -419,6 +463,29 @@ SlangResult HTTPPacketConnection::write(const void* content, size_t sizeInBytes)
 
     // Write the content
     SLANG_RETURN_ON_FAIL(m_writeStream->write(content, sizeInBytes));
+
+    if (rpcDiagnosticsEnabled)
+    {
+        auto endTime = std::chrono::steady_clock::now();
+        auto duration =
+            std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count();
+        fprintf(
+            stderr,
+            "[RPC-WRITE] HTTPPacketConnection::write size=%zu duration=%lldus (thread=%zu)\n",
+            sizeInBytes,
+            (long long)duration,
+            getCurrentThreadDiagnosticId());
+
+        // Warn if write took more than 100ms
+        if (duration > 100000)
+        {
+            fprintf(
+                stderr,
+                "[RPC-WARNING] Slow RPC write: %lldus for %zu bytes\n",
+                (long long)duration,
+                sizeInBytes);
+        }
+    }
 
     return SLANG_OK;
 }

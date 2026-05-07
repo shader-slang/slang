@@ -29,6 +29,8 @@ supports.
 class JSONRPCConnection : public RefObject
 {
 public:
+    typedef void (*DisconnectPollFunc)(void* userData);
+
     enum class CallStyle
     {
         Default, ///< The default
@@ -49,8 +51,9 @@ public:
         CallStyle callStyle = CallStyle::Default,
         Process* process = nullptr);
 
-    /// Disconnect. May block while server shuts down
-    void disconnect();
+    /// Disconnect. May block while server shuts down. If provided, pollFunc is called while
+    /// waiting so callers can drain side-channel output from the backing process.
+    void disconnect(DisconnectPollFunc pollFunc = nullptr, void* userData = nullptr);
 
     SlangResult checkArrayObjectWrap(
         const JSONValue& srcArgs,

@@ -330,24 +330,71 @@ SlangResult JSONToNativeConverter::convertArrayToStruct(
         infos.add(cur);
     }
 
-    // Must have the same amount of fields
     auto array = m_container->getArray(value);
-    if (array.getCount() != totalFieldCount)
+    const Index arrayCount = array.getCount();
+
+    // Cannot have more elements than fields
+    if (arrayCount > totalFieldCount)
     {
+        m_sink->diagnose(
+            value.loc,
+            JSONDiagnostics::tooManyElementsForArray,
+            arrayCount,
+            totalFieldCount);
         return SLANG_FAIL;
+    }
+
+    // If fewer elements than fields, verify that all missing fields are Optional.
+    // This converter is shared by all array-style JSON-RPC argument handling, not just
+    // test-server. The relaxed count rule only applies to fields that explicitly opt in with
+    // the Optional RTTI flag; missing required fields still fail here for every caller.
+    // Fields are processed in base-to-derived order, so we need to check if
+    // fields from arrayCount to totalFieldCount are all Optional.
+    if (arrayCount < totalFieldCount)
+    {
+        Index fieldIndex = 0;
+        for (Index i = infos.getCount() - 1; i >= 0; --i)
+        {
+            auto info = infos[i];
+            for (Index j = 0; j < info->m_fieldCount; ++j)
+            {
+                if (fieldIndex >= arrayCount)
+                {
+                    // This field is missing from the array - it must be Optional
+                    const auto& field = info->m_fields[j];
+                    if (!(field.m_flags & StructRttiInfo::Flag::Optional))
+                    {
+                        m_sink->diagnose(
+                            value.loc,
+                            JSONDiagnostics::fieldRequiredOnType,
+                            field.m_name,
+                            info->m_name);
+                        return SLANG_FAIL;
+                    }
+                }
+                ++fieldIndex;
+            }
+        }
     }
 
     Byte* dstBase = (Byte*)out;
 
     // We work in the order from the base class to the final type
     Index argIndex = 0;
-    for (Index i = infos.getCount() - 1; i >= 0; --i)
+    bool done = false;
+    for (Index i = infos.getCount() - 1; i >= 0 && !done; --i)
     {
         auto info = infos[i];
 
         const Index fieldCount = info->m_fieldCount;
         for (Index j = 0; j < fieldCount; ++j)
         {
+            // Skip if we've exhausted the array (remaining fields must be Optional)
+            if (argIndex >= arrayCount)
+            {
+                done = true;
+                break;
+            }
             // Convert the field
             const auto& field = info->m_fields[j];
             SLANG_RETURN_ON_FAIL(

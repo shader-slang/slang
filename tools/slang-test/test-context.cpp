@@ -64,6 +64,7 @@ void TestContext::setThreadIndex(int index)
 void TestContext::setMaxTestRunnerThreadCount(int count)
 {
     m_jsonRpcConnections.setCount(count);
+    m_testServerStderrStreams.setCount(count);
     m_testRequirements.setCount(count);
     m_reporters.setCount(count);
     for (auto& reporter : m_reporters)
@@ -129,6 +130,13 @@ Result TestContext::init(const char* inExePath)
 
 TestContext::~TestContext()
 {
+    // Shut down all test-server connections and drain their stderr
+    for (Index i = 0; i < m_jsonRpcConnections.getCount(); ++i)
+    {
+        _disconnectRPCConnection(i);
+    }
+    fflush(stderr);
+
     if (m_languageServerConnection)
     {
         m_languageServerConnection->sendCall(
@@ -247,6 +255,9 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
     SLANG_RETURN_ON_FAIL(
         rpcConnection->init(connection, JSONRPCConnection::CallStyle::Default, process));
 
+    // Store stderr stream for later draining only after the RPC connection is live.
+    m_testServerStderrStreams[slangTestThreadIndex] = readErrStream;
+
     out = rpcConnection;
 
     return SLANG_OK;
@@ -281,11 +292,106 @@ SlangResult TestContext::createLanguageServerJSONRPCConnection(RefPtr<JSONRPCCon
 
 void TestContext::destroyRPCConnection()
 {
-    if (m_jsonRpcConnections[slangTestThreadIndex])
+    _disconnectRPCConnection(slangTestThreadIndex);
+}
+
+struct TestServerStderrDrainContext
+{
+    TestContext* context;
+    Index threadIndex;
+};
+
+static void _drainTestServerStderrCallback(void* userData)
+{
+    auto context = static_cast<TestServerStderrDrainContext*>(userData);
+    context->context->drainTestServerStderr(context->threadIndex);
+}
+
+void TestContext::_disconnectRPCConnection(Index threadIndex)
+{
+    if (threadIndex < 0 || threadIndex >= m_jsonRpcConnections.getCount())
+        return;
+
+    if (m_jsonRpcConnections[threadIndex])
     {
-        m_jsonRpcConnections[slangTestThreadIndex]->disconnect();
-        m_jsonRpcConnections[slangTestThreadIndex].setNull();
+        // Drain before and during disconnect so a verbose test-server cannot block writing stderr
+        // while the parent waits for it to exit.
+        drainTestServerStderr(threadIndex);
+
+        TestServerStderrDrainContext drainContext = {this, threadIndex};
+        m_jsonRpcConnections[threadIndex]->disconnect(
+            _drainTestServerStderrCallback,
+            &drainContext);
+        m_jsonRpcConnections[threadIndex].setNull();
+
+        // Drain any shutdown diagnostics emitted after the quit request. The process has exited,
+        // so this final drain is unbounded and should not truncate diagnostics.
+        _drainTestServerStderr(threadIndex, false);
+
+        if (threadIndex < m_testServerStderrStreams.getCount() &&
+            m_testServerStderrStreams[threadIndex])
+        {
+            m_testServerStderrStreams[threadIndex].setNull();
+        }
     }
+}
+
+void TestContext::drainTestServerStderr()
+{
+    drainTestServerStderr(slangTestThreadIndex);
+}
+
+void TestContext::drainTestServerStderr(Index threadIndex)
+{
+    _drainTestServerStderr(threadIndex, true);
+}
+
+void TestContext::_drainTestServerStderr(Index threadIndex, bool limitBytes)
+{
+    if (threadIndex < 0 || threadIndex >= m_testServerStderrStreams.getCount())
+        return;
+
+    auto& stderrStream = m_testServerStderrStreams[threadIndex];
+    if (!stderrStream)
+        return;
+
+    // Read any available data from the test-server's stderr and forward to our stderr.
+    // This is safe to call while the test-server is running: on Unix, the underlying
+    // UnixPipeStream::read uses poll() which returns immediately when no data is available.
+    // On Windows, WinPipeStream checks PeekNamedPipe before ReadFile so empty pipes do not block.
+    List<uint8_t> buffer;
+    buffer.setCount(4096);
+
+    static const size_t kMaxDrainBytes = 16 * 1024 * 1024;
+    size_t totalDrained = 0;
+
+    while (!stderrStream->isEnd())
+    {
+        if (limitBytes && totalDrained >= kMaxDrainBytes)
+        {
+            break;
+        }
+
+        size_t bytesRead = 0;
+        SlangResult res = stderrStream->read(buffer.getBuffer(), buffer.getCount(), bytesRead);
+
+        if (SLANG_FAILED(res) || bytesRead == 0)
+            break;
+
+        // Write to our stderr
+        fwrite(buffer.getBuffer(), 1, bytesRead, stderr);
+        totalDrained += bytesRead;
+    }
+
+    if (limitBytes && totalDrained >= kMaxDrainBytes)
+    {
+        fprintf(
+            stderr,
+            "[TEST-SERVER] stderr drain paused after %zu bytes; remaining diagnostics will be "
+            "forwarded by a later drain or during shutdown\n",
+            totalDrained);
+    }
+    fflush(stderr);
 }
 
 Slang::JSONRPCConnection* TestContext::getOrCreateJSONRPCConnection()

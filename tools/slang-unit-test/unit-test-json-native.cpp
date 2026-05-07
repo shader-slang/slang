@@ -2,7 +2,9 @@
 
 #include "../../source/compiler-core/slang-json-native.h"
 #include "../../source/compiler-core/slang-json-parser.h"
+#include "../../source/compiler-core/slang-test-server-protocol.h"
 #include "../../source/core/slang-rtti-info.h"
+#include "../../source/core/slang-test-diagnostics.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -74,6 +76,48 @@ static const StructRttiInfo _makeSomeStructRtti()
     return builder.make();
 }
 /* static */ const StructRttiInfo SomeStruct::g_rttiInfo = _makeSomeStructRtti();
+
+struct ArrayStyleOptionalFieldsTestStruct
+{
+    String toolName;
+    List<String> args;
+    String optionalNote;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
+static const StructRttiInfo _makeArrayStyleOptionalFieldsTestStructRtti()
+{
+    ArrayStyleOptionalFieldsTestStruct obj;
+    StructRttiBuilder builder(&obj, "ArrayStyleOptionalFieldsTestStruct", nullptr);
+    builder.addField("toolName", &obj.toolName);
+    builder.addField("args", &obj.args);
+    builder.addField("optionalNote", &obj.optionalNote, StructRttiInfo::Flag::Optional);
+    return builder.make();
+}
+/* static */ const StructRttiInfo ArrayStyleOptionalFieldsTestStruct::g_rttiInfo =
+    _makeArrayStyleOptionalFieldsTestStructRtti();
+
+struct ArrayStyleRequiredAfterOptionalTestStruct
+{
+    String first;
+    String optionalMiddle;
+    String requiredTail;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
+static const StructRttiInfo _makeArrayStyleRequiredAfterOptionalTestStructRtti()
+{
+    ArrayStyleRequiredAfterOptionalTestStruct obj;
+    StructRttiBuilder builder(&obj, "ArrayStyleRequiredAfterOptionalTestStruct", nullptr);
+    builder.addField("first", &obj.first);
+    builder.addField("optionalMiddle", &obj.optionalMiddle, StructRttiInfo::Flag::Optional);
+    builder.addField("requiredTail", &obj.requiredTail);
+    return builder.make();
+}
+/* static */ const StructRttiInfo ArrayStyleRequiredAfterOptionalTestStruct::g_rttiInfo =
+    _makeArrayStyleRequiredAfterOptionalTestStructRtti();
 
 } // namespace
 
@@ -159,4 +203,365 @@ static SlangResult _check()
 SLANG_UNIT_TEST(JSONNative)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_check()));
+}
+
+struct ExpectedStructField
+{
+    const char* name;
+    uint32_t offset;
+    StructRttiInfo::Flags flags;
+};
+
+static SlangResult _checkStructFields(
+    const StructRttiInfo& info,
+    const ExpectedStructField* expectedFields,
+    Index expectedFieldCount)
+{
+    if (info.m_fieldCount != expectedFieldCount)
+    {
+        SLANG_CHECK(info.m_fieldCount == expectedFieldCount);
+        return SLANG_FAIL;
+    }
+
+    for (Index i = 0; i < expectedFieldCount; ++i)
+    {
+        SLANG_CHECK(String(info.m_fields[i].m_name) == expectedFields[i].name);
+        SLANG_CHECK(info.m_fields[i].m_offset == expectedFields[i].offset);
+        // Keep protocol field flags stable: marking an existing field Optional changes
+        // array-style compatibility for external clients compiled against this header.
+        SLANG_CHECK(info.m_fields[i].m_flags == expectedFields[i].flags);
+    }
+
+    return SLANG_OK;
+}
+
+// Test that externally consumed test-server protocol structures keep their layout-compatible field
+// lists. VK-GL-CTS compiles this header into pre-built binaries, so even Optional RTTI fields can
+// break protocol compatibility.
+static SlangResult _checkProtocolCompatibility()
+{
+    struct ExpectedExecuteUnitTestArgsLayout
+    {
+        String moduleName;
+        String testName;
+        uint32_t enabledApis;
+        bool enableDebugLayers;
+    };
+
+    struct ExpectedExecuteToolTestArgsLayout
+    {
+        String toolName;
+        List<String> args;
+    };
+
+    struct ExpectedExecutionResultLayout
+    {
+        String stdOut;
+        String stdError;
+        String debugLayer;
+        int32_t result;
+        int32_t returnCode;
+    };
+
+    struct ExpectedQuitArgsLayout
+    {
+    };
+
+    SLANG_CHECK(
+        sizeof(TestServerProtocol::ExecuteUnitTestArgs) ==
+        sizeof(ExpectedExecuteUnitTestArgsLayout));
+    SLANG_CHECK(
+        alignof(TestServerProtocol::ExecuteUnitTestArgs) ==
+        alignof(ExpectedExecuteUnitTestArgsLayout));
+    SLANG_CHECK(
+        sizeof(TestServerProtocol::ExecuteToolTestArgs) ==
+        sizeof(ExpectedExecuteToolTestArgsLayout));
+    SLANG_CHECK(
+        alignof(TestServerProtocol::ExecuteToolTestArgs) ==
+        alignof(ExpectedExecuteToolTestArgsLayout));
+    SLANG_CHECK(
+        sizeof(TestServerProtocol::ExecutionResult) == sizeof(ExpectedExecutionResultLayout));
+    SLANG_CHECK(
+        alignof(TestServerProtocol::ExecutionResult) == alignof(ExpectedExecutionResultLayout));
+    SLANG_CHECK(sizeof(TestServerProtocol::QuitArgs) == sizeof(ExpectedQuitArgsLayout));
+    SLANG_CHECK(alignof(TestServerProtocol::QuitArgs) == alignof(ExpectedQuitArgsLayout));
+
+    SLANG_CHECK(String(TestServerProtocol::ExecuteUnitTestArgs::g_methodName) == "unitTest");
+    SLANG_CHECK(String(TestServerProtocol::ExecuteToolTestArgs::g_methodName) == "tool");
+    SLANG_CHECK(String(TestServerProtocol::QuitArgs::g_methodName) == "quit");
+
+    static const ExpectedStructField executeUnitFields[] = {
+        {"moduleName", uint32_t(offsetof(ExpectedExecuteUnitTestArgsLayout, moduleName)), 0},
+        {"testName", uint32_t(offsetof(ExpectedExecuteUnitTestArgsLayout, testName)), 0},
+        {"enabledApis", uint32_t(offsetof(ExpectedExecuteUnitTestArgsLayout, enabledApis)), 0},
+        {"enableDebugLayers",
+         uint32_t(offsetof(ExpectedExecuteUnitTestArgsLayout, enableDebugLayers)),
+         0},
+    };
+    SLANG_RETURN_ON_FAIL(_checkStructFields(
+        TestServerProtocol::ExecuteUnitTestArgs::g_rttiInfo,
+        executeUnitFields,
+        SLANG_COUNT_OF(executeUnitFields)));
+
+    static const ExpectedStructField executeToolFields[] = {
+        {"toolName", uint32_t(offsetof(ExpectedExecuteToolTestArgsLayout, toolName)), 0},
+        {"args", uint32_t(offsetof(ExpectedExecuteToolTestArgsLayout, args)), 0},
+    };
+    SLANG_RETURN_ON_FAIL(_checkStructFields(
+        TestServerProtocol::ExecuteToolTestArgs::g_rttiInfo,
+        executeToolFields,
+        SLANG_COUNT_OF(executeToolFields)));
+
+    static const ExpectedStructField executionResultFields[] = {
+        {"stdOut", uint32_t(offsetof(ExpectedExecutionResultLayout, stdOut)), 0},
+        {"stdError", uint32_t(offsetof(ExpectedExecutionResultLayout, stdError)), 0},
+        {"debugLayer", uint32_t(offsetof(ExpectedExecutionResultLayout, debugLayer)), 0},
+        {"result", uint32_t(offsetof(ExpectedExecutionResultLayout, result)), 0},
+        {"returnCode", uint32_t(offsetof(ExpectedExecutionResultLayout, returnCode)), 0},
+    };
+    SLANG_RETURN_ON_FAIL(_checkStructFields(
+        TestServerProtocol::ExecutionResult::g_rttiInfo,
+        executionResultFields,
+        SLANG_COUNT_OF(executionResultFields)));
+
+    return SLANG_OK;
+}
+
+SLANG_UNIT_TEST(TestServerProtocolCompatibility)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_checkProtocolCompatibility()));
+}
+
+SLANG_UNIT_TEST(TestDiagnosticConfigParsing)
+{
+    {
+        const TestDiagnosticConfig config =
+            parseTestDiagnosticConfig(UnownedStringSlice::fromLiteral(""));
+        SLANG_CHECK(!config.all);
+        SLANG_CHECK(!config.timing);
+        SLANG_CHECK(!config.timingPhases);
+        SLANG_CHECK(!config.rpc);
+        SLANG_CHECK(!config.fd);
+        SLANG_CHECK(!config.pipe);
+    }
+
+    {
+        const TestDiagnosticConfig config =
+            parseTestDiagnosticConfig(UnownedStringSlice::fromLiteral(" timing-phases, RPC ,fd "));
+        SLANG_CHECK(!config.all);
+        SLANG_CHECK(config.timing);
+        SLANG_CHECK(config.timingPhases);
+        SLANG_CHECK(config.rpc);
+        SLANG_CHECK(config.fd);
+        SLANG_CHECK(!config.pipe);
+    }
+
+    {
+        const TestDiagnosticConfig config =
+            parseTestDiagnosticConfig(UnownedStringSlice::fromLiteral("pipe,unknown,1"));
+        SLANG_CHECK(config.all);
+        SLANG_CHECK(!config.timing);
+        SLANG_CHECK(!config.timingPhases);
+        SLANG_CHECK(!config.rpc);
+        SLANG_CHECK(!config.fd);
+        SLANG_CHECK(config.pipe);
+    }
+}
+
+// Test that array-style JSON-RPC works with Optional fields (backward compatibility).
+// This simulates an older client sending fewer array elements than the struct has fields,
+// where the missing fields are marked as Optional.
+static SlangResult _checkArrayStyleOptionalFields()
+{
+    SourceManager sourceManager;
+    sourceManager.initialize(nullptr, nullptr);
+    auto typeMap = JSONNativeUtil::getTypeFuncsMap();
+
+    // Test: Array-style parsing with a missing Optional field.
+    // Old clients send: ["toolName", ["arg1", "arg2"]]
+    // New struct has: toolName, args, optionalNote (Optional)
+    {
+        const char* json = R"(["render-test", ["-api", "vk"]])";
+        ArrayStyleOptionalFieldsTestStruct args;
+
+        DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
+        RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
+
+        String contents(json);
+        SourceFile* sourceFile =
+            sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, &sink);
+
+        JSONBuilder builder(container);
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
+
+        JSONToNativeConverter converter(container, &typeMap, &sink);
+        SLANG_RETURN_ON_FAIL(converter.convertArrayToStruct(
+            builder.getRootValue(),
+            GetRttiInfo<ArrayStyleOptionalFieldsTestStruct>::get(),
+            &args));
+
+        SLANG_CHECK(args.toolName == "render-test");
+        SLANG_CHECK(args.args.getCount() == 2);
+        SLANG_CHECK(args.args[0] == "-api");
+        SLANG_CHECK(args.args[1] == "vk");
+        SLANG_CHECK(args.optionalNote.getLength() == 0);
+    }
+
+    // Test: Array-style parsing with all fields provided (including Optional)
+    {
+        const char* json = R"(["render-test", ["-api", "vk"], "diagnostic-note"])";
+        ArrayStyleOptionalFieldsTestStruct args;
+
+        DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
+        RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
+
+        String contents(json);
+        SourceFile* sourceFile =
+            sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, &sink);
+
+        JSONBuilder builder(container);
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
+
+        JSONToNativeConverter converter(container, &typeMap, &sink);
+        SLANG_RETURN_ON_FAIL(converter.convertArrayToStruct(
+            builder.getRootValue(),
+            GetRttiInfo<ArrayStyleOptionalFieldsTestStruct>::get(),
+            &args));
+
+        SLANG_CHECK(args.toolName == "render-test");
+        SLANG_CHECK(args.args.getCount() == 2);
+        SLANG_CHECK(args.optionalNote == "diagnostic-note");
+    }
+
+    // Test: Array-style parsing rejects a missing required field after an Optional field.
+    {
+        const char* json = R"(["first"])";
+        ArrayStyleRequiredAfterOptionalTestStruct args;
+
+        DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
+        RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
+
+        String contents(json);
+        SourceFile* sourceFile =
+            sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, &sink);
+
+        JSONBuilder builder(container);
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
+
+        JSONToNativeConverter converter(container, &typeMap, &sink);
+        SLANG_CHECK(SLANG_FAILED(converter.convertArrayToStruct(
+            builder.getRootValue(),
+            GetRttiInfo<ArrayStyleRequiredAfterOptionalTestStruct>::get(),
+            &args)));
+        SLANG_CHECK(sink.getErrorCount() > 0);
+    }
+
+    // Test: Array-style parsing accepts all fields in a struct with an Optional middle field.
+    {
+        const char* json = R"(["first", "middle", "tail"])";
+        ArrayStyleRequiredAfterOptionalTestStruct args;
+
+        DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
+        RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
+
+        String contents(json);
+        SourceFile* sourceFile =
+            sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, &sink);
+
+        JSONBuilder builder(container);
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
+
+        JSONToNativeConverter converter(container, &typeMap, &sink);
+        SLANG_RETURN_ON_FAIL(converter.convertArrayToStruct(
+            builder.getRootValue(),
+            GetRttiInfo<ArrayStyleRequiredAfterOptionalTestStruct>::get(),
+            &args));
+
+        SLANG_CHECK(args.first == "first");
+        SLANG_CHECK(args.optionalMiddle == "middle");
+        SLANG_CHECK(args.requiredTail == "tail");
+    }
+
+    // Test: Array-style parsing rejects a missing required field.
+    {
+        const char* json = R"(["render-test"])";
+        ArrayStyleOptionalFieldsTestStruct args;
+
+        DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
+        RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
+
+        String contents(json);
+        SourceFile* sourceFile =
+            sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, &sink);
+
+        JSONBuilder builder(container);
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
+
+        JSONToNativeConverter converter(container, &typeMap, &sink);
+        SLANG_CHECK(SLANG_FAILED(converter.convertArrayToStruct(
+            builder.getRootValue(),
+            GetRttiInfo<ArrayStyleOptionalFieldsTestStruct>::get(),
+            &args)));
+        SLANG_CHECK(sink.getErrorCount() > 0);
+    }
+
+    // Test: Array-style parsing rejects too many elements.
+    {
+        const char* json = R"(["render-test", ["-api", "vk"], "diagnostic-note", "extra"])";
+        ArrayStyleOptionalFieldsTestStruct args;
+
+        DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
+        RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
+
+        String contents(json);
+        SourceFile* sourceFile =
+            sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+        SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+        JSONLexer lexer;
+        lexer.init(sourceView, &sink);
+
+        JSONBuilder builder(container);
+        JSONParser parser;
+        SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &sink));
+
+        JSONToNativeConverter converter(container, &typeMap, &sink);
+        SLANG_CHECK(SLANG_FAILED(converter.convertArrayToStruct(
+            builder.getRootValue(),
+            GetRttiInfo<ArrayStyleOptionalFieldsTestStruct>::get(),
+            &args)));
+        SLANG_CHECK(sink.getErrorCount() > 0);
+    }
+
+    return SLANG_OK;
+}
+
+SLANG_UNIT_TEST(ArrayStyleOptionalFields)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_checkArrayStyleOptionalFields()));
 }
