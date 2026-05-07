@@ -1,5 +1,4 @@
-Slang Design and Implementation Notes
-=====================================
+# Slang Design and Implementation Notes
 
 This directory contains documents that are primarily intended for developers working on the Slang implementation.
 They are not intended to be helpful to Slang users.
@@ -15,6 +14,8 @@ The [Interfaces](interfaces.md) document describes the high-level design plan fo
 The [Declaration References](decl-refs.md) document is intended to help out developers who are mystified by the heavily used `DeclRef` type in the compiler implementation.
 
 The [Intermediate Representation (IR)](ir.md) document describes the design of Slang's internal IR.
+
+The [Shader Coverage](shader-coverage.md) document describes the current architecture for shader coverage instrumentation, including the interaction between IR-time buffer synthesis and post-emit metadata.
 
 The [Existential Types](existential-types.md) document goes into some detail about what "existential types" are in the context of the Slang language, and explains how we may go about supporting them.
 

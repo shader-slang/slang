@@ -1955,7 +1955,7 @@ err(
     "forward-reference-in-generic-constraint",
     30117,
     "forward reference in generic constraint",
-    span { loc = "expr:Expr", message = "generic constraint for parameter '~param:Type' references type parameter '~referenced:Decl' before it is declared" }
+    span { loc = "expr:Expr", message = "generic constraint for parameter '~param:Type' references parameter '~referenced:Decl' before it is declared" }
 )
 
 err(
@@ -1963,6 +1963,13 @@ err(
     30118,
     "cannot mix differentiable value types with differentiable pointer outputs",
     span { loc = "location", message = "function has both IDifferentiable value types and IDifferentiablePtrType outputs, which is not currently supported. Please split the function so that differentiable value parameters and pointer differentiable outputs are in separate functions." }
+)
+
+err(
+    "forward-reference-in-generic-default-initializer",
+    30122,
+    "forward reference in generic default initializer",
+    span { loc = "expr:Expr", message = "generic default initializer for parameter '~param:Decl' references parameter '~referenced:Decl' before it is declared" }
 )
 
 
@@ -4037,6 +4044,13 @@ err(
     span { loc = "location", message = "type '~type:Type' cannot be used as ~direction ~context of entry point '~entryPoint:Name' when targeting ~target because ~reason" }
 )
 
+warning(
+    "vertex-shader-missing-sv-position",
+    38052,
+    "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic",
+    span { loc = "location", message = "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic; the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output, or suppress with -warnings-disable 38052)" }
+)
+
 --
 -- 382xx: module imports
 --
@@ -4092,7 +4106,7 @@ err(
     "cannot-use-resource-type-in-structured-buffer",
     38204,
     "resource type in StructuredBuffer",
-    span { loc = "location", message = "StructuredBuffer element type '~type:IRInst' cannot contain resource or opaque handle types" }
+    span { loc = "location", message = "StructuredBuffer element type '~type:IRInst' must not be a resource type or contain an opaque handle type" }
 )
 
 err(
@@ -4586,6 +4600,40 @@ err(
     45001,
     "unresolved external symbol",
     span { loc = "location", message = "unresolved external symbol '~symbol:IRInst'." }
+)
+
+-- 451xx - Coverage instrumentation (-trace-coverage)
+
+warning(
+    "coverage-buffer-reserved-name",
+    45100,
+    "`__slang_coverage` is reserved by `-trace-coverage`",
+    span { loc = "location", message = "the global parameter name `__slang_coverage` is reserved by the `-trace-coverage` instrumentation. The IR coverage pass synthesizes its own buffer with this name; the user declaration here is silently shadowed and will not receive any counter writes. Either rename the user declaration or remove `-trace-coverage` from the compile." }
+)
+
+err(
+    "coverage-binding-collision",
+    45101,
+    "`-trace-coverage-binding` collides with an existing parameter",
+    span { loc = "location", message = "the explicit `-trace-coverage-binding` slot collides with this global parameter; downstream code generation will emit two parameters at the same `(register, space)` and fail validation. Pick a free slot, or omit `-trace-coverage-binding` to let the IR pass auto-allocate." }
+)
+
+warning(
+    "coverage-target-not-supported",
+    45102,
+    "`-trace-coverage` is not supported on this target; coverage instrumentation skipped"
+)
+
+err(
+    "coverage-binding-exhausted",
+    45103,
+    "could not allocate a free binding slot for `__slang_coverage` — existing global parameters occupy too many slots in space 0"
+)
+
+err(
+    "coverage-pass-through-incompatible",
+    45104,
+    "`-trace-coverage` cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation"
 )
 
 -- 41xxx - Semantic checking (continued)

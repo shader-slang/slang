@@ -33,13 +33,18 @@ gcloud compute scp "${BINARY}" "${VM_NAME}:/tmp/scaler" \
   --zone="${ZONE}" --project="${PROJECT}"
 
 echo "Stopping services, replacing binary, restarting..."
+# Keep the service list synchronized between the stop block and the restart loop.
+# scaler-linux-sm80plus was added in PR #10967 (2026-04-29) but was missing from
+# this script, so deployments silently left the SM80Plus tier on the old binary
+# until manually restarted.
+SCALER_SERVICES="scaler-windows scaler-linux scaler-linux-sm80plus scaler-windows-build"
 gcloud compute ssh "${VM_NAME}" --zone="${ZONE}" --project="${PROJECT}" --command="
-    sudo systemctl stop scaler-windows scaler-linux scaler-windows-build 2>/dev/null || true
+    sudo systemctl stop ${SCALER_SERVICES} 2>/dev/null || true
     sudo mv /tmp/scaler /opt/scaler/scaler
     sudo chmod 755 /opt/scaler/scaler
     sudo chown scaler:scaler /opt/scaler/scaler
     failed=0
-    for svc in scaler-windows scaler-linux scaler-windows-build; do
+    for svc in ${SCALER_SERVICES}; do
         if sudo systemctl is-enabled \$svc 2>/dev/null | grep -q enabled; then
             sudo systemctl start \$svc
             if sudo systemctl is-active \$svc >/dev/null 2>&1; then

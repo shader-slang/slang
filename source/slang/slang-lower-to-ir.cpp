@@ -1,6 +1,7 @@
 // lower.cpp
 #include "slang-lower-to-ir.h"
 
+#include "../core/slang-char-encode.h"
 #include "../core/slang-char-util.h"
 #include "../core/slang-hash.h"
 #include "../core/slang-performance-profiler.h"
@@ -469,6 +470,13 @@ struct IRGenEnv
     IRGenEnv* outer = nullptr;
 };
 
+struct DebugSourceLineColumnCache
+{
+    bool isInitialized = false;
+    bool hasEmbeddedSourceText = false;
+    List<IRIntegerValue> lineMaxColumns;
+};
+
 struct SharedIRGenContext
 {
 
@@ -497,6 +505,7 @@ struct SharedIRGenContext
 
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
+    Dictionary<IRInst*, DebugSourceLineColumnCache> mapDebugSourceToLineColumnCache;
 
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
 
@@ -615,6 +624,12 @@ struct IRGenContext
     FunctionDeclBase* funcDecl = nullptr;
 
     DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
+
+    // Shader-coverage instrumentation. When true, each lowered
+    // statement is preceded by an IncrementCoverageCounter op, which a
+    // later IR pass rewrites into an atomic counter write on a
+    // synthesized buffer.
+    bool traceCoverage = false;
 
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
@@ -8965,6 +8980,119 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
     return debugSourceInst;
 }
 
+static DebugSourceLineColumnCache _buildDebugSourceLineColumnCache(IRInst* debugSourceInst)
+{
+    DebugSourceLineColumnCache cache;
+    cache.isInitialized = true;
+
+    auto debugSource = as<IRDebugSource>(debugSourceInst);
+    if (!debugSource)
+        return cache;
+
+    auto source = as<IRStringLit>(debugSource->getSource());
+    if (!source)
+        return cache;
+
+    UnownedStringSlice remaining = source->getStringSlice();
+    if (remaining.getLength() == 0)
+        return cache;
+
+    cache.hasEmbeddedSourceText = true;
+    UnownedStringSlice line;
+    while (StringUtil::extractLine(remaining, line))
+    {
+        // HumaneSourceLoc columns are code-point based when SourceFile has contents, so keep the
+        // cached SPIR-V validation bound in the same units.
+        cache.lineMaxColumns.add(IRIntegerValue(UTF8Util::calcCodePointCount(line) + 1));
+    }
+
+    return cache;
+}
+
+static bool _tryGetDebugSourceLineMaxColumn(
+    IRGenContext* context,
+    IRInst* debugSourceInst,
+    IRIntegerValue oneBasedLine,
+    IRIntegerValue& outMaxColumn)
+{
+    auto& cache = context->shared->mapDebugSourceToLineColumnCache[debugSourceInst];
+    if (!cache.isInitialized)
+        cache = _buildDebugSourceLineColumnCache(debugSourceInst);
+
+    if (!cache.hasEmbeddedSourceText)
+        return false;
+
+    // SPIRV-Tools validates DebugLine columns against the embedded DebugSource text. The maximum
+    // accepted column is one past the final code point on the source line. If the line is outside
+    // the embedded text, clamp to column 1 as the only defensible column for an absent line.
+    if (oneBasedLine <= 0)
+    {
+        outMaxColumn = 1;
+        return true;
+    }
+
+    const auto lineIndex = Index(oneBasedLine - 1);
+    if (lineIndex >= 0 && lineIndex < cache.lineMaxColumns.getCount())
+    {
+        outMaxColumn = cache.lineMaxColumns[lineIndex];
+        return true;
+    }
+
+    outMaxColumn = 1;
+    return true;
+}
+
+static void _clampDebugLineColumns(
+    IRGenContext* context,
+    IRInst* debugSourceInst,
+    IRIntegerValue line,
+    IRIntegerValue& colStart,
+    IRIntegerValue& colEnd)
+{
+    IRIntegerValue maxColumn = 0;
+    if (!_tryGetDebugSourceLineMaxColumn(context, debugSourceInst, line, maxColumn))
+        return;
+
+    if (colStart < 1)
+        colStart = 1;
+    if (colStart > maxColumn)
+        colStart = maxColumn;
+
+    if (colEnd < colStart)
+        colEnd = colStart;
+    if (colEnd > maxColumn)
+        colEnd = maxColumn;
+}
+
+static IRIntegerValue _clampDebugColumn(
+    IRGenContext* context,
+    IRInst* debugSourceInst,
+    IRIntegerValue line,
+    IRIntegerValue column)
+{
+    IRIntegerValue maxColumn = 0;
+    if (!_tryGetDebugSourceLineMaxColumn(context, debugSourceInst, line, maxColumn))
+        return column;
+
+    if (column < 1)
+        return 1;
+    if (column > maxColumn)
+        return maxColumn;
+    return column;
+}
+
+static HumaneSourceLoc _getDebugHumaneLoc(
+    IRGenContext* context,
+    IRInst* debugSourceInst,
+    SourceLoc loc)
+{
+    auto sourceManager = context->getLinkage()->getSourceManager();
+    auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
+    humaneLoc.column =
+        _clampDebugColumn(context, debugSourceInst, humaneLoc.line, humaneLoc.column);
+    return humaneLoc;
+}
+
 void maybeEmitDebugLine(
     IRGenContext* context,
     StmtLoweringVisitor* visitor,
@@ -8990,15 +9118,14 @@ void maybeEmitDebugLine(
 
     auto sourceManager = context->getLinkage()->getSourceManager();
     auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
+    IRIntegerValue colStart = humaneLoc.column;
+    IRIntegerValue colEnd = humaneLoc.column + 1;
+    _clampDebugLineColumns(context, debugSourceInst, humaneLoc.line, colStart, colEnd);
 
     if (visitor)
         visitor->startBlockIfNeeded(stmt);
-    context->irBuilder->emitDebugLine(
-        debugSourceInst,
-        humaneLoc.line,
-        humaneLoc.line,
-        humaneLoc.column,
-        humaneLoc.column + 1);
+    context->irBuilder
+        ->emitDebugLine(debugSourceInst, humaneLoc.line, humaneLoc.line, colStart, colEnd);
 }
 
 void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
@@ -9011,8 +9138,7 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
     if (!debugSourceInst)
         return;
 
-    auto sourceManager = context->getLinkage()->getSourceManager();
-    auto humaneLoc = sourceManager->getHumaneLoc(inst->sourceLoc, SourceLocType::Emit);
+    auto humaneLoc = _getDebugHumaneLoc(context, debugSourceInst, inst->sourceLoc);
 
     context->irBuilder
         ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
@@ -9028,6 +9154,16 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
     try
     {
         maybeEmitDebugLine(context, &visitor, stmt, stmt->loc);
+
+        // Under `-trace-coverage`, emit a counter op before each executable
+        // statement (skip Block/Seq/Empty wrappers — no execution to count).
+        if (context->traceCoverage && stmt->loc.isValid() && !as<EmptyStmt>(stmt) &&
+            !as<BlockStmt>(stmt) && !as<SeqStmt>(stmt))
+        {
+            visitor.startBlockIfNeeded(stmt);
+            context->irBuilder->emitIncrementCoverageCounter();
+        }
+
         visitor.dispatch(stmt);
     }
     // Don't emit any context message for an explicit `AbortCompilationException`
@@ -10962,14 +11098,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     // Create a debug variable for this let declaration
                     auto builder = context->irBuilder;
-                    auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(
-                        decl->loc,
-                        SourceLocType::Emit);
-
                     // Find the debug source for this file
                     IRInst* debugSourceInst = getOrEmitDebugSource(context, decl->loc);
                     if (debugSourceInst)
                     {
+                        auto humaneLoc = _getDebugHumaneLoc(context, debugSourceInst, decl->loc);
                         auto debugVar = builder->emitDebugVar(
                             varType,
                             debugSourceInst,
@@ -13385,13 +13518,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto instanceAttr = as<InstanceAttribute>(modifier))
             {
-                IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), instanceAttr);
-                getBuilder()->addDecoration(irFunc, kIROp_InstanceDecoration, intLit);
+                auto builder = getBuilder();
+                builder->addDecoration(
+                    irFunc,
+                    kIROp_InstanceDecoration,
+                    builder->getIntValue(builder->getIntType(), instanceAttr->value));
             }
             else if (auto maxVertCountAttr = as<MaxVertexCountAttribute>(modifier))
             {
-                IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), maxVertCountAttr);
-                getBuilder()->addDecoration(irFunc, kIROp_MaxVertexCountDecoration, intLit);
+                auto builder = getBuilder();
+                builder->addDecoration(
+                    irFunc,
+                    kIROp_MaxVertexCountDecoration,
+                    builder->getIntValue(builder->getIntType(), maxVertCountAttr->value));
             }
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
             {
@@ -14256,6 +14395,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     context->irBuilder = builder;
     context->debugInfoLevel = compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel();
+    context->traceCoverage =
+        compileRequest->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage);
 
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {
