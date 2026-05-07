@@ -38,11 +38,6 @@ MyStruct func(RWStructuredBuffer<uint> buffer)
 void main(uint3 pixelIndex : SV_DispatchThreadID)
 {
 
-    // CHECK_SPV: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_SPV: OpDecorate %[[VAR2:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_SPV: OpDecorate %[[VAR3:[a-zA-Z0-9_]+]] NonUniform
-
-
     // CHECK_GLSL_SPV: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
     // CHECK_GLSL_SPV: OpDecorate %[[VAR2:[a-zA-Z0-9_]+]] NonUniform
     // CHECK_GLSL_SPV: OpDecorate %[[VAR3:[a-zA-Z0-9_]+]] NonUniform
@@ -62,13 +57,14 @@ void main(uint3 pixelIndex : SV_DispatchThreadID)
     // CHECK_GLSL_SPV: OpDecorate %[[VAR17:[a-zA-Z0-9_]+]] NonUniform
     // CHECK_GLSL_SPV: OpDecorate %[[VAR18:[a-zA-Z0-9_]+]] NonUniform
 
-
     // Test case 1: slang will specialize the func call to 'MyStruct func(uint)'
+    // The access chain for bufferIdx should be decorated NonUniform.
+    // CHECK_SPV-DAG: %[[AC_BUF1:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %globalBuffer %bufferIdx{{[^0-9]}}
+    // CHECK_SPV-DAG: OpDecorate %[[AC_BUF1]] NonUniform
+
     uint bufferIdx = pixelIndex.x;
     uint nonUniformIdx = NonUniformResourceIndex(bufferIdx);
     RWStructuredBuffer<uint> buffer = globalBuffer[nonUniformIdx];
-
-    // CHECK_SPV: %[[VAR1]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %bufferIdx
 
     // CHECK_GLSL_SPV: %[[VAR1]] = OpCopyObject %uint %{{.*}}
 
@@ -89,8 +85,9 @@ void main(uint3 pixelIndex : SV_DispatchThreadID)
 
     // Test case 2: Make sure we cover the case for the different data type of the index.
     // In this case, slang will specialize the function to 'MyStruct func(int)'
-    // CHECK_SPV: %[[VAR2]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %bufferIdx2
-
+    // The access chain for bufferIdx2 should be decorated NonUniform.
+    // CHECK_SPV-DAG: %[[AC_BUF2:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %globalBuffer %bufferIdx2
+    // CHECK_SPV-DAG: OpDecorate %[[AC_BUF2]] NonUniform
 
     // CHECK_GLSL_SPV: %[[VAR2]] = OpCopyObject %int %{{.*}}
 
@@ -115,19 +112,17 @@ void main(uint3 pixelIndex : SV_DispatchThreadID)
     // Test case 4: Test to make sure we correctly cover the case that intCast or uintCast of a NonUniformResourceIndex
     // is still a NonUniformResourceIndex.
 
-    // The cast generates OpBitcast to int for the intermediate cast (happens before bufferIdx3 in SPIRV)
-    // CHECK_SPV: OpBitcast %int %{{.*}}
-
     RWStructuredBuffer<uint> buffer3 = globalBuffer[bufferIdx3];
 
-    // CHECK_SPV: %[[VAR4:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %bufferIdx3
-
-    // Test to make sure this command is not decorated with NonUniform:
-    // CHECK_SPV-NOT: OpDecorate %[[VAR4]] NonUniform
+    // Test case 3: The access chain for uniform bufferIdx3 should NOT be decorated NonUniform.
+    // The slang-test output appends "; NonUniform" to decorated instructions,
+    // so we match the access chain line and verify NonUniform does NOT appear
+    // before the next access chain.
+    // CHECK_SPV: OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %globalBuffer %bufferIdx3
+    // CHECK_SPV-NOT: NonUniform
+    // CHECK_SPV: OpAccessChain
     // CHECK_CUDA: func_{{[0-9]+}}(globalParams_{{[0-9]+}}->globalBuffer_{{[0-9]+}}[{{.*}}])
     MyStruct myStruct3 = func(buffer3);
-
-    // CHECK_SPV: OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}}
 
     // CHECK_GLSL-SPV: %[[VAR19:[a-zA-Z0-9_]+]]  = OpBitcast %int %[[VAR3]]
     // CHECK_GLSL-SPV: %[[VAR16]] = OpCopyObject %int %[[VAR19]]

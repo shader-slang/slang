@@ -6057,6 +6057,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 ensureExtensionDeclarationBeforeSpv15(toSlice("SPV_EXT_descriptor_indexing"));
 
                 requireSPIRVCapability(SpvCapabilityShaderNonUniform);
+                requireNonUniformIndexingCapabilityForInst(decoration->getParent());
                 emitOpDecorate(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
@@ -10502,6 +10503,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // This keeps track of the named IDs used in the asm block
         Dictionary<UnownedStringSlice, SpvWord> idMap;
 
+        // Track asm-local IDs whose values are derived from a NonUniform
+        // operand.  Seeded from IR-backed operands that carry
+        // IRSPIRVNonUniformResourceDecoration; propagated transitively
+        // through any instruction whose operand is already in the set.
+        HashSet<SpvWord> nonUniformLocalIDs;
+
+        // Record (opcode, resultID) for non-uniform results so we can
+        // emit the right capability after the asm block.
+        List<std::pair<SpvOp, SpvWord>> nonUniformResults;
+
         for (const auto spvInst : inst->getInsts())
         {
             const bool isLast = spvInst == inst->getLastChild();
@@ -10977,7 +10988,68 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             }
                         });
                 }
+
+                // Propagate NonUniform through asm-local IDs.
+                // An instruction's result is non-uniform if any operand is
+                // either an IR value with IRSPIRVNonUniformResourceDecoration
+                // or an asm-local ID already in nonUniformLocalIDs.
+                {
+                    bool hasNonUniformOperand = false;
+                    for (const auto operand : spvInst->getSPIRVOperands())
+                    {
+                        if (operand->getOp() == kIROp_SPIRVAsmOperandInst)
+                        {
+                            auto irVal = operand->getValue();
+                            if (irVal &&
+                                irVal->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+                                hasNonUniformOperand = true;
+                        }
+                        else if (operand->getOp() == kIROp_SPIRVAsmOperandId)
+                        {
+                            SpvWord id = 0;
+                            auto idName = cast<IRStringLit>(operand->getValue())->getStringSlice();
+                            if (idMap.tryGetValue(idName, id) && nonUniformLocalIDs.contains(id))
+                                hasNonUniformOperand = true;
+                        }
+                    }
+
+                    if (hasNonUniformOperand)
+                    {
+                        // Find the result ID and mark it non-uniform.
+                        SpvWord resultID = 0;
+                        for (const auto operand : spvInst->getSPIRVOperands())
+                        {
+                            if (operand->getOp() == kIROp_SPIRVAsmOperandId)
+                            {
+                                auto idName =
+                                    cast<IRStringLit>(operand->getValue())->getStringSlice();
+                                idMap.tryGetValue(idName, resultID);
+                                break;
+                            }
+                            else if (operand->getOp() == kIROp_SPIRVAsmOperandResult)
+                            {
+                                resultID = getID(last);
+                                break;
+                            }
+                        }
+                        if (resultID && nonUniformLocalIDs.add(resultID))
+                            nonUniformResults.add({opcode, resultID});
+                    }
+                }
             }
+        }
+
+        for (const auto& [resultOpcode, resultID] : nonUniformResults)
+        {
+            ensureExtensionDeclarationBeforeSpv15(toSlice("SPV_EXT_descriptor_indexing"));
+            requireSPIRVCapability(SpvCapabilityShaderNonUniform);
+            if (resultOpcode == SpvOpSampledImage)
+                requireSPIRVCapability(SpvCapabilitySampledImageArrayNonUniformIndexing);
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                resultID,
+                SpvDecorationNonUniform);
         }
 
         for (const auto& [name, id] : idMap)
@@ -10992,6 +11064,76 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (m_capabilities.add(capability))
         {
             emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, capability);
+        }
+    }
+
+    // Given the IR type of a NonUniform-decorated instruction, determine and emit
+    // the resource-kind-specific NonUniformIndexing capability required by Vulkan.
+    void requireNonUniformIndexingCapabilityForInst(IRInst* inst)
+    {
+        if (!inst)
+            return;
+        auto type = inst->getDataType();
+        if (!type)
+            return;
+
+        // StorageBuffer address space unambiguously identifies SSBOs even after
+        // type lowering. Uniform address space is NOT checked here because
+        // pre-SPIR-V-1.4 targets lower SSBOs to Uniform as well; fall through
+        // to the type-based checks to distinguish UBOs from SSBOs.
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+        {
+            if (ptrType->getAddressSpace() == AddressSpace::StorageBuffer)
+            {
+                requireSPIRVCapability(SpvCapabilityStorageBufferArrayNonUniformIndexing);
+                return;
+            }
+        }
+
+        type = unwrapArrayAndPointers(type);
+
+        if (auto texType = as<IRTextureTypeBase>(type))
+        {
+            if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER)
+            {
+                auto access = texType->getAccess();
+                if (access == SLANG_RESOURCE_ACCESS_READ_WRITE ||
+                    access == SLANG_RESOURCE_ACCESS_WRITE ||
+                    access == SLANG_RESOURCE_ACCESS_RASTER_ORDERED)
+                    requireSPIRVCapability(SpvCapabilityStorageTexelBufferArrayNonUniformIndexing);
+                else
+                    requireSPIRVCapability(SpvCapabilityUniformTexelBufferArrayNonUniformIndexing);
+            }
+            else
+            {
+                auto access = texType->getAccess();
+                if (access == SLANG_RESOURCE_ACCESS_READ_WRITE ||
+                    access == SLANG_RESOURCE_ACCESS_WRITE ||
+                    access == SLANG_RESOURCE_ACCESS_RASTER_ORDERED)
+                    requireSPIRVCapability(SpvCapabilityStorageImageArrayNonUniformIndexing);
+                else
+                    requireSPIRVCapability(SpvCapabilitySampledImageArrayNonUniformIndexing);
+            }
+        }
+        else if (as<IRSamplerStateTypeBase>(type))
+        {
+            requireSPIRVCapability(SpvCapabilitySampledImageArrayNonUniformIndexing);
+        }
+        else if (as<IRHLSLStructuredBufferTypeBase>(type))
+        {
+            requireSPIRVCapability(SpvCapabilityStorageBufferArrayNonUniformIndexing);
+        }
+        else if (as<IRSubpassInputType>(type))
+        {
+            requireSPIRVCapability(SpvCapabilityInputAttachmentArrayNonUniformIndexing);
+        }
+        else if (as<IRUniformParameterGroupType>(type))
+        {
+            requireSPIRVCapability(SpvCapabilityUniformBufferArrayNonUniformIndexing);
+        }
+        else if (as<IRGLSLShaderStorageBufferType>(type))
+        {
+            requireSPIRVCapability(SpvCapabilityStorageBufferArrayNonUniformIndexing);
         }
     }
 
