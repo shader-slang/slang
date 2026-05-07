@@ -1032,7 +1032,7 @@ local insts = {
 	{ CombinedTextureSamplerGetSampler = { operands = { { "sampler" } } } },
 	{ call = { operands = { { "callee" } } } },
 	{ rtti_object = { struct_name = "RTTIObject" } },
-	{ alloca = { operands = { { "allocSize" } } } },
+	{ alloca = { operands = { { "count" } } } },
 	{ updateElement = { operands = { { "oldValue" }, { "elementValue" } } } },
 	{ detachDerivative = { operands = { { "value" } } } },
 	{ bitfieldExtract = { operands = { { "value" }, { "offset" }, { "count" } } } },
