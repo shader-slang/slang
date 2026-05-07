@@ -433,8 +433,8 @@ IRFunc* createIntegerMappingFunc(IRModule* module, Dictionary<UInt, UInt>& mappi
     return func;
 }
 
-// This context lowers `GetTagOfElementInSet`,
-// `GetTagForSuperSet`, and `GetTagForMappedSet` instructions,
+// This context lowers `GetTagOfElementInSet`, `GetTagForSuperSet`,
+// `GetTagForMappedSet`, and `GetTagForMappedValueSet` instructions,
 //
 struct TagOpsLoweringContext : public InstPassBase
 {
@@ -452,6 +452,8 @@ struct TagOpsLoweringContext : public InstPassBase
         : InstPassBase(module)
     {
     }
+
+    Dictionary<KeyValuePair<IRInst*, IRInst*>, IRFunc*> valueSetDispatchFuncCache;
 
     void lowerGetTagForSuperSet(IRGetTagForSuperSet* inst)
     {
@@ -479,6 +481,120 @@ struct TagOpsLoweringContext : public InstPassBase
         IRBuilder builder(inst->getModule());
         builder.setInsertAfter(inst);
         inst->replaceUsesWith(builder.emitCast(inst->getDataType(), inst->getOperand(0), true));
+        inst->removeAndDeallocate();
+    }
+
+    // Lower a `GetTagForMappedValueSet`: the destination is a `ValueSet`
+    // (value-typed `static const` interface members like `Int` or `Bool`),
+    // and the per-table entry is itself the constant IR value.
+    //
+    // Build a `(UInt witnessTag) -> ValueType` dispatch function: a switch
+    // that returns the constant entry for each witness-table tag, then
+    // replace the inst with a call to that function.
+    IRFunc* getOrCreateValueSetDispatchFunc(
+        IRWitnessTableSet* srcSet,
+        IRStructKey* requirementKey,
+        IRType* resultType)
+    {
+        KeyValuePair<IRInst*, IRInst*> cacheKey(srcSet, requirementKey);
+
+        IRFunc* dispatchFunc = nullptr;
+        if (valueSetDispatchFuncCache.tryGetValue(cacheKey, dispatchFunc))
+        {
+            SLANG_RELEASE_ASSERT(dispatchFunc->getResultType() == resultType);
+            return dispatchFunc;
+        }
+
+        // Collect (witness-tag, value-entry) pairs.
+        List<UInt> caseTags;
+        List<IRInst*> caseEntries;
+        {
+            IRBuilder tagBuilder(this->module);
+            for (UInt i = 0; i < srcSet->getCount(); i++)
+            {
+                auto table = as<IRWitnessTable>(srcSet->getElement(i));
+                SLANG_RELEASE_ASSERT(table);
+                auto entry = findWitnessTableEntry(table, requirementKey);
+                SLANG_RELEASE_ASSERT(entry);
+                caseTags.add(getUniqueID(&tagBuilder, table));
+                caseEntries.add(entry);
+            }
+        }
+        SLANG_RELEASE_ASSERT(caseEntries.getCount() > 0);
+
+        // Build a dispatch function `(UInt) -> resultType`.
+        IRBuilder funcBuilder(this->module);
+        auto funcType =
+            funcBuilder.getFuncType(List<IRType*>({funcBuilder.getUIntType()}), resultType);
+        dispatchFunc = funcBuilder.createFunc();
+        funcBuilder.setInsertInto(dispatchFunc);
+        dispatchFunc->setFullType(funcType);
+
+        auto entryBlock = funcBuilder.emitBlock();
+        funcBuilder.setInsertInto(entryBlock);
+        auto tagParam = funcBuilder.emitParam(funcBuilder.getUIntType());
+
+        List<IRInst*> caseValues;
+        List<IRBlock*> caseBlocks;
+        for (Index i = 0; i < caseEntries.getCount(); i++)
+        {
+            auto caseBlock = funcBuilder.emitBlock();
+            funcBuilder.setInsertInto(caseBlock);
+            funcBuilder.emitReturn(caseEntries[i]);
+
+            caseValues.add(funcBuilder.getIntValue(funcBuilder.getUIntType(), caseTags[i]));
+            caseBlocks.add(caseBlock);
+        }
+
+        List<IRInst*> flattenedCaseArgs;
+        for (Index i = 0; i < caseValues.getCount(); i++)
+        {
+            flattenedCaseArgs.add(caseValues[i]);
+            flattenedCaseArgs.add(caseBlocks[i]);
+        }
+
+        // The default block must end in a real return: HLSL emit lowers
+        // `kIROp_Unreachable` to nothing, and dxc rejects functions whose
+        // control can fall off the end (`-Wreturn-type`). In well-formed IR
+        // the witness tag always matches one of the cases, so the value here
+        // is never observed.
+        auto defaultBlock = funcBuilder.emitBlock();
+        funcBuilder.setInsertInto(defaultBlock);
+        funcBuilder.emitReturn(funcBuilder.emitDefaultConstruct(resultType));
+
+        auto unreachableBlock = funcBuilder.emitBlock();
+        funcBuilder.setInsertInto(unreachableBlock);
+        funcBuilder.emitUnreachable();
+
+        funcBuilder.setInsertInto(entryBlock);
+        funcBuilder.emitSwitch(
+            tagParam,
+            unreachableBlock,
+            defaultBlock,
+            flattenedCaseArgs.getCount(),
+            flattenedCaseArgs.getBuffer());
+
+        valueSetDispatchFuncCache.add(cacheKey, dispatchFunc);
+        return dispatchFunc;
+    }
+
+    void lowerGetTagForMappedValueSet(IRGetTagForMappedValueSet* inst)
+    {
+        auto srcSet = cast<IRWitnessTableSet>(
+            cast<IRSetTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
+        auto key = cast<IRStructKey>(inst->getOperand(1));
+        auto resultType = inst->getDataType();
+        auto dispatchFunc = getOrCreateValueSetDispatchFunc(srcSet, key, resultType);
+
+        // Replace the inst with a call to the dispatch function. The
+        // witness-tag operand has SetTagType but is treated as UInt at the
+        // IR level after lowerTagTypes.
+        IRBuilder builder(this->module);
+        builder.setInsertBefore(inst);
+        auto callResult =
+            builder.emitCallInst(resultType, dispatchFunc, List<IRInst*>({inst->getOperand(0)}));
+
+        inst->replaceUsesWith(callResult);
         inst->removeAndDeallocate();
     }
 
@@ -566,6 +682,9 @@ struct TagOpsLoweringContext : public InstPassBase
             break;
         case kIROp_GetTagForMappedSet:
             lowerGetTagForMappedSet(as<IRGetTagForMappedSet>(inst));
+            break;
+        case kIROp_GetTagForMappedValueSet:
+            lowerGetTagForMappedValueSet(as<IRGetTagForMappedValueSet>(inst));
             break;
         case kIROp_GetTagOfElementInSet:
             lowerGetTagOfElementInSet(as<IRGetTagOfElementInSet>(inst));
