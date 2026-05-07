@@ -12,4 +12,5 @@ void test()
 {
     Visibility t1 = {1, 2}; // error: synthesized ctor takes 1 arg (y), not 2
 //CHECK:            ^ too many arguments to call
+//CHECK: member 'x' is internal, but 'Visibility' is public
 }
