@@ -435,3 +435,35 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
     ctx().record(RecordFlag::None, readBack);
     SLANG_CHECK(readBack == 123);
 }
+
+// Dtor side of the REPLAY_TEST contract: when a test leaves the singleton
+// dirty (mid-recording, non-empty streams) and exits the ScopedReplayContext
+// scope normally, the dtor must reset it so the next test sees a clean
+// singleton. Covered implicitly by every other replay test today, but pinning
+// it down explicitly so a regression in ScopedReplayContext::~ScopedReplayContext
+// fails here directly instead of as a downstream cascade.
+SLANG_UNIT_TEST(replayContextDtorLeavesSingletonClean)
+{
+    ReplayContext::get().reset();
+    {
+        REPLAY_TEST;
+        SLANG_UNUSED(unitTestContext);
+
+        // Dirty the singleton inside the REPLAY_TEST scope. The dtor at the
+        // closing brace must clean all of this back up.
+        ctx().setMode(Mode::Record);
+        int32_t value = 99;
+        ctx().record(RecordFlag::None, value);
+        ctx().switchToSync();
+        ctx().record(RecordFlag::None, value);
+        SLANG_CHECK(ctx().isActive());
+        SLANG_CHECK(ctx().getStream().getSize() > 0);
+    }
+
+    SLANG_CHECK(ReplayContext::get().getMode() == Mode::Idle);
+    SLANG_CHECK(!ReplayContext::get().isActive());
+    SLANG_CHECK(ReplayContext::get().getStream().getSize() == 0);
+    SLANG_CHECK(!ReplayContext::get().hasCallIndex());
+    SLANG_CHECK(ReplayContext::get().getNextHandle() == kFirstValidHandle);
+    SLANG_CHECK(ReplayContext::get().getCurrentThisHandle() == kNullHandle);
+}
