@@ -112,10 +112,14 @@ public:
         stmts.add(stmt);
     }
 
-    void addScriptSpliceExpr(char const* sourceBegin, char const* sourceEnd)
+    void addScriptSpliceExpr(
+        char const* sourceBegin,
+        char const* sourceEnd,
+        bool hasTrailingNewline = false)
     {
         auto stmt = RefPtr(new TextTemplateSpliceStmt());
         stmt->scriptExprSource = UnownedStringSlice(sourceBegin, sourceEnd);
+        stmt->hasTrailingNewline = hasTrailingNewline;
         stmts.add(stmt);
     }
 
@@ -199,7 +203,26 @@ public:
                     while (isIdentifierChar(*_cursor))
                         _cursor++;
                     auto spliceExprEnd = _cursor;
-                    addScriptSpliceExpr(spliceExprBegin, spliceExprEnd);
+
+                    bool hasTrailingNewline = false;
+                    if (!atEnd() && (*_cursor == '\r' || *_cursor == '\n'))
+                    {
+                        hasTrailingNewline = true;
+                        if (*_cursor == '\r')
+                        {
+                            _cursor++;
+                            if (!atEnd() && *_cursor == '\n')
+                                _cursor++;
+                        }
+                        else
+                        {
+                            _cursor++;
+                        }
+                        isAtStartOfLine = true;
+                        currentLineBegin = _cursor;
+                    }
+
+                    addScriptSpliceExpr(spliceExprBegin, spliceExprEnd, hasTrailingNewline);
                     currentSpanBegin = _cursor;
                     break;
                 }
@@ -473,6 +496,12 @@ private:
             _builder.append("SPLICE(function()return(");
             _builder.append(spliceStmt->scriptExprSource);
             _builder.append(")end)");
+
+            // If splice had a trailing newline, emit it as raw text
+            if (spliceStmt->hasTrailingNewline)
+            {
+                _builder.append("RAW\"\\n\"");
+            }
         }
         else
         {
