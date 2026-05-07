@@ -44,6 +44,7 @@ from lcov_io import (  # noqa: E402
     parse_lcov,
     parse_llvm_cov_report,
 )
+from llvm_cov_json import parse_llvm_cov_json  # noqa: E402
 
 MARKER_NAME = "slang-coverage-html.marker"
 GENERATOR_NAME = "slang-coverage-html"
@@ -309,8 +310,8 @@ def _render_rate_bar(pct: float) -> str:
 def _overall_metrics(records: List[FileRecord]) -> List[Metric]:
     """Compute the summary metrics to display in the page header.
 
-    Lines is always shown. Functions and Branches appear only if
-    the LCOV carries any such records.
+    Lines is always shown. Functions, Branches, and Regions each
+    appear only if the input carries any such data.
     """
     total_l = sum(r.total_lines for r in records)
     hit_l = sum(r.hit_lines for r in records)
@@ -342,6 +343,17 @@ def _overall_metrics(records: List[FileRecord]) -> List[Metric]:
                 pct=(100.0 * hit_br / total_br) if total_br else 0.0,
                 total=total_br,
                 hit=hit_br,
+            )
+        )
+    if has_any_regions(records):
+        total_rg = sum(r.total_regions for r in records)
+        hit_rg = sum(r.hit_regions for r in records)
+        metrics.append(
+            Metric(
+                label="Regions",
+                pct=(100.0 * hit_rg / total_rg) if total_rg else 0.0,
+                total=total_rg,
+                hit=hit_rg,
             )
         )
     return metrics
@@ -423,11 +435,12 @@ def _indent_style(depth: int) -> str:
 
 
 def _index_thead_html(
-    show_fns: bool, show_br: bool
+    show_fns: bool, show_br: bool, show_rg: bool
 ) -> Tuple[str, str, int]:
     """Returns (top-row extra cells, sub-rate-row extra cells, total
     columns). The line group always has 4 cells (Bar+Rate+Total+Hit);
-    fns / branches groups have 3 cells each (no bar) when present."""
+    fns / branches / regions groups have 3 cells each (no bar) when
+    present."""
     extra_top = ""
     extra_sub = ""
     cols_total = 5
@@ -447,10 +460,18 @@ def _index_thead_html(
             '\n        <td class="tableHead">Hit</td>'
         )
         cols_total += 3
+    if show_rg:
+        extra_top += '\n        <td class="tableHead" colspan="3">Region Coverage</td>'
+        extra_sub += (
+            '\n        <td class="tableHead">Rate</td>'
+            '\n        <td class="tableHead">Total</td>'
+            '\n        <td class="tableHead">Hit</td>'
+        )
+        cols_total += 3
     return extra_top, extra_sub, cols_total
 
 
-def _index_colgroup_html(show_fns: bool, show_br: bool) -> str:
+def _index_colgroup_html(show_fns: bool, show_br: bool, show_rg: bool) -> str:
     """Colgroup widths driven by CSS classes; defined here once and
     reused by `fnInner` so per-function cells line up under their
     parent column."""
@@ -473,6 +494,12 @@ def _index_colgroup_html(show_fns: bool, show_br: bool) -> str:
             '        <col class="colBTotal">',
             '        <col class="colBHit">',
         ]
+    if show_rg:
+        cols += [
+            '        <col class="colRRate">',
+            '        <col class="colRTotal">',
+            '        <col class="colRHit">',
+        ]
     return "      <colgroup>\n" + "\n".join(cols) + "\n      </colgroup>"
 
 
@@ -481,6 +508,7 @@ def _render_dir_header_row(
     dir_records: List[FileRecord],
     show_fns: bool,
     show_br: bool,
+    show_rg: bool,
 ) -> str:
     depth = _dir_depth(dirpath)
     label = (dirpath.rsplit("/", 1)[-1] + "/") if dirpath else "(top level)"
@@ -497,6 +525,9 @@ def _render_dir_header_row(
     t_br = sum(r.total_branches for r in dir_records)
     h_br = sum(r.hit_branches for r in dir_records)
     rate_br = (100.0 * h_br / t_br) if t_br else 0.0
+    t_rg = sum(r.total_regions for r in dir_records)
+    h_rg = sum(r.hit_regions for r in dir_records)
+    rate_rg = (100.0 * h_rg / t_rg) if t_rg else 0.0
 
     dir_attr = html.escape(dirpath)
     cells: List[str] = [
@@ -513,6 +544,8 @@ def _render_dir_header_row(
         cells.append(_index_col_group(has_bar=False, rate=rate_fn, total=t_fn, hit=h_fn))
     if show_br:
         cells.append(_index_col_group(has_bar=False, rate=rate_br, total=t_br, hit=h_br))
+    if show_rg:
+        cells.append(_index_col_group(has_bar=False, rate=rate_rg, total=t_rg, hit=h_rg))
     return (
         f'            <tr class="dirHeader" data-path="{dir_attr}" '
         f'data-depth="{depth}">\n'
@@ -529,6 +562,7 @@ def _render_file_row(
     file_depth: int,
     show_fns: bool,
     show_br: bool,
+    show_rg: bool,
 ) -> str:
     display = _display_path(rec.path, prefix)
     display_basename = display.rsplit("/", 1)[-1]
@@ -565,6 +599,15 @@ def _render_file_row(
                 rate=rec.percent_branches,
                 total=rec.total_branches,
                 hit=rec.hit_branches,
+            )
+        )
+    if show_rg:
+        cells.append(
+            _index_col_group(
+                has_bar=False,
+                rate=rec.percent_regions,
+                total=rec.total_regions,
+                hit=rec.hit_regions,
             )
         )
     return (
@@ -614,6 +657,7 @@ def render_index(
 ) -> None:
     show_fns = has_any_functions(records)
     show_br = has_any_branches(records)
+    show_rg = has_any_regions(records)
 
     header = _render_page_header(
         title=title,
@@ -626,7 +670,7 @@ def render_index(
         show_metric_grid=False,
     )
 
-    extra_top, extra_sub, cols_for_empty = _index_thead_html(show_fns, show_br)
+    extra_top, extra_sub, cols_for_empty = _index_thead_html(show_fns, show_br, show_rg)
     files_by_dir, sorted_all_dirs = _index_dir_tree(records, prefix)
 
     rows_html: List[str] = []
@@ -636,14 +680,15 @@ def render_index(
         if not dir_records:
             continue
         rows_html.append(
-            _render_dir_header_row(dirpath, dir_records, show_fns, show_br)
+            _render_dir_header_row(dirpath, dir_records, show_fns, show_br, show_rg)
         )
         dir_attr = html.escape(dirpath)
         file_depth = _dir_depth(dirpath) + 1
         for rec in files_by_dir.get(dirpath, []):
             rows_html.append(
                 _render_file_row(
-                    rec, prefix, file_map, dir_attr, file_depth, show_fns, show_br
+                    rec, prefix, file_map, dir_attr, file_depth,
+                    show_fns, show_br, show_rg,
                 )
             )
             if rec.functions:
@@ -677,7 +722,7 @@ def render_index(
     )
 
     body = f"""  <table class="indexTable" cellpadding="1" cellspacing="1" border="0">
-{_index_colgroup_html(show_fns, show_br)}
+{_index_colgroup_html(show_fns, show_br, show_rg)}
     <thead>
       <tr>
         <td class="tableHead" rowspan="2">File</td>
@@ -739,6 +784,15 @@ def render_file_page(
                 pct=record.percent_branches,
                 total=record.total_branches,
                 hit=record.hit_branches,
+            )
+        )
+    if record.total_regions > 0:
+        metrics.append(
+            Metric(
+                label="Regions",
+                pct=record.percent_regions,
+                total=record.total_regions,
+                hit=record.hit_regions,
             )
         )
 
@@ -1182,6 +1236,42 @@ def has_any_functions(records: List[FileRecord]) -> bool:
     return any(r.functions for r in records)
 
 
+def has_any_regions(records: List[FileRecord]) -> bool:
+    """Region totals exist only on the JSON path (or on auth-summary-
+    enriched LCOV when the report text carries them). Drives whether
+    the renderer shows the Regions column at all."""
+    return any(r.total_regions > 0 for r in records)
+
+
+# ---------------------------------------------------------------------------
+# Input format detection
+# ---------------------------------------------------------------------------
+
+
+def _input_format(path: str) -> str:
+    """Return "json" or "lcov" by file extension.
+
+    Recognized:
+      *.json, *.json.gz                              → "json"
+      *.info, *.lcov, *.info.gz, *.lcov.gz, anything → "lcov"
+
+    The lcov fallback is intentional: the original tool consumed any
+    LCOV-shaped input regardless of extension and we want that
+    behavior preserved.
+    """
+    lower = path.lower()
+    if lower.endswith(".json") or lower.endswith(".json.gz"):
+        return "json"
+    return "lcov"
+
+
+def _load_records(path: str) -> List[FileRecord]:
+    """Dispatch to the correct parser based on input extension."""
+    if _input_format(path) == "json":
+        return parse_llvm_cov_json(path)
+    return parse_lcov(path)
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -1192,7 +1282,15 @@ def build_argparser() -> argparse.ArgumentParser:
         prog="slang-coverage-html",
         description="Render an LCOV .info coverage file to static HTML.",
     )
-    p.add_argument("input", help="LCOV .info file to render")
+    p.add_argument(
+        "input",
+        help=(
+            "Coverage input. Accepts an LCOV .info / .lcov file (also "
+            ".info.gz / .lcov.gz) or an `llvm-cov export -format=json` "
+            "document (also .json.gz). Format is picked by extension; "
+            "anything not ending in .json[.gz] is treated as LCOV."
+        ),
+    )
     p.add_argument(
         "--output-dir",
         default="coverage-html",
@@ -1247,14 +1345,17 @@ def build_argparser() -> argparse.ArgumentParser:
         default=None,
         metavar="REPORT_TXT",
         help=(
-            "Path to an `llvm-cov report` text dump. When supplied, "
-            "per-file Lines/Functions/Branches totals on the index, "
-            "directory aggregates and per-file pages are taken from "
-            "the report instead of from the LCOV — these are the "
-            "numbers CI's coverage dashboard quotes. Source-view "
-            "rendering (per-line hits, branch markers, function table) "
-            "still uses LCOV detail. Files in the LCOV but missing "
-            "from the report fall back to LCOV-derived totals."
+            "Path to an `llvm-cov report` text dump. LCOV-input only; "
+            "rejected when the input is `llvm-cov export -format=json` "
+            "(JSON already carries authoritative per-file summaries). "
+            "When supplied, per-file Lines/Functions/Branches/Regions "
+            "totals on the index, directory aggregates and per-file "
+            "pages are taken from the report instead of from the LCOV "
+            "— these are the numbers CI's coverage dashboard quotes. "
+            "Source-view rendering (per-line hits, branch markers, "
+            "function table) still uses LCOV detail. Files in the "
+            "LCOV but missing from the report fall back to LCOV-"
+            "derived totals."
         ),
     )
     p.add_argument(
@@ -1289,8 +1390,18 @@ def apply_auth_summary(
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_argparser().parse_args(argv)
 
+    input_format = _input_format(args.input)
+    if input_format == "json" and args.auth_summary:
+        print(
+            "slang-coverage-html: --auth-summary is only meaningful with "
+            "LCOV input; the JSON export already carries authoritative "
+            "per-file totals in its `summary` block.",
+            file=sys.stderr,
+        )
+        return 2
+
     try:
-        records = parse_lcov(args.input)
+        records = _load_records(args.input)
     except LcovParseError as e:
         print(f"slang-coverage-html: {e}", file=sys.stderr)
         return 2

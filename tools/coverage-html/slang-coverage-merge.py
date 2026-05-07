@@ -136,8 +136,23 @@ def _gunzip_to_temp(gz_path: str, suffix: str = ".lcov") -> str:
 
 
 def load(path: str) -> List[FileRecord]:
-    """Parse a possibly-gzipped LCOV file into FileRecords."""
-    if path.lower().endswith(".gz"):
+    """Parse a possibly-gzipped LCOV file into FileRecords.
+
+    JSON inputs (`llvm-cov export -format=json`) are rejected: the
+    merger collapses to LCOV records and gzipped LCOV files are the
+    only shape that survives the existing aggregation rules. To merge
+    a JSON export across OSes, render each per-OS JSON to its own HTML
+    and merge at the LCOV layer separately, or feed an LCOV converted
+    from the JSON in upstream.
+    """
+    lower = path.lower()
+    if lower.endswith(".json") or lower.endswith(".json.gz"):
+        raise SystemExit(
+            f"slang-coverage-merge: {path}: JSON coverage exports are "
+            f"not supported as merger input. Pass the LCOV variant of "
+            f"this artifact instead."
+        )
+    if lower.endswith(".gz"):
         path = _gunzip_to_temp(path)
     return parse_lcov(path, warn_prefix=GENERATOR_NAME)
 

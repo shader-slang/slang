@@ -221,11 +221,15 @@ jobs:
       - name: Run Tests with Coverage (Linux/macOS)
         if: inputs.os != 'windows'
         run: |
-          # Generate both HTML and LCOV formats
+          # Generate HTML, LCOV, and llvm-cov JSON formats. The JSON
+          # export carries regions natively and is the preferred input
+          # to slang-coverage-html for the LLVM-coverage path.
           export COVERAGE_HTML=1
           export COVERAGE_LCOV=1
+          export COVERAGE_JSON=1
           export COVERAGE_HTML_DIR="$PWD/coverage-html"
           export COVERAGE_LCOV_FILE="$PWD/coverage.lcov"
+          export COVERAGE_JSON_FILE="$PWD/coverage.json"
 
           # Set SPIRV validation environment variables (same as regular CI)
           export SLANG_RUN_SPIRV_VALIDATION=1
@@ -656,5 +660,26 @@ jobs:
         with:
           name: coverage-lcov-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}
           path: coverage.lcov.gz
+          retention-days: 7
+          compression-level: 0 # Already compressed, no need to compress again
+
+      - name: Compress and Upload llvm-cov JSON Export (Linux/macOS only)
+        if: inputs.os != 'windows'
+        run: |
+          # The JSON file is the lossless companion to coverage.lcov;
+          # downstream renderers prefer it because it carries regions
+          # natively and matches `llvm-cov report` by construction.
+          # Windows uses OpenCppCoverage and has no llvm-cov JSON
+          # equivalent — Cobertura→LCOV is the only artifact there.
+          gzip -9 coverage.json
+          echo "Compressed JSON file:"
+          ls -lh coverage.json.gz
+
+      - name: Upload llvm-cov JSON Export (Linux/macOS only)
+        if: inputs.os != 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-json-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}
+          path: coverage.json.gz
           retention-days: 7
           compression-level: 0 # Already compressed, no need to compress again
