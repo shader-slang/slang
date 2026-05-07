@@ -7,6 +7,15 @@
 namespace slang_llvm
 {
 
+/// Disable the AVX-512 feature family on the JIT TargetMachine before LLJIT
+/// construction. On x86_64, builds an explicit JITTargetMachineBuilder via
+/// detectHost() and subtracts every AVX-512 feature LLVM might recognise, then
+/// hands it to the LLJITBuilder. On non-x86_64 hosts this is a no-op. Both
+/// LLJIT construction sites in slang-llvm (the downstream compiler in
+/// slang-llvm.cpp and the IR builder in slang-llvm-builder.cpp) call this so
+/// the policy stays in one place. See https://github.com/shader-slang/slang/issues/11062.
+void disableAVX512ForJIT(llvm::orc::LLJITBuilder& jitBuilder);
+
 /* This implementation uses atomic ref counting to ensure the shared libraries lifetime can outlive
 the LLVMDownstreamCompileResult and the compilation that created it */
 class LLVMJITSharedLibrary : public Slang::ComBaseObject, public ISlangSharedLibrary

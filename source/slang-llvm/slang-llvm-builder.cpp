@@ -5,7 +5,6 @@
 
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/CodeGen/CommandFlags.h"
-#include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
@@ -98,39 +97,6 @@ static llvm::ArrayRef<T*> sliceToArrayRef(Slice<U> slice)
 llvm::StringRef charSliceToLLVM(CharSlice slice)
 {
     return llvm::StringRef(slice.begin(), slice.count);
-}
-
-static void disableAVX512ForJIT(llvm::orc::LLJITBuilder& jitBuilder)
-{
-    // Keep this in sync with the downstream compiler JIT path in slang-llvm.cpp.
-    // Both paths can create an LLJIT for CPU/LLVM tests, and #11062 shows that
-    // AVX-512 must be disabled before the JIT TargetMachine is constructed.
-    llvm::Expected<llvm::orc::JITTargetMachineBuilder> expectJTMB =
-        llvm::orc::JITTargetMachineBuilder::detectHost();
-    if (expectJTMB && expectJTMB->getTargetTriple().getArch() == llvm::Triple::x86_64)
-    {
-        expectJTMB->addFeatures({
-            "-avx512f",
-            "-avx512cd",
-            "-avx512dq",
-            "-avx512bw",
-            "-avx512vl",
-            "-avx512vbmi",
-            "-avx512vbmi2",
-            "-avx512vnni",
-            "-avx512bitalg",
-            "-avx512vpopcntdq",
-            "-avx512ifma",
-            "-avx512vp2intersect",
-            "-avx512fp16",
-            "-avx512bf16",
-            "-avx512er",
-            "-avx512pf",
-            "-avx512_4fmaps",
-            "-avx512_4vnniw",
-        });
-        jitBuilder.setJITTargetMachineBuilder(std::move(*expectJTMB));
-    }
 }
 
 class LLVMBuilder : public ComBaseObject, public ILLVMBuilder
