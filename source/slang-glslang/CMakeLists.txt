@@ -6,6 +6,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         .
         MODULE
         USE_FEWER_WARNINGS
+        SKIP_ASAN
         LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt SPIRV-Tools-link
         INCLUDE_DIRECTORIES_PRIVATE
             ${slang_SOURCE_DIR}/include
@@ -30,11 +31,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
             PROPERTIES OUTPUT_NAME slang-glslang-${SLANG_VERSION_NUMERIC}
         )
     endif()
-    add_supported_cxx_flags(
-        slang-glslang
-        PRIVATE
-        -fno-rtti
-    )
+    add_supported_cxx_flags(slang-glslang PRIVATE -fno-rtti)
     add_supported_cxx_linker_flags(
         slang-glslang
         PRIVATE

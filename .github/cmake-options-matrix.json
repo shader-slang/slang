@@ -1,0 +1,67 @@
+{
+  "include": [
+    { "option": "SLANG_EMBED_CORE_MODULE_SOURCE" },
+    { "option": "SLANG_EMBED_CORE_MODULE" },
+    { "option": "SLANG_ENABLE_DXIL" },
+    { "option": "SLANG_ENABLE_PCH" },
+    { "option": "SLANG_STANDARD_MODULE_DEVELOP_BUILD" },
+    {
+      "option": "SLANG_ENABLE_SLANGD",
+      "extra_cmake_flags": "-DSLANG_ENABLE_TESTS=OFF -DSLANG_ENABLE_EXAMPLES=OFF"
+    },
+    {
+      "option": "SLANG_ENABLE_SLANGC",
+      "extra_cmake_flags": "-DSLANG_ENABLE_GFX=OFF"
+    },
+    { "option": "SLANG_ENABLE_SLANGI" },
+    { "option": "SLANG_ENABLE_SLANGRT" },
+    { "option": "SLANG_ENABLE_SLANG_GLSLANG" },
+    {
+      "option": "SLANG_ENABLE_TESTS",
+      "extra_cmake_flags": "-DSLANG_ENABLE_EXAMPLES=OFF"
+    },
+    { "option": "SLANG_ENABLE_EXAMPLES" },
+    { "option": "SLANG_ENABLE_REPLAYER" },
+    { "option": "SLANG_ENABLE_RELEASE_DEBUG_INFO" },
+    { "option": "SLANG_ENABLE_SPLIT_DEBUG_INFO" },
+    { "option": "SLANG_ENABLE_FULL_IR_VALIDATION" },
+    {
+      "option": "SLANG_ENABLE_IR_BREAK_ALLOC",
+      "value_debug": "OFF",
+      "value_release": "ON"
+    },
+    { "option": "SLANG_EXCLUDE_DAWN" },
+    { "option": "SLANG_EXCLUDE_TINT" },
+    { "option": "SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC" },
+    { "option": "SLANG_ENABLE_RELEASE_LTO" },
+    { "option": "SLANG_IGNORE_ABORT_MSG" },
+    { "option": "SLANG_ENABLE_TIME_TRACE" },
+    {
+      "option": "SLANG_ENABLE_XLIB",
+      "value": "ON",
+      "linux_only": "true"
+    },
+    {
+      "option": "SLANG_ENABLE_SLANG_RHI",
+      "extra_cmake_flags": "-DSLANG_ENABLE_GFX=OFF -DSLANG_ENABLE_EXAMPLES=OFF -DSLANG_ENABLE_TESTS=OFF"
+    },
+    {
+      "option": "SLANG_LIB_TYPE",
+      "value": "STATIC"
+    },
+    {
+      "option": "SLANG_ENABLE_ASAN",
+      "skip_linux_aarch64": "true"
+    },
+    {
+      "option": "SLANG_ENABLE_COVERAGE",
+      "extra_cmake_flags": "-DCMAKE_COMPILE_WARNING_AS_ERROR=OFF"
+    },
+    { "option": "SLANG_ENABLE_CUDA", "container_only": "true" },
+    {
+      "option": "SLANG_ENABLE_OPTIX",
+      "container_only": "true",
+      "extra_cmake_flags": "-DSLANG_ENABLE_CUDA=ON"
+    }
+  ]
+}
