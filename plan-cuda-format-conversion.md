@@ -238,6 +238,20 @@ Since `resolveTextureFormat` does NOT run for CUDA, these two sources may not be
 
 **Coordinate scaling** (**critical invariant**): The raw-typed call must use correct byte-addressing. `$E` first checks for an `IRFormatDecoration` and, if found, uses `getImageFormatInfo(format).sizeInBytes`. If no decoration is found, it falls back to computing size from the element type via `_calcBackingElementSizeInBytes()` (slang-intrinsic-expand.cpp:196-220). **After the IR pass removes the format decoration AND rewrites the element type to the raw storage type, `$E` falls through to the element-type path.** This produces the correct byte size — `sizeof(uchar4) = 4` for `rgba8`, `sizeof(uint8_t) = 1` for `r8`, etc. **The element type rewrite is therefore load-bearing for `$E` correctness, not just `$C`.** If the pass removes the decoration but fails to rewrite the element type (e.g., leaves it as `float4` for `r8`), `$E` would compute `sizeof(float4) = 16` instead of the correct `1`, causing incorrect address scaling. **The pass MUST rewrite the element type before removing the format decoration.**
 
+**Coordinate Scaling Verification Table**:
+
+| Format | Access Type | Raw Storage Type | Format Size (Decoration) | Element Size (After Rewrite) | `$E` Before Pass | `$E` After Pass | Correct? |
+|--------|-------------|------------------|--------------------------|-------------------------------|-------------------|-----------------|----------|
+| `rgba8` | `float4` | `uchar4` | 4 bytes | 4 bytes | 4 (from decoration) | 4 (from element type) | ✅ |
+| `r8` | `float` | `uint8_t` | 1 byte | 1 byte | 1 (from decoration) | 1 (from element type) | ✅ |
+| `rg8` | `float2` | `uchar2` | 2 bytes | 2 bytes | 2 (from decoration) | 2 (from element type) | ✅ |
+| `rgba16f` | `float4` | `ushort4` | 8 bytes | 8 bytes | 8 (from decoration) | 8 (from element type) | ✅ |
+| `r16f` | `float` | `uint16_t` | 2 bytes | 2 bytes | 2 (from decoration) | 2 (from element type) | ✅ |
+| `rgba8_snorm` | `float4` | `char4` | 4 bytes | 4 bytes | 4 (from decoration) | 4 (from element type) | ✅ |
+| `r8` | `float4` | `uint8_t` | 1 byte | 1 byte | 1 (from decoration) | 1 (from element type) | ✅ (channel mismatch handled by decode) |
+
+**Key invariant**: For all formats, `sizeof(rawStorageType) == format.sizeInBytes`. This ensures `$E` produces the same byte offset before and after the pass, maintaining correct memory addressing.
+
 **Removing format decoration** (**critical**): After lowering, remove the `IRFormatDecoration` from the **owner node that `_findImageFormatDecoration()` found it on** — which may be the texture variable itself, or the struct field key when the texture is a struct member (accessed via `IRLoad(IRFieldAddress(...))`). Removing from the wrong node leaves the decoration alive and causes `$C` to still emit `_convert`, producing a call to a now-deleted prelude function. The pass needs a helper `findFormatDecorationOwner(IRInst* resourceInst) -> IRInst*` (returning the field key or the resource inst itself) and must call `decoration->removeFromParent()` on the result.
 
 #### Format Conversion Functions (generated as IR)
@@ -258,6 +272,8 @@ For each format category, the pass generates inline IR instructions:
 **SNORM convention**: The SNORM decode formula uses the OpenGL/Vulkan convention where both -128 and -127 map to -1.0 (via the `max(..., -1.0)` clamp). This matches the Vulkan spec (§16.1.3) and OpenGL spec (§2.3.5). DirectX uses the same formula. The encode formula `fptosi(round(clamp(val,-1,1) * 127.0))` produces -127 for input -1.0, never -128, which is correct per both conventions. The asymmetry (128 negative vs 127 positive representable values) is intentional — -128 is treated as an alias for -1.0 on decode but is never produced by encode.
 
 The pass builds these as IR instruction sequences using `IRBuilder`. This is standard practice for IR passes in Slang — see `slang-ir-legalize-image-subscript.cpp` for a similar pattern.
+
+**Half Extension Requirement**: For float16 formats, the pass must ensure the CUDA half extension is enabled. Since `$C` no longer fires after lowering (the decoration is removed), the original `extensionTracker->requireBaseType(BaseType::Half)` call in `$C` is bypassed. However, the CUDA emitter already detects `half`-typed instructions during emission and enables `#include <cuda_fp16.h>`. The lowered conversion arithmetic contains `half` intermediate values (from the `bitcast<half>` in the decode path), so the detection works automatically. **Verify during testing** that float16 format conversion generates the `#include <cuda_fp16.h>` header. If not, add explicit `extensionTracker->requireBaseType(BaseType::Half)` in the pass.
 
 #### Channel Count Mismatch Handling
 
@@ -342,12 +358,267 @@ struct CUDASurfaceFormatLegalizer {
     bool isSurfaceReadCall(IRCall* call, IRInst*& outTexture);
     bool isSurfaceWriteCall(IRCall* call, IRInst*& outTexture, IRInst*& outValue);
 
-    // Main entry: scan and rewrite
+    // Process all textures and their calls
     void processModule();
+
+    // Process a single texture: find all calls, rewrite them, remove decoration
+    void processTexture(IRInst* textureInst, ImageFormat format);
+
+    // Rewrite a single read/write call
+    void rewriteSurfaceReadCall(IRCall* call, ImageFormat format);
+    void rewriteSurfaceWriteCall(IRCall* call, ImageFormat format);
+
+    // Create a new call with raw storage type (helper)
+    IRCall* createRawTypedCall(IRCall* originalCall, ImageFormat format, IRInst* convertedValue = nullptr);
+
+    // Update texture type and propagate to uses
+    void updateTextureType(IRInst* textureInst, IRType* newTextureType);
 };
 
 } // namespace Slang
 ```
+
+#### SSA Maintenance and Use-Def Chain Updates
+
+**Critical invariant**: When rewriting a surface read call, the original call returns one type (e.g., `float4`) but the rewritten call returns a different type (e.g., `uchar4`). All users of the original result must be updated to use the conversion result instead.
+
+**Pattern for read calls**:
+```cpp
+void rewriteSurfaceReadCall(IRCall* originalCall, ImageFormat format) {
+    // 1. Create new call with raw storage type
+    IRInst* rawCall = createRawTypedCall(originalCall, format);
+
+    // 2. Insert conversion instructions after the call
+    m_builder.setInsertAfter(rawCall);
+    IRInst* convertedResult = emitDecode(format, rawCall, originalCall->getDataType());
+
+    // 3. Copy source location for debuggability
+    convertedResult->sourceLoc = originalCall->sourceLoc;
+
+    // 4. Replace all uses of original call with converted result
+    originalCall->replaceUsesWith(convertedResult);
+
+    // 5. Remove original call from IR
+    originalCall->removeAndDeallocate();
+}
+```
+
+**Pattern for write calls** (simpler — no return value to manage):
+```cpp
+void rewriteSurfaceWriteCall(IRCall* originalCall, ImageFormat format) {
+    // 1. Insert conversion instructions before the call
+    m_builder.setInsertBefore(originalCall);
+    IRInst* originalValue = originalCall->getArg(0); // value to write
+    IRInst* convertedValue = emitEncode(format, originalValue, getStorageType(format));
+
+    // 2. Create new call with converted value and raw-typed texture
+    IRInst* rawCall = createRawTypedCall(originalCall, format, convertedValue);
+    rawCall->sourceLoc = originalCall->sourceLoc;
+
+    // 3. Remove original call (no uses to replace — void return)
+    originalCall->removeAndDeallocate();
+}
+```
+
+**Type propagation for texture variables**:
+
+When changing a texture's element type, uses of the texture must have their types updated. Follow the pattern from `resolveTextureFormat`:
+
+```cpp
+void updateTextureType(IRInst* textureInst, IRType* newTextureType) {
+    // Build worklist of all uses that need type updates
+    List<IRUse*> typeReplacementWorkList;
+    HashSet<IRUse*> typeReplacementWorkListSet;
+
+    textureInst->setFullType(newTextureType);
+
+    for (auto use = textureInst->firstUse; use; use = use->nextUse) {
+        if (typeReplacementWorkListSet.add(use))
+            typeReplacementWorkList.add(use);
+    }
+
+    // Propagate type changes through dependent instructions
+    for (Index i = 0; i < typeReplacementWorkList.getCount(); i++) {
+        auto use = typeReplacementWorkList[i];
+        auto user = use->getUser();
+
+        switch (user->getOp()) {
+        case kIROp_Load:
+        case kIROp_GetElementPtr:
+            // Update user's type and add its uses to worklist
+            auto newUserType = replaceImageElementType(user->getFullType(), newTextureType);
+            if (newUserType != user->getFullType()) {
+                user->setFullType(newUserType);
+                for (auto u = user->firstUse; u; u = u->nextUse) {
+                    if (typeReplacementWorkListSet.add(u))
+                        typeReplacementWorkList.add(u);
+                }
+            }
+            break;
+        // ... handle other cases as needed ...
+        }
+    }
+}
+```
+
+**Reference implementation**: See `resolveTextureFormatForParameter()` in [slang-ir-resolve-texture-format.cpp](source/slang/slang-ir-resolve-texture-format.cpp#L40-L122) for the complete type propagation pattern.
+
+#### Pass Processing Order (Critical for Correctness)
+
+The pass must process textures in a specific order to avoid missing calls due to premature decoration removal:
+
+**Algorithm**:
+```cpp
+void CUDASurfaceFormatLegalizer::processModule() {
+    // 1. Find all global texture parameters needing conversion
+    List<Pair<IRInst*, ImageFormat>> texturesToProcess;
+
+    for (auto globalInst : m_module->getGlobalInsts()) {
+        IRInst* textureInst = globalInst;
+
+        // Handle both direct texture globals and textures in arrays
+        if (auto arrayType = as<IRArrayTypeBase>(globalInst->getDataType())) {
+            if (as<IRTextureTypeBase>(arrayType->getElementType()))
+                textureInst = globalInst;
+        } else if (!as<IRTextureTypeBase>(globalInst->getDataType())) {
+            continue;
+        }
+
+        // Resolve effective format (decoration takes priority, fall back to type operand)
+        ImageFormat format = getEffectiveFormat(textureInst);
+        if (format == ImageFormat::unknown)
+            continue;
+
+        // Check if conversion is needed
+        if (!needsConversion(textureInst, format))
+            continue;
+
+        texturesToProcess.add(Pair<IRInst*, ImageFormat>(textureInst, format));
+    }
+
+    // 2. Process each texture atomically: find all calls, rewrite all calls, then remove decoration
+    for (auto& pair : texturesToProcess) {
+        processTexture(pair.first, pair.second);
+    }
+
+    // 3. Validate IR is still well-formed
+    #ifdef _DEBUG
+    validateIRModule(m_module, m_sink);
+    #endif
+}
+
+void CUDASurfaceFormatLegalizer::processTexture(IRInst* textureInst, ImageFormat format) {
+    // 1. Find ALL surface calls using this texture
+    List<IRCall*> readsToRewrite;
+    List<IRCall*> writesToRewrite;
+
+    traverseUses(textureInst, [&](IRUse* use) {
+        if (auto call = as<IRCall>(use->getUser())) {
+            IRInst* textureArg;
+            IRInst* valueArg;
+
+            if (isSurfaceReadCall(call, textureArg) && textureArg == textureInst) {
+                readsToRewrite.add(call);
+            } else if (isSurfaceWriteCall(call, textureArg, valueArg) && textureArg == textureInst) {
+                writesToRewrite.add(call);
+            }
+        }
+    });
+
+    // 2. Rewrite texture type to use raw storage element type
+    IRType* storageType = getStorageType(format, getChannelCount(format));
+    IRType* newTextureType = createRawTextureType(textureInst->getDataType(), storageType);
+    updateTextureType(textureInst, newTextureType);
+
+    // 3. Rewrite ALL read calls
+    for (auto call : readsToRewrite) {
+        rewriteSurfaceReadCall(call, format);
+    }
+
+    // 4. Rewrite ALL write calls
+    for (auto call : writesToRewrite) {
+        rewriteSurfaceWriteCall(call, format);
+    }
+
+    // 5. Remove format decoration ONCE after all calls are rewritten
+    IRInst* decorationOwner = findFormatDecorationOwner(textureInst);
+    if (decorationOwner) {
+        if (auto decoration = decorationOwner->findDecoration<IRFormatDecoration>()) {
+            decoration->removeFromParent();
+        }
+    }
+}
+```
+
+**Rationale**: This ordering ensures:
+- All calls are discovered before any modifications (decoration is still present)
+- All calls for a texture are rewritten before the decoration is removed
+- `$C` and `$E` specifiers see consistent state (either all calls have decoration, or none do)
+- No race conditions between type updates and call rewriting
+
+---
+
+### Step 2.5: Extract Shared IR Utility Functions
+
+**Files**: [source/slang/slang-ir-util.h](source/slang/slang-ir-util.h) and [source/slang/slang-ir-util.cpp](source/slang/slang-ir-util.cpp)
+
+Extract `_findImageFormatDecoration()` from `slang-intrinsic-expand.cpp` into a shared utility function so both the intrinsic expander and the IR pass can use it:
+
+```cpp
+// slang-ir-util.h
+IRFormatDecoration* findImageFormatDecoration(IRInst* resourceInst);
+IRInst* findFormatDecorationOwner(IRInst* resourceInst);
+```
+
+**Implementation** (move from `slang-intrinsic-expand.cpp`):
+```cpp
+// slang-ir-util.cpp
+IRFormatDecoration* findImageFormatDecoration(IRInst* resourceInst)
+{
+    // Direct decoration on the resource
+    if (auto decoration = resourceInst->findDecoration<IRFormatDecoration>())
+        return decoration;
+
+    // Traverse IRLoad -> IRFieldAddress chains for struct member textures
+    if (auto load = as<IRLoad>(resourceInst))
+    {
+        if (auto fieldAddress = as<IRFieldAddress>(load->getPtr()))
+        {
+            if (auto fieldKey = fieldAddress->getField())
+            {
+                if (auto decoration = fieldKey->findDecoration<IRFormatDecoration>())
+                    return decoration;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+IRInst* findFormatDecorationOwner(IRInst* resourceInst)
+{
+    // Check direct decoration first
+    if (resourceInst->findDecoration<IRFormatDecoration>())
+        return resourceInst;
+
+    // Check for decoration on struct field key
+    if (auto load = as<IRLoad>(resourceInst))
+    {
+        if (auto fieldAddress = as<IRFieldAddress>(load->getPtr()))
+        {
+            if (auto fieldKey = fieldAddress->getField())
+            {
+                if (fieldKey->findDecoration<IRFormatDecoration>())
+                    return fieldKey;
+            }
+        }
+    }
+
+    return nullptr;
+}
+```
+
+**Update `slang-intrinsic-expand.cpp`**: Replace the local `_findImageFormatDecoration()` with a call to the shared utility function.
 
 ---
 
@@ -479,7 +750,9 @@ case ImageFormat::r11f_g11f_b10f:
 | **NEW** `source/slang/slang-ir-legalize-cuda-surface-format.cpp` | IR lowering pass (core implementation) |
 | **NEW** `source/slang/slang-ir-legalize-cuda-surface-format.h` | Pass declaration |
 | [source/slang/slang-emit.cpp](source/slang/slang-emit.cpp) | Register pass in CUDA pipeline |
-| [source/slang/slang-intrinsic-expand.cpp](source/slang/slang-intrinsic-expand.cpp) | Remove `$E` scaling special-case; simplify `$C` |
+| [source/slang/slang-intrinsic-expand.cpp](source/slang/slang-intrinsic-expand.cpp) | Remove `$E` scaling special-case; simplify `$C`; replace local `_findImageFormatDecoration()` with shared utility |
+| [source/slang/slang-ir-util.h](source/slang/slang-ir-util.h) | Add shared `findImageFormatDecoration()` and `findFormatDecorationOwner()` utilities |
+| [source/slang/slang-ir-util.cpp](source/slang/slang-ir-util.cpp) | Implement shared format decoration utilities |
 | [prelude/slang-cuda-prelude.h](prelude/slang-cuda-prelude.h) | Remove `sust.p` code, `_convert` functions, half-read macros |
 | [source/slang/CMakeLists.txt](source/slang/CMakeLists.txt) | Add new source files |
 | `tests/cuda/cuda-texture-format-*.slang` | New test files |
@@ -493,36 +766,97 @@ case ImageFormat::r11f_g11f_b10f:
 
 ## Implementation Order
 
-1. **Remove `sust.p` code** from prelude — clean deletion of `_convert` functions, half-read macros, empty layered stubs.
+### Phase 1: Foundation (Steps 1–4)
 
-2. **Create the IR pass** — `slang-ir-legalize-cuda-surface-format.cpp`:
-   - Implement intrinsic call detection (identify surface read/write calls on format-decorated textures)
-   - Implement `emitDecode()` for reads: raw→access conversion as inline IR
-   - Implement `emitEncode()` for writes: access→raw conversion as inline IR
-   - Implement texture type rewriting (change element type to raw storage type, remove format decoration)
-   - Start with UNORM8 (`rgba8`) + `float4` access only
+1. **Extract utility functions** (Step 2.5):
+   - Move `_findImageFormatDecoration()` to `slang-ir-util.{h,cpp}`
+   - Add `findFormatDecorationOwner()` utility
+   - Update `slang-intrinsic-expand.cpp` to use shared utilities
+   - **Verify**: Existing CUDA tests still pass (no behavior change)
 
-3. **Register the pass** in `slang-emit.cpp` for CUDA targets.
+2. **Remove `sust.p` code** from prelude:
+   - Delete `_convert` function macros and instantiations
+   - Delete half-read macros
+   - Delete empty layered write stubs
+   - **Verify**: Build succeeds (prelude compiles)
 
-4. **Remove `$E` scaling special-case** — the dead code for `elemSizeInBytes = 1` on converted writes.
+3. **Create pass skeleton** with SSA maintenance:
+   - Create `slang-ir-legalize-cuda-surface-format.{h,cpp}` files
+   - Implement `CUDASurfaceFormatLegalizer` struct with all declared methods
+   - Implement `processModule()` with correct ordering (find all → rewrite all → remove decoration)
+   - Add `validateIRModule()` call in debug builds
+   - Register pass in `slang-emit.cpp` for CUDA targets
+   - **Verify**: Pass runs but does nothing (no-op), existing tests pass
 
-5. **Simplify `$C`** — add assertion that format conversion is never needed for CUDA after the pass runs.
+4. **Remove `$E` scaling special-case** and simplify `$C`:
+   - Remove the `elemSizeInBytes = 1` block from `$E` handler
+   - Add assertion in `$C` for CUDA that conversion is never needed after pass runs
+   - **Verify**: Existing CUDA tests still pass
 
-6. **Expand format coverage** in the pass:
-   - UNORM16, SNORM8/16 (with correct rounding)
-   - Float16 (half↔float bitcast + conversion)
-   - Sub-32-bit integers (sign/zero extension)
-   - BGRA8 (UNORM8 + swizzle)
+### Phase 2: Single Format Implementation (Steps 5–7)
 
-7. **Add tests**:
-   - Numeric round-trip tests for rgba8, rgba8_snorm, rgba16f, integer formats
-   - Multi-dimension tests (1D, 2D, 3D, layered)
-   - IR dump verification
-   - Diagnostic test for unsupported packed formats
+5. **Implement UNORM8 conversion** (rgba8 + float4 only):
+   - Implement `getEffectiveFormat()` checking both decoration and type operand
+   - Implement `needsConversion()` checking format vs access type compatibility
+   - Implement `isSurfaceReadCall()` and `isSurfaceWriteCall()` detection
+   - Implement `getStorageType()` returning `uchar4` for rgba8
+   - Implement `emitDecode()` for rgba8: `uitofp(raw) * (1.0/255.0)` per channel
+   - Implement `emitEncode()` for rgba8: `fptoui(saturate(val) * 255.0 + 0.5)` per channel
+   - Implement `rewriteSurfaceReadCall()` with `replaceUsesWith()` pattern
+   - Implement `rewriteSurfaceWriteCall()` with decoration removal
+   - Implement `updateTextureType()` with use-worklist propagation
+   - **Verify**: rgba8 format conversion test passes (create test first)
 
-8. **Phase 2 — Packed formats**:
-   - Implement `rgb10_a2`, `rgb10_a2ui`, `r11f_g11f_b10f` in the pass
-   - Remove corresponding diagnostics
+6. **Add IR dump test**:
+   - Create test that dumps IR with `-dump-ir`
+   - Verify conversion arithmetic is inline (no format decorations, no `_convert` calls)
+   - **Verify**: IR shows `uitofp`, `mul`, `fptoui` instructions
+
+7. **Add comprehensive UNORM8 tests**:
+   - Round-trip test (write then read)
+   - Multi-dimension test (1D, 2D, 3D)
+   - Layered texture test
+   - Struct member texture test
+   - Channel count mismatch test (`r8` → `float4`)
+   - **Verify**: All tests pass
+
+### Phase 3: Format Expansion (Steps 8–10)
+
+8. **Add remaining UNORM/SNORM formats**:
+   - UNORM16 (divide by 65535)
+   - SNORM8/SNORM16 (with `max(..., -1.0)` clamp on decode)
+   - Update `getStorageType()` for all format variants
+   - **Verify**: Format-specific tests pass
+
+9. **Add FLOAT16 formats**:
+   - Implement half ↔ float bitcast + conversion
+   - Add half extension detection verification
+   - **Verify**: Float16 tests pass, generated code includes `<cuda_fp16.h>`
+
+10. **Add integer formats and BGRA8**:
+    - INT8/16, UINT8/16 (sign/zero extension + truncation)
+    - BGRA8 (UNORM8 + `.zyxw` swizzle)
+    - **Verify**: Integer and BGRA8 tests pass
+
+### Phase 4: Polish (Steps 11–12)
+
+11. **Add diagnostics for unsupported formats**:
+    - Detect packed formats (rgb10_a2, r11f_g11f_b10f)
+    - Emit diagnostic, leave call unchanged
+    - **Verify**: Diagnostic test produces expected error
+
+12. **Full regression testing**:
+    - Run entire CUDA test suite
+    - Verify no `sust.p` in generated code
+    - Verify no `_convert` function calls in generated code
+    - Verify generated CUDA compiles with nvcc
+    - **Verify**: All items on verification checklist pass
+
+### Phase 5: Packed Formats (Deferred)
+
+13. **Implement packed formats**:
+    - Implement `rgb10_a2`, `rgb10_a2ui`, `r11f_g11f_b10f` in the pass
+    - Remove corresponding diagnostics
 
 ---
 
@@ -564,11 +898,9 @@ So both specifiers work correctly without any changes to `hlsl.meta.slang`.
 
 ### Half Extension Tracking
 
-The `$C` handler currently triggers `extensionTracker->requireBaseType(BaseType::Half)` for float16 formats. After the pass lowers the call, `$C` no longer fires. The IR pass must instead ensure the half extension is required. This can be done by:
-- Having the pass call the extension tracker directly, OR
-- The lowered IR will contain `half`-typed instructions, which the CUDA emitter already detects and enables half support for
+The `$C` handler currently triggers `extensionTracker->requireBaseType(BaseType::Half)` for float16 formats. After the pass lowers the call, `$C` no longer fires. The lowered IR will contain `half`-typed instructions (from the `bitcast<half>` in the decode path), which the CUDA emitter already detects and enables half support for. This is the preferred approach — the emitter already scans for half types.
 
-The second approach is more robust — the emitter already scans for half types.
+**Verification**: During testing, confirm that float16 format conversion generates `#include <cuda_fp16.h>` in the emitted CUDA source. If the emitter's automatic detection fails, add explicit `extensionTracker->requireBaseType(BaseType::Half)` in the pass (requires threading the extension tracker through the pass API).
 
 ---
 
@@ -619,6 +951,12 @@ The second approach is more robust — the emitter already scans for half types.
 - [ ] Format decoration removed from field key (not texture var) for struct-member textures — no `_convert` suffix emitted after pass runs on struct-member texture
 - [ ] `RWTexture2D<unorm float4>` (inferred format, no explicit `[format]`) triggers conversion
 - [ ] Element type rewrite + decoration removal ordering is correct (type rewrite first)
+- [ ] **SSA Invariants**: IR validation passes after the pass runs (`validateIRModule()` succeeds in debug builds)
+- [ ] **Use-Def Chains**: All uses of original call results are updated to conversion results (checked via `-dump-ir`, no dangling uses)
+- [ ] **Type Propagation**: Texture type changes propagate to all dependent instructions (`IRLoad`, `IRGetElementPtr`, etc.)
+- [ ] **Decoration Removal**: Format decorations removed from correct owner (field key for struct members, var for direct globals)
+- [ ] **Insertion Points**: Generated conversion instructions have correct parent blocks (verified via `-dump-ir` structure)
+- [ ] **Source Locations**: Conversion instructions have source locations copied from original calls (verified via error messages if conversion traps)
 
 ---
 
