@@ -11332,6 +11332,7 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
     Index inheritanceClauseCounter = 0;
     Type* tagType = nullptr;
     InheritanceDecl* tagTypeInheritanceDecl = nullptr;
+    bool hasBaseError = false;
     for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
     {
         Index inheritanceClauseIndex = inheritanceClauseCounter++;
@@ -11354,6 +11355,7 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
                 .decl = decl,
                 .baseType = baseType,
                 .inheritanceDecl = inheritanceDecl});
+            hasBaseError = true;
             continue;
         }
 
@@ -11397,8 +11399,15 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
                 .decl = decl,
                 .baseType = baseType,
                 .inheritanceDecl = inheritanceDecl});
+            hasBaseError = true;
             continue;
         }
+    }
+
+    if (hasBaseError)
+    {
+        decl->tagType = m_astBuilder->getErrorType();
+        return;
     }
 
     // If a tag type has not been set, then we
@@ -11506,6 +11515,9 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
 
     auto tagType = decl->tagType;
 
+    if (as<ErrorType>(tagType))
+        return;
+
     auto isEnumFlags = decl->hasModifier<FlagsAttribute>();
 
     // Check the enum cases in order.
@@ -11603,6 +11615,9 @@ void SemanticsDeclBodyVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
     // the surrounding `enum` declaration.
     auto tagType = parentEnumDecl->tagType;
     SLANG_ASSERT(tagType);
+
+    if (as<ErrorType>(tagType))
+        return;
 
     // Need to check the init expression, if present, since
     // that represents the explicit tag for this case.
