@@ -788,10 +788,44 @@ void lowerUntaggedUnionTypes(IRModule* module, TargetProgram* targetProgram, Dia
 //
 struct SequentialIDTagLoweringContext : public InstPassBase
 {
-    SequentialIDTagLoweringContext(Linkage* linkage, IRModule* module)
-        : InstPassBase(module), m_linkage(linkage)
+    SequentialIDTagLoweringContext(Linkage* linkage, IRModule* module, DiagnosticSink* sink)
+        : InstPassBase(module), m_linkage(linkage), m_sink(sink)
     {
     }
+
+    void diagnoseDuplicateSequentialID(
+        IRInst* interfaceType,
+        IRInst* witnessTable,
+        IRInst* previousWitnessTable,
+        uint32_t sequentialID)
+    {
+        SLANG_ASSERT(interfaceType);
+        SLANG_ASSERT(witnessTable);
+        SLANG_ASSERT(previousWitnessTable);
+
+        auto diagnosedSequentialIDs =
+            m_diagnosedDuplicateSequentialIDKeys.tryGetValue(interfaceType);
+        if (!diagnosedSequentialIDs)
+        {
+            m_diagnosedDuplicateSequentialIDKeys.add(interfaceType, HashSet<uint32_t>());
+            diagnosedSequentialIDs =
+                m_diagnosedDuplicateSequentialIDKeys.tryGetValue(interfaceType);
+        }
+
+        if (!diagnosedSequentialIDs->add(sequentialID))
+            return;
+
+        if (!m_sink)
+            return;
+
+        m_sink->diagnose(Diagnostics::DuplicateTypeConformanceSequentialId{
+            .id = int(sequentialID),
+            .interfaceType = interfaceType,
+            .location = getDiagnosticPos(witnessTable),
+            .previousLocation = getDiagnosticPos(previousWitnessTable),
+        });
+    }
+
     void lowerGetTagFromSequentialID(IRGetTagFromSequentialID* inst)
     {
         // We use the result type to figure out the destination collection
@@ -806,9 +840,11 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         //
 
         // We use the result type and the type of the operand
+        auto interfaceType = inst->getOperand(0);
         auto srcSeqID = inst->getOperand(1);
 
         Dictionary<UInt, UInt> mapping;
+        Dictionary<uint32_t, IRInst*> witnessTableForSequentialID;
 
         // Map from sequential ID to unique ID
         auto destSet = cast<IRSetTagType>(inst->getDataType())->getSet();
@@ -826,8 +862,23 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                 auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
                 if (seqDecoration)
                 {
-                    auto inputId = seqDecoration->getSequentialID();
-                    mapping[inputId] = outputId; // Map ID to itself for now
+                    auto inputId = uint32_t(seqDecoration->getSequentialID());
+                    if (auto previousWitnessTable =
+                            witnessTableForSequentialID.tryGetValue(inputId))
+                    {
+                        if (*previousWitnessTable != table)
+                        {
+                            diagnoseDuplicateSequentialID(
+                                interfaceType,
+                                table,
+                                *previousWitnessTable,
+                                inputId);
+                        }
+                        return;
+                    }
+
+                    witnessTableForSequentialID.add(inputId, table);
+                    mapping[inputId] = outputId; // Map the global sequential ID to the local tag.
                 }
             });
 
@@ -944,15 +995,23 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                     shouldUpdateSequentialIDMap = true;
                 }
 
-                // If the inst already has a SequentialIDDecoration, stop now.
-                if (inst->findDecoration<IRSequentialIDDecoration>())
-                    continue;
+                auto interfaceType =
+                    cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
+                auto interfaceName = String();
+                if (as<IRInterfaceType>(interfaceType))
+                {
+                    auto interfaceLinkage = interfaceType->findDecoration<IRLinkageDecoration>();
+                    SLANG_ASSERT(
+                        interfaceLinkage && "An interface type does not have a linkage,"
+                                            "but a witness table associated with it has one.");
+                    interfaceName = interfaceLinkage->getMangledName();
+                }
 
-                // Get a sequential ID for the witness table using the map from the Linkage.
+                // Get or register the sequential ID for the witness table using the maps from the
+                // Linkage. This updates shared linkage state, so keep name generation, lookup, and
+                // insertion atomic.
                 uint32_t seqID = 0;
                 {
-                    // Witness-table sequential ID allocation updates both linkage maps and the
-                    // generated-name counter, so keep the whole lookup/allocation/insertion atomic.
                     std::lock_guard<std::mutex> lock(linkage->m_sequentialIDMapMutex);
 
                     if (shouldUpdateSequentialIDMap)
@@ -963,41 +1022,47 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                         witnessTableMangledName = generatedMangledName.getUnownedSlice();
                     }
 
+                    // If the inst already has a SequentialIDDecoration, make sure the linkage-side
+                    // bookkeeping reflects that explicit ID before moving on.
+                    if (auto seqDecoration = inst->findDecoration<IRSequentialIDDecoration>())
+                    {
+                        seqID = uint32_t(seqDecoration->getSequentialID());
+                        if (interfaceName.getLength())
+                        {
+                            linkage->registerTypeConformanceWitnessSequentialID(
+                                String(witnessTableMangledName),
+                                interfaceName,
+                                seqID);
+                        }
+                        continue;
+                    }
+
                     if (!linkage->mapMangledNameToRTTIObjectIndex.tryGetValue(
                             witnessTableMangledName,
                             seqID))
                     {
-                        auto interfaceType =
-                            cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
                         if (as<IRInterfaceType>(interfaceType))
                         {
-                            auto interfaceLinkage =
-                                interfaceType->findDecoration<IRLinkageDecoration>();
-                            SLANG_ASSERT(
-                                interfaceLinkage &&
-                                "An interface type does not have a linkage,"
-                                "but a witness table associated with it has one.");
-                            auto interfaceName = interfaceLinkage->getMangledName();
-                            auto idAllocator =
-                                linkage->mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(
-                                    interfaceName);
-                            if (!idAllocator)
-                            {
-                                linkage
-                                    ->mapInterfaceMangledNameToSequentialIDCounters[interfaceName] =
-                                    0;
-                                idAllocator = linkage->mapInterfaceMangledNameToSequentialIDCounters
-                                                  .tryGetValue(interfaceName);
-                            }
-                            seqID = *idAllocator;
-                            ++(*idAllocator);
+                            seqID = linkage->getFirstFreeTypeConformanceWitnessSequentialID(
+                                interfaceName);
                         }
                         else
                         {
                             // NoneWitness, has special ID of -1.
                             seqID = uint32_t(-1);
                         }
-                        linkage->mapMangledNameToRTTIObjectIndex[witnessTableMangledName] = seqID;
+                        if (interfaceName.getLength())
+                        {
+                            linkage->registerTypeConformanceWitnessSequentialID(
+                                String(witnessTableMangledName),
+                                interfaceName,
+                                seqID);
+                        }
+                        else
+                        {
+                            linkage->mapMangledNameToRTTIObjectIndex[witnessTableMangledName] =
+                                seqID;
+                        }
                     }
                 }
 
@@ -1026,12 +1091,13 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
 private:
     Linkage* m_linkage;
+    DiagnosticSink* m_sink;
+    Dictionary<IRInst*, HashSet<uint32_t>> m_diagnosedDuplicateSequentialIDKeys;
 };
 
 void lowerSequentialIDTagCasts(IRModule* module, Linkage* linkage, DiagnosticSink* sink)
 {
-    SLANG_UNUSED(sink);
-    SequentialIDTagLoweringContext context(linkage, module);
+    SequentialIDTagLoweringContext context(linkage, module, sink);
     context.processModule();
 }
 
