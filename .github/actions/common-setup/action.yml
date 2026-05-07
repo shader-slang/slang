@@ -128,15 +128,18 @@ runs:
           # CMake's standard subdirectory search. Also set LLVM_DIR/Clang_DIR
           # to the explicit cmake-config directories as fallback. Use $PWD
           # so the path resolves inside the current shell context (container
-          # or host). On Windows Git Bash, convert the path with `cygpath -m`
-          # so CMake sees "C:/..." instead of "/c/...", and use `;` as the
-          # path separator (CMake's documented separator on Windows; `:`
-          # would split drive letters like `C:/` mid-path).
+          # or host). Windows CMake uses `;` as the path-list separator; when
+          # running through Git Bash or WSL, convert the shell path to a form
+          # Windows tools can consume.
           LLVM_INSTALL="$PWD/build/llvm-project-install"
           PATH_SEP=":"
-          if command -v cygpath >/dev/null; then
-            LLVM_INSTALL="$(cygpath -m "$LLVM_INSTALL")"
+          if [[ "${{ inputs.os }}" == "windows" ]]; then
             PATH_SEP=";"
+            if command -v cygpath >/dev/null; then
+              LLVM_INSTALL="$(cygpath -m "$LLVM_INSTALL")"
+            elif command -v wslpath >/dev/null; then
+              LLVM_INSTALL="$(wslpath -m "$LLVM_INSTALL")"
+            fi
           fi
           echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+${PATH_SEP}${CMAKE_PREFIX_PATH}}" >> "$GITHUB_ENV"
           echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> "$GITHUB_ENV"

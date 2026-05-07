@@ -300,6 +300,8 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     # With SLANG_EMBED_CORE_MODULE=OFF, building the neural module crashes
     # (slang-bootstrap exits 0xC0000005 when processing neural.slang), so we
     # exclude the dependency to keep development builds with EMBED=OFF working.
+    # TODO(#11079): remove this workaround once slang-bootstrap handles neural.slang
+    # in EMBED=OFF builds.
     if(SLANG_EMBED_CORE_MODULE)
         add_dependencies(slang-test slang-neural-module)
     endif()

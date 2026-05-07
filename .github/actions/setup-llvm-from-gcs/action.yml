@@ -93,8 +93,8 @@ runs:
         # link against, treat it as a cache miss and let the from-source
         # build step recover. Failing hard would block the build on a stale
         # cache entry that the next master push will overwrite anyway.
-        if [ ! -d "build/llvm-project-install/lib/cmake/clang" ]; then
-          echo "⚠️  Downloaded LLVM prebuilt is missing build/llvm-project-install/lib/cmake/clang/ — treating as cache miss"
+        if [ ! -d "build/llvm-project-install/lib/cmake/clang" ] || [ ! -d "build/llvm-project-install/lib/cmake/llvm" ]; then
+          echo "⚠️  Downloaded LLVM prebuilt is missing build/llvm-project-install/lib/cmake/{clang,llvm}/ — treating as cache miss"
           rm -rf build/llvm-project-install
           echo "cache-hit=false" >> $GITHUB_OUTPUT
           exit 0
@@ -110,15 +110,18 @@ runs:
         # LLVM install prefix so find_package(Clang CONFIG) can locate
         # ClangConfig.cmake via CMake's standard subdirectory search. Use $PWD
         # so the path resolves inside the current shell (container or host).
-        # On Windows Git Bash, convert the path with `cygpath -m` so CMake sees
-        # "C:/..." instead of "/c/...", and use `;` as the path separator
-        # (CMake's documented separator on Windows; `:` would split drive
-        # letters like `C:/` mid-path).
+        # Windows CMake uses `;` as the path-list separator; when running
+        # through Git Bash or WSL, convert the shell path to a form Windows
+        # tools can consume.
         LLVM_INSTALL="$PWD/build/llvm-project-install"
         PATH_SEP=":"
-        if command -v cygpath >/dev/null; then
-          LLVM_INSTALL="$(cygpath -m "$LLVM_INSTALL")"
+        if [[ "${{ inputs.os }}" == "windows" ]]; then
           PATH_SEP=";"
+          if command -v cygpath >/dev/null; then
+            LLVM_INSTALL="$(cygpath -m "$LLVM_INSTALL")"
+          elif command -v wslpath >/dev/null; then
+            LLVM_INSTALL="$(wslpath -m "$LLVM_INSTALL")"
+          fi
         fi
         echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+${PATH_SEP}${CMAKE_PREFIX_PATH}}" >> $GITHUB_ENV
         echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> $GITHUB_ENV
@@ -137,13 +140,18 @@ runs:
         fi
 
         # Use $PWD so the install prefix is an absolute path that is valid
-        # inside the current shell (container or host). On Windows Git Bash,
-        # convert to Windows-style ("C:/...") so CMake interprets it correctly.
+        # inside the current shell (container or host). Windows CMake uses `;`
+        # as the path-list separator; when running through Git Bash or WSL,
+        # convert the shell path to a form Windows tools can consume.
         LLVM_INSTALL="$PWD/build/llvm-project-install"
         PATH_SEP=":"
-        if command -v cygpath >/dev/null; then
-          LLVM_INSTALL="$(cygpath -m "$LLVM_INSTALL")"
+        if [[ "${{ inputs.os }}" == "windows" ]]; then
           PATH_SEP=";"
+          if command -v cygpath >/dev/null; then
+            LLVM_INSTALL="$(cygpath -m "$LLVM_INSTALL")"
+          elif command -v wslpath >/dev/null; then
+            LLVM_INSTALL="$(wslpath -m "$LLVM_INSTALL")"
+          fi
         fi
 
         ./external/build-llvm.sh \
@@ -156,12 +164,13 @@ runs:
         # Verify the install actually landed where we expect. Fail hard
         # rather than letting the subsequent Slang configure fail with an
         # opaque find_package(Clang) error.
-        if [ ! -d "${LLVM_INSTALL}/lib/cmake/clang" ]; then
-          echo "::error::LLVM install is missing ${LLVM_INSTALL}/lib/cmake/clang/; install-distribution in external/build-llvm.sh did not produce ClangConfig.cmake."
+        if [ ! -d "${LLVM_INSTALL}/lib/cmake/clang" ] || [ ! -d "${LLVM_INSTALL}/lib/cmake/llvm" ]; then
+          echo "::error::LLVM install is missing ${LLVM_INSTALL}/lib/cmake/{clang,llvm}/; install-distribution in external/build-llvm.sh did not produce the expected CMake package configs."
           exit 1
         fi
         echo "📊 LLVM installation contents:"
         ls -la "${LLVM_INSTALL}/lib/cmake/clang/"
+        ls -la "${LLVM_INSTALL}/lib/cmake/llvm/"
 
         # Set environment variables for CMake. See matching comment in the
         # download step above.
@@ -176,8 +185,12 @@ runs:
         LLVM_KEY="${{ steps.cache-key.outputs.llvm-key }}"
         GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
         LLVM_DIR="$PWD/build/llvm-project-install"
-        if command -v cygpath >/dev/null; then
-          LLVM_DIR="$(cygpath -m "$LLVM_DIR")"
+        if [[ "${{ inputs.os }}" == "windows" ]]; then
+          if command -v cygpath >/dev/null; then
+            LLVM_DIR="$(cygpath -m "$LLVM_DIR")"
+          elif command -v wslpath >/dev/null; then
+            LLVM_DIR="$(wslpath -m "$LLVM_DIR")"
+          fi
         fi
 
         if [ ! -d "${LLVM_DIR}" ]; then

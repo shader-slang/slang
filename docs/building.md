@@ -338,9 +338,10 @@ it would just be a convoluted way to download a prebuilt binary.
 
 `USE_SYSTEM_LLVM` requires an LLVM install on disk that exposes
 `LLVMConfig.cmake` and `ClangConfig.cmake`. You can satisfy that requirement
-several ways: a distro package (e.g. `apt install llvm-21-dev clang-21`), a
-prebuilt LLVM toolchain you've built yourself for unrelated reasons, or a
-fresh build produced specifically for Slang. **You do not need
+several ways: a distro package or LLVM package repository that provides
+matching LLVM 21.1 development packages, a prebuilt LLVM toolchain you've built
+yourself for unrelated reasons, or a fresh build produced specifically for
+Slang. **You do not need
 `external/build-llvm.sh` if you already have a suitable LLVM install** —
 just point `CMAKE_PREFIX_PATH` (or `LLVM_DIR`/`Clang_DIR`) at it.
 
