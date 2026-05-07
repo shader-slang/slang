@@ -386,3 +386,38 @@ SLANG_UNIT_TEST(replayContextSyncModeWritesToStream)
     ctx().record(RecordFlag::None, readVal);
     SLANG_CHECK(readVal == 42);
 }
+
+// =============================================================================
+// Test isolation: REPLAY_TEST must recover from a dirty singleton left behind
+// by a prior test that aborted before its ScopedReplayContext dtor ran.
+// =============================================================================
+
+SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
+{
+    // Simulate the leaked-state cases the old skip-on-active guard protected
+    // against: a recording in flight, plus residual handle/object state.
+    ReplayContext::get().setMode(Mode::Record);
+    int32_t leakedValue = 7;
+    ReplayContext::get().record(RecordFlag::None, leakedValue);
+    SLANG_CHECK(ReplayContext::get().isActive());
+    SLANG_CHECK(ReplayContext::get().getStream().getSize() > 0);
+
+    // Now run the standard per-test setup. ScopedReplayContext's ctor must
+    // force the singleton back to a clean Mode::Idle with empty streams.
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    SLANG_CHECK(ctx().getMode() == Mode::Idle);
+    SLANG_CHECK(!ctx().isActive());
+    SLANG_CHECK(ctx().getStream().getSize() == 0);
+
+    // And a normal record/playback cycle still works after recovery.
+    ctx().setMode(Mode::Record);
+    int32_t value = 123;
+    ctx().record(RecordFlag::None, value);
+
+    ctx().switchToPlayback();
+    int32_t readBack = 0;
+    ctx().record(RecordFlag::None, readBack);
+    SLANG_CHECK(readBack == 123);
+}
