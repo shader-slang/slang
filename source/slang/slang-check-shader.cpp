@@ -2973,7 +2973,7 @@ Scope* ComponentType::_getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder)
     // specified via the API or command line.
     //
     // We begin with a dummy scope that has as its parent
-    // the scope that provides the "base" langauge
+    // the scope that provides the "base" language
     // definitions (that scope is necessary because
     // it defines keywords like `true` and `false`).
     //
