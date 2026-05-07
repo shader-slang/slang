@@ -611,7 +611,9 @@ are not opaque handles, `DescriptorHandle<T>` maps to `T` and will have the same
 struct DescriptorHandle<T> where T:IOpaqueDescriptor {}
 ```
 where `IOpaqueDescriptor` is an interface implemented by all resource types, including textures,
-`ConstantBuffer`, `RaytracingAccelerationStructure`, `SamplerState`, `SamplerComparisonState` and all types of `StructuredBuffer`.
+`ConstantBuffer`, `RaytracingAccelerationStructure`, `SamplerState`, `SamplerComparisonState`,
+all types of `StructuredBuffer`, and all byte-address buffer types (`ByteAddressBuffer`,
+`RWByteAddressBuffer`, `RasterizerOrderedByteAddressBuffer`).
 
 You may also write `Texture2D.Handle` as a shorthand for `DescriptorHandle<Texture2D>`.
 

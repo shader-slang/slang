@@ -967,6 +967,20 @@ struct ByteAddressBufferLegalizationContext
                 1,
                 &arg);
         }
+        else if (byteAddressBuffer->getOp() == kIROp_SPIRVLoadDescriptorFromHeap)
+        {
+            // For spvDescriptorHeapEXT: re-emit the heap load with the equivalent
+            // StructuredBuffer<T> type so the downstream SPIRV legalization converts it to a
+            // pointer-typed resource.
+            auto equivalentType = getEquivalentStructuredBufferParamType(
+                elementType,
+                byteAddressBuffer->getDataType());
+            if (!equivalentType)
+                return nullptr;
+            IRInst* args[2] = {byteAddressBuffer->getOperand(0), byteAddressBuffer->getOperand(1)};
+            return m_builder
+                .emitIntrinsicInst(equivalentType, kIROp_SPIRVLoadDescriptorFromHeap, 2, args);
+        }
 
         if (byteAddressBuffer->getOp() == kIROp_GetElement)
         {
