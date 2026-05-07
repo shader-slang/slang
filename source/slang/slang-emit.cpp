@@ -1436,6 +1436,11 @@ Result linkAndOptimizeIR(
     if (target == CodeGenTarget::HostVM)
     {
         SLANG_PASS(performForceInlining);
+        // Same invariant as the main path: after `performForceInlining` the
+        // synthesized coverage thunk must have zero remaining uses. Without
+        // this, an unhonored `[ForceInline]` would leak `__slang_coverage_hit`
+        // into HostVM bytecode.
+        SLANG_PASS(verifyAndRemoveCoverageThunk);
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
         return SLANG_OK;
     }
@@ -2211,6 +2216,8 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(performForceInlining);
+
+    SLANG_PASS(verifyAndRemoveCoverageThunk);
 
     if (emitSpirvDirectly)
     {
