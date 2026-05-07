@@ -91,8 +91,11 @@ Add an IR pass that runs before CUDA emission, identifies intrinsic calls to sur
 | **HLSL** | None in shader code | Hardware at binding time |
 | **GLSL** | `layout(rgba8) uniform image2D` | Hardware via format qualifier |
 | **Metal** | Texture type encodes format | Hardware via texture type |
+| **WGSL** | `texture_storage_2d<rgba8unorm, read_write>` | Hardware via storage texel format; limited format set (only `rgba16float` and a few others support read-write per `wgslFormatSupportsReadWrite()` in `slang-emit-wgsl.cpp`) |
 
 **Key insight**: All GPU backends rely on **dedicated texture units** that perform format conversion in hardware. CUDA surfaces use generic memory hardware without this capability.
+
+**Note**: `resolveTextureFormat` at `slang-emit.cpp:1905` runs for GLSL, SPIRV, and WGSL (not `SPIRVAssembly` — handled by SPIRV emitter directly; not CUDA/HLSL/Metal).
 
 ### CUDA PTX Surface Instructions
 
@@ -134,7 +137,7 @@ Key IR components that the pass will interact with:
 | `IRImageLoad` / `IRImageStore` | [slang-ir-insts.h:1878-1903](source/slang/slang-ir-insts.h) | NOT used for CUDA (only SPIRV/GLSL/Metal) |
 | `IRTextureTypeBase` | [slang-ir.h:1444](source/slang/slang-ir.h) | Texture type with operand 8 = format |
 | `IRFormatDecoration` | [slang-ir-insts.h:476](source/slang/slang-ir-insts.h) | Format attached to texture vars |
-| `resolveTextureFormat` pass | [slang-ir-resolve-texture-format.cpp](source/slang/slang-ir-resolve-texture-format.cpp) | Propagates format to texture type; runs for GLSL/SPIRV/WGSL only |
+| `resolveTextureFormat` pass | [slang-ir-resolve-texture-format.cpp](source/slang/slang-ir-resolve-texture-format.cpp) | Propagates format from `IRFormatDecoration` to texture type's format operand; runs for GLSL/SPIRV/WGSL only (not `SPIRVAssembly` — handled by SPIRV emitter directly; not CUDA/HLSL/Metal) |
 | `legalizeImageSubscript` pass | [slang-ir-legalize-image-subscript.cpp](source/slang/slang-ir-legalize-image-subscript.cpp) | Lowers `ImageSubscript` → `ImageLoad`/`ImageStore`; Metal/GLSL/SPIRV only |
 | `$C` / `$E` specifiers | [slang-intrinsic-expand.cpp:442-520](source/slang/slang-intrinsic-expand.cpp) | Emit-time format conversion for CUDA |
 | CUDA `Load()` / `Store()` | [hlsl.meta.slang:4862-5110](source/slang/hlsl.meta.slang) | `__intrinsic_asm` strings → direct text emission |
@@ -164,7 +167,7 @@ Key IR components that the pass will interact with:
 
 **Remove entirely**:
 - All `SLANG_SURF1DWRITE_CONVERT_IMPL` / `SLANG_SURF2DWRITE_CONVERT_IMPL` / `SLANG_SURF3DWRITE_CONVERT_IMPL` macros and their instantiations (lines 1573-1817) — these emit `sust.p` PTX instructions
-- All `surf*Layeredwrite_convert` stub functions (empty bodies that silently drop writes)
+- All `surf*Layeredwrite_convert` stub functions (empty bodies that **silently drop writes** — this is a **pre-existing data loss bug**: any CUDA shader using format-converted writes on 1D/2D array textures has its writes silently discarded today). The IR pass fixes this because it is dimension-agnostic — layered format conversion works automatically.
 - The `SLANG_SURFACE_READ_HALF_CONVERT` macro and its instantiations (lines 1517-1559) — superseded by the IR pass
 
 ---
@@ -221,11 +224,19 @@ AFTER:
 **Identifying surface intrinsic calls**: The pass needs to identify which `IRCall` instructions are surface read/write intrinsics. Options:
 - **Pattern match the `__intrinsic_asm` string** for `surf*read` / `surf*write` patterns — fragile but works
 - **Check the callee's decoration** — intrinsic functions carry decorations that identify them
-- **Best approach**: Look at the call's first argument type. If it's an `IRTextureTypeBase` with a format decoration that requires conversion, and the call is to an intrinsic function, it's a candidate. Then check if the call has a non-void return type (read) or void (write).
+- **Best approach**: Look at the call's first argument type. If it's an `IRTextureTypeBase` and the texture has a format that requires conversion, and the call is to an intrinsic function, it's a candidate. Then check if the call has a non-void return type (read) or void (write).
+
+**Format decoration lookup** (**critical**): The existing `_findImageFormatDecoration()` in `slang-intrinsic-expand.cpp` (lines 132-152) traverses `IRLoad` → `IRFieldAddress` → field key chains to find decorations on struct fields. For example, `myStruct.tex.Load(coord)` produces an `IRLoad` of an `IRFieldAddress`, and the format decoration lives on the field key, not on the `IRLoad` result. **The IR pass must replicate this traversal**, or it will miss format decorations on textures accessed as struct members. The recommended approach is to extract `_findImageFormatDecoration()` into a shared utility in `slang-ir-util.h` and call it from both `slang-intrinsic-expand.cpp` and the new pass.
+
+**Format source duality** (**critical**): The effective format must be resolved from **two sources**:
+- **`IRFormatDecoration`** on the texture variable (via the traversal above)
+- **Texture type's format operand** (`IRTextureTypeBase::getFormat()`, operand index 8) — this is set when the user writes `RWTexture2D<unorm float4>` without an explicit `[format]` attribute; the format is inferred during semantic checking and baked into the type.
+
+Since `resolveTextureFormat` does NOT run for CUDA, these two sources may not be reconciled. The decoration (if present) takes priority; otherwise fall back to the type's format operand. The pass must check both.
 
 **Modifying the texture type**: The pass must create a new `IRTextureType` with the storage element type (e.g., `uchar4` for `rgba8`) instead of the access type (e.g., `float4`). The format decoration is removed after lowering so `$C` doesn't fire during emission.
 
-**Coordinate scaling**: The raw-typed call must use correct byte-addressing. For `rgba8`, coordinates are already scaled by `$E` (which reads format size from the decoration). After the pass rewrites the element type, `$E` will compute the size from the new raw type — which is the same size. So coordinate scaling is automatically correct.
+**Coordinate scaling** (**critical invariant**): The raw-typed call must use correct byte-addressing. `$E` first checks for an `IRFormatDecoration` and, if found, uses `getImageFormatInfo(format).sizeInBytes`. If no decoration is found, it falls back to computing size from the element type via `_calcBackingElementSizeInBytes()` (slang-intrinsic-expand.cpp:196-220). **After the IR pass removes the format decoration AND rewrites the element type to the raw storage type, `$E` falls through to the element-type path.** This produces the correct byte size — `sizeof(uchar4) = 4` for `rgba8`, `sizeof(uint8_t) = 1` for `r8`, etc. **The element type rewrite is therefore load-bearing for `$E` correctness, not just `$C`.** If the pass removes the decoration but fails to rewrite the element type (e.g., leaves it as `float4` for `r8`), `$E` would compute `sizeof(float4) = 16` instead of the correct `1`, causing incorrect address scaling. **The pass MUST rewrite the element type before removing the format decoration.**
 
 **Removing format decoration**: After lowering, remove the `IRFormatDecoration` from the texture variable. This ensures `$C` sees no format mismatch and emits the plain function name (no `_convert` suffix). `$E` computes the correct byte size from the raw type.
 
@@ -244,7 +255,30 @@ For each format category, the pass generates inline IR instructions:
 | **UINT8/16** | `zext(raw)` to uint32 | `trunc(val)` to uint8/16 |
 | **BGRA8** | Same as UNORM8 with `.zyxw` swizzle | Same as UNORM8 with `.zyxw` swizzle |
 
+**SNORM convention**: The SNORM decode formula uses the OpenGL/Vulkan convention where both -128 and -127 map to -1.0 (via the `max(..., -1.0)` clamp). This matches the Vulkan spec (§16.1.3) and OpenGL spec (§2.3.5). DirectX uses the same formula. The encode formula `fptosi(round(clamp(val,-1,1) * 127.0))` produces -127 for input -1.0, never -128, which is correct per both conventions. The asymmetry (128 negative vs 127 positive representable values) is intentional — -128 is treated as an alias for -1.0 on decode but is never produced by encode.
+
 The pass builds these as IR instruction sequences using `IRBuilder`. This is standard practice for IR passes in Slang — see `slang-ir-legalize-image-subscript.cpp` for a similar pattern.
+
+#### Channel Count Mismatch Handling
+
+The format's channel count may differ from the access type's vector width. For example, `[format("r8")] RWTexture2D<float4>` has a 1-channel format but a 4-component access type. The existing `_isConvertRequired()` already flags this as requiring conversion (via `_isImageFormatCompatible` checking `numElems != imageFormatInfo.channelCount`).
+
+The IR pass must handle this explicitly in `emitDecode()` and `emitEncode()`:
+
+**Reads (fewer storage channels → more access channels)**:
+- Read `N` raw channels (where `N` = format channel count)
+- Convert each raw channel to the access scalar type
+- Pad remaining channels with GPU-standard defaults: **(0, 0, 0, 1)**
+  - Missing R/G/B channels → `0.0` (float) / `0` (int)
+  - Missing A channel → `1.0` (float) / `1` (int for UNORM/SNORM) / max value (for UINT)
+- Example: `r8` → `float4` produces `(uitofp(raw)/255.0, 0.0, 0.0, 1.0)`
+
+**Writes (more access channels → fewer storage channels)**:
+- Extract only the first `N` channels from the access value
+- Convert and write `N` raw channels; remaining access channels are discarded
+- Example: `float4` → `r8` writes only `fptoui(saturate(val.x) * 255.0 + 0.5)`
+
+**Raw storage type**: When the format has fewer channels than the access type, the raw storage type is a vector of `N` elements (or scalar if `N=1`), not a vector matching the access width. For `r8` the raw type is `uint8_t` (scalar), for `rg8` it is `uchar2`, etc.
 
 #### Pass Placement in Pipeline
 
@@ -292,6 +326,11 @@ struct CUDASurfaceFormatLegalizer {
 
     // Emit IR instructions to encode access type value → raw storage bytes
     IRInst* emitEncode(ImageFormat format, IRInst* accessValue, IRType* storageType);
+
+    // Resolve the effective image format for a texture resource, checking both
+    // IRFormatDecoration (via IRLoad→IRFieldAddress traversal) and the texture
+    // type's format operand. Decoration takes priority.
+    ImageFormat getEffectiveFormat(IRInst* resourceInst);
 
     // Check if a call is a CUDA surface read/write intrinsic
     bool isSurfaceReadCall(IRCall* call, IRInst*& outTexture);
@@ -489,8 +528,10 @@ The pass must find `IRCall` instructions that are CUDA surface reads/writes. Str
 
 1. Walk all instructions in all functions
 2. For each `IRCall`, check if the callee is an `IRFunc` with an `__intrinsic_asm` body
-3. Check if the first argument is a texture/surface resource with an `IRFormatDecoration`
-4. Check if `_isConvertRequired()` — format storage type differs from element type
+3. Determine the effective format from **two sources** (check both):
+   - **`IRFormatDecoration`** on the texture variable (via the `_findImageFormatDecoration()` traversal — see "Format decoration lookup" in Step 2)
+   - **Texture type's format operand** (`IRTextureTypeBase::getFormat()`, operand index 8) — this is set when the user writes `RWTexture2D<unorm float4>` without an explicit `[format]` attribute; the format is inferred during semantic checking and baked into the type. Since `resolveTextureFormat` does NOT run for CUDA, these two sources may not be reconciled; the decoration (if present) takes priority, otherwise fall back to the type's format operand.
+4. Check if `_isConvertRequired()` — format storage type differs from element type. Use the effective format from step 3.
 5. Determine read vs write: non-void return type = read, void = write
 
 Alternatively, the pass can look at the `IRFormatDecoration` on global texture variables and trace their uses to find all load/store calls — this is similar to how `resolveTextureFormat` works.
@@ -511,7 +552,7 @@ For writes: reverse the process — insert conversion before the call, change th
 
 After the pass:
 - **`$C`**: The format decoration is removed. `_isConvertRequired()` returns false. `$C` emits nothing. The function name stays `surf2Dread` (no `_convert` suffix). ✅
-- **`$E`**: The element type is now the raw storage type. `_calcBackingElementSizeInBytes()` returns the correct byte size from the element type (not the format, since the decoration is removed). ✅
+- **`$E`**: The format decoration is removed, so `_calcBackingElementSizeInBytes()` falls through to the element-type codepath. The element type is now the raw storage type, so it computes the correct byte size. **Invariant**: the element type rewrite must happen before the decoration removal, and the raw storage type must have the same byte size as the original format. For single-channel formats like `r8` (1 byte) accessed as `float4` (16 bytes), the rewrite changes the element type to `uint8_t` (1 byte) — matching the format's `sizeInBytes`. ✅
 
 So both specifiers work correctly without any changes to `hlsl.meta.slang`.
 
@@ -566,6 +607,11 @@ The second approach is more robust — the emitter already scans for half types.
 - [ ] No regressions in existing CUDA tests
 - [ ] Generated CUDA code compiles with nvcc
 - [ ] Half extension is properly required for float16 format conversions
+- [ ] Channel count mismatch works: `[format("r8")] RWTexture2D<float4>` reads `(x, 0, 0, 1)`
+- [ ] Channel count mismatch works: `[format("rg16f")] RWTexture2D<float4>` reads `(x, y, 0, 1)`
+- [ ] Format on struct field members detected correctly (`IRLoad`→`IRFieldAddress` chain)
+- [ ] `RWTexture2D<unorm float4>` (inferred format, no explicit `[format]`) triggers conversion
+- [ ] Element type rewrite + decoration removal ordering is correct (type rewrite first)
 
 ---
 
