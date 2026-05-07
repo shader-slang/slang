@@ -75,8 +75,172 @@ jobs:
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
 
+      # TEMPORARY: enable core-dump capture on Linux to investigate the
+      # SIGILL in slang-test on the linux-cpu job (seen 2026-05-04 PR #10977
+      # and 2026-05-05 PR #11053, both crashing right after
+      # tests/autodiff/global-param-hoisting.slang.1 (vk)). Remove once root-caused.
+      - name: Enable core dumps (Linux)
+        if: inputs.os == 'linux'
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/cores"
+          # Override Ubuntu's default apport pipe so cores land as plain files.
+          sudo sysctl -w kernel.core_pattern="$GITHUB_WORKSPACE/cores/core.%e.%p"
+          sudo sysctl -w kernel.core_uses_pid=1
+          ulimit -c unlimited
+          # Make sure gdb is installed for the post-run extraction step.
+          sudo apt-get install -y --no-install-recommends gdb
+
+      # TEMPORARY: gather AVX-512 detection ground truth on each Linux test
+      # runner so we can validate the hypothesis behind #11062 (slang-llvm JIT
+      # emits AVX-512 because LLVM reports the CPU supports it, then the
+      # instruction faults at execution). Confirms which of these is happening:
+      #   (a) CPUID reports AVX-512 + XCR0 has bits 5-7 + kmovd runs cleanly
+      #       → falsifies hypothesis, points at IR/JIT-attribute leakage
+      #   (b) CPUID reports AVX-512 but XCR0 lacks bits 5-7
+      #       → OS XSAVE problem
+      #   (c) CPUID reports AVX-512, XCR0 fine, kmovd still SIGILLs
+      #       → hypervisor passthrough / instruction-mask discrepancy
+      # Remove once #11062 is fixed and verified.
+      - name: CPUID / AVX-512 probe (Linux)
+        if: inputs.os == 'linux'
+        shell: bash
+        run: |
+          echo "::group::Runner identity"
+          uname -a
+          # boot_id is unique per host boot — proxy for "same physical host".
+          if [ -r /proc/sys/kernel/random/boot_id ]; then
+            printf 'boot_id=%s\n' "$(cat /proc/sys/kernel/random/boot_id)"
+          fi
+          echo "::endgroup::"
+
+          echo "::group::/proc/cpuinfo (first processor entry)"
+          awk '/^processor/{n++} n==2{exit} {print}' /proc/cpuinfo
+          echo "::endgroup::"
+
+          echo "::group::AVX-512 family flags reported in /proc/cpuinfo"
+          grep -oE 'avx512[a-z0-9]*' /proc/cpuinfo | sort -u || echo "(none)"
+          echo "::endgroup::"
+
+          echo "::group::clang -march=native (LLVM-style detection)"
+          if command -v clang >/dev/null 2>&1; then
+            clang --version | head -1
+            # Print only the cc1 invocation line; that contains all
+            # -target-cpu and -target-feature flags clang would set.
+            clang -E -x c /dev/null -march=native -### 2>&1 \
+              | tr ' ' '\n' \
+              | grep -E '^-(target-cpu|target-feature|march|mcpu)' \
+              | sort -u || true
+          else
+            echo "(clang not on PATH)"
+          fi
+          echo "::endgroup::"
+
+          echo "::group::CPUID leaf 7, sub 0 (raw)"
+          cat >/tmp/cpuid.c <<'EOF'
+          #include <stdio.h>
+          #include <stdint.h>
+          static void cpuid_count(uint32_t leaf, uint32_t sub,
+                                  uint32_t *a, uint32_t *b,
+                                  uint32_t *c, uint32_t *d) {
+              __asm__ volatile("cpuid"
+                  : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
+                  : "a"(leaf), "c"(sub));
+          }
+          int main(void) {
+              uint32_t a, b, c, d;
+              cpuid_count(7, 0, &a, &b, &c, &d);
+              printf("EAX=0x%08x EBX=0x%08x ECX=0x%08x EDX=0x%08x\n", a, b, c, d);
+              printf("  AVX-512F   (EBX bit 16): %s\n", (b & (1u<<16)) ? "yes" : "no");
+              printf("  AVX-512DQ  (EBX bit 17): %s\n", (b & (1u<<17)) ? "yes" : "no");
+              printf("  AVX-512CD  (EBX bit 28): %s\n", (b & (1u<<28)) ? "yes" : "no");
+              printf("  AVX-512BW  (EBX bit 30): %s\n", (b & (1u<<30)) ? "yes" : "no");
+              printf("  AVX-512VL  (EBX bit 31): %s\n", (b & (1u<<31)) ? "yes" : "no");
+              printf("  AVX-512VBMI(ECX bit  1): %s\n", (c & (1u<< 1)) ? "yes" : "no");
+              printf("  AVX-512VNNI(ECX bit 11): %s\n", (c & (1u<<11)) ? "yes" : "no");
+              return 0;
+          }
+          EOF
+          cc -O0 -o /tmp/cpuid /tmp/cpuid.c && /tmp/cpuid || echo "(cpuid probe failed)"
+          echo "::endgroup::"
+
+          echo "::group::OS XSAVE state (XCR0)"
+          # AVX-512 also requires the OS to enable XSAVE for opmask + ZMM regs
+          # (XCR0 bits 5, 6, 7). If those are clear, AVX-512 instructions
+          # raise #UD even on supporting hardware.
+          cat >/tmp/xcr0.c <<'EOF'
+          #include <stdio.h>
+          #include <stdint.h>
+          int main(void) {
+              uint32_t a, d;
+              __asm__ volatile("xgetbv" : "=a"(a), "=d"(d) : "c"(0));
+              uint64_t xcr0 = ((uint64_t)d << 32) | a;
+              printf("XCR0=0x%016llx\n", (unsigned long long)xcr0);
+              printf("  X87/SSE  (bits 0-1): %s\n", (xcr0 & 0x3) == 0x3 ? "on" : "off");
+              printf("  AVX      (bit 2):    %s\n", (xcr0 & (1ull<<2)) ? "on" : "off");
+              printf("  opmask   (bit 5):    %s\n", (xcr0 & (1ull<<5)) ? "on" : "off");
+              printf("  ZMM_Hi256(bit 6):    %s\n", (xcr0 & (1ull<<6)) ? "on" : "off");
+              printf("  Hi16_ZMM (bit 7):    %s\n", (xcr0 & (1ull<<7)) ? "on" : "off");
+              return 0;
+          }
+          EOF
+          cc -O0 -o /tmp/xcr0 /tmp/xcr0.c && /tmp/xcr0 || echo "(xcr0 probe failed)"
+          echo "::endgroup::"
+
+          echo "::group::Execute kmovd %eax, %k1 in a child"
+          # The exact instruction we observed crashing in the cores. Use the
+          # raw VEX encoding via .byte so this assembles even on toolchains
+          # that don't have AVX-512 enabled by default (system gcc on
+          # GitHub-hosted ubuntu often won't accept "%k1" without -mavx512f).
+          # Run in a forked child so SIGILL doesn't terminate the whole job.
+          # `kmovd %eax, %k1` -> C5 FB 92 C8 (verified with llvm-mc)
+          cat >/tmp/avx512.c <<'EOF'
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/wait.h>
+          int main(void) {
+              pid_t p = fork();
+              if (p < 0) { perror("fork"); return 2; }
+              if (p == 0) {
+                  __asm__ volatile(".byte 0xc5,0xfb,0x92,0xc8"); /* kmovd %eax, %k1 */
+                  fputs("kmovd executed cleanly\n", stdout);
+                  fflush(stdout);
+                  _exit(0);
+              }
+              int s = 0;
+              waitpid(p, &s, 0);
+              if (WIFEXITED(s)) {
+                  printf("child exited normally, status=%d\n", WEXITSTATUS(s));
+                  return 0;
+              }
+              if (WIFSIGNALED(s)) {
+                  int sig = WTERMSIG(s);
+                  printf("child killed by signal %d (%s)\n", sig,
+                         sig == 4 ? "SIGILL" : sig == 11 ? "SIGSEGV" : "other");
+                  return 132;
+              }
+              printf("child finished in unexpected state, raw=0x%x\n", s);
+              return 3;
+          }
+          EOF
+          cc -O0 -o /tmp/avx512 /tmp/avx512.c && /tmp/avx512 || true
+          echo "kmovd probe exit code: $?"
+          echo "::endgroup::"
+
       - name: Test Slang
         run: |
+          # Inherit unlimited core size for any child processes (slang-test,
+          # test-servers, etc.). No-op on non-Linux runners.
+          ulimit -c unlimited || true
+          # TEMPORARY: have slang-llvm dump every JIT module's IR so we can
+          # inspect per-function `target-features` attributes for the SIGILL
+          # investigation in #11062. Remove with the rest of the debug
+          # machinery once root-caused.
+          if [[ "${{ inputs.os }}" == "linux" ]]; then
+            mkdir -p "$GITHUB_WORKSPACE/llvm-ir"
+            export SLANG_LLVM_DUMP_IR_DIR="$GITHUB_WORKSPACE/llvm-ir"
+          fi
           # Fail fast on mutually exclusive inputs — both would accumulate
           # -api filters and produce an empty test partition.
           if [[ "${{ inputs.cpu-only }}" == "true" && "${{ inputs.gpu-api-only }}" == "true" ]]; then
@@ -175,6 +339,103 @@ jobs:
             via_glsl_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
           fi
           "$bin_dir/slang-test" "${via_glsl_args[@]}"
+
+      # TEMPORARY: extract gdb backtraces from any cores produced above and
+      # upload both backtraces and raw cores as artifacts. Paired with
+      # "Enable core dumps (Linux)". Remove once the SIGILL is root-caused.
+      - name: Capture core dumps (Linux)
+        if: always() && inputs.os == 'linux'
+        shell: bash
+        run: |
+          shopt -s nullglob
+          # Drop known-benign cores from intentional unit-test crashes (test-process
+          # exercises subprocess management; gfx-smoke fails to load a GPU driver
+          # on the GitHub-hosted runner). Keeps the artifact lean so the slang-test
+          # cores we actually care about are easy to find.
+          for benign in test-process gfx-smoke; do
+            rm -f "$GITHUB_WORKSPACE/cores/core.$benign".*
+          done
+          cores=("$GITHUB_WORKSPACE/cores"/core.*)
+          if [ "${#cores[@]}" -eq 0 ]; then
+            echo "No interesting core dumps captured."
+            exit 0
+          fi
+          echo "Captured ${#cores[@]} core dump(s):"
+          ls -lh "${cores[@]}"
+          mkdir -p "$GITHUB_WORKSPACE/cores/backtraces"
+          for c in "${cores[@]}"; do
+            name=$(basename "$c")
+            # Pull the executable name out of core.<exe>.<pid>.
+            exe_name=${name#core.}
+            exe_name=${exe_name%.*}
+            exe_path="$bin_dir/$exe_name"
+            if [ ! -x "$exe_path" ]; then
+              # Fall back to whatever gdb finds in the core itself.
+              exe_path=""
+            fi
+            bt_file="$GITHUB_WORKSPACE/cores/backtraces/$name.bt.txt"
+            echo "=== Backtrace for $name (exe=$exe_path) ===" | tee "$bt_file"
+            # Run a richer gdb inspection: registers, faulting instruction,
+            # disassembly around $pc, shared-library map (so we can correlate
+            # the faulting RIP to a JITed mmap region), and process mappings.
+            gdb -batch \
+              -ex "set pagination off" \
+              -ex "set print pretty on" \
+              -ex "thread apply all bt full" \
+              -ex "info registers" \
+              -ex "x/i \$pc" \
+              -ex "x/16i \$pc-32" \
+              -ex "info sharedlibrary" \
+              -ex "maintenance info sections" \
+              ${exe_path:+"$exe_path"} "$c" 2>&1 | tee -a "$bt_file" || true
+          done
+
+      - name: Upload core dumps and backtraces
+        if: always() && inputs.os == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cores-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}${{ inputs.artifact-suffix }}
+          path: cores/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # TEMPORARY: also upload the dumped LLVM IR so we can grep for
+      # `target-features` attributes (#11062). Remove with the rest of the
+      # debug machinery.
+      - name: Filter and upload LLVM IR dumps
+        if: always() && inputs.os == 'linux'
+        shell: bash
+        run: |
+          if [ ! -d "$GITHUB_WORKSPACE/llvm-ir" ]; then
+            echo "No LLVM IR dump directory; nothing to do."
+            exit 0
+          fi
+          echo "::group::IR file count and total size"
+          count=$(find "$GITHUB_WORKSPACE/llvm-ir" -name 'slang-llvm-*.ll' | wc -l)
+          echo "files: $count"
+          du -sh "$GITHUB_WORKSPACE/llvm-ir" 2>/dev/null || true
+          echo "::endgroup::"
+          echo "::group::AVX-512 feature mentions across all dumped IR"
+          grep -lE 'avx512[a-z0-9]*' "$GITHUB_WORKSPACE/llvm-ir"/*.ll 2>/dev/null \
+            | head -10 || echo "(none — IR has no AVX-512 attributes)"
+          echo "::endgroup::"
+          echo "::group::Sample target-features attributes (first match per file, up to 5)"
+          for f in "$GITHUB_WORKSPACE"/llvm-ir/*.ll; do
+            [ -f "$f" ] || continue
+            line=$(grep -m1 'target-features' "$f" | head -c 400 || true)
+            if [ -n "$line" ]; then
+              printf '%s:\n  %s\n' "$(basename "$f")" "$line"
+            fi
+          done | head -50
+          echo "::endgroup::"
+      - name: Upload LLVM IR dumps
+        if: always() && inputs.os == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: llvm-ir-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}${{ inputs.artifact-suffix }}
+          path: llvm-ir/
+          if-no-files-found: ignore
+          retention-days: 7
 
   # Run slang-rhi tests when:
   # 1. full-gpu-tests is enabled AND

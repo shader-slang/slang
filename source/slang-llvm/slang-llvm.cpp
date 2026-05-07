@@ -64,6 +64,7 @@
 #include <core/slang-shared-library.h>
 #include <core/slang-string-util.h>
 #include <core/slang-string.h>
+#include <optional>
 #include <stdio.h>
 
 // We want to make math functions available to the JIT
@@ -883,6 +884,26 @@ SlangResult LLVMDownstreamCompiler::compile(
             // Get the module produced by the action
             module = codeGenAction->takeModule();
             break;
+        }
+    }
+
+    // TEMPORARY: dump LLVM IR pre-JIT when SLANG_LLVM_DUMP_IR_DIR is set so
+    // we can inspect per-function `target-features` attributes (#11062).
+    // Writes <dir>/slang-llvm-<pid>-<seq>.ll. Remove with the rest of the
+    // SIGILL debug machinery.
+    if (module)
+    {
+        std::optional<std::string> dumpDir = llvm::sys::Process::GetEnv("SLANG_LLVM_DUMP_IR_DIR");
+        if (dumpDir.has_value() && !dumpDir->empty())
+        {
+            static unsigned dumpSeq = 0;
+            std::string path = *dumpDir + "/slang-llvm-" +
+                               std::to_string(llvm::sys::Process::getProcessId()) + "-" +
+                               std::to_string(dumpSeq++) + ".ll";
+            std::error_code ec;
+            llvm::raw_fd_ostream out(path, ec);
+            if (!ec)
+                module->print(out, nullptr);
         }
     }
 
