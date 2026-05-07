@@ -434,7 +434,7 @@ struct CompilerOptionSet
     {
         if (!hasOption(CompilerOptionName::LanguageVersion))
         {
-            return SLANG_LANGAUGE_VERSION_DEFAULT;
+            return SLANG_LANGUAGE_VERSION_DEFAULT;
         }
         return (SlangLanguageVersion)getIntOption(CompilerOptionName::LanguageVersion);
     }

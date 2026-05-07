@@ -11042,7 +11042,7 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
                 }
                 else
                 {
-                    // For legacy langauge versions, we still allow struct inheritance to avoid
+                    // For legacy language versions, we still allow struct inheritance to avoid
                     // breaking existing code, but we will emit a warning to inform the user
                     // that this feature is unstable and may be removed in the future.
                     getSink()->diagnose(
