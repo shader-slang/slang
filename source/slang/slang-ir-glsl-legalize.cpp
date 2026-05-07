@@ -2120,7 +2120,15 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         // and generate a variable for each of them.
 
         auto structTypeLayout = as<IRStructTypeLayout>(typeLayout);
-        SLANG_ASSERT(structTypeLayout);
+        if (!structTypeLayout)
+        {
+            // A concrete IRStructType reached this path without a matching IRStructTypeLayout.
+            // This indicates a layout/type mismatch, typically from an unresolved link-time type.
+            SLANG_UNEXPECTED(
+                "IRStructType has no matching IRStructTypeLayout in createGLSLGlobalVaryingsImpl; "
+                "check lookupExternDeclRefType for unhandled associated-type patterns");
+            return ScalarizedVal();
+        }
         RefPtr<ScalarizedTupleValImpl> tupleValImpl = new ScalarizedTupleValImpl();
 
         // Since we are going to recurse into struct fields,
