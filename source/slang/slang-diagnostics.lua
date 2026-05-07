@@ -1043,6 +1043,13 @@ err(
     span { loc = "location", message = "cannot use a stage name in '__target_switch', use '__stage_switch' for stage-specific code." }
 )
 
+warning(
+    "spirv-layout-sensitive-type-in-asm",
+    29116,
+    "layout-sensitive SPIR-V type declaration in spirv_asm",
+    span { loc = "location", message = "layout-sensitive SPIR-V type declaration '~opcode' in spirv_asm may not preserve Slang data-layout information; form layout-sensitive pointers/values with Slang types or expressions and pass them into spirv_asm instead" }
+)
+
 
 -- Load semantic checking diagnostics (part 1)
 -- (inlined from slang-diagnostics-semantic-checking-1.lua)

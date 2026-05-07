@@ -703,7 +703,7 @@ struct LoweredElementTypeContext
                     loweredInnerTypeInfo.loweredType,
                     arrayType->getElementCount(),
                     needExplicitLayout ? builder.getIntValue(
-                                             builder.getIntType(),
+                                             builder.getUIntType(),
                                              elementSizeAlignment.getStride())
                                        : nullptr);
                 builder.createStructField(loweredType, structKey, innerArrayType);
@@ -729,7 +729,7 @@ struct LoweredElementTypeContext
                     loweredInnerTypeInfo.loweredType,
                     nullptr,
                     needExplicitLayout ? builder.getIntValue(
-                                             builder.getIntType(),
+                                             builder.getUIntType(),
                                              elementSizeAlignment.getStride())
                                        : nullptr);
                 maybeAddPhysicalTypeDecoration(builder, innerArrayType, config);
@@ -2389,6 +2389,12 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
                                                      : kIROp_DefaultBufferLayoutType;
 
         IRTypeLayoutRuleName defaultRule = IRTypeLayoutRuleName::Natural;
+        // SPIR-V storage-buffer pointers inherit the same std430 default as
+        // GLSLShaderStorageBuffer when no explicit data layout is attached, so stride
+        // computations match the ArrayStride decorations emitted later.
+        if (target->shouldEmitSPIRVDirectly() &&
+            ptrType->getAddressSpace() == AddressSpace::StorageBuffer)
+            defaultRule = IRTypeLayoutRuleName::Std430;
         if (isCPUTargetViaLLVM(targetReq))
             defaultRule = IRTypeLayoutRuleName::LLVM;
 
@@ -2683,7 +2689,7 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
                 vectorType,
                 isColMajor ? matrixType->getColumnCount() : matrixType->getRowCount(),
                 needExplicitLayout
-                    ? builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride())
+                    ? builder.getIntValue(builder.getUIntType(), elementSizeAlignment.getStride())
                     : nullptr);
             builder.createStructField(loweredType, structKey, arrayType);
 

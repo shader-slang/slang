@@ -135,7 +135,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         const auto arrayType = builder.getUnsizedArrayType(
             inst->getElementType(),
-            builder.getIntValue(builder.getIntType(), elementSize.getStride()));
+            builder.getIntValue(builder.getUIntType(), elementSize.getStride()));
         const auto structType = builder.createStructType();
         builder.addPhysicalTypeDecoration(structType);
         const auto arrayKey = builder.createStructKey();
