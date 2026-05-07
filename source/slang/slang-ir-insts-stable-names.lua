@@ -829,5 +829,6 @@ return {
 	["assumeAddress"] = 853,
 	["DebugCompilationUnit"] = 854,
 	["IncrementCoverageCounter"] = 855,
-	["SetBase.ValueSet"] = 856
+	["SetBase.ValueSet"] = 856,
+	["GetTagForMappedValueSet"] = 857
 }

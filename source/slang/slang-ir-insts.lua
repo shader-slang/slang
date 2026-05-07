@@ -2927,7 +2927,15 @@ local insts = {
 		--
 		-- Operands: (the tag for the witness table set, the lookup key)
 	} },
-	{ GetTagForSpecializedSet = { 
+	{ GetTagForMappedValueSet = {
+		-- Like GetTagForMappedSet, but for ValueSet destinations: the
+		-- per-table entry is itself the constant IR value (e.g. IRIntLit
+		-- from a `static const int` interface requirement), so the result
+		-- type is the underlying value type rather than TagType(destSet).
+		--
+		-- Operands: (the tag for the witness table set, the lookup key)
+	} },
+	{ GetTagForSpecializedSet = {
 		-- Translate a tag from a set of generics to its equivalent in a specialized set
 		-- according to the set of specialization arguments that are encoded in the 
 		-- operands of this instruction.

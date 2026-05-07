@@ -433,8 +433,8 @@ IRFunc* createIntegerMappingFunc(IRModule* module, Dictionary<UInt, UInt>& mappi
     return func;
 }
 
-// This context lowers `GetTagOfElementInSet`,
-// `GetTagForSuperSet`, and `GetTagForMappedSet` instructions,
+// This context lowers `GetTagOfElementInSet`, `GetTagForSuperSet`,
+// `GetTagForMappedSet`, and `GetTagForMappedValueSet` instructions,
 //
 struct TagOpsLoweringContext : public InstPassBase
 {
@@ -484,15 +484,13 @@ struct TagOpsLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
-    // Lower a `GetTagForMappedSet` whose destination is a `ValueSet` (i.e.
-    // value-typed `static const` interface members like `Int` or `Bool`).
+    // Lower a `GetTagForMappedValueSet`: the destination is a `ValueSet`
+    // (value-typed `static const` interface members like `Int` or `Bool`),
+    // and the per-table entry is itself the constant IR value.
     //
-    // The typeflow specialization pass emits this with result type = the
-    // underlying value type (Int / Bool) rather than `TagType(ValueSet)`, so
-    // that the existing use sites at the call site continue to type-check.
-    // Lowering builds a `(UInt witnessTag) -> ValueType` dispatch function:
-    // a switch that returns the constant entry for each witness-table tag,
-    // then replaces the `GetTagForMappedSet` with a call to that function.
+    // Build a `(UInt witnessTag) -> ValueType` dispatch function: a switch
+    // that returns the constant entry for each witness-table tag, then
+    // replace the inst with a call to that function.
     IRFunc* getOrCreateValueSetDispatchFunc(
         IRWitnessTableSet* srcSet,
         IRStructKey* requirementKey,
@@ -580,7 +578,7 @@ struct TagOpsLoweringContext : public InstPassBase
         return dispatchFunc;
     }
 
-    void lowerGetTagForMappedSetForValueSet(IRGetTagForMappedSet* inst)
+    void lowerGetTagForMappedValueSet(IRGetTagForMappedValueSet* inst)
     {
         auto srcSet = cast<IRWitnessTableSet>(
             cast<IRSetTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
@@ -602,18 +600,6 @@ struct TagOpsLoweringContext : public InstPassBase
 
     void lowerGetTagForMappedSet(IRGetTagForMappedSet* inst)
     {
-        // For value-typed lookups (`ValueSet` destination), the typeflow
-        // specialization pass deliberately emits this inst with result type
-        // = the underlying value type (Int / Bool) rather than
-        // `TagType(ValueSet)`, so existing use sites at the call site
-        // continue to type-check. Detect that shape and lower via a switch
-        // returning the constant entries directly.
-        if (!as<IRSetTagType>(inst->getDataType()))
-        {
-            lowerGetTagForMappedSetForValueSet(inst);
-            return;
-        }
-
         // `GetTagForMappedSet` turns into a integer mapping from
         // the unique ID of each input set element to the unique ID of the
         // corresponding element (as determined by witness table lookup) in the destination set.
@@ -696,6 +682,9 @@ struct TagOpsLoweringContext : public InstPassBase
             break;
         case kIROp_GetTagForMappedSet:
             lowerGetTagForMappedSet(as<IRGetTagForMappedSet>(inst));
+            break;
+        case kIROp_GetTagForMappedValueSet:
+            lowerGetTagForMappedValueSet(as<IRGetTagForMappedValueSet>(inst));
             break;
         case kIROp_GetTagOfElementInSet:
             lowerGetTagOfElementInSet(as<IRGetTagOfElementInSet>(inst));

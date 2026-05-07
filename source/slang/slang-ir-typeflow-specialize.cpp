@@ -5738,19 +5738,18 @@ struct TypeFlowSpecializationContext
                 IRInst* operands[] = {witnessTableInst, inst->getRequirementKey()};
 
                 // For ValueSet (e.g. Int / Bool from `static const` interface
-                // requirements), the "tag" IS the value — each entry is an
-                // immediate constant (IRIntLit / IRBoolLit). Using a TagType
-                // result would create a type mismatch at every existing use
-                // site (which expects the value type). Emit GetTagForMappedSet
-                // with the original value type as its result type instead;
-                // lowerGetTagForMappedSet detects this and synthesizes a
-                // switch returning the actual constant for each witness tag.
-                IRType* resultType = as<IRValueSet>(thisInstInfo->getSet())
+                // requirements), the per-table entry is itself the constant
+                // value (IRIntLit / IRBoolLit). A separate op carries the
+                // value-typed result so each op has a single well-defined
+                // result-type shape: GetTagForMappedSet → TagType(destSet),
+                // GetTagForMappedValueSet → underlying value type.
+                IROp op = as<IRValueSet>(thisInstInfo->getSet()) ? kIROp_GetTagForMappedValueSet
+                                                                 : kIROp_GetTagForMappedSet;
+                IRType* resultType = (op == kIROp_GetTagForMappedValueSet)
                                          ? inst->getDataType()
                                          : (IRType*)makeTagType(thisInstInfo->getSet());
 
-                auto newInst =
-                    builder.emitIntrinsicInst(resultType, kIROp_GetTagForMappedSet, 2, operands);
+                auto newInst = builder.emitIntrinsicInst(resultType, op, 2, operands);
 
                 inst->replaceUsesWith(newInst);
                 inst->removeAndDeallocate();

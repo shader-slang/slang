@@ -9334,6 +9334,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetDispatcher:
     case kIROp_GetSpecializedDispatcher:
     case kIROp_GetTagForMappedSet:
+    case kIROp_GetTagForMappedValueSet:
     case kIROp_GetTagForSpecializedSet:
     case kIROp_GetTagForSuperSet:
     case kIROp_GetTagForSubSet:
