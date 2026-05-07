@@ -2828,6 +2828,16 @@ err(
     span { loc = "expr:Expr", message = "unexpected form for 'enum' tag value expression" }
 )
 
+warning(
+    "enum-case-implicit-tag-value-overflow",
+    32006,
+    "implicit enum case value overflows underlying tag type",
+    span {
+        loc = "decl:Decl",
+        message = "implicit value for enum case '~decl' overflows tag type '~tagType:Type' and wraps around",
+    }
+)
+
 -- 303xx: interfaces and associated types
 
 err(
