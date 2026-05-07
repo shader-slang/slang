@@ -96,15 +96,9 @@ add_custom_command(
 )
 
 # Create a target to ensure the neural module is built.
-# When SLANG_EMBED_CORE_MODULE=OFF the compiler runs slang-bootstrap from source and currently
-# crashes (exit 0xC0000005) when processing neural.slang's CoopMat/spirv_asm code. Exclude the
-# module from the default ALL build in that configuration so development builds with
-# SLANG_EMBED_CORE_MODULE=OFF do not fail. The target can still be built explicitly.
-if(SLANG_EMBED_CORE_MODULE)
-    add_custom_target(slang-neural-module ALL DEPENDS ${neural_module_file})
-else()
-    add_custom_target(slang-neural-module DEPENDS ${neural_module_file})
-endif()
+# The prelinkIR crashes that previously blocked SLANG_EMBED_CORE_MODULE=OFF builds
+# are fixed (PRs #10835, #10847). Build the neural module unconditionally.
+add_custom_target(slang-neural-module ALL DEPENDS ${neural_module_file})
 set_target_properties(slang-neural-module PROPERTIES FOLDER generated)
 
 # Install the neural directory to the configured location in the release package
