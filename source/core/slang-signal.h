@@ -21,12 +21,10 @@ enum class SignalType
 [[noreturn]] void handleSignal(SignalType type, char const* message);
 
 // Special handler for assertions that can optionally return based on environment variable.
+// `file` and `line` should be __FILE__ / __LINE__ at the assertion site and are prepended
+// to the diagnostic message as the basename only (no directory path).
 // Pass isReleaseAssert=true for assertions that should fire even in release-assert-only mode.
-void handleAssert(
-    char const* message,
-    char const* file,
-    int line,
-    bool isReleaseAssert = false);
+void handleAssert(char const* message, char const* file, int line, bool isReleaseAssert);
 
 #define SLANG_UNEXPECTED(reason) ::Slang::handleSignal(::Slang::SignalType::Unexpected, reason)
 
@@ -34,7 +32,7 @@ void handleAssert(
 
 #define SLANG_UNREACHABLE(msg) ::Slang::handleSignal(::Slang::SignalType::Unreachable, msg)
 
-#define SLANG_ASSERT_FAILURE(msg) ::Slang::handleAssert(msg, __FILE__, __LINE__)
+#define SLANG_ASSERT_FAILURE(msg) ::Slang::handleAssert(msg, __FILE__, __LINE__, false)
 
 #define SLANG_INVALID_OPERATION(msg) \
     ::Slang::handleSignal(::Slang::SignalType::InvalidOperation, msg)

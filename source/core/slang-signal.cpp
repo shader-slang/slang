@@ -86,9 +86,15 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
 #endif
     }
 
-    // Format message with source location, then delegate to handleSignal
+    // Use only the basename to avoid leaking build-machine paths in release builds.
+    const char* basename = file;
+    for (const char* p = file; *p; ++p)
+    {
+        if (*p == '/' || *p == '\\')
+            basename = p + 1;
+    }
     StringBuilder locMsg;
-    locMsg << file << "(" << line << "): " << message;
+    locMsg << basename << "(" << line << "): " << message;
     handleSignal(SignalType::AssertFailure, locMsg.getBuffer());
 }
 
