@@ -305,6 +305,13 @@ public:
     void setDigest(SHA1::Digest const& digest) { m_digest = digest; }
     SHA1::Digest computeDigest();
 
+    /// Set / get a digest of the raw source that produced this module.
+    ///
+    /// Currently populated by `Linkage::loadModuleFromBlob` so that subsequent
+    /// load attempts with the same module name can be compared for equivalence.
+    void setSourceDigest(SHA1::Digest const& digest) { m_sourceDigest = digest; }
+    SHA1::Digest const& getSourceDigest() const { return m_sourceDigest; }
+
     /// Create a module (initially empty).
     Module(Linkage* linkage, ASTBuilder* astBuilder = nullptr);
 
@@ -479,6 +486,11 @@ private:
 
     // A digest that uniquely identifies the contents of the module.
     SHA1::Digest m_digest;
+
+    // Digest of the raw source blob that produced this module, when loaded via
+    // `Linkage::loadModuleFromBlob`.  Zero-initialised for modules that were not
+    // loaded from a source blob (e.g. loaded from disk).
+    SHA1::Digest m_sourceDigest{};
 
     // List of modules this module depends on
     ModuleDependencyList m_moduleDependencyList;
