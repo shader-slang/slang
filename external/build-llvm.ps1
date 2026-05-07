@@ -167,14 +167,15 @@ $buildDir = Join-Path $sourceDir "build"
 New-Item -Path $buildDir -ItemType Directory -Force
 $myScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $toolchainFile = Join-Path $myScriptDir "WindowsToolchain\Windows.MSVC.toolchain.cmake"
+$llvmSourceDir = Join-Path $sourceDir "llvm"
 # Use the single-config Ninja generator rather than Ninja Multi-Config because
 # LLVM_DISTRIBUTION_COMPONENTS (used above) is not compatible with
 # multi-configuration generators.
-cmake -S $sourceDir\llvm -B $buildDir `
+cmake -S "$llvmSourceDir" -B "$buildDir" `
     -G "Ninja" `
     "-DCMAKE_BUILD_TYPE=$config" `
     "-DCMAKE_INSTALL_PREFIX=$installPrefix" `
-    --toolchain $toolchainFile `
+    --toolchain "$toolchainFile" `
     @cmakeArgumentsForSlang `
     @extraArguments
 
@@ -192,7 +193,7 @@ Msg "##########################################################"
 # analyzer sources we don't need. install-distribution sidesteps that
 # whole class of "off switches that don't switch off" by only building
 # what we listed.
-cmake --build $buildDir -j --target install-distribution
+cmake --build "$buildDir" -j --target install-distribution
 
 # Sanity-check that the install tree actually contains the per-target
 # codegen libraries we asked for. Mirrors the equivalent check in

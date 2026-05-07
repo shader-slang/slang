@@ -124,8 +124,11 @@ jobs:
           echo "CMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}" >> "$GITHUB_ENV"
 
       - name: Build Slang
+        env:
+          TARGET_OS: ${{ matrix.os }}
+          TARGET_PLATFORM: ${{ matrix.platform }}
         run: |
-          if [[ "${{ matrix.platform }}" == "wasm" ]]; then
+          if [[ "$TARGET_PLATFORM" == "wasm" ]]; then
             npm install -g typescript@5.9.3
             tsc --version
             git clone https://github.com/emscripten-core/emsdk.git
@@ -139,7 +142,7 @@ jobs:
             exit 0
           fi
 
-          if [[ "${{ matrix.os }}" == "windows" && "${{ matrix.config }}" != "release" && "${{ matrix.config }}" != "releaseWithDebugInfo" ]]; then
+          if [[ "$TARGET_OS" == "windows" && "${{ matrix.config }}" != "release" && "${{ matrix.config }}" != "releaseWithDebugInfo" ]]; then
               echo "Please see ci.yml for the steps to make non-release builds work on Windows" >&2
               exit 1
           fi
@@ -156,6 +159,21 @@ jobs:
             ${{matrix.extra-cmake-flags}}
 
           cmake --build --preset "${{matrix.config}}"
+
+          host_arch="$(uname -m)"
+          if [[ "$host_arch" == "arm64" ]]; then
+            host_arch="aarch64"
+          fi
+          if [[ "$TARGET_PLATFORM" == "$host_arch" ]]; then
+            slangc_bin="${bin_dir:?}/slangc"
+            if [[ "$TARGET_OS" == "windows" ]]; then
+              slangc_bin="${slangc_bin}.exe"
+            fi
+            "$slangc_bin" -version
+            "$slangc_bin" -help-style markdown -h >/dev/null
+          else
+            echo "Skipping slangc smoke test for ${TARGET_PLATFORM} binary on ${host_arch} runner"
+          fi
 
       - name: Sign and notarize binaries
         if: matrix.os == 'macos' && startsWith(github.ref, 'refs/tags/v')

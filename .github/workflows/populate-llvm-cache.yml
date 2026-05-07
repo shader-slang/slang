@@ -86,7 +86,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: build/llvm-project-install
-          key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+          key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh', 'external/build-llvm.ps1') }}
           lookup-only: true
 
       - name: Report cache status
@@ -99,7 +99,7 @@ jobs:
             echo "⚠️  This will overwrite the existing cache. If you want to keep the existing cache, cancel this workflow now."
           else
             echo "ℹ️  No existing cache found for: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}"
-            echo "Cache key to be created: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}"
+            echo "Cache key to be created: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh', 'external/build-llvm.ps1') }}"
           fi
 
       - name: Build LLVM
@@ -131,7 +131,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: build/llvm-project-install
-          key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+          key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh', 'external/build-llvm.ps1') }}
 
       - name: Cache saved successfully
         shell: bash
@@ -139,7 +139,7 @@ jobs:
           echo "✅ LLVM cache saved successfully!"
           echo ""
           echo "Cache details:"
-          echo "  Key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}"
+          echo "  Key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh', 'external/build-llvm.ps1') }}"
           echo "  OS: ${{ inputs.os }}"
           echo "  Compiler: ${{ inputs.compiler }}"
           echo "  Platform: ${{ inputs.platform }}"

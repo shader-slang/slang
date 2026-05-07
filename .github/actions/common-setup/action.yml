@@ -114,7 +114,7 @@ runs:
         os: ${{ inputs.os }}
         compiler: ${{ inputs.compiler }}
         platform: ${{ inputs.platform }}
-        llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+        llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/build-llvm.ps1') }}
         llvm-targets: ${{ inputs.llvm-targets }}
         build-if-missing: "true"
         github-token: ${{ github.token }}
