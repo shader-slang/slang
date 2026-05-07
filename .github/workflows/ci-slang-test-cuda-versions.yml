@@ -1,0 +1,119 @@
+name: CI CUDA Version Test
+
+on:
+  workflow_call:
+    inputs:
+      config:
+        required: true
+        type: string
+
+jobs:
+  test-cuda-12-5:
+    name: "CUDA 12.5 (${{ inputs.config }})"
+    runs-on: ["Linux", "self-hosted", "GPU"]
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      packages: read
+
+    container:
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.0-cuda12.5
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: >-
+        --gpus all
+        --user root
+        --cap-add SYSLOG
+        --device /dev/nvidia-modeset:/dev/nvidia-modeset
+        --device /dev/dri:/dev/dri
+        -e NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: GPU health check
+        run: |
+          if ! output=$(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>&1); then
+            echo "nvidia-smi output: $output"
+            echo "::error::GPU health check failed — this VM has a faulty GPU. Re-run to get a new VM."
+            exit 1
+          fi
+          echo "GPU: $output"
+
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "1"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}
+          path: artifacts
+
+      - name: Setup test environment
+        run: |
+          if [[ "${{ inputs.config }}" == "release" ]]; then
+            cmake_config="Release"
+          else
+            cmake_config="Debug"
+          fi
+          echo "cmake_config=$cmake_config" >> $GITHUB_ENV
+
+          bin_dir="$PWD/artifacts/${cmake_config}/bin"
+          echo "bin_dir=$bin_dir" >> $GITHUB_ENV
+
+          chmod +x "$bin_dir"/* 2>/dev/null || true
+          echo "LD_LIBRARY_PATH=$PWD/artifacts/${cmake_config}/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+          echo "CUDA version in this container:"
+          nvcc --version
+
+          # Display environment configuration
+          print-env-info
+
+      - name: Run CUDA-only tests
+        run: |
+          "$bin_dir/slang-test" \
+            -api cuda -api-only \
+            -hide-ignored \
+            -expected-failure-list tests/expected-failure-github.txt \
+            -expected-failure-list tests/expected-failure-linux.txt \
+            -expected-failure-list tests/expected-failure-linux-gpu.txt \
+            -expected-failure-list tests/expected-failure-cuda-12.5.txt
+
+      - name: GPU post-test diagnostics
+        if: failure()
+        run: |
+          gpu_crashed=0
+          echo "=== GPU State ==="
+          if ! nvidia-smi 2>&1; then
+            echo "nvidia-smi FAILED (GPU may have crashed)"
+            echo "::error::GPU crashed during tests — retrying may help."
+            gpu_crashed=1
+          fi
+          echo ""
+          echo "=== GPU Memory & ECC ==="
+          nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
+            --format=csv,noheader 2>&1 || true
+          echo ""
+          echo "=== XID Errors ==="
+          nvidia-smi -q -d XID_ERRORS 2>&1 || true
+          echo ""
+          echo "=== GPU Process State ==="
+          nvidia-smi pmon -c 1 2>&1 || true
+          echo ""
+          echo "=== Kernel GPU Messages ==="
+          dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
+          sudo dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
+          echo "(dmesg not available in container)"
+          if [[ "$gpu_crashed" -eq 1 ]]; then
+            exit 1
+          fi
