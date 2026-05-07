@@ -102,9 +102,10 @@ def parse_llvm_cov_json(path: str) -> List[FileRecord]:
       four metric totals so the rendered numbers match `llvm-cov
       report` by construction.
     """
+    opener: IO[Any]
     try:
         if path.lower().endswith(".gz"):
-            opener: IO[Any] = gzip.open(path, "rt", encoding="utf-8")
+            opener = gzip.open(path, "rt", encoding="utf-8-sig")
         else:
             opener = open(path, "r", encoding="utf-8-sig")
     except OSError as e:
@@ -180,12 +181,17 @@ def _line_hits_from_segments(
     """Walk segments to produce {line: max_count} for executable lines.
 
     Each segment activates a count at (line, col); the next segment
-    deactivates it. For per-line rendering we take the max active
-    count seen on each line, matching what `llvm-cov show` displays.
+    deactivates or replaces it. The active count covers the half-open
+    line interval [seg.line, next_seg.line) — the next segment's start
+    line is excluded so a deactivating successor doesn't inherit the
+    previous active count under our `max()` rule. For the final
+    segment, no successor exists, so we attribute its own start line
+    only.
+
     Gap regions and segments without an associated count are skipped
     — they mark non-executable spans, not zero-hit ones.
 
-    The last segment is a closing marker (count usually 0,
+    The last segment is typically a closing marker (count 0,
     `has_count=False`) and contributes nothing on its own.
     """
     line_hits: Dict[int, int] = {}
@@ -200,12 +206,15 @@ def _line_hits_from_segments(
         is_gap = bool(seg[_SEG_IS_GAP])
         if not has_count or is_gap:
             continue
-        # The active count runs from this segment until the next.
+        # Half-open end: next segment's line excluded so it doesn't
+        # inherit this segment's count via the max rule below.
         if i + 1 < n and len(segments[i + 1]) >= 2:
             end_line = int(segments[i + 1][_SEG_LINE])
+            if end_line <= line:
+                end_line = line + 1
         else:
-            end_line = line
-        for ln in range(line, end_line + 1):
+            end_line = line + 1
+        for ln in range(line, end_line):
             prev = line_hits.get(ln)
             if prev is None or count > prev:
                 line_hits[ln] = count
@@ -224,9 +233,11 @@ def _branches_from_json(
     while LCOV BRDA counts each arm as one, and we want the rendered
     total to match the report.
 
-    Block index is set to 0; per-arm branch_id alternates 0 (true)
-    / 1 (false). A `count` of 0 with non-zero `false_count` (or
-    vice-versa) produces a partial-coverage line in the gutter.
+    The dict key is `(line, idx, arm)` where `idx` is the branch's
+    index within the JSON `branches[]` array (used as a synthetic
+    block id) and `arm` alternates 0 (true path) / 1 (false path).
+    A `count` of 0 with non-zero `false_count` (or vice-versa)
+    produces a partial-coverage line in the gutter.
     """
     out: Dict[Tuple[int, int, int], Optional[int]] = {}
     for idx, br in enumerate(branches):
@@ -299,15 +310,22 @@ def _attach_function(fn: Dict[str, Any], records: Dict[str, FileRecord]) -> None
 
     regions = fn.get("regions") or []
 
-    # First non-skipped region drives `first_line`. Skipped /
-    # gap / expansion regions don't represent the function's source
-    # entry — fall through them.
+    # First CodeRegion in the primary file drives `first_line`. Mirror
+    # the same filter the region-append loop below uses so an
+    # EXPANSION region pointing into an included file (file_id != 0)
+    # can't set `first_line` to a line that doesn't exist in the
+    # primary file.
     first_line = 0
     for r in regions:
         if len(r) <= _RG_KIND:
             continue
-        kind = r[_RG_KIND]
-        if kind in (_REGION_KIND_SKIPPED, _REGION_KIND_GAP):
+        if r[_RG_KIND] != _REGION_KIND_CODE:
+            continue
+        try:
+            file_id = int(r[_RG_FILE_ID])
+        except (TypeError, ValueError):
+            file_id = 0
+        if file_id != 0:
             continue
         try:
             first_line = int(r[_RG_LINE_START])

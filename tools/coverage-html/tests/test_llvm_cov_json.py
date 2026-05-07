@@ -101,6 +101,55 @@ class FixtureParserTests(unittest.TestCase):
             self.assertIsNone(r.reported_brf)
 
 
+class SegmentBoundaryTests(unittest.TestCase):
+    """Direct tests on _line_hits_from_segments — the half-open
+    interval rule prevents a deactivating successor from inheriting
+    the previous segment's active count."""
+
+    def _walk(self, segments):
+        from llvm_cov_json import _line_hits_from_segments
+        return _line_hits_from_segments(segments)
+
+    def test_half_open_at_segment_boundary(self):
+        # Segment 1: line 10 with count=5 active.
+        # Segment 2: line 20 with count=0 (deactivation-style).
+        # Line 20 belongs to segment 2, not segment 1, so count=0.
+        segments = [
+            [10, 1, 5, True, True, False],
+            [20, 1, 0, True, True, False],
+            [25, 1, 0, False, False, False],  # closing marker
+        ]
+        hits = self._walk(segments)
+        # Lines 10..19 covered by segment 1 with count=5.
+        for ln in range(10, 20):
+            self.assertEqual(hits.get(ln), 5, f"line {ln}")
+        # Line 20 is segment 2's domain (count=0).
+        self.assertEqual(hits.get(20), 0)
+
+    def test_final_segment_attributed_only_to_its_own_line(self):
+        # When no successor exists, the segment covers just its own
+        # start line — not an unbounded suffix of the file.
+        segments = [
+            [5, 1, 7, True, True, False],
+        ]
+        hits = self._walk(segments)
+        self.assertEqual(hits, {5: 7})
+
+    def test_deactivating_segment_skipped(self):
+        segments = [
+            [10, 1, 0, False, False, False],  # has_count=False
+            [11, 1, 5, True, True, False],
+            [13, 1, 0, False, False, False],  # closing marker
+        ]
+        hits = self._walk(segments)
+        # The has_count=False segment contributes nothing; only
+        # segment 2 fires, covering lines 11..12.
+        self.assertNotIn(10, hits)
+        self.assertEqual(hits.get(11), 5)
+        self.assertEqual(hits.get(12), 5)
+        self.assertNotIn(13, hits)
+
+
 class FormatGuardTests(unittest.TestCase):
     def test_missing_file(self):
         with self.assertRaises(LcovParseError):
