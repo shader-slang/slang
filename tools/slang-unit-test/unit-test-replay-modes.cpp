@@ -392,38 +392,51 @@ SLANG_UNIT_TEST(replayContextSyncModeWritesToStream)
 // by a prior test that aborted before its ScopedReplayContext dtor ran.
 // =============================================================================
 
-SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
+// Post-reset() invariants for the singleton. Both isolation tests below assert
+// these, so keep the field set in sync with ReplayContext::reset() in
+// source/slang-record-replay/replay-context.cpp.
+static void checkReplayContextIsPristine()
 {
-    // Force a known-clean entry state. This test runs amid other replay tests
-    // in the same process, and any prior test that left the stream in reading
-    // mode (e.g. Mode::Playback) would make our setMode(Record) + record()
-    // setup throw before REPLAY_TEST executes.
-    ReplayContext::get().reset();
-
-    // Simulate the leaked-state case the old skip-on-active guard protected
-    // against: a non-Idle mode plus dirty data on both the main and reference
-    // streams. switchToSync() copies the main stream into the reference stream,
-    // so after the second record() the singleton is in Mode::Sync with both
-    // streams holding bytes.
-    ReplayContext::get().setMode(Mode::Record);
-    int32_t leakedValue = 7;
-    ReplayContext::get().record(RecordFlag::None, leakedValue);
-    ReplayContext::get().switchToSync();
-    ReplayContext::get().record(RecordFlag::None, leakedValue);
-    SLANG_CHECK(ReplayContext::get().isActive());
-    SLANG_CHECK(ReplayContext::get().getStream().getSize() > 0);
-
-    // Now run the standard per-test setup. ScopedReplayContext's ctor must
-    // force the singleton back to its post-reset() state.
-    REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
-
     SLANG_CHECK(ctx().getMode() == Mode::Idle);
     SLANG_CHECK(!ctx().isActive());
     SLANG_CHECK(ctx().getStream().getSize() == 0);
     SLANG_CHECK(!ctx().hasCallIndex());
     SLANG_CHECK(ctx().getNextHandle() == kFirstValidHandle);
     SLANG_CHECK(ctx().getCurrentThisHandle() == kNullHandle);
+}
+
+// Dirty the singleton with a non-Idle mode plus data on both the main and
+// reference streams. switchToSync() copies the main stream into the reference
+// stream, so after the second record() the singleton is in Mode::Sync with
+// both streams holding bytes.
+static void dirtyReplayContext(int32_t value)
+{
+    ctx().setMode(Mode::Record);
+    ctx().record(RecordFlag::None, value);
+    ctx().switchToSync();
+    ctx().record(RecordFlag::None, value);
+    SLANG_CHECK(ctx().isActive());
+    SLANG_CHECK(ctx().getStream().getSize() > 0);
+}
+
+SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
+{
+    // Force a known-clean entry state. This test runs amid other replay tests
+    // in the same process, and any prior test that left the stream in reading
+    // mode (e.g. Mode::Playback) would make our setMode(Record) + record()
+    // setup throw before REPLAY_TEST executes.
+    ctx().reset();
+
+    // Simulate the leaked-state case the old skip-on-active guard protected
+    // against.
+    dirtyReplayContext(7);
+
+    // Now run the standard per-test setup. ScopedReplayContext's ctor must
+    // force the singleton back to its post-reset() state.
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    checkReplayContextIsPristine();
 
     // And a normal record/playback cycle still works after recovery.
     ctx().setMode(Mode::Record);
@@ -444,26 +457,15 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
 // fails here directly instead of as a downstream cascade.
 SLANG_UNIT_TEST(replayContextDtorLeavesSingletonClean)
 {
-    ReplayContext::get().reset();
+    ctx().reset();
     {
         REPLAY_TEST;
         SLANG_UNUSED(unitTestContext);
 
         // Dirty the singleton inside the REPLAY_TEST scope. The dtor at the
         // closing brace must clean all of this back up.
-        ctx().setMode(Mode::Record);
-        int32_t value = 99;
-        ctx().record(RecordFlag::None, value);
-        ctx().switchToSync();
-        ctx().record(RecordFlag::None, value);
-        SLANG_CHECK(ctx().isActive());
-        SLANG_CHECK(ctx().getStream().getSize() > 0);
+        dirtyReplayContext(99);
     }
 
-    SLANG_CHECK(ReplayContext::get().getMode() == Mode::Idle);
-    SLANG_CHECK(!ReplayContext::get().isActive());
-    SLANG_CHECK(ReplayContext::get().getStream().getSize() == 0);
-    SLANG_CHECK(!ReplayContext::get().hasCallIndex());
-    SLANG_CHECK(ReplayContext::get().getNextHandle() == kFirstValidHandle);
-    SLANG_CHECK(ReplayContext::get().getCurrentThisHandle() == kNullHandle);
+    checkReplayContextIsPristine();
 }
