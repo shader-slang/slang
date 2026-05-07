@@ -9,7 +9,7 @@ CUDA's `surf2Dread`/`surf2Dwrite` (and 1D/3D variants) perform **raw byte operat
 - Packed formats (rgb10_a2, r11f_g11f_b10f)
 - 8/16-bit integer formats
 
-**Current `$E` bug**: The `$E` intrinsic specifier (slang-intrinsic-expand.cpp:490-515) returns `elemSizeInBytes = 1` for format-converted writes because the old `sust.p` was sample-addressed. With the move to raw byte stores, this is wrong — all writes must be byte-addressed. `rgba8` must write at `x * 4`, `rgba16f` at `x * 8`, etc.
+**Current `$E` bug**: The `$E` intrinsic specifier (slang-intrinsic-expand.cpp:490-515) returns `elemSizeInBytes = 1` for format-converted writes because the old `sust.p` was sample-addressed. With raw byte stores, this is wrong — all writes must be byte-addressed. `rgba8` must write at `x * 4`, `rgba16f` at `x * 8`, etc.
 
 ---
 
@@ -19,20 +19,65 @@ CUDA's `surf2Dread`/`surf2Dwrite` (and 1D/3D variants) perform **raw byte operat
 2. **Do software decode on every formatted `Load`.**
 3. **Do software encode on every formatted `Store`.**
 4. **Remove all `sust.p` reliance** from the CUDA prelude.
+5. **Perform format conversion as an IR lowering pass**, not via prelude templates or emit-time hacks.
 
-All reads and writes uniformly follow this pattern:
+The compiler philosophy from CLAUDE.md:
+> "Keep emission simple and do heavy transforms in IR passes."
 
-```cpp
-// Load
-raw = slang_cuda_surf_read_raw<StorageRep<F>>(surf, coord * sizeof(StorageRep<F>));
-value = slang_cuda_decode_texel<F, T>(raw);
+---
 
-// Store
-raw = slang_cuda_encode_texel<F, T>(value);
-slang_cuda_surf_write_raw<StorageRep<F>>(raw, surf, coord * sizeof(StorageRep<F>));
-```
+## Approach: IR Lowering Pass
 
-This means byte-coordinate scaling (`$E`) is always `sizeof(StorageRep<F>)` — for both reads and writes. The current special case that sets `$E = 1` for converted writes must be removed.
+### Why Not a Prelude-Based Approach
+
+The previous plan used switch-dispatched template specializations in the CUDA prelude. This requires **7 surface dimensions × ~9 access types × 2 directions = ~126 specializations**, each with a ~15-case format switch — easily 2000+ lines of prelude code. Every new format means touching every specialization. The `$C`/`$F` specifier mechanism adds complexity to intrinsic expansion.
+
+### Why an IR Pass Is Better
+
+An IR pass intercepts texture load/store at the IR level and lowers them to raw-typed access + inline conversion arithmetic **before** code emission. This eliminates:
+
+- **All prelude format functions** — conversion math becomes inline IR arithmetic at each call site
+- **The `$C`/`$F` specifier mechanism** — the emitter sees raw-typed access with no format mismatch
+- **The `$E` scaling bug** — the lowered IR uses the storage type, so byte sizing is naturally correct
+- **Dimension-specific specializations** — the surface dimension is orthogonal to format conversion; the pass handles it once
+
+| | Prelude approach | IR lowering pass |
+|---|---|---|
+| Code volume | ~2000+ lines of templates | ~400-600 lines in one pass file |
+| Adding a format | Touch every specialization | Add one case in one function |
+| Debuggability | Read emitted CUDA source | `-dump-ir` shows conversion inline |
+| Dimensions | Must handle each variant separately | Orthogonal — handled once |
+| Emit complexity | Needs `$C`/`$F` specifier hacks | No emit changes |
+| Layered support | Must wire up each variant | Free — same IR transform |
+
+### Architectural Constraint: CUDA Bypasses `IRImageLoad`/`IRImageStore`
+
+A critical discovery during research: **For CUDA, `Load()`/`Store()` do NOT produce `kIROp_ImageLoad`/`kIROp_ImageStore` instructions.** Instead, they use `__intrinsic_asm` strings that expand directly during code emission via `$C`/`$E` specifiers. This differs from SPIRV/GLSL/Metal which use `IRImageLoad`/`IRImageStore` and handle them in their emitters.
+
+The CUDA IR for `tex.Load(coord)` contains an `IRCall` to an intrinsic function with an `__intrinsic_asm` body — it never becomes an `IRImageLoad`.
+
+This means a naive IR pass that looks for `kIROp_ImageLoad`/`kIROp_ImageStore` would see nothing for CUDA.
+
+**Two sub-approaches to handle this:**
+
+#### Approach A: Rewrite CUDA `Load()`/`Store()` to Use `IRImageLoad`/`IRImageStore`
+
+Change `hlsl.meta.slang` so the CUDA path goes through `kIROp_ImageLoad`/`kIROp_ImageStore` like other backends, then add a CUDA legalization pass that lowers these to `surf*read`/`surf*write` calls with format conversion inlined.
+
+**Pros**: Unifies the IR representation across all backends. The existing `legalizeImageSubscript` pass (currently SPIRV/GLSL/Metal-only) could be extended to cover CUDA.
+**Cons**: Larger refactor of the CUDA codegen path. Must add `kIROp_ImageLoad`/`kIROp_ImageStore` handling to the CUDA emitter or fully lower them before emission. Risk of regressions in non-format-conversion cases.
+
+#### Approach B: IR Pass That Intercepts Intrinsic Calls
+
+Add an IR pass that runs before CUDA emission, identifies intrinsic calls to surface read/write functions on textures with format decorations, and rewrites them:
+1. Changes the texture's element type to the raw storage type
+2. Inserts encode/decode arithmetic around the call
+3. Removes the format decoration so `$C` doesn't fire
+
+**Pros**: Smaller, more targeted change. Doesn't disturb the existing CUDA codegen path for non-converting cases.
+**Cons**: Must pattern-match on intrinsic call structure rather than clean IR opcodes.
+
+**Recommendation**: **Approach B** for Phase 1. It's lower risk and delivers the same correctness. Approach A is a nice-to-have cleanup that can happen later.
 
 ---
 
@@ -58,10 +103,7 @@ This means byte-coordinate scaling (`$E`) is always `sizeof(StorageRep<F>)` — 
 | `sust.b` | Surface store, byte-addressed | **No** - raw bits |
 | ~~`sust.p`~~ | ~~Surface store, packed~~ | ❌ **Removed in PTX 3.0** |
 
-**Critical finding**: PTX spec states:
-> "Unimplemented instructions suld.p and sust.p.{u32,s32,f32} have been removed." (PTX 3.0)
-
-**Nuance**: Current NVIDIA docs still describe a `sust.p...b32` formatted-store form, while the above quote is about removed/unimplemented `suld.p` and `sust.p.{u32,s32,f32}` typed forms. But this distinction is not worth building correctness on. If a path depends on "formatted surface store" semantics, it is fragile. `suld` is definitely only unformatted binary load, and `surf*read/write` use byte coordinates in CUDA's own docs. Sources: [PTX surface docs](https://docs.nvidia.com/cuda/parallel-thread-execution/index.html), [CUDA surface API docs](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html).
+**Nuance**: Current NVIDIA docs still describe a `sust.p...b32` formatted-store form, while the removed quote is about `suld.p` and `sust.p.{u32,s32,f32}` typed forms. But this distinction is not worth building correctness on. `suld` is definitely only unformatted binary load, and `surf*read/write` use byte coordinates in CUDA's own docs.
 
 ⚠️ The existing `sust.p` code in the prelude is the wrong foundation for correctness.
 ✅ **Software conversion with raw byte I/O is the ONLY reliable path.**
@@ -83,281 +125,214 @@ From `slang-image-format-defs.h`:
 
 **Special case — `bgra8`**: Treat as `rgba8` read/write with b↔r channel swizzle (`.zyxw`), not a separate code path.
 
+### Existing IR Infrastructure
+
+Key IR components that the pass will interact with:
+
+| Component | Location | Role |
+|-----------|----------|------|
+| `IRImageLoad` / `IRImageStore` | [slang-ir-insts.h:1878-1903](source/slang/slang-ir-insts.h) | NOT used for CUDA (only SPIRV/GLSL/Metal) |
+| `IRTextureTypeBase` | [slang-ir.h:1444](source/slang/slang-ir.h) | Texture type with operand 8 = format |
+| `IRFormatDecoration` | [slang-ir-insts.h:476](source/slang/slang-ir-insts.h) | Format attached to texture vars |
+| `resolveTextureFormat` pass | [slang-ir-resolve-texture-format.cpp](source/slang/slang-ir-resolve-texture-format.cpp) | Propagates format to texture type; runs for GLSL/SPIRV/WGSL only |
+| `legalizeImageSubscript` pass | [slang-ir-legalize-image-subscript.cpp](source/slang/slang-ir-legalize-image-subscript.cpp) | Lowers `ImageSubscript` → `ImageLoad`/`ImageStore`; Metal/GLSL/SPIRV only |
+| `$C` / `$E` specifiers | [slang-intrinsic-expand.cpp:442-520](source/slang/slang-intrinsic-expand.cpp) | Emit-time format conversion for CUDA |
+| CUDA `Load()` / `Store()` | [hlsl.meta.slang:4862-5110](source/slang/hlsl.meta.slang) | `__intrinsic_asm` strings → direct text emission |
+
+### Current CUDA Flow (Before This Change)
+
+```
+1. AST: [format("rgba8")] RWTexture2D<float4> tex;
+2. Lower-to-IR: addFormatDecoration(var, rgba8)
+3. IR: IRVar with IRFormatDecoration(rgba8) + IRTextureType(elementType=float4, format=unknown)
+4. resolveTextureFormat: SKIPPED for CUDA
+5. CUDA emission: tex.Load(coord) →
+   - Intrinsic expansion of "surf2Dread$C<$T0>($0, ($1).x * $E, ($1).y, ...)"
+   - $C: detects format mismatch → emits "_convert"
+   - $E: computes backing element size (but returns 1 for writes — BUG)
+   - Final: "surf2Dread_convert<float4>(surfObj, coord.x * 4, coord.y, ...)"
+6. Prelude: surf2Dread_convert<float4> handles ONLY half→float
+```
+
 ---
 
 ## Detailed Implementation Plan
 
-### Overview
-
-Implement software format conversion functions in the CUDA prelude that convert between:
-- **Storage format** (how bytes are stored in surface memory, e.g., `rgba8` = 4 bytes)
-- **Access type** (shader type, e.g., `float4`)
-
-The conversion happens at load/store time via format-aware `surf*Dread_format`/`surf*Dwrite_format` functions that use raw byte I/O + software encode/decode.
-
----
-
-### Step 1: Remove `sust.p` PTX Code and `_convert` Functions
+### Step 1: Remove `sust.p` PTX Code and `_convert` Functions from Prelude
 
 **File**: [prelude/slang-cuda-prelude.h](prelude/slang-cuda-prelude.h)
 
 **Remove entirely**:
 - All `SLANG_SURF1DWRITE_CONVERT_IMPL` / `SLANG_SURF2DWRITE_CONVERT_IMPL` / `SLANG_SURF3DWRITE_CONVERT_IMPL` macros and their instantiations (lines 1573-1817) — these emit `sust.p` PTX instructions
 - All `surf*Layeredwrite_convert` stub functions (empty bodies that silently drop writes)
-- The `SLANG_SURFACE_READ_HALF_CONVERT` macro and its instantiations (lines 1517-1559) — these will be superseded by the general format-aware read path
-
-**Rationale**: The `sust.p` instructions are fragile/removed. The half-read macros are a subset of the new format-aware path and keeping them creates two parallel code paths. Clean removal first, then add the unified replacement.
+- The `SLANG_SURFACE_READ_HALF_CONVERT` macro and its instantiations (lines 1517-1559) — superseded by the IR pass
 
 ---
 
-### Step 2: Fix `$E` Byte-Address Scaling for Converted Writes
+### Step 2: Create the IR Lowering Pass — `slang-ir-legalize-cuda-surface-format.cpp`
+
+**New file**: `source/slang/slang-ir-legalize-cuda-surface-format.cpp`
+
+This is the core of the approach. The pass:
+1. Scans all functions for calls to intrinsic functions whose `__intrinsic_asm` body matches `surf*read$C` or `surf*write$C` patterns
+2. For each such call, checks if the texture argument has an `IRFormatDecoration`
+3. If format conversion is needed (format's storage type ≠ element type), rewrites the call:
+
+#### For Reads (`surf*Dread`):
+
+```
+BEFORE:
+  %result = call surf2Dread_intrinsic(%tex, %coord) : float4  // format=rgba8
+
+AFTER:
+  // 1. Change texture element type to raw storage type (uchar4 for rgba8)
+  // 2. Read raw storage bytes
+  %raw = call surf2Dread_intrinsic(%tex_raw, %coord_scaled) : uchar4
+
+  // 3. Convert each channel: uitofp + multiply by 1/255.0
+  %r_uint = extractElement(%raw, 0) : uint8
+  %r_f    = uitofp(%r_uint) : float
+  %r      = mul(%r_f, 1.0/255.0) : float
+  // ... repeat for g, b, a
+  %result = makeVector(%r, %g, %b, %a) : float4
+```
+
+#### For Writes (`surf*Dwrite`):
+
+```
+BEFORE:
+  call surf2Dwrite_intrinsic(%value, %tex, %coord) : void  // format=rgba8, value:float4
+
+AFTER:
+  // 1. Convert each channel: saturate + multiply by 255 + round + fptoui
+  %r_sat   = call __saturatef(%value.x) : float
+  %r_scaled= mul(%r_sat, 255.0) : float
+  %r_round = add(%r_scaled, 0.5) : float
+  %r_uint  = fptoui(%r_round) : uint8
+  // ... repeat for g, b, a
+  %raw     = makeVector(%r_uint, %g_uint, %b_uint, %a_uint) : uchar4
+
+  // 2. Write raw bytes
+  call surf2Dwrite_intrinsic(%raw, %tex_raw, %coord_scaled) : void
+```
+
+#### Key Implementation Details
+
+**Identifying surface intrinsic calls**: The pass needs to identify which `IRCall` instructions are surface read/write intrinsics. Options:
+- **Pattern match the `__intrinsic_asm` string** for `surf*read` / `surf*write` patterns — fragile but works
+- **Check the callee's decoration** — intrinsic functions carry decorations that identify them
+- **Best approach**: Look at the call's first argument type. If it's an `IRTextureTypeBase` with a format decoration that requires conversion, and the call is to an intrinsic function, it's a candidate. Then check if the call has a non-void return type (read) or void (write).
+
+**Modifying the texture type**: The pass must create a new `IRTextureType` with the storage element type (e.g., `uchar4` for `rgba8`) instead of the access type (e.g., `float4`). The format decoration is removed after lowering so `$C` doesn't fire during emission.
+
+**Coordinate scaling**: The raw-typed call must use correct byte-addressing. For `rgba8`, coordinates are already scaled by `$E` (which reads format size from the decoration). After the pass rewrites the element type, `$E` will compute the size from the new raw type — which is the same size. So coordinate scaling is automatically correct.
+
+**Removing format decoration**: After lowering, remove the `IRFormatDecoration` from the texture variable. This ensures `$C` sees no format mismatch and emits the plain function name (no `_convert` suffix). `$E` computes the correct byte size from the raw type.
+
+#### Format Conversion Functions (generated as IR)
+
+For each format category, the pass generates inline IR instructions:
+
+| Format | Read Conversion (storage → access) | Write Conversion (access → storage) |
+|--------|-------------------------------------|--------------------------------------|
+| **UNORM8** | `uitofp(raw) * (1.0/255.0)` | `fptoui(saturate(val) * 255.0 + 0.5)` |
+| **UNORM16** | `uitofp(raw) * (1.0/65535.0)` | `fptoui(saturate(val) * 65535.0 + 0.5)` |
+| **SNORM8** | `max(sitofp(raw) * (1.0/127.0), -1.0)` | `fptosi(round(clamp(val,-1,1) * 127.0))` |
+| **SNORM16** | `max(sitofp(raw) * (1.0/32767.0), -1.0)` | `fptosi(round(clamp(val,-1,1) * 32767.0))` |
+| **FLOAT16** | `half_to_float(bitcast<half>(raw))` | `bitcast<uint16>(float_to_half(val))` |
+| **INT8/16** | `sext(raw)` to int32 | `trunc(val)` to int8/16 |
+| **UINT8/16** | `zext(raw)` to uint32 | `trunc(val)` to uint8/16 |
+| **BGRA8** | Same as UNORM8 with `.zyxw` swizzle | Same as UNORM8 with `.zyxw` swizzle |
+
+The pass builds these as IR instruction sequences using `IRBuilder`. This is standard practice for IR passes in Slang — see `slang-ir-legalize-image-subscript.cpp` for a similar pattern.
+
+#### Pass Placement in Pipeline
+
+**File**: [source/slang/slang-emit.cpp](source/slang/slang-emit.cpp)
+
+Add the pass in the CUDA-specific legalization section (around line 1960):
+
+```cpp
+case CodeGenTarget::CUDASource:
+case CodeGenTarget::CUDAHeader:
+    {
+        SLANG_PASS(legalizeCUDASurfaceFormat, codeGenContext->getSink());
+        SLANG_PASS(legalizeEntryPointVaryingParamsForCUDA, codeGenContext->getSink());
+    }
+    break;
+```
+
+The pass must run:
+- **After** format decorations are attached (lower-to-IR)
+- **After** generic specialization (so texture types are concrete)
+- **Before** CUDA emission (so the emitter sees raw-typed accesses)
+- **Before** `legalizeEntryPointVaryingParamsForCUDA` (which may modify function signatures)
+
+The location at line ~1960 satisfies all of these — it's in the target-specific legalization section that runs after all common passes.
+
+#### Pass Structure
+
+```cpp
+// slang-ir-legalize-cuda-surface-format.h
+void legalizeCUDASurfaceFormat(IRModule* module, DiagnosticSink* sink);
+
+// slang-ir-legalize-cuda-surface-format.cpp
+namespace Slang {
+
+struct CUDASurfaceFormatLegalizer {
+    IRModule* m_module;
+    DiagnosticSink* m_sink;
+    IRBuilder m_builder;
+
+    // Get the raw storage type for a given image format + channel count
+    IRType* getStorageType(ImageFormat format, int channelCount);
+
+    // Emit IR instructions to decode raw storage bytes → access type value
+    IRInst* emitDecode(ImageFormat format, IRInst* rawValue, IRType* accessType);
+
+    // Emit IR instructions to encode access type value → raw storage bytes
+    IRInst* emitEncode(ImageFormat format, IRInst* accessValue, IRType* storageType);
+
+    // Check if a call is a CUDA surface read/write intrinsic
+    bool isSurfaceReadCall(IRCall* call, IRInst*& outTexture);
+    bool isSurfaceWriteCall(IRCall* call, IRInst*& outTexture, IRInst*& outValue);
+
+    // Main entry: scan and rewrite
+    void processModule();
+};
+
+} // namespace Slang
+```
+
+---
+
+### Step 3: Fix `$E` Byte-Address Scaling for Converted Writes
 
 **File**: [source/slang/slang-intrinsic-expand.cpp](source/slang/slang-intrinsic-expand.cpp)
 
-**Remove the special case** in the `$E` handler (lines 500-509) that sets `elemSizeInBytes = 1` for format-converted writes:
+**Remove the special case** in the `$E` handler (lines 500-509) that sets `elemSizeInBytes = 1` for format-converted writes. After the IR pass, format-converted calls no longer have format decorations, so this code path is dead. But removing it is still necessary for correctness if any edge case bypasses the IR pass.
 
 ```cpp
-// REMOVE THIS BLOCK:
-// If we have a format conversion and its a *write* we don't need to scale
+// REMOVE THIS BLOCK from case 'E':
 if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
 {
     const ImageFormat imageFormat = formatDecoration->getFormat();
     if (_isConvertRequired(imageFormat, resourceInst) && _isResourceWrite(m_callInst))
     {
-        // If there is a conversion *and* it's a write we don't need to scale.
         elemSizeInBytes = 1;
     }
 }
 ```
 
-**After removal**, `$E` always returns `_calcBackingElementSizeInBytes()` — the byte size of the storage format. This is correct for raw byte-addressed `surf*write` calls.
-
-This is a **critical correctness fix**. Without it, every format-converted store will write to the wrong byte offset (e.g., `rgba8` stores at `x * 1` instead of `x * 4`).
-
 ---
 
-### Step 3: Add Format Conversion Math Functions to Prelude
-
-**File**: [prelude/slang-cuda-prelude.h](prelude/slang-cuda-prelude.h)
-
-Add conversion helper functions. Note: SNORM encode functions must use rounding (not truncation) to match GPU hardware behavior.
-
-```cpp
-// === Format enum (must match slang-image-format-defs.h order) ===
-// Use SlangImageFormat from slang.h to avoid enum drift.
-// If slang.h is not included in the prelude, replicate from the canonical
-// SLANG_IMAGE_FORMAT_* values in include/slang.h.
-
-// === UNORM Conversion ===
-// UNORM8: [0,255] → [0.0, 1.0]
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_unorm8_to_float(uint8_t v)
-{
-    return v * (1.0f / 255.0f);
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint8_t _slang_float_to_unorm8(float v)
-{
-    return (uint8_t)(__saturatef(v) * 255.0f + 0.5f);
-}
-
-// UNORM16: [0,65535] → [0.0, 1.0]
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_unorm16_to_float(uint16_t v)
-{
-    return v * (1.0f / 65535.0f);
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint16_t _slang_float_to_unorm16(float v)
-{
-    return (uint16_t)(__saturatef(v) * 65535.0f + 0.5f);
-}
-
-// === SNORM Conversion ===
-// SNORM8: [-128,127] → [-1.0, 1.0], with -128 and -127 both mapping to -1.0
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_snorm8_to_float(int8_t v)
-{
-    return fmaxf(v * (1.0f / 127.0f), -1.0f);
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int8_t _slang_float_to_snorm8(float v)
-{
-    // Use roundf() to avoid truncation bias toward zero
-    return (int8_t)roundf(fminf(fmaxf(v, -1.0f), 1.0f) * 127.0f);
-}
-
-// SNORM16: [-32768,32767] → [-1.0, 1.0]
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_snorm16_to_float(int16_t v)
-{
-    return fmaxf(v * (1.0f / 32767.0f), -1.0f);
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int16_t _slang_float_to_snorm16(float v)
-{
-    // Use roundf() to avoid truncation bias toward zero
-    return (int16_t)roundf(fminf(fmaxf(v, -1.0f), 1.0f) * 32767.0f);
-}
-
-// === Half Conversion ===
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_half_to_float(uint16_t v)
-{
-    return __half2float(__ushort_as_half(v));
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint16_t _slang_float_to_half(float v)
-{
-    return __half_as_ushort(__float2half(v));
-}
-
-// === BGRA8 ===
-// Handled as rgba8 unorm with b↔r swizzle (.zyxw), not a separate code path.
-```
-
-**Note on `__saturatef()`**: This is a CUDA device intrinsic. Verify it's available in all prelude compilation modes (device code only — which is the only context where surface functions are called, so this is fine).
-
----
-
-### Step 4: Add Format-Aware Surface Read/Write Functions
-
-**File**: [prelude/slang-cuda-prelude.h](prelude/slang-cuda-prelude.h)
-
-Use switch-based dispatch by format enum. nvcc will constant-fold the switch since the format value is a compile-time constant emitted by `$F`.
-
-Both reads and writes use raw byte I/O (`surf*Dread<RawT>` / `surf*Dwrite<RawT>`) — no `sust.p`, no formatted PTX ops.
-
-```cpp
-// Format-converting 2D surface read (representative example)
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T surf2Dread_format(
-    cudaSurfaceObject_t surfObj,
-    int x, int y,
-    SlangImageFormat format,
-    cudaSurfaceBoundaryMode boundaryMode);
-
-// Specialization for float4 access
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 surf2Dread_format<float4>(
-    cudaSurfaceObject_t surfObj,
-    int x, int y,
-    SlangImageFormat format,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    switch (format)
-    {
-    case SLANG_IMAGE_FORMAT_rgba8:
-        {
-            uchar4 raw = surf2Dread<uchar4>(surfObj, x, y, boundaryMode);
-            return float4{
-                _slang_unorm8_to_float(raw.x),
-                _slang_unorm8_to_float(raw.y),
-                _slang_unorm8_to_float(raw.z),
-                _slang_unorm8_to_float(raw.w)
-            };
-        }
-    case SLANG_IMAGE_FORMAT_bgra8:
-        {
-            // Same as rgba8 but with b↔r swizzle
-            uchar4 raw = surf2Dread<uchar4>(surfObj, x, y, boundaryMode);
-            return float4{
-                _slang_unorm8_to_float(raw.z),  // b → r
-                _slang_unorm8_to_float(raw.y),
-                _slang_unorm8_to_float(raw.x),  // r → b
-                _slang_unorm8_to_float(raw.w)
-            };
-        }
-    case SLANG_IMAGE_FORMAT_rgba8_snorm:
-        {
-            char4 raw = surf2Dread<char4>(surfObj, x, y, boundaryMode);
-            return float4{
-                _slang_snorm8_to_float(raw.x),
-                _slang_snorm8_to_float(raw.y),
-                _slang_snorm8_to_float(raw.z),
-                _slang_snorm8_to_float(raw.w)
-            };
-        }
-    case SLANG_IMAGE_FORMAT_rgba16f:
-        {
-            ushort4 raw = surf2Dread<ushort4>(surfObj, x, y, boundaryMode);
-            return float4{
-                _slang_half_to_float(raw.x),
-                _slang_half_to_float(raw.y),
-                _slang_half_to_float(raw.z),
-                _slang_half_to_float(raw.w)
-            };
-        }
-    // ... more formats (rgba16 unorm/snorm, rg*/r* variants, integer formats)
-    default:
-        return surf2Dread<float4>(surfObj, x, y, boundaryMode);
-    }
-}
-
-// Format-converting 2D surface write (representative example)
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_format(
-    T val,
-    cudaSurfaceObject_t surfObj,
-    int x, int y,
-    SlangImageFormat format,
-    cudaSurfaceBoundaryMode boundaryMode);
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_format<float4>(
-    float4 val,
-    cudaSurfaceObject_t surfObj,
-    int x, int y,
-    SlangImageFormat format,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    switch (format)
-    {
-    case SLANG_IMAGE_FORMAT_rgba8:
-        {
-            uchar4 raw = {
-                _slang_float_to_unorm8(val.x),
-                _slang_float_to_unorm8(val.y),
-                _slang_float_to_unorm8(val.z),
-                _slang_float_to_unorm8(val.w)
-            };
-            surf2Dwrite(raw, surfObj, x, y, boundaryMode);
-            break;
-        }
-    case SLANG_IMAGE_FORMAT_bgra8:
-        {
-            uchar4 raw = {
-                _slang_float_to_unorm8(val.z),  // b
-                _slang_float_to_unorm8(val.y),
-                _slang_float_to_unorm8(val.x),  // r
-                _slang_float_to_unorm8(val.w)
-            };
-            surf2Dwrite(raw, surfObj, x, y, boundaryMode);
-            break;
-        }
-    // ... more formats
-    default:
-        surf2Dwrite(val, surfObj, x, y, boundaryMode);
-        break;
-    }
-}
-```
-
-**Surface dimension coverage**: Implement `_format` variants for all 7 surface function types:
-- `surf1Dread_format` / `surf1Dwrite_format`
-- `surf2Dread_format` / `surf2Dwrite_format`
-- `surf3Dread_format` / `surf3Dwrite_format`
-- `surf1DLayeredread_format` / `surf1DLayeredwrite_format`
-- `surf2DLayeredread_format` / `surf2DLayeredwrite_format`
-- `surfCubemapread_format` / `surfCubemapwrite_format`
-- `surfCubemapLayeredread_format` / `surfCubemapLayeredwrite_format`
-
-**Layered textures now work**: Since we use raw `surf*Layeredwrite` (byte-addressed) + software encode, layered writes are no longer blocked. Remove the old empty stub functions.
-
-**Access type specializations needed**: `float`, `float2`, `float4`, `int`, `int2`, `int4`, `uint`, `uint2`, `uint4` (matching current `SLANG_SURFACE_READ`/`SLANG_SURFACE_WRITE` macro coverage). Use macros to reduce boilerplate across dimensions.
-
----
-
-### Step 5: Modify Intrinsic Expansion — `$C` and new `$F`
+### Step 4: Clean Up `$C` Specifier
 
 **File**: [source/slang/slang-intrinsic-expand.cpp](source/slang/slang-intrinsic-expand.cpp)
 
-The main compiler change: the format-aware prelude functions need the actual image format, not just a `_convert` flag. The current `$C` mechanism only says "conversion needed" and appends `_convert`; it does not select `rgba8` vs `rg16f` vs `r8_snorm`.
+After the IR pass, `$C` should never encounter a format mismatch for CUDA (the pass removes the decoration after lowering). The `$C` code can be simplified or left as-is — it becomes a no-op for format-converted calls since the decoration is gone.
 
-**Changes to `$C` specifier** (line 442):
-
-Current behavior: Appends `_convert` suffix
-New behavior: Appends `_format` suffix AND stores format for `$F` to emit
+Optionally, add an assertion in `$C` for CUDA targets that format conversion is never needed (to catch cases where the IR pass didn't run):
 
 ```cpp
 case 'C':
@@ -368,115 +343,31 @@ case 'C':
         if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
         {
             const ImageFormat imageFormat = formatDecoration->getFormat();
-            if (_isConvertRequired(imageFormat, resourceInst))
-            {
-                // If reading a half-derived format, still require half extension
-                if (_isResourceRead(m_callInst))
-                {
-                    switch (imageFormat)
-                    {
-                    case ImageFormat::r16f:
-                    case ImageFormat::rg16f:
-                    case ImageFormat::rgba16f:
-                        {
-                            CUDAExtensionTracker* extensionTracker =
-                                as<CUDAExtensionTracker>(m_emitter->getExtensionTracker());
-                            if (extensionTracker)
-                                extensionTracker->requireBaseType(BaseType::Half);
-                            break;
-                        }
-                    default: break;
-                    }
-                }
-
-                // Append _format suffix (replaces old _convert)
-                m_writer->emit("_format");
-                // Store format for $F to emit later
-                m_pendingFormat = imageFormat;
-                m_hasFormatConversion = true;
-            }
+            SLANG_ASSERT(!_isConvertRequired(imageFormat, resourceInst) &&
+                "CUDA surface format conversion should have been lowered by IR pass");
         }
     }
     break;
 }
 ```
 
-**Add new `$F` specifier** to emit the format enum value:
-
-```cpp
-case 'F':
-{
-    // Emit format enum value as extra argument for format-converting functions.
-    // When no conversion is needed, $F emits nothing (function has no format param).
-    if (m_hasFormatConversion)
-    {
-        m_writer->emit("(SlangImageFormat)");
-        m_writer->emitUInt64((uint64_t)m_pendingFormat);
-    }
-    break;
-}
-```
-
-Using `(SlangImageFormat)N` (cast of integer literal) rather than `SLANG_IMAGE_FORMAT_name` avoids string table lookups and is immune to naming mismatches between the enum and `getImageFormatInfo().name`.
-
-**State tracking**: Add `m_pendingFormat` (ImageFormat) and `m_hasFormatConversion` (bool) as member variables to the intrinsic expander class, initialized to `ImageFormat::unknown` / `false` at the start of each expansion.
-
 ---
 
-### Step 6: Update hlsl.meta.slang CUDA Intrinsics
-
-**File**: [source/slang/hlsl.meta.slang](source/slang/hlsl.meta.slang)
-
-The intrinsic asm strings need the `$F` format argument added for format-converting functions. The challenge: when no conversion is needed, the function is `surf2Dread<T>(...)` with no format argument; when conversion is needed, it becomes `surf2Dread_format<T>(..., FORMAT, ...)`.
-
-**Approach**: Have `$F` emit `, (SlangImageFormat)N` (with leading comma) when conversion is active, and emit nothing when inactive. This way the intrinsic string doesn't change shape:
-
-**Current** (line ~4905):
-```slang
-case $(SLANG_TEXTURE_2D):
-    __intrinsic_asm "surf2Dread$C<$T0>($0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
-```
-
-**New**:
-```slang
-case $(SLANG_TEXTURE_2D):
-    __intrinsic_asm "surf2Dread$C<$T0>($0, ($1).x * $E, ($1).y$F, SLANG_CUDA_BOUNDARY_MODE)";
-```
-
-Where `$F` expands to:
-- `, (SlangImageFormat)10` when format conversion is needed (e.g., format enum value 10 = rgba8)
-- Empty string when no conversion needed
-
-This approach keeps a single intrinsic definition per dimension and avoids splitting into converting/non-converting variants.
-
-**Apply the same pattern to all write intrinsics** (line ~5075):
-```slang
-// Current:
-__intrinsic_asm "surf2Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
-// New:
-__intrinsic_asm "surf2Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y$F, SLANG_CUDA_BOUNDARY_MODE)";
-```
-
----
-
-### Step 7: Add Slang Tests
+### Step 5: Add Slang Tests
 
 **New file**: `tests/cuda/cuda-texture-format-conversion.slang`
 
 ```slang
 //TEST(compute):COMPARE_COMPUTE:-cuda -compute -output-using-type
 
-// Test UNORM8 format conversion
 //TEST_INPUT:RWTexture2D(format=RGBA8, size=4, content=one):name=tex_unorm8
 [format("rgba8")]
 RWTexture2D<float4> tex_unorm8;
 
-// Test SNORM8 format conversion
 //TEST_INPUT:RWTexture2D(format=RGBA8SNorm, size=4, content=zero):name=tex_snorm8
 [format("rgba8_snorm")]
 RWTexture2D<float4> tex_snorm8;
 
-// Test FLOAT16 format conversion
 //TEST_INPUT:RWTexture2D(format=RGBA16Float, size=4, content=one):name=tex_f16
 [format("rgba16f")]
 RWTexture2D<float4> tex_f16;
@@ -487,23 +378,19 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // Test Load from UNORM8 texture (should return ~1.0 for content=one)
     float4 v0 = tex_unorm8.Load(int2(0, 0));
     outputBuffer[0] = v0.x;  // CHECK: 1.0
 
-    // Test Store to UNORM8 texture, then Load back
     tex_unorm8.Store(int2(1, 0), float4(0.5, 0.25, 0.75, 1.0));
     float4 v1 = tex_unorm8.Load(int2(1, 0));
-    outputBuffer[1] = v1.x;  // CHECK: ~0.498 (127/255)
-    outputBuffer[2] = v1.y;  // CHECK: ~0.247 (63/255)
+    outputBuffer[1] = v1.x;  // CHECK: ~0.498
+    outputBuffer[2] = v1.y;  // CHECK: ~0.247
 
-    // Test SNORM8 Store and Load
     tex_snorm8.Store(int2(0, 0), float4(-0.5, 0.5, -1.0, 1.0));
     float4 v2 = tex_snorm8.Load(int2(0, 0));
     outputBuffer[3] = v2.x;  // CHECK: ~-0.496
     outputBuffer[4] = v2.z;  // CHECK: -1.0
 
-    // Test FLOAT16 round-trip
     tex_f16.Store(int2(0, 0), float4(0.123, 456.789, -0.001, 65504.0));
     float4 v3 = tex_f16.Load(int2(0, 0));
     outputBuffer[5] = v3.x;  // CHECK: ~0.123
@@ -516,80 +403,148 @@ void computeMain()
 - `tests/cuda/cuda-texture-format-layered.slang` — Layered texture format conversion (now supported)
 - `tests/cuda/cuda-texture-format-integer.slang` — 8/16-bit integer formats
 
-**Negative test**: Assert generated CUDA code contains no `sust.p`:
-```slang
-// Compile to CUDA source, grep output for sust.p — should not appear
+**IR dump test**: Verify the IR pass produces correct conversion arithmetic:
+```bash
+slangc -dump-ir -target cuda -o /dev/null tests/cuda/cuda-texture-format-conversion.slang
+# Should show inline uitofp/mul/fptoui instructions, no format decorations
 ```
 
 ---
 
-### Step 8: Add Diagnostic for Unsupported Packed Formats
+### Step 6: Add Diagnostic for Unsupported Packed Formats
+
+Add a diagnostic in the IR pass for formats it doesn't yet handle:
+
+```cpp
+case ImageFormat::rgb10_a2:
+case ImageFormat::rgb10_a2ui:
+case ImageFormat::r11f_g11f_b10f:
+    m_sink->diagnose(call, Diagnostics::unsupportedCUDATextureFormat, formatName);
+    return; // Leave call unchanged
+```
 
 **New file**: `tests/diagnostics/cuda-texture-unsupported-format.slang`
 
-```slang
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuda
-
-[format("r11f_g11f_b10f")]
-RWTexture2D<float3> tex;
-// CHECK: error
-
-void main() {
-    tex.Store(int2(0,0), float3(1,2,3));
-}
-```
-
-Emit explicit diagnostics for these formats until bespoke packing is implemented:
-- `r11f_g11f_b10f`
-- `rgb10_a2`
-- `rgb10_a2ui`
-
 ---
 
-## Files to Modify Summary
+## Files to Modify/Create Summary
 
 | File | Changes |
 |------|---------|
-| [prelude/slang-cuda-prelude.h](prelude/slang-cuda-prelude.h) | Remove `sust.p` code and `_convert` functions; add conversion math; add `_format` surface functions |
-| [source/slang/slang-intrinsic-expand.cpp](source/slang/slang-intrinsic-expand.cpp) | Remove `$E` scaling special-case for converted writes; modify `$C` to emit `_format`; add `$F` specifier |
-| [source/slang/hlsl.meta.slang](source/slang/hlsl.meta.slang) | Add `$F` to CUDA intrinsic strings |
+| **NEW** `source/slang/slang-ir-legalize-cuda-surface-format.cpp` | IR lowering pass (core implementation) |
+| **NEW** `source/slang/slang-ir-legalize-cuda-surface-format.h` | Pass declaration |
+| [source/slang/slang-emit.cpp](source/slang/slang-emit.cpp) | Register pass in CUDA pipeline |
+| [source/slang/slang-intrinsic-expand.cpp](source/slang/slang-intrinsic-expand.cpp) | Remove `$E` scaling special-case; simplify `$C` |
+| [prelude/slang-cuda-prelude.h](prelude/slang-cuda-prelude.h) | Remove `sust.p` code, `_convert` functions, half-read macros |
+| [source/slang/CMakeLists.txt](source/slang/CMakeLists.txt) | Add new source files |
 | `tests/cuda/cuda-texture-format-*.slang` | New test files |
 | `tests/diagnostics/cuda-texture-unsupported-format.slang` | Diagnostic test for packed formats |
+
+**Files NOT modified** (compared to previous plan):
+- ~~`hlsl.meta.slang`~~ — no changes needed; `$C` and `$E` become no-ops after the pass
+- ~~`slang-cuda-prelude.h` conversion functions~~ — no new format functions added to prelude
 
 ---
 
 ## Implementation Order
 
-1. **Remove `$E` scaling special-case** for converted writes — restore byte addressing for all surface access. This is a correctness fix independent of everything else.
+1. **Remove `sust.p` code** from prelude — clean deletion of `_convert` functions, half-read macros, empty layered stubs.
 
-2. **Remove all `sust.p` code and `_convert` functions** from the prelude. Remove `SLANG_SURFACE_READ_HALF_CONVERT` macro. Remove empty layered write stubs.
+2. **Create the IR pass** — `slang-ir-legalize-cuda-surface-format.cpp`:
+   - Implement intrinsic call detection (identify surface read/write calls on format-decorated textures)
+   - Implement `emitDecode()` for reads: raw→access conversion as inline IR
+   - Implement `emitEncode()` for writes: access→raw conversion as inline IR
+   - Implement texture type rewriting (change element type to raw storage type, remove format decoration)
+   - Start with UNORM8 (`rgba8`) + `float4` access only
 
-3. **Add conversion math functions** to prelude:
-   - UNORM8/16, SNORM8/16 (with correct rounding), Half↔Float converters
-   - Verify `__saturatef()` availability in device code
+3. **Register the pass** in `slang-emit.cpp` for CUDA targets.
 
-4. **Add format-aware surface functions** to prelude:
-   - `surf*read_format<T>()` / `surf*write_format<T>()` with switch on `SlangImageFormat`
-   - Cover all 7 surface dimensions (1D, 2D, 3D, 1DLayered, 2DLayered, Cubemap, CubemapLayered)
-   - Start with `float4` + `rgba8`, expand to all scalar-type-backed formats
+4. **Remove `$E` scaling special-case** — the dead code for `elemSizeInBytes = 1` on converted writes.
 
-5. **Modify intrinsic expansion**:
-   - Update `$C` to emit `_format` suffix and store format
-   - Add `$F` specifier to emit format enum value with leading comma
-   - Add `m_pendingFormat` / `m_hasFormatConversion` state to expander class
+5. **Simplify `$C`** — add assertion that format conversion is never needed for CUDA after the pass runs.
 
-6. **Update hlsl.meta.slang**:
-   - Add `$F` to all CUDA read/write intrinsic asm strings
+6. **Expand format coverage** in the pass:
+   - UNORM16, SNORM8/16 (with correct rounding)
+   - Float16 (half↔float bitcast + conversion)
+   - Sub-32-bit integers (sign/zero extension)
+   - BGRA8 (UNORM8 + swizzle)
 
 7. **Add tests**:
    - Numeric round-trip tests for rgba8, rgba8_snorm, rgba16f, integer formats
    - Multi-dimension tests (1D, 2D, 3D, layered)
-   - Negative test asserting no `sust.p` in generated CUDA source
+   - IR dump verification
    - Diagnostic test for unsupported packed formats
 
-8. **Expand format coverage** (Phase 2):
-   - Implement packed format codecs: `rgb10_a2`, `rgb10_a2ui`, `r11f_g11f_b10f`
-   - Remove corresponding diagnostics once implemented
+8. **Phase 2 — Packed formats**:
+   - Implement `rgb10_a2`, `rgb10_a2ui`, `r11f_g11f_b10f` in the pass
+   - Remove corresponding diagnostics
+
+---
+
+## Key Design Decisions in the IR Pass
+
+### How to Identify Surface Read/Write Intrinsic Calls
+
+The pass must find `IRCall` instructions that are CUDA surface reads/writes. Strategy:
+
+1. Walk all instructions in all functions
+2. For each `IRCall`, check if the callee is an `IRFunc` with an `__intrinsic_asm` body
+3. Check if the first argument is a texture/surface resource with an `IRFormatDecoration`
+4. Check if `_isConvertRequired()` — format storage type differs from element type
+5. Determine read vs write: non-void return type = read, void = write
+
+Alternatively, the pass can look at the `IRFormatDecoration` on global texture variables and trace their uses to find all load/store calls — this is similar to how `resolveTextureFormat` works.
+
+### How to Rewrite the Call's Element Type
+
+When the pass finds a read call like `surf2Dread<float4>(surfObj, x, y, boundary)`:
+
+1. Create a new texture type with `elementType = uchar4` (the raw storage type for `rgba8`)
+2. The `$T0` specifier in the intrinsic asm reads the element type — after rewriting, it emits `uchar4` instead of `float4`
+3. The `$E` specifier computes byte size from the element type — `sizeof(uchar4) = 4`, same as `sizeof(float4)`, so no issue for `rgba8`. But for `r8` (1 byte vs 4 bytes), this matters and is now correct.
+4. The call's return type changes to `uchar4`
+5. Insert conversion instructions after the call to produce `float4`
+
+For writes: reverse the process — insert conversion before the call, change the value argument type.
+
+### What About the `$C` and `$E` Specifiers After the Pass?
+
+After the pass:
+- **`$C`**: The format decoration is removed. `_isConvertRequired()` returns false. `$C` emits nothing. The function name stays `surf2Dread` (no `_convert` suffix). ✅
+- **`$E`**: The element type is now the raw storage type. `_calcBackingElementSizeInBytes()` returns the correct byte size from the element type (not the format, since the decoration is removed). ✅
+
+So both specifiers work correctly without any changes to `hlsl.meta.slang`.
+
+### Half Extension Tracking
+
+The `$C` handler currently triggers `extensionTracker->requireBaseType(BaseType::Half)` for float16 formats. After the pass lowers the call, `$C` no longer fires. The IR pass must instead ensure the half extension is required. This can be done by:
+- Having the pass call the extension tracker directly, OR
+- The lowered IR will contain `half`-typed instructions, which the CUDA emitter already detects and enables half support for
+
+The second approach is more robust — the emitter already scans for half types.
+
+---
+
+## New CUDA Flow (After This Change)
+
+```
+1. AST: [format("rgba8")] RWTexture2D<float4> tex;
+2. Lower-to-IR: addFormatDecoration(var, rgba8)
+3. IR: IRVar with IRFormatDecoration(rgba8) + IRTextureType(elementType=float4)
+4. ... common passes ...
+5. legalizeCUDASurfaceFormat pass:
+   a. Find: call surf2Dread_intrinsic(%tex, %coord) → float4  [tex has format=rgba8]
+   b. Rewrite tex type: elementType = uchar4 (raw storage for rgba8)
+   c. Rewrite call: surf2Dread_intrinsic(%tex_raw, %coord) → uchar4
+   d. Insert decode: uitofp + mul(1/255) per channel → float4
+   e. Remove IRFormatDecoration from tex
+6. CUDA emission:
+   - $C: no format decoration → no suffix → "surf2Dread"
+   - $T0: element type = uchar4 → "surf2Dread<uchar4>"
+   - $E: element size = 4 → correct byte scaling
+   - Final: "surf2Dread<uchar4>(surfObj, coord.x * 4, coord.y, ...)"
+   - Followed by inline conversion arithmetic in emitted CUDA
+```
 
 ---
 
@@ -602,19 +557,32 @@ Emit explicit diagnostics for these formats until bespoke packing is implemented
 - [ ] Float16 round-trips preserve precision
 - [ ] BGRA8 swizzles b↔r channels correctly
 - [ ] All 1D/2D/3D variants work
-- [ ] Layered texture reads and writes work
-- [ ] Byte-address scaling (`$E`) is correct for both reads AND writes
+- [ ] Layered texture reads and writes work (no longer blocked)
+- [ ] Byte-address scaling is correct for both reads AND writes
 - [ ] Generated CUDA code contains NO `sust.p` instructions
+- [ ] Generated CUDA code contains NO `_convert` function calls
+- [ ] IR dump shows inline conversion arithmetic (no format decorations remain)
 - [ ] Unsupported packed formats emit explicit diagnostics
 - [ ] No regressions in existing CUDA tests
 - [ ] Generated CUDA code compiles with nvcc
-- [ ] `SlangImageFormat` enum in prelude matches `slang.h` canonical values
+- [ ] Half extension is properly required for float16 format conversions
 
 ---
 
 ## Resolved Questions
 
-1. ~~**Existing `sust.p` code**~~: **Remove it entirely.** Do not keep behind version guard. Relying on formatted surface store semantics is fragile regardless of PTX version.
+1. ~~**Existing `sust.p` code**~~: **Remove it entirely.** Do not keep behind version guard.
 2. **TEST_INPUT format syntax**: Need to verify `RWTexture2D(format=RGBA8, ...)` is correct test input syntax. **Blocker for Step 7** — verify before writing tests.
-3. ~~**BGRA format**~~: Handle as `rgba8` with b↔r swizzle in the same switch case. No separate code path.
-4. ~~**Layered textures**~~: **Now fully supported.** Raw byte I/O works identically for layered and non-layered surfaces once the texel is software-encoded/decoded.
+3. ~~**BGRA format**~~: Handle as `rgba8` with b↔r swizzle in the pass's `emitDecode`/`emitEncode`.
+4. ~~**Layered textures**~~: **Now fully supported.** The pass is dimension-agnostic — it rewrites types and inserts conversion regardless of surface shape.
+5. ~~**Prelude code volume**~~: **Eliminated.** No format-specific functions in the prelude. All conversion is inline IR.
+
+---
+
+## Future Work (Approach A)
+
+After Phase 1 is stable, consider making CUDA use `kIROp_ImageLoad`/`kIROp_ImageStore` like other backends. This would:
+- Unify the IR representation across all targets
+- Allow `legalizeImageSubscript` to cover CUDA
+- Eliminate the `__intrinsic_asm` surface calls in `hlsl.meta.slang` for CUDA
+- Make the format conversion pass cleaner (match on `IRImageLoad`/`IRImageStore` instead of pattern-matching intrinsic calls)
