@@ -48,7 +48,7 @@ String _getMessage(SignalType type, char const* message)
     return buf.produceString();
 }
 
-void handleAssert(char const* message, bool isReleaseAssert)
+void handleAssert(char const* message, char const* file, int line, bool isReleaseAssert)
 {
     StringBuilder envValue;
     if (SLANG_SUCCEEDED(
@@ -86,8 +86,23 @@ void handleAssert(char const* message, bool isReleaseAssert)
 #endif
     }
 
-    // Default behavior: delegate to handleSignal
-    handleSignal(SignalType::AssertFailure, message);
+    // Strip any remaining directory prefix for readability (the build system already
+    // maps the source root away via -fmacro-prefix-map / /d1trimfile).
+    const char* basename = file ? file : "unknown";
+    if (file)
+    {
+        for (const char* p = file; *p; ++p)
+        {
+            if (*p == '/' || *p == '\\')
+                basename = p + 1;
+        }
+    }
+    // Use a stack buffer to avoid heap allocation on the assertion path, which could
+    // mask the original failure if the heap is corrupted.
+    char locMsg[1024];
+    const char* safeMessage = message ? message : "unknown assert";
+    snprintf(locMsg, sizeof(locMsg), "%s(%d): %s", basename, line, safeMessage);
+    handleSignal(SignalType::AssertFailure, locMsg);
 }
 
 // One point of having as a single function is a choke point both for handling (allowing different
