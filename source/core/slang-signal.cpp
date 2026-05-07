@@ -48,7 +48,7 @@ String _getMessage(SignalType type, char const* message)
     return buf.produceString();
 }
 
-void handleAssert(char const* message, bool isReleaseAssert)
+void handleAssert(char const* message, char const* file, int line, bool isReleaseAssert)
 {
     StringBuilder envValue;
     if (SLANG_SUCCEEDED(
@@ -86,8 +86,10 @@ void handleAssert(char const* message, bool isReleaseAssert)
 #endif
     }
 
-    // Default behavior: delegate to handleSignal
-    handleSignal(SignalType::AssertFailure, message);
+    // Format message with source location, then delegate to handleSignal
+    StringBuilder locMsg;
+    locMsg << file << "(" << line << "): " << message;
+    handleSignal(SignalType::AssertFailure, locMsg.getBuffer());
 }
 
 // One point of having as a single function is a choke point both for handling (allowing different

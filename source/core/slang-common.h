@@ -361,21 +361,21 @@ public:
 // assumptions in release builds
 //
 #ifdef _DEBUG
-#define SLANG_ASSERT(VALUE)                       \
-    do                                            \
-    {                                             \
-        if (!(VALUE)) [[unlikely]]                \
-            ::Slang::handleAssert(#VALUE, false); \
+#define SLANG_ASSERT(VALUE)                                           \
+    do                                                                \
+    {                                                                 \
+        if (!(VALUE)) [[unlikely]]                                    \
+            ::Slang::handleAssert(#VALUE, __FILE__, __LINE__, false); \
     } while (0)
 #else
 #define SLANG_ASSERT(VALUE) SLANG_ASSUME(VALUE)
 #endif
 
-#define SLANG_RELEASE_ASSERT(VALUE)              \
-    do                                           \
-    {                                            \
-        if (!(VALUE)) [[unlikely]]               \
-            ::Slang::handleAssert(#VALUE, true); \
+#define SLANG_RELEASE_ASSERT(VALUE)                                  \
+    do                                                               \
+    {                                                                \
+        if (!(VALUE)) [[unlikely]]                                   \
+            ::Slang::handleAssert(#VALUE, __FILE__, __LINE__, true); \
     } while (0)
 
 template<typename T>
