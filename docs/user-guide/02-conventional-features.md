@@ -239,7 +239,7 @@ enum Channel
 }
 ```
 
-Unlike C/C++, `enum` types in Slang are always scoped by default (like `enum class` in C++). You can also write `enum class` explicitly in Slang, but it isn't required. If you want an `enum` type to be unscoped, you can use the `[UnscopedEnum]` attribute:
+Unlike C/C++, named `enum` types in Slang are always scoped by default (like `enum class` in C++), whereas anonymous `enum` types are unscoped. You can also write `enum class` explicitly in Slang for clarity, but it isn't required. If you want an `enum` type to be unscoped, you can use the `[UnscopedEnum]` attribute:
 
 ```csharp
 [UnscopedEnum]
@@ -253,7 +253,7 @@ void test(Channel c)
 }
 ```
 
-You can also use the `-unscoped-enum` command-line option to make all `enum` types other than `enum class` unscoped by default. It is an error to combine `[UnscopedEnum]` with `enum class`.
+You can also use the `-unscoped-enum` command-line option to make all named `enum` types other than `enum class` unscoped by default. It is an error to combine `[UnscopedEnum]` with `enum class`, or to declare an anonymous `enum class`.
 
 You can specify an explicit underlying integer type for `enum` types:
 
