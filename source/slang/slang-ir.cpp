@@ -1460,19 +1460,30 @@ IRInst* mergeCandidateParentsForHoistableInst(IRInst* left, IRInst* right)
         }
     }
 
-    // As a matter of validity in the IR, we expect one
-    // of the two to be an ancestor (in the non-block case),
-    // because otherwise we'd be violating the basic dominance
-    // assumptions.
-    //
-    SLANG_ASSERT(parentNonBlock);
-
-    // As a fallback, try to use the left parent as a default
-    // in case things go badly.
+    // Ordinarily one of the two should be an ancestor of the other.
+    // However, in cases involving transitive witnesses for associated types
+    // from inherited interfaces, the operands can end up in sibling scopes
+    // (e.g., two different IRGeneric nodes at module scope). In that case we
+    // search for the lowest common ancestor so the instruction is placed at
+    // a scope that dominates both operands.
     //
     if (!parentNonBlock)
     {
-        parentNonBlock = leftNonBlock;
+        for (auto candidate = leftNonBlock->getParent(); candidate && !parentNonBlock;
+             candidate = candidate->getParent())
+        {
+            for (auto rr = rightNonBlock; rr; rr = rr->getParent())
+            {
+                if (rr == candidate)
+                {
+                    parentNonBlock = candidate;
+                    break;
+                }
+            }
+        }
+        // Final fallback in case no common ancestor was found.
+        if (!parentNonBlock)
+            parentNonBlock = leftNonBlock;
     }
 
     IRInst* parent = parentNonBlock;

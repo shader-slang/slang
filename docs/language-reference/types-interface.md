@@ -74,6 +74,21 @@ The interface member functions may be static or non-static.
 An object of a type conforming to an interface can be converted to the interface type.
 
 An interface may also inherit from another interface. The inherited members add to the inheriting interface.
+Associated types declared in a base interface may be used by name in the derived interface's method signatures:
+
+```hlsl
+interface IStorage<T>
+{
+    associatedtype Address;
+}
+
+// Address (from IStorage<T>) is used as a parameter and return type here.
+interface IParameterStorage<T> : IStorage<T>
+{
+    void add(Address address, T value);
+    Address getAddress(T value);
+}
+```
 
 A member function implementation is compatible with an interface member function when:
 - The implementation function can be called with the parameter types of the interface; AND
