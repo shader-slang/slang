@@ -151,6 +151,14 @@ struct CUDASurfaceFormatLegalizer
     // Get the IR base type for the raw storage of a given image format.
     BaseType getStorageBaseType(ImageFormat format)
     {
+        // SNORM formats are listed as UINT8/UINT16 in the format defs, but we
+        // need signed types so that sitofp works correctly during decode.
+        auto kind = getConversionKind(format);
+        if (kind == FormatConversionKind::Snorm8)
+            return BaseType::Int8;
+        if (kind == FormatConversionKind::Snorm16)
+            return BaseType::Int16;
+
         const auto& info = getImageFormatInfo(format);
         switch (info.scalarType)
         {
@@ -383,20 +391,101 @@ struct CUDASurfaceFormatLegalizer
         }
     }
 
+    // Classification of format conversion semantics.
+    enum class FormatConversionKind
+    {
+        None,       // No conversion (32-bit float/int/uint, or format matches access type)
+        Float16,    // half precision float stored as uint16
+        Unorm8,     // [0,1] float stored as uint8
+        Unorm16,    // [0,1] float stored as uint16
+        Snorm8,     // [-1,1] float stored as int8
+        Snorm16,    // [-1,1] float stored as int16
+        Int8,       // signed 8-bit → sign-extend to int32
+        Int16,      // signed 16-bit → sign-extend to int32
+        Uint8,      // unsigned 8-bit → zero-extend to uint32
+        Uint16,     // unsigned 16-bit → zero-extend to uint32
+        Bgra8Unorm, // UNORM8 with B↔R channel swap
+        Packed,     // Unsupported packed formats
+    };
+
+    FormatConversionKind getConversionKind(ImageFormat format)
+    {
+        switch (format)
+        {
+        case ImageFormat::rgba8:
+        case ImageFormat::rg8:
+        case ImageFormat::r8:
+            return FormatConversionKind::Unorm8;
+        case ImageFormat::rgba16:
+        case ImageFormat::rg16:
+        case ImageFormat::r16:
+            return FormatConversionKind::Unorm16;
+        case ImageFormat::rgba8_snorm:
+        case ImageFormat::rg8_snorm:
+        case ImageFormat::r8_snorm:
+            return FormatConversionKind::Snorm8;
+        case ImageFormat::rgba16_snorm:
+        case ImageFormat::rg16_snorm:
+        case ImageFormat::r16_snorm:
+            return FormatConversionKind::Snorm16;
+        case ImageFormat::rgba16f:
+        case ImageFormat::rg16f:
+        case ImageFormat::r16f:
+            return FormatConversionKind::Float16;
+        case ImageFormat::rgba8i:
+        case ImageFormat::rg8i:
+        case ImageFormat::r8i:
+            return FormatConversionKind::Int8;
+        case ImageFormat::rgba16i:
+        case ImageFormat::rg16i:
+        case ImageFormat::r16i:
+            return FormatConversionKind::Int16;
+        case ImageFormat::rgba8ui:
+        case ImageFormat::rg8ui:
+        case ImageFormat::r8ui:
+            return FormatConversionKind::Uint8;
+        case ImageFormat::rgba16ui:
+        case ImageFormat::rg16ui:
+        case ImageFormat::r16ui:
+            return FormatConversionKind::Uint16;
+        case ImageFormat::bgra8:
+            return FormatConversionKind::Bgra8Unorm;
+        case ImageFormat::rgb10_a2:
+        case ImageFormat::rgb10_a2ui:
+        case ImageFormat::r11f_g11f_b10f:
+            return FormatConversionKind::Packed;
+        default:
+            return FormatConversionKind::None;
+        }
+    }
+
     // Emit decode conversion: raw storage value -> access type value.
-    // Currently implements FLOAT16 formats only; other formats will be added later.
     IRInst* emitDecode(ImageFormat format, IRInst* rawValue, IRType* accessType)
     {
         const auto& info = getImageFormatInfo(format);
+        auto kind = getConversionKind(format);
 
-        switch (info.scalarType)
+        switch (kind)
         {
-        case SLANG_SCALAR_TYPE_FLOAT16:
+        case FormatConversionKind::Float16:
             return emitDecodeFloat16(rawValue, accessType, info.channelCount);
+        case FormatConversionKind::Unorm8:
+            return emitDecodeUnorm(rawValue, accessType, info.channelCount, 255.0);
+        case FormatConversionKind::Unorm16:
+            return emitDecodeUnorm(rawValue, accessType, info.channelCount, 65535.0);
+        case FormatConversionKind::Snorm8:
+            return emitDecodeSnorm(rawValue, accessType, info.channelCount, 127.0);
+        case FormatConversionKind::Snorm16:
+            return emitDecodeSnorm(rawValue, accessType, info.channelCount, 32767.0);
+        case FormatConversionKind::Int8:
+        case FormatConversionKind::Int16:
+            return emitDecodeSignedInt(rawValue, accessType, info.channelCount);
+        case FormatConversionKind::Uint8:
+        case FormatConversionKind::Uint16:
+            return emitDecodeUnsignedInt(rawValue, accessType, info.channelCount);
+        case FormatConversionKind::Bgra8Unorm:
+            return emitDecodeBgra8(rawValue, accessType);
         default:
-            // For formats we haven't implemented yet, just return the raw value.
-            // This keeps the pass from crashing — it will produce incorrect results
-            // for unsupported formats, but those will be addressed in later phases.
             return rawValue;
         }
     }
@@ -405,11 +494,28 @@ struct CUDASurfaceFormatLegalizer
     IRInst* emitEncode(ImageFormat format, IRInst* accessValue, IRType* storageType)
     {
         const auto& info = getImageFormatInfo(format);
+        auto kind = getConversionKind(format);
 
-        switch (info.scalarType)
+        switch (kind)
         {
-        case SLANG_SCALAR_TYPE_FLOAT16:
+        case FormatConversionKind::Float16:
             return emitEncodeFloat16(accessValue, storageType, info.channelCount);
+        case FormatConversionKind::Unorm8:
+            return emitEncodeUnorm(accessValue, storageType, info.channelCount, 255.0);
+        case FormatConversionKind::Unorm16:
+            return emitEncodeUnorm(accessValue, storageType, info.channelCount, 65535.0);
+        case FormatConversionKind::Snorm8:
+            return emitEncodeSnorm(accessValue, storageType, info.channelCount, 127.0);
+        case FormatConversionKind::Snorm16:
+            return emitEncodeSnorm(accessValue, storageType, info.channelCount, 32767.0);
+        case FormatConversionKind::Int8:
+        case FormatConversionKind::Int16:
+            return emitEncodeSignedInt(accessValue, storageType, info.channelCount);
+        case FormatConversionKind::Uint8:
+        case FormatConversionKind::Uint16:
+            return emitEncodeUnsignedInt(accessValue, storageType, info.channelCount);
+        case FormatConversionKind::Bgra8Unorm:
+            return emitEncodeBgra8(accessValue, storageType);
         default:
             return accessValue;
         }
@@ -468,7 +574,524 @@ struct CUDASurfaceFormatLegalizer
         return m_builder.emitMakeVector(storageType, (UInt)channelCount, channels.getBuffer());
     }
 
-    // Rewrite a surface read call to use raw storage type + decode conversion.
+    // Helper: get the number of channels in an access type (vector width, or 1 for scalar).
+    int getAccessChannelCount(IRType* accessType)
+    {
+        if (auto vecType = as<IRVectorType>(accessType))
+            return int(getIntVal(vecType->getElementCount()));
+        return 1;
+    }
+
+    // Helper: get the scalar element type of an access type.
+    IRType* getAccessScalarType(IRType* accessType)
+    {
+        if (auto vecType = as<IRVectorType>(accessType))
+            return vecType->getElementType();
+        return accessType;
+    }
+
+    // Helper: build a vector or scalar result from decoded channels, handling channel
+    // count mismatch. If format has fewer channels than access type, pad with (0,0,0,1).
+    IRInst* buildAccessResult(
+        List<IRInst*>& decodedChannels,
+        int formatChannelCount,
+        IRType* accessType)
+    {
+        int accessChannels = getAccessChannelCount(accessType);
+        IRType* scalarType = getAccessScalarType(accessType);
+
+        if (accessChannels == 1)
+        {
+            // Scalar access - just return the first decoded channel.
+            return decodedChannels[0];
+        }
+
+        // Build full vector, padding if needed.
+        List<IRInst*> finalChannels;
+        for (int i = 0; i < accessChannels; i++)
+        {
+            if (i < formatChannelCount)
+            {
+                finalChannels.add(decodedChannels[i]);
+            }
+            else
+            {
+                // Pad: (0, 0, 0, 1) pattern - alpha channel (index 3) defaults to 1.
+                IRFloatingPointValue padVal = (i == 3) ? 1.0 : 0.0;
+                finalChannels.add(m_builder.getFloatValue(scalarType, padVal));
+            }
+        }
+
+        return m_builder.emitMakeVector(
+            accessType,
+            (UInt)accessChannels,
+            finalChannels.getBuffer());
+    }
+
+    // Helper: extract the first N channels from the access value for encoding.
+    // If access type has more channels than format, truncate. If fewer, read what's available.
+    void extractChannelsForEncode(
+        IRInst* accessValue,
+        IRType* accessType,
+        int formatChannelCount,
+        List<IRInst*>& outChannels)
+    {
+        int accessChannels = getAccessChannelCount(accessType);
+        int channelsToExtract = (formatChannelCount < accessChannels) ? formatChannelCount
+                                                                      : accessChannels;
+
+        if (accessChannels == 1)
+        {
+            outChannels.add(accessValue);
+            return;
+        }
+
+        for (int i = 0; i < channelsToExtract; i++)
+        {
+            auto idx = m_builder.getIntValue(m_builder.getIntType(), i);
+            outChannels.add(m_builder.emitElementExtract(accessValue, idx));
+        }
+    }
+
+    // UNORM decode: uitofp(raw) * (1.0 / maxVal)
+    IRInst* emitDecodeUnorm(IRInst* rawValue, IRType* accessType, int formatChannels, double maxVal)
+    {
+        auto floatType = m_builder.getBasicType(BaseType::Float);
+        auto scale = m_builder.getFloatValue(floatType, 1.0 / maxVal);
+
+        List<IRInst*> decodedChannels;
+        if (formatChannels == 1)
+        {
+            auto floatVal = m_builder.emitCast(floatType, rawValue);
+            decodedChannels.add(m_builder.emitMul(floatType, floatVal, scale));
+        }
+        else
+        {
+            for (int i = 0; i < formatChannels; i++)
+            {
+                auto idx = m_builder.getIntValue(m_builder.getIntType(), i);
+                auto rawChannel = m_builder.emitElementExtract(rawValue, idx);
+                auto floatVal = m_builder.emitCast(floatType, rawChannel);
+                decodedChannels.add(m_builder.emitMul(floatType, floatVal, scale));
+            }
+        }
+
+        return buildAccessResult(decodedChannels, formatChannels, accessType);
+    }
+
+    // UNORM encode: fptoui(saturate(val) * maxVal + 0.5)
+    IRInst* emitEncodeUnorm(
+        IRInst* accessValue,
+        IRType* storageType,
+        int formatChannels,
+        double maxVal)
+    {
+        auto floatType = m_builder.getBasicType(BaseType::Float);
+        auto scaleConst = m_builder.getFloatValue(floatType, maxVal);
+        auto halfConst = m_builder.getFloatValue(floatType, 0.5);
+        auto zeroConst = m_builder.getFloatValue(floatType, 0.0);
+        auto oneConst = m_builder.getFloatValue(floatType, 1.0);
+
+        IRType* storageScalarType;
+        if (auto vecType = as<IRVectorType>(storageType))
+            storageScalarType = vecType->getElementType();
+        else
+            storageScalarType = storageType;
+
+        List<IRInst*> encodedChannels;
+        List<IRInst*> inputChannels;
+        extractChannelsForEncode(
+            accessValue,
+            accessValue->getDataType(),
+            formatChannels,
+            inputChannels);
+
+        for (int i = 0; i < formatChannels; i++)
+        {
+            IRInst* ch =
+                (i < (int)inputChannels.getCount()) ? inputChannels[i] : zeroConst;
+            // saturate: max(0, min(1, val))
+            auto cmpLt0 = m_builder.emitLess(ch, zeroConst);
+            IRInst* clampLowArgs[] = {cmpLt0, zeroConst, ch};
+            auto clampLow = m_builder.emitIntrinsicInst(
+                floatType,
+                kIROp_Select,
+                3,
+                clampLowArgs);
+            auto cmpGt1 = m_builder.emitLess(oneConst, clampLow);
+            IRInst* clampHighArgs[] = {cmpGt1, oneConst, clampLow};
+            auto saturated = m_builder.emitIntrinsicInst(
+                floatType,
+                kIROp_Select,
+                3,
+                clampHighArgs);
+            // val * maxVal + 0.5
+            auto scaled = m_builder.emitMul(floatType, saturated, scaleConst);
+            auto biased = m_builder.emitAdd(floatType, scaled, halfConst);
+            // Convert to unsigned integer storage type
+            auto encoded = m_builder.emitCast(storageScalarType, biased);
+            encodedChannels.add(encoded);
+        }
+
+        if (formatChannels == 1)
+            return encodedChannels[0];
+        return m_builder.emitMakeVector(
+            storageType,
+            (UInt)formatChannels,
+            encodedChannels.getBuffer());
+    }
+
+    // SNORM decode: max(sitofp(raw) * (1.0 / maxVal), -1.0)
+    IRInst* emitDecodeSnorm(
+        IRInst* rawValue,
+        IRType* accessType,
+        int formatChannels,
+        double maxVal)
+    {
+        auto floatType = m_builder.getBasicType(BaseType::Float);
+        auto scale = m_builder.getFloatValue(floatType, 1.0 / maxVal);
+        auto negOne = m_builder.getFloatValue(floatType, -1.0);
+
+        List<IRInst*> decodedChannels;
+        if (formatChannels == 1)
+        {
+            // sitofp (signed int to float)
+            auto floatVal = m_builder.emitCast(floatType, rawValue);
+            auto scaled = m_builder.emitMul(floatType, floatVal, scale);
+            // max(scaled, -1.0)
+            auto cmpLt = m_builder.emitLess(scaled, negOne);
+            IRInst* selectArgs[] = {cmpLt, negOne, scaled};
+            decodedChannels.add(
+                m_builder.emitIntrinsicInst(floatType, kIROp_Select, 3, selectArgs));
+        }
+        else
+        {
+            for (int i = 0; i < formatChannels; i++)
+            {
+                auto idx = m_builder.getIntValue(m_builder.getIntType(), i);
+                auto rawChannel = m_builder.emitElementExtract(rawValue, idx);
+                auto floatVal = m_builder.emitCast(floatType, rawChannel);
+                auto scaled = m_builder.emitMul(floatType, floatVal, scale);
+                auto cmpLt = m_builder.emitLess(scaled, negOne);
+                IRInst* selectArgs[] = {cmpLt, negOne, scaled};
+                decodedChannels.add(
+                    m_builder.emitIntrinsicInst(floatType, kIROp_Select, 3, selectArgs));
+            }
+        }
+
+        return buildAccessResult(decodedChannels, formatChannels, accessType);
+    }
+
+    // SNORM encode: fptosi(clamp(val, -1, 1) * maxVal + copysign(0.5, val))
+    // We use round-to-nearest: fptosi(clamp(val,-1,1) * maxVal + 0.5) for positive,
+    // fptosi(clamp(val,-1,1) * maxVal - 0.5) for negative. Simplified: add sign-aware 0.5.
+    // Actually for correctness: fptosi(round(clamp(val,-1,1) * maxVal))
+    // which is equivalent to fptosi(clamp(val,-1,1) * maxVal + (val >= 0 ? 0.5 : -0.5))
+    IRInst* emitEncodeSnorm(
+        IRInst* accessValue,
+        IRType* storageType,
+        int formatChannels,
+        double maxVal)
+    {
+        auto floatType = m_builder.getBasicType(BaseType::Float);
+        auto scaleConst = m_builder.getFloatValue(floatType, maxVal);
+        auto negOne = m_builder.getFloatValue(floatType, -1.0);
+        auto posOne = m_builder.getFloatValue(floatType, 1.0);
+        auto halfConst = m_builder.getFloatValue(floatType, 0.5);
+        auto negHalfConst = m_builder.getFloatValue(floatType, -0.5);
+        auto zeroConst = m_builder.getFloatValue(floatType, 0.0);
+
+        IRType* storageScalarType;
+        if (auto vecType = as<IRVectorType>(storageType))
+            storageScalarType = vecType->getElementType();
+        else
+            storageScalarType = storageType;
+
+        List<IRInst*> encodedChannels;
+        List<IRInst*> inputChannels;
+        extractChannelsForEncode(
+            accessValue,
+            accessValue->getDataType(),
+            formatChannels,
+            inputChannels);
+
+        for (int i = 0; i < formatChannels; i++)
+        {
+            IRInst* ch =
+                (i < (int)inputChannels.getCount()) ? inputChannels[i] : zeroConst;
+            // clamp(ch, -1, 1)
+            auto cmpLtNeg1 = m_builder.emitLess(ch, negOne);
+            IRInst* clampLowArgs[] = {cmpLtNeg1, negOne, ch};
+            auto clampLow = m_builder.emitIntrinsicInst(
+                floatType,
+                kIROp_Select,
+                3,
+                clampLowArgs);
+            auto cmpGt1 = m_builder.emitLess(posOne, clampLow);
+            IRInst* clampHighArgs[] = {cmpGt1, posOne, clampLow};
+            auto clamped = m_builder.emitIntrinsicInst(
+                floatType,
+                kIROp_Select,
+                3,
+                clampHighArgs);
+            // scale
+            auto scaled = m_builder.emitMul(floatType, clamped, scaleConst);
+            // Round to nearest: add +0.5 if >= 0, -0.5 if < 0
+            auto isNeg = m_builder.emitLess(scaled, zeroConst);
+            IRInst* biasArgs[] = {isNeg, negHalfConst, halfConst};
+            auto bias =
+                m_builder.emitIntrinsicInst(floatType, kIROp_Select, 3, biasArgs);
+            auto biased = m_builder.emitAdd(floatType, scaled, bias);
+            // Convert to signed integer storage type (truncates toward zero)
+            auto encoded = m_builder.emitCast(storageScalarType, biased);
+            encodedChannels.add(encoded);
+        }
+
+        if (formatChannels == 1)
+            return encodedChannels[0];
+        return m_builder.emitMakeVector(
+            storageType,
+            (UInt)formatChannels,
+            encodedChannels.getBuffer());
+    }
+
+    // Signed integer decode: sign-extend from int8/int16 to int32
+    IRInst* emitDecodeSignedInt(IRInst* rawValue, IRType* accessType, int formatChannels)
+    {
+        auto intType = m_builder.getBasicType(BaseType::Int);
+        int accessChannels = getAccessChannelCount(accessType);
+
+        List<IRInst*> decodedChannels;
+        if (formatChannels == 1)
+        {
+            // Cast from int8/int16 to int32 (sign extension)
+            decodedChannels.add(m_builder.emitCast(intType, rawValue));
+        }
+        else
+        {
+            for (int i = 0; i < formatChannels; i++)
+            {
+                auto idx = m_builder.getIntValue(m_builder.getIntType(), i);
+                auto rawChannel = m_builder.emitElementExtract(rawValue, idx);
+                decodedChannels.add(m_builder.emitCast(intType, rawChannel));
+            }
+        }
+
+        if (accessChannels == 1)
+            return decodedChannels[0];
+
+        // Pad remaining channels with 0 (integer default: 0,0,0,1 for alpha)
+        List<IRInst*> finalChannels;
+        for (int i = 0; i < accessChannels; i++)
+        {
+            if (i < formatChannels)
+                finalChannels.add(decodedChannels[i]);
+            else
+                finalChannels.add(
+                    m_builder.getIntValue(intType, (i == 3) ? 1 : 0));
+        }
+
+        return m_builder.emitMakeVector(
+            accessType,
+            (UInt)accessChannels,
+            finalChannels.getBuffer());
+    }
+
+    // Unsigned integer decode: zero-extend from uint8/uint16 to uint32
+    IRInst* emitDecodeUnsignedInt(IRInst* rawValue, IRType* accessType, int formatChannels)
+    {
+        auto uintType = m_builder.getBasicType(BaseType::UInt);
+        int accessChannels = getAccessChannelCount(accessType);
+
+        List<IRInst*> decodedChannels;
+        if (formatChannels == 1)
+        {
+            decodedChannels.add(m_builder.emitCast(uintType, rawValue));
+        }
+        else
+        {
+            for (int i = 0; i < formatChannels; i++)
+            {
+                auto idx = m_builder.getIntValue(m_builder.getIntType(), i);
+                auto rawChannel = m_builder.emitElementExtract(rawValue, idx);
+                decodedChannels.add(m_builder.emitCast(uintType, rawChannel));
+            }
+        }
+
+        if (accessChannels == 1)
+            return decodedChannels[0];
+
+        List<IRInst*> finalChannels;
+        for (int i = 0; i < accessChannels; i++)
+        {
+            if (i < formatChannels)
+                finalChannels.add(decodedChannels[i]);
+            else
+                finalChannels.add(
+                    m_builder.getIntValue(uintType, (i == 3) ? 1 : 0));
+        }
+
+        return m_builder.emitMakeVector(
+            accessType,
+            (UInt)accessChannels,
+            finalChannels.getBuffer());
+    }
+
+    // Signed integer encode: truncate from int32 to int8/int16
+    IRInst* emitEncodeSignedInt(IRInst* accessValue, IRType* storageType, int formatChannels)
+    {
+        IRType* storageScalarType;
+        if (auto vecType = as<IRVectorType>(storageType))
+            storageScalarType = vecType->getElementType();
+        else
+            storageScalarType = storageType;
+
+        List<IRInst*> encodedChannels;
+        List<IRInst*> inputChannels;
+        extractChannelsForEncode(
+            accessValue,
+            accessValue->getDataType(),
+            formatChannels,
+            inputChannels);
+
+        auto zeroVal = m_builder.getIntValue(storageScalarType, 0);
+        for (int i = 0; i < formatChannels; i++)
+        {
+            IRInst* ch = (i < (int)inputChannels.getCount()) ? inputChannels[i] : zeroVal;
+            encodedChannels.add(m_builder.emitCast(storageScalarType, ch));
+        }
+
+        if (formatChannels == 1)
+            return encodedChannels[0];
+        return m_builder.emitMakeVector(
+            storageType,
+            (UInt)formatChannels,
+            encodedChannels.getBuffer());
+    }
+
+    // Unsigned integer encode: truncate from uint32 to uint8/uint16
+    IRInst* emitEncodeUnsignedInt(IRInst* accessValue, IRType* storageType, int formatChannels)
+    {
+        IRType* storageScalarType;
+        if (auto vecType = as<IRVectorType>(storageType))
+            storageScalarType = vecType->getElementType();
+        else
+            storageScalarType = storageType;
+
+        List<IRInst*> encodedChannels;
+        List<IRInst*> inputChannels;
+        extractChannelsForEncode(
+            accessValue,
+            accessValue->getDataType(),
+            formatChannels,
+            inputChannels);
+
+        auto zeroVal = m_builder.getIntValue(storageScalarType, 0);
+        for (int i = 0; i < formatChannels; i++)
+        {
+            IRInst* ch = (i < (int)inputChannels.getCount()) ? inputChannels[i] : zeroVal;
+            encodedChannels.add(m_builder.emitCast(storageScalarType, ch));
+        }
+
+        if (formatChannels == 1)
+            return encodedChannels[0];
+        return m_builder.emitMakeVector(
+            storageType,
+            (UInt)formatChannels,
+            encodedChannels.getBuffer());
+    }
+
+    // BGRA8 decode: UNORM8 decode with B↔R channel swap (indices 0↔2).
+    IRInst* emitDecodeBgra8(IRInst* rawValue, IRType* accessType)
+    {
+        auto floatType = m_builder.getBasicType(BaseType::Float);
+        auto scale = m_builder.getFloatValue(floatType, 1.0 / 255.0);
+        int formatChannels = 4;
+
+        // Decode all 4 channels as UNORM8
+        List<IRInst*> decodedChannels;
+        for (int i = 0; i < formatChannels; i++)
+        {
+            auto idx = m_builder.getIntValue(m_builder.getIntType(), i);
+            auto rawChannel = m_builder.emitElementExtract(rawValue, idx);
+            auto floatVal = m_builder.emitCast(floatType, rawChannel);
+            decodedChannels.add(m_builder.emitMul(floatType, floatVal, scale));
+        }
+
+        // Swizzle: BGRA → RGBA (swap indices 0 and 2)
+        auto tmp = decodedChannels[0];
+        decodedChannels[0] = decodedChannels[2];
+        decodedChannels[2] = tmp;
+
+        return buildAccessResult(decodedChannels, formatChannels, accessType);
+    }
+
+    // BGRA8 encode: UNORM8 encode with B↔R channel swap (indices 0↔2).
+    IRInst* emitEncodeBgra8(IRInst* accessValue, IRType* storageType)
+    {
+        auto floatType = m_builder.getBasicType(BaseType::Float);
+        auto scaleConst = m_builder.getFloatValue(floatType, 255.0);
+        auto halfConst = m_builder.getFloatValue(floatType, 0.5);
+        auto zeroConst = m_builder.getFloatValue(floatType, 0.0);
+        auto oneConst = m_builder.getFloatValue(floatType, 1.0);
+        int formatChannels = 4;
+
+        IRType* storageScalarType;
+        if (auto vecType = as<IRVectorType>(storageType))
+            storageScalarType = vecType->getElementType();
+        else
+            storageScalarType = storageType;
+
+        // Extract input channels (RGBA order)
+        List<IRInst*> inputChannels;
+        extractChannelsForEncode(
+            accessValue,
+            accessValue->getDataType(),
+            formatChannels,
+            inputChannels);
+
+        // Pad with defaults if needed
+        while ((int)inputChannels.getCount() < formatChannels)
+        {
+            int idx = (int)inputChannels.getCount();
+            inputChannels.add(m_builder.getFloatValue(floatType, (idx == 3) ? 1.0 : 0.0));
+        }
+
+        // Swap R↔B (index 0 and 2) for BGRA layout
+        auto tmp = inputChannels[0];
+        inputChannels[0] = inputChannels[2];
+        inputChannels[2] = tmp;
+
+        // Encode each channel as UNORM8
+        List<IRInst*> encodedChannels;
+        for (int i = 0; i < formatChannels; i++)
+        {
+            auto ch = inputChannels[i];
+            // saturate
+            auto cmpLt0 = m_builder.emitLess(ch, zeroConst);
+            IRInst* clampLowArgs[] = {cmpLt0, zeroConst, ch};
+            auto clampLow = m_builder.emitIntrinsicInst(
+                floatType,
+                kIROp_Select,
+                3,
+                clampLowArgs);
+            auto cmpGt1 = m_builder.emitLess(oneConst, clampLow);
+            IRInst* clampHighArgs[] = {cmpGt1, oneConst, clampLow};
+            auto saturated = m_builder.emitIntrinsicInst(
+                floatType,
+                kIROp_Select,
+                3,
+                clampHighArgs);
+            auto scaled = m_builder.emitMul(floatType, saturated, scaleConst);
+            auto biased = m_builder.emitAdd(floatType, scaled, halfConst);
+            encodedChannels.add(m_builder.emitCast(storageScalarType, biased));
+        }
+
+        return m_builder.emitMakeVector(
+            storageType,
+            (UInt)formatChannels,
+            encodedChannels.getBuffer());
+    }
     void rewriteSurfaceReadCall(IRCall* originalCall, ImageFormat format, IRType* storageType)
     {
         // The original call returns the access type (e.g. float4).

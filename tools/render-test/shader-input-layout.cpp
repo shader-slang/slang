@@ -1327,8 +1327,46 @@ void generateTextureData(TextureData& output, const InputTextureDesc& desc)
     switch (desc.format)
     {
     case Format::RGBA8Unorm:
+    case Format::RGBA8UnormSrgb:
+    case Format::R8Unorm:
+    case Format::RG8Unorm:
+    case Format::BGRA8Unorm:
+    case Format::BGRA8UnormSrgb:
         {
             generateTextureDataRGB8(output, desc);
+            break;
+        }
+    case Format::R8Snorm:
+    case Format::RG8Snorm:
+    case Format::RGBA8Snorm:
+        {
+            generateTextureDataWithTargetTStorage<int8_t>(
+                output,
+                desc,
+                formatInfo,
+                loadDataIntoInt<int8_t>);
+            break;
+        }
+    case Format::R16Unorm:
+    case Format::RG16Unorm:
+    case Format::RGBA16Unorm:
+        {
+            generateTextureDataWithTargetTStorage<uint16_t>(
+                output,
+                desc,
+                formatInfo,
+                loadDataIntoUint<uint16_t>);
+            break;
+        }
+    case Format::R16Snorm:
+    case Format::RG16Snorm:
+    case Format::RGBA16Snorm:
+        {
+            generateTextureDataWithTargetTStorage<int16_t>(
+                output,
+                desc,
+                formatInfo,
+                loadDataIntoInt<int16_t>);
             break;
         }
     case Format::R16Float:
