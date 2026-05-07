@@ -1030,10 +1030,10 @@ class UnscopedEnumAttribute : public Attribute
     FIDDLE(...)
 };
 
-// Used to detect conflicting explicit unscoped/scoped enum declarations. This
-// attribute has no further semantics.
+// Marker for enum class declarations, used to detect conflicting explicit
+// unscoped/scoped enum declarations. This attribute has no further semantics.
 FIDDLE()
-class EnumClassAttribute : public Attribute
+class EnumClassModifier : public Modifier
 {
     FIDDLE(...)
 };

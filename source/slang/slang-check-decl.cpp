@@ -11510,12 +11510,12 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
 
     // Check for conflicting scoped/unscoped attributes
     auto unscopedEnumAttr = decl->findModifier<UnscopedEnumAttribute>();
-    auto enumClassAttr = decl->findModifier<EnumClassAttribute>();
-    if (unscopedEnumAttr && enumClassAttr)
+    auto enumClassModifier = decl->findModifier<EnumClassModifier>();
+    if (unscopedEnumAttr && enumClassModifier)
     {
         getSink()->diagnose(Diagnostics::ConflictingEnumScopeDecl{
             .decl = decl,
-            .classLocation = enumClassAttr->loc,
+            .classLocation = enumClassModifier->loc,
             .modifier = unscopedEnumAttr});
     }
 

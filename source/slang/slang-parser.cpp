@@ -6001,9 +6001,9 @@ static Decl* parseEnumDecl(Parser* parser)
             // conflicting unscoped/scoped enum detection.
             if (isEnumClass)
             {
-                auto enumClassAttr = parser->astBuilder->create<EnumClassAttribute>();
-                enumClassAttr->loc = enumClassLoc;
-                addModifier(decl, enumClassAttr);
+                auto enumClassModifier = parser->astBuilder->create<EnumClassModifier>();
+                enumClassModifier->loc = enumClassLoc;
+                addModifier(decl, enumClassModifier);
             }
 
             parseOptionalInheritanceClause(parser, decl);
