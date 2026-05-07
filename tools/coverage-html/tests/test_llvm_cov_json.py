@@ -212,6 +212,98 @@ class GzipInputTests(unittest.TestCase):
             os.remove(tmp)
 
 
+class IsJsonInputTests(unittest.TestCase):
+    """The shared extension policy used by both CLI tools."""
+
+    def test_json_extensions(self):
+        from llvm_cov_json import is_json_input
+        self.assertTrue(is_json_input("coverage.json"))
+        self.assertTrue(is_json_input("coverage.json.gz"))
+        self.assertTrue(is_json_input("/abs/path/COVERAGE.JSON"))
+        self.assertTrue(is_json_input("snake_case.json.GZ"))
+
+    def test_non_json_extensions(self):
+        from llvm_cov_json import is_json_input
+        self.assertFalse(is_json_input("coverage.lcov"))
+        self.assertFalse(is_json_input("coverage.info"))
+        self.assertFalse(is_json_input("coverage.lcov.gz"))
+        self.assertFalse(is_json_input("coverage.info.gz"))
+        self.assertFalse(is_json_input("plain.txt"))
+        # No extension at all → not JSON. Renderer still treats it
+        # as LCOV (the historical fallback).
+        self.assertFalse(is_json_input("coverage"))
+
+
+class DuplicateFilenameTests(unittest.TestCase):
+    """`llvm-cov export` emits one `data[]` block per binary; if a
+    shared header appears in multiple blocks the parser silently
+    keeps the *last* occurrence. Slang's pipeline never invokes
+    `llvm-cov export` with multiple binaries so duplicates don't
+    arise in practice — this test pins the documented
+    last-wins precondition so a future refactor can't change it
+    without an explicit signal."""
+
+    def test_last_block_wins_for_duplicate_filenames(self):
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".json", delete=False
+        ) as fh:
+            json.dump(
+                {
+                    "type": "llvm.coverage.json.export",
+                    "data": [
+                        {
+                            "files": [
+                                {
+                                    "filename": "shared.h",
+                                    "branches": [],
+                                    "expansions": [],
+                                    "mcdc_records": [],
+                                    "segments": [],
+                                    "summary": {
+                                        "lines": {"count": 10, "covered": 3},
+                                        "functions": {"count": 1, "covered": 0},
+                                        "branches": {"count": 0, "covered": 0},
+                                        "regions": {"count": 5, "covered": 1},
+                                    },
+                                }
+                            ],
+                            "functions": [],
+                        },
+                        {
+                            "files": [
+                                {
+                                    "filename": "shared.h",
+                                    "branches": [],
+                                    "expansions": [],
+                                    "mcdc_records": [],
+                                    "segments": [],
+                                    "summary": {
+                                        "lines": {"count": 10, "covered": 9},
+                                        "functions": {"count": 1, "covered": 1},
+                                        "branches": {"count": 0, "covered": 0},
+                                        "regions": {"count": 5, "covered": 5},
+                                    },
+                                }
+                            ],
+                            "functions": [],
+                        },
+                    ],
+                },
+                fh,
+            )
+            tmp = fh.name
+        try:
+            recs = parse_llvm_cov_json(tmp)
+            self.assertEqual(len(recs), 1)
+            rec = recs[0]
+            self.assertEqual(rec.path, "shared.h")
+            # Last block wins: covered=9 hits, not 3 from the first.
+            self.assertEqual(rec.hit_lines, 9)
+            self.assertEqual(rec.hit_regions, 5)
+        finally:
+            os.remove(tmp)
+
+
 class EmptyDocumentTests(unittest.TestCase):
     def test_no_files(self):
         with tempfile.NamedTemporaryFile(

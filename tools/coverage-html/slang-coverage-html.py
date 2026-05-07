@@ -44,7 +44,7 @@ from lcov_io import (  # noqa: E402
     parse_lcov,
     parse_llvm_cov_report,
 )
-from llvm_cov_json import parse_llvm_cov_json  # noqa: E402
+from llvm_cov_json import is_json_input, parse_llvm_cov_json  # noqa: E402
 
 MARKER_NAME = "slang-coverage-html.marker"
 GENERATOR_NAME = "slang-coverage-html"
@@ -1259,10 +1259,7 @@ def _input_format(path: str) -> str:
     LCOV-shaped input regardless of extension and we want that
     behavior preserved.
     """
-    lower = path.lower()
-    if lower.endswith(".json") or lower.endswith(".json.gz"):
-        return "json"
-    return "lcov"
+    return "json" if is_json_input(path) else "lcov"
 
 
 def _load_records(path: str) -> List[FileRecord]:

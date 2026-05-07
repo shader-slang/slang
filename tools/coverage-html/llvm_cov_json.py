@@ -80,8 +80,30 @@ _RG_FILE_ID = 5
 _RG_KIND = 7
 
 
+def is_json_input(path: str) -> bool:
+    """True iff `path` looks like an `llvm-cov export -format=json`
+    artifact based on its extension.
+
+    Single source of truth for the JSON-vs-LCOV input policy. Both
+    `slang-coverage-html.py` (dispatch to the right parser) and
+    `slang-coverage-merge.py` (refuse JSON input) consult this
+    helper so the two CLIs can't drift on what counts as JSON.
+    """
+    lower = path.lower()
+    return lower.endswith(".json") or lower.endswith(".json.gz")
+
+
 def parse_llvm_cov_json(path: str) -> List[FileRecord]:
     """Parse an `llvm-cov export -format=json` document into FileRecords.
+
+    Single-binary input expected. `llvm-cov export` emits one
+    `data[]` block per binary passed on its command line; if the
+    same source file appears in more than one block (typical when
+    a shared header is included by multiple binaries), the later
+    block overwrites the earlier one. Slang's pipeline only ever
+    invokes `llvm-cov export $LIBSLANG` so duplicates don't occur
+    in practice; cross-binary merging belongs upstream of this
+    parser if it ever becomes a use case.
 
     Auto-detects gzip by extension. The resulting records have:
 
@@ -203,16 +225,24 @@ def _line_hits_from_segments(
         # exports emit only five fields; treat absent as False.
         if len(seg) < 5:
             continue
-        line = int(seg[_SEG_LINE])
-        count = int(seg[_SEG_COUNT])
-        has_count = bool(seg[_SEG_HAS_COUNT])
-        is_gap = bool(seg[_SEG_IS_GAP]) if len(seg) > _SEG_IS_GAP else False
+        try:
+            line = int(seg[_SEG_LINE])
+            count = int(seg[_SEG_COUNT])
+            has_count = bool(seg[_SEG_HAS_COUNT])
+            is_gap = (
+                bool(seg[_SEG_IS_GAP]) if len(seg) > _SEG_IS_GAP else False
+            )
+        except (TypeError, ValueError):
+            continue
         if not has_count or is_gap:
             continue
         # Half-open end: next segment's line excluded so it doesn't
         # inherit this segment's count via the max rule below.
         if i + 1 < n and len(segments[i + 1]) >= 2:
-            end_line = int(segments[i + 1][_SEG_LINE])
+            try:
+                end_line = int(segments[i + 1][_SEG_LINE])
+            except (TypeError, ValueError):
+                end_line = line + 1
             if end_line <= line:
                 end_line = line + 1
         else:

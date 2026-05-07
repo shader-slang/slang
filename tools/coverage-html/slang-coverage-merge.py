@@ -55,6 +55,7 @@ from lcov_io import (  # noqa: E402
     write_lcov,
     write_llvm_cov_report,
 )
+from llvm_cov_json import is_json_input  # noqa: E402
 
 GENERATOR_NAME = "slang-coverage-merge"
 
@@ -145,8 +146,7 @@ def load(path: str) -> List[FileRecord]:
     and merge at the LCOV layer separately, or feed an LCOV converted
     from the JSON in upstream.
     """
-    lower = path.lower()
-    if lower.endswith(".json") or lower.endswith(".json.gz"):
+    if is_json_input(path):
         # Match the renderer's exit-2 contract for "wrong kind of
         # input file" errors so CI / scripting callers can grep on
         # a single code across both tools.
@@ -157,7 +157,7 @@ def load(path: str) -> List[FileRecord]:
             file=sys.stderr,
         )
         raise SystemExit(2)
-    if lower.endswith(".gz"):
+    if path.lower().endswith(".gz"):
         path = _gunzip_to_temp(path)
     return parse_lcov(path, warn_prefix=GENERATOR_NAME)
 

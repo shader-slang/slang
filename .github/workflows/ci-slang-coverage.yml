@@ -671,6 +671,23 @@ jobs:
           # natively and matches `llvm-cov report` by construction.
           # Windows uses OpenCppCoverage and has no llvm-cov JSON
           # equivalent — Cobertura→LCOV is the only artifact there.
+
+          # Smoke check: a missing $LIBSLANG, a wrong $LLVM_COV
+          # binary resolution, or a future refactor that drops the
+          # `>"$JSON_FILE"` redirection in run-coverage.sh would
+          # otherwise produce a zero-byte / malformed artifact that
+          # only fails downstream when the renderer rejects it.
+          # Failing here surfaces it on the producer job instead.
+          python3 -c "
+          import json, sys
+          with open('coverage.json') as f:
+              doc = json.load(f)
+          if doc.get('type') != 'llvm.coverage.json.export':
+              sys.exit('coverage.json missing or wrong llvm-cov type field')
+          if not doc.get('data'):
+              sys.exit('coverage.json has no data blocks')
+          "
+
           gzip -9 coverage.json
           echo "Compressed JSON file:"
           ls -lh coverage.json.gz
