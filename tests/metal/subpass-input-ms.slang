@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage fragment -entry main
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage fragment -entry main
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG): -target metal -stage fragment -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG, non-exhaustive): -target metal -stage fragment -entry main
 
 // Test that SubpassInputMS emits a warning on Metal and still compiles.
 

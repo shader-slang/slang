@@ -295,7 +295,7 @@ This generates a Metal fragment function with `[[color(N)]]` parameters:
 
 - **Fragment stage only.** `SubpassInput` can only be used in fragment entry points.
 - **Direct entry-point parameters only.** `SubpassInput` cannot be placed inside a `ParameterBlock`. It must be a global-scope declaration directly referenced by the entry point.
-- **No cross-function references.** `SubpassInput` cannot be accessed from `[noinline]` helper functions. The compiler inlines `SubpassLoad` calls into the entry point during legalization, so only `[ForceInline]` (the default) helpers work.
+- **No cross-function references.** `SubpassInput` must be referenced only from the fragment entry point or from helper functions that are inlined into it. Mark any helper that calls `SubpassLoad` with `[ForceInline]` to guarantee inlining; `[noinline]` helpers will fail with error E56108.
 - **`SubpassInputMS` per-sample limitation.** Metal does not support per-sample reads. When using `SubpassInputMS`, the sample index passed to `SubpassLoad` is ignored and the resolved value is returned. The compiler emits warning E56107 at each call site where a sample index is provided.
 
 ## Address Space Assignment

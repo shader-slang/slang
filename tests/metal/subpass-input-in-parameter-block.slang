@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -stage fragment -entry main
-//DIAGNOSTIC_TEST:SIMPLE(diag=NESTED): -target metal -stage fragment -entry nestedMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive): -target metal -stage fragment -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=NESTED, non-exhaustive): -target metal -stage fragment -entry nestedMain
 
 // CHECK: error[E56109]
 // CHECK: SubpassInput

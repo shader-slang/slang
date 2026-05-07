@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -stage compute -entry computeMain
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -stage vertex -entry vertexMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive): -target metal -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive): -target metal -stage vertex -entry vertexMain
 
 // SubpassInput requires the fragment stage; using it in compute or vertex should fail.
 

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -stage fragment -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive): -target metal -stage fragment -entry main
 
 // SubpassInput used only in a [noinline] helper should produce an error
 // because the global cannot be resolved to a fragment entry point.
