@@ -77,6 +77,7 @@ protected:
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
 
+    virtual void _emitPrefixTypeAttr(IRAttr* attr) SLANG_OVERRIDE;
     virtual void emitGlobalInstImpl(IRInst* inst) override;
     void emitBufferPointerTypeDefinition(IRInst* ptrType);
 

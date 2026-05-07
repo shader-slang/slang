@@ -234,6 +234,18 @@ void GLSLSourceEmitter::emitMemoryQualifiers(IRInst* varDecl)
     _emitMemoryQualifierDecorations(varDecl);
 }
 
+void GLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
+{
+    switch (attr->getOp())
+    {
+    case kIROp_CoherentAttr:
+        m_writer->emit("coherent ");
+        break;
+    default:
+        Super::_emitPrefixTypeAttr(attr);
+        break;
+    }
+}
 
 void GLSLSourceEmitter::emitStructFieldAttributes(
     IRStructType* structType,
@@ -2404,20 +2416,6 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     break;
                 case BaseType::UInt:
                     m_writer->emit("uintBitsToFloat");
-                    break;
-                default:
-                    emitType(inst->getDataType());
-                    break;
-                }
-                break;
-            case BaseType::Double:
-                switch (fromType)
-                {
-                case BaseType::UInt64:
-                    m_writer->emit("uint64BitsToDouble");
-                    break;
-                case BaseType::Int64:
-                    m_writer->emit("int64BitsToDouble");
                     break;
                 default:
                     emitType(inst->getDataType());

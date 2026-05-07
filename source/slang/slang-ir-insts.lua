@@ -2672,6 +2672,7 @@ local insts = {
 				},
 			},
 			{ no_diff = { struct_name = "NoDiffAttr" } },
+			{ coherent = { struct_name = "CoherentAttr" } },
 			{
 				nonuniform = {
 					struct_name = "NonUniformAttr",

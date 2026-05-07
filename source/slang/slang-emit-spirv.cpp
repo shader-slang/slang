@@ -1654,6 +1654,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    /// Check if a type has CoherentAttr in its IRAttributedType wrapper.
+    bool hasCoherentAttrInType(IRType* type)
+    {
+        if (!type)
+            return false;
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+        {
+            type = ptrType->getValueType();
+            if (!type)
+                return false;
+        }
+        if (auto attrType = as<IRAttributedType>(type))
+        {
+            for (auto attr : attrType->getAllAttrs())
+            {
+                if (attr->getOp() == kIROp_CoherentAttr)
+                    return true;
+            }
+        }
+        return false;
+    }
+
     bool NeedToUseCoherentLoadOrStore(IRInst* pointer)
     {
         if (m_memoryModel != SpvMemoryModelVulkan)
@@ -1712,6 +1734,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
             }
         }
+        // Also check if the base object's type has CoherentAttr
+        // (e.g. from DescriptorHandle<globallycoherent T>).
+        if (hasCoherentAttrInType(baseObj->getDataType()))
+            return true;
         return false;
     }
 
@@ -1735,6 +1761,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     }
                 }
             }
+            // Also check if the texture pointer's value type has CoherentAttr.
+            if (hasCoherentAttrInType(texPtr->getDataType()))
+                return true;
         }
         return false;
     }
@@ -4800,7 +4829,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 SpvOp conversionOp = SpvOpConvertUToSampledImageNV;
                 IRType* resultType = inst->getDataType();
 
-                switch (resultType->getOp())
+                // Unwrap IRAttributedType (e.g. from coherent/globallycoherent modifiers)
+                // to get the underlying resource type for the switch.
+                auto unwrappedType = unwrapAttributedType(resultType);
+
+                switch (unwrappedType->getOp())
                 {
                 case kIROp_TextureType:
                     conversionOp = SpvOpConvertUToSampledImageNV;
@@ -5534,6 +5567,26 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         for (auto decoration : irInst->getDecorations())
         {
             emitDecoration(dstID, decoration);
+        }
+        // For global variables/params, also check if the value type has CoherentAttr
+        // (e.g. from DescriptorHandle<globallycoherent RWTexture2D<float4>>).
+        // In non-Vulkan memory models, emit OpDecorate Coherent.
+        if (as<IRGlobalParam>(irInst) || as<IRGlobalVar>(irInst))
+            maybeEmitCoherentDecorationFromType(irInst, dstID);
+    }
+
+    void maybeEmitCoherentDecorationFromType(IRInst* irInst, SpvWord dstID)
+    {
+        if (m_memoryModel == SpvMemoryModelVulkan)
+            return;
+
+        if (hasCoherentAttrInType(irInst->getDataType()))
+        {
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                dstID,
+                SpvDecorationCoherent);
         }
     }
 

@@ -1164,6 +1164,14 @@ class NoDiffModifierVal : public TypeModifierVal
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+FIDDLE()
+class CoherentModifierVal : public TypeModifierVal
+{
+    FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 /// Represents the result of differentiating a function.
 FIDDLE()
 class DifferentiateVal : public Val

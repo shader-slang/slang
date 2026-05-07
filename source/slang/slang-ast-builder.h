@@ -664,6 +664,7 @@ public:
     Val* getUNormModifierVal();
     Val* getSNormModifierVal();
     Val* getNoDiffModifierVal();
+    Val* getCoherentModifierVal();
 
     /// Create a UIntSetVal from a UIntSet
     UIntSetVal* getUIntSetVal(const UIntSet& uintSet);
