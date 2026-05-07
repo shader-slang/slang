@@ -86,16 +86,22 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
 #endif
     }
 
-    // Use only the basename to avoid leaking build-machine paths in release builds.
-    const char* basename = file;
-    for (const char* p = file; *p; ++p)
+    // Strip directory prefix for readability. Note: the full path is still baked into
+    // the binary's read-only data by the compiler; this only affects the printed output.
+    const char* basename = file ? file : "unknown";
+    if (file)
     {
-        if (*p == '/' || *p == '\\')
-            basename = p + 1;
+        for (const char* p = file; *p; ++p)
+        {
+            if (*p == '/' || *p == '\\')
+                basename = p + 1;
+        }
     }
-    StringBuilder locMsg;
-    locMsg << basename << "(" << line << "): " << message;
-    handleSignal(SignalType::AssertFailure, locMsg.getBuffer());
+    // Use a stack buffer to avoid heap allocation on the assertion path, which could
+    // mask the original failure if the heap is corrupted.
+    char locMsg[1024];
+    snprintf(locMsg, sizeof(locMsg), "%s(%d): %s", basename, line, message);
+    handleSignal(SignalType::AssertFailure, locMsg);
 }
 
 // One point of having as a single function is a choke point both for handling (allowing different
