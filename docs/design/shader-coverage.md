@@ -65,6 +65,12 @@ filtering those entries out of line-oriented output.
 The host-side interface design built on top of these channels lives in
 [`shader-coverage-host-interface.md`](./shader-coverage-host-interface.md).
 
+The current reporting mode is line-oriented hit-count coverage, but
+the binding/resource model is intentionally more general than that.
+Future revisions may add branch coverage, function coverage, binary
+covered/uncovered modes, or warp-aggregated modes without changing the
+hidden-resource binding contract.
+
 ### Buffer synthesis at IR-pass time
 
 Coverage is a runtime-instrumentation concern. It has no language-

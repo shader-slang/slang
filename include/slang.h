@@ -4520,7 +4520,8 @@ struct IMetadata : public ISlangCastable
 
 /** Coverage tracing metadata produced when `-trace-coverage` is active.
 
-Each counter slot in the synthesized coverage buffer maps to a source
+The current implementation reports line-oriented hit-count coverage:
+each counter slot in the synthesized coverage buffer maps to a source
 `(file, line)` pair. The interface lets hosts read that mapping at
 compile time so they can attribute counter values back to source lines
 at runtime without a separate sidecar file. The metadata is retrieved
@@ -4542,6 +4543,14 @@ Lifetime and ownership:
     lifetime of that metadata object
   - callers do not own returned strings and must not free them
 
+Future coverage modes:
+  - this interface is intended to grow to cover richer reporting modes
+    such as branch coverage, function coverage, binary
+    covered/uncovered reporting, or warp-aggregated coverage
+  - callers should not assume that future revisions will always model
+    one entry as one source line or one counter value as an exact hit
+    count
+
 Extensible without ABI breakage in two ways:
   - tail-extending the `CoverageEntryInfo` / `CoverageBufferInfo`
     structs (gated by their leading `structSize` field), or
@@ -4551,22 +4560,27 @@ The vtable of `ICoverageTracingMetadata` itself is fixed; new
 methods would break ABI for callers compiled against the existing
 header.
 */
-/// Per-counter-slot attribution returned by
+/// Per-coverage-entry attribution returned by
 /// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
 /// `structSize` for ABI-versioned struct growth: future revisions
-/// will add fields (column, function name, branch arm) at the end
-/// without changing the COM interface.
+/// may add fields such as column/span information, function identity,
+/// branch-arm identity, or coverage-mode-specific metadata at the end
+/// without changing the COM interface. The current implementation uses
+/// one entry per line-oriented counter slot.
 struct CoverageEntryInfo
 {
     size_t structSize = sizeof(CoverageEntryInfo);
 
-    /// Source file for this counter slot, or `nullptr` if the slot
+    /// Source file for this coverage entry, or `nullptr` if the entry
     /// could not be attributed to a real source file. The returned
     /// pointer is valid for the lifetime of the metadata object.
     const char* file = nullptr;
 
-    /// 1-based source line for this counter slot, or 0 if the slot
-    /// could not be attributed to a real source line.
+    /// 1-based source line for this coverage entry, or 0 if the entry
+    /// could not be attributed to a real source line. The current
+    /// implementation reports line-oriented entries; future revisions
+    /// may attach additional fields describing branch/function/region
+    /// semantics.
     uint32_t line = 0;
 };
 
@@ -4602,7 +4616,10 @@ struct ICoverageTracingMetadata : public ISlangCastable
         0x4b9c,
         {0x8e, 0x21, 0x3f, 0x7b, 0x82, 0xa3, 0xd9, 0x51})
 
-    /// Number of counter slots in the synthesized coverage buffer.
+    /// Number of coverage entries in the synthesized coverage buffer.
+    /// In the current implementation this is the number of line-
+    /// oriented counter slots. Future revisions may extend the entry
+    /// model without changing the interface shape.
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() = 0;
 
     /// Populate `outInfo` with attribution info for counter slot
