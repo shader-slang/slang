@@ -812,7 +812,7 @@ class ModuleDecl : public NamespaceDeclBase
     /// whether a module is written in the legacy language. We detect this by checking whether the
     /// module has any visibility modifiers, or if the module uses new language constructs, e.g.
     /// `module`, `__include`, `__implementing` etc.
-    FIDDLE() SlangLanguageVersion languageVersion = SLANG_LANGAUGE_VERSION_DEFAULT;
+    FIDDLE() SlangLanguageVersion languageVersion = SLANG_LANGUAGE_VERSION_DEFAULT;
 
     FIDDLE() DeclVisibility defaultVisibility = DeclVisibility::Internal;
 
