@@ -854,6 +854,38 @@ static bool _matchVectorBoolType(Type* type)
     return elemType->getBaseType() == BaseType::Bool;
 }
 
+// Returns true if `type` is `OutputIndices<T, N>` (`IndicesType`) whose
+// element type `T` is anything other than the three valid mesh-output
+// index shapes: `uint` for point indices, `uint2` for line indices, or
+// `uint3` for triangle indices. Any other element type (e.g. `float`,
+// `int`, `uint4`, a struct) makes the GLSL legalization pass
+// dereference a null `IRIntLit` and segfault (issue #9435).
+static bool _matchInvalidIndicesElementType(Type* type)
+{
+    auto indicesType = as<IndicesType>(type);
+    if (!indicesType)
+        return false;
+    auto elementType = indicesType->getElementType();
+    if (auto basicType = as<BasicExpressionType>(elementType))
+    {
+        // Point indices: scalar `uint`.
+        return basicType->getBaseType() != BaseType::UInt;
+    }
+    if (auto vectorType = as<VectorExpressionType>(elementType))
+    {
+        // Line/triangle indices: `uint2`/`uint3`.
+        auto basicElem = as<BasicExpressionType>(vectorType->getElementType());
+        if (!basicElem || basicElem->getBaseType() != BaseType::UInt)
+            return true;
+        auto count = as<ConstantIntVal>(vectorType->getElementCount());
+        if (!count)
+            return true;
+        auto n = count->getValue();
+        return n != 2 && n != 3;
+    }
+    return true;
+}
+
 static bool _matchMatrixWithOutOfRangeDimensions(Type* type)
 {
     // Row and column counts outside the 1..4 range break downstream codegen
@@ -940,6 +972,14 @@ static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
      "matrix row and column counts must be between 1 and 4 inclusive",
      nullptr,
      _isInterfaceBlockVaryingStage},
+
+    // `OutputIndices<T, N>` requires `T` to be `uint`/`uintN`. Other
+    // element types (e.g. `float`) cause the GLSL legalization pass to
+    // dereference a null vector-shape lookup and segfault (issue #9435).
+    {_matchInvalidIndicesElementType,
+     "OutputIndices element type must be uint, uint2, or uint3",
+     nullptr,
+     nullptr},
 };
 
 struct VaryingTypeValidationContext
