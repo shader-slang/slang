@@ -1,6 +1,7 @@
 // unit-test-replay-modes.cpp
 // Unit tests for ReplayContext mode and state management
 
+#include "../../source/slang-record-replay/proxy/proxy-mutable-file-system.h"
 #include "unit-test-replay-common.h"
 
 // =============================================================================
@@ -405,18 +406,30 @@ static void checkReplayContextIsPristine()
     SLANG_CHECK(ctx().getCurrentThisHandle() == kNullHandle);
 }
 
-// Dirty the singleton with a non-Idle mode plus data on both the main and
-// reference streams. switchToSync() copies the main stream into the reference
-// stream, so after the second record() the singleton is in Mode::Sync with
-// both streams holding bytes.
-static void dirtyReplayContext(int32_t value)
+// Build a dirty singleton state covering everything reset() clears that has an
+// observable post-condition: a non-Idle mode, non-empty main and reference
+// streams (via switchToSync), and entries in the handle dictionaries with
+// m_nextHandle advanced past kFirstValidHandle (via registerProxy).
+//
+// The proxy registration must happen after switchToSync, since switchToSync
+// itself wipes the dictionaries and resets m_nextHandle. The caller must keep
+// the returned proxy alive across REPLAY_TEST so the dictionary entries are
+// still present when ScopedReplayContext::reset() runs.
+static Slang::ComPtr<MutableFileSystemProxy> dirtyReplayContext(int32_t value)
 {
     ctx().setMode(Mode::Record);
     ctx().record(RecordFlag::None, value);
     ctx().switchToSync();
     ctx().record(RecordFlag::None, value);
+
+    auto* osFileSystem = Slang::OSFileSystem::getMutableSingleton();
+    Slang::ComPtr<MutableFileSystemProxy> fsProxy(new MutableFileSystemProxy(osFileSystem));
+    ctx().registerProxy(fsProxy.get(), osFileSystem);
+
     SLANG_CHECK(ctx().isActive());
     SLANG_CHECK(ctx().getStream().getSize() > 0);
+    SLANG_CHECK(ctx().getNextHandle() > kFirstValidHandle);
+    return fsProxy;
 }
 
 SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
@@ -427,12 +440,12 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
     // setup throw before REPLAY_TEST executes.
     ctx().reset();
 
-    // Simulate the leaked-state case the old skip-on-active guard protected
-    // against.
-    dirtyReplayContext(7);
+    // Hold the proxy alive across REPLAY_TEST's ctor so the handle dictionaries
+    // still contain entries when ScopedReplayContext::reset() runs.
+    auto fsProxy = dirtyReplayContext(7);
 
-    // Now run the standard per-test setup. ScopedReplayContext's ctor must
-    // force the singleton back to its post-reset() state.
+    // ScopedReplayContext's ctor must force the singleton back to its
+    // post-reset() state.
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
@@ -449,22 +462,55 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
     SLANG_CHECK(readBack == 123);
 }
 
+// Mode::Playback is the most failure-prone prior state: a prior test that
+// aborted mid-read leaves the stream in reading mode at a non-zero position,
+// and a subsequent test that calls setMode(Record) + record() before
+// REPLAY_TEST throws on the still-reading stream.
+SLANG_UNIT_TEST(replayContextRecoversFromDirtyPlaybackState)
+{
+    ctx().reset();
+
+    // Record two values, switch to playback, consume the first one. The stream
+    // is now in reading mode at a non-zero position, mimicking the state an
+    // aborted SLANG_CHECK during a read would leave behind.
+    ctx().setMode(Mode::Record);
+    int32_t value = 42;
+    ctx().record(RecordFlag::None, value);
+    ctx().record(RecordFlag::None, value);
+    ctx().switchToPlayback();
+    int32_t consumed = 0;
+    ctx().record(RecordFlag::None, consumed);
+    SLANG_CHECK(consumed == 42);
+    SLANG_CHECK(ctx().isPlayback());
+    SLANG_CHECK(ctx().getStream().getPosition() > 0);
+
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    checkReplayContextIsPristine();
+}
+
 // Dtor side of the REPLAY_TEST contract: when a test leaves the singleton
-// dirty (mid-recording, non-empty streams) and exits the ScopedReplayContext
-// scope normally, the dtor must reset it so the next test sees a clean
-// singleton. Covered implicitly by every other replay test today, but pinning
-// it down explicitly so a regression in ScopedReplayContext::~ScopedReplayContext
-// fails here directly instead of as a downstream cascade.
+// dirty (mid-recording, non-empty streams, registered proxies) and exits the
+// ScopedReplayContext scope normally, the dtor must reset it so the next test
+// sees a clean singleton. Covered implicitly by every other replay test today,
+// but pinning it down explicitly so a regression in
+// ScopedReplayContext::~ScopedReplayContext fails here directly instead of as
+// a downstream cascade.
 SLANG_UNIT_TEST(replayContextDtorLeavesSingletonClean)
 {
     ctx().reset();
+
+    // Outer-scope ComPtr so the proxy outlives the inner ScopedReplayContext
+    // dtor. The dictionaries must still hold the proxy entry when reset() runs
+    // at inner-scope exit, otherwise the dictionary clears in reset() aren't
+    // exercised.
+    Slang::ComPtr<MutableFileSystemProxy> fsProxy;
     {
         REPLAY_TEST;
         SLANG_UNUSED(unitTestContext);
 
-        // Dirty the singleton inside the REPLAY_TEST scope. The dtor at the
-        // closing brace must clean all of this back up.
-        dirtyReplayContext(99);
+        fsProxy = dirtyReplayContext(99);
     }
 
     checkReplayContextIsPristine();
