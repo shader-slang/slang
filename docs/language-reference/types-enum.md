@@ -22,7 +22,8 @@ Enumeration case declaration:
 - *`modifier-list`* is an optional list of modifiers. (TODO: link)
 - **`'class'`** is a compatibility feature that allows the same enumeration declarations to be shared between
   C/C++ and Slang.
-- *`enum-identifier`* is the identifier for the declared enumeration type.
+- *`enum-identifier`* is the identifier for the declared enumeration type. If omitted, the enumeration
+  is *anonymous*.
 - *`tag-type`* specifies the underlying type of the enumeration. If omitted, the default is `int`.
 - *`enum-const-identifier`* is an identifier for an enumerator, i.e., an enumerated constant.
 - *`expr`* is a [link-time constant](expressions-evaluation-classes.md), specifying the
@@ -43,11 +44,12 @@ within the enumeration namespace using the `EnumType.ENUM_CONST` form. If the en
 the named constants are defined in the same namespace as the enumeration type. The enumerators of an unscoped
 enumeration can also be accessed using the scoped form.
 
-Enumerations are scoped by default. The `slangc` command-line option `-unscoped-enum` changes the default to
-unscoped. The [\[UnscopedEnum\]](../../../core-module-reference/attributes/unscopedenum-08.html) attribute in
-the modifier list explicitly declares an unscoped enumeration, while the **`'class'`** keyword explicitly
+Named enumerations are scoped by default; anonymous enumerations are always unscoped. The `slangc`
+command-line option `-unscoped-enum` changes the default for named enumerations to unscoped. The
+[\[UnscopedEnum\]](../../../core-module-reference/attributes/unscopedenum-08.html) attribute in the
+modifier list explicitly declares an unscoped enumeration, while the **`'class'`** keyword explicitly
 declares a scoped enumeration. It is an error to apply the \[UnscopedEnum\] attribute to an enum class
-declaration.
+declaration, or to declare an anonymous enum class.
 
 Multiple enumerators may share the same numeric value.
 
