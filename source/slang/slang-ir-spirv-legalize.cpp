@@ -113,6 +113,119 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return structType;
     }
 
+    // Rewrite every `IRSPIRVLoadDescriptorFromHeap` instruction whose result
+    // type is a ConstantBuffer into one whose result type is a
+    // `Ptr(elementStruct, Uniform, dataLayout)`.  If the element type is not
+    // a struct, wrap it in one (mirrors `wrapConstantBufferElement` but scoped
+    // to a single instruction rather than a global parameter).  Add a
+    // SPIRVBlockDecoration on the element struct so the emitter lays it out
+    // correctly as a Uniform block.
+    //
+    // ParameterBlock is intentionally excluded: `DescriptorHandle<T>` is
+    // constrained to `IOpaqueDescriptor`, and a parameter block semantically
+    // owns nested bindings rather than a single CBV descriptor.
+    void lowerConstantBufferDescriptorHeapLoads()
+    {
+        List<IRInst*> loadsToProcess;
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto func = as<IRGlobalValueWithCode>(globalInst);
+            if (!func)
+                continue;
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    if (inst->getOp() != kIROp_SPIRVLoadDescriptorFromHeap)
+                        continue;
+                    if (!as<IRConstantBufferType>(inst->getDataType()))
+                        continue;
+                    loadsToProcess.add(inst);
+                }
+            }
+        }
+
+        for (auto oldLoad : loadsToProcess)
+        {
+            auto cbType = as<IRConstantBufferType>(oldLoad->getDataType());
+            auto elementType = cbType->getElementType();
+            auto dataLayout = cbType->getDataLayout();
+
+            IRBuilder builder(oldLoad);
+
+            // If the element type isn't already a struct, wrap it in one so
+            // we can attach a Block decoration and emit a valid SPIR-V
+            // uniform buffer.
+            IRType* blockStruct = as<IRStructType>(elementType);
+            if (!blockStruct)
+            {
+                builder.setInsertBefore(oldLoad);
+                auto structType = builder.createStructType();
+                builder.addPhysicalTypeDecoration(structType);
+                StringBuilder sb;
+                sb << "cbuffer_";
+                getTypeNameHint(sb, elementType);
+                sb << "_t";
+                builder.addNameHintDecoration(structType, sb.produceString().getUnownedSlice());
+                auto key = builder.createStructKey();
+                builder.createStructField(structType, key, elementType);
+                blockStruct = structType;
+
+                // Compute size and alignment for the wrapper under the cbuffer
+                // layout rules so downstream member-decoration emission sees
+                // the correct std140/std430 layout (mirrors
+                // wrapConstantBufferElement).
+                auto rules =
+                    getTypeLayoutRuleForBuffer(m_sharedContext->m_targetProgram, cbType);
+                IRSizeAndAlignment sizeAlignment;
+                getSizeAndAlignment(
+                    m_sharedContext->m_targetRequest,
+                    rules,
+                    structType,
+                    &sizeAlignment);
+
+                // Rewrite each use to insert a field address dereference into
+                // the new wrapper struct so downstream code still sees the
+                // original element type.
+                IRInst* elementFieldKey = key;
+                traverseUses(
+                    oldLoad,
+                    [&](IRUse* use)
+                    {
+                        IRBuilder useBuilder(use->getUser());
+                        useBuilder.setInsertBefore(use->getUser());
+                        auto innerPtr = useBuilder.emitFieldAddress(
+                            useBuilder.getPtrType(
+                                elementType,
+                                AccessQualifier::Read,
+                                AddressSpace::Uniform,
+                                dataLayout),
+                            oldLoad,
+                            elementFieldKey);
+                        use->set(innerPtr);
+                    });
+            }
+
+            builder.addDecorationIfNotExist(blockStruct, kIROp_SPIRVBlockDecoration);
+
+            builder.setInsertBefore(oldLoad);
+            auto newPtrType = builder.getPtrType(
+                kIROp_PtrType,
+                blockStruct,
+                AccessQualifier::Read,
+                AddressSpace::Uniform,
+                dataLayout);
+            IRInst* args[2] = {oldLoad->getOperand(0), oldLoad->getOperand(1)};
+            auto newLoad = builder.emitIntrinsicInst(
+                newPtrType,
+                kIROp_SPIRVLoadDescriptorFromHeap,
+                2,
+                args);
+            oldLoad->replaceUsesWith(newLoad);
+            oldLoad->removeAndDeallocate();
+        }
+    }
+
     LoweredStructuredBufferTypeInfo lowerStructuredBufferType(IRHLSLStructuredBufferTypeBase* inst)
     {
         LoweredStructuredBufferTypeInfo result;
@@ -2558,6 +2671,20 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             builder.setInsertBefore(t);
             t->replaceUsesWith(lowered);
         }
+
+        // Lower `IRSPIRVLoadDescriptorFromHeap` results whose type is a
+        // ConstantBuffer/ParameterBlock into a `Ptr(element, Uniform, layout)`.
+        //
+        // This mirrors `processGlobalParam`'s handling of global constant-buffer
+        // parameters (see ~line 448) and the structured-buffer rewrite above:
+        // the SPIR-V emitter expects buffer resource handles to be lowered to
+        // pointers before emission, and `getDescriptorHeapBufferStorageClass`
+        // (slang-emit-spirv.cpp:6797) asserts on a non-pointer value type.
+        //
+        // Without this rewrite, `DescriptorHandle<ConstantBuffer<T>>` accessed
+        // via `getDescriptorFromHandle(...)` crashes the SPIR-V backend
+        // (issue #11037).
+        lowerConstantBufferDescriptorHeapLoads();
 
         // If older than spirv 1.4, we need more legalization steps due to lack of opcodes.
         if (!m_sharedContext->isSpirv14OrLater())
