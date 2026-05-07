@@ -1935,13 +1935,6 @@ Result linkAndOptimizeIR(
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
         break;
-    case CodeGenTarget::Metal:
-    case CodeGenTarget::MetalLib:
-    case CodeGenTarget::MetalLibAssembly:
-        {
-            SLANG_PASS(legalizeIRForMetal, targetProgram, sink);
-        }
-        break;
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
@@ -2065,6 +2058,14 @@ Result linkAndOptimizeIR(
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
         break;
+    }
+
+    if (isMetalTarget(targetRequest))
+    {
+        // We need to legalize Metal IR after introducing the explicit global context,
+        // as introduceExplicitGlobalContext depends on entry points which can change during
+        // legalization
+        SLANG_PASS(legalizeIRForMetal, targetProgram, sink);
     }
 
     // TODO: our current dynamic dispatch pass will remove all uses of witness tables.
