@@ -214,6 +214,15 @@ if(SLANG_ENABLE_GFX)
 
     # Since slang-test does not depend on gfx, we just copy the gfx modules to the slangc
     # directory. So even if slang-test is not built, the gfx modules are still available.
+    # The destination expands $<TARGET_FILE_DIR:slangc>, so the entire
+    # custom target / dependency / install block only makes sense when
+    # slangc is being built.
+    if(NOT SLANG_ENABLE_SLANGC)
+        message(
+            FATAL_ERROR
+            "SLANG_ENABLE_GFX requires SLANG_ENABLE_SLANGC so gfx.slang and slang.slang can be staged next to slangc."
+        )
+    endif()
     set(modules_dest_dir $<TARGET_FILE_DIR:slangc>)
     add_custom_target(
         copy-gfx-slang-modules
@@ -228,6 +237,9 @@ if(SLANG_ENABLE_GFX)
         VERBATIM
     )
     set_target_properties(copy-gfx-slang-modules PROPERTIES FOLDER generators)
+    # gfx owns this dependency (not slang-test) so the module files are
+    # copied even when SLANG_ENABLE_TESTS=OFF, e.g. in release builds.
+    add_dependencies(gfx copy-gfx-slang-modules)
     install(
         FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
         DESTINATION ${runtime_subdir}
@@ -284,16 +296,25 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
-    add_dependencies(slang-test slang-neural-module)
+    # Only depend on slang-neural-module when SLANG_EMBED_CORE_MODULE=ON.
+    # With SLANG_EMBED_CORE_MODULE=OFF, building the neural module crashes
+    # (slang-bootstrap exits 0xC0000005 when processing neural.slang), so we
+    # exclude the dependency to keep development builds with EMBED=OFF working.
+    # TODO(#11079): remove this workaround once slang-bootstrap handles neural.slang
+    # in EMBED=OFF builds.
+    if(SLANG_EMBED_CORE_MODULE)
+        add_dependencies(slang-test slang-neural-module)
+    endif()
+    # Keep targeted slang-test builds creating the module files even though gfx
+    # owns the dependency for release/package builds.
+    if(TARGET copy-gfx-slang-modules)
+        add_dependencies(slang-test copy-gfx-slang-modules)
+    endif()
 
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
         PROPERTY VS_STARTUP_PROJECT slang-test
     )
-
-    if(SLANG_ENABLE_GFX)
-        add_dependencies(slang-test copy-gfx-slang-modules)
-    endif()
 
     include(CTest)
     add_test(

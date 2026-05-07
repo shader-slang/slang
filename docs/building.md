@@ -241,32 +241,33 @@ works for any given binary.
 
 ### CMake options
 
-| Option                            | Default                    | Description                                                                                  |
-| --------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------- |
-| `SLANG_VERSION`                   | Latest `v*` tag            | The project version, detected using git if available                                         |
-| `SLANG_EMBED_CORE_MODULE`         | `TRUE`                     | Build slang with an embedded version of the core module                                      |
-| `SLANG_EMBED_CORE_MODULE_SOURCE`  | `TRUE`                     | Embed the core module source in the binary                                                   |
-| `SLANG_ENABLE_DXIL`               | `TRUE`                     | Enable generating DXIL using DXC                                                             |
-| `SLANG_ENABLE_ASAN`               | `FALSE`                    | Enable ASAN (address sanitizer)                                                              |
-| `SLANG_ENABLE_COVERAGE`           | `FALSE`                    | Enable code coverage instrumentation                                                         |
-| `SLANG_ENABLE_FULL_IR_VALIDATION` | `FALSE`                    | Enable full IR validation (SLOW!)                                                            |
-| `SLANG_ENABLE_IR_BREAK_ALLOC`     | `FALSE`                    | Enable IR BreakAlloc functionality for debugging.                                            |
-| `SLANG_ENABLE_GFX`                | `TRUE`                     | Enable gfx targets                                                                           |
-| `SLANG_ENABLE_SLANGD`             | `TRUE`                     | Enable language server target                                                                |
-| `SLANG_ENABLE_SLANGC`             | `TRUE`                     | Enable standalone compiler target                                                            |
-| `SLANG_ENABLE_SLANGI`             | `TRUE`                     | Enable Slang interpreter target                                                              |
-| `SLANG_ENABLE_SLANGRT`            | `TRUE`                     | Enable runtime target                                                                        |
-| `SLANG_ENABLE_SLANG_GLSLANG`      | `TRUE`                     | Enable glslang dependency and slang-glslang wrapper target                                   |
-| `SLANG_ENABLE_TESTS`              | `TRUE`                     | Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT |
-| `SLANG_ENABLE_EXAMPLES`           | `TRUE`                     | Enable example targets, requires SLANG_ENABLE_GFX                                            |
-| `SLANG_LIB_TYPE`                  | `SHARED`                   | How to build the slang library                                                               |
-| `SLANG_ENABLE_RELEASE_DEBUG_INFO` | `TRUE`                     | Enable generating debug info for Release configs                                             |
-| `SLANG_ENABLE_RELEASE_LTO`        | `FALSE`                    | Enable LTO for Release builds                                                                |
-| `SLANG_ENABLE_SPLIT_DEBUG_INFO`   | `TRUE`                     | Enable generating split debug info for Debug and RelWithDebInfo configs                      |
-| `SLANG_SLANG_LLVM_FLAVOR`         | `FETCH_BINARY_IF_POSSIBLE` | How to set up llvm support                                                                   |
-| `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent           | URL specifying the location of the slang-llvm prebuilt library                               |
-| `SLANG_USE_SCCACHE`               | `FALSE`                    | Use sccache as compiler launcher (auto-disables PCH)                                         |
-| `SLANG_GENERATORS_PATH`           | ``                         | Path to an installed `all-generators` target for cross compilation                           |
+| Option                            | Default                    | Description                                                                                                                              |
+| --------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `SLANG_VERSION`                   | Latest `v*` tag            | The project version, detected using git if available                                                                                     |
+| `SLANG_EMBED_CORE_MODULE`         | `TRUE`                     | Build slang with an embedded version of the core module                                                                                  |
+| `SLANG_EMBED_CORE_MODULE_SOURCE`  | `TRUE`                     | Embed the core module source in the binary                                                                                               |
+| `SLANG_ENABLE_DXIL`               | `TRUE`                     | Enable generating DXIL using DXC                                                                                                         |
+| `SLANG_ENABLE_ASAN`               | `FALSE`                    | Enable ASAN (address sanitizer)                                                                                                          |
+| `SLANG_ENABLE_COVERAGE`           | `FALSE`                    | Enable code coverage instrumentation                                                                                                     |
+| `SLANG_ENABLE_FULL_IR_VALIDATION` | `FALSE`                    | Enable full IR validation (SLOW!)                                                                                                        |
+| `SLANG_ENABLE_IR_BREAK_ALLOC`     | `FALSE`                    | Enable IR BreakAlloc functionality for debugging.                                                                                        |
+| `SLANG_ENABLE_GFX`                | `TRUE`                     | Enable gfx targets                                                                                                                       |
+| `SLANG_ENABLE_SLANGD`             | `TRUE`                     | Enable language server target                                                                                                            |
+| `SLANG_ENABLE_SLANGC`             | `TRUE`                     | Enable standalone compiler target                                                                                                        |
+| `SLANG_ENABLE_SLANGI`             | `TRUE`                     | Enable Slang interpreter target                                                                                                          |
+| `SLANG_ENABLE_REPLAYER`           | `TRUE`                     | Enable the slang-replay tool                                                                                                             |
+| `SLANG_ENABLE_SLANGRT`            | `TRUE`                     | Enable runtime target                                                                                                                    |
+| `SLANG_ENABLE_SLANG_GLSLANG`      | `TRUE`                     | Enable glslang dependency and slang-glslang wrapper target                                                                               |
+| `SLANG_ENABLE_TESTS`              | `TRUE`                     | Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT                                             |
+| `SLANG_ENABLE_EXAMPLES`           | `TRUE`                     | Enable example targets, requires SLANG_ENABLE_GFX                                                                                        |
+| `SLANG_LIB_TYPE`                  | `SHARED`                   | How to build the slang library                                                                                                           |
+| `SLANG_ENABLE_RELEASE_DEBUG_INFO` | `TRUE`                     | Enable generating debug info for Release configs                                                                                         |
+| `SLANG_ENABLE_RELEASE_LTO`        | `FALSE`                    | Enable LTO for Release builds                                                                                                            |
+| `SLANG_ENABLE_SPLIT_DEBUG_INFO`   | `TRUE`                     | Enable generating split debug info for Debug and RelWithDebInfo configs                                                                  |
+| `SLANG_SLANG_LLVM_FLAVOR`         | `FETCH_BINARY_IF_POSSIBLE` | How to set up llvm support                                                                                                               |
+| `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent           | URL specifying the location of the slang-llvm prebuilt library                                                                           |
+| `SLANG_USE_SCCACHE`               | `FALSE`                    | Use sccache as compiler launcher (auto-disables PCH)                                                                                     |
+| `SLANG_GENERATORS_PATH`           | ``                         | Path to an installed `all-generators` target for cross compilation                                                                       |
 | `SLANG_IGNORE_ABORT_MSG`          | `FALSE`                    | Suppress the Windows modal abort dialog at compile time (baked into all built executables; recommended for unattended/LLM-driven builds) |
 
 The following options relate to optional dependencies for additional backends
@@ -332,6 +333,42 @@ cmake --workflow --preset slang-llvm
 This will generate `build/dist-release/slang-slang-llvm.zip` containing the
 library. This, of course, uses the system LLVM to build slang-llvm, otherwise
 it would just be a convoluted way to download a prebuilt binary.
+
+#### Building LLVM from source with `external/build-llvm.sh`
+
+`USE_SYSTEM_LLVM` requires an LLVM install on disk that exposes
+`LLVMConfig.cmake` and `ClangConfig.cmake`. You can satisfy that requirement
+several ways: a distro package or LLVM package repository that provides
+matching LLVM 21.1 development packages, a prebuilt LLVM toolchain you've built
+yourself for unrelated reasons, or a fresh build produced specifically for
+Slang. **You do not need
+`external/build-llvm.sh` if you already have a suitable LLVM install** —
+just point `CMAKE_PREFIX_PATH` (or `LLVM_DIR`/`Clang_DIR`) at it.
+
+Slang ships `external/build-llvm.sh` (and `external/build-llvm.ps1`) as a
+convenience for the case where you don't already have one. It's the same
+script the release workflow uses when seeding the GCS cache, so it produces
+exactly the LLVM tree Slang's release CI consumes:
+
+- Only the LLVM/Clang libraries and headers that `slang-llvm` links against
+  are compiled and installed. We do this by setting
+  `LLVM_DISTRIBUTION_COMPONENTS` and building LLVM's `install-distribution`
+  target instead of the default `ninja all` — which builds LLVM's tools
+  (`opt`, `llc`, `clang`, …), tests, examples, and benchmarks even with the
+  corresponding `LLVM_BUILD_TOOLS=OFF` / `CLANG_ENABLE_STATIC_ANALYZER=OFF`
+  / etc. flags set (see
+  [llvm/llvm-project#117705](https://github.com/llvm/llvm-project/issues/117705)
+  for one example of an off-switch that doesn't take effect under
+  `ninja all`). Building the `install-distribution` target sidesteps that
+  whole category of issues by only building what we explicitly listed.
+- LLVM backends default to `X86;ARM;AArch64`. Pass `--targets "X86"` (or a
+  different semicolon-separated list) if you only need a single backend.
+- Benchmarks, docs, examples, tests, and the DIA SDK are disabled at the
+  CMake-flag level too, as defense-in-depth.
+
+If you need a fuller LLVM install (for example to run `scan-build`), build
+LLVM yourself with the flags you need and point `CMAKE_PREFIX_PATH` /
+`Clang_DIR` at that install instead.
 
 ### Cross compiling
 

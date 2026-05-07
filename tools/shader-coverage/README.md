@@ -207,9 +207,9 @@ sidecar shape.
 
 ## CLI reference
 
-| Flag | Effect |
-|---|---|
-| `-trace-coverage` | Enables the feature. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites counter ops to atomic increments, and emits `<output>.coverage-mapping.json` sidecar when writing to a file. |
+| Flag                                      | Effect                                                                                                                                                                                                                                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `-trace-coverage`                         | Enables the feature. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites counter ops to atomic increments, and emits `<output>.coverage-mapping.json` sidecar when writing to a file.          |
 | `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time (e.g. for a pre-built D3D12 root signature). |
 
 ---
@@ -217,7 +217,7 @@ sidecar shape.
 ## Counter buffer format
 
 `uint32_t counters[N]` — flat little-endian array, no header. Indexed
-by slot. Saturates at ~4 × 10⁹ hits per slot (see *Current scope*).
+by slot. Saturates at ~4 × 10⁹ hits per slot (see _Current scope_).
 
 ---
 
@@ -255,15 +255,15 @@ slot in its own pipeline layout / root signature.
 
 ### Compiler instrumentation
 
-| Backend | Default `-trace-coverage` | `-trace-coverage-binding=N:0` | `-trace-coverage-binding=N:M` (M ≠ 0) |
-|---|---|---|---|
-| CPU | Supported | (no-op — backend uses uniform offsets) | (no-op) |
-| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported | Supported | Compiler-side decoration correct |
-| D3D12 / HLSL | Supported | Supported | Supported |
-| CUDA | Supported | (no-op — backend uses uniform offsets) | (no-op) |
-| Metal (direct) | Compiles. End-to-end dispatch is unreliable due to a pre-existing slang-rhi Metal binding quirk ([shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724)) — not a coverage-feature defect. | (untested) | (untested) |
-| GLSL | Supported codegen | (untested) | (untested) |
-| WGSL / WebGPU | **Not supported** — `-trace-coverage` emits a warning (E45102) and skips instrumentation. WGSL requires the synthesized counter buffer to use `atomic<u32>` element type, which the IR coverage pass does not yet produce. Use `-target spirv` for Vulkan-based WebGPU workflows as a workaround. | (n/a) | (n/a) |
+| Backend                                   | Default `-trace-coverage`                                                                                                                                                                                                                                                                         | `-trace-coverage-binding=N:0`          | `-trace-coverage-binding=N:M` (M ≠ 0) |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
+| CPU                                       | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
+| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported                                                                                                                                                                                                                                                                                         | Supported                              | Compiler-side decoration correct      |
+| D3D12 / HLSL                              | Supported                                                                                                                                                                                                                                                                                         | Supported                              | Supported                             |
+| CUDA                                      | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
+| Metal (direct)                            | Compiles. End-to-end dispatch is unreliable due to a pre-existing slang-rhi Metal binding quirk ([shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724)) — not a coverage-feature defect.                                                                             | (untested)                             | (untested)                            |
+| GLSL                                      | Supported codegen                                                                                                                                                                                                                                                                                 | (untested)                             | (untested)                            |
+| WGSL / WebGPU                             | **Not supported** — `-trace-coverage` emits a warning (E45102) and skips instrumentation. WGSL requires the synthesized counter buffer to use `atomic<u32>` element type, which the IR coverage pass does not yet produce. Use `-target spirv` for Vulkan-based WebGPU workflows as a workaround. | (n/a)                                  | (n/a)                                 |
 
 ### Format scope
 
@@ -295,7 +295,6 @@ slot in its own pipeline layout / root signature.
   coverage buffer.** The coverage pass's auto-allocator walks
   module-scope globals only, so a shader that declares uniforms as
   parameters of the entry-point function (HLSL-legacy `void main(uniform
-  Buf b, ...)` style) may end up sharing a register slot with
+Buf b, ...)` style) may end up sharing a register slot with
   `__slang_coverage`. Workaround: declare uniforms at module scope
   (modern Slang convention) — that path works correctly.
-

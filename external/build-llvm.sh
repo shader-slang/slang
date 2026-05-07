@@ -13,6 +13,7 @@ Options:
   --source-dir: Unpack and build in this directory: default $source_dir
   --config: The configuration to build, default $config
   --install-prefix: Install under this prefix
+  --targets: Semicolon-separated LLVM target architectures, default: $llvm_targets
   --: Any following arguments will be passed to the CMake configuration command
 EOF
 }
@@ -58,6 +59,7 @@ branch=llvmorg-21.1.2
 source_dir=$temp_dir
 install_prefix=
 config=Release
+llvm_targets="X86;ARM;AArch64"
 extra_arguments=()
 
 while [[ "$#" -gt 0 ]]; do
@@ -86,6 +88,10 @@ while [[ "$#" -gt 0 ]]; do
     install_prefix=$2
     shift
     ;;
+  --targets)
+    llvm_targets=$2
+    shift
+    ;;
   --)
     shift
     extra_arguments+=("$@")
@@ -105,6 +111,27 @@ done
 [ -n "$source_dir" ] || fail "please set --source-dir"
 [ -n "$config" ] || fail "please set --config"
 [ -n "$install_prefix" ] || fail "please set --install-prefix"
+
+normalized_targets=()
+IFS=';' read -ra requested_targets <<<"$llvm_targets"
+for target in "${requested_targets[@]}"; do
+  target=${target//[[:space:]]/}
+  if [ -n "$target" ]; then
+    normalized_targets+=("$target")
+  fi
+done
+if [ "${#normalized_targets[@]}" -eq 0 ]; then
+  fail "please set --targets to at least one LLVM target"
+fi
+llvm_targets=$(
+  IFS=';'
+  printf '%s' "${normalized_targets[*]}"
+)
+
+msvc_runtime_lib=MultiThreaded
+if [ "$config" = "Debug" ]; then
+  msvc_runtime_lib=MultiThreadedDebug
+fi
 
 msg "##########################################################"
 msg "# Fetching LLVM from $repo at $branch"
@@ -132,30 +159,73 @@ cmake_arguments_for_slang=(
   -DCLANG_INCLUDE_TESTS=0
   # Requirements for Slang
   -DLLVM_ENABLE_PROJECTS=clang
-  "-DLLVM_TARGETS_TO_BUILD=X86;ARM;AArch64"
+  "-DLLVM_TARGETS_TO_BUILD=${llvm_targets}"
   -DLLVM_BUILD_TOOLS=0
-  # Get LLVM to use the static linked version of the msvc runtime
-  "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>"
+  # Narrow the distribution to just the libraries/headers Slang links against.
+  # Used in combination with the install-distribution target (below) instead
+  # of `ninja all`, which would otherwise build LLVM tools, tests, examples,
+  # and benchmarks we don't need.
+  "-DLLVM_DISTRIBUTION_COMPONENTS=clang-libraries;clang-headers;clang-cmake-exports;llvm-libraries;llvm-headers;cmake-exports"
+  # Get LLVM to use the static linked version of the msvc runtime.
+  # CMAKE_MSVC_RUNTIME_LIBRARY is resolved at configure time with the
+  # single-config generator, so we set it from $msvc_runtime_lib directly
+  # rather than via a $<CONFIG:Debug> generator expression (mirrors the
+  # equivalent inlining in build-llvm.ps1).
+  "-DCMAKE_MSVC_RUNTIME_LIBRARY=$msvc_runtime_lib"
   "-DLLVM_USE_CRT_RELEASE=MT"
   "-DLLVM_USE_CRT_DEBUG=MTd"
 )
 build_dir=$source_dir/build
 mkdir -p "$build_dir"
+# Use the single-config Ninja generator rather than Ninja Multi-Config because
+# LLVM_DISTRIBUTION_COMPONENTS (used below) is not compatible with
+# multi-configuration generators.
 cmake \
   -S "$source_dir/llvm" -B "$build_dir" \
-  -G "Ninja Multi-Config" \
+  -G "Ninja" \
+  "-DCMAKE_BUILD_TYPE=$config" \
+  "-DCMAKE_INSTALL_PREFIX=$install_prefix" \
   "${cmake_arguments_for_slang[@]}" \
   "${extra_arguments[@]}"
 
 msg "##########################################################"
-msg "# Building LLVM in $build_dir"
+msg "# Building and installing LLVM into $install_prefix"
 msg "##########################################################"
-cmake --build "$build_dir" -j --config "$config"
+# install-distribution builds and installs exactly the components listed in
+# LLVM_DISTRIBUTION_COMPONENTS (set at configure time). This is LLVM's
+# supported mechanism for producing a trimmed toolchain — see
+# https://llvm.org/docs/BuildingADistribution.html. We use it instead of
+# `ninja all` because `ninja all` honors neither LLVM_BUILD_TOOLS=0 nor
+# CLANG_ENABLE_STATIC_ANALYZER=OFF reliably (see
+# llvm/llvm-project#117705), so it builds tools, tests, examples, and
+# analyzer sources we don't need. install-distribution sidesteps that
+# whole class of "off switches that don't switch off" by only building
+# what we listed.
+cmake --build "$build_dir" -j --target install-distribution
 
+# Sanity-check that the install tree actually contains the per-target
+# codegen libraries we asked for. install-distribution only installs what
+# the named components transitively pull in; if upstream LLVM ever
+# regroups components and drops LLVM<TARGET>CodeGen out of the libraries
+# component, the install would silently produce a libslang-llvm that
+# cannot emit code for the requested target. Catch that here rather than
+# at first use.
 msg "##########################################################"
-msg "# Installing LLVM to $install_prefix"
+msg "# Verifying installed LLVM codegen libraries"
 msg "##########################################################"
-cmake --install "$build_dir" --prefix "$install_prefix" --config "$config"
+missing_codegen=()
+for target in "${normalized_targets[@]}"; do
+  # Library extension varies by platform (.a on Unix, .lib on Windows);
+  # match by stem only.
+  if ! find "$install_prefix" -type f \
+    \( -name "libLLVM${target}CodeGen.*" -o -name "LLVM${target}CodeGen.lib" \) \
+    -print -quit | grep -q .; then
+    missing_codegen+=("$target")
+  fi
+done
+if [ "${#missing_codegen[@]}" -gt 0 ]; then
+  fail "LLVM install at $install_prefix is missing codegen libraries for: ${missing_codegen[*]}. The LLVM_DISTRIBUTION_COMPONENTS list in this script likely needs updating."
+fi
 
 msg "##########################################################"
 msg "LLVM installed in $install_prefix"

@@ -1,11 +1,9 @@
-Shader Coverage Design
-======================
+# Shader Coverage Design
 
 This document describes the shader coverage implementation in Slang
 and the role of the main pieces in the pipeline.
 
-Overview
---------
+## Overview
 
 Shader coverage has two separate jobs:
 
@@ -23,8 +21,7 @@ The first is about getting the buffer into the compiled shader. The
 second is about letting the host discover where the buffer lives and
 attribute counter values back to source.
 
-Binding and attribution
------------------------
+## Binding and attribution
 
 Coverage instrumentation has two jobs that don't reduce to one
 primitive:
@@ -90,13 +87,12 @@ they would for any user-declared resource — the metadata-driven
 binding info is the canonical source for any compiler-synthesized
 resource.
 
-Pipeline architecture
----------------------
+## Pipeline architecture
 
 Enabling `-trace-coverage` runs three pipeline stages:
 
 1. **AST lowering** (`source/slang/slang-lower-to-ir.cpp`). Before
-   each *executable* statement is lowered to IR, the front-end
+   each _executable_ statement is lowered to IR, the front-end
    emits an `IncrementCoverageCounter` IR op:
    - The op is opaque (zero operands, void return) — it doesn't
      reference a buffer at this point. The IR coverage pass will
@@ -138,7 +134,7 @@ Enabling `-trace-coverage` runs three pipeline stages:
      multiple ops on the same source line get distinct slots, which
      keeps the door open for branch/function coverage later).
    - **Rewrites each op as `AtomicAdd(__slang_coverage[slot], 1,
-     Relaxed)`**.
+Relaxed)`**.
    - **Records `(slot → file, line)` plus the buffer's binding** on
      the artifact's `ICoverageTracingMetadata`. A slot is
      unattributable when its `IncrementCoverageCounter` op carried
@@ -166,26 +162,24 @@ The `IncrementCoverageCounter` op is side-effectful by default in
 DCE analysis, so it survives optimizations untouched until the
 coverage pass rewrites it.
 
-Where each stage lives
-----------------------
+## Where each stage lives
 
-| Path | Role |
-|---|---|
-| `source/slang/slang-ir-coverage-instrument.{h,cpp}` | IR pass — synthesizes the buffer, extends program-scope layout, rewrites counter ops, writes metadata |
-| `source/slang/slang-ir-insts.lua` | Declares the `IncrementCoverageCounter` IR op |
-| `source/slang/slang-lower-to-ir.cpp` | Emits counter ops during AST lowering; filters `BlockStmt` / `SeqStmt` / `EmptyStmt` |
-| `source/slang/slang-emit.cpp` | Integrates the pass into the pipeline + allocates metadata + plumbs `-trace-coverage-binding` |
-| `source/slang/slang-options.cpp` | Registers the `-trace-coverage` and `-trace-coverage-binding` CLI flags |
-| `source/slang/slang-end-to-end-request.cpp` | Writes the `.coverage-mapping.json` sidecar from slangc |
-| `include/slang.h` | `slang::ICoverageTracingMetadata` public interface |
-| `source/compiler-core/slang-artifact-associated-impl.{h,cpp}` | `ArtifactPostEmitMetadata` implements the interface |
-| `prelude/slang-cpp-prelude.h` | CPU-target atomic helpers (`_slang_atomic_add_u32/i32`) |
-| `source/slang/slang-emit-cpp.cpp` | CPU emitter's `kIROp_AtomicAdd` handling |
-| `tests/language-feature/coverage/` | End-to-end tests |
+| Path                                                                         | Role                                                                                                                |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `source/slang/slang-ir-coverage-instrument.{h,cpp}`                          | IR pass — synthesizes the buffer, extends program-scope layout, rewrites counter ops, writes metadata               |
+| `source/slang/slang-ir-insts.lua`                                            | Declares the `IncrementCoverageCounter` IR op                                                                       |
+| `source/slang/slang-lower-to-ir.cpp`                                         | Emits counter ops during AST lowering; filters `BlockStmt` / `SeqStmt` / `EmptyStmt`                                |
+| `source/slang/slang-emit.cpp`                                                | Integrates the pass into the pipeline + allocates metadata + plumbs `-trace-coverage-binding`                       |
+| `source/slang/slang-options.cpp`                                             | Registers the `-trace-coverage` and `-trace-coverage-binding` CLI flags                                             |
+| `source/slang/slang-end-to-end-request.cpp`                                  | Writes the `.coverage-mapping.json` sidecar from slangc                                                             |
+| `include/slang.h`                                                            | `slang::ICoverageTracingMetadata` public interface                                                                  |
+| `source/compiler-core/slang-artifact-associated-impl.{h,cpp}`                | `ArtifactPostEmitMetadata` implements the interface                                                                 |
+| `prelude/slang-cpp-prelude.h`                                                | CPU-target atomic helpers (`_slang_atomic_add_u32/i32`)                                                             |
+| `source/slang/slang-emit-cpp.cpp`                                            | CPU emitter's `kIROp_AtomicAdd` handling                                                                            |
+| `tests/language-feature/coverage/`                                           | End-to-end tests                                                                                                    |
 | `tools/slang-unit-test/unit-test-descriptor-set-space-offset-reflection.cpp` | Reflection unit test for `DescriptorSetInfo::spaceOffset` (regression-watch for the non-zero space mis-binding bug) |
 
-Two reporting channels
-----------------------
+## Two reporting channels
 
 Coverage metadata is exposed through two channels because two
 distinct audiences need it in two distinct shapes. The metadata API
@@ -218,7 +212,7 @@ Today the in-tree consumer is:
 
 - **`slangc` itself** — its `_maybeWriteCoverageMapping` calls
   `slang_writeCoverageManifestJson` and writes the bytes to disk.
-  This is what makes the metadata API + manifest shape *one*
+  This is what makes the metadata API + manifest shape _one_
   contract, not two: `slangc` is its own first consumer of the
   public serializer.
 
@@ -233,7 +227,7 @@ the audience the API shape is designed for.
 
 ### Cross-process / offline consumers — `<output>.coverage-mapping.json`
 
-The other audience runs *later*, possibly on a different machine,
+The other audience runs _later_, possibly on a different machine,
 without Slang linked: a runtime dispatching the precompiled shader;
 a CI script processing test output; a Python tool converting to
 LCOV; a custom dashboard. By the time these consumers run, the
@@ -283,12 +277,11 @@ dashboards, any non-Slang-linked tool) to embed a Slang process to
 query the metadata, defeating the point of shipping precompiled
 shaders without the toolchain.
 
-Host integration workflows
---------------------------
+## Host integration workflows
 
 Two equally-supported workflows, each suited to a different host
 architecture. Both expose the same data through
-`ICoverageTracingMetadata`; they differ only in *when* and *where*
+`ICoverageTracingMetadata`; they differ only in _when_ and _where_
 the host queries it.
 
 ### A. In-process compile (Slang C++ API)
@@ -331,8 +324,7 @@ without implementing the format themselves. It will not be required
 for either workflow above. A reference end-to-end host integration
 (`examples/shader-coverage-demo`) ships with the same follow-up.
 
-Roadmap
--------
+## Roadmap
 
 The current implementation provides line coverage instrumentation
 end-to-end across all Slang backends. Directions scoped for follow-

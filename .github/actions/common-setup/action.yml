@@ -16,6 +16,10 @@ inputs:
   use-cached-llvm:
     default: true
     required: false
+  llvm-targets:
+    description: "Semicolon-separated LLVM target architectures to build. Defaults to setup-llvm-from-gcs's own default (cross-architecture set)."
+    required: false
+    default: "X86;ARM;AArch64"
   min-disk-gb:
     description: "Minimum required free disk space in GB"
     default: "3"
@@ -110,7 +114,8 @@ runs:
         os: ${{ inputs.os }}
         compiler: ${{ inputs.compiler }}
         platform: ${{ inputs.platform }}
-        llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+        llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/build-llvm.ps1') }}
+        llvm-targets: ${{ inputs.llvm-targets }}
         build-if-missing: "true"
         github-token: ${{ github.token }}
 
@@ -118,8 +123,27 @@ runs:
       shell: bash
       run: |
         if [ "${{inputs.build-llvm}}" == "true" ]; then
-          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
-          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
+          # Set CMAKE_PREFIX_PATH to the LLVM install prefix so
+          # find_package(Clang CONFIG) can locate ClangConfig.cmake via
+          # CMake's standard subdirectory search. Also set LLVM_DIR/Clang_DIR
+          # to the explicit cmake-config directories as fallback. Use $PWD
+          # so the path resolves inside the current shell context (container
+          # or host). Windows CMake uses `;` as the path-list separator; when
+          # running through Git Bash or WSL, convert the shell path to a form
+          # Windows tools can consume.
+          LLVM_INSTALL="$PWD/build/llvm-project-install"
+          PATH_SEP=":"
+          if [[ "${{ inputs.os }}" == "windows" ]]; then
+            PATH_SEP=";"
+            if command -v cygpath >/dev/null; then
+              LLVM_INSTALL="$(cygpath -m "$LLVM_INSTALL")"
+            elif command -v wslpath >/dev/null; then
+              LLVM_INSTALL="$(wslpath -m "$LLVM_INSTALL")"
+            fi
+          fi
+          echo "CMAKE_PREFIX_PATH=${LLVM_INSTALL}${CMAKE_PREFIX_PATH:+${PATH_SEP}${CMAKE_PREFIX_PATH}}" >> "$GITHUB_ENV"
+          echo "LLVM_DIR=${LLVM_INSTALL}/lib/cmake/llvm" >> "$GITHUB_ENV"
+          echo "Clang_DIR=${LLVM_INSTALL}/lib/cmake/clang" >> "$GITHUB_ENV"
         fi
 
       # Note: ccache for Windows self-hosted has been replaced by sccache

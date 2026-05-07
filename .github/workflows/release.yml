@@ -124,8 +124,11 @@ jobs:
           echo "CMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}" >> "$GITHUB_ENV"
 
       - name: Build Slang
+        env:
+          TARGET_OS: ${{ matrix.os }}
+          TARGET_PLATFORM: ${{ matrix.platform }}
         run: |
-          if [[ "${{ matrix.platform }}" == "wasm" ]]; then
+          if [[ "$TARGET_PLATFORM" == "wasm" ]]; then
             npm install -g typescript@5.9.3
             tsc --version
             git clone https://github.com/emscripten-core/emsdk.git
@@ -136,10 +139,18 @@ jobs:
             popd
             emcmake cmake -DSLANG_GENERATORS_PATH=build-platform-generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
             cmake --build --preset emscripten --config Release --target slang-wasm
+
+            wasm_bin="build.em/Release/bin/slang-wasm.wasm"
+            file_out="$(file -b "$wasm_bin")"
+            echo "$file_out"
+            if ! grep -Eiq "WebAssembly" <<< "$file_out"; then
+              echo "::error::${wasm_bin} is not a WebAssembly artifact: ${file_out}"
+              exit 1
+            fi
             exit 0
           fi
 
-          if [[ "${{ matrix.os }}" == "windows" && "${{ matrix.config }}" != "release" && "${{ matrix.config }}" != "releaseWithDebugInfo" ]]; then
+          if [[ "$TARGET_OS" == "windows" && "${{ matrix.config }}" != "release" && "${{ matrix.config }}" != "releaseWithDebugInfo" ]]; then
               echo "Please see ci.yml for the steps to make non-release builds work on Windows" >&2
               exit 1
           fi
@@ -147,6 +158,8 @@ jobs:
           cmake --preset default --fresh \
             -DSLANG_GENERATORS_PATH=build-platform-generators/bin \
             -DSLANG_ENABLE_EXAMPLES=OFF \
+            -DSLANG_ENABLE_TESTS=OFF \
+            -DSLANG_ENABLE_REPLAYER=OFF \
             -DSLANG_ENABLE_RELEASE_LTO=ON \
             -DSLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF \
             "-DSLANG_SLANG_LLVM_FLAVOR=$(
@@ -154,6 +167,39 @@ jobs:
             ${{matrix.extra-cmake-flags}}
 
           cmake --build --preset "${{matrix.config}}"
+
+          host_arch="$(uname -m)"
+          if [[ "$host_arch" == "arm64" ]]; then
+            host_arch="aarch64"
+          fi
+          if [[ "$TARGET_PLATFORM" == "$host_arch" ]]; then
+            slangc_bin="${bin_dir:?}/slangc"
+            if [[ "$TARGET_OS" == "windows" ]]; then
+              slangc_bin="${slangc_bin}.exe"
+            fi
+            "$slangc_bin" -version
+            "$slangc_bin" -help-style markdown -h >/dev/null
+          else
+            slangc_bin="${bin_dir:?}/slangc"
+            if [[ "$TARGET_OS" == "windows" ]]; then
+              slangc_bin="${slangc_bin}.exe"
+            fi
+            case "$TARGET_PLATFORM" in
+              aarch64) expected_arch="aarch64|arm64" ;;
+              x86_64) expected_arch="x86[_-]64|x86-64|amd64" ;;
+              *) expected_arch="" ;;
+            esac
+            if [[ -n "$expected_arch" ]]; then
+              file_out="$(file -b "$slangc_bin")"
+              echo "$file_out"
+              if ! grep -Eiq "$expected_arch" <<< "$file_out"; then
+                echo "::error::${slangc_bin} is not a ${TARGET_PLATFORM} artifact: ${file_out}"
+                exit 1
+              fi
+            else
+              echo "Skipping slangc format check for ${TARGET_PLATFORM} binary on ${host_arch} runner"
+            fi
+          fi
 
       - name: Sign and notarize binaries
         if: matrix.os == 'macos' && startsWith(github.ref, 'refs/tags/v')

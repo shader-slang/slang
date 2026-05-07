@@ -12,6 +12,7 @@ Options:
   --source-dir: Unpack and build in this directory: default $source_dir
   --config: The configuration to build, default $config
   --install-prefix: Install under this prefix
+  --targets: Semicolon-separated LLVM target architectures, default: $llvmTargets
   --: Any following arguments will be passed to the CMake configuration command
 "
 }
@@ -59,6 +60,7 @@ $branch = "llvmorg-21.1.2"
 $sourceDir = $tempDir.FullName
 $installPrefix = ""
 $config = "Release"
+$llvmTargets = "X86;ARM;AArch64"
 $extraArguments = @()
 
 # Argument parsing
@@ -83,6 +85,9 @@ for ($i = 0; $i -lt $args.Length; $i++) {
         "--install-prefix" {
             $installPrefix = $args[++$i]
         }
+        "--targets" {
+            $llvmTargets = $args[++$i]
+        }
         "--" {
             $extraArguments = $args[$i + 1..$args.Length]
             break
@@ -101,6 +106,16 @@ if (-not $sourceDir) { Fail "please set --source-dir" }
 if (-not $config) { Fail "please set --config" }
 if (-not $installPrefix) { Fail "please set --install-prefix" }
 
+$llvmTargetList = @(
+    $llvmTargets -split ';' |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ }
+)
+if ($llvmTargetList.Count -eq 0) {
+    Fail "please set --targets to at least one LLVM target"
+}
+$llvmTargets = $llvmTargetList -join ';'
+
 # Fetch LLVM from the repo
 Msg "##########################################################"
 Msg "# Fetching LLVM from $repo at $branch"
@@ -117,6 +132,7 @@ if ($config -eq 'Debug')
     $msvcRuntimeLib = "MultiThreadedDebug"
 }
 $cmakeArgumentsForSlang = @(
+    # Don't build unnecessary things
     "-DLLVM_BUILD_LLVM_C_DYLIB=0"
     "-DLLVM_INCLUDE_BENCHMARKS=0"
     "-DLLVM_INCLUDE_DOCS=0"
@@ -129,10 +145,20 @@ $cmakeArgumentsForSlang = @(
     "-DCLANG_ENABLE_ARCMT=0"
     "-DCLANG_INCLUDE_DOCS=0"
     "-DCLANG_INCLUDE_TESTS=0"
+    # Requirements for Slang
     "-DLLVM_ENABLE_PROJECTS=clang"
-    "-DLLVM_TARGETS_TO_BUILD=X86;ARM;AArch64"
+    "-DLLVM_TARGETS_TO_BUILD=$llvmTargets"
     "-DLLVM_BUILD_TOOLS=0"
-    "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>"
+    # Narrow the distribution to just the libraries/headers Slang links against.
+    # Used in combination with the install-distribution target (below) instead
+    # of `ninja all`, which would otherwise build LLVM tools, tests, examples,
+    # and benchmarks we don't need.
+    "-DLLVM_DISTRIBUTION_COMPONENTS=clang-libraries;clang-headers;clang-cmake-exports;llvm-libraries;llvm-headers;cmake-exports"
+    # Get LLVM to use the static linked version of the msvc runtime.
+    # CMAKE_MSVC_RUNTIME_LIBRARY is resolved at configure time with the
+    # single-config generator, so we set it from $msvcRuntimeLib directly
+    # rather than via a $<CONFIG:Debug> generator expression.
+    "-DCMAKE_MSVC_RUNTIME_LIBRARY=$msvcRuntimeLib"
     "-DLLVM_USE_CRT_RELEASE=MT"
     "-DLLVM_USE_CRT_DEBUG=MTd"
 )
@@ -141,19 +167,55 @@ $buildDir = Join-Path $sourceDir "build"
 New-Item -Path $buildDir -ItemType Directory -Force
 $myScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $toolchainFile = Join-Path $myScriptDir "WindowsToolchain\Windows.MSVC.toolchain.cmake"
-cmake -S $sourceDir\llvm -B $buildDir $cmakeArgumentsForSlang + $extraArguments -G "Ninja" --toolchain $toolchainFile
+$llvmSourceDir = Join-Path $sourceDir "llvm"
+# Use the single-config Ninja generator rather than Ninja Multi-Config because
+# LLVM_DISTRIBUTION_COMPONENTS (used above) is not compatible with
+# multi-configuration generators.
+cmake -S "$llvmSourceDir" -B "$buildDir" `
+    -G "Ninja" `
+    "-DCMAKE_BUILD_TYPE=$config" `
+    "-DCMAKE_INSTALL_PREFIX=$installPrefix" `
+    --toolchain "$toolchainFile" `
+    @cmakeArgumentsForSlang `
+    @extraArguments
 
-# Build LLVM
+# Build and install LLVM
 Msg "##########################################################"
-Msg "# Building LLVM in $buildDir"
+Msg "# Building and installing LLVM into $installPrefix"
 Msg "##########################################################"
-cmake --build $buildDir -j --config $config
+# install-distribution builds and installs exactly the components listed in
+# LLVM_DISTRIBUTION_COMPONENTS (set at configure time). This is LLVM's
+# supported mechanism for producing a trimmed toolchain — see
+# https://llvm.org/docs/BuildingADistribution.html. We use it instead of
+# `ninja all` because `ninja all` honors neither LLVM_BUILD_TOOLS=0 nor
+# CLANG_ENABLE_STATIC_ANALYZER=OFF reliably (see
+# llvm/llvm-project#117705), so it builds tools, tests, examples, and
+# analyzer sources we don't need. install-distribution sidesteps that
+# whole class of "off switches that don't switch off" by only building
+# what we listed.
+cmake --build "$buildDir" -j --target install-distribution
 
-# Install LLVM
+# Sanity-check that the install tree actually contains the per-target
+# codegen libraries we asked for. Mirrors the equivalent check in
+# build-llvm.sh: install-distribution only installs what the named
+# components transitively pull in, so if upstream LLVM ever regroups
+# components and drops LLVM<TARGET>CodeGen out of the libraries
+# component, fail loudly here rather than at first use.
 Msg "##########################################################"
-Msg "# Installing LLVM to $installPrefix"
+Msg "# Verifying installed LLVM codegen libraries"
 Msg "##########################################################"
-cmake --install $buildDir --prefix $installPrefix --config $config
+$missingCodegen = @()
+foreach ($target in $llvmTargetList) {
+    $hit = Get-ChildItem -Path $installPrefix -Recurse -File -ErrorAction SilentlyContinue `
+        -Include "LLVM${target}CodeGen.lib", "libLLVM${target}CodeGen.*" |
+        Select-Object -First 1
+    if (-not $hit) {
+        $missingCodegen += $target
+    }
+}
+if ($missingCodegen.Count -gt 0) {
+    Fail "LLVM install at $installPrefix is missing codegen libraries for: $($missingCodegen -join ', '). The LLVM_DISTRIBUTION_COMPONENTS list in this script likely needs updating."
+}
 
 Msg "##########################################################"
 Msg "LLVM installed in $installPrefix"
