@@ -555,6 +555,15 @@ struct TagOpsLoweringContext : public InstPassBase
             flattenedCaseArgs.add(caseBlocks[i]);
         }
 
+        // The default block must end in a real return: HLSL emit lowers
+        // `kIROp_Unreachable` to nothing, and dxc rejects functions whose
+        // control can fall off the end (`-Wreturn-type`). In well-formed IR
+        // the witness tag always matches one of the cases, so the value here
+        // is never observed.
+        auto defaultBlock = funcBuilder.emitBlock();
+        funcBuilder.setInsertInto(defaultBlock);
+        funcBuilder.emitReturn(funcBuilder.emitDefaultConstruct(resultType));
+
         auto unreachableBlock = funcBuilder.emitBlock();
         funcBuilder.setInsertInto(unreachableBlock);
         funcBuilder.emitUnreachable();
@@ -563,7 +572,7 @@ struct TagOpsLoweringContext : public InstPassBase
         funcBuilder.emitSwitch(
             tagParam,
             unreachableBlock,
-            unreachableBlock,
+            defaultBlock,
             flattenedCaseArgs.getCount(),
             flattenedCaseArgs.getBuffer());
 
