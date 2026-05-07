@@ -1,0 +1,40 @@
+{
+	"name": "playground-render-canvas",
+	"version": "0.0.1",
+	"description": "Extension for the Slang Shading Language",
+	"main": "dist/index.umd.js",
+	"module": "dist/index.es.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"style": "./dist/playground-render-canvas.css",
+			"import": "./dist/index.es.js",
+			"require": "./dist/index.umd.js"
+		},
+		"./dist/playground-render-canvas.css": {
+			"default": "./dist/playground-render-canvas.css"
+		}
+	},
+	"scripts": {
+		"build": "vite build",
+		"type-check": "vue-tsc --build"
+	},
+	"dependencies": {
+		"slang-playground-shared": "0.0.1"
+	},
+	"peerDependencies": {
+		"vue": "^3.5.17"
+	},
+	"devDependencies": {
+		"@types/node": "^24.0.14",
+		"@types/vscode": "^1.85.0",
+		"@vitejs/plugin-vue": "^5.0.4",
+		"@vscode/test-web": "^0.0.51",
+		"vite-plugin-dts": "^4.5.4",
+		"@webgpu/types": "^0.1.51",
+		"vue": "^3.5.17",
+		"vue-tsc": "^3.0.1"
+	},
+	"type": "module"
+}
