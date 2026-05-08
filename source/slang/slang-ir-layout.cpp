@@ -375,9 +375,8 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_StringType:
         if (targetReq && builtinTypeInfo.stringSize != 0)
         {
-            *outSizeAndAlignment = IRSizeAndAlignment(
-                builtinTypeInfo.stringSize,
-                builtinTypeInfo.stringAlignment);
+            *outSizeAndAlignment =
+                IRSizeAndAlignment(builtinTypeInfo.stringSize, builtinTypeInfo.stringAlignment);
             return SLANG_OK;
         }
         break;
