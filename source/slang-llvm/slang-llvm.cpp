@@ -1088,7 +1088,7 @@ extern "C" SLANG_DLL_EXPORT SlangResult getLLVMTargetBuiltinTypeLayoutInfo_V1(
 
     out->genericPointerSize = pointerBits / 8;
     out->stringSize = out->genericPointerSize;
-    out->stringSize = out->genericPointerSize;
+    out->stringAlignment = out->genericPointerSize;
 
     return SLANG_OK;
 }
