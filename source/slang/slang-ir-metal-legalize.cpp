@@ -339,6 +339,13 @@ static void legalizeSubpassInputsForMetal(
         {
             nextUse = use->nextUse;
             auto user = use->getUser();
+
+            // Decorations referencing the global (e.g., debug-value, layout
+            // metadata) are not value uses; leave them alone so they aren't
+            // destroyed alongside the global's data uses.
+            if (as<IRDecoration>(user))
+                continue;
+
             auto parentFunc = getParentFunc(user);
 
             IRInst* newParam = nullptr;
