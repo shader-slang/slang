@@ -5847,7 +5847,7 @@ inline SlangResult getSyntheticResourceDescriptorRange(
 {
     if (!metadata || !outRange)
         return SLANG_E_INVALID_ARG;
-    if (outRange->structSize != sizeof(SyntheticResourceDescriptorRange))
+    if (outRange->structSize < sizeof(SyntheticResourceDescriptorRange))
         return SLANG_E_INVALID_ARG;
 
     SyntheticResourceInfo info = {};
@@ -5911,7 +5911,7 @@ inline SlangResult getSyntheticResourceDescriptorSpaceSpan(
 {
     if (!metadata || !outSpan)
         return SLANG_E_INVALID_ARG;
-    if (outSpan->structSize != sizeof(SyntheticResourceDescriptorSpaceSpan))
+    if (outSpan->structSize < sizeof(SyntheticResourceDescriptorSpaceSpan))
         return SLANG_E_INVALID_ARG;
 
     outSpan->minSpace = -1;

@@ -676,9 +676,23 @@ static bool tryGetCoverageUniformBindingInfo(
     outUniformOffset = -1;
     outUniformStride = 0;
 
+    if (!targetRequest || !(isCPUTarget(targetRequest) || isCUDATarget(targetRequest)))
+        return false;
+
     auto bufferReference = CoverageMaterializer::resolveBufferReference(module);
     if (!bufferReference.isValid())
         return false;
+
+    auto tryNarrowToInt32 = [](IRIntegerValue value, int32_t& outValue)
+    {
+        if (value < std::numeric_limits<int32_t>::min() ||
+            value > std::numeric_limits<int32_t>::max())
+        {
+            return false;
+        }
+        outValue = (int32_t)value;
+        return true;
+    };
 
     auto tryFillFromNaturalFieldLayout = [&](IRStructField* field)
     {
@@ -699,8 +713,16 @@ static bool tryGetCoverageUniformBindingInfo(
         if (fieldSizeAlignment.size == IRSizeAndAlignment::kIndeterminateSize)
             return false;
 
-        outUniformOffset = (int32_t)naturalOffset;
-        outUniformStride = (int32_t)fieldSizeAlignment.getStride();
+        int32_t narrowOffset = -1;
+        int32_t narrowStride = 0;
+        if (!tryNarrowToInt32(naturalOffset, narrowOffset) ||
+            !tryNarrowToInt32(fieldSizeAlignment.getStride(), narrowStride))
+        {
+            return false;
+        }
+
+        outUniformOffset = narrowOffset;
+        outUniformStride = narrowStride;
         return true;
     };
 
@@ -709,34 +731,41 @@ static bool tryGetCoverageUniformBindingInfo(
         if (!varLayout)
             return false;
 
+        int32_t narrowOffset = -1;
         if (auto uniformOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::Uniform))
-            outUniformOffset = (int32_t)uniformOffsetAttr->getOffset();
+        {
+            if (!tryNarrowToInt32(uniformOffsetAttr->getOffset(), narrowOffset))
+                return false;
+            outUniformOffset = narrowOffset;
+        }
 
+        int32_t narrowStride = 0;
         if (auto uniformSizeAttr = varLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::Uniform))
-            outUniformStride = (int32_t)uniformSizeAttr->getFiniteSize();
+        {
+            if (!tryNarrowToInt32(uniformSizeAttr->getFiniteSize(), narrowStride))
+                return false;
+            outUniformStride = narrowStride;
+        }
 
         return outUniformOffset >= 0;
     };
 
     if (bufferReference.directBuffer)
     {
-        if (targetRequest && (isCPUTarget(targetRequest) || isCUDATarget(targetRequest)))
+        IRSizeAndAlignment fieldSizeAlignment;
+        if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(
+                targetRequest,
+                bufferReference.directBuffer->getDataType(),
+                &fieldSizeAlignment)) &&
+            fieldSizeAlignment.size != IRSizeAndAlignment::kIndeterminateSize)
         {
-            IRSizeAndAlignment fieldSizeAlignment;
-            if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(
-                    targetRequest,
-                    bufferReference.directBuffer->getDataType(),
-                    &fieldSizeAlignment)) &&
-                fieldSizeAlignment.size != IRSizeAndAlignment::kIndeterminateSize)
-            {
-                outUniformOffset = 0;
-                outUniformStride = (int32_t)fieldSizeAlignment.getStride();
-                return true;
-            }
+            int32_t narrowStride = 0;
+            if (!tryNarrowToInt32(fieldSizeAlignment.getStride(), narrowStride))
+                return false;
+            outUniformOffset = 0;
+            outUniformStride = narrowStride;
+            return true;
         }
-
-        if (auto layoutDecor = bufferReference.directBuffer->findDecoration<IRLayoutDecoration>())
-            return tryFillFromVarLayout(as<IRVarLayout>(layoutDecor->getLayout()));
         return false;
     }
 

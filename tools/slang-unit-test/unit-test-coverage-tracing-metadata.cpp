@@ -49,63 +49,78 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
-    slang::TargetDesc targetDesc = {};
-    targetDesc.format = SLANG_CPP_SOURCE;
-    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    struct MetadataBundle
+    {
+        ComPtr<slang::IMetadata> metadata;
+        slang::ICoverageTracingMetadata* coverage = nullptr;
+        slang::ISyntheticResourceMetadata* syntheticResources = nullptr;
+    };
 
-    slang::CompilerOptionEntry covOption = {};
-    covOption.name = slang::CompilerOptionName::TraceCoverage;
-    covOption.value.kind = slang::CompilerOptionValueKind::Int;
-    covOption.value.intValue0 = 1;
+    auto createMetadataBundle = [&](SlangCompileTarget format, const char* profileName)
+    {
+        MetadataBundle bundle;
 
-    slang::SessionDesc sessionDesc = {};
-    sessionDesc.targetCount = 1;
-    sessionDesc.targets = &targetDesc;
-    sessionDesc.compilerOptionEntries = &covOption;
-    sessionDesc.compilerOptionEntryCount = 1;
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = format;
+        targetDesc.profile = globalSession->findProfile(profileName);
 
-    ComPtr<slang::ISession> session;
-    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+        slang::CompilerOptionEntry covOption = {};
+        covOption.name = slang::CompilerOptionName::TraceCoverage;
+        covOption.value.kind = slang::CompilerOptionValueKind::Int;
+        covOption.value.intValue0 = 1;
 
-    ComPtr<slang::IBlob> diagnostics;
-    auto module = session->loadModuleFromSourceString(
-        "coverageTest",
-        "coverageTest.slang",
-        shaderSource,
-        diagnostics.writeRef());
-    SLANG_CHECK(module != nullptr);
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.compilerOptionEntries = &covOption;
+        sessionDesc.compilerOptionEntryCount = 1;
 
-    ComPtr<slang::IEntryPoint> entryPoint;
-    module->findEntryPointByName("computeMain", entryPoint.writeRef());
-    SLANG_CHECK(entryPoint != nullptr);
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
-    slang::IComponentType* components[] = {module, entryPoint};
-    ComPtr<slang::IComponentType> program;
-    SLANG_CHECK(
-        session->createCompositeComponentType(components, 2, program.writeRef(), nullptr) ==
-        SLANG_OK);
+        ComPtr<slang::IBlob> diagnostics;
+        auto module = session->loadModuleFromSourceString(
+            "coverageTest",
+            "coverageTest.slang",
+            shaderSource,
+            diagnostics.writeRef());
+        SLANG_CHECK(module != nullptr);
 
-    ComPtr<slang::IComponentType> linked;
-    SLANG_CHECK(program->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+        ComPtr<slang::IEntryPoint> entryPoint;
+        module->findEntryPointByName("computeMain", entryPoint.writeRef());
+        SLANG_CHECK(entryPoint != nullptr);
 
-    // Force codegen so the coverage pass runs. The compiled blob is
-    // not inspected here — metadata is populated as a side effect of
-    // the back-end pipeline.
-    ComPtr<slang::IBlob> codeBlob;
-    SLANG_CHECK(
-        linked->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+        slang::IComponentType* components[] = {module, entryPoint};
+        ComPtr<slang::IComponentType> program;
+        SLANG_CHECK(
+            session->createCompositeComponentType(components, 2, program.writeRef(), nullptr) ==
+            SLANG_OK);
 
-    ComPtr<slang::IMetadata> metadata;
-    SLANG_CHECK(
-        linked->getEntryPointMetadata(0, 0, metadata.writeRef(), diagnostics.writeRef()) ==
-        SLANG_OK);
+        ComPtr<slang::IComponentType> linked;
+        SLANG_CHECK(program->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
 
-    auto* coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
-        slang::ICoverageTracingMetadata::getTypeGuid());
-    SLANG_CHECK(coverage != nullptr);
-    auto* syntheticResources = (slang::ISyntheticResourceMetadata*)metadata->castAs(
-        slang::ISyntheticResourceMetadata::getTypeGuid());
-    SLANG_CHECK(syntheticResources != nullptr);
+        ComPtr<slang::IBlob> codeBlob;
+        SLANG_CHECK(
+            linked->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnostics.writeRef()) ==
+            SLANG_OK);
+
+        SLANG_CHECK(
+            linked->getEntryPointMetadata(0, 0, bundle.metadata.writeRef(), diagnostics.writeRef()) ==
+            SLANG_OK);
+
+        bundle.coverage = (slang::ICoverageTracingMetadata*)bundle.metadata->castAs(
+            slang::ICoverageTracingMetadata::getTypeGuid());
+        SLANG_CHECK(bundle.coverage != nullptr);
+        bundle.syntheticResources = (slang::ISyntheticResourceMetadata*)bundle.metadata->castAs(
+            slang::ISyntheticResourceMetadata::getTypeGuid());
+        SLANG_CHECK(bundle.syntheticResources != nullptr);
+
+        return bundle;
+    };
+
+    auto cpuBundle = createMetadataBundle(SLANG_CPP_SOURCE, "sm_5_0");
+    auto* coverage = cpuBundle.coverage;
+    auto* syntheticResources = cpuBundle.syntheticResources;
 
     // The shader has multiple instrumented statements (for loop, if,
     // else, assignments, writeback) — expect at least several slots.
@@ -275,6 +290,47 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
                     SLANG_OK);
                 SLANG_CHECK(uniformInfo.uniformOffset == info.uniformOffset);
                 SLANG_CHECK(uniformInfo.uniformStride == info.uniformStride);
+            }
+        }
+        SLANG_CHECK(foundCoverageResource);
+    }
+
+    // Descriptor-backed targets should expose descriptor-facing binding
+    // information while leaving CPU/CUDA uniform marshaling fields at their
+    // documented sentinel values.
+    {
+        auto spirvBundle = createMetadataBundle(SLANG_SPIRV, "spirv_1_5");
+        auto* spirvSyntheticResources = spirvBundle.syntheticResources;
+
+        const uint32_t resourceCount = spirvSyntheticResources->getResourceCount();
+        SLANG_CHECK(resourceCount > 0);
+
+        bool foundCoverageResource = false;
+        for (uint32_t i = 0; i < resourceCount; ++i)
+        {
+            slang::SyntheticResourceInfo info;
+            SLANG_CHECK(spirvSyntheticResources->getResourceInfo(i, &info) == SLANG_OK);
+            if (info.featureTag && UnownedStringSlice(info.featureTag) == toSlice("coverage"))
+            {
+                foundCoverageResource = true;
+                SLANG_CHECK(info.binding >= 0);
+                SLANG_CHECK(info.space >= 0);
+                SLANG_CHECK(info.uniformOffset == -1);
+                SLANG_CHECK(info.uniformStride == 0);
+
+                slang::SyntheticResourceDescriptorBindingInfo descriptorInfo;
+                SLANG_CHECK(
+                    spirvSyntheticResources->getResourceDescriptorBindingInfo(i, &descriptorInfo) ==
+                    SLANG_OK);
+                SLANG_CHECK(descriptorInfo.binding == info.binding);
+                SLANG_CHECK(descriptorInfo.space == info.space);
+
+                slang::SyntheticResourceUniformBindingInfo uniformInfo;
+                SLANG_CHECK(
+                    spirvSyntheticResources->getResourceUniformBindingInfo(i, &uniformInfo) ==
+                    SLANG_OK);
+                SLANG_CHECK(uniformInfo.uniformOffset == -1);
+                SLANG_CHECK(uniformInfo.uniformStride == 0);
             }
         }
         SLANG_CHECK(foundCoverageResource);
