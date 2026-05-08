@@ -900,13 +900,13 @@ SlangResult LLVMDownstreamCompiler::compile(
             // Try running something in the module on the JIT
             std::unique_ptr<llvm::orc::LLJIT> jit;
             {
-                // AVX-512 is disabled in the JIT TargetMachine here to dodge
-                // intermittent SIGILLs on hosts where LLVM's host detection
-                // claims AVX-512 but the CPU then faults on kmovd /
-                // vmovss-with-mask (see #11062). The same helper is called
-                // from the IR builder JIT path; the wrapper pairs disable
-                // with create() so a future caller can't accidentally
-                // construct an LLJIT with AVX-512 enabled.
+                // Host-specific features are disabled in the JIT TargetMachine
+                // here for CI runs that opt in via SLANG_DISABLE_AVX512. This
+                // dodges intermittent SIGILLs when LLVM's host detection
+                // reports features that the runner later cannot execute (see
+                // #11062). The same helper is called from the IR builder JIT
+                // path; the wrapper pairs mitigation with create() so a future
+                // caller cannot accidentally construct an unsafe LLJIT.
                 Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = createAVX512SafeLLJIT();
                 if (!expectJit)
                 {

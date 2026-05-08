@@ -7,15 +7,15 @@
 namespace slang_llvm
 {
 
-/// Disable the AVX-512 feature family on the JIT TargetMachine before LLJIT
+/// Avoid host-specific x86_64 codegen on the JIT TargetMachine before LLJIT
 /// construction, **only when the SLANG_DISABLE_AVX512 environment variable
-/// is set to "1"**. Default is a no-op so production builds keep AVX-512
-/// codegen on capable hosts. CI workflows that hit #11062 set the env
-/// var on the test step.
+/// is set to "1"**. Default is a no-op so production builds keep native
+/// codegen on capable hosts. CI workflows that hit #11062 set the env var on
+/// the test step.
 ///
 /// On x86_64 with the var set, builds an explicit JITTargetMachineBuilder
-/// via detectHost() and subtracts every AVX-512 feature LLVM might
-/// recognise, then hands it to the LLJITBuilder. On non-x86_64 hosts (or
+/// via detectHost(), then overrides the CPU and feature string to baseline
+/// x86-64 before handing it to the LLJITBuilder. On non-x86_64 hosts (or
 /// without the env var) this is a no-op.
 ///
 /// Prefer `createAVX512SafeLLJIT()` over calling this helper directly: it
@@ -24,20 +24,20 @@ namespace slang_llvm
 /// https://github.com/shader-slang/slang/issues/11062.
 ///
 /// TODO(#11017): once the LLVM 22 bump lands, the underlying detectHost()
-/// mis-reporting may go away — drop SLANG_DISABLE_AVX512 from the CI
+/// mis-reporting may go away; drop SLANG_DISABLE_AVX512 from the CI
 /// workflows, observe whether the merge queue stays clean, and if so
 /// remove this helper entirely.
-void disableAVX512ForJIT(llvm::orc::LLJITBuilder& jitBuilder);
+void disableHostSpecificFeaturesForJIT(llvm::orc::LLJITBuilder& jitBuilder);
 
-/// Construct an LLJIT with AVX-512 conditionally disabled in its JIT
-/// TargetMachine. Equivalent to:
+/// Construct an LLJIT with host-specific features conditionally disabled in its
+/// JIT TargetMachine. Equivalent to:
 ///
 ///   LLJITBuilder b;
-///   disableAVX512ForJIT(b);
+///   disableHostSpecificFeaturesForJIT(b);
 ///   return b.create();
 ///
-/// `disableAVX512ForJIT` only fires when SLANG_DISABLE_AVX512=1 is set in
-/// the environment; otherwise this is a plain `LLJITBuilder().create()`.
+/// `disableHostSpecificFeaturesForJIT` only fires when SLANG_DISABLE_AVX512=1
+/// is set in the environment; otherwise this is a plain `LLJITBuilder().create()`.
 /// Use this from every LLJIT construction site in slang-llvm so the
 /// mitigation can't be forgotten. See #11062.
 llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> createAVX512SafeLLJIT();
