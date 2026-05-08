@@ -8,8 +8,6 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-target-program.h"
-#include "slang-target.h"
 
 namespace Slang
 {
@@ -382,13 +380,11 @@ static void legalizeSubpassInputsForMetal(
             }
             sink->diagnose(Diagnostics::SubpassInputUsedOutsideEntryPoint{
                 .location = getDiagnosticPos(user)});
-            if (user->firstUse)
+            if (auto resultType = user->getDataType())
             {
                 IRBuilder localBuilder(user);
                 localBuilder.setInsertBefore(user);
-                auto resultType = user->getDataType();
-                user->replaceUsesWith(
-                    resultType ? localBuilder.emitPoison(resultType) : nullptr);
+                user->replaceUsesWith(localBuilder.emitPoison(resultType));
             }
             user->removeAndDeallocate();
         }

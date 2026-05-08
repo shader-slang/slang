@@ -5007,7 +5007,7 @@ fatal(
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 
--- Metal and WGSL (56101-56109)
+-- Metal or WGSL (56101-56109)
 
 err(
     "resource-types-in-constant-buffer-in-parameter-block-not-allowed-on-metal",
