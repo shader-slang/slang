@@ -35,6 +35,7 @@ struct VariableScopeCorrectionContext
     void _processUnstorableInst(IRInst* inst, const List<IRUse*>& outOfScopeUser);
 
     bool _isStorableType(IRType* inst);
+    bool _isAddressInst(IRInst* inst);
     bool _isOutOfScopeUse(
         IRInst* inst,
         IRDominatorTree* domTree,
@@ -112,7 +113,11 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
         }
     }
 
-    auto instAfterParam = funcInst->getFirstBlock()->getFirstOrdinaryInst();
+    auto entryBlock = funcInst->getFirstBlock();
+    auto instAfterParam = entryBlock->getFirstOrdinaryInst();
+    if (!instAfterParam)
+        instAfterParam = entryBlock->getTerminator();
+    SLANG_ASSERT(instAfterParam);
 
     for (Index i = 0; i < workList.getCount(); i++)
     {
@@ -180,7 +185,7 @@ void VariableScopeCorrectionContext::_processInstruction(
         return;
     }
 
-    if (_isStorableType(originInst->getDataType()))
+    if (!_isAddressInst(originInst) && _isStorableType(originInst->getDataType()))
     {
         _processStorableInst(instAfterParam, originInst, outOfScopeUses);
     }
@@ -245,9 +250,6 @@ bool VariableScopeCorrectionContext::_isStorableType(IRType* type)
     if (!type)
         return false;
 
-    if (as<IRPtrTypeBase>(type))
-        return false;
-
     // C/CPP/CUDA can store any type.
     if (isCPUTarget(m_targetReq) || isCUDATarget(m_targetReq))
         return true;
@@ -270,6 +272,20 @@ bool VariableScopeCorrectionContext::_isStorableType(IRType* type)
         }
     case kIROp_UnsizedArrayType:
         return false;
+    default:
+        return false;
+    }
+}
+
+bool VariableScopeCorrectionContext::_isAddressInst(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_FieldAddress:
+    case kIROp_GetElementPtr:
+    case kIROp_GetOffsetPtr:
+    case kIROp_RWStructuredBufferGetElementPtr:
+        return true;
     default:
         return false;
     }
