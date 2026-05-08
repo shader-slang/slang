@@ -50,7 +50,7 @@ void fillWeightMatrixTiled<int InputSize, int OutputSize>(uint tid)
     fillForwardWeightTiled<DType, InputSize, OutputSize, BatchSize>(tid, buffers.weightBuffer, DType(0.125f));
 }
 
-bool test<int InputSize, int OutputSize>(uint tid)
+void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
@@ -85,7 +85,11 @@ bool test<int InputSize, int OutputSize>(uint tid)
         }
     }
 
-    return collectResults<BatchSize>(tid, res);
+    bool finalResult = collectResults<BatchSize>(tid, res);
+    if (tid == 0)
+    {
+        outputBuffer[resIndex] = finalResult ? 1 : 0;
+    }
 }
 
 [numthreads(BatchSize, 1, 1)]
@@ -101,9 +105,7 @@ void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
     {
         fillWeightMatrixTiled<3, 5>(tid);
         AllMemoryBarrierWithGroupSync();
-        bool result = test<3, 5>(tid);
-        if (tid == 0)
-            outputBuffer[0] = result ? 1 : 0;
+        test<3, 5>(tid, 0);
         AllMemoryBarrierWithGroupSync();
     }
 
@@ -111,9 +113,7 @@ void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
     {
         fillWeightMatrixTiled<11, 18>(tid);
         AllMemoryBarrierWithGroupSync();
-        bool result = test<11, 18>(tid);
-        if (tid == 0)
-            outputBuffer[1] = result ? 1 : 0;
+        test<11, 18>(tid, 1);
         AllMemoryBarrierWithGroupSync();
     }
 
@@ -121,9 +121,7 @@ void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
     {
         fillWeightMatrixTiled<23, 9>(tid);
         AllMemoryBarrierWithGroupSync();
-        bool result = test<23, 9>(tid);
-        if (tid == 0)
-            outputBuffer[2] = result ? 1 : 0;
+        test<23, 9>(tid, 2);
         AllMemoryBarrierWithGroupSync();
     }
 
@@ -131,9 +129,7 @@ void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
     {
         fillWeightMatrixTiled<35, 3>(tid);
         AllMemoryBarrierWithGroupSync();
-        bool result = test<35, 3>(tid);
-        if (tid == 0)
-            outputBuffer[3] = result ? 1 : 0;
+        test<35, 3>(tid, 3);
         AllMemoryBarrierWithGroupSync();
     }
 
@@ -141,9 +137,7 @@ void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
     {
         fillWeightMatrixTiled<17, 64>(tid);
         AllMemoryBarrierWithGroupSync();
-        bool result = test<17, 64>(tid);
-        if (tid == 0)
-            outputBuffer[4] = result ? 1 : 0;
+        test<17, 64>(tid, 4);
     }
     // BUFFER: {{^}}1{{$}}
     // BUFFER-NEXT: {{^}}1{{$}}
