@@ -829,5 +829,6 @@ return {
 	["assumeAddress"] = 853,
 	["DebugCompilationUnit"] = 854,
 	["IncrementCoverageCounter"] = 855,
-	["Decoration.CoverageSlotDecoration"] = 856
+	["Decoration.CoverageSlotDecoration"] = 856,
+	["Decoration.CoverageBufferDecoration"] = 857
 }

@@ -416,6 +416,7 @@ SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* o
 
 uint32_t ArtifactPostEmitMetadata::getResourceCount()
 {
+    m_syntheticResourcesPublished = true;
     return (uint32_t)m_syntheticResources.getCount();
 }
 
@@ -424,6 +425,7 @@ SlangResult ArtifactPostEmitMetadata::findResourceIndexByID(uint32_t id, uint32_
     if (!outIndex)
         return SLANG_E_INVALID_ARG;
 
+    m_syntheticResourcesPublished = true;
     for (Index i = 0; i < m_syntheticResources.getCount(); ++i)
     {
         if (m_syntheticResources[i].id == id)
@@ -433,7 +435,7 @@ SlangResult ArtifactPostEmitMetadata::findResourceIndexByID(uint32_t id, uint32_
         }
     }
 
-    return SLANG_E_INVALID_ARG;
+    return SLANG_E_NOT_FOUND;
 }
 
 SlangResult ArtifactPostEmitMetadata::getResourceInfo(
@@ -447,6 +449,7 @@ SlangResult ArtifactPostEmitMetadata::getResourceInfo(
     if (index >= (uint32_t)m_syntheticResources.getCount())
         return SLANG_E_INVALID_ARG;
 
+    m_syntheticResourcesPublished = true;
     auto& record = m_syntheticResources[index];
     outInfo->id = record.id;
     outInfo->bindingType = record.bindingType;
@@ -474,6 +477,7 @@ SlangResult ArtifactPostEmitMetadata::getResourceDescriptorBindingInfo(
     if (index >= (uint32_t)m_syntheticResources.getCount())
         return SLANG_E_INVALID_ARG;
 
+    m_syntheticResourcesPublished = true;
     auto& record = m_syntheticResources[index];
     outInfo->space = record.space;
     outInfo->binding = record.binding;
@@ -491,6 +495,7 @@ SlangResult ArtifactPostEmitMetadata::getResourceUniformBindingInfo(
     if (index >= (uint32_t)m_syntheticResources.getCount())
         return SLANG_E_INVALID_ARG;
 
+    m_syntheticResourcesPublished = true;
     auto& record = m_syntheticResources[index];
     outInfo->uniformOffset = record.uniformOffset;
     outInfo->uniformStride = record.uniformStride;

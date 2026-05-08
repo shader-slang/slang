@@ -3,8 +3,8 @@
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "compiler-core/slang-source-loc.h"
-#include "slang-ir-layout.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-target.h"
@@ -46,6 +46,7 @@ static SyntheticResourceRecord* findSyntheticResourceRecordById(
 static SyntheticResourceRecord& getOrAddCoverageSyntheticResourceRecord(
     ArtifactPostEmitMetadata& metadata)
 {
+    SLANG_ASSERT(!metadata.m_syntheticResourcesPublished);
     if (auto existing = findSyntheticResourceRecordById(metadata, kCoverageSyntheticResourceID))
         return *existing;
 
@@ -116,9 +117,34 @@ static IRGlobalParam* findGlobalParamByName(
     return nullptr;
 }
 
-static IRStructField* findStructFieldByName(
-    IRType* type,
-    UnownedTerminatedStringSlice expectedName)
+static bool hasCoverageBufferDecoration(IRInst* inst)
+{
+    return inst && inst->findDecorationImpl(kIROp_CoverageBufferDecoration);
+}
+
+static void removeCoverageBufferDecorations(IRInst* inst)
+{
+    if (!inst)
+        return;
+
+    while (auto decor = inst->findDecoration<IRCoverageBufferDecoration>())
+        decor->removeAndDeallocate();
+}
+
+static IRGlobalParam* findCoverageBufferGlobalByDecoration(IRModule* module)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto param = as<IRGlobalParam>(inst))
+        {
+            if (hasCoverageBufferDecoration(param))
+                return param;
+        }
+    }
+    return nullptr;
+}
+
+static IRStructField* findStructFieldByName(IRType* type, UnownedTerminatedStringSlice expectedName)
 {
     if (auto structType = as<IRStructType>(type))
     {
@@ -142,9 +168,50 @@ static IRStructField* findStructFieldByName(
     return nullptr;
 }
 
-static IRStructField* findStructFieldByKey(
-    IRType* type,
-    IRStructKey* expectedKey)
+static IRStructField* findCoverageBufferFieldByDecoration(IRType* type)
+{
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (hasCoverageBufferDecoration(field->getKey()))
+                return field;
+        }
+        return nullptr;
+    }
+
+    if (auto specialize = as<IRSpecialize>(type))
+    {
+        if (auto generic = as<IRGeneric>(specialize->getBase()))
+        {
+            if (auto genericStructType = as<IRStructType>(findInnerMostGenericReturnVal(generic)))
+                return findCoverageBufferFieldByDecoration(genericStructType);
+        }
+    }
+
+    return nullptr;
+}
+
+static void removeCoverageBufferFieldDecorations(IRType* type)
+{
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+            removeCoverageBufferDecorations(field->getKey());
+        return;
+    }
+
+    if (auto specialize = as<IRSpecialize>(type))
+    {
+        if (auto generic = as<IRGeneric>(specialize->getBase()))
+        {
+            if (auto genericStructType = as<IRStructType>(findInnerMostGenericReturnVal(generic)))
+                removeCoverageBufferFieldDecorations(genericStructType);
+        }
+    }
+}
+
+static IRStructField* findStructFieldByKey(IRType* type, IRStructKey* expectedKey)
 {
     if (auto structType = as<IRStructType>(type))
     {
@@ -477,10 +544,7 @@ struct CoverageInstrumenter
     ArtifactPostEmitMetadata& outMetadata;
     IRType* intType;
 
-    CoverageInstrumenter(
-        IRModule* m,
-        SourceManager* sm,
-        ArtifactPostEmitMetadata& md)
+    CoverageInstrumenter(IRModule* m, SourceManager* sm, ArtifactPostEmitMetadata& md)
         : module(m), sourceManager(sm), outMetadata(md)
     {
         IRBuilder tmpBuilder(module);
@@ -551,33 +615,36 @@ struct CoverageMaterializer
     {
         BufferReference result;
 
-        if (auto directBuffer =
-                findGlobalParamByName(module, UnownedTerminatedStringSlice(kCoverageBufferName)))
+        if (auto directBuffer = findCoverageBufferGlobalByDecoration(module))
         {
             result.directBuffer = directBuffer;
             return result;
         }
 
-        auto wrapperParam =
-            findGlobalParamByName(module, UnownedTerminatedStringSlice(kGlobalParamsName));
-        if (!wrapperParam)
-            return result;
-
-        IRType* wrapperValueType = wrapperParam->getDataType();
-        if (auto parameterGroupType = as<IRParameterGroupType>(wrapperValueType))
+        for (auto inst : module->getGlobalInsts())
         {
-            result.wrapperIsParameterGroup = true;
-            wrapperValueType = cast<IRType>(parameterGroupType->getOperand(0));
-        }
+            auto wrapperParam = as<IRGlobalParam>(inst);
+            if (!wrapperParam)
+                continue;
 
-        auto field =
-            findStructFieldByName(wrapperValueType, UnownedTerminatedStringSlice(kCoverageBufferName));
-        if (!field)
+            IRType* wrapperValueType = wrapperParam->getDataType();
+            bool wrapperIsParameterGroup = false;
+            if (auto parameterGroupType = as<IRParameterGroupType>(wrapperValueType))
+            {
+                wrapperIsParameterGroup = true;
+                wrapperValueType = cast<IRType>(parameterGroupType->getOperand(0));
+            }
+
+            auto field = findCoverageBufferFieldByDecoration(wrapperValueType);
+            if (!field)
+                continue;
+
+            result.wrapperParam = wrapperParam;
+            result.wrapperFieldKey = field->getKey();
+            result.wrapperFieldType = field->getFieldType();
+            result.wrapperIsParameterGroup = wrapperIsParameterGroup;
             return result;
-
-        result.wrapperParam = wrapperParam;
-        result.wrapperFieldKey = field->getKey();
-        result.wrapperFieldType = field->getFieldType();
+        }
         return result;
     }
 
@@ -586,6 +653,11 @@ struct CoverageMaterializer
         if (bufferReference.directBuffer)
             return bufferReference.directBuffer;
         return bufferReference.wrapperParam;
+    }
+
+    static IRInst* getFieldKeyForKeepAlive(BufferReference const& bufferReference)
+    {
+        return bufferReference.wrapperFieldKey;
     }
 
     static void removeKeepAliveDecorations(IRInst* value)
@@ -619,7 +691,7 @@ struct CoverageMaterializer
     void lowerCounterOp(IRInst* counterOp)
     {
         auto slotDecoration = counterOp->findDecoration<IRCoverageSlotDecoration>();
-        SLANG_ASSERT(slotDecoration);
+        SLANG_RELEASE_ASSERT(slotDecoration);
         if (!slotDecoration)
         {
             counterOp->removeAndDeallocate();
@@ -704,8 +776,10 @@ static bool tryGetCoverageUniformBindingInfo(
             return false;
 
         IRSizeAndAlignment fieldSizeAlignment;
-        if (SLANG_FAILED(
-                getNaturalSizeAndAlignment(targetRequest, field->getFieldType(), &fieldSizeAlignment)))
+        if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                targetRequest,
+                field->getFieldType(),
+                &fieldSizeAlignment)))
         {
             return false;
         }
@@ -740,7 +814,8 @@ static bool tryGetCoverageUniformBindingInfo(
         }
 
         int32_t narrowStride = 0;
-        if (auto uniformSizeAttr = varLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::Uniform))
+        if (auto uniformSizeAttr =
+                varLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::Uniform))
         {
             if (!tryNarrowToInt32(uniformSizeAttr->getFiniteSize(), narrowStride))
                 return false;
@@ -799,6 +874,87 @@ static bool tryGetCoverageUniformBindingInfo(
     }
 
     return false;
+}
+
+static CoverageMaterializer::BufferReference resolveCoverageBufferReferenceForFinalizedModule(
+    IRModule* module)
+{
+    if (auto decoratedReference = CoverageMaterializer::resolveBufferReference(module);
+        decoratedReference.isValid())
+    {
+        return decoratedReference;
+    }
+
+    CoverageMaterializer::BufferReference result;
+
+    if (auto directBuffer =
+            findGlobalParamByName(module, UnownedTerminatedStringSlice(kCoverageBufferName)))
+    {
+        result.directBuffer = directBuffer;
+        return result;
+    }
+
+    auto wrapperParam =
+        findGlobalParamByName(module, UnownedTerminatedStringSlice(kGlobalParamsName));
+    if (!wrapperParam)
+        return result;
+
+    IRType* wrapperValueType = wrapperParam->getDataType();
+    if (auto parameterGroupType = as<IRParameterGroupType>(wrapperValueType))
+    {
+        result.wrapperIsParameterGroup = true;
+        wrapperValueType = cast<IRType>(parameterGroupType->getOperand(0));
+    }
+
+    auto field =
+        findStructFieldByName(wrapperValueType, UnownedTerminatedStringSlice(kCoverageBufferName));
+    if (!field)
+        return result;
+
+    result.wrapperParam = wrapperParam;
+    result.wrapperFieldKey = field->getKey();
+    result.wrapperFieldType = field->getFieldType();
+    return result;
+}
+
+static void attachCoverageBufferDecoration(IRModule* module, IRInst* inst)
+{
+    if (!inst || hasCoverageBufferDecoration(inst))
+        return;
+
+    IRBuilder builder(module);
+    builder.addDecoration(inst, kIROp_CoverageBufferDecoration);
+}
+
+static void clearCoverageBufferDecorations(IRModule* module)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto param = as<IRGlobalParam>(inst))
+        {
+            removeCoverageBufferDecorations(param);
+
+            IRType* valueType = param->getDataType();
+            if (auto parameterGroupType = as<IRParameterGroupType>(valueType))
+                valueType = cast<IRType>(parameterGroupType->getOperand(0));
+            removeCoverageBufferFieldDecorations(valueType);
+        }
+    }
+}
+
+static void ensureCoverageBufferReferenceDecorated(
+    IRModule* module,
+    CoverageMaterializer::BufferReference const& bufferReference)
+{
+    clearCoverageBufferDecorations(module);
+
+    if (bufferReference.directBuffer)
+    {
+        attachCoverageBufferDecoration(module, bufferReference.directBuffer);
+        return;
+    }
+
+    attachCoverageBufferDecoration(module, bufferReference.wrapperFieldKey);
 }
 
 } // anonymous namespace
@@ -918,6 +1074,7 @@ void prepareCoverageInstrumentation(
     // standalone `IRGlobalParam`.
     IRBuilder builder(module);
     builder.setInsertInto(module->getModuleInst());
+    builder.addDecoration(buffer, kIROp_CoverageBufferDecoration);
     auto newScopeVarLayout =
         extendScopeLayoutWithCoverageBuffer(builder, globalScopeVarLayout, buffer);
     if (newScopeVarLayout != globalScopeVarLayout)
@@ -961,6 +1118,11 @@ void finalizeCoverageInstrumentationMetadata(
     if (!record)
         return;
 
+    auto bufferReference = resolveCoverageBufferReferenceForFinalizedModule(module);
+    if (!bufferReference.isValid())
+        return;
+    ensureCoverageBufferReferenceDecorated(module, bufferReference);
+
     int32_t uniformOffset = -1;
     int32_t uniformStride = 0;
     if (tryGetCoverageUniformBindingInfo(module, targetRequest, uniformOffset, uniformStride))
@@ -980,22 +1142,23 @@ void preserveCoverageBindingForMaterialization(IRModule* module, bool enabled)
     if (counterOps.getCount() == 0)
         return;
 
-    auto bufferReference = CoverageMaterializer::resolveBufferReference(module);
+    auto bufferReference = resolveCoverageBufferReferenceForFinalizedModule(module);
     if (!bufferReference.isValid())
         return;
 
+    ensureCoverageBufferReferenceDecorated(module, bufferReference);
+
     auto keepAliveTarget = CoverageMaterializer::getOwningGlobalForKeepAlive(bufferReference);
-    if (!keepAliveTarget || keepAliveTarget->findDecoration<IRKeepAliveDecoration>())
-        return;
+    auto fieldKeepAliveTarget = CoverageMaterializer::getFieldKeyForKeepAlive(bufferReference);
 
     IRBuilder builder(module);
-    builder.addKeepAliveDecoration(keepAliveTarget);
+    if (keepAliveTarget && !keepAliveTarget->findDecoration<IRKeepAliveDecoration>())
+        builder.addKeepAliveDecoration(keepAliveTarget);
+    if (fieldKeepAliveTarget && !fieldKeepAliveTarget->findDecoration<IRKeepAliveDecoration>())
+        builder.addKeepAliveDecoration(fieldKeepAliveTarget);
 }
 
-void materializeCoverageInstrumentation(
-    IRModule* module,
-    DiagnosticSink* sink,
-    bool enabled)
+void materializeCoverageInstrumentation(IRModule* module, DiagnosticSink* sink, bool enabled)
 {
     SLANG_UNUSED(sink);
 
@@ -1020,6 +1183,8 @@ void materializeCoverageInstrumentation(
 
     if (auto keepAliveTarget = CoverageMaterializer::getOwningGlobalForKeepAlive(bufferReference))
         CoverageMaterializer::removeKeepAliveDecorations(keepAliveTarget);
+    if (auto fieldKeepAliveTarget = CoverageMaterializer::getFieldKeyForKeepAlive(bufferReference))
+        CoverageMaterializer::removeKeepAliveDecorations(fieldKeepAliveTarget);
 
     CoverageMaterializer materializer(module, bufferReference);
     materializer.run(counterOps);

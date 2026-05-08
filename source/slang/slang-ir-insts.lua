@@ -2246,6 +2246,15 @@ local insts = {
 					operands = { { "slot", "IRIntLit" } },
 				},
 			},
+			{
+				CoverageBufferDecoration = {
+					-- Internal marker identifying the synthesized coverage
+					-- resource, either as a standalone global parameter or as
+					-- the packed wrapper field key created by later layout
+					-- passes.
+					struct_name = "CoverageBufferDecoration",
+				},
+			},
 			{ RequireSPIRVDescriptorIndexingExtensionDecoration = {} },
 			{
 				spirvOpDecoration = {

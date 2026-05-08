@@ -896,6 +896,12 @@ struct IRCoverageSlotDecoration : IRDecoration
 };
 
 FIDDLE()
+struct IRCoverageBufferDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
 struct IRStageAccessDecoration : public IRDecoration
 {
     FIDDLE(baseInst())

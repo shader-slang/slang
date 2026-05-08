@@ -4792,8 +4792,9 @@ struct ISyntheticResourceMetadata : public ISlangCastable
     getResourceInfo(uint32_t index, SyntheticResourceInfo* outInfo) = 0;
 
     /// Look up the resource index for a stable synthetic resource
-    /// identifier. Returns `SLANG_OK` on success and
-    /// `SLANG_E_INVALID_ARG` for null `outIndex` or unknown `id`.
+    /// identifier. Returns `SLANG_OK` on success,
+    /// `SLANG_E_NOT_FOUND` when no resource with that id exists, and
+    /// `SLANG_E_INVALID_ARG` for null `outIndex`.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     findResourceIndexByID(uint32_t id, uint32_t* outIndex) = 0;
 
@@ -4817,9 +4818,8 @@ struct ISyntheticResourceMetadata : public ISlangCastable
     /// `uniformOffset == -1` means the marshaling location is
     /// unavailable for this target. `uniformStride == 0` means no
     /// array stride is applicable or available.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getResourceUniformBindingInfo(
-        uint32_t index,
-        SyntheticResourceUniformBindingInfo* outInfo) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getResourceUniformBindingInfo(uint32_t index, SyntheticResourceUniformBindingInfo* outInfo) = 0;
 };
     #define SLANG_UUID_ISyntheticResourceMetadata ISyntheticResourceMetadata::getTypeGuid()
 
@@ -5739,16 +5739,16 @@ namespace slang
 enum class SyntheticResourceDescriptorClass : uint32_t
 {
     Unsupported = 0,
-    Sampler,
-    CombinedTextureSampler,
-    SampledImage,
-    StorageImage,
-    UniformTexelBuffer,
-    StorageTexelBuffer,
-    StorageBuffer,
-    InputAttachment,
-    AccelerationStructure,
-    UniformBuffer,
+    Sampler = 1,
+    CombinedTextureSampler = 2,
+    SampledImage = 3,
+    StorageImage = 4,
+    UniformTexelBuffer = 5,
+    StorageTexelBuffer = 6,
+    StorageBuffer = 7,
+    InputAttachment = 8,
+    AccelerationStructure = 9,
+    UniformBuffer = 10,
 };
 
 struct SyntheticResourceDescriptorRange
@@ -5756,7 +5756,8 @@ struct SyntheticResourceDescriptorRange
     size_t structSize = sizeof(SyntheticResourceDescriptorRange);
 
     uint32_t id = 0;
-    SyntheticResourceDescriptorClass descriptorClass = SyntheticResourceDescriptorClass::Unsupported;
+    SyntheticResourceDescriptorClass descriptorClass =
+        SyntheticResourceDescriptorClass::Unsupported;
     BindingType bindingType = BindingType::Unknown;
     uint32_t arraySize = 1;
     SyntheticResourceScope scope = SyntheticResourceScope::Global;
@@ -5781,7 +5782,8 @@ inline bool getSyntheticResourceDescriptorClass(
     BindingType bindingType,
     SyntheticResourceDescriptorClass* outClass)
 {
-    SyntheticResourceDescriptorClass descriptorClass = SyntheticResourceDescriptorClass::Unsupported;
+    SyntheticResourceDescriptorClass descriptorClass =
+        SyntheticResourceDescriptorClass::Unsupported;
     switch (bindingType)
     {
     case BindingType::Sampler:
@@ -5857,7 +5859,8 @@ inline SlangResult getSyntheticResourceDescriptorRange(
             return result;
     }
 
-    SyntheticResourceDescriptorClass descriptorClass = SyntheticResourceDescriptorClass::Unsupported;
+    SyntheticResourceDescriptorClass descriptorClass =
+        SyntheticResourceDescriptorClass::Unsupported;
     if (!getSyntheticResourceDescriptorClass(info.bindingType, &descriptorClass))
         return SLANG_E_NOT_AVAILABLE;
     if (info.binding < 0)
@@ -5922,7 +5925,8 @@ inline SlangResult getSyntheticResourceDescriptorSpaceSpan(
     for (uint32_t i = 0; i < resourceCount; ++i)
     {
         SyntheticResourceDescriptorRange descriptorRange = {};
-        const SlangResult result = getSyntheticResourceDescriptorRange(metadata, i, &descriptorRange);
+        const SlangResult result =
+            getSyntheticResourceDescriptorRange(metadata, i, &descriptorRange);
         if (result == SLANG_E_NOT_AVAILABLE)
             continue;
         if (SLANG_FAILED(result))
@@ -5964,7 +5968,8 @@ inline SlangResult getSyntheticResourceDescriptorRangeCountForSpace(
     for (uint32_t i = 0; i < resourceCount; ++i)
     {
         SyntheticResourceDescriptorRange descriptorRange = {};
-        const SlangResult result = getSyntheticResourceDescriptorRange(metadata, i, &descriptorRange);
+        const SlangResult result =
+            getSyntheticResourceDescriptorRange(metadata, i, &descriptorRange);
         if (result == SLANG_E_NOT_AVAILABLE)
             continue;
         if (SLANG_FAILED(result))
@@ -6008,7 +6013,8 @@ inline SlangResult getSyntheticResourceDescriptorRangesForSpace(
     for (uint32_t i = 0; i < resourceCount; ++i)
     {
         SyntheticResourceDescriptorRange descriptorRange = {};
-        const SlangResult result = getSyntheticResourceDescriptorRange(metadata, i, &descriptorRange);
+        const SlangResult result =
+            getSyntheticResourceDescriptorRange(metadata, i, &descriptorRange);
         if (result == SLANG_E_NOT_AVAILABLE)
             continue;
         if (SLANG_FAILED(result))

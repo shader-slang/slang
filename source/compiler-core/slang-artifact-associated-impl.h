@@ -293,8 +293,12 @@ public:
 
     // Generic compiler-synthesized bindable resources, including
     // coverage's hidden buffer. Empty when the compiled target does
-    // not introduce any such resources.
+    // not introduce any such resources. Records are finalized before
+    // host queries begin; getters may return raw `const char*`
+    // pointers into the stored `String`s, so adding new records after
+    // publication would invalidate that contract.
     List<SyntheticResourceRecord> m_syntheticResources;
+    bool m_syntheticResourcesPublished = false;
 };
 
 } // namespace Slang
