@@ -107,13 +107,6 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
         {
             for (auto inst : block->getChildren())
             {
-                List<IRInst*> instList;
-                // Don't process the variable declaration instruction because the code is not
-                // emitted for them unless there is a use.
-                if (inst->getOp() == kIROp_Var)
-                {
-                    continue;
-                }
                 workList.add(inst);
             }
         }
@@ -178,6 +171,15 @@ void VariableScopeCorrectionContext::_processInstruction(
     if (outOfScopeUses.getCount() == 0)
         return;
 
+    // A var represents storage, so cloning it would create fresh uninitialized
+    // storage at the use site. Hoist the declaration instead, preserving the
+    // stores that define its value.
+    if (auto var = as<IRVar>(originInst))
+    {
+        var->insertBefore(instAfterParam);
+        return;
+    }
+
     if (_isStorableType(originInst->getDataType()))
     {
         _processStorableInst(instAfterParam, originInst, outOfScopeUses);
@@ -227,14 +229,13 @@ void VariableScopeCorrectionContext::_processUnstorableInst(
     IRInst* inst,
     const List<IRUse*>& outOfScopeUsers)
 {
-    IRCloneEnv cloneEnv;
-    auto clonedInst = cloneInst(&cloneEnv, &m_builder, inst);
-
     for (auto user : outOfScopeUsers)
     {
         // duplicate the invisible instruction and insert it right before the use site,
         // then replace the operand with the duplicated instruction
-        clonedInst->insertBefore(user->getUser());
+        IRCloneEnv cloneEnv;
+        m_builder.setInsertBefore(user->getUser());
+        auto clonedInst = cloneInst(&cloneEnv, &m_builder, inst);
         m_builder.replaceOperand(user, clonedInst);
     }
 }
@@ -242,6 +243,9 @@ void VariableScopeCorrectionContext::_processUnstorableInst(
 bool VariableScopeCorrectionContext::_isStorableType(IRType* type)
 {
     if (!type)
+        return false;
+
+    if (as<IRPtrTypeBase>(type))
         return false;
 
     // C/CPP/CUDA can store any type.
