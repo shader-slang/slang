@@ -9,7 +9,7 @@ class DiagnosticSink;
 class TargetRequest;
 class ArtifactPostEmitMetadata;
 
-// Shader coverage instrumentation pass.
+// Early shader coverage preparation pass.
 //
 // When `enabled` is true, the pass synthesizes a fresh
 // `RWStructuredBuffer<uint> __slang_coverage` `IRGlobalParam` directly
@@ -18,7 +18,9 @@ class ArtifactPostEmitMetadata;
 // extends the program-scope var layout so the buffer participates in
 // `collectGlobalUniformParameters` packaging on targets that need it
 // (CPU, CUDA), assigns one counter slot per `IncrementCoverageCounter`
-// op, and rewrites each op into an atomic add on its slot. The pass
+// op, and records that slot on the marker as an IR decoration. The
+// final rewrite into runtime coverage operations is deferred to the
+// later `materializeCoverageInstrumentation` pass. The preparation pass
 // writes the resulting `(slot → file, line)` mapping and the chosen
 // buffer binding into `outMetadata` so hosts can query it via
 // `ICoverageTracingMetadata`.
@@ -36,7 +38,7 @@ class ArtifactPostEmitMetadata;
 // from cached modules are dropped so the backend never sees them, no
 // buffer is synthesized, and `outMetadata` and `globalScopeVarLayout`
 // are left untouched.
-void instrumentCoverage(
+void prepareCoverageInstrumentation(
     IRModule* module,
     DiagnosticSink* sink,
     bool enabled,
@@ -45,6 +47,39 @@ void instrumentCoverage(
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata);
+
+// Finalize coverage-related synthetic resource metadata after global
+// uniform packing has run. This updates any backend-independent
+// marshaling fields (for example CPU/CUDA uniform offsets) that can
+// only be determined from the post-packing IR layout.
+void finalizeCoverageInstrumentationMetadata(
+    IRModule* module,
+    bool enabled,
+    TargetRequest* targetRequest,
+    ArtifactPostEmitMetadata& outMetadata);
+
+// Preserve the synthesized coverage binding while coverage remains in
+// compact marker form. This should run after
+// `collectGlobalUniformParameters`, before simplification/DCE can drop
+// an otherwise-unused hidden resource on targets where coverage may be
+// the only global parameter.
+void preserveCoverageBindingForMaterialization(IRModule* module, bool enabled);
+
+// Late shader coverage materialization pass.
+//
+// Lowers any surviving `IncrementCoverageCounter` ops into runtime
+// coverage operations using the slot assigned by
+// `prepareCoverageInstrumentation`. This pass should run after the
+// major specialization/cloning-heavy transformations, but still before
+// backend lowering stages that need to see the resulting resource
+// accesses.
+//
+// When `enabled` is false, or when there are no remaining counter ops,
+// the pass simply drops any stray markers.
+void materializeCoverageInstrumentation(
+    IRModule* module,
+    DiagnosticSink* sink,
+    bool enabled);
 
 } // namespace Slang
 

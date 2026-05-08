@@ -2237,6 +2237,24 @@ local insts = {
 					operands = { { "counterBuffer" } },
 				},
 			},
+			{
+				CoverageSlotDecoration = {
+					-- Internal slot assignment for `IncrementCoverageCounter`.
+					-- Assigned early, survives specialization/cloning, and is
+					-- consumed by the later coverage materialization pass.
+					struct_name = "CoverageSlotDecoration",
+					operands = { { "slot", "IRIntLit" } },
+				},
+			},
+			{
+				CoverageBufferDecoration = {
+					-- Internal marker identifying the synthesized coverage
+					-- resource, either as a standalone global parameter or as
+					-- the packed wrapper field key created by later layout
+					-- passes.
+					struct_name = "CoverageBufferDecoration",
+				},
+			},
 			{ RequireSPIRVDescriptorIndexingExtensionDecoration = {} },
 			{
 				spirvOpDecoration = {

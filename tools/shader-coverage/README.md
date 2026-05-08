@@ -11,6 +11,10 @@ design, including why IR-time buffer synthesis is paired with post-
 emit coverage metadata for binding-info propagation, see
 [`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md).
 
+For the host-facing binding contract used by `slang-rhi` and direct
+hosts, see
+[`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).
+
 Not to be confused with `tools/coverage/`, which measures C++ coverage
 of the Slang compiler itself.
 
@@ -58,7 +62,9 @@ runtime over the Python converter.
 
 For the pipeline architecture, design rationale, and alternatives
 weighed, see
-[`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md).
+[`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md)
+and
+[`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).
 
 ## Pinning the coverage buffer at an explicit slot
 
@@ -115,12 +121,39 @@ linked->getEntryPointMetadata(0, 0, metadata.writeRef(), ...);
 
 auto* coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
     slang::ICoverageTracingMetadata::getTypeGuid());
+auto* syntheticResources = (slang::ISyntheticResourceMetadata*)metadata->castAs(
+    slang::ISyntheticResourceMetadata::getTypeGuid());
 
 uint32_t n = coverage->getCounterCount();
+SLANG_CHECK(syntheticResources != nullptr);
 
-slang::CoverageBufferInfo bufferInfo;
-coverage->getBufferInfo(&bufferInfo);
-// bufferInfo.space, bufferInfo.binding (-1 when not assigned for this target)
+uint32_t coverageResourceIndex = ~0u;
+for (uint32_t i = 0; i < syntheticResources->getResourceCount(); ++i)
+{
+    slang::SyntheticResourceInfo info = {};
+    info.structSize = sizeof(info);
+    SLANG_CHECK(syntheticResources->getResourceInfo(i, &info) == SLANG_OK);
+    if (info.featureTag && !strcmp(info.featureTag, "coverage"))
+    {
+        coverageResourceIndex = i;
+        break;
+    }
+}
+SLANG_CHECK(coverageResourceIndex != ~0u);
+
+slang::SyntheticResourceDescriptorBindingInfo descriptorInfo = {};
+if (SLANG_SUCCEEDED(
+        syntheticResources->getResourceDescriptorBindingInfo(coverageResourceIndex, &descriptorInfo)))
+{
+    // descriptorInfo.space, descriptorInfo.binding
+}
+
+slang::SyntheticResourceUniformBindingInfo uniformInfo = {};
+if (SLANG_SUCCEEDED(
+        syntheticResources->getResourceUniformBindingInfo(coverageResourceIndex, &uniformInfo)))
+{
+    // uniformInfo.uniformOffset, uniformInfo.uniformStride
+}
 
 for (uint32_t i = 0; i < n; ++i) {
     slang::CoverageEntryInfo entry;
@@ -130,11 +163,11 @@ for (uint32_t i = 0; i < n; ++i) {
 }
 ```
 
-The host allocates a `uint32_t[n]` counter buffer, declares its slot
-in its own pipeline-layout / root-signature at the reported
-`(set, binding)`, dispatches the shader, reads the counters back,
-and consumes the attribution data however it likes — direct
-telemetry, a custom LCOV writer, a dashboard, etc.
+The host allocates a `uint32_t[n]` counter buffer, binds it using the
+hidden binding information reported through
+`ISyntheticResourceMetadata`, dispatches the shader, reads the
+counters back, and consumes the attribution data however it likes —
+direct telemetry, a custom LCOV writer, a dashboard, etc.
 
 #### Producing the canonical manifest JSON in-process
 
@@ -298,4 +331,3 @@ slot in its own pipeline layout / root signature.
   Buf b, ...)` style) may end up sharing a register slot with
   `__slang_coverage`. Workaround: declare uniforms at module scope
   (modern Slang convention) — that path works correctly.
-

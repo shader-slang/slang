@@ -4,6 +4,10 @@ Shader Coverage Design
 This document describes the shader coverage implementation in Slang
 and the role of the main pieces in the pipeline.
 
+For the host-facing binding contract for hidden synthetic coverage
+resources, see
+[`shader-coverage-host-interface.md`](./shader-coverage-host-interface.md).
+
 Overview
 --------
 
@@ -58,6 +62,15 @@ and that fact is preserved in the metadata and JSON sidecar. The
 LCOV conversion step then applies gcov-style reporting rules by
 filtering those entries out of line-oriented output.
 
+The host-side interface design built on top of these channels lives in
+[`shader-coverage-host-interface.md`](./shader-coverage-host-interface.md).
+
+The current reporting mode is line-oriented hit-count coverage, but
+the binding/resource model is intentionally more general than that.
+Future revisions may add branch coverage, function coverage, binary
+covered/uncovered modes, or warp-aggregated modes without changing the
+hidden-resource binding contract.
+
 ### Buffer synthesis at IR-pass time
 
 Coverage is a runtime-instrumentation concern. It has no language-
@@ -93,14 +106,14 @@ resource.
 Pipeline architecture
 ---------------------
 
-Enabling `-trace-coverage` runs three pipeline stages:
+Enabling `-trace-coverage` runs five pipeline stages:
 
 1. **AST lowering** (`source/slang/slang-lower-to-ir.cpp`). Before
    each *executable* statement is lowered to IR, the front-end
    emits an `IncrementCoverageCounter` IR op:
    - The op is opaque (zero operands, void return) — it doesn't
-     reference a buffer at this point. The IR coverage pass will
-     rewrite it later.
+     reference a buffer at this point. The later IR passes attach
+     slot information and lower it to runtime atomics.
    - Purely structural compound statements (`BlockStmt`, `SeqStmt`,
      `EmptyStmt`) are filtered to keep counter density proportional
      to real execution events.
@@ -109,9 +122,10 @@ Enabling `-trace-coverage` runs three pipeline stages:
      survives `stripDebugInfo` and every IR transform that preserves
      operands (inline, clone, link).
 
-2. **IR pass** (`source/slang/slang-ir-coverage-instrument.cpp`).
-   Runs after `linkIR` has produced the linked-program IR, and
-   before `collectGlobalUniformParameters` packs globals into the
+2. **Coverage preparation** (`prepareCoverageInstrumentation` in
+   `source/slang/slang-ir-coverage-instrument.cpp`). Runs after
+   `linkIR` has produced the linked-program IR, and before
+   `collectGlobalUniformParameters` packs globals into the
    `GlobalParams` struct. The pass:
    - **Synthesizes the coverage buffer** as a fresh `IRGlobalParam`
      of type `RWStructuredBuffer<uint>`, with a target-aware layout:
@@ -137,8 +151,6 @@ Enabling `-trace-coverage` runs three pipeline stages:
      op** (per-inst UID — consecutive index in traversal order;
      multiple ops on the same source line get distinct slots, which
      keeps the door open for branch/function coverage later).
-   - **Rewrites each op as `AtomicAdd(__slang_coverage[slot], 1,
-     Relaxed)`**.
    - **Records `(slot → file, line)` plus the buffer's binding** on
      the artifact's `ICoverageTracingMetadata`. A slot is
      unattributable when its `IncrementCoverageCounter` op carried
@@ -151,7 +163,22 @@ Enabling `-trace-coverage` runs three pipeline stages:
      see them as `entry.file == nullptr` / `entry.line == 0` after
      `getEntryInfo`.
 
-3. **Emission.** Each backend already handles `kIROp_AtomicAdd` on
+3. **Coverage metadata finalization**
+   (`finalizeCoverageInstrumentationMetadata`). Runs after
+   `collectGlobalUniformParameters` so CPU/CUDA targets can report
+   the final `uniformOffset` / `uniformStride` of the synthesized
+   resource when it is packed into generated wrapper data.
+
+4. **Coverage keep-alive + materialization**
+   (`preserveCoverageBindingForMaterialization` and
+   `materializeCoverageInstrumentation`). The first step protects the
+   synthesized coverage resource through the specialization-heavy
+   middle of the pipeline. The second runs later, after those
+   transforms have finished, and rewrites each
+   `IncrementCoverageCounter` marker to the final runtime operation:
+   `AtomicAdd(__slang_coverage[slot], 1, Relaxed)`.
+
+5. **Emission.** Each backend already handles `kIROp_AtomicAdd` on
    `RWStructuredBuffer<uint>`:
    - HLSL/DXIL → `InterlockedAdd`
    - SPIR-V → `OpAtomicIAdd`
@@ -163,15 +190,15 @@ Enabling `-trace-coverage` runs three pipeline stages:
      `__atomic_fetch_add`, MSVC `_InterlockedExchangeAdd`)
 
 The `IncrementCoverageCounter` op is side-effectful by default in
-DCE analysis, so it survives optimizations untouched until the
-coverage pass rewrites it.
+DCE analysis, so it survives optimizations untouched until the late
+materialization pass rewrites it.
 
 Where each stage lives
 ----------------------
 
 | Path | Role |
 |---|---|
-| `source/slang/slang-ir-coverage-instrument.{h,cpp}` | IR pass — synthesizes the buffer, extends program-scope layout, rewrites counter ops, writes metadata |
+| `source/slang/slang-ir-coverage-instrument.{h,cpp}` | Coverage passes — prepare, finalize metadata, preserve, materialize |
 | `source/slang/slang-ir-insts.lua` | Declares the `IncrementCoverageCounter` IR op |
 | `source/slang/slang-lower-to-ir.cpp` | Emits counter ops during AST lowering; filters `BlockStmt` / `SeqStmt` / `EmptyStmt` |
 | `source/slang/slang-emit.cpp` | Integrates the pass into the pipeline + allocates metadata + plumbs `-trace-coverage-binding` |

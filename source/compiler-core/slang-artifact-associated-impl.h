@@ -182,9 +182,26 @@ struct CoverageTracingEntry
     uint32_t line = 0;
 };
 
+struct SyntheticResourceRecord
+{
+    uint32_t id = 0;
+    slang::BindingType bindingType = slang::BindingType::Unknown;
+    uint32_t arraySize = 1;
+    slang::SyntheticResourceScope scope = slang::SyntheticResourceScope::Global;
+    slang::SyntheticResourceAccess access = slang::SyntheticResourceAccess::Read;
+    int32_t entryPointIndex = -1;
+    int32_t space = -1;
+    int32_t binding = -1;
+    int32_t uniformOffset = -1;
+    int32_t uniformStride = 0;
+    String debugName;
+    String featureTag;
+};
+
 class ArtifactPostEmitMetadata : public ComBaseObject,
                                  public IArtifactPostEmitMetadata,
                                  public slang::ICoverageTracingMetadata,
+                                 public slang::ISyntheticResourceMetadata,
                                  public slang::ICooperativeTypesMetadata
 {
 public:
@@ -218,6 +235,19 @@ public:
     getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE;
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
         SLANG_OVERRIDE;
+
+    // ISyntheticResourceMetadata
+    SLANG_NO_THROW virtual uint32_t SLANG_MCALL getResourceCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL
+    getResourceInfo(uint32_t index, slang::SyntheticResourceInfo* outInfo) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL
+    findResourceIndexByID(uint32_t id, uint32_t* outIndex) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getResourceDescriptorBindingInfo(
+        uint32_t index,
+        slang::SyntheticResourceDescriptorBindingInfo* outInfo) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getResourceUniformBindingInfo(
+        uint32_t index,
+        slang::SyntheticResourceUniformBindingInfo* outInfo) SLANG_OVERRIDE;
 
     // ICooperativeTypesMetadata
     SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeMatrixTypeCount() SLANG_OVERRIDE;
@@ -260,6 +290,15 @@ public:
     List<CoverageTracingEntry> m_coverageEntries;
     int32_t m_coverageBufferSpace = -1;
     int32_t m_coverageBufferBinding = -1;
+
+    // Generic compiler-synthesized bindable resources, including
+    // coverage's hidden buffer. Empty when the compiled target does
+    // not introduce any such resources. Records are finalized before
+    // host queries begin; getters may return raw `const char*`
+    // pointers into the stored `String`s, so adding new records after
+    // publication would invalidate that contract.
+    List<SyntheticResourceRecord> m_syntheticResources;
+    bool m_syntheticResourcesPublished = false;
 };
 
 } // namespace Slang

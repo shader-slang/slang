@@ -828,5 +828,7 @@ return {
 	["SpecializeExistentialsInType"] = 852,
 	["assumeAddress"] = 853,
 	["DebugCompilationUnit"] = 854,
-	["IncrementCoverageCounter"] = 855
+	["IncrementCoverageCounter"] = 855,
+	["Decoration.CoverageSlotDecoration"] = 856,
+	["Decoration.CoverageBufferDecoration"] = 857
 }

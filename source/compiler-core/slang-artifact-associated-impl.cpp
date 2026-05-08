@@ -293,6 +293,10 @@ void* ArtifactPostEmitMetadata::getInterface(const Guid& guid)
     {
         return static_cast<slang::ICoverageTracingMetadata*>(this);
     }
+    if (guid == slang::ISyntheticResourceMetadata::getTypeGuid())
+    {
+        return static_cast<slang::ISyntheticResourceMetadata*>(this);
+    }
     if (guid == slang::ICooperativeTypesMetadata::getTypeGuid())
         return static_cast<slang::ICooperativeTypesMetadata*>(this);
     return nullptr;
@@ -372,6 +376,12 @@ static constexpr size_t kCoverageEntryInfoV1MinSize =
     offsetof(slang::CoverageEntryInfo, line) + sizeof(uint32_t);
 static constexpr size_t kCoverageBufferInfoV1MinSize =
     offsetof(slang::CoverageBufferInfo, binding) + sizeof(int32_t);
+static constexpr size_t kSyntheticResourceInfoV1MinSize =
+    offsetof(slang::SyntheticResourceInfo, featureTag) + sizeof(const char*);
+static constexpr size_t kSyntheticResourceDescriptorBindingInfoV1MinSize =
+    offsetof(slang::SyntheticResourceDescriptorBindingInfo, binding) + sizeof(int32_t);
+static constexpr size_t kSyntheticResourceUniformBindingInfoV1MinSize =
+    offsetof(slang::SyntheticResourceUniformBindingInfo, uniformStride) + sizeof(int32_t);
 
 SlangResult ArtifactPostEmitMetadata::getEntryInfo(
     uint32_t index,
@@ -401,6 +411,94 @@ SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* o
         return SLANG_E_INVALID_ARG;
     outInfo->space = m_coverageBufferSpace;
     outInfo->binding = m_coverageBufferBinding;
+    return SLANG_OK;
+}
+
+uint32_t ArtifactPostEmitMetadata::getResourceCount()
+{
+    m_syntheticResourcesPublished = true;
+    return (uint32_t)m_syntheticResources.getCount();
+}
+
+SlangResult ArtifactPostEmitMetadata::findResourceIndexByID(uint32_t id, uint32_t* outIndex)
+{
+    if (!outIndex)
+        return SLANG_E_INVALID_ARG;
+
+    m_syntheticResourcesPublished = true;
+    for (Index i = 0; i < m_syntheticResources.getCount(); ++i)
+    {
+        if (m_syntheticResources[i].id == id)
+        {
+            *outIndex = uint32_t(i);
+            return SLANG_OK;
+        }
+    }
+
+    return SLANG_E_NOT_FOUND;
+}
+
+SlangResult ArtifactPostEmitMetadata::getResourceInfo(
+    uint32_t index,
+    slang::SyntheticResourceInfo* outInfo)
+{
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize < kSyntheticResourceInfoV1MinSize)
+        return SLANG_E_INVALID_ARG;
+    if (index >= (uint32_t)m_syntheticResources.getCount())
+        return SLANG_E_INVALID_ARG;
+
+    m_syntheticResourcesPublished = true;
+    auto& record = m_syntheticResources[index];
+    outInfo->id = record.id;
+    outInfo->bindingType = record.bindingType;
+    outInfo->arraySize = record.arraySize;
+    outInfo->scope = record.scope;
+    outInfo->access = record.access;
+    outInfo->entryPointIndex = record.entryPointIndex;
+    outInfo->space = record.space;
+    outInfo->binding = record.binding;
+    outInfo->uniformOffset = record.uniformOffset;
+    outInfo->uniformStride = record.uniformStride;
+    outInfo->debugName = record.debugName.getLength() ? record.debugName.getBuffer() : nullptr;
+    outInfo->featureTag = record.featureTag.getLength() ? record.featureTag.getBuffer() : nullptr;
+    return SLANG_OK;
+}
+
+SlangResult ArtifactPostEmitMetadata::getResourceDescriptorBindingInfo(
+    uint32_t index,
+    slang::SyntheticResourceDescriptorBindingInfo* outInfo)
+{
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize < kSyntheticResourceDescriptorBindingInfoV1MinSize)
+        return SLANG_E_INVALID_ARG;
+    if (index >= (uint32_t)m_syntheticResources.getCount())
+        return SLANG_E_INVALID_ARG;
+
+    m_syntheticResourcesPublished = true;
+    auto& record = m_syntheticResources[index];
+    outInfo->space = record.space;
+    outInfo->binding = record.binding;
+    return SLANG_OK;
+}
+
+SlangResult ArtifactPostEmitMetadata::getResourceUniformBindingInfo(
+    uint32_t index,
+    slang::SyntheticResourceUniformBindingInfo* outInfo)
+{
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize < kSyntheticResourceUniformBindingInfoV1MinSize)
+        return SLANG_E_INVALID_ARG;
+    if (index >= (uint32_t)m_syntheticResources.getCount())
+        return SLANG_E_INVALID_ARG;
+
+    m_syntheticResourcesPublished = true;
+    auto& record = m_syntheticResources[index];
+    outInfo->uniformOffset = record.uniformOffset;
+    outInfo->uniformStride = record.uniformStride;
     return SLANG_OK;
 }
 
