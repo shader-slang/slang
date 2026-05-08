@@ -72,11 +72,8 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 
 [numthreads(BatchSize, 1, 1)]
 [shader("compute")]
-void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
+void computeMain(uint tid : SV_GroupIndex)
 {
-    if (gid.x != 0)
-        return;
-
     {
         fillWeightMatrixTiled<3, 5, 16, 16, false>(tid);
         AllMemoryBarrierWithGroupSync();
