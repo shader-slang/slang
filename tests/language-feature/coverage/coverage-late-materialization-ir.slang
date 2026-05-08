@@ -9,9 +9,9 @@
 //   decorations must survive cloning/specialization before the late
 //   materialization pass runs
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=PREP):-target cpp -stage compute -entry computeMain -trace-coverage -dump-ir-after prepareCoverageInstrumentation
-//DIAGNOSTIC_TEST:SIMPLE(diag=MAT_CPP):-target cpp -stage compute -entry computeMain -trace-coverage -dump-ir-after materializeCoverageInstrumentation
-//DIAGNOSTIC_TEST:SIMPLE(diag=MAT_SPV):-target spirv-asm -stage compute -entry computeMain -trace-coverage -dump-ir-after materializeCoverageInstrumentation
+//TEST:SIMPLE(filecheck=PREP):-target cpp -stage compute -entry computeMain -trace-coverage -dump-ir-after prepareCoverageInstrumentation
+//TEST:SIMPLE(filecheck=MAT_CPP):-target cpp -stage compute -entry computeMain -trace-coverage -dump-ir-after materializeCoverageInstrumentation
+//TEST:SIMPLE(filecheck=MAT_SPV):-target spirv-asm -stage compute -entry computeMain -trace-coverage -dump-ir-after materializeCoverageInstrumentation
 
 __generic<let Bias : int>
 uint genericHelper(uint value)
