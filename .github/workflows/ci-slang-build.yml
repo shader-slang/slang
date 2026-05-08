@@ -65,6 +65,7 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "2"
+          fetch-tags: true
 
       # Restore sccache local cache from master
       - name: Restore sccache cache
