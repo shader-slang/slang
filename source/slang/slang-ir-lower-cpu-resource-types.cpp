@@ -125,6 +125,11 @@ struct ResourceTypeLoweringContext : InstPassBase
                 loweredType = builder.getPtrType(builder.getVoidType());
             }
             break;
+        case kIROp_StringType:
+            {
+                loweredType = builder.getNativeStringType();
+            }
+            break;
         default:
             break;
         }
