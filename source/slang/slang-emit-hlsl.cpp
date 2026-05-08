@@ -4,7 +4,6 @@
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-util.h"
-#include "slang-mangled-lexer.h"
 #include "slang-rich-diagnostics.h"
 
 #include <assert.h>
@@ -1075,11 +1074,6 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
-    case kIROp_ControlBarrier:
-        {
-            m_writer->emit("GroupMemoryBatrierWithGroupSync();\n");
-            return true;
-        }
     case kIROp_MakeCoopVector:
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
@@ -1980,7 +1974,8 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
         return;
     }
-    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type);
+             untypedBufferType)
     {
         switch (type->getOp())
         {
@@ -2179,7 +2174,8 @@ void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
 
     if (enablePAQs)
     {
-        if (const auto payloadDecoration = inst->findDecoration<IRRayPayloadDecoration>())
+        if (const auto payloadDecoration = inst->findDecoration<IRRayPayloadDecoration>();
+            payloadDecoration)
         {
             m_writer->emit("[raypayload] ");
         }
@@ -2383,7 +2379,7 @@ void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest*)
 
 void HLSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
-    if (const auto nvapiDecor = inst->findDecoration<IRNVAPIMagicDecoration>())
+    if (const auto nvapiDecor = inst->findDecoration<IRNVAPIMagicDecoration>(); nvapiDecor)
     {
         // When emitting one of the "magic" NVAPI declarations,
         // we will wrap it in a preprocessor conditional that

@@ -32,6 +32,7 @@ This document is designed to guide you in contributing to the project. It is int
 3. [Code Style](#code-style)
 4. [Issue Tracking](#issue-tracking)
 5. [Communication](#communication)
+   - [Discord](#discord)
 6. [License](#license)
 
 ## Contribution Process
@@ -369,6 +370,7 @@ When the PR is limited to document changes, the build workflows may not start pr
 When introducing new compiler warnings or errors, or changing the behavior of existing diagnostics, update the relevant documentation in the same PR. Documentation updates should reflect the new behavior and provide guidance on how users should respond to the diagnostic.
 
 Key documentation areas that may need updates:
+
 - `docs/language-reference/` - Language features and restrictions
 - `docs/user-guide/` - User-facing guidance and examples
 - `docs/design/` - Design rationale and implementation details
@@ -399,6 +401,19 @@ If you're new to the project or looking for a good starting point, consider expl
 ## Communication
 
 Join our [Discussions](https://github.com/shader-slang/slang/discussions).
+
+### Discord
+
+The Slang project also runs a Discord server for real-time conversation with users, contributors, and maintainers. It is a good place to ask quick questions, share work in progress, and coordinate with others on larger changes.
+
+To join:
+
+1. Open the invite link in a browser: [https://khr.io/slangdiscord](https://khr.io/slangdiscord). The invite is also embedded in several compiler diagnostics (for example, internal compiler errors) so users can find help when they hit a problem.
+2. Sign in to Discord, or create a free Discord account if you do not already have one.
+3. Accept the invite to join the Slang server.
+4. Read the rules and complete any onboarding prompts the server presents (for example, agreeing to the rules and selecting roles), then browse the topic-specific channels to find conversations relevant to your interests.
+
+Please keep discussion in Discord friendly and on-topic; the [Code of Conduct](CODE_OF_CONDUCT.md) applies there just as it does on GitHub. For questions or reports that require a durable record (bug reports, feature requests, design discussions), prefer GitHub [Issues](https://github.com/shader-slang/slang/issues) and [Discussions](https://github.com/shader-slang/slang/discussions) so the context remains searchable for future contributors.
 
 ## License
 

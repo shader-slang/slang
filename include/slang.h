@@ -858,6 +858,15 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
+    typedef SlangUInt32 SlangScopeIntegral;
+    enum SlangScope : SlangScopeIntegral
+    {
+        SLANG_SCOPE_NONE,
+        SLANG_SCOPE_THREAD,
+        SLANG_SCOPE_WAVE,
+        SLANG_SCOPE_THREAD_GROUP,
+    };
+
     typedef SlangUInt32 SlangCooperativeMatrixUseIntegral;
     enum SlangCooperativeMatrixUse : SlangCooperativeMatrixUseIntegral
     {
@@ -1154,6 +1163,11 @@ typedef uint32_t SlangSizeT;
         DiagnosticColor = 144, // intValue0: SlangDiagnosticColor (always, never, auto)
 
         // Add new options HERE, immediately before CountOf.
+
+        TraceCoverage = 145, // bool: insert per-statement execution counters
+        TraceCoverageBinding =
+            146, // intValue0: register index; intValue1: register space — explicit
+                 //   binding for the synthesized __slang_coverage buffer
 
         CountOf,
     };
@@ -4504,6 +4518,194 @@ struct IMetadata : public ISlangCastable
 };
     #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
 
+/** Coverage tracing metadata produced when `-trace-coverage` is active.
+
+Each counter slot in the synthesized coverage buffer maps to a source
+`(file, line)` pair. The interface lets hosts read that mapping at
+compile time so they can attribute counter values back to source lines
+at runtime without a separate sidecar file. The metadata is retrieved
+by calling `castAs` / `queryInterface` on the artifact-associated
+`IMetadata` object.
+
+Extensible without ABI breakage in two ways:
+  - tail-extending the `CoverageEntryInfo` / `CoverageBufferInfo`
+    structs (gated by their leading `structSize` field), or
+  - adding a derived `ICoverageTracingMetadataN` interface with a
+    new UUID, queryable through `castAs`.
+The vtable of `ICoverageTracingMetadata` itself is fixed; new
+methods would break ABI for callers compiled against the existing
+header.
+*/
+/// Per-counter-slot attribution returned by
+/// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
+/// `structSize` for ABI-versioned struct growth: future revisions
+/// will add fields (column, function name, branch arm) at the end
+/// without changing the COM interface.
+struct CoverageEntryInfo
+{
+    size_t structSize = sizeof(CoverageEntryInfo);
+
+    /// Source file for this counter slot, or `nullptr` if the slot
+    /// could not be attributed to a real source file. The returned
+    /// pointer is valid for the lifetime of the metadata object.
+    const char* file = nullptr;
+
+    /// 1-based source line for this counter slot, or 0 if the slot
+    /// could not be attributed to a real source line.
+    uint32_t line = 0;
+};
+
+/// Coverage-buffer binding info returned by
+/// `ICoverageTracingMetadata::getBufferInfo`. Same `structSize`-
+/// versioning pattern as `CoverageEntryInfo`.
+struct CoverageBufferInfo
+{
+    size_t structSize = sizeof(CoverageBufferInfo);
+
+    /// Register space the coverage buffer is bound to (D3D12
+    /// `space`, Vulkan descriptor set), or -1 if not assigned for
+    /// this target.
+    int32_t space = -1;
+
+    /// Binding index the coverage buffer is bound at (D3D12
+    /// `register`, Vulkan `binding`), or -1 if not assigned for
+    /// this target.
+    int32_t binding = -1;
+};
+
+struct ICoverageTracingMetadata : public ISlangCastable
+{
+    SLANG_COM_INTERFACE(
+        0x7c9f1d50,
+        0x1e4a,
+        0x4b9c,
+        {0x8e, 0x21, 0x3f, 0x7b, 0x82, 0xa3, 0xd9, 0x51})
+
+    /// Number of counter slots in the synthesized coverage buffer.
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() = 0;
+
+    /// Populate `outInfo` with attribution info for counter slot
+    /// `index`. The caller must pre-set `outInfo->structSize =
+    /// sizeof(CoverageEntryInfo)`. Returns `SLANG_OK` on success,
+    /// `SLANG_E_INVALID_ARG` for null `outInfo`, mismatched
+    /// `structSize`, or out-of-range `index`.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getEntryInfo(uint32_t index, CoverageEntryInfo* outInfo) = 0;
+
+    /// Populate `outInfo` with the coverage buffer's binding info.
+    /// The caller must pre-set `outInfo->structSize =
+    /// sizeof(CoverageBufferInfo)`. Returns `SLANG_OK` on success,
+    /// `SLANG_E_INVALID_ARG` for null `outInfo` or mismatched
+    /// `structSize`.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo* outInfo) = 0;
+};
+    #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()
+
+struct CooperativeMatrixType
+{
+    // Component type `NONE` means this type is not valid.
+    SlangScalarType componentType = SLANG_SCALAR_TYPE_NONE;
+    SlangScope scope = SLANG_SCOPE_NONE;
+
+    uint32_t rowCount = 0;
+    uint32_t columnCount = 0;
+
+    SlangCooperativeMatrixUse use = SLANG_COOPERATIVE_MATRIX_USE_A;
+};
+
+struct CooperativeMatrixCombination
+{
+    // Number of rows of matrix A and the result.
+    uint32_t m = 0;
+    // Number of columns of matrix B and the result.
+    uint32_t n = 0;
+    // Shared inner dimension: columns of A and rows of B.
+    uint32_t k = 0;
+
+    SlangScalarType componentTypeA = SLANG_SCALAR_TYPE_NONE;
+    SlangScalarType componentTypeB = SLANG_SCALAR_TYPE_NONE;
+    SlangScalarType componentTypeC = SLANG_SCALAR_TYPE_NONE;
+    SlangScalarType componentTypeResult = SLANG_SCALAR_TYPE_NONE;
+
+    SlangBool saturate = false;
+    SlangScope scope = SLANG_SCOPE_NONE;
+};
+
+struct CooperativeVectorTypeUsageInfo
+{
+    SlangScalarType componentType = SLANG_SCALAR_TYPE_NONE;
+
+    // Maximum element count used for this component type in cooperative
+    // operations (e.g. MatMul).
+    uint32_t maxSize = 0;
+
+    // Whether this component type is used as an accumulation/storage type for
+    // cooperative training operations (e.g. outer-product accumulation and
+    // reduce-sum accumulation). This flag is independent of `maxSize`.
+    SlangBool usedForTrainingOp = false;
+};
+
+struct CooperativeVectorCombination
+{
+    SlangScalarType inputType = SLANG_SCALAR_TYPE_NONE;
+    SlangScalarType inputInterpretation = SLANG_SCALAR_TYPE_NONE;
+    // Number of logical elements packed into each physical input element.
+    // For example, this is 4 when four int8 values are packed into one uint32 input element.
+    uint32_t inputPackingFactor = 1;
+    SlangScalarType matrixInterpretation = SLANG_SCALAR_TYPE_NONE;
+    // `NONE` means the operation has no bias operand/matrix.
+    SlangScalarType biasInterpretation = SLANG_SCALAR_TYPE_NONE;
+    SlangScalarType resultType = SLANG_SCALAR_TYPE_NONE;
+    SlangBool transpose = false;
+};
+
+/** Cooperative matrix and vector metadata.
+
+This interface reports the cooperative matrix/vector type information that a compiled target uses,
+including cooperative matrix types, cooperative vector type-usage records, and certain type
+combinations required to execute some operations (like matrix multiplication).
+
+Applications can use this metadata to compare shader requirements against the capabilities exposed
+by the target API/driver (for example Vulkan cooperative matrix/vector property queries, or
+analogous APIs on other backends).
+
+Metadata is collected from the IR after target-specific lowering, so it only reflects cooperative
+types that survive as native constructs in the final output.  Targets that lower cooperative types
+into ordinary arrays will report empty lists.
+
+Lists are exposed using `get*Count()` plus `get*ByIndex()` methods, where the count returns the
+number of elements currently available and valid indices are in the range `[0, count)`.
+
+Cast from an `IMetadata*` using `castAs()`.
+*/
+struct ICooperativeTypesMetadata : public ISlangCastable
+{
+    SLANG_COM_INTERFACE(
+        0x64c4d536,
+        0xd949,
+        0x49c3,
+        {0x9f, 0xde, 0x3f, 0x0f, 0x9c, 0x6f, 0x01, 0x31})
+
+    virtual SLANG_NO_THROW SlangUInt SLANG_MCALL getCooperativeMatrixTypeCount() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getCooperativeMatrixTypeByIndex(SlangUInt index, CooperativeMatrixType* outType) = 0;
+
+    virtual SLANG_NO_THROW SlangUInt SLANG_MCALL getCooperativeMatrixCombinationCount() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCooperativeMatrixCombinationByIndex(
+        SlangUInt index,
+        CooperativeMatrixCombination* outCombination) = 0;
+
+    virtual SLANG_NO_THROW SlangUInt SLANG_MCALL getCooperativeVectorTypeCount() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getCooperativeVectorTypeByIndex(SlangUInt index, CooperativeVectorTypeUsageInfo* outType) = 0;
+
+    virtual SLANG_NO_THROW SlangUInt SLANG_MCALL getCooperativeVectorCombinationCount() = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCooperativeVectorCombinationByIndex(
+        SlangUInt index,
+        CooperativeVectorCombination* outCombination) = 0;
+};
+    #define SLANG_UUID_ICooperativeTypesMetadata ICooperativeTypesMetadata::getTypeGuid()
+
 /** Compile result for storing and retrieving multiple output blobs.
     This is needed for features such as separate debug compilation which
     output both base and debug spirv.
@@ -4984,7 +5186,9 @@ enum SlangLanguageVersion
     SLANG_LANGUAGE_VERSION_LEGACY = 2018,
     SLANG_LANGUAGE_VERSION_2025 = 2025,
     SLANG_LANGUAGE_VERSION_2026 = 2026,
+    /* Deprecated: retained for source compatibility; prefer SLANG_LANGUAGE_VERSION_DEFAULT. */
     SLANG_LANGAUGE_VERSION_DEFAULT = SLANG_LANGUAGE_VERSION_LEGACY,
+    SLANG_LANGUAGE_VERSION_DEFAULT = SLANG_LANGUAGE_VERSION_LEGACY,
     SLANG_LANGUAGE_VERSION_LATEST = SLANG_LANGUAGE_VERSION_2026,
 };
 
@@ -5016,6 +5220,26 @@ struct SlangGlobalSessionDesc
  * @return The created blob on success, or nullptr on failure.
  */
 SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t size);
+
+/* Serialize an `ICoverageTracingMetadata` artifact into the canonical
+ * `.coverage-mapping.json` shape. Same bytes that `slangc` writes
+ * alongside compiled output when `-trace-coverage` is on, available
+ * in-process for hosts compiling via the C++ API.
+ *
+ * The returned JSON is consumable by:
+ * - `slang-coverage-rt` (C library) for accumulation + LCOV emission
+ * - `tools/shader-coverage/slang-coverage-to-lcov.py` (Python)
+ * - any tool expecting the version-1 manifest format
+ *
+ * @param metadata The coverage metadata, obtained via
+ *                 `castAs<ICoverageTracingMetadata>` on the artifact's
+ *                 `IMetadata`. Must not be null.
+ * @param outBlob (out) The JSON bytes. Caller releases when done.
+ * @return `SLANG_OK` on success, `SLANG_E_INVALID_ARG` for null
+ *         arguments.
+ */
+SLANG_EXTERN_C SLANG_API SlangResult
+slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlangBlob** outBlob);
 
 /* Load a module from source code with size specification.
  *

@@ -4,7 +4,6 @@
 #include "slang-emit-base.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-clone.h"
-#include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-float-non-uniform-resource-index.h"

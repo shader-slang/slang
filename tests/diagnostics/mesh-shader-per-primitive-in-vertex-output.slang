@@ -61,5 +61,9 @@ struct MeshOutput2 {
 [outputtopology("triangle")]
 [numthreads(1, 1, 1)]
 void msmain_indices(out indices IndexWithPrimSemantic triangles[3], out primitives MeshOutput2 vertices[9]) {
+/*CHECK:
+     ^^^^^^^^^^^^^^ mesh shader missing OutputVertices/OutputIndices output
+     ^^^^^^^^^^^^^^ mesh shader entry point 'msmain_indices' must declare both an 'OutputVertices' and an 'OutputIndices' output parameter
+*/
     SetMeshOutputCounts(6, 2);
 }

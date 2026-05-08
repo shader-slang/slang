@@ -15,22 +15,22 @@ void computeMain()
 {
     // Test positions with pseudo-random values for better coverage
     // 1D position: [42]
-    uvec<1> pos1D;
+    Array<uint32_t, 1> pos1D;
     pos1D[0] = 42u;
 
     // 2D position: [17, 53]
-    uvec<2> pos2D;
+    Array<uint32_t, 2> pos2D;
     pos2D[0] = 17u;
     pos2D[1] = 53u;
 
     // 3D position: [137, 281, 419]
-    uvec<3> pos3D;
+    Array<uint32_t, 3> pos3D;
     pos3D[0] = 137u;
     pos3D[1] = 281u;
     pos3D[2] = 419u;
 
     // 4D position: [523, 661, 797, 937]
-    uvec<4> pos4D;
+    Array<uint32_t, 4> pos4D;
     pos4D[0] = 523u;
     pos4D[1] = 661u;
     pos4D[2] = 797u;
@@ -39,38 +39,38 @@ void computeMain()
     int idx = 0;
 
     // primeHash for 1D, 2D, 3D, 4D
-    gOutputBuffer[idx++] = primeHash<1>(pos1D);
-    gOutputBuffer[idx++] = primeHash<2>(pos2D);
-    gOutputBuffer[idx++] = primeHash<3>(pos3D);
-    gOutputBuffer[idx++] = primeHash<4>(pos4D);
+    gOutputBuffer[idx++] = neural_unittest.testPrimeHash<1>(pos1D);
+    gOutputBuffer[idx++] = neural_unittest.testPrimeHash<2>(pos2D);
+    gOutputBuffer[idx++] = neural_unittest.testPrimeHash<3>(pos3D);
+    gOutputBuffer[idx++] = neural_unittest.testPrimeHash<4>(pos4D);
 
     // coherentPrimeHash for 1D, 2D, 3D, 4D
-    gOutputBuffer[idx++] = coherentPrimeHash<1>(pos1D);
-    gOutputBuffer[idx++] = coherentPrimeHash<2>(pos2D);
-    gOutputBuffer[idx++] = coherentPrimeHash<3>(pos3D);
-    gOutputBuffer[idx++] = coherentPrimeHash<4>(pos4D);
+    gOutputBuffer[idx++] = neural_unittest.testCoherentPrimeHash<1>(pos1D);
+    gOutputBuffer[idx++] = neural_unittest.testCoherentPrimeHash<2>(pos2D);
+    gOutputBuffer[idx++] = neural_unittest.testCoherentPrimeHash<3>(pos3D);
+    gOutputBuffer[idx++] = neural_unittest.testCoherentPrimeHash<4>(pos4D);
 
     // reversedPrimeHash for 1D, 2D, 3D, 4D
-    gOutputBuffer[idx++] = reversedPrimeHash<1>(pos1D);
-    gOutputBuffer[idx++] = reversedPrimeHash<2>(pos2D);
-    gOutputBuffer[idx++] = reversedPrimeHash<3>(pos3D);
-    gOutputBuffer[idx++] = reversedPrimeHash<4>(pos4D);
+    gOutputBuffer[idx++] = neural_unittest.testReversedPrimeHash<1>(pos1D);
+    gOutputBuffer[idx++] = neural_unittest.testReversedPrimeHash<2>(pos2D);
+    gOutputBuffer[idx++] = neural_unittest.testReversedPrimeHash<3>(pos3D);
+    gOutputBuffer[idx++] = neural_unittest.testReversedPrimeHash<4>(pos4D);
 
     // baseConvertHash for 1D, 2D, 3D, 4D
-    gOutputBuffer[idx++] = baseConvertHash<1>(pos1D);
-    gOutputBuffer[idx++] = baseConvertHash<2>(pos2D);
-    gOutputBuffer[idx++] = baseConvertHash<3>(pos3D);
-    gOutputBuffer[idx++] = baseConvertHash<4>(pos4D);
+    gOutputBuffer[idx++] = neural_unittest.testBaseConvertHash<1>(pos1D);
+    gOutputBuffer[idx++] = neural_unittest.testBaseConvertHash<2>(pos2D);
+    gOutputBuffer[idx++] = neural_unittest.testBaseConvertHash<3>(pos3D);
+    gOutputBuffer[idx++] = neural_unittest.testBaseConvertHash<4>(pos4D);
 
     // rngHash for 1D, 2D, 3D, 4D
-    gOutputBuffer[idx++] = rngHash<1>(pos1D);
-    gOutputBuffer[idx++] = rngHash<2>(pos2D);
-    gOutputBuffer[idx++] = rngHash<3>(pos3D);
-    gOutputBuffer[idx++] = rngHash<4>(pos4D);
+    gOutputBuffer[idx++] = neural_unittest.testRngHash<1>(pos1D);
+    gOutputBuffer[idx++] = neural_unittest.testRngHash<2>(pos2D);
+    gOutputBuffer[idx++] = neural_unittest.testRngHash<3>(pos3D);
+    gOutputBuffer[idx++] = neural_unittest.testRngHash<4>(pos4D);
 
     // gridHash dispatcher tests (using 3D to verify it calls the right function)
-    gOutputBuffer[idx++] = gridHash<HashType.Prime, 3>(pos3D);
-    gOutputBuffer[idx++] = gridHash<HashType.BaseConvert, 3>(pos3D);
+    gOutputBuffer[idx++] = neural_unittest.testGridHashPrime< 3>(pos3D);
+    gOutputBuffer[idx++] = neural_unittest.testGridHashBaseConvert< 3>(pos3D);
 }
 
 // Expected values (run hashgrid_reference.cu to generate these):

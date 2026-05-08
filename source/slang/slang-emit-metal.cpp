@@ -5,7 +5,6 @@
 #include "slang-emit-source-writer.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-util.h"
-#include "slang-mangled-lexer.h"
 #include "slang-rich-diagnostics.h"
 
 #include <assert.h>
@@ -1375,7 +1374,8 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_writer->emit(" device*");
         return;
     }
-    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type);
+             untypedBufferType)
     {
         switch (type->getOp())
         {

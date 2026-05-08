@@ -4,6 +4,9 @@
 
 glob_append(neural_shader_sources "*.slang")
 
+# Unit test sources (not copied to build output, resolved via -I at compile time)
+glob_append(neural_unittest_sources "unit-test/*.slang")
+
 # Set output directories for build tree
 # Files go under a "slang/" subdirectory so that `import slang.neural;` resolves
 # to <standard-module-dir>/slang/neural.slang-module at runtime.
@@ -77,13 +80,15 @@ else()
 endif()
 
 # Build neural.slang-module and output to the output directory
+# Pass -I to source dir so that __include "unit-test/..." resolves without copying.
 add_custom_command(
     OUTPUT ${neural_module_file}
     COMMAND
-        ${SLANG_COMPILER} ${NEURAL_MODULE_DEFINES} neural.slang -o
-        ${SLANG_NEURAL_MODULE_FILE_NAME}
+        ${SLANG_COMPILER} ${NEURAL_MODULE_DEFINES} -I ${CMAKE_CURRENT_SOURCE_DIR}
+        neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
     DEPENDS
         ${neural_copied_files}
+        ${neural_unittest_sources}
         ${SLANG_COMPILER_DEPENDENCY}
         ${SLANG_COMPILER_EXTRA_DEPS}
     WORKING_DIRECTORY ${neural_output_dir}
@@ -91,15 +96,9 @@ add_custom_command(
 )
 
 # Create a target to ensure the neural module is built.
-# When SLANG_EMBED_CORE_MODULE=OFF the compiler runs slang-bootstrap from source and currently
-# crashes (exit 0xC0000005) when processing neural.slang's CoopMat/spirv_asm code. Exclude the
-# module from the default ALL build in that configuration so development builds with
-# SLANG_EMBED_CORE_MODULE=OFF do not fail. The target can still be built explicitly.
-if(SLANG_EMBED_CORE_MODULE)
-    add_custom_target(slang-neural-module ALL DEPENDS ${neural_module_file})
-else()
-    add_custom_target(slang-neural-module DEPENDS ${neural_module_file})
-endif()
+# The prelinkIR crashes that previously blocked SLANG_EMBED_CORE_MODULE=OFF builds
+# are fixed (PRs #10835, #10847). Build the neural module unconditionally.
+add_custom_target(slang-neural-module ALL DEPENDS ${neural_module_file})
 set_target_properties(slang-neural-module PROPERTIES FOLDER generated)
 
 # Install the neural directory to the configured location in the release package
