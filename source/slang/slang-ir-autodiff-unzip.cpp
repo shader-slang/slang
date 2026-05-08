@@ -72,16 +72,11 @@ struct UnzippingContext
             }
         }
 
-        IRBlock* firstPrimalBlock = nullptr;
-
         // Emit an empty primal block for every mixed block.
         for (auto block : mixedBlocks)
         {
             IRBlock* primalBlock = builder->emitBlock();
             primalMap[block] = primalBlock;
-
-            if (block == firstBlock)
-                firstPrimalBlock = primalBlock;
         }
 
         // Emit an empty differential block for every mixed block.
@@ -141,9 +136,6 @@ struct UnzippingContext
                         (IndexedRegion*)indexRegionMap->map[block]);
             }
         }
-
-        // Swap the first block's occurences out for the first primal block.
-        // firstBlock->replaceUsesWith(firstPrimalBlock);
 
         RefPtr<BlockSplitInfo> splitInfo = new BlockSplitInfo();
 

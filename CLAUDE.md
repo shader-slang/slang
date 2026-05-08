@@ -33,7 +33,11 @@ cmake --preset default
 # Configure with visual studio 2022 settings (Preferred on Windows)
 # On Windows, include -DSLANG_IGNORE_ABORT_MSG=ON to suppress
 # modal abort dialogs during unattended/LLM-driven builds.
-cmake.exe --preset vs2022 -DSLANG_IGNORE_ABORT_MSG=ON
+# Use -DSLANG_EMBED_CORE_MODULE=OFF to keep core module compilation separate
+# from C++ source compilation. This way errors in *.meta.slang files (e.g.
+# hlsl.meta.slang) do not break the C++ build — slangc and slang-test still
+# compile successfully and the module errors surface at runtime instead.
+cmake.exe --preset vs2022 -DSLANG_IGNORE_ABORT_MSG=ON -DSLANG_EMBED_CORE_MODULE=OFF
 
 # Build Release/Debug binaries.
 # It can take from 5 minutes to 20 minutes depending on the machine.
@@ -64,6 +68,26 @@ cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
 ### Formatting
 
 **Run `./extras/formatting.sh` before committing changes.** PRs must conform to the project's coding style. Use `./extras/formatting.sh --check-only` to verify without modifying files.
+
+### Suppressing Unused Variable Warnings
+
+When a variable declared in an `if` condition is unused inside the body (the condition exists only for its type-check side-effect), use the **C++17 if-init-statement** pattern instead of `SLANG_UNUSED`:
+
+```cpp
+// Preferred: C++17 if-init pattern
+if (auto foo = as<IRFoo>(inst); foo)
+{
+    // foo not needed in body — the type check is the point
+}
+
+// Avoid: SLANG_UNUSED inside the body
+if (auto foo = as<IRFoo>(inst))
+{
+    SLANG_UNUSED(foo);
+}
+```
+
+For variables that are set but never read outside an `if` (e.g., a plain local variable), use `SLANG_UNUSED(var)` with a comment explaining why.
 
 ### PR Workflow
 
@@ -192,6 +216,39 @@ int foo = undefined;
 - **Adding a built-in function**: Add to appropriate module in `prelude/`
 - **Adding a new target**: Implement new emitter in `source/slang/slang-emit-*.cpp`
 
+### Modifying Public Headers (`include/`)
+
+All files under `include/` are public API. Changes must preserve binary (ABI) and source
+compatibility for callers compiled against older versions of the header.
+
+#### Enums
+
+- **Never insert a new enumerator in the middle of an existing enum.** Insertion shifts all
+  subsequent integer values, silently breaking any caller that stores or compares the value.
+- **Always append** new enumerators immediately before the terminal count/sentinel member
+  (e.g. `CountOf`, `Count`, `NUM_*`), assigning an explicit integer value (the next sequential
+  integer after the preceding enumerator).
+- **Removed enumerators**: rename to `REMOVED_<Name>` and keep the original integer value.
+  Never reuse or reclaim a retired integer.
+
+#### Virtual tables (COM interfaces)
+
+Slang's public interfaces (`ISession`, `IModule`, `IComponentType`, etc.) are COM-style
+vtables declared with `virtual` methods in `include/slang.h`. The vtable layout is fixed by
+declaration order. Violating these rules corrupts the vtable and causes silent crashes or
+wrong-method dispatch for any caller compiled against an older header.
+
+- **Never reorder virtual methods** within an interface.
+- **Never change a virtual method's signature** (return type, parameter types, calling
+  convention, or `SLANG_MCALL` decoration).
+- **Never insert a new virtual method** in the middle of an interface — append only, at the
+  end of the interface before the closing brace.
+- **Never remove a virtual method** — replace its body with a stub that returns
+  `SLANG_E_NOT_IMPLEMENTED` and keep the declaration in place.
+- Avoid extending an existing public COM interface in place when clients may implement or
+  query it by UUID. Prefer adding a new derived/versioned interface with its own UUID, while
+  keeping the original interface declaration and UUID supported for existing callers.
+
 ### Debugging tools
 
 #### IR Dump (`-dump-ir`)
@@ -291,6 +348,10 @@ When running under WSL environment, try to append `.exe` to the executables to a
 - Use `cmake.exe` instead of `cmake`,
 - Use `python.exe` instead of `python`,
 - Use `gh.exe` instead of `gh` and so on.
+
+### Release Process
+
+Use the `/slang-release-process` skill to push a new release. See `.claude/skills/slang-release-process/SKILL.md` for the full workflow.
 
 ## Additional Documents
 

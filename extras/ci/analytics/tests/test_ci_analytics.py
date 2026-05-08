@@ -20,10 +20,11 @@ import ci_visualization
 
 
 class TestRunnerTypeCoverage(unittest.TestCase):
-    def test_classify_group_supports_all_three_gcp_runner_types(self):
+    def test_classify_group_supports_all_gcp_runner_types(self):
         config = {
             "label_groups": [],
             "runner_name_prefixes": [
+                {"prefix": "linux-sm80plus-", "name": "Linux SM80Plus GPU (GCP)", "self_hosted": True},
                 {"prefix": "linux-runner-", "name": "Linux GPU (GCP)", "self_hosted": True},
                 {"prefix": "win-build-", "name": "Windows Build (GCP)", "self_hosted": True},
                 {"prefix": "win-runner-", "name": "Windows GPU (GCP)", "self_hosted": True},
@@ -31,10 +32,13 @@ class TestRunnerTypeCoverage(unittest.TestCase):
             "non_production_periods": {"runners": {}},
         }
 
+        sm80_group, sm80_self_hosted = ci_visualization.classify_group([], config, "linux-sm80plus-1")
         linux_group, linux_self_hosted = ci_visualization.classify_group([], config, "linux-runner-1")
         build_group, build_self_hosted = ci_visualization.classify_group([], config, "win-build-5")
         gpu_group, gpu_self_hosted = ci_visualization.classify_group([], config, "win-runner-3")
 
+        self.assertEqual(sm80_group, "Linux SM80Plus GPU (GCP)")
+        self.assertTrue(sm80_self_hosted)
         self.assertEqual(linux_group, "Linux GPU (GCP)")
         self.assertTrue(linux_self_hosted)
         self.assertEqual(build_group, "Windows Build (GCP)")
@@ -42,7 +46,29 @@ class TestRunnerTypeCoverage(unittest.TestCase):
         self.assertEqual(gpu_group, "Windows GPU (GCP)")
         self.assertTrue(gpu_self_hosted)
 
-    def test_record_snapshot_counts_all_three_gcp_runner_types(self):
+    def test_classify_group_supports_sm80plus_without_generic_gpu_label(self):
+        config = {
+            "label_groups": [
+                {
+                    "labels": ["Linux", "self-hosted", "SM80Plus"],
+                    "name": "Linux SM80Plus GPU (GCP)",
+                    "self_hosted": True,
+                },
+                {"labels": ["Linux", "self-hosted", "GPU"], "name": "Linux GPU (GCP)", "self_hosted": True},
+            ],
+            "runner_name_prefixes": [],
+            "non_production_periods": {"runners": {}},
+        }
+
+        group, self_hosted = ci_visualization.classify_group(
+            ["Linux", "self-hosted", "SM80Plus"],
+            config,
+        )
+
+        self.assertEqual(group, "Linux SM80Plus GPU (GCP)")
+        self.assertTrue(self_hosted)
+
+    def test_record_snapshot_counts_all_gcp_runner_types(self):
         queue_data = {
             "summary": {
                 "jobs_queued": 4,
@@ -52,12 +78,14 @@ class TestRunnerTypeCoverage(unittest.TestCase):
             },
             "self_hosted_runners": [
                 {"group": "Linux GPU (GCP)", "status": "online", "busy": True},
+                {"group": "Linux SM80Plus GPU (GCP)", "status": "online", "busy": True},
                 {"group": "Windows Build (GCP)", "status": "online", "busy": False},
                 {"group": "Windows GPU (GCP)", "status": "online", "busy": True},
                 {"group": "Windows GPU (GCP)", "status": "offline", "busy": True},
             ],
             "queue_by_group": [
                 {"name": "Linux GPU (GCP)", "queued": 1, "running": 2},
+                {"name": "Linux SM80Plus GPU (GCP)", "queued": 1, "running": 1},
                 {"name": "Windows Build (GCP)", "queued": 3, "running": 4},
                 {"name": "Windows GPU (GCP)", "queued": 5, "running": 6},
             ],
@@ -69,10 +97,11 @@ class TestRunnerTypeCoverage(unittest.TestCase):
                 snapshot = json.loads(f.readline())
 
         self.assertEqual(snapshot["runner_groups"]["Linux GPU (GCP)"], {"busy": 1, "total": 1})
+        self.assertEqual(snapshot["runner_groups"]["Linux SM80Plus GPU (GCP)"], {"busy": 1, "total": 1})
         self.assertEqual(snapshot["runner_groups"]["Windows Build (GCP)"], {"busy": 0, "total": 1})
         self.assertEqual(snapshot["runner_groups"]["Windows GPU (GCP)"], {"busy": 1, "total": 1})
 
-    def test_build_history_chart_includes_all_three_gcp_runner_types(self):
+    def test_build_history_chart_includes_all_gcp_runner_types(self):
         snapshots = [
             {
                 "timestamp": "2026-03-03T10:00:00Z",
@@ -82,6 +111,7 @@ class TestRunnerTypeCoverage(unittest.TestCase):
                 "runs_in_progress": 4,
                 "runner_groups": {
                     "Linux GPU (GCP)": {"total": 1},
+                    "Linux SM80Plus GPU (GCP)": {"total": 1},
                     "Windows Build (GCP)": {"total": 2},
                     "Windows GPU (GCP)": {"total": 3},
                 },
@@ -94,6 +124,7 @@ class TestRunnerTypeCoverage(unittest.TestCase):
                 "runs_in_progress": 5,
                 "runner_groups": {
                     "Linux GPU (GCP)": {"total": 2},
+                    "Linux SM80Plus GPU (GCP)": {"total": 1},
                     "Windows Build (GCP)": {"total": 3},
                     "Windows GPU (GCP)": {"total": 4},
                 },
@@ -102,10 +133,11 @@ class TestRunnerTypeCoverage(unittest.TestCase):
 
         html = ci_health.build_history_chart(snapshots)
         self.assertIn("Linux GPU (GCP)", html)
+        self.assertIn("Linux SM80Plus GPU (GCP)", html)
         self.assertIn("Windows Build (GCP)", html)
         self.assertIn("Windows GPU (GCP)", html)
 
-    def test_generate_health_html_renders_all_three_gcp_runner_tables(self):
+    def test_generate_health_html_renders_all_gcp_runner_tables(self):
         queue_data = {
             "summary": {
                 "jobs_queued": 1,
@@ -115,6 +147,7 @@ class TestRunnerTypeCoverage(unittest.TestCase):
             },
             "self_hosted_runners": [
                 {"name": "linux-runner-1", "group": "Linux GPU (GCP)", "status": "online", "busy": True},
+                {"name": "linux-sm80plus-1", "group": "Linux SM80Plus GPU (GCP)", "status": "online", "busy": True},
                 {"name": "win-build-1", "group": "Windows Build (GCP)", "status": "online", "busy": False},
                 {"name": "win-runner-1", "group": "Windows GPU (GCP)", "status": "online", "busy": True},
             ],
@@ -128,6 +161,7 @@ class TestRunnerTypeCoverage(unittest.TestCase):
                 html = f.read()
 
         self.assertIn("Linux GPU (GCP)", html)
+        self.assertIn("Linux SM80Plus GPU (GCP)", html)
         self.assertIn("Windows Build (GCP)", html)
         self.assertIn("Windows GPU (GCP)", html)
 
@@ -147,14 +181,121 @@ class TestRunnerTypeCoverage(unittest.TestCase):
             with open(os.path.join(tmp, "health.html"), encoding="utf-8") as f:
                 html = f.read()
 
-        # All three groups should appear even when no runners are online
+        # All GCP groups should appear even when no runners are online
         self.assertIn("Linux GPU (GCP)", html)
+        self.assertIn("Linux SM80Plus GPU (GCP)", html)
         self.assertIn("Windows Build (GCP)", html)
         self.assertIn("Windows GPU (GCP)", html)
         self.assertIn("scales to zero when idle", html)
 
 
 class TestGpuQuota(unittest.TestCase):
+    def test_load_gpu_quota_metrics_falls_back_for_malformed_config(self):
+        cases = [
+            (["not", "an", "object"], "root must be an object"),
+            ({"gpu_quota_metrics": {"metric": "NVIDIA_L4_GPUS"}}, "gpu_quota_metrics must be a list"),
+            (
+                {"gpu_quota_metrics": [{"metric": "NVIDIA_L4_GPUS", "regions": "us-central1"}]},
+                "regions must be a non-empty string list",
+            ),
+        ]
+
+        for payload, warning in cases:
+            with self.subTest(payload=payload):
+                stderr = io.StringIO()
+                with mock.patch("builtins.open", mock.mock_open(read_data=json.dumps(payload))):
+                    with contextlib.redirect_stderr(stderr):
+                        metrics = ci_health.load_gpu_quota_metrics()
+
+                self.assertEqual(metrics, ci_health.DEFAULT_GPU_QUOTA_METRICS)
+                self.assertIn(warning, stderr.getvalue())
+                self.assertIn("using defaults", stderr.getvalue())
+
+    def test_load_gpu_quota_metrics_distinguishes_missing_from_empty_config(self):
+        with mock.patch("builtins.open", mock.mock_open(read_data=json.dumps({}))):
+            missing_metrics = ci_health.load_gpu_quota_metrics()
+
+        stderr = io.StringIO()
+        with mock.patch("builtins.open", mock.mock_open(read_data=json.dumps({"gpu_quota_metrics": []}))):
+            with contextlib.redirect_stderr(stderr):
+                empty_metrics = ci_health.load_gpu_quota_metrics()
+
+        self.assertEqual(missing_metrics, ci_health.DEFAULT_GPU_QUOTA_METRICS)
+        self.assertEqual(empty_metrics, [])
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_fetch_gpu_quota_honors_explicit_empty_metric_list(self):
+        with mock.patch("ci_health.subprocess.run") as run:
+            quota = ci_health.fetch_gpu_quota([])
+
+        self.assertIsNone(quota)
+        run.assert_not_called()
+
+    def test_fetch_gpu_quota_fetches_configured_gpu_metrics(self):
+        responses = {
+            "us-central1": {
+                "quotas": [
+                    {"metric": "NVIDIA_T4_GPUS", "usage": 1, "limit": 8},
+                    {"metric": "NVIDIA_L4_GPUS", "usage": 2, "limit": 16},
+                ],
+            },
+            "us-east1": {
+                "quotas": [
+                    {"metric": "NVIDIA_L4_GPUS", "usage": 3, "limit": 16},
+                ],
+            },
+        }
+
+        def fake_run(cmd, **kwargs):
+            region = cmd[cmd.index("describe") + 1]
+            return mock.Mock(
+                returncode=0,
+                stdout=json.dumps(responses[region]),
+                stderr="",
+            )
+
+        with mock.patch("ci_health.subprocess.run", side_effect=fake_run):
+            quota = ci_health.fetch_gpu_quota([
+                {"metric": "NVIDIA_T4_GPUS", "name": "T4", "regions": ["us-central1"]},
+                {"metric": "NVIDIA_L4_GPUS", "name": "L4", "regions": ["us-central1", "us-east1"]},
+            ])
+
+        self.assertEqual(quota["usage"], 1)
+        self.assertEqual(quota["limit"], 8)
+        self.assertEqual(quota["by_metric"]["NVIDIA_T4_GPUS"]["regions"]["us-central1"], {"usage": 1, "limit": 8})
+        self.assertEqual(quota["by_metric"]["NVIDIA_L4_GPUS"]["usage"], 5)
+        self.assertEqual(quota["by_metric"]["NVIDIA_L4_GPUS"]["limit"], 32)
+
+    def test_fetch_gpu_quota_skips_invalid_numeric_values(self):
+        response = {
+            "quotas": [
+                {"metric": "NVIDIA_T4_GPUS", "usage": "bad", "limit": 8},
+                {"metric": "NVIDIA_L4_GPUS", "usage": 2, "limit": None},
+                {"metric": "NVIDIA_L4_GPUS", "usage": "3", "limit": "16"},
+            ],
+        }
+
+        def fake_run(cmd, **kwargs):
+            return mock.Mock(
+                returncode=0,
+                stdout=json.dumps(response),
+                stderr="",
+            )
+
+        stderr = io.StringIO()
+        with mock.patch("ci_health.subprocess.run", side_effect=fake_run):
+            with contextlib.redirect_stderr(stderr):
+                quota = ci_health.fetch_gpu_quota([
+                    {"metric": "NVIDIA_T4_GPUS", "name": "T4", "regions": ["us-central1"]},
+                    {"metric": "NVIDIA_L4_GPUS", "name": "L4", "regions": ["us-central1"]},
+                ])
+
+        self.assertNotIn("NVIDIA_T4_GPUS", quota["by_metric"])
+        self.assertEqual(quota["by_metric"]["NVIDIA_L4_GPUS"]["usage"], 3)
+        self.assertEqual(quota["by_metric"]["NVIDIA_L4_GPUS"]["limit"], 16)
+        self.assertIn("invalid quota values for NVIDIA_T4_GPUS in us-central1", stderr.getvalue())
+        self.assertIn("invalid quota values for NVIDIA_L4_GPUS in us-central1", stderr.getvalue())
+
     def test_record_snapshot_stores_gpu_quota_per_region(self):
         queue_data = {
             "summary": {"jobs_queued": 0, "jobs_running": 0, "runs_queued": 0, "runs_in_progress": 0},
@@ -162,12 +303,26 @@ class TestGpuQuota(unittest.TestCase):
             "queue_by_group": [],
         }
         gpu_quota = {
-            "usage": 18,
-            "limit": 24,
-            "regions": {
-                "us-central1": {"usage": 6, "limit": 8},
-                "us-east1": {"usage": 7, "limit": 8},
-                "us-west1": {"usage": 5, "limit": 8},
+            "by_metric": {
+                "NVIDIA_T4_GPUS": {
+                    "name": "T4",
+                    "usage": 18,
+                    "limit": 24,
+                    "regions": {
+                        "us-central1": {"usage": 6, "limit": 8},
+                        "us-east1": {"usage": 7, "limit": 8},
+                        "us-west1": {"usage": 5, "limit": 8},
+                    },
+                },
+                "NVIDIA_L4_GPUS": {
+                    "name": "L4",
+                    "usage": 2,
+                    "limit": 32,
+                    "regions": {
+                        "us-central1": {"usage": 1, "limit": 16},
+                        "us-east1": {"usage": 1, "limit": 16},
+                    },
+                },
             },
         }
 
@@ -179,8 +334,53 @@ class TestGpuQuota(unittest.TestCase):
         self.assertEqual(snapshot["gpu_quota"]["us-central1"], {"usage": 6, "limit": 8})
         self.assertEqual(snapshot["gpu_quota"]["us-east1"], {"usage": 7, "limit": 8})
         self.assertEqual(snapshot["gpu_quota"]["us-west1"], {"usage": 5, "limit": 8})
+        self.assertEqual(
+            snapshot["gpu_quota_by_metric"]["NVIDIA_L4_GPUS"]["regions"]["us-east1"],
+            {"usage": 1, "limit": 16},
+        )
 
     def test_build_history_chart_includes_gpu_quota_when_present(self):
+        snapshots = [
+            {
+                "timestamp": "2026-03-03T10:00:00Z",
+                "jobs_queued": 0,
+                "jobs_running": 0,
+                "runs_queued": 0,
+                "runs_in_progress": 0,
+                "runner_groups": {},
+                "gpu_quota_by_metric": {
+                    "NVIDIA_T4_GPUS": {
+                        "name": "T4",
+                        "usage": 13,
+                        "limit": 16,
+                        "regions": {
+                            "us-central1": {"usage": 6, "limit": 8},
+                            "us-east1": {"usage": 7, "limit": 8},
+                        },
+                    },
+                    "NVIDIA_L4_GPUS": {
+                        "name": "L4",
+                        "usage": 2,
+                        "limit": 32,
+                        "regions": {
+                            "us-central1": {"usage": 1, "limit": 16},
+                            "us-east1": {"usage": 1, "limit": 16},
+                        },
+                    },
+                },
+            },
+        ]
+
+        html = ci_health.build_history_chart(snapshots)
+        self.assertIn("T4 GPU Usage", html)
+        self.assertIn("L4 GPU Usage", html)
+        self.assertIn("gpuQuota_canvas", html)
+        self.assertIn("gpuQuota_NVIDIA_L4_GPUS_canvas", html)
+        self.assertIn("us-central1", html)
+        self.assertIn("us-east1", html)
+        self.assertIn("Quota Limit", html)
+
+    def test_build_history_chart_supports_legacy_t4_gpu_quota_snapshots(self):
         snapshots = [
             {
                 "timestamp": "2026-03-03T10:00:00Z",
@@ -199,9 +399,6 @@ class TestGpuQuota(unittest.TestCase):
         html = ci_health.build_history_chart(snapshots)
         self.assertIn("T4 GPU Usage", html)
         self.assertIn("gpuQuota_canvas", html)
-        self.assertIn("us-central1", html)
-        self.assertIn("us-east1", html)
-        self.assertIn("Quota Limit", html)
 
     def test_build_history_chart_omits_gpu_quota_section_when_absent(self):
         snapshots = [

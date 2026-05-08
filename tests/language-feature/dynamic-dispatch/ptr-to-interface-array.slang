@@ -70,7 +70,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     int y = 22;
 
     // ArrayPtrImpl: *values[0] + *values[1] = 20 + 22 = 42
-    var comp = makeCompute(typeSelector[0], &x, &y, 0, 0);
+    var comp = makeCompute(typeSelector[0], __getAddress(x), __getAddress(y), 0, 0);
     // CHECK: 42
     outputBuffer[0] = comp.compute();
 
@@ -82,7 +82,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // Modify pointed-to values.
     x = 100;
     y = -50;
-    var comp3 = makeCompute(typeSelector[2], &x, &y, 0, 0);
+    var comp3 = makeCompute(typeSelector[2], __getAddress(x), __getAddress(y), 0, 0);
     // CHECK: 50
     outputBuffer[2] = comp3.compute();
 }

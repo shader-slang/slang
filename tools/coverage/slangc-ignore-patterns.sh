@@ -22,6 +22,10 @@ SLANGC_IGNORE_ARGS=(
   -ignore-filename-regex='tools/'
   -ignore-filename-regex='source/slang/slang-(language-server|doc-markdown-writer|doc-ast|ast-dump|repro|workspace-version)[.\-]'
 
+  # Language-server / doc-only files that live in compiler-core
+  # (LSP protocol structs, JSON-RPC framing, doc-comment extraction).
+  -ignore-filename-regex='source/compiler-core/slang-(language-server-protocol|json-rpc|doc-extractor)[.\-]'
+
   # FIDDLE-generated AST declaration headers (no executable code)
   -ignore-filename-regex='source/slang/slang-ast-(expr|modifier|stmt)\.h$'
 )

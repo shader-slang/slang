@@ -3144,7 +3144,8 @@ static void legalizeMeshPayloadInputParam(
         builder->createGlobalVar(ptrType->getValueType(), AddressSpace::TaskPayloadWorkgroup);
     g->setFullType(builder->getRateQualifiedType(builder->getGroupSharedRate(), g->getFullType()));
     // moveValueBefore(g, builder->getFunc());
-    builder->addNameHintDecoration(g, pp->findDecoration<IRNameHintDecoration>()->getName());
+    if (auto nameDecor = pp->findDecoration<IRNameHintDecoration>())
+        builder->addNameHintDecoration(g, nameDecor->getName());
     pp->replaceUsesWith(g);
     struct MeshPayloadInputSpecializationCondition : FunctionCallSpecializeCondition
     {
@@ -3360,7 +3361,7 @@ static void replaceAllUsesOfMeshOutputValWithLegalizedVal(
                 auto replacementSrcVal = dereferenceVal(builder, replacement);
                 replaceAllUsesOfMeshOutputValWithLegalizedVal(context, load, replacementSrcVal);
             }
-            else if (const auto swiz = as<IRSwizzledStore>(user))
+            else if (const auto swiz = as<IRSwizzledStore>(user); swiz)
             {
                 SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
             }
@@ -3523,9 +3524,8 @@ static void legalizeMeshOutputParam(
     //
     auto placeholderGlobalParam = addGlobalParam(builder->getModule(), pp->getFullType());
     moveValueBefore(placeholderGlobalParam, builder->getFunc());
-    builder->addNameHintDecoration(
-        placeholderGlobalParam,
-        pp->findDecoration<IRNameHintDecoration>()->getName());
+    if (auto nameDecor = pp->findDecoration<IRNameHintDecoration>())
+        builder->addNameHintDecoration(placeholderGlobalParam, nameDecor->getName());
     pp->replaceUsesWith(placeholderGlobalParam);
     // pp is only removed later on, so sadly we have to keep it around for now
     struct MeshOutputSpecializationCondition : FunctionCallSpecializeCondition
@@ -4082,7 +4082,7 @@ void legalizeEntryPointParameterForGLSL(
     {
         valueType = paramPtrType->getValueType();
     }
-    if (const auto gsStreamType = as<IRHLSLStreamOutputType>(valueType))
+    if (const auto gsStreamType = as<IRHLSLStreamOutputType>(valueType); gsStreamType)
     {
         // An output stream type like `TriangleStream<Foo>` should
         // more or less translate into `out Foo` (plus scalarization).
@@ -4231,7 +4231,7 @@ void legalizeEntryPointParameterForGLSL(
         auto localVariable = builder->emitVar(valueType);
         auto localVal = ScalarizedVal::address(localVariable);
 
-        if (const auto inOutType = as<IRBorrowInOutParamType>(paramType))
+        if (const auto inOutType = as<IRBorrowInOutParamType>(paramType); inOutType)
         {
             // In the `in out` case we need to declare two
             // sets of global variables: one for the `in`

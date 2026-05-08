@@ -591,6 +591,59 @@ When building Slang from source, the DXC headers are automatically copied to
 `build/dxc/include/` during the build, so you can use `-Xdxc -Ibuild/dxc/include`
 for local development and testing.
 
+#### Querying Cooperative Type Metadata Used by a Shader
+
+Before dispatching a shader that uses cooperative vector or matrix operations,
+applications may need to verify that the driver supports the specific types and
+combinations the shader uses.
+
+Slang exposes this information via the `slang::ICooperativeTypesMetadata`
+interface, obtained from the `slang::IMetadata` pointer returned by
+`getTargetMetadata()` or `getEntryPointMetadata()`.
+
+The interface reports the distinct cooperative matrix types, cooperative vector
+type-usage records, and supported operation-specific combinations that survive
+in the final target output. Targets that lower cooperative types to ordinary
+arrays report empty lists.
+
+```c++
+slang::IComponentType* program = ...;
+slang::IMetadata* metadata = nullptr;
+program->getTargetMetadata(targetIndex, &metadata);
+
+auto* coopMeta = static_cast<slang::ICooperativeTypesMetadata*>(
+    metadata ? metadata->castAs(slang::ICooperativeTypesMetadata::getTypeGuid()) : nullptr);
+
+if (coopMeta)
+{
+    SlangUInt vecTypeCount = coopMeta->getCooperativeVectorTypeCount();
+    for (SlangUInt i = 0; i < vecTypeCount; ++i)
+    {
+        slang::CooperativeVectorTypeUsageInfo typeInfo = {};
+        coopMeta->getCooperativeVectorTypeByIndex(i, &typeInfo);
+        // typeInfo.componentType, typeInfo.maxSize, typeInfo.usedForTrainingOp
+    }
+
+    SlangUInt vecCombCount = coopMeta->getCooperativeVectorCombinationCount();
+    for (SlangUInt i = 0; i < vecCombCount; ++i)
+    {
+        slang::CooperativeVectorCombination comb = {};
+        coopMeta->getCooperativeVectorCombinationByIndex(i, &comb);
+        // comb.inputType, comb.inputInterpretation, comb.matrixInterpretation,
+        // comb.biasInterpretation, comb.resultType, comb.transpose
+    }
+
+    SlangUInt matCombCount = coopMeta->getCooperativeMatrixCombinationCount();
+    for (SlangUInt i = 0; i < matCombCount; ++i)
+    {
+        slang::CooperativeMatrixCombination comb = {};
+        coopMeta->getCooperativeMatrixCombinationByIndex(i, &comb);
+        // comb.m, comb.n, comb.k, comb.componentTypeA/B/C/Result,
+        // comb.scope, comb.saturate
+    }
+}
+```
+
 ## Using the Compilation API
 
 The C++ API provided by Slang is meant to provide more complete control over compilation for applications that need it.
@@ -1028,9 +1081,27 @@ meanings of their `CompilerOptionValue` encodings.
 | GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entry point. `intValue0` specifies a bool value for the setting. |
 | UseUpToDateBinaryModule | When set will only load precompiled modules if it is up-to-date with its source. `intValue0` specifies a bool value for the setting. |
 | ValidateUniformity | When set will perform [uniformity analysis](a1-05-uniformity.md).|
+| SPIRVResourceHeapStride | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
+| SPIRVSamplerHeapStride | Specifies the byte stride for the sampler descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
+| ForceDXLayout | When set forces the compiler to use DirectX-compatible (HLSL register packing) rules when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
+| ForceCLayout | When set forces the compiler to use C struct layout rules (natural alignment, no HLSL/GLSL padding) when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
+| DenormalModeFp16 | Specifies how 16-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
+| DenormalModeFp32 | Specifies how 32-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
+| DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
+| UseMSVCStyleBitfieldPacking | When set uses MSVC-compatible bitfield packing rules instead of the default GLSL/Vulkan rules. `intValue0` specifies a bool value for the setting. |
+
+### Compiler Option ABI Stability
+
+Each `CompilerOptionName` enumerator has an explicit integer value in `include/slang.h`. You
+can safely pass option names through the `CompilerOptionEntry` API and rely on them remaining
+consistent across Slang releases.
+
+New options are assigned explicit integer values above the current `CountOf` sentinel; existing
+values are never changed. Deprecated options are retained as numbered placeholders to prevent
+renumbering of subsequent members.
 
 ## Debugging
 
-Slang's SPIR-V backend supports generating debug information using the [NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc).
+Slang's SPIR-V backend supports generating debug information using the [NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.asciidoc).
 To enable debugging information when targeting SPIR-V, specify the `-emit-spirv-directly` and the `-g2` argument when using `slangc` tool, or set `EmitSpirvDirectly` to `1` and `DebugInformation` to `SLANG_DEBUG_INFO_LEVEL_STANDARD` when using the API.
 Debugging support has been tested with RenderDoc.

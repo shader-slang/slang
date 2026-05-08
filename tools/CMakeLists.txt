@@ -273,7 +273,6 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             slangd
             test-server
             test-process
-            slang-neural-module
         OPTIONAL_REQUIRES
             slang-rt
             slang-glslang
@@ -285,6 +284,8 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
+    add_dependencies(slang-test slang-neural-module)
+
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
         PROPERTY VS_STARTUP_PROJECT slang-test

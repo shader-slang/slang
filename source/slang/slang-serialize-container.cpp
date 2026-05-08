@@ -7,7 +7,6 @@
 #include "../core/slang-text-io.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
-#include "slang-mangled-lexer.h"
 #include "slang-parser.h"
 #include "slang-serialize-ast.h"
 #include "slang-serialize-ir.h"
