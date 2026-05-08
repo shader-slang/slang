@@ -281,16 +281,8 @@ void BackwardTestWithBias(int tid, int resIndex)
 
 [shader("compute")]
 [numthreads(BatchSize, 1, 1)]
-void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
+void computeMain(uint tid : SV_GroupIndex)
 {
-    if (gid.x != 0)
-        return;
-
-    uint lane = WaveGetLaneIndex();
-    uint wave = WaveGetWaveIndex();
-    if (lane >= uint(SubgroupSize) || wave >= uint(workgroupCount))
-        return;
-
     setupParameters(tid);
     AllMemoryBarrierWithGroupSync();
 
