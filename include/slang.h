@@ -5860,7 +5860,7 @@ inline SlangResult getSyntheticResourceDescriptorRange(
     SyntheticResourceDescriptorClass descriptorClass = SyntheticResourceDescriptorClass::Unsupported;
     if (!getSyntheticResourceDescriptorClass(info.bindingType, &descriptorClass))
         return SLANG_E_NOT_AVAILABLE;
-    if (info.space < 0 || info.binding < 0)
+    if (info.binding < 0)
         return SLANG_E_NOT_AVAILABLE;
 
     outRange->id = info.id;

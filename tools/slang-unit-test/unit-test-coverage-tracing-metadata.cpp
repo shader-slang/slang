@@ -186,13 +186,11 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
                 SLANG_CHECK(info.debugName != nullptr);
                 SLANG_CHECK(UnownedStringSlice(info.debugName) == toSlice("__slang_coverage"));
 
-                // Descriptor-facing binding info should be available
-                // even when the resource is hidden from ordinary
-                // reflection. For the current CPU source target, the
-                // metadata should also expose the concrete
+                // CPU/CUDA-style targets must expose the concrete
                 // marshaling location in the generated global params
-                // payload.
-                SLANG_CHECK(info.binding >= 0);
+                // payload. Descriptor-facing binding information may
+                // also be available, but it is not the primary
+                // contract for these targets.
                 SLANG_CHECK(info.space >= -1);
                 SLANG_CHECK(info.uniformOffset >= 0);
                 SLANG_CHECK(info.uniformStride > 0);
@@ -202,11 +200,16 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
                 SLANG_CHECK(lookedUpIndex == i);
 
                 slang::SyntheticResourceDescriptorBindingInfo descriptorInfo;
+                const SlangResult descriptorBindingResult =
+                    syntheticResources->getResourceDescriptorBindingInfo(i, &descriptorInfo);
                 SLANG_CHECK(
-                    syntheticResources->getResourceDescriptorBindingInfo(i, &descriptorInfo) ==
-                    SLANG_OK);
-                SLANG_CHECK(descriptorInfo.binding == info.binding);
-                SLANG_CHECK(descriptorInfo.space == info.space);
+                    descriptorBindingResult == SLANG_OK ||
+                    descriptorBindingResult == SLANG_E_NOT_AVAILABLE);
+                if (descriptorBindingResult == SLANG_OK)
+                {
+                    SLANG_CHECK(descriptorInfo.binding == info.binding);
+                    SLANG_CHECK(descriptorInfo.space == info.space);
+                }
 
                 slang::SyntheticResourceDescriptorClass descriptorClass =
                     slang::SyntheticResourceDescriptorClass::Unsupported;

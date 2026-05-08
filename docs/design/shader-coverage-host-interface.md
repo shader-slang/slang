@@ -121,10 +121,10 @@ Current key fields:
   - `uniformStride`
 - `debugName`
 
-Coverage currently emits exactly one synthetic resource record:
-
-- id `1`
-- name `__slang_coverage`
+Coverage currently emits exactly one synthetic resource record for the
+hidden `__slang_coverage` buffer. Hosts should treat its synthetic
+resource id as an opaque, stable, non-zero identifier returned by the
+metadata queries, rather than hardcoding a literal numeric value.
 
 ### Query functions
 
@@ -190,6 +190,9 @@ Backend usage
 
 `slang-rhi` consumption model
 -----------------------------
+
+The companion `slang-rhi` implementation is tracked in
+`shader-slang/slang-rhi#739`.
 
 The intended `slang-rhi` contract is:
 
