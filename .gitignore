@@ -111,6 +111,7 @@ vkd3d-proton.cache.write
 
 # Claude local settings, memory, and worktrees
 /.claude/settings.local.json
+/.claude/scheduled_tasks.lock
 /.claude/worktrees/
 /issue-*/plan.*.md
 /issue-*/review-guide.md
