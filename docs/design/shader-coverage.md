@@ -134,11 +134,21 @@ Enabling `-trace-coverage` runs three pipeline stages:
      extension is a no-op for them; the buffer flows through emit
      as a standalone `IRGlobalParam`.
    - **Assigns a counter slot to each `IncrementCoverageCounter`
-     op** (per-inst UID — consecutive index in traversal order;
-     multiple ops on the same source line get distinct slots, which
-     keeps the door open for branch/function coverage later).
-   - **Rewrites each op as `AtomicAdd(__slang_coverage[slot], 1,
-     Relaxed)`**.
+     op**, deduped by `(file, line)`: multiple ops resolving to the
+     same source line share a slot. Per-statement firing is
+     preserved (each op still emits its own call), but the buffer
+     holds one slot per source line instead of one per statement.
+     Counter ops with an unresolvable source location are not
+     deduped — each gets a fresh slot since attribution can't tell
+     them apart.
+   - **Synthesizes a `[ForceInline]` thunk**
+     `__slang_coverage_hit(int slot)` that performs the atomic add
+     on `__slang_coverage[slot]`. One thunk per linked module.
+   - **Rewrites each op as `Call(__slang_coverage_hit, slot)`** — a
+     single IR inst per call site. Backend inlining folds the thunk
+     back into a per-site atomic at emit time, preserving final
+     compiled output shape (HLSL `InterlockedAdd`, SPIR-V
+     `OpAtomicIAdd`, etc.).
    - **Records `(slot → file, line)` plus the buffer's binding** on
      the artifact's `ICoverageTracingMetadata`. A slot is
      unattributable when its `IncrementCoverageCounter` op carried
@@ -330,6 +340,135 @@ dispatches, and LCOV serialization for hosts that want LCOV output
 without implementing the format themselves. It will not be required
 for either workflow above. A reference end-to-end host integration
 (`examples/shader-coverage-demo`) ships with the same follow-up.
+
+Performance and integration considerations
+------------------------------------------
+
+The IR coverage pass reduces per-shader memory pressure by emitting a
+per-call-site `Call` to a shared `[ForceInline]` thunk rather than
+expanding the atomic-add chain inline at every counter site. This
+section captures the contracts that make that work and the
+host-observable consequences.
+
+### Per-call-site IR cost
+
+After generic specialization clones a function body for each
+instantiation, the per-clone coverage cost is:
+
+- **Today**: one `Call(__slang_coverage_hit, slot)` inst per source
+  statement.
+- **Pre-thunk implementation** (for context): one `IntLit` + one
+  `RWStructuredBufferGetElementPtr` + one `AtomicAdd` per statement,
+  with `IntLit` globally pooled so the per-clone unique-inst count
+  was 2.
+
+The savings ratio in linked-module IR for coverage-related insts
+specifically is roughly **2× per call site**. On a 50-spec ×
+1000-statement RT shader with no multi-statement-per-line dedup, that
+amortizes to ~50% fewer coverage IR insts; on small shaders the
+ratio is softened by constant overhead from the thunk body and the
+pool of slot literals. Measured baseline-vs-thunk on a synthetic
+3-spec × 6-line helper plus 11-stmt entry point: 59 → 36 coverage
+IR insts in the post-specialization snapshot (~1.6×). Final compiled
+output (HLSL / SPIR-V text) is byte-identical between the two
+shapes — the thunk inlines fully at backend emit.
+
+### Inline-hint contract
+
+`__slang_coverage_hit` carries `IRForceInlineDecoration`
+(`addForceInlineDecoration` in `slang-ir-coverage-instrument.cpp`).
+Every backend used by Slang today honors this and folds the thunk
+back into a per-site atomic at emit time. Final compiled assembly
+(HLSL `InterlockedAdd`, SPIR-V `OpAtomicIAdd`, GLSL `atomicAdd`,
+Metal atomic builtins, CUDA `atomicAdd`, CPU
+`_slang_atomic_add_u32`) is shape-equivalent to what the pre-thunk
+implementation produced.
+
+If any backend ever stops honoring `[ForceInline]` on this thunk:
+
+- A per-coverage-hit function call frame appears at runtime.
+- Shaders with tight stack budgets (RT hit / closest-hit / miss
+  shaders especially) could push past their stack limits and fail.
+- Atomic-contention behavior is unchanged — the call is the only
+  added cost.
+
+The regression test
+`tests/language-feature/coverage/coverage-thunk-instrumentation.slang`
+asserts both expected per-site atomic-add count and the absence of
+any surviving `__slang_coverage_hit` call symbol in CPU emit output;
+it catches inlining regressions on the CPU path. Other targets do
+not have an equivalent assertion today — adding one per backend is a
+follow-up.
+
+### Slot dedup and `getCounterCount` behavior
+
+Counter-slot assignment dedupes by `(file, line)`. Hosts auto-sizing
+their `__slang_coverage` buffer from `getCounterCount()` get smaller
+allocations on shaders with multi-statement source lines (the
+intended outcome). `getBufferInfo()` reports binding location only
+(`space` + `binding`) and is unaffected by dedup. The LCOV / gcov
+reporting pipeline already aggregates by `(file, line)` on the host,
+so the user-visible coverage report is unchanged.
+
+`ICoverageTracingMetadata::getCounterCount()` returns the count of
+unique `(file, line)` pairs, **not** the count of executable
+statements. Hosts that hardcode a slot count or assume "N statements
+→ N slots" would break — but no such pattern is supported by the
+public API contract, and the existing `getCounterCount()` API
+explicitly leaves the buffer-sizing question to the host.
+
+Counter ops with unresolvable source locations (synthetic statements
+from autodiff reverse-mode, generic specialization, struct
+constructor synthesis) bypass the dedup and each get their own slot,
+since attribution can't tell them apart. The LCOV converter filters
+these out of line-oriented output; consumers reading
+`ICoverageTracingMetadata` directly see them as `entry.file ==
+nullptr` / `entry.line == 0`.
+
+### Runtime cost
+
+Per executed statement: one atomic-add on a `RWStructuredBuffer<uint>`
+slot. Same memory traffic as the pre-thunk implementation. After
+backend inlining, no function-call overhead.
+
+Atomic contention on a shared slot is the only inherent runtime
+cost: many threads incrementing the same slot in a hot inner loop
+will serialize on the underlying hardware atomic unit. This is
+inherent to coverage instrumentation, not specific to the thunk
+shape — `gcov`-style line counters have the same contention
+profile. For inner loops with high thread occupancy, expect
+measurable but not catastrophic slowdown; coverage is intended for
+correctness / completeness measurement, not for runs at full
+throughput.
+
+### Compile-time cost
+
+The IR pass adds:
+
+- One `Dictionary<String, UInt>` lookup per counter op (slot dedup).
+- One thunk function (5 IR insts) per linked module.
+- One `Call` IR inst per counter op (replaces a 3-inst chain).
+
+Net effect on compile time is below noise floor for typical
+workloads — the IR pass itself runs once per linked module, and the
+generated IR is smaller, so downstream optimization passes have
+less to walk.
+
+### Multi-target consistency
+
+All Slang backends (HLSL, SPIR-V, GLSL, Metal, CUDA, CPU) lower
+`kIROp_AtomicAdd` on `RWStructuredBuffer<uint>` to their native
+atomic-increment intrinsic. Coverage data is consistent across
+targets for the same shader and the same workload — same slot
+mapping, same atomic-add behavior, same per-line counts. The
+observable difference between targets is binding location
+(reported via `ICoverageTracingMetadata`), not coverage values.
+
+WGSL is the one exception: instrumentation is currently skipped on
+WGSL targets (warning E45102) until the synthesized buffer's
+element type is wrapped in `Atomic<...>`. WebGPU workflows that
+need coverage today should use `-target spirv` and rely on the
+SPIR-V → WebGPU path.
 
 Roadmap
 -------

@@ -268,14 +268,15 @@ slot in its own pipeline layout / root signature.
 ### Format scope
 
 - **Line coverage only** — emits `DA:` records; no `FN:` / `BRDA:`
-  (function / branch) coverage yet. Per-inst slot assignment is
-  forward-compatible with branch coverage: each branch point would
-  get its own slot, and the LCOV emitter would grow a `BRDA:`
-  writer.
+  (function / branch) coverage yet. Per-`(file, line)` slot
+  assignment is forward-compatible with branch coverage: each branch
+  point would get its own slot, and the LCOV emitter would grow a
+  `BRDA:` writer.
 - **Column position is dropped.** Only `(file, line)` reaches LCOV.
 - **Counter type is `uint32`.** Saturates at ~4 × 10⁹ hits per
-  slot. Multiple ops on the same source line accumulate
-  independently before LCOV-emit-time aggregation.
+  slot. Multiple `IncrementCoverageCounter` ops on the same source
+  line share one slot and aggregate at runtime via repeated atomic
+  increments on the same counter.
 
 ## Current limitations
 

@@ -20,6 +20,13 @@ namespace
 // matches the manifest / sidecar key that hosts read.
 static const char kCoverageBufferName[] = "__slang_coverage";
 
+// Well-known name of the synthesized coverage-hit thunk. Each
+// `IncrementCoverageCounter` op is rewritten to a single `Call` to
+// this helper; the helper performs the atomic increment on the slot.
+// Naming it explicitly (rather than letting Slang auto-mangle) keeps
+// the function recognizable in dumped IR / generated source.
+static const char kCoverageHitFuncName[] = "__slang_coverage_hit";
+
 // Choose the resource kind under which the coverage buffer is bound
 // for `target`. Each target family speaks a different vocabulary
 // for buffer slots, and parameter binding only routes a kind through
@@ -371,64 +378,179 @@ static bool resolveHumaneLoc(
         return false;
     outFile = humane.pathInfo.foundPath;
     outLine = (uint32_t)humane.line;
+    // Synthetic source views (e.g. token-paste / macro-synthesized
+    // locations) can carry a positive line with an empty file path.
+    // Treat those as unresolvable so the escape hatch in `assignSlot`
+    // gives each one a fresh slot — otherwise `("", line)` keys would
+    // collapse unrelated synthetic origins onto a single counter.
+    if (outFile.getLength() == 0)
+        return false;
     return true;
+}
+
+// Synthesize the coverage-hit thunk. Each `IncrementCoverageCounter`
+// op is rewritten to a single `Call(thunk, slot)` instead of expanding
+// inline to a 3-inst `(IntLit slot) + GEP + AtomicAdd` chain. After
+// generic specialization clones a function body N times for N
+// instantiations, only the 1-inst `Call` is duplicated per clone — not
+// the whole atomic-add sequence — saving ~2/3 of the coverage-related
+// IR insts in the linked module.
+//
+// `[ForceInline]` is essential, not optional: the helper's body is
+// trivial (one atomic) and inlining is what restores the final
+// emitted code to the same shape as the pre-thunk implementation.
+// Without it, GPU backends would leave a per-hit function call,
+// adding stack-budget / runtime cost on RT-shader workloads where
+// the call overhead is non-trivial.
+static IRFunc* synthesizeCoverageHitThunk(IRModule* module, IRGlobalParam* coverageBuffer)
+{
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+
+    auto uintType = builder.getUIntType();
+    auto intType = builder.getIntType();
+    auto voidType = builder.getVoidType();
+    auto uintPtrType = builder.getPtrType(uintType);
+
+    // Slot parameter is `int` to match what the pre-thunk
+    // implementation passed to `RWStructuredBufferGetElementPtr`. After
+    // `[ForceInline]` folds the body back into each call site, the
+    // emitted GEP keeps the same signed-index shape (`int(N)`) that
+    // existing snapshot tests were anchored against.
+    IRType* paramTypes[] = {intType};
+    auto funcType = builder.getFuncType(1, paramTypes, voidType);
+
+    auto thunk = builder.createFunc();
+    thunk->setFullType(funcType);
+    // Tag the thunk with a dedicated decoration (rather than relying on the
+    // name hint) so the post-`performForceInlining` verifier can identify
+    // it unambiguously, even if user code declares a function with the same
+    // reserved-looking name.
+    builder.addDecoration(thunk, kIROp_CoverageThunkDecoration);
+    builder.addNameHintDecoration(thunk, UnownedTerminatedStringSlice(kCoverageHitFuncName));
+    builder.addForceInlineDecoration(thunk);
+
+    auto block = builder.createBlock();
+    thunk->addBlock(block);
+    builder.setInsertInto(block);
+
+    auto slotParam = builder.emitParam(intType);
+
+    // slotPtr = &__slang_coverage[slot]
+    IRInst* gepArgs[] = {coverageBuffer, slotParam};
+    auto slotPtr =
+        builder.emitIntrinsicInst(uintPtrType, kIROp_RWStructuredBufferGetElementPtr, 2, gepArgs);
+
+    // AtomicAdd(slotPtr, 1, relaxed). Each backend emitter lowers
+    // this to its native atomic-increment idiom (InterlockedAdd on
+    // HLSL, atomicAdd on GLSL, OpAtomicIAdd on SPIR-V, etc.).
+    IRInst* atomicArgs[] = {
+        slotPtr,
+        builder.getIntValue(uintType, 1),
+        builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
+    };
+    builder.emitIntrinsicInst(uintType, kIROp_AtomicAdd, 3, atomicArgs);
+
+    builder.emitReturn();
+    return thunk;
 }
 
 struct CoverageInstrumenter
 {
     IRModule* module;
     IRGlobalParam* coverageBuffer;
+    IRFunc* hitThunk;
     SourceManager* sourceManager;
     ArtifactPostEmitMetadata& outMetadata;
     IRType* uintType;
-    IRType* uintPtrType;
+    IRType* voidType;
     IRType* intType;
+
+    // Dedup map for same-line slot sharing: every counter op resolving
+    // to the same `(file, line)` reuses the first slot allocated for
+    // that pair. Keyed on a struct rather than a stringified
+    // `file + ":" + line` to (a) skip the per-op `StringBuilder`
+    // allocation and (b) avoid any path-with-colon ambiguity. Counter
+    // ops with an unresolvable source location are not deduped — they
+    // each get a unique slot, since attribution can't tell them apart
+    // anyway.
+    struct FileLineKey
+    {
+        String file;
+        uint32_t line;
+        bool operator==(const FileLineKey& other) const
+        {
+            return line == other.line && file == other.file;
+        }
+        HashCode getHashCode() const
+        {
+            return combineHash(Slang::getHashCode(file), Slang::getHashCode(line));
+        }
+    };
+    Dictionary<FileLineKey, UInt> slotByLineKey;
 
     CoverageInstrumenter(
         IRModule* m,
         IRGlobalParam* buf,
+        IRFunc* thunk,
         SourceManager* sm,
         ArtifactPostEmitMetadata& md)
-        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md)
+        : module(m), coverageBuffer(buf), hitThunk(thunk), sourceManager(sm), outMetadata(md)
     {
         IRBuilder tmpBuilder(module);
         uintType = tmpBuilder.getUIntType();
-        uintPtrType = tmpBuilder.getPtrType(uintType);
+        voidType = tmpBuilder.getVoidType();
         intType = tmpBuilder.getIntType();
     }
 
-    // Lower a single IncrementCoverageCounter op to an atomic add on
-    // `coverageBuffer[slot]`. Appends a metadata entry for `slot` and
-    // removes the op.
-    void lowerCounterOp(IRInst* counterOp, UInt slot)
+    // Resolve `counterOp`'s source position and assign it a slot,
+    // either by reusing an existing slot for the same `(file, line)`
+    // or by allocating a new one. Appends a new metadata entry on a
+    // miss; returns the slot index in either case.
+    UInt assignSlot(IRInst* counterOp)
     {
-        CoverageTracingEntry entry;
-        resolveHumaneLoc(sourceManager, counterOp, entry.file, entry.line);
+        // Value-initialize so the unresolvable-loc path appends a
+        // well-defined zero entry even if `CoverageTracingEntry`'s
+        // in-class field initializers ever change.
+        CoverageTracingEntry entry = {};
+        bool valid = resolveHumaneLoc(sourceManager, counterOp, entry.file, entry.line);
+
+        if (valid)
+        {
+            FileLineKey key{entry.file, entry.line};
+            UInt existing = 0;
+            if (slotByLineKey.tryGetValue(key, existing))
+                return existing;
+
+            UInt slot = (UInt)outMetadata.m_coverageEntries.getCount();
+            outMetadata.m_coverageEntries.add(entry);
+            slotByLineKey.add(key, slot);
+            return slot;
+        }
+
+        // Unresolvable location: each such op gets a fresh slot. The
+        // metadata entry is empty (`file == ""`, `line == 0`); the
+        // host-side LCOV converter filters these out of line-oriented
+        // output.
+        UInt slot = (UInt)outMetadata.m_coverageEntries.getCount();
         outMetadata.m_coverageEntries.add(entry);
+        return slot;
+    }
+
+    // Lower a single IncrementCoverageCounter op to a `Call(hitThunk,
+    // slot)` — a single IR inst per call site. The thunk itself
+    // performs the atomic add on `coverageBuffer[slot]`. Slot is
+    // resolved via `assignSlot` (which may reuse a slot for an
+    // already-seen source line) and the op is removed.
+    void lowerCounterOp(IRInst* counterOp)
+    {
+        UInt slot = assignSlot(counterOp);
 
         IRBuilder builder(module);
         builder.setInsertBefore(counterOp);
 
-        IRInst* getElemArgs[] = {
-            coverageBuffer,
-            builder.getIntValue(intType, (IRIntegerValue)slot),
-        };
-        IRInst* slotPtr = builder.emitIntrinsicInst(
-            uintPtrType,
-            kIROp_RWStructuredBufferGetElementPtr,
-            2,
-            getElemArgs);
-
-        // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
-        // backend emitter to its native atomic-increment idiom
-        // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
-        // SPIR-V, etc.). Correct under GPU concurrency.
-        IRInst* atomicArgs[] = {
-            slotPtr,
-            builder.getIntValue(uintType, 1),
-            builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
-        };
-        builder.emitIntrinsicInst(uintType, kIROp_AtomicAdd, 3, atomicArgs);
+        IRInst* slotArg = builder.getIntValue(intType, (IRIntegerValue)slot);
+        builder.emitCallInst(voidType, hitThunk, 1, &slotArg);
 
         // The counter op has void return type and, by construction, no uses.
         // Catch a future IR transform that takes a use of it before we reach
@@ -439,14 +561,20 @@ struct CoverageInstrumenter
 
     void run(List<IRInst*> const& counterOps)
     {
+        // Best-case reservation: every op gets its own slot. Worst
+        // case the buffer grows by less due to same-line dedup; the
+        // over-reservation is harmless.
         outMetadata.m_coverageEntries.reserve(counterOps.getCount());
-        // Each counter op gets its own slot: the op's identity IS the
-        // UID, and we assign a consecutive index in traversal order.
-        // Multiple ops on the same source line get distinct slots; the
-        // LCOV converter aggregates per (file, line) at the host side
-        // via summation.
-        for (UInt slot = 0; slot < (UInt)counterOps.getCount(); ++slot)
-            lowerCounterOp(counterOps[slot], slot);
+
+        // Multiple ops resolving to the same `(file, line)` share a
+        // counter slot. Net effect: same per-statement firing in the
+        // emitted code (each op still triggers an atomic-add), but
+        // the buffer holds one slot per source line instead of one
+        // per statement, and the metadata holds one entry per line.
+        // The LCOV converter already aggregates by `(file, line)` on
+        // the host, so the user-visible report is unchanged.
+        for (auto op : counterOps)
+            lowerCounterOp(op);
     }
 };
 
@@ -585,12 +713,46 @@ void instrumentCoverage(
     outMetadata.m_coverageBufferSpace = chosenSpace;
     outMetadata.m_coverageBufferBinding = chosenBinding;
 
+    // Synthesize the coverage-hit thunk after the buffer is in place.
+    // Each `IncrementCoverageCounter` op will be lowered to a single
+    // `Call(thunk, slot)` rather than expanding inline to a 3-inst
+    // atomic-add chain — see `synthesizeCoverageHitThunk` for the
+    // rationale and inlining requirement.
+    auto hitThunk = synthesizeCoverageHitThunk(module, buffer);
+
     CoverageInstrumenter instrumenter(
         module,
         buffer,
+        hitThunk,
         sink ? sink->getSourceManager() : nullptr,
         outMetadata);
     instrumenter.run(counterOps);
+}
+
+void verifyAndRemoveCoverageThunk(IRModule* module)
+{
+    for (auto inst : module->getModuleInst()->getChildren())
+    {
+        auto func = as<IRFunc>(inst);
+        if (!func)
+            continue;
+        if (!func->findDecoration<IRCoverageThunkDecoration>())
+            continue;
+
+        // Found the thunk. After `performForceInlining` it should
+        // have zero remaining uses; any surviving use means a `Call`
+        // site escaped inlining and a per-hit function-call frame
+        // would appear in emitted code.
+        SLANG_RELEASE_ASSERT(!func->hasUses());
+
+        // Remove the now-dead thunk explicitly. Downstream global-DCE
+        // would also eliminate it today, but doing so here makes the
+        // contract independent of which simplification passes happen
+        // to run after this point — important for minimal-optimization
+        // builds that may skip simplifyIR.
+        func->removeAndDeallocate();
+        return;
+    }
 }
 
 } // namespace Slang
