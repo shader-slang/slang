@@ -5,8 +5,8 @@
 //   Vulkan: TiledMMAVulkan (WaveMatrix + shmem, CoopMat.Load)
 //   Metal:  TiledMMAMetal (8x8 simdgroup_matrix, row-major weights)
 //
-// InputSize and OutputSize must be tile-aligned (multiples of 16).
-// Callers with arbitrary sizes should pad via PadToTile before instantiation.
+// InputSize and OutputSize must be target-tile-aligned:
+// 16 elements for CUDA/Vulkan and 8 elements for Metal.
 implementing neural;
 
 

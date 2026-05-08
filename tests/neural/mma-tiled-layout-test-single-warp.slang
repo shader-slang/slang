@@ -46,81 +46,10 @@ public struct TestShMemSize : ISharedMemorySize {
 static const uint OffsetA = 0;
 static const uint OffsetB = 256;
 
-// Clear the weight buffer region used by a PaddedSize x PaddedSize tiled matrix.
-void clearWeightBuffer<int PaddedSize>(uint tid)
+bool testImpl<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
-    static const int TotalElements = PaddedSize * PaddedSize;
-    static const int NumIters = (TotalElements + BatchSize - 1) / BatchSize;
-
-    [ForceUnroll]
-    for (int iter = 0; iter < NumIters; iter++)
-    {
-        int index = iter * BatchSize + tid;
-        if (index < TotalElements)
-            buffers.inputBuffer[index] = DType(0);
-    }
-}
-
-// Write an identity matrix in tiled layout.
-// The weight matrix is PaddedSize x PaddedSize (both multiples of 16),
-// but only the top-left InputSize x InputSize has the identity.
-//
-// Tiled layout addressing for element (row, col):
-//   tileRow   = row / 16
-//   tileCol   = col / 16
-//   NTileCols = PaddedSize / 16
-//   tileIndex = tileRow * NTileCols + tileCol
-//   offset    = tileIndex * 256 + (row % 16) * 16 + (col % 16)
-void identityWeightMatrixTiled<int InputSize, int PaddedSize>(uint tid, bool clear = false)
-{
-    static const int TileSize = 16;
-    static const int NTileCols = PaddedSize / TileSize;
-
-    if (clear)
-    {
-        clearWeightBuffer<PaddedSize>(tid);
-        return;
-    }
-
-    clearWeightBuffer<PaddedSize>(tid);
-    AllMemoryBarrierWithGroupSync();
-
-    __target_switch
-    {
-    case metal:
-        {
-            fillForwardWeightTiled<DType, InputSize, InputSize, BatchSize>(
-                tid, buffers.inputBuffer, DType(1.0f / float(InputSize)));
-        }
-    default:
-        {
-            static const int NumDiagIters = (InputSize + BatchSize - 1) / BatchSize;
-            [ForceUnroll]
-            for (int iter = 0; iter < NumDiagIters; iter++)
-            {
-                int row = iter * BatchSize + tid;
-                if (row >= InputSize)
-                    break;
-
-                int tileRow = row / TileSize;
-                int tileCol = row / TileSize;
-                int localRow = row % TileSize;
-                int localCol = row % TileSize;
-                int tileIndex = tileRow * NTileCols + tileCol;
-                int offset = tileIndex * TileSize * TileSize + localRow * TileSize + localCol;
-                buffers.inputBuffer[offset] = DType(1);
-            }
-
-            AllMemoryBarrierWithGroupSync();
-            convertTiledToNativeB<DType, PaddedSize, PaddedSize, BatchSize>(tid, buffers.inputBuffer);
-        }
-    }
-}
-
-bool test<int InputSize, int OutputSize>(uint tid)
-{
-    static const int PaddedInputSize = PadToTile<InputSize>.Value;
-    static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
+    static const int PaddedInputSize = PadToTargetTile<InputSize, Target>.Value;
+    static const int PaddedOutputSize = PadToTargetTile<OutputSize, Target>.Value;
 
     typealias InputVec = WaveTangledVector<DType, TestShMemSize, PaddedInputSize, SubgroupSize, 1>;
     InputVec inputData = InputVec(DType(0));
@@ -153,6 +82,19 @@ bool test<int InputSize, int OutputSize>(uint tid)
     return WaveActiveAllTrue(res);
 }
 
+bool test<int InputSize, int OutputSize>(uint tid)
+{
+    __target_switch
+    {
+    case cuda:
+        return testImpl<InputSize, OutputSize, TargetEnum.CUDA>(tid);
+    case spirv:
+        return testImpl<InputSize, OutputSize, TargetEnum.SPIR_V>(tid);
+    case metal:
+        return testImpl<InputSize, OutputSize, TargetEnum.Metal>(tid);
+    }
+}
+
 [numthreads(BatchSize, 1, 1)]
 [shader("compute")]
 void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
@@ -162,9 +104,9 @@ void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
 
     initBias<DType, 64, BatchSize>(tid, buffers.biasBuffer);
 
-    // 4x4 (padded to 16x16)
+    // 4x4 (target-padded)
     {
-        identityWeightMatrixTiled<4, 16>(tid);
+        identityWeightMatrixTiled<DType, 4, BatchSize, false>(tid, buffers.inputBuffer);
         AllMemoryBarrierWithGroupSync();
         bool result = test<4, 4>(tid);
         if (tid == 0)
@@ -172,9 +114,9 @@ void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
         AllMemoryBarrierWithGroupSync();
     }
 
-    // 8x8 (padded to 16x16)
+    // 8x8 (target-padded)
     {
-        identityWeightMatrixTiled<8, 16>(tid);
+        identityWeightMatrixTiled<DType, 8, BatchSize, false>(tid, buffers.inputBuffer);
         AllMemoryBarrierWithGroupSync();
         bool result = test<8, 8>(tid);
         if (tid == 0)
@@ -182,9 +124,9 @@ void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
         AllMemoryBarrierWithGroupSync();
     }
 
-    // 16x16 (already aligned)
+    // 16x16 (target-padded)
     {
-        identityWeightMatrixTiled<16, 16>(tid);
+        identityWeightMatrixTiled<DType, 16, BatchSize, false>(tid, buffers.inputBuffer);
         AllMemoryBarrierWithGroupSync();
         bool result = test<16, 16>(tid);
         if (tid == 0)
@@ -192,9 +134,9 @@ void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
         AllMemoryBarrierWithGroupSync();
     }
 
-    // 32x32 (already aligned)
+    // 32x32 (target-padded)
     {
-        identityWeightMatrixTiled<32, 32>(tid);
+        identityWeightMatrixTiled<DType, 32, BatchSize, false>(tid, buffers.inputBuffer);
         AllMemoryBarrierWithGroupSync();
         bool result = test<32, 32>(tid);
         if (tid == 0)
@@ -202,9 +144,9 @@ void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
         AllMemoryBarrierWithGroupSync();
     }
 
-    // 64x64 (already aligned)
+    // 64x64 (target-padded)
     {
-        identityWeightMatrixTiled<64, 64>(tid);
+        identityWeightMatrixTiled<DType, 64, BatchSize, false>(tid, buffers.inputBuffer);
         AllMemoryBarrierWithGroupSync();
         bool result = test<64, 64>(tid);
         if (tid == 0)

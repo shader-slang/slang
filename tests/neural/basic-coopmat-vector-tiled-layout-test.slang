@@ -41,31 +41,27 @@ RWStructuredBuffer<uint> testResult;
 
 // Tiled layout weight buffer: 258 elements (one 16x16 tile + 2 bias).
 // Use stride=4 so the buffer is large enough for both half (258*2=516B) and float (258*4=1032B).
-//TEST_INPUT: set parametersPtr = ubuffer(stride=4, count=258)
 //TEST_INPUT: set buffers.parameters = ubuffer(stride=4, count=258)
 
 // Tiled layout dW buffer (same layout as parameters).
-//TEST_INPUT: set dParametersPtr = ubuffer(stride=4, count=258)
 //TEST_INPUT: set buffers.dParameters = ubuffer(stride=4, count=258)
-
-uniform ElementType* parametersPtr;
-uniform ElementType* dParametersPtr;
 
 struct TestBuffers
 {
+#if TEST_POINTER
+    ElementType* parameters;
+    ElementType* dParameters;
+#else
     RWStructuredBuffer<ElementType>.Handle parameters;
     RWStructuredBuffer<ElementType>.Handle dParameters;
+#endif
 }
 
 ParameterBlock<TestBuffers> buffers;
 
 #if TEST_POINTER
-    #define parameters parametersPtr
-    #define dParameters dParametersPtr
     typealias Address = PointerAddress<ElementType>;
 #else
-    #define parameters buffers.parameters
-    #define dParameters buffers.dParameters
     typealias Address = BindlessAddress<ElementType>;
 #endif
 
@@ -95,16 +91,16 @@ void setupParameters(uint tid)
     if (tid == 0)
     {
         for (int i = 0; i < 258; i++)
-            parameters[i] = ElementType(0.0);
+            buffers.parameters[i] = ElementType(0.0);
 
         for (int col = 0; col < InputSize; col++)
-            parameters[tiledWeightOffset(0, col)] = ElementType(col + 1);
+            buffers.parameters[tiledWeightOffset(0, col)] = ElementType(col + 1);
 
         for (int col = 0; col < InputSize; col++)
-            parameters[tiledWeightOffset(1, col)] = ElementType(InputSize + col + 1);
+            buffers.parameters[tiledWeightOffset(1, col)] = ElementType(InputSize + col + 1);
 
-        parameters[256] = ElementType(9);
-        parameters[257] = ElementType(10);
+        buffers.parameters[256] = ElementType(9);
+        buffers.parameters[257] = ElementType(10);
     }
 
 }
@@ -114,7 +110,7 @@ void cleanupDParameters(uint tid)
     if (tid == 0)
     {
         for (int i = 0; i < 258; i++)
-            dParameters[i] = ElementType(0.0);
+            buffers.dParameters[i] = ElementType(0.0);
     }
 }
 
@@ -127,7 +123,7 @@ void ForwardTestWithoutBias(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
 
-    Address weightAddress = Address(parameters);
+    Address weightAddress = Address(buffers.parameters);
 
     let outputVec = input.linearTransform<Address, OptimalLayout, OutVectorType>(weightAddress);
 
@@ -152,7 +148,7 @@ void ForwardTestWithBias(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
 
-    Address weightAddress = Address(parameters);
+    Address weightAddress = Address(buffers.parameters);
     Address biasAddress = weightAddress.getOffset(256);
 
     let outputVec = input.linearTransform<Address, OptimalLayout, OutVectorType>(weightAddress, biasAddress);
@@ -198,8 +194,8 @@ void BackwardTestWithoutBias(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
 
-    Address weightAddress = Address(parameters);
-    Address dWeightAddress = Address(dParameters);
+    Address weightAddress = Address(buffers.parameters);
+    Address dWeightAddress = Address(buffers.dParameters);
 
     let outputVec = MatVecMul<InVectorType, OutVectorType>(input, weightAddress);
 
@@ -213,7 +209,6 @@ void BackwardTestWithoutBias(int tid, int resIndex)
 
     // Backward: dInput = W^T * dOutput = [[1,5],[2,6],[3,7],[4,8]] * [1,1] = [6, 8, 10, 12]
     bwd_diff(MatVecMul<InVectorType, OutVectorType>)(dPair, weightDiffPair, dRes);
-    AllMemoryBarrierWithGroupSync();
 
     isPassed = isPassed &&
         equals(dPair.d[0], ElementType(6.0)) && equals(dPair.d[1], ElementType(8.0)) &&
@@ -222,10 +217,10 @@ void BackwardTestWithoutBias(int tid, int resIndex)
     // dW = dOutput * input^T = [[1],[1]] * [1,2,3,4] = [[1,2,3,4],[1,2,3,4]]
     // Accumulated across 32 threads: 32x.
     isPassed = isPassed &&
-        equals(dParameters[tiledDWeightOffset(0, 0)], ElementType(32.0)) && equals(dParameters[tiledDWeightOffset(0, 1)], ElementType(64.0)) &&
-        equals(dParameters[tiledDWeightOffset(0, 2)], ElementType(96.0)) && equals(dParameters[tiledDWeightOffset(0, 3)], ElementType(128.0)) &&
-        equals(dParameters[tiledDWeightOffset(1, 0)], ElementType(32.0)) && equals(dParameters[tiledDWeightOffset(1, 1)], ElementType(64.0)) &&
-        equals(dParameters[tiledDWeightOffset(1, 2)], ElementType(96.0)) && equals(dParameters[tiledDWeightOffset(1, 3)], ElementType(128.0));
+        equals(buffers.dParameters[tiledDWeightOffset(0, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset(0, 1)], ElementType(64.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset(0, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset(0, 3)], ElementType(128.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset(1, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset(1, 1)], ElementType(64.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset(1, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset(1, 3)], ElementType(128.0));
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
@@ -243,9 +238,9 @@ void BackwardTestWithBias(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
 
-    Address weightAddress = Address(parameters);
+    Address weightAddress = Address(buffers.parameters);
     Address biasAddress = weightAddress.getOffset(256);
-    Address dWeightAddress = Address(dParameters);
+    Address dWeightAddress = Address(buffers.dParameters);
     Address dBiasAddress = dWeightAddress.getOffset(256);
 
     let outputVec = MatVecMulAdd<InVectorType, OutVectorType>(input, weightAddress, biasAddress);
@@ -261,7 +256,6 @@ void BackwardTestWithBias(int tid, int resIndex)
 
     // Backward: dInput = W^T * dOutput = [6, 8, 10, 12]
     bwd_diff(MatVecMulAdd<InVectorType, OutVectorType>)(dPair, weightDiffPair, biasDiffPair, dOutput);
-    AllMemoryBarrierWithGroupSync();
 
     isPassed = isPassed &&
         equals(dPair.d[0], ElementType(6.0)) && equals(dPair.d[1], ElementType(8.0)) &&
@@ -269,14 +263,14 @@ void BackwardTestWithBias(int tid, int resIndex)
 
     // dW: same as BackwardTestWithoutBias.
     isPassed = isPassed &&
-        equals(dParameters[tiledDWeightOffset(0, 0)], ElementType(32.0)) && equals(dParameters[tiledDWeightOffset(0, 1)], ElementType(64.0)) &&
-        equals(dParameters[tiledDWeightOffset(0, 2)], ElementType(96.0)) && equals(dParameters[tiledDWeightOffset(0, 3)], ElementType(128.0)) &&
-        equals(dParameters[tiledDWeightOffset(1, 0)], ElementType(32.0)) && equals(dParameters[tiledDWeightOffset(1, 1)], ElementType(64.0)) &&
-        equals(dParameters[tiledDWeightOffset(1, 2)], ElementType(96.0)) && equals(dParameters[tiledDWeightOffset(1, 3)], ElementType(128.0));
+        equals(buffers.dParameters[tiledDWeightOffset(0, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset(0, 1)], ElementType(64.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset(0, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset(0, 3)], ElementType(128.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset(1, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset(1, 1)], ElementType(64.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset(1, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset(1, 3)], ElementType(128.0));
 
     // dBias = dOutput accumulated across 32 threads = [32, 32]
     isPassed = isPassed &&
-        equals(dParameters[256], ElementType(32.0)) && equals(dParameters[257], ElementType(32.0));
+        equals(buffers.dParameters[256], ElementType(32.0)) && equals(buffers.dParameters[257], ElementType(32.0));
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
