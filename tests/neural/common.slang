@@ -529,15 +529,14 @@ void identityWeightMatrixTiledMetal<T, int InputSize, int WorkgroupSize, bool Cl
 
     AllMemoryBarrierWithGroupSync();
 
-    static const int NumRowIters = (InputSize + WorkgroupSize - 1) / WorkgroupSize;
-    for (int iter = 0; iter < NumRowIters; iter++)
+    static const int NumDiagIters = (InputSize + WorkgroupSize - 1) / WorkgroupSize;
+    for (int iter = 0; iter < NumDiagIters; iter++)
     {
         int row = iter * WorkgroupSize + tid;
         if (row >= InputSize)
             break;
 
-        for (int col = 0; col < InputSize; col++)
-            buffer[row * PaddedSize + col] = T(1.0f / float(InputSize));
+        buffer[row * PaddedSize + row] = T(1);
     }
 
     AllMemoryBarrierWithGroupSync();
@@ -588,8 +587,7 @@ void identityWeightMatrixTiledNative<T, int InputSize, int WorkgroupSize, bool C
 // Initialize the forward weight matrix used by tiled mat-vec tests.
 //
 // CUDA/Vulkan use a 16x16 tiled layout. Metal uses row-major weights with an
-// 8-element alignment. The Metal test data is dense 1/InputSize rows so that
-// constant input vectors still produce the original expected value.
+// 8-element alignment.
 public void identityWeightMatrixTiled<T, int InputSize, int WorkgroupSize, bool Clear>(
     uint tid, RWStructuredBuffer<T>.Handle buffer)
     where T : __BuiltinFloatingPointType

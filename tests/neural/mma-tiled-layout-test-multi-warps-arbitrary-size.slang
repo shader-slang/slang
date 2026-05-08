@@ -94,11 +94,8 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 
 [numthreads(BatchSize, 1, 1)]
 [shader("compute")]
-void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
+void computeMain(uint tid : SV_GroupIndex)
 {
-    if (gid.x != 0)
-        return;
-
     initBias<DType, 64, BatchSize>(tid, buffers.biasBuffer);
 
     // 3x5 (padded to 16x16)

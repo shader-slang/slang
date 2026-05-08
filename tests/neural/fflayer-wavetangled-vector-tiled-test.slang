@@ -25,8 +25,6 @@ import common;
 
 typealias ElementType = float;
 
-//TEST_INPUT: set parametersPtr = ubuffer(stride=4, count=258)
-//TEST_INPUT: set dParametersPtr = ubuffer(stride=4, count=258)
 //TEST_INPUT: set buffers.parameters = ubuffer(stride=4, count=258)
 //TEST_INPUT: set buffers.dParameters = ubuffer(stride=4, count=258)
 
@@ -37,24 +35,22 @@ typealias Layout = OptimalLayout;
 //TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
 
-uniform ElementType* parametersPtr;
-uniform ElementType* dParametersPtr;
-
 struct TestBuffers
 {
+#if TEST_POINTER
+    ElementType* parameters;
+    ElementType* dParameters;
+#else
     RWStructuredBuffer<ElementType>.Handle parameters;
     RWStructuredBuffer<ElementType>.Handle dParameters;
+#endif
 }
 
 ParameterBlock<TestBuffers> buffers;
 
 #if TEST_POINTER
-    #define parameters parametersPtr
-    #define dParameters dParametersPtr
     typealias Address = PointerAddress<ElementType>;
 #else
-    #define parameters buffers.parameters
-    #define dParameters buffers.dParameters
     typealias Address = BindlessAddress<ElementType>;
 #endif
 
@@ -96,7 +92,7 @@ void testFFLayerForward(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVec input = InVec(inputData);
 
-    let baseAddr = Address(parameters);
+    let baseAddr = Address(buffers.parameters);
     let layer = Layer();
 
     let output = layer.eval<Address>(input, baseAddr);
@@ -117,8 +113,8 @@ void testFFLayerBackward(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVec input = InVec(inputData);
 
-    let baseAddr = Address(parameters);
-    let dBaseAddr = Address(dParameters);
+    let baseAddr = Address(buffers.parameters);
+    let dBaseAddr = Address(buffers.dParameters);
     let layer = Layer();
 
     var paramAddrPair = DifferentialPtrPair<Address>(baseAddr, dBaseAddr);
@@ -126,7 +122,6 @@ void testFFLayerBackward(int tid, int resIndex)
     let dOutput = OutVec(1.0);
 
     bwd_diff(computeLayerOutput)(paramAddrPair, inputPair, layer, dOutput);
-    AllMemoryBarrierWithGroupSync();
 
     // dInput = W^T * dOutput = [6, 8, 10, 12]
     bool isPassed = true;
@@ -138,18 +133,18 @@ void testFFLayerBackward(int tid, int resIndex)
     // dW accumulated across BatchSize threads.
     // dW = BatchSize * [[1,2,3,4],[1,2,3,4]]
     ElementType scale = ElementType(BatchSize);
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(0, 0)], scale * ElementType(1.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(0, 1)], scale * ElementType(2.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(0, 2)], scale * ElementType(3.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(0, 3)], scale * ElementType(4.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(1, 0)], scale * ElementType(1.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(1, 1)], scale * ElementType(2.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(1, 2)], scale * ElementType(3.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(1, 3)], scale * ElementType(4.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(0, 0)], scale * ElementType(1.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(0, 1)], scale * ElementType(2.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(0, 2)], scale * ElementType(3.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(0, 3)], scale * ElementType(4.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(1, 0)], scale * ElementType(1.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(1, 1)], scale * ElementType(2.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(1, 2)], scale * ElementType(3.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(1, 3)], scale * ElementType(4.0));
 
     // dBias = [BatchSize, BatchSize]
-    isPassed = isPassed && equals(dParameters[BiasOffset], scale);
-    isPassed = isPassed && equals(dParameters[BiasOffset + 1], scale);
+    isPassed = isPassed && equals(buffers.dParameters[BiasOffset], scale);
+    isPassed = isPassed && equals(buffers.dParameters[BiasOffset + 1], scale);
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
@@ -178,7 +173,7 @@ void cleanupDParameters(uint tid)
     if (tid == 0)
     {
         for (int i = 0; i < ParamBufferSize; i++)
-            dParameters[i] = ElementType(0.0);
+            buffers.dParameters[i] = ElementType(0.0);
     }
 }
 
@@ -187,31 +182,23 @@ void setupParameters(uint tid)
     if (tid == 0)
     {
         for (int i = 0; i < ParamBufferSize; i++)
-            parameters[i] = ElementType(0.0);
+            buffers.parameters[i] = ElementType(0.0);
 
         for (int col = 0; col < InputSize; col++)
-            parameters[tiledWeightOffset(0, col)] = ElementType(col + 1);
+            buffers.parameters[tiledWeightOffset(0, col)] = ElementType(col + 1);
 
         for (int col = 0; col < InputSize; col++)
-            parameters[tiledWeightOffset(1, col)] = ElementType(InputSize + col + 1);
+            buffers.parameters[tiledWeightOffset(1, col)] = ElementType(InputSize + col + 1);
 
-        parameters[256] = ElementType(9);
-        parameters[257] = ElementType(10);
+        buffers.parameters[256] = ElementType(9);
+        buffers.parameters[257] = ElementType(10);
     }
 }
 
 [shader("compute")]
 [numthreads(BatchSize, 1, 1)]
-void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
+void computeMain(uint tid : SV_GroupIndex)
 {
-    if (gid.x != 0)
-        return;
-
-    uint lane = WaveGetLaneIndex();
-    uint wave = WaveGetWaveIndex();
-    if (lane >= uint(SubgroupSize) || wave >= uint(WarpCount))
-        return;
-
     setupParameters(tid);
     AllMemoryBarrierWithGroupSync();
 
