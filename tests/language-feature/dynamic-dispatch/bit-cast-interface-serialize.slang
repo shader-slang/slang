@@ -1,10 +1,18 @@
-// Manual serialization of interface-typed values into a raw uint buffer using
-// bit_cast, then deserialization back to interface type.
+// `bit_cast` from raw memory into an interface-typed existential is rejected.
+// Reconstructing an existential from raw bytes is a compiler-managed
+// operation: use `createDynamicObject(typeId, value)` instead.  See
+// serialize-dynamic-object.slang for a working round-trip example.
 //
-// Blocked on the same two sub-issues as bit-cast-interface-roundtrip:
-//   #10221 — bit_cast extracts concrete payload instead of full existential
-//   #10222 — specialization lowers existential to compact tagged-union
-// See parent issue #9920.
+// Note: the forward direction (`bit_cast<Raw>(iface)`) fires the semantic-check
+// E41205 via `typeInvolvesInterface` on the argument type.  The reverse
+// direction uses the IR-layer E41204 ("cannot bit-cast to existential
+// (non-concrete) type") because by the time `ResolveInvoke` runs, the generic
+// application `bit_cast<IFoo>` has not yet been rewritten to a resolved
+// `FuncType` whose return type we could inspect — so the semantic check
+// cannot see the result type `IFoo` the way it sees the argument types.
+// Both errors carry the same meaning; users get a clear diagnostic either way.
+//
+// See #10221 / #10222; parent feature tracker is #9920.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
 
@@ -26,37 +34,24 @@ struct FooB : IFoo
     float eval() { return x * 2.0; }
 }
 
-static const int kRawUints = 8;
-
 struct RawExistential
 {
-    uint data[kRawUints];
+    uint data[8];
 }
 
-void serialize(IFoo foo, RWStructuredBuffer<uint> buf, int baseSlot)
+IFoo testReverse(RawExistential raw)
 {
-    RawExistential raw = bit_cast<RawExistential>(foo);
-    for (int i = 0; i < kRawUints; i++)
-        buf[baseSlot + i] = raw.data[i];
-}
-
-IFoo deserialize(RWStructuredBuffer<uint> buf, int baseSlot)
-{
-    RawExistential raw;
-    for (int i = 0; i < kRawUints; i++)
-        raw.data[i] = buf[baseSlot + i];
     return bit_cast<IFoo>(raw);
 //CHECK:                 ^ cannot bit-cast to existential (non-concrete) type
 }
 
 RWStructuredBuffer<float> outputBuffer;
-RWStructuredBuffer<uint> storageBuf;
 
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
-    IFoo fooA = createDynamicObject<IFoo>(id, 3.0);
-    serialize(fooA, storageBuf, 0);
-    IFoo restored = deserialize(storageBuf, 0);
-    outputBuffer[0] = restored.eval();
+    RawExistential raw;
+    for (int i = 0; i < 8; i++)
+        raw.data[i] = 0;
+    outputBuffer[0] = testReverse(raw).eval();
 }

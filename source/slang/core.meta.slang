@@ -3309,13 +3309,29 @@ $}
 
 /// Bit cast between types. `T` and `U` must have the same size.
 /// They can be any scalar, vector, matrix, struct or array types.
+///
+/// Interface types (and types transitively containing interface
+/// fields) are rejected with E41205, because the in-memory layout
+/// of an existential value is implementation-defined and not safe
+/// to reinterpret. Use `createDynamicObject` and
+/// `serializeDynamicObject` instead for the typed serialize /
+/// deserialize round-trip between raw memory and interface values.
 /// @category conversion
 __generic<T, U>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitCast))
 T bit_cast(U value);
 
-// Create Existential object
+/// Builds an existential value of interface type `T` from a sequential
+/// witness-table ID and a concrete payload of type `U`.  `U` must be the
+/// same size as the interface's any-value payload.
+///
+/// Use together with `serializeDynamicObject` to round-trip interface-typed
+/// values through raw memory.  Note: plain `bit_cast` between raw memory
+/// and interface types is intentionally not supported; use this builtin
+/// for the deserialize direction and `serializeDynamicObject` for the
+/// serialize direction.
+/// @category dynamic_dispatch
 __generic<T, U>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_CreateExistentialObject))
@@ -3336,6 +3352,35 @@ T createDynamicObject(uint typeId)
 {
     return createDynamicObject<T, uint>(typeId, 0);
 }
+
+/// Inverse of `createDynamicObject`.  Unpacks an existential value of interface
+/// type `T` into its sequential witness-table ID and its concrete payload
+/// reinterpreted as storage type `U`.
+///
+/// `U` must match the *specialized* payload size of `T` at this call site,
+/// which is context-dependent:
+/// - With multiple conformances visible the packed type is the union of
+///   all conforming types and its size matches the `[anyValueSize]`
+///   annotation on `T`.
+/// - With a single conformance visible the typeflow pass collapses the
+///   packed type to the concrete struct, and `U` must match that struct's
+///   size — which can be smaller than the declared `[anyValueSize]`.
+///
+/// A mismatch is rejected at compile time with diagnostic E41206. Code
+/// that serializes in one compilation unit and deserializes in another
+/// must therefore use the same conformance set on both sides, or use a
+/// storage type whose size matches the worst-case `[anyValueSize]`.
+///
+/// Use together with `createDynamicObject` to serialize and reconstruct
+/// interface-typed values through raw buffers.  Note: plain `bit_cast`
+/// between interface types and raw memory is intentionally not supported;
+/// use this builtin for the serialize direction and `createDynamicObject`
+/// for the deserialize direction.
+/// @category dynamic_dispatch
+__generic<T, U>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_ExtractDynamicObject))
+void serializeDynamicObject(T obj, out uint typeId, out U value);
 
 /// Reinterpret type `U` as type `T`. `T` and `U`
 /// can be any scalar, vector, matrix, struct or array types.

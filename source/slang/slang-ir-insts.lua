@@ -2464,6 +2464,15 @@ local insts = {
 	-- A 'CreateExistentialObject<I>(typeID, T)` packs user-provided `typeID` and a
 	-- value of any type, and constructs an existential value of type `I`.
 	{ createExistentialObject = { operands = { { "typeID" }, { "value" } } } },
+	-- An `ExtractDynamicObject<I,U>(obj, typeIDOut, valueOut)` is the inverse of
+	-- `CreateExistentialObject`: it takes an existential value of interface type `I`
+	-- and writes the sequential witness-table ID and the concrete payload (packed
+	-- into type `U`) to the pointer operands `typeIDOut` and `valueOut`.
+	{
+		extractDynamicObject = {
+			operands = { { "object" }, { "typeIDOut" }, { "valueOut" } },
+		},
+	},
 	-- A `wrapExistential(v, T0,w0, T1,w0) : T` instruction is similar to `makeExistential`.
 	-- but applies to a value `v` that is of type `BindExistentials(T, T0,w0, ...)`. The
 	-- result of the `wrapExistentials` operation is a value of type `T`, allowing us to

@@ -2439,6 +2439,12 @@ struct IRCreateExistentialObject : IRInst
     FIDDLE(leafInst())
 };
 
+FIDDLE()
+struct IRExtractDynamicObject : IRInst
+{
+    FIDDLE(leafInst())
+};
+
 /// Generalizes `IRMakeExistential` by allowing a type with existential sub-fields to be boxed
 FIDDLE()
 struct IRWrapExistential : IRInst

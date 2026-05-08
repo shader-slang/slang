@@ -2027,6 +2027,7 @@ struct SpecializationContext
             case kIROp_Call:
             case kIROp_ExtractExistentialType:
             case kIROp_CreateExistentialObject:
+            case kIROp_ExtractDynamicObject:
             case kIROp_Param:
                 return false;
             default:
