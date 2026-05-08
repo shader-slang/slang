@@ -216,7 +216,7 @@ CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name
     case CompilerOptionName::Optimization:
         return CompilerOptionValue::fromEnum(OptimizationLevel::Default);
     case CompilerOptionName::LanguageVersion:
-        return CompilerOptionValue::fromEnum(SLANG_LANGAUGE_VERSION_DEFAULT);
+        return CompilerOptionValue::fromEnum(SLANG_LANGUAGE_VERSION_DEFAULT);
     default:
         return CompilerOptionValue();
     }
