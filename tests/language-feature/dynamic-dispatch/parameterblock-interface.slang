@@ -3,15 +3,31 @@
 // semantics than ConstantBuffer (descriptor sets on Vulkan, root
 // signatures on DX12), but the dispatch mechanism should be the same.
 //
-// Currently crashes with the same null-pointer dereference as
-// ConstantBuffer<IFoo> (#10314). Disabled until fixed.
+// Two complementary verifications:
+//
+// (1) REPORT — `-report-dynamic-dispatch-sites` is the stable
+//     structural contract that the compiler generated dispatch code
+//     for the multi-conformance call site. Pinning the diagnostic
+//     (E50102) is target-independent and survives renames of the
+//     synthesized dispatch shim.
+//
+// (2) Cross-target compiles confirm each backend produces an entry
+//     point without crashing on `ParameterBlock<IFoo>`. End-to-end
+//     runtime correctness for the IRPointerLikeType (ConstantBuffer/
+//     ParameterBlock) fix path is covered by the
+//     `parameterblock-struct-interface-field.slang` and
+//     `global-interface-param-compute.slang` compute tests, which
+//     exercise the same `specializeLoad` / `lowerExtractDynamicObject`
+//     paths fixed by this PR.
 
-//DISABLED_TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
-//DISABLED_TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
-//DISABLED_TEST:SIMPLE(filecheck=CUDA): -target cuda -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
-//DISABLED_TEST:SIMPLE(filecheck=CPP): -target cpp -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
-//DISABLED_TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
-//DISABLED_TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
+//TEST:SIMPLE(filecheck=REPORT): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -report-dynamic-dispatch-sites
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
+//TEST:SIMPLE(filecheck=CUDA): -target cuda -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
+//TEST:SIMPLE(filecheck=CPP): -target cpp -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
+//TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
 
 [anyValueSize(16)]
 interface IFoo
@@ -38,11 +54,17 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
+    // The type list ('ImplA, ImplB' or 'ImplB, ImplA') is iteration-
+    // order dependent across platforms — pin only the count + line.
+    // REPORT-DAG: note[E50102]: generated{{.*}}dispatch code{{.*}}2 possible types:
+    // REPORT-DAG: :[[# @LINE+1]]:
     outputBuffer[0] = gFoo.getValue();
 }
 
+// Each backend must produce the entry point without crashing.
 // SPIRV: OpEntryPoint
 // HLSL: void computeMain
+// GLSL: void main
 // CUDA: void computeMain
 // CPP: void computeMain
 // MTL: void computeMain

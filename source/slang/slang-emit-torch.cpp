@@ -30,6 +30,9 @@ void emitTorchScalarTypeName(SourceWriter* m_writer, IRInst* type)
     case kIROp_HalfType:
         m_writer->emit("kFloat16");
         break;
+    case kIROp_BFloat16Type:
+        m_writer->emit("kBFloat16");
+        break;
     case kIROp_DoubleType:
         m_writer->emit("kFloat64");
         break;
