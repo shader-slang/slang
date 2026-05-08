@@ -147,11 +147,8 @@ void clearTiledBuffer<int PaddedSize, int WorkgroupSize>(uint tid)
 
 [shader("compute")]
 [numthreads(WorkgroupSize, 1, 1)]
-void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
+void computeMain(uint tid : SV_GroupIndex)
 {
-    if (gid.x != 0)
-        return;
-
     // 3x15 → padded to 16x16
     {
         clearTiledBuffer<16, WorkgroupSize>(tid);

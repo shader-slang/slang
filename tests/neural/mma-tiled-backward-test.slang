@@ -41,20 +41,6 @@ public struct TestShMemSize : ISharedMemorySize {
     public static const uint Bytes = 1024 * sizeof(uint4);
 }
 
-void clearWeightBuffer<int PaddedSize>(uint tid)
-{
-    static const int TotalElements = PaddedSize * PaddedSize;
-    static const int NumIters = (TotalElements + BatchSize - 1) / BatchSize;
-
-    [ForceUnroll]
-    for (int iter = 0; iter < NumIters; iter++)
-    {
-        int index = iter * BatchSize + tid;
-        if (index < TotalElements)
-            buffers.weightBuffer[index] = DType(0);
-    }
-}
-
 void clearGradBuffers<int PaddedSize>(uint tid)
 {
     static const int TotalElements = PaddedSize * PaddedSize;
@@ -75,58 +61,6 @@ void clearGradBuffers<int PaddedSize>(uint tid)
         int index = iter * BatchSize + tid;
         if (index < PaddedSize)
             buffers.biasGradBuffer[index] = DType(0);
-    }
-}
-
-// Write identity matrix in the layout expected by the active backend.
-// CUDA/Vulkan use row-major 16x16 tiled layout. CUDA then converts that
-// temporary row-major tiled data to native fragment layout. Metal uses plain
-// row-major weights.
-void identityWeightTiled<int Size, int PaddedSize>(uint tid)
-{
-    static const int TileSize = 16;
-    static const int NTileCols = PaddedSize / TileSize;
-
-    clearWeightBuffer<PaddedSize>(tid);
-    AllMemoryBarrierWithGroupSync();
-
-    __target_switch
-    {
-    case metal:
-        {
-            static const int NumDiagIters = (Size + BatchSize - 1) / BatchSize;
-            [ForceUnroll]
-            for (int iter = 0; iter < NumDiagIters; iter++)
-            {
-                int row = iter * BatchSize + tid;
-                if (row >= Size)
-                    break;
-                buffers.weightBuffer[row * PaddedSize + row] = DType(1);
-            }
-            AllMemoryBarrierWithGroupSync();
-        }
-    default:
-        {
-            static const int NumDiagIters = (Size + BatchSize - 1) / BatchSize;
-            [ForceUnroll]
-            for (int iter = 0; iter < NumDiagIters; iter++)
-            {
-                int row = iter * BatchSize + tid;
-                if (row >= Size)
-                    break;
-                int tileRow = row / TileSize;
-                int tileCol = row / TileSize;
-                int localRow = row % TileSize;
-                int localCol = row % TileSize;
-                int tileIndex = tileRow * NTileCols + tileCol;
-                int offset = tileIndex * TileSize * TileSize + localRow * TileSize + localCol;
-                buffers.weightBuffer[offset] = DType(1);
-            }
-            AllMemoryBarrierWithGroupSync();
-
-            convertTiledToNativeB<DType, PaddedSize, PaddedSize, BatchSize>(tid, buffers.weightBuffer);
-            AllMemoryBarrierWithGroupSync();
-        }
     }
 }
 
@@ -174,19 +108,19 @@ void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
 
     // 16x16
     {
-        identityWeightTiled<16, 16>(tid);
+        identityWeightMatrixTiled<DType, 16, BatchSize, false>(tid, buffers.weightBuffer);
         test<16>(tid, 0);
     }
 
     // 32x32
     {
-        identityWeightTiled<32, 32>(tid);
+        identityWeightMatrixTiled<DType, 32, BatchSize, false>(tid, buffers.weightBuffer);
         test<32>(tid, 1);
     }
 
     // 64x64
     {
-        identityWeightTiled<64, 64>(tid);
+        identityWeightMatrixTiled<DType, 64, BatchSize, false>(tid, buffers.weightBuffer);
         test<64>(tid, 2);
     }
 
