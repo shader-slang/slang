@@ -13,9 +13,9 @@ void computeMain()
     outputBuffer[0] = 0;
     // This gets passed as a `String`, which will get implicitly stack allocated
     // with `-O0 -g3` so that the debugger can see the parameter values of
-    // `crasher`. If `String` is not lowered, it's size is miscalculated and
-    // will mess up the stack!
+    // `crasher`. If the size of `String` is not calculated correctly, this will
+    // mess up the stack!
     crasher("hello, world");
-    // CHECK: 1
-    outputBuffer[0] = 1;
+    // CHECK: 8
+    outputBuffer[0] = sizeof(String);
 }

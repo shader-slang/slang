@@ -372,6 +372,15 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             return SLANG_OK;
         }
         break;
+    case kIROp_StringType:
+        if (targetReq && builtinTypeInfo.stringSize != 0)
+        {
+            *outSizeAndAlignment = IRSizeAndAlignment(
+                builtinTypeInfo.stringSize,
+                builtinTypeInfo.stringAlignment);
+            return SLANG_OK;
+        }
+        break;
     case kIROp_ScalarBufferLayoutType:
     case kIROp_CBufferLayoutType:
     case kIROp_Std140BufferLayoutType:
