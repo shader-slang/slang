@@ -272,24 +272,28 @@ Since Metal doesn't support conservative rasterization, SV_InnerCoverage is alwa
 
 ## SubpassInput
 
-Slang supports `SubpassInput` and `SubpassInputMS` on Metal, lowered to Metal's framebuffer fetch. The `[[vk::input_attachment_index(N)]]` attribute maps to Metal's `[[color(N)]]` fragment input, allowing a fragment shader to read the current value in the render target without a separate render pass.
+Slang supports `SubpassInput` and `SubpassInputMS` on Metal, lowered to Metal's framebuffer fetch. The `[[vk::input_attachment_index(N)]]` attribute maps to Metal's `[[color(N)]]` fragment input, allowing a fragment shader to read the current value in the render target within the same render pass.
 
 ```slang
 [[vk::input_attachment_index(0)]] SubpassInput<float4> color;
-[[vk::input_attachment_index(1)]] SubpassInput<float4> depth;
+[[vk::input_attachment_index(1)]] SubpassInput<float4> prevBloom;
 
 [shader("fragment")]
 float4 main() : SV_Target
 {
-    return color.SubpassLoad() + depth.SubpassLoad();
+    return color.SubpassLoad() + prevBloom.SubpassLoad();
 }
 ```
 
-This generates a Metal fragment function with `[[color(N)]]` parameters:
+This generates a Metal fragment function with `[[color(N)]]` parameters. The `SV_Target` return value is wrapped in a Slang-generated output struct:
 
 ```cpp
-[[fragment]] pixelOutput main(float4 color [[color(0)]], float4 depth [[color(1)]])
+struct pixelOutput { float4 output [[color(0)]]; };
+
+[[fragment]] pixelOutput main(float4 color [[color(0)]], float4 prevBloom [[color(1)]]);
 ```
+
+Note that `[[vk::input_attachment_index(N)]]` always maps to `[[color(N)]]` regardless of what the attachment semantically holds — Metal framebuffer fetch reads from color attachments only, not from `[[depth]]`/`[[stencil]]` attachments.
 
 ### Restrictions
 
