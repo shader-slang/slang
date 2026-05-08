@@ -2081,7 +2081,6 @@ public:
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyConstraintRequirements(
-        Type* satisfyingType,
         DeclRef<ContainerDecl> requiredAssociatedTypeDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
@@ -2642,7 +2641,19 @@ public:
     Type* getBackwardDiffFuncInterfaceType(Type* baseType);
     Type* getBwdCallableBaseType(Type* baseType);
 
-    //
+    // Priority levels for constraint solving. Lower numeric values indicate
+    // higher priority — a Required constraint overrides Optional, which
+    // overrides Default.
+    enum class ConstraintPriority
+    {
+        // constraints from explicit parameters, inferred argument types or where-clauses
+        Required = 0,
+        // constraints from `where optional` clauses and hint values from
+        // inferred-but-non-binding unification steps
+        Optional,
+        // default generic argument values (e.g., T = int)
+        Default
+    };
 
     struct Constraint
     {
@@ -2655,15 +2666,21 @@ public:
                                      // used in an l-value parameter?
         bool satisfied = false;      // Has this constraint been met?
 
-        // Is this constraint optional? An optional constraint provides a hint value to a
-        // parameter if it is otherwise unconstrained, but doesn't take precedence over a
-        // constraint that is not optional.
-        bool isOptional = false;
+        // There are multiple levels of optional constraints, the least binding
+        // of which are the default generic arguments; all deduced (even
+        // optional) constraints must override those.
+        ConstraintPriority priority = ConstraintPriority::Required;
 
         // Is this constraint an equality? This tells us that "joining" types is meaningless, we
         // know the result will be the sub type. If it is not, we will error once we start
         // substituting types.
         bool isEquality = false;
+
+        // Marks that `val` can depend on other constraints. E.g. `<T, U = T>`
+        // `potentiallyDependent` constraints must occur after the constraints
+        // that they depend on, otherwise results may be invalid as the prior
+        // constraints haven't been resolved yet.
+        bool potentiallyDependent = false;
     };
 
     // A collection of constraints that will need to be satisfied (solved)
@@ -2763,6 +2780,27 @@ public:
     SubtypeWitness* tryGetInterfaceConformanceWitness(Type* type, Type* interfaceType);
 
     Expr* createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, Val* witness);
+
+    /// Expand a compressed interface-to-interface subtype witness into a
+    /// transitive chain rooted at `subType`.
+    ///
+    /// The facet merger (see `_specializeInterfaceInheritanceWitness`) may
+    /// produce a `DeclaredSubtypeWitness(sub, sup, declRef)` where
+    /// `declRef.parent` is an interface *different* from `sub` — i.e. the
+    /// witness is conceptually a composition of (sub : declRef.parent) and
+    /// (declRef.parent : sup) but stored as a single node.  That shape is
+    /// fine for facet-based lookup but malformed for IR lowering, because
+    /// `declRef`'s inheritance key only resolves against the witness table
+    /// of its declaring interface.
+    ///
+    /// This helper walks the witness tree and splits any such compressed
+    /// step back into a `TransitiveSubtypeWitness`, so downstream lowering
+    /// can mechanically chain `lookupWitnessMethod` calls without doing
+    /// any inheritance-graph discovery itself.
+    SubtypeWitness* normalizeSubtypeWitnessForInterfaceUpcast(
+        Type* subType,
+        SubtypeWitness* witness,
+        int depth = 0);
 
     // Handles special modifier cases. In general case, calls createModifierCastExpr.
     Expr* createModifierCast(Type* toType, Type* fromType, Expr* fromExpr);
@@ -3577,6 +3615,10 @@ VarDeclBase* getTrailingUnsizedArrayElement(
 // Test if `type` can be an opaque handle on certain targets, this includes
 // texture, buffer, sampler, acceleration structure, etc.
 bool isOpaqueHandleType(Type* type);
+
+// Returns true if `type` itself is an opaque handle type, or if it is a struct
+// (or array thereof) that transitively contains an opaque handle field.
+bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type);
 
 void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,

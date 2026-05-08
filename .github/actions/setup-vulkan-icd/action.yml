@@ -1,0 +1,48 @@
+name: Setup Vulkan ICD
+description: >-
+  Override the NVIDIA Vulkan ICD to use libEGL_nvidia.so.0 as the driver
+  entry point, avoiding a libEGL crash observed on driver 580.x when
+  loaded via the default libGLX_nvidia.so.0 ICD.
+
+runs:
+  using: composite
+  steps:
+    - name: Write Vulkan ICD override
+      shell: bash
+      run: |
+        # Locate the NVIDIA ICD JSON injected by nvidia-container-toolkit.
+        # The path is mounted read-only in toolkit 1.19+, so we write our
+        # override elsewhere and point VK_ICD_FILENAMES at it.
+        source_icd=""
+        for candidate in \
+          /etc/vulkan/icd.d/nvidia_icd.json \
+          /usr/share/vulkan/icd.d/nvidia_icd.json; do
+          if [ -f "$candidate" ]; then
+            source_icd="$candidate"
+            break
+          fi
+        done
+
+        icd_dir="${RUNNER_TEMP:-/tmp}/vulkan-icd"
+        icd_path="$icd_dir/nvidia_icd.json"
+        mkdir -p "$icd_dir"
+
+        script="${GITHUB_ACTION_PATH}/setup-vulkan-icd.py"
+        if ! ICD_SOURCE="$source_icd" ICD_OUT="$icd_path" \
+            python3 "$script" 2>"$icd_dir/py.err"; then
+          echo "::error::Failed to write Vulkan ICD override — default ICD risks libEGL_nvidia crash on driver 580.x"
+          echo "source_icd=$source_icd"
+          if [ -n "$source_icd" ]; then
+            echo "--- $source_icd ---"
+            cat "$source_icd" || true
+          fi
+          echo "--- python stderr ---"
+          cat "$icd_dir/py.err" 2>/dev/null || true
+          exit 1
+        fi
+
+        echo "VK_ICD_FILENAMES=$icd_path" >> "$GITHUB_ENV"
+
+        # Remove the NVIDIA EGL vendor JSON if writable, to prevent
+        # libglvnd from loading libEGL_nvidia through the EGL path.
+        rm -f /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null || true

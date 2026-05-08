@@ -4,7 +4,7 @@
 
 extern static const int N;
 
-// SPIRV: warning[E31000]
+// SPIRV: warning[E31010]
 struct S { int xs[N]; }
 
 RWStructuredBuffer<S> b;

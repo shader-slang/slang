@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -profile ps_5_0
+//TEST:COMPARE_HLSL: -profile ps_5_0 -warnings-disable 31106,31107
 
 #ifdef __SLANG__
 

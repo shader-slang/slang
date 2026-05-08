@@ -94,7 +94,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     int source = 39;
 
     // Auto-sized with pointer: 39 + 3 = 42
-    var a = makeAutoSized(typeSelector[0], &source);
+    var a = makeAutoSized(typeSelector[0], __getAddress(source));
     // CHECK: 42
     outputBuffer[0] = a.get();
 
@@ -104,7 +104,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[1] = b.get();
 
     // Explicit-sized with pointer: 39 + 3 = 42
-    var c = makeExplicitSized(typeSelector[2], &source);
+    var c = makeExplicitSized(typeSelector[2], __getAddress(source));
     // CHECK: 42
     outputBuffer[2] = c.get();
 

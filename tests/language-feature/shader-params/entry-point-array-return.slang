@@ -1,9 +1,9 @@
 // Entry points cannot return array types. The compiler should emit
 // a diagnostic error for all array return patterns.
 
-//TEST:SIMPLE(filecheck=SINGLE): -target spirv -O0 -entry singleField
-//TEST:SIMPLE(filecheck=MULTI): -target spirv -O0 -entry multiField
-//TEST:SIMPLE(filecheck=NESTED): -target spirv -O0 -entry nestedArray
+//TEST:SIMPLE(filecheck=SINGLE): -target spirv -O0 -entry singleField -warnings-disable 38052
+//TEST:SIMPLE(filecheck=MULTI): -target spirv -O0 -entry multiField -warnings-disable 38052
+//TEST:SIMPLE(filecheck=NESTED): -target spirv -O0 -entry nestedArray -warnings-disable 38052
 
 struct SingleFieldStruct
 {

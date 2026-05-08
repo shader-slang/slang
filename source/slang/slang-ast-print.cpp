@@ -84,7 +84,7 @@ void ASTPrinter::addExpr(Expr* expr)
 
     auto& sb = m_builder;
 
-    if (const auto incompleteExpr = as<IncompleteExpr>(expr))
+    if (const auto incompleteExpr = as<IncompleteExpr>(expr); incompleteExpr)
     {
         sb << "<incomplete>";
     }
@@ -296,7 +296,7 @@ void ASTPrinter::addExpr(Expr* expr)
     {
         if (const auto operatorExpr = as<OperatorExpr>(invokeExpr))
         {
-            if (const auto infixExpr = as<InfixExpr>(operatorExpr))
+            if (const auto infixExpr = as<InfixExpr>(operatorExpr); infixExpr)
             {
                 // Binary operator
                 if (invokeExpr->arguments.getCount() == 2)
@@ -317,7 +317,7 @@ void ASTPrinter::addExpr(Expr* expr)
                     return;
                 }
             }
-            else if (const auto prefixExpr = as<PrefixExpr>(operatorExpr))
+            else if (const auto prefixExpr = as<PrefixExpr>(operatorExpr); prefixExpr)
             {
                 // Prefix operator
                 if (operatorExpr->functionExpr && as<VarExpr>(operatorExpr->functionExpr) &&
@@ -336,7 +336,7 @@ void ASTPrinter::addExpr(Expr* expr)
                 }
                 return;
             }
-            else if (const auto postfixExpr = as<PostfixExpr>(operatorExpr))
+            else if (const auto postfixExpr = as<PostfixExpr>(operatorExpr); postfixExpr)
             {
                 // Postfix operator
                 if (invokeExpr->arguments.getCount() > 0)
@@ -355,7 +355,7 @@ void ASTPrinter::addExpr(Expr* expr)
                 }
                 return;
             }
-            else if (const auto selectExpr = as<SelectExpr>(operatorExpr))
+            else if (const auto selectExpr = as<SelectExpr>(operatorExpr); selectExpr)
             {
                 // Ternary operator: cond ? ifTrue : ifFalse
                 if (invokeExpr->arguments.getCount() == 3)
@@ -818,19 +818,23 @@ void ASTPrinter::addExpr(Expr* expr)
     }
     else if (const auto higherOrderInvokeExpr = as<HigherOrderInvokeExpr>(expr))
     {
-        if (const auto primalSubstituteExpr = as<PrimalSubstituteExpr>(higherOrderInvokeExpr))
+        if (const auto primalSubstituteExpr = as<PrimalSubstituteExpr>(higherOrderInvokeExpr);
+            primalSubstituteExpr)
         {
             sb << "__primal(";
         }
-        else if (const auto forwardDiffExpr = as<ForwardDifferentiateExpr>(higherOrderInvokeExpr))
+        else if (const auto forwardDiffExpr = as<ForwardDifferentiateExpr>(higherOrderInvokeExpr);
+                 forwardDiffExpr)
         {
             sb << "__fwd_diff(";
         }
-        else if (const auto backwardDiffExpr = as<BackwardDifferentiateExpr>(higherOrderInvokeExpr))
+        else if (const auto backwardDiffExpr = as<BackwardDifferentiateExpr>(higherOrderInvokeExpr);
+                 backwardDiffExpr)
         {
             sb << "__bwd_diff(";
         }
-        else if (const auto dispatchKernelExpr = as<DispatchKernelExpr>(higherOrderInvokeExpr))
+        else if (const auto dispatchKernelExpr = as<DispatchKernelExpr>(higherOrderInvokeExpr);
+                 dispatchKernelExpr)
         {
             sb << "__dispatch_kernel(";
         }
@@ -1165,7 +1169,7 @@ void ASTPrinter::addExpr(Expr* expr)
             addExpr(tryExpr->base);
         }
     }
-    else if (const auto defaultConstructExpr = as<DefaultConstructExpr>(expr))
+    else if (const auto defaultConstructExpr = as<DefaultConstructExpr>(expr); defaultConstructExpr)
     {
         sb << "default(";
         addType(expr->type);
@@ -1670,7 +1674,7 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
             m_builder << " ";
         }
     }
-    else if (const auto propertyDecl = as<PropertyDecl>(decl))
+    else if (const auto propertyDecl = as<PropertyDecl>(decl); propertyDecl)
     {
         m_builder << "property ";
     }
@@ -1698,11 +1702,11 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
             m_builder << " ";
         }
     }
-    else if (const auto assocType = as<AssocTypeDecl>(decl))
+    else if (const auto assocType = as<AssocTypeDecl>(decl); assocType)
     {
         m_builder << "associatedtype ";
     }
-    else if (const auto attribute = as<AttributeDecl>(decl))
+    else if (const auto attribute = as<AttributeDecl>(decl); attribute)
     {
         m_builder << "attribute ";
     }

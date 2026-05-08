@@ -168,27 +168,28 @@ bool isResourceType(IRType* type)
         type = arrayType->getElementType();
     }
 
-    if (const auto resourceTypeBase = as<IRResourceTypeBase>(type))
+    if (const auto resourceTypeBase = as<IRResourceTypeBase>(type); resourceTypeBase)
     {
         return true;
     }
-    else if (const auto builtinGenericType = as<IRBuiltinGenericType>(type))
+    else if (const auto builtinGenericType = as<IRBuiltinGenericType>(type); builtinGenericType)
     {
         return true;
     }
-    else if (const auto pointerLikeType = as<IRPointerLikeType>(type))
+    else if (const auto pointerLikeType = as<IRPointerLikeType>(type); pointerLikeType)
     {
         return true;
     }
-    else if (const auto samplerType = as<IRSamplerStateTypeBase>(type))
+    else if (const auto samplerType = as<IRSamplerStateTypeBase>(type); samplerType)
     {
         return true;
     }
-    else if (const auto subpassInputType = as<IRSubpassInputType>(type))
+    else if (const auto subpassInputType = as<IRSubpassInputType>(type); subpassInputType)
     {
         return true;
     }
-    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type);
+             untypedBufferType)
     {
         return true;
     }
@@ -1230,6 +1231,29 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
         else
         {
             legalElementType = legalizeType(context, originalElementType);
+
+            // When special types leak out of a parameter group, they need to
+            // be bound differently. Warn the user when this happens.
+            if (legalElementType.flavor == LegalType::Flavor::pair &&
+                as<IRConstantBufferType>(type))
+            {
+                context->m_sink->diagnose(Diagnostics::SpecialTypeLeaksFromParameterGroup{
+                    .location = findFirstUseLoc(type)});
+
+                // indicate which elements cannot be part of the parameter group
+                auto& specialType = legalElementType.getPair()->specialType;
+                if (specialType.flavor == LegalType::Flavor::tuple)
+                {
+                    auto specialTuple = specialType.getTuple();
+                    for (auto specialElement : specialTuple->elements)
+                    {
+                        context->m_sink->diagnose(
+                            Diagnostics::SpecialTypeMemberLeaksFromParameterGroup{
+                                .member = specialElement.key});
+                    }
+                }
+            }
+
             // As a bit of a corner case, if the user requested something
             // like `ConstantBuffer<Texture2D>` the element type would
             // legalize to a "simple" type, and that would be interpreted

@@ -84,7 +84,7 @@ struct DeadCodeEliminationContext
                 builder.setInsertBefore(firstChild);
             else
                 builder.setInsertInto(module->getModuleInst());
-            undefInst = Slang::getUnitPoisonVal(builder, module);
+            undefInst = Slang::getUnitPoisonVal(&builder, module);
         }
         return undefInst;
     }
@@ -559,6 +559,9 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
         {
             innerInst = findInnerMostGenericReturnVal(genInst);
         }
+        // TODO: PR #9808 (Sai Praveen Bangaru) removed the loop over innerInst->getDecorations()
+        // that set shouldKeptAliveIfImported, leaving innerInst unused.
+        SLANG_UNUSED(innerInst);
         for (auto decor : inst->getDecorations())
         {
             switch (decor->getOp())

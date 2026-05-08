@@ -33,6 +33,7 @@ DEFAULT_TOP_WAITING = 15
 # Checked top-to-bottom; first match where required_labels is a subset of
 # the job's labels wins.
 DEFAULT_LABEL_GROUPS = [
+    ({"Linux", "self-hosted", "SM80Plus"}, "Linux SM80Plus GPU (GCP)", True),
     ({"Linux", "self-hosted", "GPU"}, "Linux GPU (GCP)", True),
     ({"Windows", "self-hosted", "GCP-T4"}, "Windows GPU (GCP)", True),
     # These Windows runners share the same physical machines (SLANGWIN*)

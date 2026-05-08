@@ -127,7 +127,8 @@ Slang supports access control modifiers: `public`, `internal`, and `private`. Th
 
 `public` symbols are accessible everywhere: from within different types, different files, or different modules.
 
-`private` symbols are only visible to other symbols in the same type. The following example shows the scope of `private` visibility:
+`private` symbols are only visible to other symbols in the same type. Members declared in an `extension` are treated as members of the extended type for `private` access, so code inside the original type or another extension of that type can access them. The following example shows the scope of `private` visibility:
+
 ```csharp
 struct MyType
 {

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -warnings-disable 38052
 
 // Test that we can use Optional<T> or bool types in varying input or outputs.
 

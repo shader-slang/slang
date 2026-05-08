@@ -71,10 +71,11 @@ static void maybeAddTypeAnnotationsForHigherOrderDiff(
                                                           origType,
                                                           AnnotationKind::DifferentialPairType))
                                ->getWitness();
-        if (as<IRStructKey>(diffWitness))
+        if (as<IRStructKey>(diffWitness) || as<IRPoison>(diffWitness))
         {
-            // For now, we'll ignore this case (happens for existential types)
-            // Existential types cannot be higher-order differentiated at the moment.
+            // Existential/interface differential pairs may carry a placeholder witness
+            // instead of a usable IDifferentiable witness table. Higher-order autodiff
+            // doesn't support synthesizing annotations from that representation yet.
             return;
         }
 
@@ -323,7 +324,7 @@ struct ForwardDiffTranslationContext
     {
         auto primalVal = maybeCloneForPrimalInst(builder, origInst);
 
-        if (IRType* const diffType = differentiateType(builder, origInst->getFullType()))
+        if (IRType* const diffType = differentiateType(builder, origInst->getFullType()); diffType)
         {
             auto dzero = getDifferentialZeroOfType(builder, origInst->getFullType());
             if (dzero)
@@ -680,7 +681,8 @@ struct ForwardDiffTranslationContext
                 else
                 {
                     auto operandDataType = origConstruct->getOperand(ii)->getDataType();
-                    if (const auto diffOperandType = differentiateType(builder, operandDataType))
+                    if (const auto diffOperandType = differentiateType(builder, operandDataType);
+                        diffOperandType)
                     {
                         operandDataType =
                             (IRType*)findOrTranslatePrimalInst(builder, operandDataType);
@@ -691,6 +693,25 @@ struct ForwardDiffTranslationContext
                         diffOperands.add(builder->getVoidValue());
                     }
                 }
+            }
+
+            // If all diff operands are VoidLit (all operands are non-differentiable),
+            // the differential of the entire construct is also non-differentiable.
+            // Return nullptr instead of creating a construct with VoidLit operands
+            // that would have mismatched types (e.g. MakeVectorFromScalar(void_constant)
+            // with a float3 result type).
+            {
+                bool allVoid = true;
+                for (auto op : diffOperands)
+                {
+                    if (op->getOp() != kIROp_VoidLit)
+                    {
+                        allVoid = false;
+                        break;
+                    }
+                }
+                if (allVoid)
+                    return InstPair(primalConstruct, nullptr);
             }
 
             return InstPair(
@@ -1716,7 +1737,7 @@ struct ForwardDiffTranslationContext
                 diffAccessChain.add(key);
             }
         }
-        if (const auto diffType = differentiateType(builder, originalInst->getDataType()))
+        if (const auto diffType = differentiateType(builder, originalInst->getDataType()); diffType)
         {
             auto diffBase = findOrTranslateDiffInst(builder, origBase);
             if (!diffBase)
@@ -2114,7 +2135,7 @@ struct ForwardDiffTranslationContext
         List<IRParam*> params;
         for (auto param : firstBlock->getParams())
         {
-            if (const auto ptrType = as<IROutParamTypeBase>(param->getDataType()))
+            if (const auto ptrType = as<IROutParamTypeBase>(param->getDataType()); ptrType)
             {
                 params.add(param);
             }
