@@ -146,11 +146,8 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
 
 [shader("compute")]
 [numthreads(WorkgroupSize, 1, 1)]
-void computeMain(uint tid : SV_GroupIndex, uint3 gid : SV_GroupID)
+void computeMain(uint tid : SV_GroupIndex)
 {
-    if (gid.x != 0)
-        return;
-
     setBufferOneValue<TEST_SIZE * TEST_SIZE, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
     test<TEST_SIZE, TEST_SIZE>(tid, 0);
     // BUFFER: {{^}}1{{$}}

@@ -131,16 +131,6 @@ public int tiledWeightOffset(int row, int col)
     }
 }
 
-public int tiledWeightOffset<int RowStride>(int row, int col)
-{
-    __target_switch
-    {
-    case cuda:  return rowMajorToNativeMatB(col, row);
-    case spirv: return row * 16 + col;
-    case metal: return row * RowStride + col;
-    }
-}
-
 // Offset for element (row, col) in the dWeight buffer's tiled layout.
 // On CUDA: native MatC fragment layout (from storeRaw + atomicAdd).
 // On Vulkan: row-major within each 16×16 tile (from storeTileRowToGlobal).
@@ -152,16 +142,6 @@ public int tiledDWeightOffset(int row, int col)
     case cuda:  return rowMajorToNativeMatC(row, col);
     case spirv: return row * 16 + col;
     case metal: return row * 16 + col;
-    }
-}
-
-public int tiledDWeightOffset<int RowStride>(int row, int col)
-{
-    __target_switch
-    {
-    case cuda:  return rowMajorToNativeMatC(row, col);
-    case spirv: return row * 16 + col;
-    case metal: return row * RowStride + col;
     }
 }
 
