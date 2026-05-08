@@ -133,14 +133,14 @@ void testFFLayerBackward(int tid, int resIndex)
     // dW accumulated across BatchSize threads.
     // dW = BatchSize * [[1,2,3,4],[1,2,3,4]]
     ElementType scale = ElementType(BatchSize);
-    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(0, 0)], scale * ElementType(1.0));
-    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(0, 1)], scale * ElementType(2.0));
-    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(0, 2)], scale * ElementType(3.0));
-    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(0, 3)], scale * ElementType(4.0));
-    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(1, 0)], scale * ElementType(1.0));
-    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(1, 1)], scale * ElementType(2.0));
-    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(1, 2)], scale * ElementType(3.0));
-    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset(1, 3)], scale * ElementType(4.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 0)], scale * ElementType(1.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 1)], scale * ElementType(2.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 2)], scale * ElementType(3.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 3)], scale * ElementType(4.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 0)], scale * ElementType(1.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 1)], scale * ElementType(2.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 2)], scale * ElementType(3.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 3)], scale * ElementType(4.0));
 
     // dBias = [BatchSize, BatchSize]
     isPassed = isPassed && equals(buffers.dParameters[BiasOffset], scale);
@@ -185,10 +185,10 @@ void setupParameters(uint tid)
             buffers.parameters[i] = ElementType(0.0);
 
         for (int col = 0; col < InputSize; col++)
-            buffers.parameters[tiledWeightOffset(0, col)] = ElementType(col + 1);
+            buffers.parameters[tiledWeightOffset<InputSize>(0, col)] = ElementType(col + 1);
 
         for (int col = 0; col < InputSize; col++)
-            buffers.parameters[tiledWeightOffset(1, col)] = ElementType(InputSize + col + 1);
+            buffers.parameters[tiledWeightOffset<InputSize>(1, col)] = ElementType(InputSize + col + 1);
 
         buffers.parameters[256] = ElementType(9);
         buffers.parameters[257] = ElementType(10);
