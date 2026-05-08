@@ -5,11 +5,29 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Triple.h"
 
+#include <core/slang-platform.h>
+#include <core/slang-string.h>
+
 namespace slang_llvm
 {
 
 void disableAVX512ForJIT(llvm::orc::LLJITBuilder& jitBuilder)
 {
+    // Opt-in mitigation: only subtract AVX-512 from the JIT TargetMachine
+    // when SLANG_DISABLE_AVX512=1 in the environment. Default is to leave
+    // AVX-512 alone, so production builds keep AVX-512 codegen on capable
+    // hosts. CI workflows that hit #11062 set the env var on the test
+    // step. When LLVM 22 lands (#11017) and its host detection no longer
+    // mis-reports AVX-512 on the GitHub-Azure runners, the env var can
+    // be dropped from the workflows and this whole helper becomes dead
+    // code.
+    Slang::StringBuilder envValue;
+    if (SLANG_FAILED(Slang::PlatformUtil::getEnvironmentVariable(
+            Slang::UnownedStringSlice("SLANG_DISABLE_AVX512"),
+            envValue)) ||
+        envValue.getUnownedSlice() != Slang::UnownedStringSlice::fromLiteral("1"))
+        return;
+
     llvm::Expected<llvm::orc::JITTargetMachineBuilder> expectJTMB =
         llvm::orc::JITTargetMachineBuilder::detectHost();
     if (!expectJTMB)
