@@ -247,6 +247,153 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
     }
 }
 
+static void legalizeSubpassInputsForMetal(
+    IRModule* module,
+    DiagnosticSink* sink,
+    List<EntryPointInfo>& entryPoints)
+{
+    List<IRGlobalParam*> subpassGlobals;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto globalParam = as<IRGlobalParam>(inst))
+        {
+            if (as<IRSubpassInputType>(globalParam->getDataType()))
+                subpassGlobals.add(globalParam);
+        }
+    }
+
+    ShortList<IRFunc*> entryPointsToFix;
+    for (auto globalParam : subpassGlobals)
+    {
+        auto subpassType = as<IRSubpassInputType>(globalParam->getDataType());
+        auto elementType = subpassType->getElementType();
+
+        HashSet<IRFunc*> fragmentUsers;
+        for (auto use = globalParam->firstUse; use; use = use->nextUse)
+        {
+            auto pf = getParentFunc(use->getUser());
+            if (!pf)
+                continue;
+            for (auto& ep : entryPoints)
+                if (ep.entryPointFunc == pf &&
+                    ep.entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                    fragmentUsers.add(pf);
+        }
+        if (auto entryPointParamDecor = globalParam->findDecoration<IREntryPointParamDecoration>())
+        {
+            if (auto func = as<IRFunc>(entryPointParamDecor->getEntryPoint()))
+                fragmentUsers.add(func);
+        }
+        if (fragmentUsers.getCount() == 0)
+        {
+            sink->diagnose(Diagnostics::SubpassInputUsedOutsideEntryPoint{
+                .location = getDiagnosticPos(globalParam)});
+            continue;
+        }
+
+        IRIntegerValue attachmentIndex = 0;
+        if (auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>())
+        {
+            if (auto varLayout = as<IRVarLayout>(layoutDecor->getLayout()))
+            {
+                if (auto offsetAttr =
+                        varLayout->findOffsetAttr(LayoutResourceKind::InputAttachmentIndex))
+                {
+                    attachmentIndex = offsetAttr->getOffset();
+                }
+            }
+        }
+
+        Dictionary<IRFunc*, IRInst*> paramPerEntryPoint;
+        IRBuilder builder(module);
+        for (auto entryPointFunc : fragmentUsers)
+        {
+            auto firstBlock = entryPointFunc->getFirstBlock();
+            if (!firstBlock)
+                continue;
+
+            auto newParam = builder.createParam(elementType);
+            auto firstOrdinary = firstBlock->getFirstOrdinaryInst();
+            if (firstOrdinary)
+                newParam->insertBefore(firstOrdinary);
+            else
+                newParam->insertAtEnd(firstBlock);
+
+            StringBuilder colorStr;
+            colorStr << "color(" << Int(attachmentIndex) << ")";
+            String colorString = colorStr.produceString();
+            builder.addTargetSystemValueDecoration(newParam, colorString.getUnownedSlice());
+
+            if (auto nameHint = globalParam->findDecoration<IRNameHintDecoration>())
+                builder.addNameHintDecoration(newParam, nameHint->getName());
+
+            paramPerEntryPoint[entryPointFunc] = newParam;
+            if (entryPointsToFix.indexOf(entryPointFunc) == -1)
+                entryPointsToFix.add(entryPointFunc);
+        }
+
+        IRUse* nextUse = nullptr;
+        for (IRUse* use = globalParam->firstUse; use; use = nextUse)
+        {
+            nextUse = use->nextUse;
+            auto user = use->getUser();
+
+            // Decorations referencing the global (e.g., debug-value, layout
+            // metadata) are not value uses; leave them alone so they aren't
+            // destroyed alongside the global's data uses.
+            if (as<IRDecoration>(user))
+                continue;
+
+            auto parentFunc = getParentFunc(user);
+
+            IRInst* newParam = nullptr;
+            if (parentFunc)
+                paramPerEntryPoint.tryGetValue(parentFunc, newParam);
+
+            if (!newParam)
+            {
+                sink->diagnose(Diagnostics::SubpassInputUsedOutsideEntryPoint{
+                    .location = getDiagnosticPos(user)});
+                if (auto resultType = user->getDataType())
+                {
+                    IRBuilder localBuilder(user);
+                    localBuilder.setInsertBefore(user);
+                    user->replaceUsesWith(localBuilder.emitPoison(resultType));
+                }
+                user->removeAndDeallocate();
+                continue;
+            }
+
+            if (user->getOp() == kIROp_SubpassLoad)
+            {
+                auto subpassLoad = as<IRSubpassLoad>(user);
+                if (subpassLoad->getSample())
+                {
+                    sink->diagnose(Diagnostics::MultisampledSubpassInputNotSupportedOnMetal{
+                        .location = getDiagnosticPos(user)});
+                }
+                user->replaceUsesWith(newParam);
+                user->removeAndDeallocate();
+                continue;
+            }
+            sink->diagnose(Diagnostics::SubpassInputUsedOutsideEntryPoint{
+                .location = getDiagnosticPos(user)});
+            if (auto resultType = user->getDataType())
+            {
+                IRBuilder localBuilder(user);
+                localBuilder.setInsertBefore(user);
+                user->replaceUsesWith(localBuilder.emitPoison(resultType));
+            }
+            user->removeAndDeallocate();
+        }
+
+        globalParam->removeAndDeallocate();
+    }
+
+    for (auto func : entryPointsToFix)
+        fixUpFuncType(func);
+}
+
 void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     List<EntryPointInfo> entryPoints;
@@ -264,6 +411,8 @@ void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, Diagnost
             legalizeFuncBody(func);
         }
     }
+
+    legalizeSubpassInputsForMetal(module, sink, entryPoints);
 
     legalizeEntryPointVaryingParamsForMetal(module, sink, entryPoints);
 

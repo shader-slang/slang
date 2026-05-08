@@ -136,7 +136,11 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
     if (!layoutDecoration)
+    {
+        if (param->findDecoration<IRTargetSystemValueDecoration>())
+            maybeEmitSystemSemantic(param);
         return;
+    }
     auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
     if (!layout)
         return;
@@ -421,6 +425,12 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
     case kIROp_Discard:
         m_writer->emit("discard_fragment();\n");
+        return true;
+    case kIROp_SubpassLoad:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            inst,
+            "SubpassLoad should have been lowered before Metal emission");
         return true;
     case kIROp_MetalAtomicCast:
         {
@@ -1019,6 +1029,12 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit("nullptr");
             return true;
         }
+    case kIROp_SubpassLoad:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            inst,
+            "SubpassLoad should have been lowered before Metal emission");
+        return true;
     default:
         break;
     }
@@ -1347,6 +1363,12 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             ensurePrelude(kMetalBuiltinPreludeSimdgroupMatrixOps);
             return;
         }
+    case kIROp_SubpassInputType:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            type,
+            "SubpassInputType should have been lowered before Metal emission");
+        return;
     default:
         break;
     }
