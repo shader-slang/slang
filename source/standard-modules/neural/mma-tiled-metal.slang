@@ -57,14 +57,17 @@ internal struct TiledMMAMetal<T, int InputSize, int OutputSize, int SubgroupSize
     // =========================================================================
     // Forward: result = W(M,K) × input(K,N)
     //
-    // Blocked outer-product form (K outermost, M blocked with M_BLOCK=2).
+    // Blocked outer-product form (K outermost, M blocked with M_BLOCK rows).
     // Keeps ~13 simdgroup matrices live to avoid register spills on Apple Silicon.
     //
     // Metal: no hybrid precision -- A, B, C all use the same type T.
     // Uses WaveMatrix methods: loadWeightTiled, fromVectorViaShMem, matMad.
     // =========================================================================
 
-    static const int M_BLOCK = 2;
+    // Use the two-tile row block on the common 16-aligned path. Fall back to a
+    // single 8x8 tile block when either dimension has an odd tile count so
+    // target-native 8-aligned Metal sizes do not drop the final tile.
+    static const int M_BLOCK = ((NTileRows % 2 == 0) && (NTileCols % 2 == 0)) ? 2 : 1;
 
     // Struct-scope shared state for forward / mmaTranspose. Both functions
     // reuse the same K-loop via `mmaAccumulateMgGroup`, and both rely on the
@@ -449,6 +452,7 @@ internal struct TiledMMAMetal<T, int InputSize, int OutputSize, int SubgroupSize
         GroupMemoryBarrierWithGroupSync();
 
         outerProductAccumulate<T, Address>(dOut, input, weightGradAddress);
+        AllMemoryBarrierWithGroupSync();
 
         return bit_cast<WaveTangledVector<T.Differential, ShMemSize, InputSize, SubgroupSize, SubgroupCount>>(dInput);
     }
@@ -476,9 +480,9 @@ internal struct TiledMMAMetal<T, int InputSize, int OutputSize, int SubgroupSize
         typealias OPABMatrix = linalg.CoopMat<U, MemoryScope.Subgroup, MetalTile, MetalTile, linalg.CoopMatMatrixUse.MatrixB>;
         typealias OPACMatrix = linalg.CoopMat<U, MemoryScope.Subgroup, MetalTile, MetalTile, linalg.CoopMatMatrixUse.MatrixAccumulator>;
 
-        static const int OPA_N_BLOCK = 2;
         static const int TILES_M_ = OutputSize / MetalTile;
         static const int TILES_K_ = InputSize / MetalTile;
+        static const int OPA_N_BLOCK = (TILES_K_ % 2 == 0) ? 2 : 1;
         static const int TILES_LANE_ = SubgroupSize / MetalTile;
 
         static const int StageAElemsPerWarp = M_BLOCK * MetalTile * SubgroupSize;
