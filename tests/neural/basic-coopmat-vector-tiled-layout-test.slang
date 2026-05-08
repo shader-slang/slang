@@ -88,10 +88,10 @@ void setupParameters(uint tid)
             buffers.parameters[i] = ElementType(0.0);
 
         for (int col = 0; col < InputSize; col++)
-            buffers.parameters[tiledWeightOffset(0, col)] = ElementType(col + 1);
+            buffers.parameters[tiledWeightOffset<InputSize>(0, col)] = ElementType(col + 1);
 
         for (int col = 0; col < InputSize; col++)
-            buffers.parameters[tiledWeightOffset(1, col)] = ElementType(InputSize + col + 1);
+            buffers.parameters[tiledWeightOffset<InputSize>(1, col)] = ElementType(InputSize + col + 1);
 
         buffers.parameters[256] = ElementType(9);
         buffers.parameters[257] = ElementType(10);
@@ -211,10 +211,10 @@ void BackwardTestWithoutBias(int tid, int resIndex)
     // dW = dOutput * input^T = [[1],[1]] * [1,2,3,4] = [[1,2,3,4],[1,2,3,4]]
     // Accumulated across 32 threads: 32x.
     isPassed = isPassed &&
-        equals(buffers.dParameters[tiledDWeightOffset(0, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset(0, 1)], ElementType(64.0)) &&
-        equals(buffers.dParameters[tiledDWeightOffset(0, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset(0, 3)], ElementType(128.0)) &&
-        equals(buffers.dParameters[tiledDWeightOffset(1, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset(1, 1)], ElementType(64.0)) &&
-        equals(buffers.dParameters[tiledDWeightOffset(1, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset(1, 3)], ElementType(128.0));
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 1)], ElementType(64.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 3)], ElementType(128.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 1)], ElementType(64.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 3)], ElementType(128.0));
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
@@ -257,10 +257,10 @@ void BackwardTestWithBias(int tid, int resIndex)
 
     // dW: same as BackwardTestWithoutBias.
     isPassed = isPassed &&
-        equals(buffers.dParameters[tiledDWeightOffset(0, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset(0, 1)], ElementType(64.0)) &&
-        equals(buffers.dParameters[tiledDWeightOffset(0, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset(0, 3)], ElementType(128.0)) &&
-        equals(buffers.dParameters[tiledDWeightOffset(1, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset(1, 1)], ElementType(64.0)) &&
-        equals(buffers.dParameters[tiledDWeightOffset(1, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset(1, 3)], ElementType(128.0));
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 1)], ElementType(64.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 3)], ElementType(128.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 1)], ElementType(64.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 3)], ElementType(128.0));
 
     // dBias = dOutput accumulated across 32 threads = [32, 32]
     isPassed = isPassed &&

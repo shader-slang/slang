@@ -121,27 +121,28 @@ int rowMajorToNativeMatB(int row, int col)
 // row = output dimension (M), col = input dimension (K).
 // CUDA weight is MatB<K, M> — native layout indexed as (K_row, M_col).
 // Vulkan weight is MatA<M, K> — row-major indexed as (M_row, K_col).
-public int tiledWeightOffset(int row, int col)
+// Metal weight is row-major with the supplied row stride.
+public int tiledWeightOffset<int RowStride>(int row, int col)
 {
     __target_switch
     {
     case cuda:  return rowMajorToNativeMatB(col, row);
     case spirv: return row * 16 + col;
-    case metal: return row * 16 + col;
+    case metal: return row * RowStride + col;
     }
 }
 
 // Offset for element (row, col) in the dWeight buffer's tiled layout.
 // On CUDA: native MatC fragment layout (from storeRaw + atomicAdd).
 // On Vulkan: row-major within each 16×16 tile (from storeTileRowToGlobal).
-// Single-tile version (row, col both < 16).
-public int tiledDWeightOffset(int row, int col)
+// On Metal: row-major with the supplied row stride.
+public int tiledDWeightOffset<int RowStride>(int row, int col)
 {
     __target_switch
     {
     case cuda:  return rowMajorToNativeMatC(row, col);
     case spirv: return row * 16 + col;
-    case metal: return row * 16 + col;
+    case metal: return row * RowStride + col;
     }
 }
 
