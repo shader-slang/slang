@@ -2698,6 +2698,13 @@ err(
 )
 
 err(
+    "cuda-texture-format-conversion-unsupported",
+    31226,
+    "format conversion on CUDA textures is not yet supported",
+    span { loc = "location", message = "CUDA does not support format conversion on RWTextures for format '~format'; the element type does not match the declared format. Remove the `[format(...)]` declaration or make the element type match the format to avoid silently reading the wrong bytes." }
+)
+
+err(
     "differentiable-kernel-entry-point-cannot-have-differentiable-params",
     31214,
     "differentiable kernel param restriction",

@@ -4,6 +4,7 @@
 #include "../core/slang-char-util.h"
 #include "slang-emit-cuda.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -454,27 +455,34 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                     const ImageFormat imageFormat = formatDecoration->getFormat();
                     if (_isConvertRequired(imageFormat, resourceInst))
                     {
+                        // The CUDA prelude only ships `_convert` specializations for the
+                        // half-format family (r16f / rg16f / rgba16f).  For any other
+                        // format the `_convert` name binds to the half specialization,
+                        // which reads 2 bytes per channel and reinterprets them as half,
+                        // producing silently wrong results for e.g. a rgba8-backed
+                        // texture read as float4 (issue #11088).  Diagnose rather than
+                        // emit silently-wrong code; full format-conversion support is a
+                        // follow-up feature.
+                        bool isHalfFormat = imageFormat == ImageFormat::r16f ||
+                                            imageFormat == ImageFormat::rg16f ||
+                                            imageFormat == ImageFormat::rgba16f;
+                        if (!isHalfFormat)
+                        {
+                            m_emitter->getSink()->diagnose(
+                                Diagnostics::CudaTextureFormatConversionUnsupported{
+                                    .format = getImageFormatInfo(imageFormat).name,
+                                    .location = m_callInst->sourceLoc});
+                        }
+
                         // If the function returns something it's a reader so we may need to convert
                         // and in doing so require half
-                        if (_isResourceRead(m_callInst))
+                        if (_isResourceRead(m_callInst) && isHalfFormat)
                         {
-                            // If the source format if half derived, then we need to enable half
-                            switch (imageFormat)
+                            CUDAExtensionTracker* extensionTracker =
+                                as<CUDAExtensionTracker>(m_emitter->getExtensionTracker());
+                            if (extensionTracker)
                             {
-                            case ImageFormat::r16f:
-                            case ImageFormat::rg16f:
-                            case ImageFormat::rgba16f:
-                                {
-                                    CUDAExtensionTracker* extensionTracker =
-                                        as<CUDAExtensionTracker>(m_emitter->getExtensionTracker());
-                                    if (extensionTracker)
-                                    {
-                                        extensionTracker->requireBaseType(BaseType::Half);
-                                    }
-                                    break;
-                                }
-                            default:
-                                break;
+                                extensionTracker->requireBaseType(BaseType::Half);
                             }
                         }
 
