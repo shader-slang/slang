@@ -376,8 +376,8 @@ static void legalizeSubpassInputsForMetal(
                 user->removeAndDeallocate();
                 continue;
             }
-            sink->diagnose(Diagnostics::SubpassInputUsedOutsideEntryPoint{
-                .location = getDiagnosticPos(user)});
+            sink->diagnose(
+                Diagnostics::SubpassInputUsedOutsideEntryPoint{.location = getDiagnosticPos(user)});
             if (auto resultType = user->getDataType())
             {
                 IRBuilder localBuilder(user);
