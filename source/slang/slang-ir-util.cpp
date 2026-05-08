@@ -26,6 +26,20 @@ bool isUserPointerType(IRInst* type)
     return ptrType->getAddressSpace() == AddressSpace::UserPointer;
 }
 
+bool isAddressInst(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_FieldAddress:
+    case kIROp_GetElementPtr:
+    case kIROp_GetOffsetPtr:
+    case kIROp_RWStructuredBufferGetElementPtr:
+        return true;
+    default:
+        return false;
+    }
+}
+
 IRType* getVectorElementType(IRType* type)
 {
     if (auto vectorType = as<IRVectorType>(type))

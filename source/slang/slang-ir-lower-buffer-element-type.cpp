@@ -1749,14 +1749,8 @@ struct LoweredElementTypeContext
                     // derived from some other base address. We will let
                     // the later part of the pass to systematically propagate
                     // the cast through them.
-                    switch (user->getOp())
-                    {
-                    case kIROp_FieldAddress:
-                    case kIROp_GetElementPtr:
-                    case kIROp_GetOffsetPtr:
-                    case kIROp_RWStructuredBufferGetElementPtr:
+                    if (isAddressInst(user))
                         return;
-                    }
                     auto ptrVal = use->getUser();
                     setInsertAfterOrdinaryInst(&builder, ptrVal);
                     builder.replaceOperand(use, loweredBufferType);

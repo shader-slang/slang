@@ -35,7 +35,6 @@ struct VariableScopeCorrectionContext
     void _processUnstorableInst(IRInst* inst, const List<IRUse*>& outOfScopeUser);
 
     bool _isStorableType(IRType* inst);
-    bool _isAddressInst(IRInst* inst);
     bool _isOutOfScopeUse(
         IRInst* inst,
         IRDominatorTree* domTree,
@@ -185,7 +184,7 @@ void VariableScopeCorrectionContext::_processInstruction(
         return;
     }
 
-    if (!_isAddressInst(originInst) && _isStorableType(originInst->getDataType()))
+    if (!isAddressInst(originInst) && _isStorableType(originInst->getDataType()))
     {
         _processStorableInst(instAfterParam, originInst, outOfScopeUses);
     }
@@ -272,20 +271,6 @@ bool VariableScopeCorrectionContext::_isStorableType(IRType* type)
         }
     case kIROp_UnsizedArrayType:
         return false;
-    default:
-        return false;
-    }
-}
-
-bool VariableScopeCorrectionContext::_isAddressInst(IRInst* inst)
-{
-    switch (inst->getOp())
-    {
-    case kIROp_FieldAddress:
-    case kIROp_GetElementPtr:
-    case kIROp_GetOffsetPtr:
-    case kIROp_RWStructuredBufferGetElementPtr:
-        return true;
     default:
         return false;
     }
