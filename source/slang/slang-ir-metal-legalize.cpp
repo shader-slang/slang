@@ -354,13 +354,11 @@ static void legalizeSubpassInputsForMetal(
             {
                 sink->diagnose(Diagnostics::SubpassInputUsedOutsideEntryPoint{
                     .location = getDiagnosticPos(user)});
-                if (user->firstUse)
+                if (auto resultType = user->getDataType())
                 {
                     IRBuilder localBuilder(user);
                     localBuilder.setInsertBefore(user);
-                    auto resultType = user->getDataType();
-                    user->replaceUsesWith(
-                        resultType ? localBuilder.emitPoison(resultType) : nullptr);
+                    user->replaceUsesWith(localBuilder.emitPoison(resultType));
                 }
                 user->removeAndDeallocate();
                 continue;
