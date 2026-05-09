@@ -38,56 +38,78 @@ auto isOrContains(P predicate, IRType* type) -> decltype(predicate(type))
     return go(go, type);
 }
 
-void checkForInvalidShaderParameterTypeForMetal(IRModule* module, DiagnosticSink* sink)
+enum class MetalInvalidParameterBlockType
 {
-    auto isConstantBufferWithResource = [](IRType* type) -> std::optional<IRType*>
+    None,
+    ConstantBufferWithResource,
+    SubpassInput,
+};
+
+static MetalInvalidParameterBlockType findMetalInvalidParameterBlockType(IRType* elementType)
+{
+    auto isSubpassInput = [](IRType* t) -> std::optional<IRType*>
     {
-        if (type->getOp() == kIROp_ConstantBufferType)
-        {
-            // Get the type inside the constant buffer
-            auto innerType = as<IRType>(type->getOperand(0));
-
-            // Check if the inner type contains any resource types
-            auto hasResource = [](IRType* t) -> std::optional<IRType*>
-            {
-                if (isResourceType(t))
-                    return t;
-                return {};
-            };
-
-            if (auto resourceType = isOrContains(hasResource, innerType))
-                return type; // Return the constant buffer type if it contains a resource
-        }
+        if (as<IRSubpassInputType>(t))
+            return t;
         return {};
     };
+    if (isOrContains(isSubpassInput, elementType))
+        return MetalInvalidParameterBlockType::SubpassInput;
 
+    auto isConstantBufferWithResource = [](IRType* t) -> std::optional<IRType*>
+    {
+        if (t->getOp() != kIROp_ConstantBufferType)
+            return {};
+        auto innerType = as<IRType>(t->getOperand(0));
+        auto hasResource = [](IRType* inner) -> std::optional<IRType*>
+        {
+            if (isResourceType(inner))
+                return inner;
+            return {};
+        };
+        if (isOrContains(hasResource, innerType))
+            return t;
+        return {};
+    };
+    if (isOrContains(isConstantBufferWithResource, elementType))
+        return MetalInvalidParameterBlockType::ConstantBufferWithResource;
+
+    return MetalInvalidParameterBlockType::None;
+}
+
+static SourceLoc pickDiagnosticLoc(IRInst* inst)
+{
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (user->sourceLoc.isValid())
+            return user->sourceLoc;
+    }
+    return inst->sourceLoc;
+}
+
+void checkForInvalidShaderParameterTypeForMetal(IRModule* module, DiagnosticSink* sink)
+{
     for (auto inst : module->getGlobalInsts())
     {
         if (inst->getOp() != kIROp_ParameterBlockType)
             continue;
 
-        auto type = as<IRType>(inst->getOperand(0));
-        if (auto invalidCBType = isOrContains(isConstantBufferWithResource, type))
+        auto elementType = as<IRType>(inst->getOperand(0));
+        auto loc = pickDiagnosticLoc(inst);
+        switch (findMetalInvalidParameterBlockType(elementType))
         {
-            // Try to find a valid source location from uses
-            bool foundUseSite = false;
-            for (auto use = inst->firstUse; use; use = use->nextUse)
-            {
-                auto user = use->getUser();
-                if (user->sourceLoc.isValid())
-                {
-                    sink->diagnose(
-                        Diagnostics::ResourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal{
-                            .location = user->sourceLoc});
-                    foundUseSite = true;
-                    break;
-                }
-            }
-
-            if (!foundUseSite)
-                sink->diagnose(
-                    Diagnostics::ResourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal{
-                        .location = inst->sourceLoc});
+        case MetalInvalidParameterBlockType::SubpassInput:
+            sink->diagnose(
+                Diagnostics::SubpassInputInParameterBlockNotAllowedOnMetal{.location = loc});
+            break;
+        case MetalInvalidParameterBlockType::ConstantBufferWithResource:
+            sink->diagnose(
+                Diagnostics::ResourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal{
+                    .location = loc});
+            break;
+        case MetalInvalidParameterBlockType::None:
+            break;
         }
     }
 }
