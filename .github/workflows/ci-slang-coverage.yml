@@ -145,7 +145,7 @@ jobs:
           # Use gcc-built LLVM for Linux (ABI-compatible with clang-18)
           compiler: ${{ inputs.os == 'linux' && 'gcc' || inputs.compiler }}
           platform: ${{ inputs.platform }}
-          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/build-llvm.ps1') }}
           build-if-missing: "true"
           github-token: ${{ github.token }}
 

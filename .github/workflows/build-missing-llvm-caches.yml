@@ -150,7 +150,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: build/llvm-project-install
-          key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+          key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh', 'external/build-llvm.ps1') }}
           restore-keys: |
             llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-
 
@@ -183,18 +183,18 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: build/llvm-project-install
-          key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+          key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh', 'external/build-llvm.ps1') }}
 
       - name: Report status
         shell: bash
         run: |
           if [ "${{ inputs.force_rebuild }}" == "true" ]; then
             echo "✅ LLVM rebuilt with force_rebuild flag"
-            echo "   Key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh') }}"
+            echo "   Key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh', 'external/build-llvm.ps1') }}"
           elif [ "${{ steps.cache-restore.outputs.cache-hit }}" == "true" ]; then
             echo "✅ Cache already existed - no rebuild needed"
             echo "   Key: ${{ steps.cache-restore.outputs.cache-matched-key }}"
           else
             echo "✅ LLVM cache created successfully!"
-            echo "   Key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh') }}"
+            echo "   Key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh', 'external/build-llvm.ps1') }}"
           fi

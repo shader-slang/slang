@@ -96,7 +96,7 @@ jobs:
           # GCC-built LLVM is ABI-compatible with clang-18
           compiler: gcc
           platform: x86_64
-          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/build-llvm.ps1') }}
           build-if-missing: "true"
           github-token: ${{ github.token }}
 

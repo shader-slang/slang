@@ -1,5 +1,4 @@
-Slang Design and Implementation Notes
-=====================================
+# Slang Design and Implementation Notes
 
 This directory contains documents that are primarily intended for developers working on the Slang implementation.
 They are not intended to be helpful to Slang users.

@@ -14,7 +14,9 @@ jobs:
   # Uses nvidia/cuda container for CUDA support.
   build:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 120
+    # 180m accommodates a from-source LLVM rebuild when the GCS cache key
+    # changes (e.g. an LLVM version bump). Cached runs take well under 60m.
+    timeout-minutes: 180
     permissions:
       id-token: write # Required for Workload Identity
       contents: read
@@ -102,7 +104,7 @@ jobs:
           os: linux
           compiler: gcc
           platform: x86_64
-          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/build-llvm.ps1') }}
           build-if-missing: "true"
           github-token: ${{ github.token }}
 
