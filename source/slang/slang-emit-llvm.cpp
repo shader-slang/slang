@@ -330,6 +330,14 @@ public:
             auto& types = debugTypeMap[rules];
             if (types.containsKey(type))
                 return types.getValue(type);
+
+            // Placeholder; we need this to break infinite recursion with
+            // self-referential structs. This does unfortunately mean that we
+            // can e.g. lose the type of a pointer in those cases.
+            //
+            // TODO: Is there something we could do better here with LLVM's
+            // debug data builder?
+            types[type] = builder->getDebugVoidType();
         }
 
         LLVMDebugNode* llvmType = nullptr;
