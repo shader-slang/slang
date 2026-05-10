@@ -14,4 +14,6 @@ void checkForRecursiveFunctions(IRModule* module, TargetRequest* target, Diagnos
 
 bool isTypeRecursive(IRType* type);
 
+void collectRecursiveFunctions(IRModule* module, HashSet<IRFunc*>& recursiveFuncs);
+
 } // namespace Slang
