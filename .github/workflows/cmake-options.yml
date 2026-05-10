@@ -6,9 +6,6 @@ name: CMake Options
 # tested.
 
 on:
-  pull_request:
-    branches: [master]
-    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
   merge_group:
     types: [checks_requested]
