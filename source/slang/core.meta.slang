@@ -3942,6 +3942,7 @@ extension half : IArithmeticAtomicable {}
 __magic_type(AtomicType)
 __intrinsic_type($(kIROp_AtomicType))
 [require(cuda_glsl_hlsl_metal_spirv_wgsl)]
+[__NonCopyableType]
 struct Atomic<T : IAtomicable>
 {
     /// Atomically load the stored `T` value

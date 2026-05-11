@@ -698,7 +698,7 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
 {
     auto paramType = getType(astBuilder, param);
     bool isLVal = false;
-    switch (getParamPassingMode(param.getDecl()))
+    switch (getParamPassingMode(param.getDecl(), astBuilder))
     {
     case ParamPassingMode::BorrowInOut:
     case ParamPassingMode::Out:
@@ -3355,7 +3355,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         {
             for (auto param : callableDeclRef.getDecl()->getParameters())
             {
-                paramDirections.add(getParamPassingMode(param));
+                paramDirections.add(getParamPassingMode(param, getASTBuilder()));
             }
         }
         for (Index i = 0; i < expr->arguments.getCount(); i++)

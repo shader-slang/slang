@@ -9,7 +9,7 @@
 // the copy-in/copy-out that caused the bad atomic destination.
 
 //CHECK: OpEntryPoint
-//CHECK: OpAtomicFAdd
+//CHECK: OpAtomicFAddEXT
 
 public struct TestAtomic {
     public Atomic<float> val;

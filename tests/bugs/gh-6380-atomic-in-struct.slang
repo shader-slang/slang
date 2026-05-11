@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 // Verify that Atomic<T> inside a struct accessed via RWStructuredBuffer compiles correctly.
-// The earlier failure was error 41403 (atomic on local variable); fixed by making
-// structs containing Atomic fields non-copyable so [mutating] is promoted to [__ref].
+// The earlier failure was error 41403 (atomic on local variable); fixed by promoting
+// [mutating] this-parameters on types containing Atomic<T> fields to [__ref] semantics.
 
 //CHECK: OpEntryPoint
 

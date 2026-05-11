@@ -375,7 +375,7 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
 /// is not copyable, the mode implied by its declaration may be
 /// adjusted to something else.
 ///
-ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
+ParamPassingMode getParamPassingMode(ParamDecl* paramDecl, ASTBuilder* astBuilder);
 
 inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> declRef)
 {
