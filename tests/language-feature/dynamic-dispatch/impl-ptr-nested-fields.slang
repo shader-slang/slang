@@ -3,12 +3,16 @@
 // (StructType -> PtrType, ArrayType -> PtrType) must also compile to valid
 // SPIR-V via the AnyValue dynamic dispatch path. Mirrors the shapes the
 // removed diagnose-ptr-in-impl-spirv.slang previously rejected.
+//
+// Each impl uses a distinct pointee type so its pack/unpack produces a
+// uniquely shaped OpBitcast in the emitted SPIR-V. Both must be present —
+// dropping either impl's marshalling silently is observable.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry main -conformance NestedPtrImpl:IFoo -conformance ArrayPtrImpl:IFoo
 
 dyn interface IFoo
 {
-    int get();
+    float get();
 };
 
 struct Inner
@@ -16,25 +20,32 @@ struct Inner
     Ptr<int> p;
 }
 
-// Nested pointer reached via StructType recursion.
+// Nested pointer reached via StructType -> PtrType recursion. Pointee is int.
 struct NestedPtrImpl : IFoo
 {
     Inner inner;
-    int get() { return *inner.p; }
+    float get() { return float(*inner.p); }
 }
 
-// Array of pointers reached via ArrayType recursion.
+// Array of pointers reached via ArrayType -> PtrType recursion. Pointee is
+// float so its bitcast is distinguishable from the nested impl's.
 struct ArrayPtrImpl : IFoo
 {
-    Ptr<int> arr[2];
-    int get() { return *arr[0] + *arr[1]; }
+    Ptr<float> arr[2];
+    float get() { return *arr[0] + *arr[1]; }
 }
 
 RWStructuredBuffer<IFoo> input;
-RWStructuredBuffer<int> output;
+RWStructuredBuffer<float> output;
 
 // CHECK: OpEntryPoint
-// CHECK: OpBitcast %_ptr_PhysicalStorageBuffer_int
+// NestedPtrImpl: ptr-to-int unpacked via OpBitcast, then converted to float.
+// CHECK-DAG: OpBitcast %_ptr_PhysicalStorageBuffer_int
+// CHECK-DAG: OpConvertSToF
+// ArrayPtrImpl: two ptr-to-float unpacks via OpBitcast, then summed.
+// CHECK-DAG: OpBitcast %_ptr_PhysicalStorageBuffer_float
+// CHECK-DAG: OpBitcast %_ptr_PhysicalStorageBuffer_float
+// CHECK-DAG: OpFAdd
 [shader("compute"), numthreads(1, 1, 1)]
 void main(uint3 tid: SV_DispatchThreadID)
 {
