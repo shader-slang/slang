@@ -311,16 +311,13 @@ private:
                 if (view)
                 {
                     line.sourceAvailable = true;
-                    // Retrieve the source line using the *physical* line index
-                    // (derived from the raw SourceLoc offset), not the humane line
-                    // number. The humane line may have been remapped by a #line
-                    // directive and would index the wrong line in the file.
-                    auto physicalOffset = view->getRange().getOffset(span.startLoc);
-                    auto physicalLineIndex =
-                        view->getSourceFile()->calcLineIndexFromOffset(physicalOffset);
+                    // Use the *actual* (non-remapped) line so that a #line
+                    // directive doesn't cause us to display the wrong source.
+                    auto actualLine =
+                        view->getHumaneLoc(span.startLoc, SourceLocType::Actual).line;
                     // Get the line content and trim end-of-line characters and trailing whitespace
                     UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
-                        view->getSourceFile()->getLineAtIndex(physicalLineIndex));
+                        view->getSourceFile()->getLineAtIndex(actualLine - 1));
                     // Trim trailing whitespace but preserve leading whitespace (indentation)
                     line.content = UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
                 }
@@ -790,10 +787,10 @@ String renderDiagnosticMachineReadable(
             SourceView* view = sm->findSourceView(span.range.begin);
             if (view)
             {
-                auto offset = view->getRange().getOffset(span.range.begin);
-                auto lineIdx = view->getSourceFile()->calcLineIndexFromOffset(offset);
+                auto actualLine =
+                    view->getHumaneLoc(span.range.begin, SourceLocType::Actual).line;
                 UnownedStringSlice rawLine =
-                    StringUtil::trimEndOfLine(view->getSourceFile()->getLineAtIndex(lineIdx));
+                    StringUtil::trimEndOfLine(view->getSourceFile()->getLineAtIndex(actualLine - 1));
                 UnownedStringSlice lineContent =
                     UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
                 if (lineContent.getLength() > 0 && beginLoc.column > 0 &&

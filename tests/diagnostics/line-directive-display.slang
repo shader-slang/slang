@@ -22,4 +22,5 @@ void test()
 // The displayed source line must be the actual error line, not a
 // padding struct field from the physical file.
 // CHECK: undeclaredIdentifier
+// CHECK-NOT: uint b
 // CHECK: undefined identifier
