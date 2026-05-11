@@ -378,10 +378,6 @@ static constexpr size_t kCoverageBufferInfoV1MinSize =
     offsetof(slang::CoverageBufferInfo, binding) + sizeof(int32_t);
 static constexpr size_t kSyntheticResourceInfoV1MinSize =
     offsetof(slang::SyntheticResourceInfo, debugName) + sizeof(const char*);
-static constexpr size_t kSyntheticResourceDescriptorBindingInfoV1MinSize =
-    offsetof(slang::SyntheticResourceDescriptorBindingInfo, binding) + sizeof(int32_t);
-static constexpr size_t kSyntheticResourceUniformBindingInfoV1MinSize =
-    offsetof(slang::SyntheticResourceUniformBindingInfo, uniformStride) + sizeof(int32_t);
 
 SlangResult ArtifactPostEmitMetadata::getEntryInfo(
     uint32_t index,
@@ -462,42 +458,6 @@ SlangResult ArtifactPostEmitMetadata::getResourceInfo(
     outInfo->uniformOffset = record.uniformOffset;
     outInfo->uniformStride = record.uniformStride;
     outInfo->debugName = record.debugName.getLength() ? record.debugName.getBuffer() : nullptr;
-    return SLANG_OK;
-}
-
-SlangResult ArtifactPostEmitMetadata::getResourceDescriptorBindingInfo(
-    uint32_t index,
-    slang::SyntheticResourceDescriptorBindingInfo* outInfo)
-{
-    if (!outInfo)
-        return SLANG_E_INVALID_ARG;
-    if (outInfo->structSize < kSyntheticResourceDescriptorBindingInfoV1MinSize)
-        return SLANG_E_INVALID_ARG;
-    if (index >= (uint32_t)m_syntheticResources.getCount())
-        return SLANG_E_INVALID_ARG;
-
-    m_syntheticResourcesPublished = true;
-    auto& record = m_syntheticResources[index];
-    outInfo->space = record.space;
-    outInfo->binding = record.binding;
-    return SLANG_OK;
-}
-
-SlangResult ArtifactPostEmitMetadata::getResourceUniformBindingInfo(
-    uint32_t index,
-    slang::SyntheticResourceUniformBindingInfo* outInfo)
-{
-    if (!outInfo)
-        return SLANG_E_INVALID_ARG;
-    if (outInfo->structSize < kSyntheticResourceUniformBindingInfoV1MinSize)
-        return SLANG_E_INVALID_ARG;
-    if (index >= (uint32_t)m_syntheticResources.getCount())
-        return SLANG_E_INVALID_ARG;
-
-    m_syntheticResourcesPublished = true;
-    auto& record = m_syntheticResources[index];
-    outInfo->uniformOffset = record.uniformOffset;
-    outInfo->uniformStride = record.uniformStride;
     return SLANG_OK;
 }
 

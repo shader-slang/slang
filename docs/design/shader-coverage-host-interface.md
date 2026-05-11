@@ -129,14 +129,11 @@ The core query methods are:
 - `getResourceCount()`
 - `getResourceInfo(index, ...)`
 - `findResourceIndexByID(id, ...)`
-- `getResourceDescriptorBindingInfo(index, ...)`
-- `getResourceUniformBindingInfo(index, ...)`
 
-This gives two levels of access:
-
-- full record access through `SyntheticResourceInfo`
-- review-friendly direct helper queries for the two practical host
-  cases
+This gives direct access to the complete resource record through
+`SyntheticResourceInfo`. Descriptor-backed hosts read `space` and
+`binding`; CPU/CUDA-style marshaling hosts read `uniformOffset` and
+`uniformStride`.
 
 ### Raw binding queries
 
@@ -146,18 +143,19 @@ policy on top.
 
 For descriptor-backed paths:
 
-- `getResourceDescriptorBindingInfo(index, ...)`
+- `getResourceInfo(index, ...)`
   - returns the explicit `(space, binding)` location and descriptor-
     facing binding properties for the synthetic resource
 
 For CPU/CUDA-style marshaling paths:
 
-- `getResourceUniformBindingInfo(index, ...)`
+- `getResourceInfo(index, ...)`
   - returns `uniformOffset` and `uniformStride`
 
-For hosts that already own their runtime binding logic, these are the
-primary low-level APIs. The descriptor helper functions below are an
-optional convenience layer built on top of the same metadata.
+For hosts that already own their runtime binding logic,
+`getResourceInfo()` is the primary low-level API. The descriptor helper
+functions below are an optional convenience layer built on top of the
+same metadata.
 
 ### Slang helper functions for descriptor-backed hosts
 
@@ -167,8 +165,6 @@ logic, Slang also provides helper functions in `slang.h`:
 - `getSyntheticResourceDescriptorClass(...)`
 - `getSyntheticResourceDescriptorRange(...)`
 - `findSyntheticResourceDescriptorRangeByID(...)`
-- `getSyntheticResourceDescriptorSpaceSpan(...)`
-- `getSyntheticResourceDescriptorRangeCountForSpace(...)`
 - `getSyntheticResourceDescriptorRangesForSpace(...)`
 
 These are not a second metadata channel. They are convenience helpers
@@ -179,8 +175,8 @@ descriptor-layout construction.
 
 | Backend / host style                                    | Primary query path                                                          | Typical helper path                                                                                                                              |
 | ------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Vulkan / Metal / D3D12 / direct descriptor-backed hosts | `getResourceDescriptorBindingInfo(...)`                                     | `getSyntheticResourceDescriptorRange(...)`, `findSyntheticResourceDescriptorRangeByID(...)`, `getSyntheticResourceDescriptorRangesForSpace(...)` |
-| CUDA / CPU-style marshaling hosts                       | `getResourceUniformBindingInfo(...)`                                        | `getResourceInfo(...)` when the host wants the full record                                                                                       |
+| Vulkan / Metal / D3D12 / direct descriptor-backed hosts | `getResourceInfo(...)`                                                      | `getSyntheticResourceDescriptorRange(...)`, `findSyntheticResourceDescriptorRangeByID(...)`, `getSyntheticResourceDescriptorRangesForSpace(...)` |
+| CUDA / CPU-style marshaling hosts                       | `getResourceInfo(...)`                                                      | read `uniformOffset` / `uniformStride` from `SyntheticResourceInfo`                                                                              |
 | `slang-rhi` Vulkan / CUDA backends                      | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location                                                               |
 
 ## `slang-rhi` consumption model
@@ -262,9 +258,8 @@ For direct hosts, the intended usage is:
 5. query `ISyntheticResourceMetadata` for the hidden binding contract:
    - `getResourceCount()`
    - `getResourceInfo(...)`
-   - `getResourceDescriptorBindingInfo(...)` for descriptor-backed
-     paths
-   - `getResourceUniformBindingInfo(...)` for CPU/CUDA-style
+   - read `space` / `binding` for descriptor-backed paths
+   - read `uniformOffset` / `uniformStride` for CPU/CUDA-style
      marshaling paths
 6. if the host wants a higher-level descriptor helper layer, call the
    free helper functions in `slang.h` on the same metadata object:

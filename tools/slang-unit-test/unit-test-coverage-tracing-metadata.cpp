@@ -191,34 +191,13 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         // also be available, but it is not the primary
         // contract for these targets.
         SLANG_CHECK(info.space >= -1);
+        SLANG_CHECK(info.binding >= -1);
         SLANG_CHECK(info.uniformOffset >= 0);
         SLANG_CHECK(info.uniformStride > 0);
 
         uint32_t lookedUpIndex = ~0u;
         SLANG_CHECK(syntheticResources->findResourceIndexByID(info.id, &lookedUpIndex) == SLANG_OK);
         SLANG_CHECK(lookedUpIndex == coverageResourceIndex);
-
-        slang::SyntheticResourceDescriptorBindingInfo descriptorInfo;
-        const SlangResult descriptorBindingResult =
-            syntheticResources->getResourceDescriptorBindingInfo(
-                coverageResourceIndex,
-                &descriptorInfo);
-        SLANG_CHECK(
-            descriptorBindingResult == SLANG_OK ||
-            descriptorBindingResult == SLANG_E_NOT_AVAILABLE);
-        if (descriptorBindingResult == SLANG_OK)
-        {
-            SLANG_CHECK(descriptorInfo.binding == info.binding);
-            SLANG_CHECK(descriptorInfo.space == info.space);
-        }
-
-        slang::SyntheticResourceUniformBindingInfo uniformInfo;
-        SLANG_CHECK(
-            syntheticResources->getResourceUniformBindingInfo(
-                coverageResourceIndex,
-                &uniformInfo) == SLANG_OK);
-        SLANG_CHECK(uniformInfo.uniformOffset == info.uniformOffset);
-        SLANG_CHECK(uniformInfo.uniformStride == info.uniformStride);
     }
 
     // Descriptor-backed targets should expose descriptor-facing binding
@@ -239,14 +218,6 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(info.space >= 0);
         SLANG_CHECK(info.uniformOffset == -1);
         SLANG_CHECK(info.uniformStride == 0);
-
-        slang::SyntheticResourceDescriptorBindingInfo descriptorInfo;
-        SLANG_CHECK(
-            spirvSyntheticResources->getResourceDescriptorBindingInfo(
-                coverageResourceIndex,
-                &descriptorInfo) == SLANG_OK);
-        SLANG_CHECK(descriptorInfo.binding == info.binding);
-        SLANG_CHECK(descriptorInfo.space == info.space);
 
         slang::SyntheticResourceDescriptorClass descriptorClass =
             slang::SyntheticResourceDescriptorClass::Unsupported;
@@ -280,23 +251,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(foundDescriptorRange.space == descriptorRange.space);
         SLANG_CHECK(foundDescriptorRange.binding == descriptorRange.binding);
 
-        slang::SyntheticResourceDescriptorSpaceSpan spaceSpan = {};
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorSpaceSpan(spirvSyntheticResources, &spaceSpan) ==
-            SLANG_OK);
-        SLANG_CHECK(spaceSpan.descriptorResourceCount > 0);
-        SLANG_CHECK(spaceSpan.minSpace == info.space);
-        SLANG_CHECK(spaceSpan.maxSpace == info.space);
-
         uint32_t descriptorRangeCount = 0;
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorRangeCountForSpace(
-                spirvSyntheticResources,
-                uint32_t(info.space),
-                &descriptorRangeCount) == SLANG_OK);
-        SLANG_CHECK(descriptorRangeCount == 1);
-
-        descriptorRangeCount = 0;
         SLANG_CHECK(
             slang::getSyntheticResourceDescriptorRangesForSpace(
                 spirvSyntheticResources,
@@ -325,14 +280,6 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(descriptorRangeCount == 1);
         SLANG_CHECK(descriptorRanges[0].binding == descriptorRange.binding);
         SLANG_CHECK(descriptorRanges[0].space == descriptorRange.space);
-
-        slang::SyntheticResourceUniformBindingInfo uniformInfo;
-        SLANG_CHECK(
-            spirvSyntheticResources->getResourceUniformBindingInfo(
-                coverageResourceIndex,
-                &uniformInfo) == SLANG_OK);
-        SLANG_CHECK(uniformInfo.uniformOffset == -1);
-        SLANG_CHECK(uniformInfo.uniformStride == 0);
     }
 
     {
@@ -340,20 +287,6 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(syntheticResources->findResourceIndexByID(0, &index) == SLANG_E_NOT_FOUND);
         SLANG_CHECK(syntheticResources->findResourceIndexByID(1, nullptr) == SLANG_E_INVALID_ARG);
     }
-    {
-        slang::SyntheticResourceDescriptorBindingInfo info;
-        SLANG_CHECK(
-            syntheticResources->getResourceDescriptorBindingInfo(
-                syntheticResources->getResourceCount(),
-                &info) == SLANG_E_INVALID_ARG);
-        SLANG_CHECK(
-            syntheticResources->getResourceDescriptorBindingInfo(0, nullptr) ==
-            SLANG_E_INVALID_ARG);
-        info.structSize = 0;
-        SLANG_CHECK(
-            syntheticResources->getResourceDescriptorBindingInfo(0, &info) == SLANG_E_INVALID_ARG);
-    }
-
     // Coverage disabled: metadata interface remains queryable, but it
     // should report no synthetic coverage bindings.
     {
@@ -363,18 +296,6 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         uint32_t index = 0;
         SLANG_CHECK(
             noCoverageSyntheticResources->findResourceIndexByID(1, &index) == SLANG_E_NOT_FOUND);
-    }
-    {
-        slang::SyntheticResourceUniformBindingInfo info;
-        SLANG_CHECK(
-            syntheticResources->getResourceUniformBindingInfo(
-                syntheticResources->getResourceCount(),
-                &info) == SLANG_E_INVALID_ARG);
-        SLANG_CHECK(
-            syntheticResources->getResourceUniformBindingInfo(0, nullptr) == SLANG_E_INVALID_ARG);
-        info.structSize = 0;
-        SLANG_CHECK(
-            syntheticResources->getResourceUniformBindingInfo(0, &info) == SLANG_E_INVALID_ARG);
     }
     {
         slang::SyntheticResourceDescriptorRange descriptorRange = {};
@@ -396,25 +317,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
                 &descriptorRange) == SLANG_E_NOT_FOUND);
     }
     {
-        slang::SyntheticResourceDescriptorSpaceSpan spaceSpan = {};
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorSpaceSpan(nullptr, &spaceSpan) ==
-            SLANG_E_INVALID_ARG);
-        spaceSpan.structSize = 0;
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorSpaceSpan(syntheticResources, &spaceSpan) ==
-            SLANG_E_INVALID_ARG);
-    }
-    {
         uint32_t count = 0;
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorRangeCountForSpace(nullptr, 0, &count) ==
-            SLANG_E_INVALID_ARG);
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorRangeCountForSpace(
-                syntheticResources,
-                0,
-                nullptr) == SLANG_E_INVALID_ARG);
         SLANG_CHECK(
             slang::getSyntheticResourceDescriptorRangesForSpace(nullptr, 0, &count, nullptr) ==
             SLANG_E_INVALID_ARG);

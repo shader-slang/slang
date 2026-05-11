@@ -241,12 +241,6 @@ public:
     getResourceInfo(uint32_t index, slang::SyntheticResourceInfo* outInfo) SLANG_OVERRIDE;
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL
     findResourceIndexByID(uint32_t id, uint32_t* outIndex) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getResourceDescriptorBindingInfo(
-        uint32_t index,
-        slang::SyntheticResourceDescriptorBindingInfo* outInfo) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getResourceUniformBindingInfo(
-        uint32_t index,
-        slang::SyntheticResourceUniformBindingInfo* outInfo) SLANG_OVERRIDE;
 
     // ICooperativeTypesMetadata
     SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeMatrixTypeCount() SLANG_OVERRIDE;

@@ -134,18 +134,11 @@ SLANG_CHECK(syntheticResources != nullptr);
 SLANG_CHECK(syntheticResources->getResourceCount() == 1);
 uint32_t coverageResourceIndex = 0;
 
-slang::SyntheticResourceDescriptorBindingInfo descriptorInfo = {};
-if (SLANG_SUCCEEDED(
-        syntheticResources->getResourceDescriptorBindingInfo(coverageResourceIndex, &descriptorInfo)))
+slang::SyntheticResourceInfo resourceInfo = {};
+if (SLANG_SUCCEEDED(syntheticResources->getResourceInfo(coverageResourceIndex, &resourceInfo)))
 {
-    // descriptorInfo.space, descriptorInfo.binding
-}
-
-slang::SyntheticResourceUniformBindingInfo uniformInfo = {};
-if (SLANG_SUCCEEDED(
-        syntheticResources->getResourceUniformBindingInfo(coverageResourceIndex, &uniformInfo)))
-{
-    // uniformInfo.uniformOffset, uniformInfo.uniformStride
+    // Descriptor-backed targets: resourceInfo.space, resourceInfo.binding.
+    // CPU/CUDA targets: resourceInfo.uniformOffset, resourceInfo.uniformStride.
 }
 
 for (uint32_t i = 0; i < n; ++i) {
