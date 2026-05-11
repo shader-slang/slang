@@ -1067,6 +1067,16 @@ Result linkAndOptimizeIR(
     SLANG_PASS(collectGlobalUniformParameters, outLinkedIR.globalScopeVarLayout, target);
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    if (requiredLoweringPassSet.coverageTracing)
+    {
+        SLANG_PASS(
+            finalizeCoverageInstrumentationMetadata,
+            codeGenContext->shouldTraceCoverage(),
+            targetRequest,
+            *metadata);
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+    }
+
     SLANG_PASS(checkEntryPointDecorations, target, sink);
 
     // Add floating point denormal handling mode decorations to entry point functions based on

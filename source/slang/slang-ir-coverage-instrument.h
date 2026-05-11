@@ -46,6 +46,16 @@ void instrumentCoverage(
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata);
 
+// Finalize coverage-related synthetic resource metadata after global
+// uniform packing has run. This updates backend-independent
+// marshaling fields, such as CPU/CUDA uniform offsets, that can only
+// be determined from the post-packing IR layout.
+void finalizeCoverageInstrumentationMetadata(
+    IRModule* module,
+    bool enabled,
+    TargetRequest* targetRequest,
+    ArtifactPostEmitMetadata& outMetadata);
+
 } // namespace Slang
 
 #endif // SLANG_IR_COVERAGE_INSTRUMENT_H

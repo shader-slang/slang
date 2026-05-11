@@ -4,6 +4,7 @@
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "compiler-core/slang-source-loc.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-target.h"
@@ -19,6 +20,49 @@ namespace
 // Well-known buffer name. Surfaced via `IRNameHintDecoration` and
 // matches the manifest / sidecar key that hosts read.
 static const char kCoverageBufferName[] = "__slang_coverage";
+static const char kGlobalParamsName[] = "globalParams";
+// Synthetic resource ids are stable, non-zero feature-local
+// constants. Additional synthetic instrumentation resources should
+// claim their own ids alongside this one.
+static const uint32_t kCoverageSyntheticResourceID = 1;
+
+static bool hasNameHint(IRInst* inst, UnownedTerminatedStringSlice expectedName)
+{
+    if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
+        return nameHint->getName() == expectedName;
+    return false;
+}
+
+static SyntheticResourceRecord* findSyntheticResourceRecordById(
+    ArtifactPostEmitMetadata& metadata,
+    uint32_t id)
+{
+    for (auto& record : metadata.m_syntheticResources)
+    {
+        if (record.id == id)
+            return &record;
+    }
+    return nullptr;
+}
+
+static SyntheticResourceRecord& getOrAddCoverageSyntheticResourceRecord(
+    ArtifactPostEmitMetadata& metadata)
+{
+    SLANG_RELEASE_ASSERT(!metadata.m_syntheticResourcesPublished);
+    if (auto existing = findSyntheticResourceRecordById(metadata, kCoverageSyntheticResourceID))
+        return *existing;
+
+    SyntheticResourceRecord record;
+    record.id = kCoverageSyntheticResourceID;
+    record.bindingType = slang::BindingType::MutableRawBuffer;
+    record.arraySize = 1;
+    record.scope = slang::SyntheticResourceScope::Global;
+    record.access = slang::SyntheticResourceAccess::ReadWrite;
+    record.entryPointIndex = -1;
+    record.debugName = kCoverageBufferName;
+    metadata.m_syntheticResources.add(record);
+    return metadata.m_syntheticResources.getLast();
+}
 
 // Choose the resource kind under which the coverage buffer is bound
 // for `target`. Each target family speaks a different vocabulary
@@ -53,12 +97,52 @@ static IRGlobalParam* findUserDeclaredCoverageBuffer(IRModule* module)
         auto param = as<IRGlobalParam>(inst);
         if (!param)
             continue;
-        auto nameHint = param->findDecoration<IRNameHintDecoration>();
-        if (!nameHint)
-            continue;
-        if (nameHint->getName() == UnownedTerminatedStringSlice(kCoverageBufferName))
+        if (hasNameHint(param, UnownedTerminatedStringSlice(kCoverageBufferName)))
             return param;
     }
+    return nullptr;
+}
+
+static IRGlobalParam* findLastGlobalParamByName(
+    IRModule* module,
+    UnownedTerminatedStringSlice expectedName)
+{
+    IRGlobalParam* result = nullptr;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto param = as<IRGlobalParam>(inst))
+        {
+            if (hasNameHint(param, expectedName))
+                result = param;
+        }
+    }
+    return result;
+}
+
+static IRStructField* findLastStructFieldByName(
+    IRType* type,
+    UnownedTerminatedStringSlice expectedName)
+{
+    if (auto structType = as<IRStructType>(type))
+    {
+        IRStructField* result = nullptr;
+        for (auto field : structType->getFields())
+        {
+            if (hasNameHint(field->getKey(), expectedName))
+                result = field;
+        }
+        return result;
+    }
+
+    if (auto specialize = as<IRSpecialize>(type))
+    {
+        if (auto generic = as<IRGeneric>(specialize->getBase()))
+        {
+            if (auto genericStructType = as<IRStructType>(findInnerMostGenericReturnVal(generic)))
+                return findLastStructFieldByName(genericStructType, expectedName);
+        }
+    }
+
     return nullptr;
 }
 
@@ -450,6 +534,133 @@ struct CoverageInstrumenter
     }
 };
 
+static bool tryNarrowToInt32(IRIntegerValue value, int32_t& outValue)
+{
+    if (value < std::numeric_limits<int32_t>::min() || value > std::numeric_limits<int32_t>::max())
+    {
+        return false;
+    }
+    outValue = (int32_t)value;
+    return true;
+}
+
+static bool tryFillUniformInfoFromField(
+    TargetRequest* targetRequest,
+    IRStructField* field,
+    int32_t& outUniformOffset,
+    int32_t& outUniformStride)
+{
+    if (!field || !targetRequest)
+        return false;
+
+    IRIntegerValue naturalOffset = 0;
+    if (SLANG_FAILED(getNaturalOffset(targetRequest, field, &naturalOffset)))
+        return false;
+
+    IRSizeAndAlignment fieldSizeAlignment;
+    if (SLANG_FAILED(
+            getNaturalSizeAndAlignment(targetRequest, field->getFieldType(), &fieldSizeAlignment)))
+    {
+        return false;
+    }
+
+    if (fieldSizeAlignment.size == IRSizeAndAlignment::kIndeterminateSize)
+        return false;
+
+    int32_t narrowOffset = -1;
+    int32_t narrowStride = 0;
+    if (!tryNarrowToInt32(naturalOffset, narrowOffset) ||
+        !tryNarrowToInt32(fieldSizeAlignment.getStride(), narrowStride))
+    {
+        return false;
+    }
+
+    outUniformOffset = narrowOffset;
+    outUniformStride = narrowStride;
+    return true;
+}
+
+static bool tryFillUniformInfoFromDirectBuffer(
+    TargetRequest* targetRequest,
+    IRGlobalParam* directBuffer,
+    int32_t& outUniformOffset,
+    int32_t& outUniformStride)
+{
+    if (!directBuffer || !targetRequest)
+        return false;
+
+    IRSizeAndAlignment bufferSizeAlignment;
+    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+            targetRequest,
+            directBuffer->getDataType(),
+            &bufferSizeAlignment)))
+    {
+        return false;
+    }
+
+    if (bufferSizeAlignment.size == IRSizeAndAlignment::kIndeterminateSize)
+        return false;
+
+    int32_t narrowStride = 0;
+    if (!tryNarrowToInt32(bufferSizeAlignment.getStride(), narrowStride))
+        return false;
+
+    outUniformOffset = 0;
+    outUniformStride = narrowStride;
+    return true;
+}
+
+static IRType* getParameterGroupElementType(IRType* type)
+{
+    if (auto parameterGroupType = as<IRParameterGroupType>(type))
+        return cast<IRType>(parameterGroupType->getOperand(0));
+    return type;
+}
+
+static bool tryGetCoverageUniformBindingInfo(
+    IRModule* module,
+    TargetRequest* targetRequest,
+    int32_t& outUniformOffset,
+    int32_t& outUniformStride)
+{
+    outUniformOffset = -1;
+    outUniformStride = 0;
+
+    if (!targetRequest || !(isCPUTarget(targetRequest) || isCUDATarget(targetRequest)))
+        return false;
+
+    if (auto wrapperParam =
+            findLastGlobalParamByName(module, UnownedTerminatedStringSlice(kGlobalParamsName)))
+    {
+        auto wrapperValueType = getParameterGroupElementType(wrapperParam->getDataType());
+        if (auto field = findLastStructFieldByName(
+                wrapperValueType,
+                UnownedTerminatedStringSlice(kCoverageBufferName)))
+        {
+            if (tryFillUniformInfoFromField(
+                    targetRequest,
+                    field,
+                    outUniformOffset,
+                    outUniformStride))
+            {
+                return true;
+            }
+        }
+    }
+
+    if (auto directBuffer =
+            findLastGlobalParamByName(module, UnownedTerminatedStringSlice(kCoverageBufferName)))
+    {
+        return tryFillUniformInfoFromDirectBuffer(
+            targetRequest,
+            directBuffer,
+            outUniformOffset,
+            outUniformStride);
+    }
+
+    return false;
+}
+
 } // anonymous namespace
 
 void instrumentCoverage(
@@ -584,6 +795,11 @@ void instrumentCoverage(
 
     outMetadata.m_coverageBufferSpace = chosenSpace;
     outMetadata.m_coverageBufferBinding = chosenBinding;
+    auto& syntheticResource = getOrAddCoverageSyntheticResourceRecord(outMetadata);
+    syntheticResource.space = chosenSpace;
+    syntheticResource.binding = chosenBinding;
+    syntheticResource.uniformOffset = -1;
+    syntheticResource.uniformStride = 0;
 
     CoverageInstrumenter instrumenter(
         module,
@@ -591,6 +807,28 @@ void instrumentCoverage(
         sink ? sink->getSourceManager() : nullptr,
         outMetadata);
     instrumenter.run(counterOps);
+}
+
+void finalizeCoverageInstrumentationMetadata(
+    IRModule* module,
+    bool enabled,
+    TargetRequest* targetRequest,
+    ArtifactPostEmitMetadata& outMetadata)
+{
+    if (!enabled)
+        return;
+
+    auto record = findSyntheticResourceRecordById(outMetadata, kCoverageSyntheticResourceID);
+    if (!record)
+        return;
+
+    int32_t uniformOffset = -1;
+    int32_t uniformStride = 0;
+    if (tryGetCoverageUniformBindingInfo(module, targetRequest, uniformOffset, uniformStride))
+    {
+        record->uniformOffset = uniformOffset;
+        record->uniformStride = uniformStride;
+    }
 }
 
 } // namespace Slang
