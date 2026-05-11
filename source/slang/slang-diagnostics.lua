@@ -306,7 +306,11 @@ err(
     "no specified '-target' option matches the output path '~path', which implies the '~format' format"
 )
 
-err("unknown-command-line-value", 62, "unknown value for option. Valid values are '~validValues'")
+err(
+    "unknown-command-line-value",
+    62,
+    "unknown value for option '~option'. Valid values are '~validValues'"
+)
 
 err("unknown-help-category", 63, "unknown help category")
 
@@ -1037,6 +1041,13 @@ err(
     29115,
     "cannot use stage name in __target_switch",
     span { loc = "location", message = "cannot use a stage name in '__target_switch', use '__stage_switch' for stage-specific code." }
+)
+
+warning(
+    "spirv-layout-sensitive-type-in-asm",
+    29116,
+    "layout-sensitive SPIR-V type declaration in spirv_asm",
+    span { loc = "location", message = "layout-sensitive SPIR-V type declaration '~opcode' in spirv_asm may not preserve Slang data-layout information; form layout-sensitive pointers/values with Slang types or expressions and pass them into spirv_asm instead" }
 )
 
 
@@ -1951,7 +1962,7 @@ err(
     "forward-reference-in-generic-constraint",
     30117,
     "forward reference in generic constraint",
-    span { loc = "expr:Expr", message = "generic constraint for parameter '~param:Type' references type parameter '~referenced:Decl' before it is declared" }
+    span { loc = "expr:Expr", message = "generic constraint for parameter '~param:Type' references parameter '~referenced:Decl' before it is declared" }
 )
 
 err(
@@ -1959,6 +1970,13 @@ err(
     30118,
     "cannot mix differentiable value types with differentiable pointer outputs",
     span { loc = "location", message = "function has both IDifferentiable value types and IDifferentiablePtrType outputs, which is not currently supported. Please split the function so that differentiable value parameters and pointer differentiable outputs are in separate functions." }
+)
+
+err(
+    "forward-reference-in-generic-default-initializer",
+    30122,
+    "forward reference in generic default initializer",
+    span { loc = "expr:Expr", message = "generic default initializer for parameter '~param:Decl' references parameter '~referenced:Decl' before it is declared" }
 )
 
 
@@ -3173,6 +3191,13 @@ warning(
     span { loc = "expr:Expr", message = "initializing an interface variable with defaults is deprecated and may cause unexpected behavior. Please provide a compatible initializer or leave the variable uninitialized" }
 )
 
+err(
+    "interface-default-initializer-error",
+    30524,
+    "cannot initialize an interface variable with defaults",
+    span { loc = "expr:Expr", message = "initializing an interface variable with defaults is not supported. Please provide a compatible initializer or leave the variable uninitialized" }
+)
+
 --
 -- 3062x: variables
 --
@@ -3924,7 +3949,7 @@ err(
     span { loc = "expr:Expr", message = "'no_diff' can only be used to decorate a call or a subscript operation" }
 )
 
-err(
+warning(
     "use-of-no-diff-on-differentiable-func",
     38032,
     "'no_diff' on differentiable function has no meaning",
@@ -4006,6 +4031,20 @@ err(
 )
 
 err(
+    "mesh-shader-missing-output-topology",
+    38047,
+    "mesh shader missing [outputtopology] attribute",
+    span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must have an '[outputtopology(\"point\"|\"line\"|\"triangle\")]' attribute" }
+)
+
+err(
+    "mesh-shader-missing-outputs",
+    38048,
+    "mesh shader missing OutputVertices/OutputIndices output",
+    span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must declare both an 'OutputVertices' and an 'OutputIndices' output parameter" }
+)
+
+err(
     "invalid-entry-point-varying-type",
     38050,
     "type cannot be used as entry-point varying parameter or return type",
@@ -4017,6 +4056,13 @@ err(
     38051,
     "type cannot be used as entry-point varying for this target",
     span { loc = "location", message = "type '~type:Type' cannot be used as ~direction ~context of entry point '~entryPoint:Name' when targeting ~target because ~reason" }
+)
+
+warning(
+    "vertex-shader-missing-sv-position",
+    38052,
+    "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic",
+    span { loc = "location", message = "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic; the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output, or suppress with -warnings-disable 38052)" }
 )
 
 --
@@ -4074,7 +4120,7 @@ err(
     "cannot-use-resource-type-in-structured-buffer",
     38204,
     "resource type in StructuredBuffer",
-    span { loc = "location", message = "StructuredBuffer element type '~type:IRInst' cannot contain resource or opaque handle types" }
+    span { loc = "location", message = "StructuredBuffer element type '~type:IRInst' must not be a resource type or contain an opaque handle type" }
 )
 
 err(
@@ -4577,6 +4623,40 @@ err(
     span { loc = "location", message = "unresolved external symbol '~symbol:IRInst'." }
 )
 
+-- 451xx - Coverage instrumentation (-trace-coverage)
+
+warning(
+    "coverage-buffer-reserved-name",
+    45100,
+    "`__slang_coverage` is reserved by `-trace-coverage`",
+    span { loc = "location", message = "the global parameter name `__slang_coverage` is reserved by the `-trace-coverage` instrumentation. The IR coverage pass synthesizes its own buffer with this name; the user declaration here is silently shadowed and will not receive any counter writes. Either rename the user declaration or remove `-trace-coverage` from the compile." }
+)
+
+err(
+    "coverage-binding-collision",
+    45101,
+    "`-trace-coverage-binding` collides with an existing parameter",
+    span { loc = "location", message = "the explicit `-trace-coverage-binding` slot collides with this global parameter; downstream code generation will emit two parameters at the same `(register, space)` and fail validation. Pick a free slot, or omit `-trace-coverage-binding` to let the IR pass auto-allocate." }
+)
+
+warning(
+    "coverage-target-not-supported",
+    45102,
+    "`-trace-coverage` is not supported on this target; coverage instrumentation skipped"
+)
+
+err(
+    "coverage-binding-exhausted",
+    45103,
+    "could not allocate a free binding slot for `__slang_coverage` — existing global parameters occupy too many slots in space 0"
+)
+
+err(
+    "coverage-pass-through-incompatible",
+    45104,
+    "`-trace-coverage` cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation"
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(
@@ -4941,7 +5021,7 @@ fatal(
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 
--- Metal and WGSL (56101-56105)
+-- Metal or WGSL (56101-56109)
 
 err(
     "resource-types-in-constant-buffer-in-parameter-block-not-allowed-on-metal",
@@ -4983,6 +5063,27 @@ err(
     56106,
     "texture format '~format' does not support '~accessMode' access for storage textures in WGSL",
     span { loc = "location" }  -- No span message: source location is not available at emit time
+)
+
+warning(
+    "multisampled-subpass-input-not-supported-on-metal",
+    56107,
+    "Metal does not support per-sample SubpassLoad; the sample index will be ignored",
+    span { loc = "location", message = "Metal framebuffer fetch does not support per-sample reads. The sample index is ignored and the resolved value is returned." }
+)
+
+err(
+    "subpass-input-used-outside-entry-point",
+    56108,
+    "SubpassInput used outside of the fragment entry point function",
+    span { loc = "location", message = "on Metal, SubpassInput can only be used from the fragment entry point or from functions that are inlined into it. If this reference is inside a helper function, ensure it is not marked [noinline]." }
+)
+
+err(
+    "subpass-input-in-parameter-block-not-allowed-on-metal",
+    56109,
+    "SubpassInput in ParameterBlock not supported on Metal",
+    span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
 )
 
 -- SPIRV (57001-57004)

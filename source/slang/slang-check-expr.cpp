@@ -3987,7 +3987,16 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                             //
                             // An argument can be made that transformation shouldn't apply to
                             // the ref scenario in general.
-                            if (implicitCastExpr && as<OutParamTypeBase>(paramType) &&
+                            // Only fall back to the implicit-cast-as-lvalue
+                            // mechanism if the inner expression is itself an
+                            // l-value: writing back the result of the call only
+                            // makes sense if we have somewhere to write back to.
+                            // Without this check, passing a literal (e.g.
+                            // `foo(0)` for `inout uint`) would survive the
+                            // front end and ICE during IR lowering.
+                            if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1 &&
+                                as<OutParamTypeBase>(paramType) &&
+                                implicitCastExpr->arguments[0]->type.isLeftValue &&
                                 _canLValueCoerce(
                                     implicitCastExpr->arguments[0]->type,
                                     implicitCastExpr->type))
@@ -4066,7 +4075,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                     .arg = argExpr});
 
 
-                                if (implicitCastExpr)
+                                if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1)
                                 {
                                     // Try and determine reason for failure
                                     if (as<RefParamType>(paramType))
@@ -8365,7 +8374,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     {
         // It's not automatically a failure to not have info, we just won't
         // be able to deduce types for operands
-        const auto opInfo = spirvInfo->opInfos.lookup(SpvOp(inst.opcode.knownValue));
+        const auto opcode = SpvOp(inst.opcode.knownValue);
+        const auto opInfo = spirvInfo->opInfos.lookup(opcode);
 
         if (opInfo && opInfo->numOperandTypes == 0 && inst.operands.getCount())
         {
@@ -8562,6 +8572,14 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
             };
 
             check(check, inst.operands[operandIndex]);
+        }
+
+        if (opcode == SpvOpTypeArray || opcode == SpvOpTypeRuntimeArray ||
+            opcode == SpvOpTypePointer)
+        {
+            getSink()->diagnose(Diagnostics::SpirvLayoutSensitiveTypeInAsm{
+                .opcode = inst.opcode.token.getContent(),
+                .location = inst.opcode.token.loc});
         }
     }
 

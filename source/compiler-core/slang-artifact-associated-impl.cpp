@@ -289,6 +289,10 @@ void* ArtifactPostEmitMetadata::getInterface(const Guid& guid)
     }
     if (guid == slang::IMetadata::getTypeGuid())
         return static_cast<slang::IMetadata*>(this);
+    if (guid == slang::ICoverageTracingMetadata::getTypeGuid())
+    {
+        return static_cast<slang::ICoverageTracingMetadata*>(this);
+    }
     if (guid == slang::ICooperativeTypesMetadata::getTypeGuid())
         return static_cast<slang::ICooperativeTypesMetadata*>(this);
     return nullptr;
@@ -346,6 +350,58 @@ SlangResult ArtifactPostEmitMetadata::isParameterLocationUsed(
 const char* ArtifactPostEmitMetadata::getDebugBuildIdentifier()
 {
     return m_debugBuildIdentifier.getBuffer();
+}
+
+uint32_t ArtifactPostEmitMetadata::getCounterCount()
+{
+    return (uint32_t)m_coverageEntries.getCount();
+}
+
+// ABI versioning: minimum `structSize` we accept for the v1 shape of
+// `CoverageEntryInfo` / `CoverageBufferInfo`. These constants are
+// frozen at the offsets of the LAST field shipped in v1 (file+line for
+// the entry struct, space+binding for the buffer struct) and **must
+// not be updated when fields are added later** — that's the whole
+// point of `structSize` versioning. Newer callers with larger structs
+// pass through; older callers feeding a future v2+ implementation
+// will likewise be accepted, with the impl writing only the v1 fields
+// the caller has space for. (When v2 fields are added, write them
+// conditionally based on `outInfo->structSize >= offsetof(struct, newField)
+// + sizeof(newField)`.)
+static constexpr size_t kCoverageEntryInfoV1MinSize =
+    offsetof(slang::CoverageEntryInfo, line) + sizeof(uint32_t);
+static constexpr size_t kCoverageBufferInfoV1MinSize =
+    offsetof(slang::CoverageBufferInfo, binding) + sizeof(int32_t);
+
+SlangResult ArtifactPostEmitMetadata::getEntryInfo(
+    uint32_t index,
+    slang::CoverageEntryInfo* outInfo)
+{
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize < kCoverageEntryInfoV1MinSize)
+        return SLANG_E_INVALID_ARG;
+    if (index >= (uint32_t)m_coverageEntries.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto& entry = m_coverageEntries[index];
+    // Surface an empty source-file path as a null pointer so callers
+    // can branch on attributability without separately checking the
+    // length. An empty file string would otherwise look like a
+    // valid (but empty) path to consumers.
+    outInfo->file = entry.file.getLength() ? entry.file.getBuffer() : nullptr;
+    outInfo->line = entry.line;
+    return SLANG_OK;
+}
+
+SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* outInfo)
+{
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize < kCoverageBufferInfoV1MinSize)
+        return SLANG_E_INVALID_ARG;
+    outInfo->space = m_coverageBufferSpace;
+    outInfo->binding = m_coverageBufferBinding;
+    return SLANG_OK;
 }
 
 SlangUInt ArtifactPostEmitMetadata::getCooperativeMatrixTypeCount()

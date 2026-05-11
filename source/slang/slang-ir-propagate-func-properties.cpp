@@ -25,6 +25,7 @@ static bool isResourceLoad(IROp op)
     case kIROp_StructuredBufferLoadStatus:
     case kIROp_RWStructuredBufferLoad:
     case kIROp_RWStructuredBufferLoadStatus:
+    case kIROp_SubpassLoad:
         return true;
     default:
         return false;
