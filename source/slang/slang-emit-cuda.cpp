@@ -73,6 +73,7 @@ struct FragmentShape
 };
 
 inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col);
+static bool coopMatMulAddTypeCombinationIsValid(IROp aType, IROp bType, IROp cType, IROp dType);
 
 static CUDAExtensionTracker::BaseTypeFlags _findBaseTypesUsed(IRModule* module)
 {
@@ -340,6 +341,12 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             auto coopType = as<IRCoopMatrixType>(type);
             auto result = emitWMMAFragmentType(coopType, out);
             m_extensionTracker->requireSMVersion(SemanticVersion(8, 0));
+            // FP8 mma instructions (mma.sync.m16n8k16 with .e4m3/.e5m2) were
+            // introduced in PTX ISA 8.7 / SM 8.9 (Ada Lovelace).  Earlier SM
+            // targets reject the PTX as invalid at JIT time.
+            auto elemOp = coopType->getElementType()->getOp();
+            if (elemOp == kIROp_FloatE4M3Type || elemOp == kIROp_FloatE5M2Type)
+                m_extensionTracker->requireSMVersion(SemanticVersion(8, 9));
             return result;
         }
     case kIROp_FloatE4M3Type:
@@ -1105,6 +1112,41 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto saturatingAccumulation =
                 cast<IRBoolLit>(coopMatMulAdd->getSaturatingAccumulation())->getValue();
 
+            auto aElemType = cast<IRCoopMatrixType>(matA->getDataType())->getElementType();
+            auto bElemType = cast<IRCoopMatrixType>(matB->getDataType())->getElementType();
+            auto cElemType = cast<IRCoopMatrixType>(matC->getDataType())->getElementType();
+            auto dElemType = cast<IRCoopMatrixType>(coopMatMulAdd->getDataType())->getElementType();
+            if (!coopMatMulAddTypeCombinationIsValid(
+                    aElemType->getOp(),
+                    bElemType->getOp(),
+                    cElemType->getOp(),
+                    dElemType->getOp()))
+            {
+                auto formatElem = [&](IRType* type) -> String
+                {
+                    StringBuilder sb;
+                    calcTypeName(type, CodeGenTarget::CUDASource, sb);
+                    return sb.toString();
+                };
+                getSink()->diagnose(Diagnostics::CooperativeMatrixInvalidMmaTypeCombination{
+                    .aType = formatElem(aElemType),
+                    .bType = formatElem(bElemType),
+                    .cType = formatElem(cElemType),
+                    .dType = formatElem(dElemType),
+                    .location = inst->sourceLoc});
+                // The DiagnosticSink has already recorded the error, but the
+                // surrounding statement-emit path expects an expression to
+                // follow `Type _Sname = ` (otherwise we'd emit the syntactically
+                // invalid `Type _Sname = ;`).  Emit a default-constructed
+                // value of the result type as a placeholder; the recorded
+                // error makes the overall compile fail anyway, so the
+                // placeholder never reaches NVRTC.
+                m_writer->emit("(");
+                emitType(inst->getDataType());
+                m_writer->emit("{})");
+                return true;
+            }
+
             m_writer->emit("Slang_CUDA_WMMA::coopMatMulAdd<");
             emitType(matA->getDataType());
             m_writer->emit("::ElementType, ");
@@ -1541,11 +1583,60 @@ static bool typeCheck(IROp op, uint32_t matrixUse)
     {
     case SLANG_COOPERATIVE_MATRIX_USE_A:
     case SLANG_COOPERATIVE_MATRIX_USE_B:
-        return op == kIROp_HalfType;
+        // PTX m16n8k16 supports f16, bf16, 8-bit integer (s8 / u8), and 8-bit
+        // float (e4m3 / e5m2) inputs.
+        return op == kIROp_HalfType || op == kIROp_BFloat16Type || op == kIROp_Int8Type ||
+               op == kIROp_UInt8Type || op == kIROp_FloatE4M3Type || op == kIROp_FloatE5M2Type;
     case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR:
-        return op == kIROp_HalfType || op == kIROp_FloatType;
+        // Union of the legal accumulator element types across all
+        // currently-supported A/B element types: half/float (for f16, bf16, f8
+        // inputs) and int (for s8 / u8 inputs).  The full A/B/C/D combination
+        // is checked separately by `coopMatMulAddTypeCombinationIsValid`
+        // before code emission.
+        return op == kIROp_HalfType || op == kIROp_FloatType || op == kIROp_IntType;
     }
     return false;
+}
+
+// Validate that a `coopMatMulAdd` (A * B + C -> D) is one of the legal
+// (AType, BType, CType, DType) tuples for the CUDA backend.  The helper
+// templates in `prelude/slang-cuda-prelude.h` only have specializations for
+// these tuples; without this check, an illegal combination would compile
+// through Slang and only fail later inside NVRTC with a hard-to-read C++
+// template error.
+static bool coopMatMulAddTypeCombinationIsValid(IROp aType, IROp bType, IROp cType, IROp dType)
+{
+    // Both A and B must share the same element type — every supported
+    // CUDA mma form has matching `.atype` and `.btype`.
+    if (aType != bType)
+        return false;
+
+    auto isHalfOrFloat = [](IROp t) { return t == kIROp_HalfType || t == kIROp_FloatType; };
+    auto isFloat = [](IROp t) { return t == kIROp_FloatType; };
+    auto isInt32 = [](IROp t) { return t == kIROp_IntType; };
+
+    switch (aType)
+    {
+    case kIROp_HalfType:
+        // f16 mma supports both f16 and f32 accumulator/output, and CType
+        // and DType may be picked independently from {half, float}.
+        return isHalfOrFloat(cType) && isHalfOrFloat(dType);
+    case kIROp_BFloat16Type:
+        // bf16 mma only allows an f32 accumulator and output on PTX.
+        return isFloat(cType) && isFloat(dType);
+    case kIROp_Int8Type:
+    case kIROp_UInt8Type:
+        // Integer mma only allows an s32 accumulator and output.
+        return isInt32(cType) && isInt32(dType);
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+        // fp8 mma supports half or float accumulator/output; the prelude only
+        // provides specializations where CType == DType for these.
+        return (cType == kIROp_HalfType && dType == kIROp_HalfType) ||
+               (cType == kIROp_FloatType && dType == kIROp_FloatType);
+    default:
+        return false;
+    }
 }
 
 static UnownedStringSlice getMatrixUseName(uint32_t matrixUse)

@@ -845,6 +845,19 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
         m_writer->emit("<uniform>");
     }
     else if (
+        type->getOp() == kIROp_ArrayType &&
+        (as<IRHLSLStructuredBufferTypeBase>((IRType*)type->getOperand(0)) ||
+         as<IRByteAddressBufferTypeBase>((IRType*)type->getOperand(0))))
+    {
+        // Arrays of structured/byte-address buffers are not representable in WGSL
+        // because the buffer types themselves map to runtime-sized arrays, and WGSL
+        // does not allow runtime-sized arrays as element types of fixed-size arrays.
+        diagnoseOnce(
+            Diagnostics::ArrayOfResourceTypeNotSupportedInWgsl{.location = varDecl->sourceLoc});
+        // Emit a placeholder to avoid cascading errors in the emitter.
+        m_writer->emit("<storage, read_write>");
+    }
+    else if (
         type->getOp() == kIROp_HLSLRWStructuredBufferType ||
         type->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
         type->getOp() == kIROp_HLSLRWByteAddressBufferType)

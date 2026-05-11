@@ -300,6 +300,19 @@ Reports compiler performance benchmark results for each intermediate pass (impli
 Reports information about checkpoint contexts used for reverse-mode automatic differentiation. 
 
 
+<a id="trace-coverage"></a>
+### -trace-coverage
+Instrument the shader with per-statement execution counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-mapping.json` mapping counter slots to source positions. 
+
+
+<a id="trace-coverage-binding"></a>
+### -trace-coverage-binding
+
+**-trace-coverage-binding &lt;index&gt; &lt;space&gt;**
+
+Bind the synthesized `__slang_coverage` buffer at an explicit (register index, space) instead of auto-allocating a slot. Useful when the host needs the binding fixed at compile time (e.g. for a pre-built D3D12 root signature). Implies `-trace-coverage`. 
+
+
 <a id="report-dynamic-dispatch-sites"></a>
 ### -report-dynamic-dispatch-sites
 Reports information about dynamic dispatch sites for interface calls. 
@@ -1657,6 +1670,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cuda_sm_6_0` 
 * `cuda_sm_7_0` 
 * `cuda_sm_8_0` 
+* `cuda_sm_8_9` 
 * `cuda_sm_9_0` 
 * `atomic_reduce` 
 * `atomic_bfloat16` 

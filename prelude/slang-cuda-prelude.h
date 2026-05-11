@@ -6697,24 +6697,16 @@ struct RegisterCount<half, 16, 16, 16, MatrixUse::MatrixD>
 #endif // #if SLANG_CUDA_ENABLE_HALF
 
 #if SLANG_CUDA_ENABLE_BF16
-// bfloat16 - 8 regs for A/B, 4 regs for C/D
-template<int M, int N, int K>
-struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixA>
+// bfloat16 (bf16) - m16n16k16: 4 regs for A/B (mma.sync.m16n8k16 register layout).
+// Note: bf16 MMA only supports float (f32) accumulators on PTX, so MatrixC/D
+// register counts for __nv_bfloat16 are intentionally not defined here.
+template<>
+struct RegisterCount<__nv_bfloat16, 16, 16, 16, MatrixUse::MatrixA>
 {
     static constexpr int value = 4;
 };
-template<int M, int N, int K>
-struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixB>
-{
-    static constexpr int value = 4;
-};
-template<int M, int N, int K>
-struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixC>
-{
-    static constexpr int value = 4;
-};
-template<int M, int N, int K>
-struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixD>
+template<>
+struct RegisterCount<__nv_bfloat16, 16, 16, 16, MatrixUse::MatrixB>
 {
     static constexpr int value = 4;
 };
@@ -6922,6 +6914,39 @@ struct MMALoadHelper<ElemT, layout, 16, 16, MatrixUse::MatrixA>
         unsigned gid,
         unsigned tid)
     {
+        if constexpr (sizeof(ElemT) == 1)
+        {
+            // 8-bit MatrixA fragment layout (m16n8k16 with .s8/.u8):
+            //   regs[0] = (row=gid,    cols=4*tid..4*tid+3) -- 4 contiguous bytes
+            //   regs[1] = (row=gid+8,  cols=4*tid..4*tid+3) -- 4 contiguous bytes
+            const uint8_t* ubuf = reinterpret_cast<const uint8_t*>(buffer);
+            if constexpr (layout == Layout::RowMajor)
+            {
+                // Row-major: a thread's 4 column-adjacent elements are 4 contiguous
+                // bytes in memory, so each register half is a single 32-bit load.
+                regs[0] = *reinterpret_cast<const uint32_t*>(&ubuf[gid * stride + 4 * tid]);
+                regs[1] = *reinterpret_cast<const uint32_t*>(&ubuf[(gid + 8) * stride + 4 * tid]);
+            }
+            else
+            {
+                // Col-major: each of the 4 column-adjacent elements lives in a
+                // different column of the buffer, so we gather byte-by-byte.
+                uint32_t r0 = 0;
+                uint32_t r1 = 0;
+#pragma unroll
+                for (int e = 0; e < 4; e++)
+                {
+                    unsigned col = 4 * tid + e;
+                    uint32_t b0 = (uint32_t)ubuf[col * stride + gid];
+                    uint32_t b1 = (uint32_t)ubuf[col * stride + (gid + 8)];
+                    r0 |= b0 << (e * 8);
+                    r1 |= b1 << (e * 8);
+                }
+                regs[0] = r0;
+                regs[1] = r1;
+            }
+            return;
+        }
         unsigned row = laneid >> 1;
         unsigned side = laneid & 1;
         uint4 loaded_v = *reinterpret_cast<const uint4*>(&buffer[row * stride + side * 8]);
@@ -6998,6 +7023,33 @@ struct MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixB>
         unsigned gid,
         unsigned tid)
     {
+        if constexpr (sizeof(ElemT) == 1)
+        {
+            // 8-bit MatrixB fragment layout (m16n8k16 with .s8/.u8):
+            //   regs[0] = (rows=4*tid..4*tid+3, col=gid) -- 4 elements packed
+            // gid here is in 0..7 (the column index inside the 16x8 tile).
+            const uint8_t* ubuf = reinterpret_cast<const uint8_t*>(buffer);
+            if constexpr (layout == Layout::ColMajor)
+            {
+                // Col-major: 4 row-adjacent elements in column `gid` are 4
+                // contiguous bytes at &buffer[gid*stride + 4*tid].
+                regs[0] = *reinterpret_cast<const uint32_t*>(&ubuf[gid * stride + 4 * tid]);
+            }
+            else
+            {
+                // Row-major: 4 row-adjacent elements all live in column `gid` of
+                // 4 different rows; gather byte-by-byte.
+                uint32_t r0 = 0;
+#pragma unroll
+                for (int e = 0; e < 4; e++)
+                {
+                    unsigned row = 4 * tid + e;
+                    r0 |= ((uint32_t)ubuf[row * stride + gid]) << (e * 8);
+                }
+                regs[0] = r0;
+            }
+            return;
+        }
         uint4 loaded_v;
         if constexpr (layout == Layout::ColMajor)
         {
@@ -7064,6 +7116,8 @@ struct MMALoadHelper<ElemT, layout, 16, 16, MatrixUse::MatrixB>
         unsigned gid,
         unsigned tid)
     {
+        // 8-bit B uses 1 reg per m16n8k16 sub-tile; 16-bit B uses 2 regs.
+        constexpr int regsPerSubTile = (sizeof(ElemT) == 1) ? 1 : 2;
         MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixB>::exec(
             regs,
             buffer,
@@ -7073,7 +7127,7 @@ struct MMALoadHelper<ElemT, layout, 16, 16, MatrixUse::MatrixB>
             tid);
         if constexpr (layout == Layout::RowMajor)
             MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixB>::exec(
-                regs + 2,
+                regs + regsPerSubTile,
                 buffer + 8,
                 stride,
                 laneid,
@@ -7081,7 +7135,7 @@ struct MMALoadHelper<ElemT, layout, 16, 16, MatrixUse::MatrixB>
                 tid);
         else
             MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixB>::exec(
-                regs + 2,
+                regs + regsPerSubTile,
                 buffer + 8 * stride,
                 stride,
                 laneid,
@@ -7236,7 +7290,7 @@ struct MMALoadHelper<ElemT, layout, 16, 16, MatrixUse::MatrixC>
         unsigned gid,
         unsigned tid)
     {
-        constexpr int regsPerHalf = (sizeof(ElemT) == 4) ? 4 : 2;
+        constexpr int regsPerSubTile = (sizeof(ElemT) == 4) ? 4 : 2;
         MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>::exec(
             regs,
             buffer,
@@ -7246,7 +7300,7 @@ struct MMALoadHelper<ElemT, layout, 16, 16, MatrixUse::MatrixC>
             tid);
         if constexpr (layout == Layout::RowMajor)
             MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>::exec(
-                regs + regsPerHalf,
+                regs + regsPerSubTile,
                 buffer + 8,
                 stride,
                 laneid,
@@ -7254,7 +7308,7 @@ struct MMALoadHelper<ElemT, layout, 16, 16, MatrixUse::MatrixC>
                 tid);
         else
             MMALoadHelper<ElemT, layout, 16, 8, MatrixUse::MatrixC>::exec(
-                regs + regsPerHalf,
+                regs + regsPerSubTile,
                 buffer + 8 * stride,
                 stride,
                 laneid,
@@ -7446,18 +7500,36 @@ struct MMAStoreHelper<ElemT, layout, 16, 16>
         int stride,
         unsigned laneid)
     {
-        constexpr int regsPerHalf = (sizeof(ElemT) == 4) ? 4 : 2;
+        // 8-bit cooperative-matrix fragments (s8 / u8 / e4m3 / e5m2) only
+        // exist as MatrixA / MatrixB on CUDA, and `Store` on MatA / MatB is
+        // broken in this prelude across element sizes -- the inner
+        // `MMAStoreHelper<...,16,8>` only implements the f32/int32 and f16/bf16
+        // *accumulator* register layouts.  For half/bf16 that produces
+        // silently-wrong data; for 8-bit it would also read past the
+        // fragment's `regs[]` array via `regs + regsPerSubTile` (an int8 16x16
+        // MatA fragment carries 2 regs total, so `regs + 2` is undefined
+        // behaviour).  Fail loudly here until a MatrixUse-aware Store path
+        // lands; in the meantime use `.equals()` against a known-expected
+        // fragment to verify content (see int8-arith.slang for the pattern).
+        static_assert(
+            sizeof(ElemT) != 1,
+            "CUDA `Store` on a 16x16 cooperative-matrix fragment with an 8-bit "
+            "element type (s8 / u8 / e4m3 / e5m2) is not implemented: it would "
+            "read past the fragment's register array.  Use `.equals()` against "
+            "a known-expected fragment to verify content (see int8-arith.slang) "
+            "until MatrixA / MatrixB Store is rewritten.");
+        constexpr int regsPerSubTile = (sizeof(ElemT) == 4) ? 4 : 2;
         MMAStoreHelper<ElemT, layout, 16, 8>::exec(buffer, regs, stride, laneid);
         if constexpr (layout == Layout::RowMajor)
             MMAStoreHelper<ElemT, layout, 16, 8>::exec(
                 buffer + 8,
-                regs + regsPerHalf,
+                regs + regsPerSubTile,
                 stride,
                 laneid);
         else
             MMAStoreHelper<ElemT, layout, 16, 8>::exec(
                 buffer + 8 * stride,
-                regs + regsPerHalf,
+                regs + regsPerSubTile,
                 stride,
                 laneid);
     }
@@ -7472,6 +7544,61 @@ __device__ inline void mmaStore(void* ptr, const uint32_t* regs, int stride)
     MMAStoreHelper<ElemT, layout, Row, Col>::exec(buffer, regs, stride, laneid);
 }
 
+// ====================================================================================
+// Packed-pair traits for 16-bit float types (half / bfloat16).
+//
+// Both half and bfloat16 fit two elements per 32-bit register. Arithmetic operators
+// for the corresponding pair types (__half2 / __nv_bfloat162) are already available:
+//   - __half2 ops are defined at global scope earlier in this prelude (when
+//     SLANG_CUDA_ENABLE_HALF is defined; cuda_fp16.h is included with
+//     __CUDA_NO_HALF2_OPERATORS__ so the prelude can supply HLSL-friendly versions).
+//   - __nv_bfloat162 ops come straight from <cuda_bf16.h>.
+// So this trait only needs to expose the pair type and the per-type broadcast
+// intrinsic — arithmetic in the WmmaFragment operator overloads can use native
+// `+`, `-`, `*`, `/`, unary `-` directly.
+// ====================================================================================
+
+template<typename T>
+struct PackedFp16Traits;
+
+#if SLANG_CUDA_ENABLE_HALF
+template<>
+struct PackedFp16Traits<half>
+{
+    using PairType = __half2;
+    static __device__ PairType broadcast(half v) { return __half2half2(v); }
+};
+#endif
+
+#if SLANG_CUDA_ENABLE_BF16
+template<>
+struct PackedFp16Traits<__nv_bfloat16>
+{
+    using PairType = __nv_bfloat162;
+    static __device__ PairType broadcast(__nv_bfloat16 v) { return __bfloat162bfloat162(v); }
+};
+#endif
+
+template<typename T>
+struct IsPackedFp16
+{
+    static constexpr bool value = false;
+};
+#if SLANG_CUDA_ENABLE_HALF
+template<>
+struct IsPackedFp16<half>
+{
+    static constexpr bool value = true;
+};
+#endif
+#if SLANG_CUDA_ENABLE_BF16
+template<>
+struct IsPackedFp16<__nv_bfloat16>
+{
+    static constexpr bool value = true;
+};
+#endif
+
 template<typename T>
 inline unsigned __device__ Pack32Helper(T value);
 
@@ -7480,6 +7607,15 @@ template<>
 inline unsigned __device__ Pack32Helper<half>(half value)
 {
     return __half_as_ushort(value) | (__half_as_ushort(value) << 16);
+};
+#endif
+
+#if SLANG_CUDA_ENABLE_BF16
+template<>
+inline unsigned __device__ Pack32Helper<__nv_bfloat16>(__nv_bfloat16 value)
+{
+    unsigned short bits = __bfloat16_as_ushort(value);
+    return (unsigned)bits | ((unsigned)bits << 16);
 };
 #endif
 
@@ -7497,13 +7633,34 @@ inline unsigned __device__ Pack32Helper<int>(int value)
 template<>
 inline unsigned __device__ Pack32Helper<char>(char value)
 {
-    return value << 24 | value << 16 | value << 8 | value;
+    // Cast through unsigned char first to avoid sign-extension when `value` is
+    // negative; otherwise the OR-chain below would leak the sign-extension bits
+    // and produce 0xFFFFFFFF for any negative `value`.
+    unsigned bits = (unsigned)(unsigned char)value;
+    return (bits << 24) | (bits << 16) | (bits << 8) | bits;
 };
 template<>
 inline unsigned __device__ Pack32Helper<unsigned char>(unsigned char value)
 {
-    return value << 24 | value << 16 | value << 8 | value;
+    unsigned bits = (unsigned)value;
+    return (bits << 24) | (bits << 16) | (bits << 8) | bits;
 };
+
+#if SLANG_CUDA_ENABLE_FP8
+template<>
+inline unsigned __device__ Pack32Helper<__nv_fp8_e4m3>(__nv_fp8_e4m3 value)
+{
+    // fp8 types are 1-byte structs; extract the storage byte and replicate.
+    unsigned bits = (unsigned)*reinterpret_cast<const uint8_t*>(&value);
+    return (bits << 24) | (bits << 16) | (bits << 8) | bits;
+};
+template<>
+inline unsigned __device__ Pack32Helper<__nv_fp8_e5m2>(__nv_fp8_e5m2 value)
+{
+    unsigned bits = (unsigned)*reinterpret_cast<const uint8_t*>(&value);
+    return (bits << 24) | (bits << 16) | (bits << 8) | bits;
+};
+#endif
 
 
 // ====================================================================================
@@ -7555,20 +7712,18 @@ struct WmmaFragment
     __device__ This operator*(T b)
     {
         This result;
-#if SLANG_CUDA_ENABLE_HALF
-        if (sizeof(T) == 2)
+        if constexpr (IsPackedFp16<T>::value)
         {
-            __half bh = *reinterpret_cast<const __half*>(&b);
-            __half2 bv = __half2half2(bh);
+            using PairT = typename PackedFp16Traits<T>::PairType;
+            PairT bv = PackedFp16Traits<T>::broadcast(b);
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __hmul2(*reinterpret_cast<const __half2*>(&regs[i]), bv);
+                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) * bv;
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
-#endif
         {
             for (int i = 0; i < GetLength(); i++)
                 result.set(i, get(i) * b);
@@ -7579,20 +7734,18 @@ struct WmmaFragment
     __device__ This operator*(const This& b)
     {
         This result;
-#if SLANG_CUDA_ENABLE_HALF
-        if (sizeof(T) == 2)
+        if constexpr (IsPackedFp16<T>::value)
         {
+            using PairT = typename PackedFp16Traits<T>::PairType;
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __hmul2(
-                    *reinterpret_cast<const __half2*>(&regs[i]),
-                    *reinterpret_cast<const __half2*>(&b.regs[i]));
+                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) *
+                          *reinterpret_cast<const PairT*>(&b.regs[i]);
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
-#endif
         {
             for (int i = 0; i < GetLength(); i++)
                 result.set(i, get(i) * b.get(i));
@@ -7603,20 +7756,18 @@ struct WmmaFragment
     __device__ This operator/(const This& other)
     {
         This result;
-#if SLANG_CUDA_ENABLE_HALF
-        if (sizeof(T) == 2)
+        if constexpr (IsPackedFp16<T>::value)
         {
+            using PairT = typename PackedFp16Traits<T>::PairType;
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __h2div(
-                    *reinterpret_cast<const __half2*>(&regs[i]),
-                    *reinterpret_cast<const __half2*>(&other.regs[i]));
+                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) /
+                          *reinterpret_cast<const PairT*>(&other.regs[i]);
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
-#endif
         {
             for (int i = 0; i < GetLength(); i++)
                 result.set(i, get(i) / other.get(i));
@@ -7627,20 +7778,18 @@ struct WmmaFragment
     __device__ This operator-(const This& other)
     {
         This result;
-#if SLANG_CUDA_ENABLE_HALF
-        if (sizeof(T) == 2)
+        if constexpr (IsPackedFp16<T>::value)
         {
+            using PairT = typename PackedFp16Traits<T>::PairType;
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __hsub2(
-                    *reinterpret_cast<const __half2*>(&regs[i]),
-                    *reinterpret_cast<const __half2*>(&other.regs[i]));
+                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) -
+                          *reinterpret_cast<const PairT*>(&other.regs[i]);
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
-#endif
         {
             for (int i = 0; i < GetLength(); i++)
                 result.set(i, get(i) - other.get(i));
@@ -7651,18 +7800,17 @@ struct WmmaFragment
     __device__ This operator-()
     {
         This result;
-#if SLANG_CUDA_ENABLE_HALF
-        if (sizeof(T) == 2)
+        if constexpr (IsPackedFp16<T>::value)
         {
+            using PairT = typename PackedFp16Traits<T>::PairType;
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __hneg2(*reinterpret_cast<const __half2*>(&regs[i]));
+                PairT r = -*reinterpret_cast<const PairT*>(&regs[i]);
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
-#endif
         {
             for (int i = 0; i < GetLength(); i++)
                 result.set(i, -get(i));
@@ -7673,20 +7821,18 @@ struct WmmaFragment
     __device__ This operator+(const This& other)
     {
         This result;
-#if SLANG_CUDA_ENABLE_HALF
-        if (sizeof(T) == 2)
+        if constexpr (IsPackedFp16<T>::value)
         {
+            using PairT = typename PackedFp16Traits<T>::PairType;
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                __half2 r = __hadd2(
-                    *reinterpret_cast<const __half2*>(&regs[i]),
-                    *reinterpret_cast<const __half2*>(&other.regs[i]));
+                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) +
+                          *reinterpret_cast<const PairT*>(&other.regs[i]);
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
-#endif
         {
             for (int i = 0; i < GetLength(); i++)
                 result.set(i, get(i) + other.get(i));
@@ -7697,9 +7843,63 @@ struct WmmaFragment
     __device__ This operator%(const This& other)
     {
         This result;
-        for (int i = 0; i < GetLength(); i++)
-            result.set(i, get(i) % other.get(i));
+        if constexpr (IsPackedFp16<T>::value)
+        {
+            // 16-bit float types (half / bfloat16) have no native `%`. Compute the
+            // modulo through a float intermediate, which is precision-preserving for
+            // both half and bfloat16.
+            for (int i = 0; i < GetLength(); i++)
+            {
+                float a = static_cast<float>(get(i));
+                float b = static_cast<float>(other.get(i));
+                result.set(i, T(fmodf(a, b)));
+            }
+        }
+        else
+        {
+            for (int i = 0; i < GetLength(); i++)
+                result.set(i, get(i) % other.get(i));
+        }
         return result;
+    }
+
+    // Element-wise equality: true iff every element matches `other`'s element at
+    // the same index. Used by Slang's `equals` on cooperative matrices.
+    __device__ bool operator==(const This& other) const
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (get(i) != other.get(i))
+                return false;
+        }
+        return true;
+    }
+
+    // Lexicographic ordering: scan elements in index order; first non-equal pair
+    // decides. Used by Slang's `lessThan` / `lessThanOrEquals` on cooperative
+    // matrices.
+    __device__ bool operator<(const This& other) const
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (get(i) < other.get(i))
+                return true;
+            if (get(i) > other.get(i))
+                return false;
+        }
+        return false;
+    }
+
+    __device__ bool operator<=(const This& other) const
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (get(i) < other.get(i))
+                return true;
+            if (get(i) > other.get(i))
+                return false;
+        }
+        return true;
     }
 
     template<typename U, MatrixUse R2>
@@ -7889,38 +8089,29 @@ struct WmmaFragment
 };
 
 // ====================================================================================
-// FP16 MMA Helper - For half x half inputs
-// Specialized on CType and DType (accumulator types)
+// 16-bit Float MMA Helpers - For half x half / bfloat16 x bfloat16 inputs
+// Specialized on CType and DType (accumulator/output types).
 //
 // Uses mma.sync.aligned.m16n8k16 instructions (2x per m16n16k16 tile).
 // Only the m16n16k16 shape is supported.
-// ====================================================================================
-
-template<typename CType, typename DType, int M, int N, int K>
-struct Fp16MMAHelper;
-
-
-// ====================================================================================
-// Fp16MMAHelper m16n16k16 specializations (via 2x mma.sync.m16n8k16)
-//
-// Override the generic WMMA-based Fp16MMAHelper for the m16n16k16 shape.
-// Each specialization fixes CType, DType AND M=16,N=16,K=16, making it
-// strictly more specialized than the corresponding generic — no ambiguity.
 //
 // Register layout for m16n16k16 = 2x m16n8k16:
 //   A: 4 regs (shared between both calls)
 //   B: 4 regs (b[0:1] → lo N-half, b[2:3] → hi N-half)
-//   C/D half: 4 regs (2 per sub-tile)
+//   C/D half:  4 regs (2 per sub-tile)
 //   C/D float: 8 regs (4 per sub-tile)
+//
+// The mma<> function template is parameterized on the input element type so half
+// and bfloat16 can share the same dispatch shape while emitting different PTX.
 // ====================================================================================
+
+template<typename InputT, typename AccumT, int M, int N, int K>
+__device__ inline void mma(uint32_t* d, const uint32_t* a, const uint32_t* b, const uint32_t* c);
 
 #if SLANG_CUDA_ENABLE_HALF
 
-template<typename AccumT, int M, int N, int K>
-__device__ inline void mma(uint32_t* d, const uint32_t* a, const uint32_t* b, const uint32_t* c);
-
 template<>
-__device__ inline void mma<float, 16, 8, 16>(
+__device__ inline void mma<half, float, 16, 8, 16>(
     uint32_t* d,
     const uint32_t* a,
     const uint32_t* b,
@@ -7945,7 +8136,7 @@ __device__ inline void mma<float, 16, 8, 16>(
 }
 
 template<>
-__device__ inline void mma<half, 16, 8, 16>(
+__device__ inline void mma<half, half, 16, 8, 16>(
     uint32_t* d,
     const uint32_t* a,
     const uint32_t* b,
@@ -7961,6 +8152,51 @@ __device__ inline void mma<half, 16, 8, 16>(
         : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]), "r"(c[0]), "r"(c[1]));
 }
 
+#endif // #if SLANG_CUDA_ENABLE_HALF
+
+#if SLANG_CUDA_ENABLE_BF16
+
+// bf16 MMA only supports float (f32) accumulators on PTX.
+template<>
+__device__ inline void mma<__nv_bfloat16, float, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32 "
+                 "{%0, %1, %2, %3}, "
+                 "{%4, %5, %6, %7}, "
+                 "{%8, %9}, "
+                 "{%10, %11, %12, %13};\n"
+                 : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
+                 : "r"(a[0]),
+                   "r"(a[1]),
+                   "r"(a[2]),
+                   "r"(a[3]),
+                   "r"(b[0]),
+                   "r"(b[1]),
+                   "r"(c[0]),
+                   "r"(c[1]),
+                   "r"(c[2]),
+                   "r"(c[3]));
+}
+
+#endif // #if SLANG_CUDA_ENABLE_BF16
+
+// ====================================================================================
+// Fp16MMAHelper m16n16k16 specializations (via 2x mma.sync.m16n8k16)
+//
+// Override the generic WMMA-based Fp16MMAHelper for the m16n16k16 shape.
+// Each specialization fixes CType, DType AND M=16,N=16,K=16, making it
+// strictly more specialized than the corresponding generic — no ambiguity.
+// ====================================================================================
+
+template<typename CType, typename DType, int M, int N, int K>
+struct Fp16MMAHelper;
+
+#if SLANG_CUDA_ENABLE_HALF
+
 template<>
 struct Fp16MMAHelper<half, half, 16, 16, 16>
 {
@@ -7970,8 +8206,8 @@ struct Fp16MMAHelper<half, half, 16, 16, 16>
         const WmmaFragment<half, 16, 16, 16, MatrixUse::MatrixB>& b,
         const WmmaFragment<half, 16, 16, 16, MatrixC>& c)
     {
-        mma<half, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
-        mma<half, 16, 8, 16>(d.regs + 2, a.regs, b.regs + 2, c.regs + 2);
+        mma<half, half, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
+        mma<half, half, 16, 8, 16>(d.regs + 2, a.regs, b.regs + 2, c.regs + 2);
     }
 };
 
@@ -7984,8 +8220,8 @@ struct Fp16MMAHelper<float, float, 16, 16, 16>
         const WmmaFragment<half, 16, 16, 16, MatrixUse::MatrixB>& b,
         const WmmaFragment<float, 16, 16, 16, MatrixC>& c)
     {
-        mma<float, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
-        mma<float, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 2, c.regs + 4);
+        mma<half, float, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
+        mma<half, float, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 2, c.regs + 4);
     }
 };
 
@@ -8007,8 +8243,8 @@ struct Fp16MMAHelper<half, float, 16, 16, 16>
             fc[2 * i] = __float_as_uint(__half2float(lo));
             fc[2 * i + 1] = __float_as_uint(__half2float(hi));
         }
-        mma<float, 16, 8, 16>(d.regs, a.regs, b.regs, fc);
-        mma<float, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 2, fc + 4);
+        mma<half, float, 16, 8, 16>(d.regs, a.regs, b.regs, fc);
+        mma<half, float, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 2, fc + 4);
     }
 };
 
@@ -8022,8 +8258,8 @@ struct Fp16MMAHelper<float, half, 16, 16, 16>
         const WmmaFragment<float, 16, 16, 16, MatrixC>& c)
     {
         uint32_t fd[8];
-        mma<float, 16, 8, 16>(fd, a.regs, b.regs, c.regs);
-        mma<float, 16, 8, 16>(fd + 4, a.regs, b.regs + 2, c.regs + 4);
+        mma<half, float, 16, 8, 16>(fd, a.regs, b.regs, c.regs);
+        mma<half, float, 16, 8, 16>(fd + 4, a.regs, b.regs + 2, c.regs + 4);
 #pragma unroll
         for (int i = 0; i < 4; i++)
         {
@@ -8037,7 +8273,290 @@ struct Fp16MMAHelper<float, half, 16, 16, 16>
 #endif // #if SLANG_CUDA_ENABLE_HALF
 
 // ====================================================================================
+// Bf16MMAHelper m16n16k16 specializations (via 2x mma.sync.m16n8k16)
+//
+// bfloat16 MMA only supports float (f32) accumulators on PTX, so only the
+// (CType=float, DType=float) combination is provided here.
+// ====================================================================================
+
+template<typename CType, typename DType, int M, int N, int K>
+struct Bf16MMAHelper;
+
+#if SLANG_CUDA_ENABLE_BF16
+
+template<>
+struct Bf16MMAHelper<float, float, 16, 16, 16>
+{
+    __device__ static void eval(
+        WmmaFragment<float, 16, 16, 16, MatrixC>& d,
+        const WmmaFragment<__nv_bfloat16, 16, 16, 16, MatrixUse::MatrixA>& a,
+        const WmmaFragment<__nv_bfloat16, 16, 16, 16, MatrixUse::MatrixB>& b,
+        const WmmaFragment<float, 16, 16, 16, MatrixC>& c)
+    {
+        mma<__nv_bfloat16, float, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
+        mma<__nv_bfloat16, float, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 2, c.regs + 4);
+    }
+};
+
+#endif // #if SLANG_CUDA_ENABLE_BF16
+
+// ====================================================================================
+// 8-bit Integer MMA intrinsics (m16n8k16 with .s8/.u8 inputs and .s32 accumulator).
+//
+// PTX form: mma.sync.aligned.m16n8k16.row.col{.satfinite}.s32.{s8|u8}.{s8|u8}.s32
+//   - Matrix A:  16x16, 2 b32 regs per thread (each register packs 4 .s8/.u8 elements)
+//   - Matrix B:  16x8,  1 b32 reg  per thread (packs 4 .s8/.u8 elements)
+//   - Matrix C:  16x8,  4 .s32 regs per thread
+//
+// PTX integer mma only supports an .s32 accumulator (unlike the fp8 mma at the
+// same shape, which adds .f16/.f32 accumulator forms).  The `.satfinite` modifier
+// clamps overflow to [INT32_MIN, INT32_MAX]; without it, the accumulator wraps.
+// ====================================================================================
+
+// Non-saturating: signed 8-bit inputs.
+template<>
+__device__ inline void mma<char, int32_t, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.s32.s8.s8.s32 "
+                 "{%0, %1, %2, %3}, "
+                 "{%4, %5}, "
+                 "{%6}, "
+                 "{%7, %8, %9, %10};\n"
+                 : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
+}
+
+// Non-saturating: unsigned 8-bit inputs.
+template<>
+__device__ inline void mma<unsigned char, int32_t, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.s32.u8.u8.s32 "
+                 "{%0, %1, %2, %3}, "
+                 "{%4, %5}, "
+                 "{%6}, "
+                 "{%7, %8, %9, %10};\n"
+                 : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
+}
+
+// Saturating variants are exposed via a parallel `mma_sat` template so the
+// existing `mma<>` specializations (which all happen to be non-saturating) stay
+// untouched.  `Int8MMAHelper` selects between the two with `if constexpr`.
+template<typename InputT, typename AccumT, int M, int N, int K>
+__device__ inline void mma_sat(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c);
+
+template<>
+__device__ inline void mma_sat<char, int32_t, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.satfinite.s32.s8.s8.s32 "
+                 "{%0, %1, %2, %3}, "
+                 "{%4, %5}, "
+                 "{%6}, "
+                 "{%7, %8, %9, %10};\n"
+                 : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
+}
+
+template<>
+__device__ inline void mma_sat<unsigned char, int32_t, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.satfinite.s32.u8.u8.s32 "
+                 "{%0, %1, %2, %3}, "
+                 "{%4, %5}, "
+                 "{%6}, "
+                 "{%7, %8, %9, %10};\n"
+                 : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
+}
+
+// ====================================================================================
+// Int8MMAHelper m16n16k16 (via 2x mma.sync.m16n8k16)
+//
+// Register layout for m16n16k16 = 2x m16n8k16 with 8-bit inputs / 32-bit accum:
+//   A: 2 regs per thread (shared between both calls — A is full-width for both N halves)
+//   B: 2 regs per thread (b[0] -> lo N-half cols 0..7, b[1] -> hi N-half cols 8..15)
+//   C/D: 8 regs per thread (4 per sub-tile)
+// ====================================================================================
+
+template<typename AInputT, typename CType, typename DType, int M, int N, int K, bool Saturating>
+struct Int8MMAHelper;
+
+template<typename AInputT, bool Saturating>
+struct Int8MMAHelper<AInputT, int32_t, int32_t, 16, 16, 16, Saturating>
+{
+    __device__ static void eval(
+        WmmaFragment<int32_t, 16, 16, 16, MatrixC>& d,
+        const WmmaFragment<AInputT, 16, 16, 16, MatrixUse::MatrixA>& a,
+        const WmmaFragment<AInputT, 16, 16, 16, MatrixUse::MatrixB>& b,
+        const WmmaFragment<int32_t, 16, 16, 16, MatrixC>& c)
+    {
+        if constexpr (Saturating)
+        {
+            mma_sat<AInputT, int32_t, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
+            mma_sat<AInputT, int32_t, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 1, c.regs + 4);
+        }
+        else
+        {
+            mma<AInputT, int32_t, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
+            mma<AInputT, int32_t, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 1, c.regs + 4);
+        }
+    }
+};
+
+// ====================================================================================
+// 8-bit Float MMA intrinsics (m16n8k16 with .e4m3 / .e5m2 inputs).
+//
+// PTX form: mma.sync.aligned.m16n8k16.row.col.{f16|f32}.{e4m3|e5m2}.{e4m3|e5m2}.{f16|f32}
+//   - Matrix A:  16x16, 2 b32 regs per thread (4 e4m3/e5m2 elements per reg)
+//   - Matrix B:  16x8,  1 b32 reg  per thread (4 e4m3/e5m2 elements)
+//   - Matrix C:  16x8,  4 .f32 regs per thread (with f32 accumulator) OR
+//                       2 .f16x2 regs per thread (with f16 accumulator)
+// Same A/B register layout as the integer m16n8k16 path; only the accumulator
+// differs.  Requires SM 8.9+ (Ada Lovelace) at runtime.
+// ====================================================================================
+
+#if SLANG_CUDA_ENABLE_FP8
+
+template<>
+__device__ inline void mma<__nv_fp8_e4m3, float, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.e4m3.e4m3.f32 "
+                 "{%0, %1, %2, %3}, "
+                 "{%4, %5}, "
+                 "{%6}, "
+                 "{%7, %8, %9, %10};\n"
+                 : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
+}
+
+template<>
+__device__ inline void mma<__nv_fp8_e5m2, float, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.e5m2.e5m2.f32 "
+                 "{%0, %1, %2, %3}, "
+                 "{%4, %5}, "
+                 "{%6}, "
+                 "{%7, %8, %9, %10};\n"
+                 : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
+}
+
+template<>
+__device__ inline void mma<__nv_fp8_e4m3, half, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f16.e4m3.e4m3.f16 "
+                 "{%0, %1}, "
+                 "{%2, %3}, "
+                 "{%4}, "
+                 "{%5, %6};\n"
+                 : "=r"(d[0]), "=r"(d[1])
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]));
+}
+
+template<>
+__device__ inline void mma<__nv_fp8_e5m2, half, 16, 8, 16>(
+    uint32_t* d,
+    const uint32_t* a,
+    const uint32_t* b,
+    const uint32_t* c)
+{
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f16.e5m2.e5m2.f16 "
+                 "{%0, %1}, "
+                 "{%2, %3}, "
+                 "{%4}, "
+                 "{%5, %6};\n"
+                 : "=r"(d[0]), "=r"(d[1])
+                 : "r"(a[0]), "r"(a[1]), "r"(b[0]), "r"(c[0]), "r"(c[1]));
+}
+
+#endif // #if SLANG_CUDA_ENABLE_FP8
+
+// ====================================================================================
+// Fp8MMAHelper m16n16k16 (via 2x mma.sync.m16n8k16)
+//
+// Register layout for m16n16k16 = 2x m16n8k16 with 8-bit FP inputs:
+//   A: 2 regs per thread (shared between both calls)
+//   B: 2 regs per thread (b[0] -> lo N-half cols 0..7, b[1] -> hi N-half cols 8..15)
+//   C/D float (f32 acc): 8 regs per thread (4 per sub-tile)
+//   C/D half  (f16 acc): 4 regs per thread (2 per sub-tile)
+// AInputT must be either __nv_fp8_e4m3 or __nv_fp8_e5m2.  CType==DType, both
+// either float (f32 mma form) or half (f16 mma form).
+// ====================================================================================
+
+template<typename AInputT, typename CType, typename DType, int M, int N, int K>
+struct Fp8MMAHelper;
+
+#if SLANG_CUDA_ENABLE_FP8
+
+template<typename AInputT>
+struct Fp8MMAHelper<AInputT, float, float, 16, 16, 16>
+{
+    __device__ static void eval(
+        WmmaFragment<float, 16, 16, 16, MatrixC>& d,
+        const WmmaFragment<AInputT, 16, 16, 16, MatrixUse::MatrixA>& a,
+        const WmmaFragment<AInputT, 16, 16, 16, MatrixUse::MatrixB>& b,
+        const WmmaFragment<float, 16, 16, 16, MatrixC>& c)
+    {
+        mma<AInputT, float, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
+        mma<AInputT, float, 16, 8, 16>(d.regs + 4, a.regs, b.regs + 1, c.regs + 4);
+    }
+};
+
+template<typename AInputT>
+struct Fp8MMAHelper<AInputT, half, half, 16, 16, 16>
+{
+    __device__ static void eval(
+        WmmaFragment<half, 16, 16, 16, MatrixC>& d,
+        const WmmaFragment<AInputT, 16, 16, 16, MatrixUse::MatrixA>& a,
+        const WmmaFragment<AInputT, 16, 16, 16, MatrixUse::MatrixB>& b,
+        const WmmaFragment<half, 16, 16, 16, MatrixC>& c)
+    {
+        mma<AInputT, half, 16, 8, 16>(d.regs, a.regs, b.regs, c.regs);
+        mma<AInputT, half, 16, 8, 16>(d.regs + 2, a.regs, b.regs + 1, c.regs + 2);
+    }
+};
+
+#endif // #if SLANG_CUDA_ENABLE_FP8
+
+// ====================================================================================
 // MMA Helper - Primary Template (dispatcher)
+//
+// Selects between Fp16MMAHelper (half x half), Bf16MMAHelper (bfloat16 x bfloat16),
+// Int8MMAHelper (s8/u8 x s32 accumulator), and Fp8MMAHelper (e4m3/e5m2 x f16/f32
+// accumulator) based on the input element type.  AType is required to equal BType
+// — the supported PTX shapes always have matching A/B element types.
 // ====================================================================================
 
 template<
@@ -8055,7 +8574,31 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
     WmmaFragment<CType, M, N, K, MatrixUse::MatrixC> matC)
 {
     WmmaFragment<DType, M, N, K, MatrixC> matD;
-    Fp16MMAHelper<CType, DType, M, N, K>::eval(matD, matA, matB, matC);
+    if constexpr (IsSameType<AType, char>::value || IsSameType<AType, unsigned char>::value)
+    {
+        Int8MMAHelper<AType, CType, DType, M, N, K, saturatingAccumulation>::eval(
+            matD,
+            matA,
+            matB,
+            matC);
+    }
+#if SLANG_CUDA_ENABLE_FP8
+    else if constexpr (
+        IsSameType<AType, __nv_fp8_e4m3>::value || IsSameType<AType, __nv_fp8_e5m2>::value)
+    {
+        Fp8MMAHelper<AType, CType, DType, M, N, K>::eval(matD, matA, matB, matC);
+    }
+#endif
+#if SLANG_CUDA_ENABLE_BF16
+    else if constexpr (IsSameType<AType, __nv_bfloat16>::value)
+    {
+        Bf16MMAHelper<CType, DType, M, N, K>::eval(matD, matA, matB, matC);
+    }
+#endif
+    else
+    {
+        Fp16MMAHelper<CType, DType, M, N, K>::eval(matD, matA, matB, matC);
+    }
     return matD;
 }
 

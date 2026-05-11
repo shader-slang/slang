@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -warnings-disable 38052
 // CHECK: OpEntryPoint
 
 __generic <Scalar : __BuiltinFloatingPointType, int Mode>

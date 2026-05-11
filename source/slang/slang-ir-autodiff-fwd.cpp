@@ -2569,6 +2569,7 @@ struct ForwardDiffTranslationContext
         case kIROp_ImageSubscript:
         case kIROp_ImageLoad:
         case kIROp_ImageStore:
+        case kIROp_SubpassLoad:
         case kIROp_UnpackAnyValue:
         case kIROp_GetNativePtr:
         case kIROp_CastIntToFloat:

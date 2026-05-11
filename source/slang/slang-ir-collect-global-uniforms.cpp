@@ -369,7 +369,7 @@ struct CollectGlobalUniformParametersContext
                 // Whatever replacement value we computed, we need
                 // to install it as the value to be used at the use site.
                 //
-                use->set(value);
+                builder->replaceOperand(use, value);
             }
 
             // Once we've replaced all uses of the global parameter,

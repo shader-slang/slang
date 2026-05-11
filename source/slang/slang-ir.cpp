@@ -2980,6 +2980,44 @@ IRFuncType* IRBuilder::getFuncType(
     return (IRFuncType*)createIntrinsicInst(nullptr, kIROp_FuncType, 3, counts, lists);
 }
 
+UInt IRFuncType::getParamCount()
+{
+    // A well-formed `IRFuncType` always has at least the result-type
+    // operand at index 0; the zero-operand check is purely defensive
+    // for malformed or partially-constructed IR.
+    auto count = getOperandCount();
+    if (count == 0)
+        return 0;
+    UInt n = count - 1;
+    if (n > 0 && as<IRAttr>(getOperand(count - 1)))
+        --n;
+    return n;
+}
+
+IRType* IRFuncType::getParamType(UInt index)
+{
+    // Bounds-checked against the (attribute-stripped) parameter count
+    // so attributed function types don't accidentally expose a trailing
+    // attribute as if it were a parameter.
+    SLANG_ASSERT(index < getParamCount());
+    return (IRType*)getOperand(1 + index);
+}
+
+IROperandList<IRType> IRFuncType::getParamTypes()
+{
+    IRUse* end = getOperands() + getOperandCount();
+    if (end != getOperands() + 1 && as<IRAttr>((end - 1)->get()))
+        --end;
+    return IROperandList<IRType>(getOperands() + 1, end);
+}
+
+IRAttr* IRFuncType::getAttr()
+{
+    if (getOperandCount() == 0)
+        return nullptr;
+    return as<IRAttr>(getOperand(getOperandCount() - 1));
+}
+
 IRType* IRBuilder::getBindExistentialsType(
     IRInst* baseType,
     UInt slotArgCount,
@@ -3378,6 +3416,11 @@ IRInst* IRBuilder::emitDebugLine(
         getIntValue(getUIntType(), colEnd)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugLine, 5, args);
 }
+IRInst* IRBuilder::emitIncrementCoverageCounter()
+{
+    return emitIntrinsicInst(getVoidType(), kIROp_IncrementCoverageCounter, 0, nullptr);
+}
+
 IRInst* IRBuilder::emitDebugVar(
     IRType* type,
     IRInst* source,
