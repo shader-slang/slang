@@ -2318,6 +2318,23 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         }
     }
 
+    // Conflicting enum scoped/unscoped markers are checked after attributes
+    // have been checked. A successful check turns UnknownAttributeName to
+    // UnscopedEnumAttribute.
+    if (auto enumClassModifier = syntaxNode->findModifier<EnumClassModifier>())
+    {
+        if (auto unscopedEnumAttribute = syntaxNode->findModifier<UnscopedEnumAttribute>())
+        {
+            if (auto enumDecl = as<Decl>(syntaxNode))
+            {
+                getSink()->diagnose(Diagnostics::ConflictingEnumScopeDecl{
+                    .decl = enumDecl,
+                    .classLocation = enumClassModifier->loc,
+                    .modifier = unscopedEnumAttribute});
+            }
+        }
+    }
+
     postProcessingOnModifiers(m_astBuilder, syntaxNode->modifiers);
 }
 
