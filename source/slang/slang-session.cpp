@@ -1802,6 +1802,8 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
     String moduleSrcPath = "";
 
     auto dependencyChunks = moduleChunk->getFileDependencies();
+    // Keep track of the primary source file dependency separately so that if the original
+    // source is unavailable, we can still accept a standalone precompiled module.
     auto firstDependencyChunk = dependencyChunks.getFirst();
     if (firstDependencyChunk)
     {
@@ -1832,6 +1834,9 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
         }
         if (!sourceFile)
         {
+            // If the primary source file is unavailable, treat the binary as unverifiable rather
+            // than stale so that standalone precompiled modules can still be loaded. Missing
+            // secondary dependencies still indicate that a source-backed module cache is stale.
             if (dependencyChunk == firstDependencyChunk)
                 return true;
             return false;
