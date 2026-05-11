@@ -52,31 +52,11 @@ void disableAVX512ForJIT(llvm::orc::LLJITBuilder& jitBuilder)
         // No AVX-512 to worry about on non-x86_64 hosts.
         return;
     }
-    // Disable the AVX-512 family on x86_64. We list the family extensions
-    // explicitly rather than relying on -avx512f to imply them, so that if a
-    // future LLVM weakens the implication chain the mitigation still holds.
-    // LLVM-22-only feature names (avx512er, avx512pf, avx512_4fmaps,
-    // avx512_4vnniw — all KNL/KNM Xeon Phi) are deliberately omitted: on
-    // LLVM 21 they hit the unknown-feature warning path and pollute stderr
-    // with one line per JIT compilation (~hundreds of lines per CI run).
-    // Any chip that would need those is unreachable from our deployment, so
-    // the perfect-coverage gain isn't worth the log noise.
-    expectJTMB->addFeatures({
-        "-avx512f",
-        "-avx512cd",
-        "-avx512dq",
-        "-avx512bw",
-        "-avx512vl",
-        "-avx512vbmi",
-        "-avx512vbmi2",
-        "-avx512vnni",
-        "-avx512bitalg",
-        "-avx512vpopcntdq",
-        "-avx512ifma",
-        "-avx512vp2intersect",
-        "-avx512fp16",
-        "-avx512bf16",
-    });
+    // Mitigation: pin the JIT CPU to the baseline "x86-64"  (SSE2 only,
+    // no AVX/AVX2/AVX-512/FMA/BMI/etc.). Feature-subtraction alone
+    // (`-avx512f`, `-avx`, …) was insufficient to workaround the problem
+    // on GitHub CPU runners. Forcing the baseline x86-64 CPU sidesteps.
+    expectJTMB->setCPU("x86-64");
     jitBuilder.setJITTargetMachineBuilder(std::move(*expectJTMB));
 }
 
