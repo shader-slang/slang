@@ -3215,32 +3215,34 @@ static Decl* findLegacyBwdDiffFunc(SemanticsVisitor* visitor, ExtensionDecl* ext
 
 void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
 
-/// Returns true if `expr` references a global variable that is not `static const`, i.e.
-/// a mutable global whose value is not a compile-time constant.  Used to distinguish
-/// "constant folding failed because of a runtime reference" from "constant folding failed
-/// because the folder cannot evaluate this particular expression" (e.g. `min(1, 2)`).
-static bool _initExprContainsMutableGlobalRef(Expr* expr)
+/// Returns true if `expr` is a runtime value that cannot be a compile-time constant.
+/// This is called only after constant folding has already failed (`varDecl->val` is null),
+/// so any surviving function call is known to be non-const-evaluable — if it were a
+/// constant-foldable intrinsic applied to constant arguments, folding would have succeeded.
+/// Used to distinguish "folding failed because of a runtime reference or call" from
+/// "folding failed because the folder doesn't handle this form" (e.g. unsupported literal type).
+static bool _initExprIsRuntimeValue(Expr* expr)
 {
     if (!expr)
         return false;
     if (as<ErrorType>(expr->type.type))
         return false;
     if (auto memberExpr = as<MemberExpr>(expr))
-        return _initExprContainsMutableGlobalRef(memberExpr->baseExpression);
+        return _initExprIsRuntimeValue(memberExpr->baseExpression);
     if (auto derefExpr = as<DerefExpr>(expr))
-        return _initExprContainsMutableGlobalRef(derefExpr->base);
+        return _initExprIsRuntimeValue(derefExpr->base);
     if (auto builtinCastExpr = as<BuiltinCastExpr>(expr))
-        return _initExprContainsMutableGlobalRef(builtinCastExpr->base);
+        return _initExprIsRuntimeValue(builtinCastExpr->base);
     if (auto swizzleExpr = as<SwizzleExpr>(expr))
-        return _initExprContainsMutableGlobalRef(swizzleExpr->base);
+        return _initExprIsRuntimeValue(swizzleExpr->base);
     if (auto matSwizzleExpr = as<MatrixSwizzleExpr>(expr))
-        return _initExprContainsMutableGlobalRef(matSwizzleExpr->base);
+        return _initExprIsRuntimeValue(matSwizzleExpr->base);
     if (auto indexExpr = as<IndexExpr>(expr))
     {
-        if (_initExprContainsMutableGlobalRef(indexExpr->baseExpression))
+        if (_initExprIsRuntimeValue(indexExpr->baseExpression))
             return true;
         for (auto idx : indexExpr->indexExprs)
-            if (_initExprContainsMutableGlobalRef(idx))
+            if (_initExprIsRuntimeValue(idx))
                 return true;
         return false;
     }
@@ -3259,19 +3261,52 @@ static bool _initExprContainsMutableGlobalRef(Expr* expr)
     }
     if (auto invokeExpr = as<InvokeExpr>(expr))
     {
-        if (_initExprContainsMutableGlobalRef(invokeExpr->functionExpr))
-            return true;
-        for (auto arg : invokeExpr->arguments)
-            if (_initExprContainsMutableGlobalRef(arg))
-                return true;
-        return false;
+        // Determine whether the callee is a "pure" callable whose result depends only
+        // on its arguments and cannot read or write arbitrary runtime state. For pure
+        // callables, the call is a runtime value only when one of its arguments is.
+        // User-defined functions without an explicit purity annotation are treated
+        // conservatively as runtime values (they could read buffers, globals, etc.).
+        //
+        // We check for purity explicitly rather than relying on constant-folding failure
+        // because the AST constant folder does not handle all pure forms (e.g. min(1,2)).
+        // IR-level folding will handle them; we only need to block user-defined calls.
+        bool isPure = false;
+        if (auto calleeDeclRef = as<DeclRefExpr>(invokeExpr->functionExpr))
+        {
+            if (auto callable = as<CallableDecl>(calleeDeclRef->declRef.getDecl()))
+            {
+                // Constructor calls (e.g. float2(x, y), MyStruct(val)) are always pure:
+                // their result depends only on their arguments.
+                if (as<ConstructorDecl>(callable))
+                    isPure = true;
+                // Builtin IR operations (e.g. integer arithmetic, vector ops).
+                else if (callable->findModifier<IntrinsicOpModifier>())
+                    isPure = true;
+                // Target-specific intrinsics (__intrinsic_asm) are also pure.
+                else if (callable->findModifier<TargetIntrinsicModifier>())
+                    isPure = true;
+                // Functions explicitly declared [__readNone] (e.g. min, max).
+                else if (callable->findModifier<ReadNoneAttribute>())
+                    isPure = true;
+            }
+        }
+        if (isPure)
+        {
+            // Pure callable: runtime only when an argument is runtime.
+            for (auto arg : invokeExpr->arguments)
+                if (_initExprIsRuntimeValue(arg))
+                    return true;
+            return false;
+        }
+        // User-defined or unrecognized function call — always a runtime value.
+        return true;
     }
     if (auto parenExpr = as<ParenExpr>(expr))
-        return _initExprContainsMutableGlobalRef(parenExpr->base);
+        return _initExprIsRuntimeValue(parenExpr->base);
     if (auto initListExpr = as<InitializerListExpr>(expr))
     {
         for (auto arg : initListExpr->args)
-            if (_initExprContainsMutableGlobalRef(arg))
+            if (_initExprIsRuntimeValue(arg))
                 return true;
         return false;
     }
@@ -3328,14 +3363,15 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // If this is a global `static const` variable and we still couldn't constant-fold
             // its initializer (and no new error was emitted during init checking, e.g. for an
             // undefined identifier, a circular definition, or a type error), check whether the
-            // initializer references a mutable global. If so, diagnose now rather than crashing
-            // in IR code generation. Note: for non-integer types, _validateCircularVarDefinition
-            // always returns nullptr, so !varDecl->val is expected for non-constant expressions;
-            // _initExprContainsMutableGlobalRef distinguishes the crash-inducing case from
-            // other non-foldable expressions (e.g. function calls).
+            // initializer is a runtime value (mutable global reference or function call). If so,
+            // diagnose now rather than crashing or silently misbehaving in IR code generation.
+            // Note: for non-integer types, _validateCircularVarDefinition always returns nullptr,
+            // so !varDecl->val is expected for non-constant expressions; _initExprIsRuntimeValue
+            // distinguishes the problematic cases from forms the constant folder simply doesn't
+            // handle (e.g. unsupported literal types).
             if (isStaticConst && isGlobalDecl(varDecl) && !varDecl->val &&
                 getSink()->getErrorCount() == errorCountBeforeInitCheck &&
-                _initExprContainsMutableGlobalRef(initExpr))
+                _initExprIsRuntimeValue(initExpr))
             {
                 getSink()->diagnose(Diagnostics::StaticConstGlobalNonConstantInit{.decl = varDecl});
             }
