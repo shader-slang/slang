@@ -1,5 +1,4 @@
-Shader Coverage Host Interface
-==============================
+# Shader Coverage Host Interface
 
 This document describes the host-facing interface used for hidden
 synthetic resources introduced by shader coverage, and how the same
@@ -10,8 +9,7 @@ contract is intended to serve:
 - descriptor-backed backends such as Vulkan, Metal, and D3D12
 - uniform-marshaling backends such as CUDA and CPU
 
-Problem
--------
+## Problem
 
 Shader coverage injects a hidden bindable resource,
 `__slang_coverage`. That resource must be:
@@ -28,8 +26,7 @@ uses two explicit metadata channels:
 - `ISyntheticResourceMetadata`
   - hidden bindable resource layout and binding data
 
-Design split
-------------
+## Design split
 
 ### 1. Coverage semantics
 
@@ -59,8 +56,7 @@ That split is intentional:
 - `ISyntheticResourceMetadata` can support future features such as
   `printf`, profiling buffers, or sanitizers
 
-Slang-side API
---------------
+## Slang-side API
 
 ### Coverage metadata object
 
@@ -179,17 +175,15 @@ These are not a second metadata channel. They are convenience helpers
 on top of `ISyntheticResourceMetadata`, mainly for Vulkan-style
 descriptor-layout construction.
 
-Backend usage
--------------
+## Backend usage
 
-| Backend / host style | Primary query path | Typical helper path |
-|---|---|---|
-| Vulkan / Metal / D3D12 / direct descriptor-backed hosts | `getResourceDescriptorBindingInfo(...)` | `getSyntheticResourceDescriptorRange(...)`, `findSyntheticResourceDescriptorRangeByID(...)`, `getSyntheticResourceDescriptorRangesForSpace(...)` |
-| CUDA / CPU-style marshaling hosts | `getResourceUniformBindingInfo(...)` | `getResourceInfo(...)` when the host wants the full record |
-| `slang-rhi` Vulkan / CUDA backends | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location |
+| Backend / host style                                    | Primary query path                                                          | Typical helper path                                                                                                                              |
+| ------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Vulkan / Metal / D3D12 / direct descriptor-backed hosts | `getResourceDescriptorBindingInfo(...)`                                     | `getSyntheticResourceDescriptorRange(...)`, `findSyntheticResourceDescriptorRangeByID(...)`, `getSyntheticResourceDescriptorRangesForSpace(...)` |
+| CUDA / CPU-style marshaling hosts                       | `getResourceUniformBindingInfo(...)`                                        | `getResourceInfo(...)` when the host wants the full record                                                                                       |
+| `slang-rhi` Vulkan / CUDA backends                      | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location                                                               |
 
-`slang-rhi` consumption model
------------------------------
+## `slang-rhi` consumption model
 
 The companion `slang-rhi` implementation is tracked in
 `shader-slang/slang-rhi#739`.
@@ -216,8 +210,7 @@ it maps hidden resources into ordinary resolved `ShaderOffset`s.
 
 That keeps the runtime binding model uniform.
 
-Binding styles
---------------
+## Binding styles
 
 The current interface supports two host-side binding styles.
 
@@ -252,8 +245,7 @@ This path is meant to reduce the amount of raw binding code a
 reflection-driven codebase has to write, while still keeping the
 resource out of normal reflection.
 
-Direct-host model without `slang-rhi`
--------------------------------------
+## Direct-host model without `slang-rhi`
 
 For direct hosts, the intended usage is:
 
