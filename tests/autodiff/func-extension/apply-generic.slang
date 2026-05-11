@@ -25,9 +25,9 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
-    // sqr(4.0) = 16.0, d/dx = 2*4 = 8.0
+    // sqr(4.0) = 16.0, d/dx = 2*4, scaled by dOut = 2.0.
     var dpx = diffPair(4.0, 0.0);
-    bwd_diff(sqr<float>)(dpx, 1.0);
+    bwd_diff(sqr<float>)(dpx, 2.0);
     outputBuffer[0] = dpx.d;
-    // CHECK: 8.0
+    // CHECK: 16.0
 }

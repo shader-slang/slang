@@ -25,10 +25,10 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     var dpv = diffPair(MyVec(3.0, 4.0), MyVec(0.0, 0.0));
-    bwd_diff(MyVec::lengthSquared)(dpv, 1.0);
-    // d/dx = 2*3 = 6, d/dy = 2*4 = 8
+    bwd_diff(MyVec::lengthSquared)(dpv, 2.0);
+    // d/dx = 2*3*2 = 12, d/dy = 2*4*2 = 16
     outputBuffer[0] = dpv.d.x;
     outputBuffer[1] = dpv.d.y;
-    // CHECK: 6.0
-    // CHECK: 8.0
+    // CHECK: 12.0
+    // CHECK: 16.0
 }

@@ -772,7 +772,8 @@ class NamespaceDeclBase : public ContainerDecl
 
 // A shorthand for defining a function extension (e.g. custom derivative)
 // that desugars into an ExtensionDecl during semantic checking.
-// Example: __func_extension fwd_diff(foo)(DifferentialPair<float> x) -> DifferentialPair<float> { ... }
+// Example:
+// __func_extension fwd_diff(foo)(DifferentialPair<float> x) -> DifferentialPair<float> { ... }
 FIDDLE()
 class FuncExtensionDecl : public Decl
 {

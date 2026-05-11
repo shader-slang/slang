@@ -285,8 +285,7 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
         }
         break;
     case kIROp_IdentityRemat:
-        translationResult = maybeTranslateIdentityRemat(inst);
-        break;
+        return memoize(maybeTranslateIdentityRemat(inst));
     default:
         break;
     }
@@ -303,6 +302,9 @@ IRInst* TranslationContext::maybeTranslateIdentityRemat(IRInst* inst)
 
     DifferentiableTypeConformanceContext ctx(&autodiffContext);
     auto funcType = cast<IRFuncType>(ctx.resolveType(&subBuilder, inst->getFullType()));
+    SLANG_ASSERT(funcType->getParamCount() > 0);
+    if (funcType->getParamCount() == 0)
+        return inst;
 
     IRBuilder funcBuilder(subBuilder);
     auto func = funcBuilder.createFunc();
@@ -318,6 +320,7 @@ IRInst* TranslationContext::maybeTranslateIdentityRemat(IRInst* inst)
         params.add(funcBuilder.emitParam(funcType->getParamType(i)));
 
     // Return the first parameter (the MinimalContext).
+    SLANG_ASSERT(params[0]->getDataType() == funcType->getResultType());
     funcBuilder.emitReturn(params[0]);
 
     return func;

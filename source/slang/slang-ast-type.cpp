@@ -449,6 +449,13 @@ static Type* getDifferentialValueTypeFromWitness(
     return nullptr;
 }
 
+static DeclRef<CallableDecl> getCallableDeclRefFromFuncTypeBase(Val* resolvedBase)
+{
+    if (auto declRefType = as<DeclRefType>(resolvedBase))
+        return declRefType->getDeclRef().as<CallableDecl>();
+    return DeclRef<CallableDecl>();
+}
+
 Val* BwdCallableFuncType::_resolveImplOverride()
 {
     // Resolve all three operands.
@@ -465,15 +472,17 @@ Val* BwdCallableFuncType::_resolveImplOverride()
         // If we have a concrete witness, we should be able to turn this into a concrete func-type.
         List<Type*> newParamTypes;
 
-        auto funcType =
-            getFuncType(astBuilder, as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
+        auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
+        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
 
         // First translate the this-type.
         // Get the differential value type and add it with flipped direction.
         auto thisParamType = diffTypeWitness->getThisParamType();
         auto [thisParamValueType, thisParamDirection] =
             splitParameterTypeAndDirection(astBuilder, thisParamType);
-        if (auto thisTypeDiffWitness = diffTypeWitness->getThisTypeDiffWitness())
+        auto thisTypeDiffWitness =
+            thisParamType ? diffTypeWitness->getThisTypeDiffWitness() : nullptr;
+        if (thisTypeDiffWitness)
         {
             if (auto diffThisType = getDifferentialValueTypeFromWitness(
                     astBuilder,
@@ -597,8 +606,8 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
         // If we have a concrete witness, we should be able to turn this into a concrete func-type.
         List<Type*> newParamTypes;
 
-        auto funcType =
-            getFuncType(astBuilder, as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
+        auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
+        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
 
         // The result type is Tuple<FuncResultType, MinimalContextType> when non-void,
         // or just MinimalContextType when the function returns void.
@@ -695,8 +704,8 @@ Val* RematFuncType::_resolveImplOverride()
     {
         List<Type*> newParamTypes;
 
-        auto funcType =
-            getFuncType(astBuilder, as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
+        auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
+        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
 
         // First parameter is always the MinimalCtxType.
         newParamTypes.add(resolvedMinimalCtxType);
@@ -790,20 +799,20 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         // If we have a concrete witness, we should be able to turn this into a concrete func-type.
         List<Type*> newParamTypes;
 
-        auto funcType =
-            getFuncType(astBuilder, as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
+        auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
+        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
 
         // The backward diff return type is void.
         auto resultType = astBuilder->getVoidType();
         auto errorType = funcType->getErrorType();
 
-        // For non-static member methods, include the this-type as an explicit parameter
-        // (bwd_diff is static in the interface, so non-static `this` becomes a parameter).
-        // Static functions should have null thisParamType in the witness.
+        // For methods, include the witness-provided this-type as an explicit parameter.
         auto thisParamType = diffTypeWitness->getThisParamType();
         auto [thisParamValueType, thisParamDirection] =
             splitParameterTypeAndDirection(astBuilder, thisParamType);
-        if (auto thisTypeDiffWitness = diffTypeWitness->getThisTypeDiffWitness())
+        auto thisTypeDiffWitness =
+            thisParamType ? diffTypeWitness->getThisTypeDiffWitness() : nullptr;
+        if (thisTypeDiffWitness)
         {
             auto thisPairType = getEffectiveDiffPairType(thisParamValueType, thisTypeDiffWitness);
             switch (thisParamDirection)
@@ -956,14 +965,16 @@ Val* FwdDiffFuncType::_resolveImplOverride()
         // If we have a concrete witness, we should be able to turn this into a concrete func-type.
         List<Type*> newParamTypes;
 
-        auto funcType = getFuncType(
-            getCurrentASTBuilder(),
-            as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
+        auto astBuilder = getCurrentASTBuilder();
+        auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
+        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
 
         auto thisParamType = diffTypeWitness->getThisParamType();
         auto [thisParamValueType, thisParamDirection] =
-            splitParameterTypeAndDirection(getCurrentASTBuilder(), thisParamType);
-        if (auto thisTypeDiffWitness = diffTypeWitness->getThisTypeDiffWitness())
+            splitParameterTypeAndDirection(astBuilder, thisParamType);
+        auto thisTypeDiffWitness =
+            thisParamType ? diffTypeWitness->getThisTypeDiffWitness() : nullptr;
+        if (thisTypeDiffWitness)
         {
             auto thisPairType = getEffectiveDiffPairType(thisParamValueType, thisTypeDiffWitness);
             switch (thisParamDirection)
@@ -972,7 +983,7 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                 newParamTypes.add(thisPairType);
                 break;
             case ParamPassingMode::BorrowInOut:
-                newParamTypes.add(getCurrentASTBuilder()->getBorrowInOutParamType(thisPairType));
+                newParamTypes.add(astBuilder->getBorrowInOutParamType(thisPairType));
                 break;
             default:
                 SLANG_UNEXPECTED("Unhandled `this` param passing mode");
@@ -982,16 +993,16 @@ Val* FwdDiffFuncType::_resolveImplOverride()
         else if (thisParamType)
         {
             // Non-differentiable this type
-            auto noDiffThisType = getCurrentASTBuilder()->getModifiedType(
+            auto noDiffThisType = astBuilder->getModifiedType(
                 thisParamValueType,
-                {getCurrentASTBuilder()->getNoDiffModifierVal()});
+                {astBuilder->getNoDiffModifierVal()});
             switch (thisParamDirection)
             {
             case ParamPassingMode::In:
                 newParamTypes.add(noDiffThisType);
                 break;
             case ParamPassingMode::BorrowInOut:
-                newParamTypes.add(getCurrentASTBuilder()->getBorrowInOutParamType(noDiffThisType));
+                newParamTypes.add(astBuilder->getBorrowInOutParamType(noDiffThisType));
                 break;
             default:
                 SLANG_UNEXPECTED("Unhandled `this` param passing mode");

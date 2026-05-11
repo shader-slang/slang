@@ -881,7 +881,7 @@ private:
     /// Used to detect when loadedModulesList has changed and the cache needs updating.
     Index m_candidateExtensionListsBuiltForModuleCount = 0;
 
-    /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`
+    /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`.
     void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
 
     /// Mapping from a decl to additional declarations of the same decl.

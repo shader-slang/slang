@@ -1,4 +1,5 @@
 //DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+// TODO: enable after direct split invocation of apply/remat is supported as a public API.
 
 // Test: __func_extension __apply(fn) — custom forward pass with context
 // Note: cube is NOT [Differentiable] — the derivative comes solely
@@ -39,6 +40,8 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     float dx;
     backPropCallable(dx, 1.0);
 
-    outputBuffer[0] = dx;
+    outputBuffer[0] = cubeResult;
+    outputBuffer[1] = dx;
+    // CHECK: 8.0
     // CHECK: 12.0
 }

@@ -5564,8 +5564,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitApplyForBwdExpr(ApplyForBwdExpr* expr)
     {
-        SLANG_UNUSED(expr);
-        SLANG_UNEXPECTED("ApplyForBwdExpr present during IR lowering");
+        context->getSink()->diagnose(Diagnostics::ApplyForBwdExpressionRequiresInvocation{
+            .expr = expr});
+        return LoweredValInfo::simple(getBuilder()->getVoidValue());
     }
 
     LoweredValInfo visitDispatchKernelExpr(DispatchKernelExpr* expr)

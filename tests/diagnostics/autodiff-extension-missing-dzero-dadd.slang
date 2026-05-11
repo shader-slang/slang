@@ -44,3 +44,6 @@ extension<T : __BuiltinFloatingPointType> MyVec2<T> : IDifferentiable
     typedef MyVec2<T> Differential;
     // No explicit dzero/dadd, but fields are differentiable at the definition site.
 }
+
+// CHECK-NOT: count
+// CHECK-NOT: MyVec2

@@ -1854,9 +1854,44 @@ err(
 
 err(
     "synthesized-differential-method-missing-field",
-    30119,
+    30125,
     "synthesized IDifferentiable method will not include differentiable field",
     span { loc = "field:Decl", message = "field '~field' of type '~fieldType:Type' is differentiable but will not be included in the synthesized 'dzero'/'dadd' methods because the 'IDifferentiable' conformance is provided via extension. Provide explicit 'dzero()' and 'dadd()' implementations, or mark the field 'no_diff'." }
+)
+
+err(
+    "func-extension-unsupported-target",
+    30126,
+    "unsupported target expression in __func_extension",
+    span { loc = "location", message = "__func_extension target must be fwd_diff(...), bwd_diff(...), or __apply(...)." }
+)
+
+err(
+    "func-extension-apply-return-type",
+    30127,
+    "invalid __func_extension __apply return type",
+    span { loc = "location", message = "return type of __func_extension __apply must be Tuple<RetType, CtxType>." }
+)
+
+err(
+    "func-extension-unresolved-function",
+    30128,
+    "could not resolve target function in __func_extension",
+    span { loc = "location", message = "could not resolve target function in __func_extension." }
+)
+
+err(
+    "func-extension-unsupported-operator",
+    30129,
+    "unsupported operator in __func_extension",
+    span { loc = "location", message = "__func_extension target must use fwd_diff, bwd_diff, or __apply." }
+)
+
+err(
+    "apply-for-bwd-expression-requires-invocation",
+    30130,
+    "__apply must be invoked directly",
+    span { loc = "expr:Expr", message = "__apply expressions must be invoked directly so they can resolve to apply_bwd." }
 )
 
 -- type pack diagnostics

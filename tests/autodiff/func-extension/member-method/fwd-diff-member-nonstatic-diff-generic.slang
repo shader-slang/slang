@@ -26,12 +26,12 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
-    var dpv = diffPair(MyVec<float>(3.0, 4.0), MyVec<float>(1.0, 1.0));
+    var dpv = diffPair(MyVec<float>(3.0, 4.0), MyVec<float>(1.0, 2.0));
     DifferentialPair<float> result = fwd_diff(MyVec<float>::lengthSquared)(dpv);
     // lengthSquared = 9 + 16 = 25
-    // d = 2*3*1 + 2*4*1 = 14
+    // d = 2*3*1 + 2*4*2 = 22
     outputBuffer[0] = result.p;
     outputBuffer[1] = result.d;
     // CHECK: 25.0
-    // CHECK: 14.0
+    // CHECK: 22.0
 }

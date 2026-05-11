@@ -8,6 +8,7 @@
 // `T.dzero()` (returns T.Differential) to fields of type T, causing a type mismatch.
 // This is a pre-existing IDifferentiable synthesis issue, not a func_extension issue.
 // Workaround: use a wider constraint on the struct (e.g., __BuiltinArithmeticType).
+// TODO: re-enable when generic IDifferentiable dzero/dadd synthesis handles T.Differential == T.
 
 struct MyVec<T : __BuiltinFloatingPointType> : IDifferentiable
 {

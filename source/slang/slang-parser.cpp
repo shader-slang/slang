@@ -3990,8 +3990,12 @@ static NodeBase* parseFuncExtensionDecl(Parser* parser, void* /*userData*/)
             innerFunc->body = parseOptBody(parser);
             if (auto blockStmt = as<BlockStmt>(innerFunc->body))
                 innerFunc->closingSourceLoc = blockStmt->closingSourceLoc;
+            else if (auto unparsedStmt = as<UnparsedStmt>(innerFunc->body))
+                innerFunc->closingSourceLoc = unparsedStmt->tokens.getLast().getLoc();
             parser->PopScope();
 
+            // `FuncExtensionDecl` is not a container; semantic checking assigns
+            // the parent when it moves this function into the generated extension.
             decl->innerFunc = innerFunc;
             return decl;
         });

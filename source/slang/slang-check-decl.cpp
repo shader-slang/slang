@@ -833,14 +833,12 @@ struct SemanticsDeclBasesVisitor : public SemanticsDeclVisitorBase,
         ExtensionDecl* extensionDecl,
         FuncDecl* innerFunc,
         Type* baseFuncAsType,
-        DeclVisibility visibility,
-        bool isStaticFunc);
+        DeclVisibility visibility);
     bool _funcExtensionApply(
         ExtensionDecl* extensionDecl,
         FuncDecl* innerFunc,
         Type* baseFuncAsType,
         DeclVisibility visibility,
-        bool isStaticFunc,
         SourceLoc loc);
 };
 
@@ -6566,7 +6564,7 @@ static void populateParams(
         auto synArg = astBuilder->create<VarExpr>();
         synArg->declRef = makeDeclRef(paramDecl);
         synArg->type.type = paramDecl->type.type;
-        synArg->type.isLeftValue = as<OutParamTypeBase>(paramType);
+        synArg->type.isLeftValue = as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType);
         synArg->loc = synthesizedLoc;
         synArgs.add(synArg);
     }
@@ -14654,10 +14652,8 @@ bool SemanticsDeclBasesVisitor::_funcExtensionBackwardDiff(
     ExtensionDecl* extensionDecl,
     FuncDecl* innerFunc,
     Type* baseFuncAsType,
-    DeclVisibility visibility,
-    bool isStaticFunc)
+    DeclVisibility visibility)
 {
-    SLANG_UNUSED(isStaticFunc);
     auto astBuilder = getASTBuilder();
 
     auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
@@ -14693,6 +14689,7 @@ bool SemanticsDeclBasesVisitor::_funcExtensionBackwardDiff(
         kIROp_BackwardContextFromLegacyBwdDiffFunc,
         {funcAsTypeForSynth->getDeclRefBase(), synBwdDiffFunc},
         {getBwdCallableBaseType(baseFuncAsType)},
+        visibility,
         visibility);
 
     auto synMinimalContextStruct = addOrExtendSynthesizedStruct(
@@ -14702,6 +14699,7 @@ bool SemanticsDeclBasesVisitor::_funcExtensionBackwardDiff(
         kIROp_BackwardMinimalContextFromLegacyBwdDiffFunc,
         {funcAsTypeForSynth->getDeclRefBase(), synBwdDiffFunc},
         {},
+        visibility,
         visibility);
 
     auto minimalCtxType = DeclRefType::create(astBuilder, synMinimalContextStruct);
@@ -14754,10 +14752,8 @@ bool SemanticsDeclBasesVisitor::_funcExtensionApply(
     FuncDecl* innerFunc,
     Type* baseFuncAsType,
     DeclVisibility visibility,
-    bool isStaticFunc,
     SourceLoc loc)
 {
-    SLANG_UNUSED(isStaticFunc);
     auto astBuilder = getASTBuilder();
 
     auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
@@ -14772,8 +14768,7 @@ bool SemanticsDeclBasesVisitor::_funcExtensionApply(
     auto tupleType = as<TupleType>(returnType);
     if (!tupleType || tupleType->getMemberCount() != 2)
     {
-        getSink()->diagnose(Diagnostics::Unimplemented{
-            .feature = "__func_extension __apply: return type must be Tuple<RetType, CtxType>",
+        getSink()->diagnose(Diagnostics::FuncExtensionApplyReturnType{
             .location = loc});
         return false;
     }
@@ -14828,8 +14823,8 @@ bool SemanticsDeclBasesVisitor::_funcExtensionApply(
         bwdCallableConformanceExt->loc = loc;
         addVisibilityModifier(bwdCallableConformanceExt, visibility);
 
-        // Add as child of the main extensionDecl so it shares the same generic scope.
-        extensionDecl->addMember(bwdCallableConformanceExt);
+        // Parent through the main extension so lifting can see any enclosing generic scope.
+        bwdCallableConformanceExt->parentDecl = extensionDecl;
 
         // Lift from generic containers — this clones the func-extension's generic
         // params and creates wrappers at module scope.
@@ -14860,6 +14855,17 @@ bool SemanticsDeclBasesVisitor::_funcExtensionApply(
     return true;
 }
 
+static void _moveModifiersToFunc(Decl* src, Decl* dst)
+{
+    Modifier** link = &src->modifiers.first;
+    while (auto modifier = *link)
+    {
+        *link = modifier->next;
+        modifier->next = nullptr;
+        addModifier(dst, modifier);
+    }
+}
+
 void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
 {
     // Convert a __func_extension into a regular ExtensionDecl.
@@ -14881,13 +14887,16 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     auto diffExpr = as<DifferentiateExpr>(decl->targetExpr);
     if (!diffExpr)
     {
-        getSink()->diagnose(Diagnostics::Unimplemented{
-            .feature = "unsupported target expression in __func_extension",
+        getSink()->diagnose(Diagnostics::FuncExtensionUnsupportedTarget{
             .location = decl->loc});
         return;
     }
 
     auto innerFunc = decl->innerFunc;
+
+    // Attributes/modifiers on `__func_extension` conceptually decorate the
+    // generated derivative/apply function.
+    _moveModifiersToFunc(decl, innerFunc);
 
     // Ensure innerFunc's param types are checked so we can build fake args.
     for (auto param : innerFunc->getMembersOfType<ParamDecl>())
@@ -14899,7 +14908,10 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     {
         auto arg = astBuilder->create<VarExpr>();
         arg->declRef = makeDeclRef(param);
-        arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
+        auto paramMode = getParamPassingMode(param);
+        arg->type.isLeftValue = paramMode == ParamPassingMode::Out ||
+                                paramMode == ParamPassingMode::BorrowInOut ||
+                                paramMode == ParamPassingMode::Ref;
         arg->type.type = param->getType();
         arg->loc = decl->loc;
         fakeArgs.add(arg);
@@ -14911,8 +14923,31 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     SemanticsContext::ExprLocalScope scope;
     auto ctx = withExprLocalScope(&scope);
     auto subVisitor = SemanticsVisitor(ctx.allowStaticReferenceToNonStaticMember());
+    auto errorCountBeforeResolve = getSink()->getErrorCount();
     // First check the diffExpr (resolves base, handles overloads).
     auto checkedDiffExpr = subVisitor.CheckExpr(diffExpr);
+    if (auto checkedApplyExpr = as<ApplyForBwdExpr>(checkedDiffExpr))
+    {
+        if (auto applyFuncType = as<FuncType>(checkedApplyExpr->type.type))
+        {
+            if (checkedApplyExpr->newParameterNames.getCount() &&
+                checkedApplyExpr->newParameterNames[0] == getName("this") &&
+                applyFuncType->getParamCount() == fakeArgs.getCount() + 1)
+            {
+                auto thisArg = astBuilder->create<VarExpr>();
+                auto [thisArgType, thisArgDirection] =
+                    splitParameterTypeAndDirection(
+                        astBuilder,
+                        applyFuncType->getParamTypeWithModeWrapper(0));
+                thisArg->type.type = thisArgType;
+                thisArg->type.isLeftValue = thisArgDirection == ParamPassingMode::Out ||
+                                            thisArgDirection == ParamPassingMode::BorrowInOut ||
+                                            thisArgDirection == ParamPassingMode::Ref;
+                thisArg->loc = decl->loc;
+                fakeArgs.insert(0, thisArg);
+            }
+        }
+    }
 
     // Then resolve the invoke with the checked diff expr and fake args.
     auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedDiffExpr, fakeArgs);
@@ -14927,10 +14962,9 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     }
     if (!baseFuncDeclRefExpr || !baseFuncDeclRefExpr->declRef)
     {
-        if (!getSink()->getErrorCount())
+        if (getSink()->getErrorCount() == errorCountBeforeResolve)
         {
-            getSink()->diagnose(Diagnostics::Unimplemented{
-                .feature = "could not resolve target function in __func_extension",
+            getSink()->diagnose(Diagnostics::FuncExtensionUnresolvedFunction{
                 .location = decl->loc});
         }
         return;
@@ -14946,10 +14980,12 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     extensionDecl->targetType.exp = astBuilder->create<SharedTypeExpr>();
     extensionDecl->targetType.exp->type = astBuilder->getOrCreate<TypeType>(baseFuncAsType);
 
-    // Wire the extension into the AST early so that synthesis helpers
+    // Wire enough parent information for synthesis helpers
     // (addOrExtendSynthesizedStruct, createDefaultSubstitutionsIfNeeded, etc.)
-    // can traverse the parent chain and find the correct GenericDecl->inner.
-    if (auto genericParent = as<GenericDecl>(decl->parentDecl))
+    // to traverse the parent chain. Non-generic extensions are added to the
+    // module only after the func-extension has been successfully populated.
+    auto genericParent = as<GenericDecl>(decl->parentDecl);
+    if (genericParent)
     {
         genericParent->inner = extensionDecl;
         extensionDecl->parentDecl = genericParent;
@@ -14957,21 +14993,11 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     else
     {
         extensionDecl->parentDecl = decl->parentDecl;
-        getModuleDecl(decl)->addMember(extensionDecl);
     }
 
     // 3. Determine the interface and populate the extension.
     auto visibility = getDeclVisibility(baseFuncDeclRef.getDecl());
     addVisibilityModifier(extensionDecl, visibility);
-
-    // Check if the target is a static/free function (needed for marking members).
-    bool isStaticFunc = false;
-    auto baseFuncDecl = baseFuncDeclRef.as<FunctionDeclBase>();
-    if (baseFuncDecl)
-    {
-        isStaticFunc = baseFuncDecl.getDecl()->findModifier<HLSLStaticModifier>() ||
-                       !getTypeForThisExpr(this, baseFuncDecl).type;
-    }
 
     // Dispatch to the appropriate helper based on the higher-order expression type.
     bool success = false;
@@ -14982,22 +15008,26 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
             extensionDecl,
             innerFunc,
             baseFuncAsType,
-            visibility,
-            isStaticFunc);
+            visibility);
     else if (as<ApplyForBwdExpr>(diffExpr))
         success = _funcExtensionApply(
             extensionDecl,
             innerFunc,
             baseFuncAsType,
             visibility,
-            isStaticFunc,
             decl->loc);
     else
-        getSink()->diagnose(Diagnostics::Unimplemented{
-            .feature = "unsupported operator in __func_extension",
+        getSink()->diagnose(Diagnostics::FuncExtensionUnsupportedOperator{
             .location = decl->loc});
     if (!success)
+    {
+        if (genericParent && genericParent->inner == extensionDecl)
+            genericParent->inner = decl;
         return;
+    }
+
+    if (!genericParent)
+        getModuleDecl(decl)->addMember(extensionDecl);
 
     // Now run the normal extension checking on the newly created ExtensionDecl.
     visitExtensionDecl(extensionDecl);
