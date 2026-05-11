@@ -151,6 +151,7 @@ struct UsedBindingRange
     UInt space = 0;
     UInt binding = 0;
     UInt count = 0;
+    bool isUnboundedArray = false;
     IRInst* source = nullptr;
 };
 
@@ -161,6 +162,56 @@ static UInt getResourceCount(IRTypeLayout* typeLayout, LayoutResourceKind kind)
     if (auto sizeAttr = typeLayout->findSizeAttr(kind))
         return (UInt)sizeAttr->getSize().getFiniteValueOr(0);
     return 0;
+}
+
+static bool hasUnboundedResourceCount(IRTypeLayout* typeLayout, LayoutResourceKind kind)
+{
+    if (!typeLayout)
+        return false;
+    if (auto sizeAttr = typeLayout->findSizeAttr(kind))
+        return sizeAttr->getSize().isInfinite();
+    return false;
+}
+
+static bool isUnsizedArrayType(IRType* type)
+{
+    return as<IRUnsizedArrayType>(type) != nullptr;
+}
+
+static IRType* getBindingSourceType(IRInst* source)
+{
+    if (auto param = as<IRGlobalParam>(source))
+        return param->getDataType();
+    if (auto param = as<IRParam>(source))
+        return param->getDataType();
+    if (auto field = as<IRStructField>(source))
+        return field->getFieldType();
+    return nullptr;
+}
+
+static IRType* getFieldTypeForLayoutKey(IRType* containerType, IRInst* fieldKey)
+{
+    if (auto structKey = as<IRStructKey>(fieldKey))
+    {
+        if (auto field = findStructField(containerType, structKey))
+            return field->getFieldType();
+    }
+
+    return getBindingSourceType(fieldKey);
+}
+
+static IRType* tryGetParameterGroupElementType(IRType* type)
+{
+    if (auto parameterGroupType = as<IRParameterGroupType>(type))
+        return parameterGroupType->getElementType();
+    return nullptr;
+}
+
+static IRType* getArrayElementType(IRType* type)
+{
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+        return arrayType->getElementType();
+    return nullptr;
 }
 
 static IRInst* selectBindingSource(IRInst* candidate, IRInst* fallback)
@@ -176,6 +227,7 @@ static void collectUsedBindingsFromTypeLayout(
     UInt baseBinding,
     UInt baseSpace,
     IRInst* source,
+    IRType* sourceType,
     List<UsedBindingRange>& outRanges);
 
 static void addUsedBindingRange(
@@ -183,6 +235,7 @@ static void addUsedBindingRange(
     UInt space,
     UInt binding,
     UInt count,
+    bool isUnboundedArray,
     IRInst* source)
 {
     if (count == 0)
@@ -192,6 +245,7 @@ static void addUsedBindingRange(
     range.space = space;
     range.binding = binding;
     range.count = count;
+    range.isUnboundedArray = isUnboundedArray;
     range.source = source;
     outRanges.add(range);
 }
@@ -202,10 +256,14 @@ static void collectUsedBindingsFromVarLayout(
     UInt baseBinding,
     UInt baseSpace,
     IRInst* source,
+    IRType* sourceType,
     List<UsedBindingRange>& outRanges)
 {
     if (!varLayout)
         return;
+
+    if (!sourceType)
+        sourceType = getBindingSourceType(source);
 
     auto typeLayout = varLayout->getTypeLayout();
 
@@ -220,12 +278,14 @@ static void collectUsedBindingsFromVarLayout(
         localSpace += offsetAttr->getSpace();
 
         UInt count = getResourceCount(typeLayout, kind);
+        bool isUnboundedArray = hasUnboundedResourceCount(typeLayout, kind) ||
+                                isUnsizedArrayType(sourceType);
         // If a layout carries an explicit resource-kind offset but
         // its type layout does not expose a finite size, reserve the
         // base slot rather than pretending the offset is unused.
         if (count == 0)
             count = 1;
-        addUsedBindingRange(outRanges, localSpace, localBinding, count, source);
+        addUsedBindingRange(outRanges, localSpace, localBinding, count, isUnboundedArray, source);
     }
 
     if (auto groupLayout = as<IRParameterGroupTypeLayout>(typeLayout))
@@ -243,13 +303,17 @@ static void collectUsedBindingsFromVarLayout(
             localBinding,
             elementSpace,
             source,
+            sourceType,
             outRanges);
+
+        auto elementSourceType = tryGetParameterGroupElementType(sourceType);
         collectUsedBindingsFromVarLayout(
             groupLayout->getElementVarLayout(),
             kind,
             localBinding,
             elementSpace,
             source,
+            elementSourceType,
             outRanges);
         return;
     }
@@ -260,6 +324,7 @@ static void collectUsedBindingsFromVarLayout(
         localBinding,
         localSpace,
         source,
+        sourceType,
         outRanges);
 }
 
@@ -269,6 +334,7 @@ static void collectUsedBindingsFromTypeLayout(
     UInt baseBinding,
     UInt baseSpace,
     IRInst* source,
+    IRType* sourceType,
     List<UsedBindingRange>& outRanges)
 {
     if (!typeLayout)
@@ -279,12 +345,14 @@ static void collectUsedBindingsFromTypeLayout(
         for (auto fieldAttr : structTypeLayout->getFieldLayoutAttrs())
         {
             auto fieldSource = selectBindingSource(fieldAttr->getFieldKey(), source);
+            auto fieldSourceType = getFieldTypeForLayoutKey(sourceType, fieldAttr->getFieldKey());
             collectUsedBindingsFromVarLayout(
                 fieldAttr->getLayout(),
                 kind,
                 baseBinding,
                 baseSpace,
                 fieldSource,
+                fieldSourceType,
                 outRanges);
         }
         return;
@@ -298,7 +366,49 @@ static void collectUsedBindingsFromTypeLayout(
             baseBinding,
             baseSpace,
             source,
+            getArrayElementType(sourceType),
             outRanges);
+    }
+}
+
+static void collectUsedBindingsFromEntryPointParamsLayout(
+    IRFunc* func,
+    IRVarLayout* paramsLayout,
+    LayoutResourceKind kind,
+    List<UsedBindingRange>& outRanges)
+{
+    if (!paramsLayout)
+        return;
+
+    auto typeLayout = paramsLayout->getTypeLayout();
+    auto structTypeLayout = as<IRStructTypeLayout>(typeLayout);
+    if (!structTypeLayout)
+    {
+        collectUsedBindingsFromVarLayout(paramsLayout, kind, 0, 0, func, nullptr, outRanges);
+        return;
+    }
+
+    UInt baseBinding = 0;
+    UInt baseSpace = 0;
+    if (auto registerSpaceAttr = paramsLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+        baseSpace += registerSpaceAttr->getOffset();
+
+    auto param = func->getFirstParam();
+    for (auto fieldAttr : structTypeLayout->getFieldLayoutAttrs())
+    {
+        IRInst* source = param ? (IRInst*)param : (IRInst*)func;
+        IRType* sourceType = param ? param->getDataType() : nullptr;
+        collectUsedBindingsFromVarLayout(
+            fieldAttr->getLayout(),
+            kind,
+            baseBinding,
+            baseSpace,
+            source,
+            sourceType,
+            outRanges);
+
+        if (param)
+            param = param->getNextParam();
     }
 }
 
@@ -309,7 +419,7 @@ static List<UsedBindingRange> collectUsedBindings(
 {
     List<UsedBindingRange> ranges;
 
-    collectUsedBindingsFromVarLayout(globalScopeVarLayout, kind, 0, 0, nullptr, ranges);
+    collectUsedBindingsFromVarLayout(globalScopeVarLayout, kind, 0, 0, nullptr, nullptr, ranges);
 
     for (auto inst : module->getGlobalInsts())
     {
@@ -322,7 +432,14 @@ static List<UsedBindingRange> collectUsedBindings(
         auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
         if (!varLayout)
             continue;
-        collectUsedBindingsFromVarLayout(varLayout, kind, 0, 0, param, ranges);
+        collectUsedBindingsFromVarLayout(
+            varLayout,
+            kind,
+            0,
+            0,
+            param,
+            param->getDataType(),
+            ranges);
     }
 
     for (auto inst : module->getGlobalInsts())
@@ -341,12 +458,10 @@ static List<UsedBindingRange> collectUsedBindings(
         // when coverage instrumentation runs. Later parameter-collection
         // passes flatten them into globals using this entry-point layout,
         // so the auto allocator must reserve their eventual slots here.
-        collectUsedBindingsFromVarLayout(
+        collectUsedBindingsFromEntryPointParamsLayout(
+            func,
             entryPointLayout->getParamsLayout(),
             kind,
-            0,
-            0,
-            func,
             ranges);
         collectUsedBindingsFromVarLayout(
             entryPointLayout->getResultLayout(),
@@ -354,6 +469,7 @@ static List<UsedBindingRange> collectUsedBindings(
             0,
             0,
             func,
+            func->getResultType(),
             ranges);
     }
 
@@ -393,23 +509,12 @@ static IRInst* findCollidingParam(
     return nullptr;
 }
 
-// Pick a binding offset in space 0 that doesn't collide with any
-// existing layout range for `kind`. Walks both the program-scope
-// layout and the module globals, so nested parameter-group resources
-// such as `ParameterBlock<T>` members are counted before later
-// target legalization flattens them into concrete descriptor slots.
-// Returns max-occupied + 1, or 0 when nothing else claims a slot of
-// that kind in space 0.
-static int pickFreeBindingForCoverage(
-    IRModule* module,
-    IRVarLayout* globalScopeVarLayout,
-    LayoutResourceKind kind)
+static int pickFreeBindingInSpace(List<UsedBindingRange>& ranges, UInt space)
 {
     int maxOccupied = -1;
-    auto ranges = collectUsedBindings(module, globalScopeVarLayout, kind);
     for (auto& range : ranges)
     {
-        if (range.space != 0 || range.count == 0)
+        if (range.space != space || range.count == 0)
             continue;
         if (range.binding > std::numeric_limits<UInt>::max() - (range.count - 1))
             return -1;
@@ -427,6 +532,88 @@ static int pickFreeBindingForCoverage(
     if (maxOccupied == std::numeric_limits<int>::max())
         return -1;
     return maxOccupied + 1;
+}
+
+static bool containsUsedSpace(List<UsedBindingRange>& ranges, UInt space)
+{
+    for (auto& range : ranges)
+    {
+        if (range.space == space)
+            return true;
+    }
+    return false;
+}
+
+static bool containsUnboundedArrayInSpace(List<UsedBindingRange>& ranges, UInt space)
+{
+    for (auto& range : ranges)
+    {
+        if (range.space == space && range.isUnboundedArray)
+            return true;
+    }
+    return false;
+}
+
+static int pickFirstUnusedSpace(List<UsedBindingRange>& ranges)
+{
+    UInt maxSpace = 0;
+    bool hasAnyRange = false;
+    for (auto& range : ranges)
+    {
+        hasAnyRange = true;
+        if (range.space > (UInt)std::numeric_limits<int>::max())
+            return -1;
+        if (range.space > maxSpace)
+            maxSpace = range.space;
+    }
+
+    if (!hasAnyRange)
+        return 0;
+    if (maxSpace == (UInt)std::numeric_limits<int>::max())
+        return -1;
+
+    for (UInt candidate = 0; candidate <= maxSpace + 1; ++candidate)
+    {
+        if (!containsUsedSpace(ranges, candidate))
+            return (int)candidate;
+    }
+    return -1;
+}
+
+// Pick a `(space, binding)` pair that doesn't collide with any
+// existing layout range for `kind`. Walks program-scope, global, and
+// entry-point layouts, so hidden resources such as `ParameterBlock<T>`
+// members are counted before later target legalization flattens them
+// into concrete descriptor slots.
+static bool pickFreeBindingForCoverage(
+    IRModule* module,
+    TargetRequest* targetRequest,
+    IRVarLayout* globalScopeVarLayout,
+    LayoutResourceKind kind,
+    int& outSpace,
+    int& outBinding)
+{
+    auto ranges = collectUsedBindings(module, globalScopeVarLayout, kind);
+
+    // Vulkan variable-descriptor-count bindings must be the highest
+    // numbered binding in their descriptor set. If set 0 already has
+    // an unsized descriptor array, placing coverage at max+1 in that
+    // same set can invalidate or mismatch the host's bindless set
+    // layout. In that case, auto-allocation creates a coverage-owned
+    // descriptor set instead.
+    if (kind == LayoutResourceKind::DescriptorTableSlot && isKhronosTarget(targetRequest) &&
+        containsUnboundedArrayInSpace(ranges, 0))
+    {
+        outSpace = pickFirstUnusedSpace(ranges);
+        if (outSpace < 0)
+            return false;
+        outBinding = 0;
+        return true;
+    }
+
+    outSpace = 0;
+    outBinding = pickFreeBindingInSpace(ranges, 0);
+    return outBinding >= 0;
 }
 
 // Construct the layout for the synthesized coverage buffer at the
@@ -493,9 +680,13 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     }
     else
     {
-        space = 0;
-        binding = pickFreeBindingForCoverage(module, globalScopeVarLayout, kind);
-        if (binding < 0)
+        if (!pickFreeBindingForCoverage(
+                module,
+                targetRequest,
+                globalScopeVarLayout,
+                kind,
+                space,
+                binding))
             return nullptr;
     }
 

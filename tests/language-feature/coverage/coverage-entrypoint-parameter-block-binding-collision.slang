@@ -12,9 +12,7 @@ struct Params
 
 [numthreads(1, 1, 1)]
 void computeMain(ParameterBlock<Params> params, uint3 tid : SV_DispatchThreadID)
-/*CHECK:
-     ^^^^^^^^^^^ `-trace-coverage-binding` collides with an existing parameter
-*/
+//CHECK:                                ^^^^^^ `-trace-coverage-binding` collides with an existing parameter
 {
     if (tid.x == 0)
     {
