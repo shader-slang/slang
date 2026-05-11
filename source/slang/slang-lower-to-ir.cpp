@@ -3453,10 +3453,43 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 }
 
 
+/// Returns true if `type` is, or transitively contains, an `Atomic<T>` field.
+/// Used to determine whether copy-in/copy-out semantics are invalid for a type.
+static bool typeContainsAtomic(Type* type)
+{
+    if (as<AtomicType>(type))
+        return true;
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
+        {
+            for (auto field : structDecl->getFields())
+            {
+                if (field->type.type && typeContainsAtomic(field->type.type))
+                    return true;
+            }
+        }
+    }
+    return false;
+}
+
 ParamPassingMode adjustParamPassingModeBasedOnParamType(
     ParamPassingMode originalMode,
     Type* paramType)
 {
+    // A `[mutating]` method on a type containing Atomic<T> fields cannot use
+    // copy-in/copy-out semantics: the atomic's identity is its address, not its
+    // value. Promote to true reference (`Ref`) so the caller passes a pointer to
+    // the original storage rather than a local copy.
+    //
+    // This check is done before the isCopyableType guard below because structs
+    // containing Atomic fields are not explicitly marked [__NonCopyableType]
+    // (they are still "copyable" in the general sense tracked by isNonCopyableType),
+    // but BorrowInOut semantics are still semantically invalid for them.
+    //
+    if (originalMode == ParamPassingMode::BorrowInOut && typeContainsAtomic(paramType))
+        return ParamPassingMode::Ref;
+
     // If the type is copyable, then the original mode is appropriate to use.
     //
     if (isCopyableType(paramType))
@@ -3477,6 +3510,13 @@ ParamPassingMode adjustParamPassingModeBasedOnParamType(
         // with a non-copyable type.
         //
         return ParamPassingMode::BorrowIn;
+
+    case ParamPassingMode::BorrowInOut:
+        // A `[mutating]` method on an explicitly non-copyable type cannot use
+        // copy-in/copy-out semantics. Promote to true reference (`Ref`) so the
+        // caller passes a pointer to the original storage rather than a local copy.
+        //
+        return ParamPassingMode::Ref;
     }
 }
 

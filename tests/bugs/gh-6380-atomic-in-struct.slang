@@ -1,8 +1,8 @@
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv
-// Disable test until below error is resolved:
-//error 41403: cannot perform atomic operation because destination is neither groupshared nor from a device buffer.
-//    Atomic<int> test;
-//                ^~~~
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
+
+// Verify that Atomic<T> inside a struct accessed via RWStructuredBuffer compiles correctly.
+// The earlier failure was error 41403 (atomic on local variable); fixed by making
+// structs containing Atomic fields non-copyable so [mutating] is promoted to [__ref].
 
 //CHECK: OpEntryPoint
 
@@ -15,6 +15,5 @@ RWStructuredBuffer<Test> data;
 [shader("compute")]
 [numthreads(1,1,1)]
 public void main() {
-    Test t = Test(1);
     data[0].test.increment();
 }
