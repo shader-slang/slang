@@ -1022,8 +1022,10 @@ class CallAttribute : public Attribute
 };
 // `[call]`
 
-// Determines whether the enum declaration is scoped (no attribute) or unscoped
-// (attribute present)
+// Marks an enum declaration as unscoped. Added by the parser either from the
+// user-written `[UnscopedEnum]` attribute, or implicitly when a non-generic
+// plain `enum` is compiled with `-unscoped-enum`. Generic enums do not carry
+// this attribute even when `-unscoped-enum` is in effect.
 FIDDLE()
 class UnscopedEnumAttribute : public Attribute
 {

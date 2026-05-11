@@ -2319,7 +2319,7 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     }
 
     // Conflicting enum scoped/unscoped markers are checked after attributes
-    // have been checked. A successful check turns UnknownAttributeName to
+    // have been checked. A successful check turns UncheckedAttribute to
     // UnscopedEnumAttribute.
     if (auto enumClassModifier = syntaxNode->findModifier<EnumClassModifier>())
     {
