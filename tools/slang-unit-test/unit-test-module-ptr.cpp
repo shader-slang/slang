@@ -110,6 +110,8 @@ SLANG_UNIT_TEST(precompiledModuleWithoutSourceWithUpToDateCheck)
         void computeMain(uint3 workGroup : SV_GroupID)
         {
             int value = getValue();
+            if (value == 7)
+                return;
         }
     )";
 

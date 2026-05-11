@@ -1804,7 +1804,8 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
     auto dependencyChunks = moduleChunk->getFileDependencies();
     // The first dependency is the module's own source file. Keep track of it separately so
     // that if the original source is unavailable, we can still accept a standalone
-    // precompiled module.
+    // precompiled module. Missing later dependencies still indicate a stale source-backed
+    // module cache.
     auto firstDependencyChunk = dependencyChunks.getFirst();
     if (firstDependencyChunk)
     {
