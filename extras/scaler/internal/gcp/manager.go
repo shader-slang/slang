@@ -24,6 +24,13 @@ const (
 	cleanupZoneScanTimeout = 30 * time.Second
 	cleanupDeleteTimeout   = 45 * time.Second
 	defaultCleanupInterval = 2 * time.Minute
+	// defaultOrphanGracePeriod is the time a tracked VM is allowed to sit
+	// idle (never marked busy by HandleJobStarted) before the periodic
+	// cleanup pass treats it as an orphan and tears it down. Legitimate
+	// idle time between VM-ready and first-job-dispatch is normally
+	// well under 5 minutes; 30 minutes gives plenty of headroom while
+	// still catching the #11115 wedge before --session-max-age fires.
+	defaultOrphanGracePeriod = 30 * time.Minute
 )
 
 //go:embed startup.ps1
@@ -41,12 +48,17 @@ type ManagerConfig struct {
 	Platform         string // "windows" or "linux"
 	VMPrefix         string // VM name prefix for cleanup (e.g., "win-runner" or "linux-runner")
 	CleanupInterval  time.Duration
+	// OrphanGracePeriod is the maximum time a tracked VM may remain idle
+	// (busy == false) before being evicted as an orphan. Zero disables
+	// the eviction. Unset uses defaultOrphanGracePeriod.
+	OrphanGracePeriod time.Duration
 }
 
 type vmInfo struct {
-	vmName string
-	zone   string
-	busy   bool
+	vmName    string
+	zone      string
+	busy      bool
+	createdAt time.Time
 }
 
 type zoneCandidate struct {
@@ -67,6 +79,11 @@ type Manager struct {
 	deleteVMFunc    func(context.Context, string, string) error
 	selectZonesFunc func(context.Context) ([]zoneCandidate, error)
 	insertVMFunc    func(context.Context, *computepb.InsertInstanceRequest) error
+	// nowFunc is overridable in tests to control the clock used for
+	// orphan eviction. Use m.now() at call sites — that falls back to
+	// time.Now when this is nil so existing tests that construct
+	// Manager directly keep working.
+	nowFunc func() time.Time
 
 	mu sync.Mutex
 	// runnerName -> vmInfo
@@ -95,6 +112,12 @@ func NewManager(ctx context.Context, cfg ManagerConfig) (*Manager, error) {
 	if cfg.CleanupInterval <= 0 {
 		cfg.CleanupInterval = defaultCleanupInterval
 	}
+	if cfg.OrphanGracePeriod < 0 {
+		cfg.OrphanGracePeriod = 0
+	}
+	if cfg.OrphanGracePeriod == 0 {
+		cfg.OrphanGracePeriod = defaultOrphanGracePeriod
+	}
 
 	cleanupCtx, cancelCleanup := context.WithCancel(ctx)
 
@@ -103,6 +126,7 @@ func NewManager(ctx context.Context, cfg ManagerConfig) (*Manager, error) {
 		instancesClient: instancesClient,
 		regionsClient:   regionsClient,
 		cancelCleanup:   cancelCleanup,
+		nowFunc:         time.Now,
 		vms:             make(map[string]*vmInfo),
 	}
 
@@ -116,6 +140,15 @@ func NewManager(ctx context.Context, cfg ManagerConfig) (*Manager, error) {
 	}
 
 	return mgr, nil
+}
+
+// now returns the current time using the injected clock, or time.Now
+// when nowFunc is unset (e.g. tests that build a Manager literal).
+func (m *Manager) now() time.Time {
+	if m.nowFunc != nil {
+		return m.nowFunc()
+	}
+	return time.Now()
 }
 
 // Close shuts down the manager.
@@ -405,7 +438,7 @@ func (m *Manager) CreateVM(ctx context.Context, runnerName, jitConfig string) (s
 		}
 
 		m.mu.Lock()
-		m.vms[runnerName] = &vmInfo{vmName: vmName, zone: zone}
+		m.vms[runnerName] = &vmInfo{vmName: vmName, zone: zone, createdAt: m.now()}
 		m.mu.Unlock()
 
 		slog.Info("VM created", "vm", vmName, "zone", zone)
@@ -671,6 +704,12 @@ func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 	// This prevents ActiveCount() from drifting above reality, which would
 	// cause the scaler to stop creating new VMs.
 	m.reconcileTrackedVMs(ctx)
+
+	// Evict orphans: tear down tracked VMs that are alive in GCP but have
+	// never been dispatched a job. Catches the #11115 wedge where a
+	// runner registers with empty labels and never goes busy, leaving
+	// ActiveCount > 0 forever and blocking drain.
+	m.evictStaleOrphans(ctx)
 }
 
 // reconcileTrackedVMs checks all tracked VMs against actual GCP instance state
@@ -740,5 +779,99 @@ func (m *Manager) reconcileTrackedVMs(ctx context.Context) {
 
 	if evicted > 0 {
 		slog.Info("reconcile: evicted stale VM entries", "count", evicted, "tracked_after", m.ActiveCount())
+	}
+}
+
+// orphanCandidate describes one tracked VM that the eviction pass has
+// decided to tear down because it has aged past the grace period without
+// ever receiving a job.
+type orphanCandidate struct {
+	runnerName string
+	vmName     string
+	zone       string
+	age        time.Duration
+}
+
+// evictStaleOrphans tears down tracked VMs that have been idle (never
+// marked busy by HandleJobStarted) for longer than OrphanGracePeriod.
+//
+// In the healthy path a VM gets a JIT-config token at creation time,
+// boots, registers a runner with the configured labels, GitHub
+// dispatches a queued job to it, and HandleJobStarted flips busy=true.
+// An orphan VM never reaches the dispatch step (because its runner
+// registered with empty labels or got stuck in a "Registration not
+// found" loop), so busy stays false and the scaler's tracking never
+// decrements. Once any orphan exists, the next --session-max-age drain
+// will never observe active_vms == 0 and wedges the entire tier.
+//
+// Grace period must be long enough to cover legitimate VM cold-start
+// plus any quiet period between VM-ready and first-job-dispatch.
+// Operationally that's been <5 min; defaultOrphanGracePeriod=30m gives
+// a wide margin while still catching wedges before --session-max-age=2h
+// fires.
+func (m *Manager) evictStaleOrphans(ctx context.Context) {
+	grace := m.config.OrphanGracePeriod
+	if grace <= 0 {
+		return
+	}
+
+	now := m.now()
+	m.mu.Lock()
+	candidates := make([]orphanCandidate, 0)
+	for runnerName, vm := range m.vms {
+		if vm.busy {
+			continue
+		}
+		// createdAt is zero for entries created before this field was
+		// introduced or in legacy tests; treat those as not yet eligible.
+		if vm.createdAt.IsZero() {
+			continue
+		}
+		age := now.Sub(vm.createdAt)
+		if age < grace {
+			continue
+		}
+		candidates = append(candidates, orphanCandidate{
+			runnerName: runnerName,
+			vmName:     vm.vmName,
+			zone:       vm.zone,
+			age:        age,
+		})
+	}
+	m.mu.Unlock()
+
+	for _, c := range candidates {
+		slog.Warn("evicting orphan VM: tracked but never went busy",
+			"runner", c.runnerName,
+			"vm", c.vmName,
+			"zone", c.zone,
+			"age", c.age,
+			"grace_period", grace,
+		)
+		deleteCtx, cancelDelete := context.WithTimeout(ctx, cleanupDeleteTimeout)
+		err := m.deleteVMForCleanup(deleteCtx, c.vmName, c.zone)
+		cancelDelete()
+		if err != nil {
+			// Don't drop tracking on delete failure — try again next pass.
+			slog.Warn("failed to delete orphan VM",
+				"vm", c.vmName, "zone", c.zone, "error", err)
+			continue
+		}
+
+		// Drop the tracked entry. Re-check busy and the same vmInfo
+		// pointer under the lock in case HandleJobStarted raced us
+		// between the snapshot and the delete.
+		m.mu.Lock()
+		if vm, ok := m.vms[c.runnerName]; ok && !vm.busy && vm.vmName == c.vmName {
+			delete(m.vms, c.runnerName)
+		}
+		m.mu.Unlock()
+	}
+
+	if len(candidates) > 0 {
+		slog.Info("orphan eviction pass completed",
+			"orphans_evicted", len(candidates),
+			"tracked_after", m.ActiveCount(),
+		)
 	}
 }
