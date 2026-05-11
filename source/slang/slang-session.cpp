@@ -1823,7 +1823,7 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
         }
     }
 
-    bool isProcessingFirstDependency = true;
+    Index dependencyIndex = 0;
     for (auto dependencyChunk : dependencyChunks)
     {
         auto file = dependencyChunk->getValue();
@@ -1837,17 +1837,15 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
         }
         if (!sourceFile)
         {
-            // If the primary source file is unavailable, treat the binary as unverifiable rather
-            // than stale so that standalone precompiled modules can still be loaded. Missing
-            // secondary dependencies still indicate that a source-backed module cache is stale.
-            if (isProcessingFirstDependency)
-                // We can't prove staleness without the module's own source file, so fall back to
-                // accepting the standalone precompiled module.
+            if (dependencyIndex == 0)
+                // If the module's own source file is unavailable, we can't prove staleness, so
+                // fall back to accepting the standalone precompiled module. Missing later
+                // dependencies still indicate a stale source-backed module cache.
                 return true;
             return false;
         }
         digestBuilder.append(sourceFile->getDigest());
-        isProcessingFirstDependency = false;
+        dependencyIndex++;
     }
     return digestBuilder.finalize() == existingDigest;
 }
