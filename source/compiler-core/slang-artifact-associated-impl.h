@@ -199,6 +199,16 @@ struct SyntheticResourceRecord
     String debugName;
 };
 
+// Internal registry for stable synthetic resource ids. Public API
+// exposes ids as opaque non-zero values, but compiler features still
+// need one shared allocation point so independently-added synthetic
+// resources do not collide.
+enum class SyntheticResourceKnownID : uint32_t
+{
+    None = 0,
+    Coverage = 1,
+};
+
 class ArtifactPostEmitMetadata : public ComBaseObject,
                                  public IArtifactPostEmitMetadata,
                                  public slang::ICoverageTracingMetadata,

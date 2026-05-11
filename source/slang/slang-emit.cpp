@@ -1078,18 +1078,6 @@ Result linkAndOptimizeIR(
     SLANG_PASS(collectGlobalUniformParameters, outLinkedIR.globalScopeVarLayout, target);
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    if (requiredLoweringPassSet.coverageTracing)
-    {
-        SLANG_PASS(
-            finalizeCoverageInstrumentationMetadata,
-            sink,
-            codeGenContext->shouldTraceCoverage(),
-            outLinkedIR.globalScopeVarLayout,
-            targetRequest,
-            *metadata);
-        validateIRModuleIfEnabled(codeGenContext, irModule);
-    }
-
     SLANG_PASS(checkEntryPointDecorations, target, sink);
 
     // Add floating point denormal handling mode decorations to entry point functions based on
@@ -1171,6 +1159,18 @@ Result linkAndOptimizeIR(
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    if (requiredLoweringPassSet.coverageTracing)
+    {
+        SLANG_PASS(
+            finalizeCoverageInstrumentationMetadata,
+            sink,
+            codeGenContext->shouldTraceCoverage(),
+            outLinkedIR.globalScopeVarLayout,
+            targetRequest,
+            *metadata);
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+    }
 
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
     SLANG_PASS(lowerLValueCast, targetProgram);

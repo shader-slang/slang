@@ -4575,7 +4575,11 @@ header.
 /// may add fields such as column/span information, function identity,
 /// branch-arm identity, or coverage-mode-specific metadata at the end
 /// without changing the COM interface. The current implementation uses
-/// one entry per line-oriented counter slot.
+/// one entry per line-oriented counter slot. Entries are source-
+/// location based: if generic specialization, cloning, or inlining
+/// duplicates code for the same source line, all executions of that
+/// source location contribute to the same line counter rather than
+/// producing per-specialization counters.
 struct CoverageEntryInfo
 {
     size_t structSize = sizeof(CoverageEntryInfo);
@@ -4603,8 +4607,10 @@ struct ICoverageTracingMetadata : public ISlangCastable
 
     /// Number of coverage entries in the synthesized coverage buffer.
     /// In the current implementation this is the number of line-
-    /// oriented counter slots. Future revisions may extend the entry
-    /// model without changing the interface shape.
+    /// oriented source-location counter slots. Generic specializations
+    /// and other cloned instances of the same source line aggregate
+    /// into that source line's slot. Future revisions may extend the
+    /// entry model without changing the interface shape.
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() = 0;
 
     /// Populate `outInfo` with attribution info for counter slot
@@ -4678,8 +4684,10 @@ struct SyntheticResourceInfo
     /// Stable, opaque, non-zero synthetic resource identifier within
     /// the compiled program. `0` is reserved as the default
     /// "unassigned" sentinel; `findResourceIndexByID(0, ...)` always
-    /// returns `SLANG_E_NOT_FOUND`. Hosts should use this to
-    /// correlate metadata and runtime binding helpers.
+    /// returns `SLANG_E_NOT_FOUND`. Non-zero ids are assigned from the
+    /// compiler's internal synthetic-resource registry; hosts should
+    /// treat the numeric value as opaque and use it only to correlate
+    /// metadata and runtime binding helpers.
     uint32_t id = 0;
 
     /// The Slang binding kind represented by this synthetic
@@ -4744,8 +4752,9 @@ struct ISyntheticResourceMetadata : public ISlangCastable
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getResourceCount() = 0;
 
     /// Populate `outInfo` with the metadata for synthetic resource
-    /// `index`. The caller must pre-set `outInfo->structSize =
-    /// sizeof(SyntheticResourceInfo)`. Returns `SLANG_OK` on success,
+    /// `index`. The caller should zero-initialize `outInfo`, then set
+    /// `outInfo->structSize = sizeof(SyntheticResourceInfo)`.
+    /// Returns `SLANG_OK` on success,
     /// `SLANG_E_INVALID_ARG` for null `outInfo`, mismatched
     /// `structSize`, or out-of-range `index`.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -5862,7 +5871,8 @@ inline SlangResult findSyntheticResourceDescriptorRangeByID(
 
    Resources for which `getSyntheticResourceDescriptorRange(...)`
    returns `SLANG_E_NOT_AVAILABLE`, or which report `space == -1`, are
-   skipped.
+   skipped. Other failures from `metadata` are propagated and abort the
+   enumeration.
    Each returned `debugName`, when non-null, aliases storage owned by
    `metadata` and remains valid only for the lifetime of that metadata
    object.

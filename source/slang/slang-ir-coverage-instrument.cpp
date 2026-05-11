@@ -20,10 +20,8 @@ namespace
 // Well-known buffer name. Surfaced via `IRNameHintDecoration` and
 // matches the manifest / sidecar key that hosts read.
 static const char kCoverageBufferName[] = "__slang_coverage";
-// Synthetic resource ids are stable, non-zero feature-local
-// constants. Additional synthetic instrumentation resources should
-// claim their own ids alongside this one.
-static const uint32_t kCoverageSyntheticResourceID = 1;
+static const uint32_t kCoverageSyntheticResourceID =
+    uint32_t(SyntheticResourceKnownID::Coverage);
 
 static bool hasNameHint(IRInst* inst, UnownedTerminatedStringSlice expectedName)
 {
@@ -53,6 +51,7 @@ static SyntheticResourceRecord& getOrAddCoverageSyntheticResourceRecord(
 
     SyntheticResourceRecord record;
     record.id = kCoverageSyntheticResourceID;
+    SLANG_RELEASE_ASSERT(record.id != uint32_t(SyntheticResourceKnownID::None));
     record.bindingType = slang::BindingType::MutableRawBuffer;
     record.arraySize = 1;
     record.scope = slang::SyntheticResourceScope::Global;

@@ -80,6 +80,11 @@ These answer:
 - how many counters exist
 - what each counter slot means
 
+Line counters are source-location based. If generic specialization,
+inlining, or other IR cloning creates multiple executable copies of
+the same source line, all those copies contribute to that source
+line's counter rather than receiving per-specialization counters.
+
 Hosts use `ICoverageTracingMetadata` when they need to interpret the
 counter values they read back, or emit LCOV or manifest output.
 
@@ -112,6 +117,12 @@ Current key fields:
   - `uniformOffset`
   - `uniformStride`
 - `debugName`
+
+Sentinels match `slang.h`: `binding == -1` means no descriptor
+binding is reported, `space == -1` means the target has no descriptor
+space dimension, `uniformOffset == -1` means no CPU/CUDA marshaling
+location is reported for this target, and `0` is a valid value for all
+reported offsets and bindings.
 
 Coverage currently emits exactly one synthetic resource record for the
 hidden `__slang_coverage` buffer. Hosts should treat its synthetic
@@ -181,6 +192,9 @@ logic, Slang also provides helper functions in `slang.h`:
 These are not a second metadata channel. They are convenience helpers
 on top of `ISyntheticResourceMetadata`, mainly for Vulkan-style
 descriptor-layout construction.
+Enumeration helpers skip resources that are not descriptor-
+representable for the target, but propagate real metadata query
+failures instead of hiding them.
 
 ## Backend usage
 
@@ -188,7 +202,7 @@ descriptor-layout construction.
 | ------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Vulkan / Metal / D3D12 / direct descriptor-backed hosts | `getResourceInfo(...)`                                                      | `getSyntheticResourceDescriptorRange(...)`, `findSyntheticResourceDescriptorRangeByID(...)`, `getSyntheticResourceDescriptorRangesForSpace(...)` |
 | CUDA / CPU-style marshaling hosts                       | `getResourceInfo(...)`                                                      | read `uniformOffset` / `uniformStride` from `SyntheticResourceInfo`                                                                              |
-| `slang-rhi` Vulkan / CUDA backends                      | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location; provided by the companion `slang-rhi` PR                     |
+| `slang-rhi` Vulkan / CUDA backends                      | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location; provided by companion `slang-rhi` PR #739, not this PR       |
 
 ## `slang-rhi` consumption model
 
@@ -206,9 +220,9 @@ The intended `slang-rhi` contract is:
 4. backend layouts append synthetic bindings into their normal
    internal layout model
 5. `slang-rhi` exposes resolved binding locations through:
-   - `ISyntheticShaderProgram`
+   - `ISyntheticShaderProgram` (provided by `slang-rhi` PR #739)
 6. runtime binding uses:
-   - `bindSyntheticResource(...)`
+   - `bindSyntheticResource(...)` (provided by `slang-rhi` PR #739)
    - or direct `IShaderObject::setBinding(location.offset, ...)`
 
 The important design choice is that `slang-rhi` does not introduce a
@@ -229,8 +243,9 @@ The host reads the hidden resource location and binds it directly:
 - direct CPU/CUDA-style hosts use `uniformOffset` and
   `uniformStride`
 - `slang-rhi` hosts use the resolved location from
-  `ISyntheticShaderProgram` and then call:
-  - `bindSyntheticResource(...)`
+  `ISyntheticShaderProgram` (provided by `slang-rhi` PR #739) and then
+  call:
+  - `bindSyntheticResource(...)` (provided by `slang-rhi` PR #739)
   - or `IShaderObject::setBinding(location.offset, ...)`
 
 This is the lowest-level path. It is appropriate for hosts that
@@ -246,7 +261,7 @@ The host uses helper functions layered on top of the same metadata:
   - `findSyntheticResourceDescriptorRangeByID(...)`
   - `getSyntheticResourceDescriptorRangesForSpace(...)`
 - `slang-rhi` hosts can use:
-  - `bindSyntheticResource(...)`
+  - `bindSyntheticResource(...)` (provided by `slang-rhi` PR #739)
 
 The `slang-rhi` symbols in this section are companion-PR interfaces
 tracked in `shader-slang/slang-rhi#739`; this Slang PR defines only the
