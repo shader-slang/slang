@@ -702,7 +702,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
         TypeExp type,
         DiagnosticSink* sink = nullptr);
 
-    void checkForwardReferencesInGenericConstraint(GenericTypeConstraintDecl* decl);
+    void checkForwardReferencesInGenericDecl(Decl* decl, Expr* expr, Val* val);
 
     void visitGenericDecl(GenericDecl* genericDecl);
 
@@ -3990,41 +3990,48 @@ bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
     return true;
 }
 
-// General utility function to collect all referenced declarations from a value
-void collectReferencedDecls(Val* val, HashSet<Decl*>& outDecls)
+struct CollectReferencedDeclsVisitor
+    : public SemanticsDeclReferenceVisitor<CollectReferencedDeclsVisitor>
 {
-    if (!val)
+    typedef SemanticsDeclReferenceVisitor<CollectReferencedDeclsVisitor> Base;
+
+    HashSet<Decl*>* outDecls;
+
+    CollectReferencedDeclsVisitor(HashSet<Decl*>& outDecls, SemanticsContext& outer)
+        : Base(outer), outDecls(&outDecls)
+    {
+    }
+
+    virtual void processReferencedDecl(Decl* decl) override { outDecls->add(decl); }
+
+    virtual void processDeclModifiers(Decl*, SourceLoc) override {}
+};
+
+// General utility function to collect all referenced declarations from a syntax node
+void collectReferencedDecls(SemanticsVisitor* context, NodeBase* node, HashSet<Decl*>& outDecls)
+{
+    if (!node)
         return;
 
-    // Process operands to find declaration references
-    for (Index i = 0; i < val->getOperandCount(); i++)
-    {
-        auto& operand = val->m_operands[i];
-        if (operand.kind == ValNodeOperandKind::ValNode)
-        {
-            // ValNode operands contain Val* nodes that we recursively
-            // traverse to find nested declaration references. For example, in the
-            // constraint expression IFoo<IBar<T>>, we need to traverse the nested
-            // type structure to find the reference to declaration T.
-            collectReferencedDecls(val->getOperand(i), outDecls);
-        }
-        else if (operand.kind == ValNodeOperandKind::ASTNode)
-        {
-            // ASTNode operands are leaf cases. They can contain any NodeBase*,
-            // so we need to check if the referenced astnode is actually a Decl*.
-            if (auto declOperand = as<Decl>(operand.values.nodeOperand))
-            {
-                outDecls.add(declOperand);
-            }
-        }
-    }
+    CollectReferencedDeclsVisitor visitor(outDecls, *context);
+
+    if (auto val = as<Val>(node))
+        visitor.dispatchIfNotNull(val);
+    else if (auto stmt = as<Stmt>(node))
+        visitor.dispatchIfNotNull(stmt);
+    else if (auto expr = as<Expr>(node))
+        visitor.dispatchIfNotNull(expr);
+    else if (auto decl = as<Decl>(node))
+        visitor.dispatchIfNotNull(decl);
 }
 
-void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(
-    GenericTypeConstraintDecl* decl)
+void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericDecl(
+    Decl* decl,
+    Expr* expr,
+    Val* val)
 {
-    // Check if this constraint references type parameters that appear later
-    // in the same GenericDecl's parameter list and report a forward reference error
+    // Check if this decl references type parameters that appear later in the
+    // same GenericDecl's parameter list and report a forward reference error
     // if it does.
 
     // Only applies to constraints within GenericDecl contexts where declaration order matters.
@@ -4055,6 +4062,10 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(
         {
             declaredBeforeConstraint.add(typeParam);
         }
+        else if (auto valueParam = as<GenericValueParamDecl>(member))
+        {
+            declaredBeforeConstraint.add(valueParam);
+        }
     }
 
     // This probably shouldn't happen, but if the constraint is not found in parent GenericDecl,
@@ -4064,24 +4075,35 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(
 
     // Collect all referenced declarations from the constraint's superior type
     HashSet<Decl*> referencedDecls;
-    collectReferencedDecls(decl->sup.type, referencedDecls);
+    collectReferencedDecls(this, val ? as<NodeBase>(val) : as<NodeBase>(expr), referencedDecls);
 
     // Check if any of the referenced declarations are forward references (not in our "declared so
     // far" set)
     for (auto referencedDecl : referencedDecls)
     {
-        if (auto typeParam = as<GenericTypeParamDeclBase>(referencedDecl))
+        // If this type parameter doesn't belong to the same generic or is in
+        // our "declared so far" set, it's OK.
+        if (referencedDecl->parentDecl != parentGeneric ||
+            declaredBeforeConstraint.contains(referencedDecl))
+            continue;
+
+        // Found a forward reference, report an error.
+        if (as<GenericTypeParamDeclBase>(referencedDecl) ||
+            as<GenericValueParamDecl>(referencedDecl))
         {
-            // Check if this type parameter belongs to the same generic but is NOT in our "declared
-            // so far" set
-            if (typeParam->parentDecl == parentGeneric &&
-                !declaredBeforeConstraint.contains(typeParam))
+            if (auto typeConstraint = as<GenericTypeConstraintDecl>(decl))
             {
-                // Found a forward reference, report an error.
                 getSink()->diagnose(Diagnostics::ForwardReferenceInGenericConstraint{
-                    .param = decl->sub.type,
-                    .referenced = typeParam,
-                    .expr = decl->sup.exp});
+                    .param = typeConstraint->sub.type,
+                    .referenced = referencedDecl,
+                    .expr = expr});
+            }
+            else if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl))
+            {
+                getSink()->diagnose(Diagnostics::ForwardReferenceInGenericDefaultInitializer{
+                    .param = decl,
+                    .referenced = referencedDecl,
+                    .expr = expr});
             }
         }
     }
@@ -4250,7 +4272,7 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
     if (getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
         // Check for forward references in generic constraints after type translation
-        checkForwardReferencesInGenericConstraint(decl);
+        checkForwardReferencesInGenericDecl(decl, decl->sup.exp, decl->sup.type);
 
         if (decl->isEqualityConstraint)
         {
@@ -4371,6 +4393,9 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeParamDecl(GenericTypeParamDecl*
     // for a generic type parameter later.
     //
     decl->initType = CheckProperType(decl->initType);
+
+    if (decl->initType && getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
+        checkForwardReferencesInGenericDecl(decl, decl->initType.exp, decl->initType.type);
 }
 
 void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDecl* decl)
@@ -4387,6 +4412,12 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
                 .decl = decl});
         }
     }
+
+    if (decl->initExpr)
+        decl->initExpr = CheckTerm(decl->initExpr);
+
+    if (decl->initExpr && getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
+        checkForwardReferencesInGenericDecl(decl, decl->initExpr, nullptr);
 }
 
 void SemanticsDeclHeaderVisitor::visitGenericValuePackParamDecl(GenericValuePackParamDecl* decl)
@@ -11046,7 +11077,7 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
                 }
                 else
                 {
-                    // For legacy langauge versions, we still allow struct inheritance to avoid
+                    // For legacy language versions, we still allow struct inheritance to avoid
                     // breaking existing code, but we will emit a warning to inform the user
                     // that this feature is unstable and may be removed in the future.
                     getSink()->diagnose(
@@ -11336,6 +11367,7 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
     Index inheritanceClauseCounter = 0;
     Type* tagType = nullptr;
     InheritanceDecl* tagTypeInheritanceDecl = nullptr;
+    bool hasBaseError = false;
     for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
     {
         Index inheritanceClauseIndex = inheritanceClauseCounter++;
@@ -11358,6 +11390,7 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
                 .decl = decl,
                 .baseType = baseType,
                 .inheritanceDecl = inheritanceDecl});
+            hasBaseError = true;
             continue;
         }
 
@@ -11401,8 +11434,15 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
                 .decl = decl,
                 .baseType = baseType,
                 .inheritanceDecl = inheritanceDecl});
+            hasBaseError = true;
             continue;
         }
+    }
+
+    if (hasBaseError)
+    {
+        decl->tagType = m_astBuilder->getErrorType();
+        return;
     }
 
     // If a tag type has not been set, then we
@@ -11510,6 +11550,9 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
 
     auto tagType = decl->tagType;
 
+    if (as<ErrorType>(tagType))
+        return;
+
     auto isEnumFlags = decl->hasModifier<FlagsAttribute>();
 
     // Check the enum cases in order.
@@ -11607,6 +11650,9 @@ void SemanticsDeclBodyVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
     // the surrounding `enum` declaration.
     auto tagType = parentEnumDecl->tagType;
     SLANG_ASSERT(tagType);
+
+    if (as<ErrorType>(tagType))
+        return;
 
     // Need to check the init expression, if present, since
     // that represents the explicit tag for this case.
@@ -14558,7 +14604,7 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
 
         // Collect all declarations referenced by the target type
         HashSet<Decl*> genericParamsReferencedByTargetType;
-        collectReferencedDecls(decl->targetType.type, genericParamsReferencedByTargetType);
+        collectReferencedDecls(this, decl->targetType.type, genericParamsReferencedByTargetType);
 
         HashSet<Decl*> genericParamsReferencedByConstraints;
 
@@ -14567,6 +14613,7 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
              getMembersOfType<GenericTypeConstraintDecl>(getASTBuilder(), genericDecl))
         {
             collectReferencedDecls(
+                this,
                 constraint.getDecl()->sup.type,
                 genericParamsReferencedByConstraints);
         }

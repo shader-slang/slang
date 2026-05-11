@@ -44,6 +44,20 @@ for stray in /home/*/actions-runner; do
   rm -rf "$stray"
 done
 
+# Configure host-side core-dump capture for CI containers.
+# Containers running under `--user root` without `--privileged` cannot write
+# `kernel.core_pattern` themselves (it is silently rejected as read-only),
+# so we set it on the host before any job container starts. The CI workflow
+# bind-mounts /var/cores into the container with `-v /var/cores:/var/cores`,
+# so cores written by a crashing process inside the container land here on
+# the host where the workflow's post-test step can read and gdb-extract them.
+# Mode 1777 (sticky-writable) so non-root processes inside the container can
+# write their own cores even after the workflow drops privileges.
+mkdir -p /var/cores
+chmod 1777 /var/cores
+sysctl -w kernel.core_pattern='/var/cores/core.%e.%p' >/dev/null
+sysctl -w kernel.core_uses_pid=1 >/dev/null
+
 # Find the runner directory and its owner
 RUNNER_DIR=""
 RUNNER_USER=""
