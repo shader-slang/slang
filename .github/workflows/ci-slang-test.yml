@@ -91,6 +91,15 @@ jobs:
           if [[ "${{ inputs.cpu-only }}" != "true" && "${{ inputs.enable-debug-layers }}" == "true" ]]; then
             export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
           fi
+          # Force AVX-512 off in slang-llvm's JIT TargetMachine. The cpu-only
+          # tier runs on GitHub-hosted Azure VMs that intermittently mis-report
+          # AVX-512 support to LLVM's host-detection path, then SIGILL when
+          # the JIT-emitted kmovd / vmovss-with-mask actually executes (#11062).
+          # Drop this once the LLVM 22 bump (#11017) fixes the underlying
+          # detection.
+          if [[ "${{ inputs.cpu-only }}" == "true" ]]; then
+            export SLANG_DISABLE_AVX512=1
+          fi
           # Build common slang-test arguments
           slang_test_args=(
             "-category" "${{ inputs.test-category }}"

@@ -342,11 +342,12 @@ SpvInst* emitOpTypeArray(IRInst* inst, const T1& elementType, const T2& length)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
-    return emitInst(
+    return emitInstMemoizedWithExtraKeyData(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeArray,
         kResultID,
+        getArrayTypeExtraKeyData(inst),
         elementType,
         length);
 }
@@ -356,11 +357,12 @@ template<typename T>
 SpvInst* emitOpTypeRuntimeArray(IRInst* inst, const T& elementType)
 {
     static_assert(isSingular<T>);
-    return emitInstMemoized(
+    return emitInstMemoizedWithExtraKeyData(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeRuntimeArray,
         kResultID,
+        getArrayTypeExtraKeyData(inst),
         elementType);
 }
 
@@ -395,11 +397,12 @@ template<typename T>
 SpvInst* emitOpTypePointer(IRInst* inst, SpvStorageClass storageClass, const T& type)
 {
     static_assert(isSingular<T>);
-    return emitInstMemoized(
+    return emitInstMemoizedWithExtraKeyData(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypePointer,
         kResultID,
+        getPointerTypeExtraKeyData(inst, storageClass),
         storageClass,
         type);
 }
