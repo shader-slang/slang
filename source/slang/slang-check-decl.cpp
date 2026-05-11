@@ -1391,6 +1391,8 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
 
     void visitFunctionDeclBase(FunctionDeclBase* funcDecl);
 
+    void visitExtensionDecl(ExtensionDecl* extensionDecl);
+
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
 
     enum class UndeclaredCapabilityDiagnosticKind
@@ -18794,6 +18796,53 @@ void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl).freeze(getASTBuilder());
 }
 
+void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extensionDecl)
+{
+    // Set up the extension's own inferred capabilities from its [require(...)] attributes,
+    // the same as any other container decl.
+    visitContainerDecl(extensionDecl);
+
+    // If the extension has no explicit capability requirements, there is nothing to validate
+    // at the extension level. Member functions with their own [require(...)] attributes are
+    // validated individually in visitFunctionDeclBase.
+    if (!extensionDecl->inferredCapabilityRequirements ||
+        extensionDecl->inferredCapabilityRequirements->isEmpty())
+        return;
+
+    // An extension can only be used where its target type is available. Therefore the
+    // capabilities declared on the extension itself must be a subset of the target type's
+    // capabilities. Use _propagateRequirement to detect conflicts: it handles cycle
+    // detection, calls ensureDecl on the target type, and emits a diagnostic if the
+    // extension's declared caps conflict with the target type's caps.
+    //
+    // We deliberately do NOT write back to extensionDecl->inferredCapabilityRequirements
+    // here: doing so would alter how getDeclaredCapabilitySet walks the parent chain for
+    // child declarations and would produce false positives in code where extension members
+    // legitimately target a subset of the target type's platforms.
+    auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType.type);
+    if (!targetDeclRefType)
+        return;
+
+    auto targetTypeDecl = targetDeclRefType->getDeclRef().getDecl();
+    if (!targetTypeDecl)
+        return;
+
+    // Ensure the target type is capability-checked before reading its
+    // inferredCapabilityRequirements, since _propagateRequirement's internal ensureDecl
+    // call happens after its nodeCaps argument is already evaluated.
+    if (!targetTypeDecl->checkState.isBeingChecked())
+        ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
+
+    CapabilitySet checkCapSet{extensionDecl->inferredCapabilityRequirements};
+    _propagateRequirement(
+        this,
+        checkCapSet,
+        extensionDecl,
+        targetTypeDecl,
+        targetTypeDecl->inferredCapabilityRequirements,
+        extensionDecl->loc);
+}
+
 void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
 {
     setParentFuncOfVisitor(funcDecl);
@@ -18900,6 +18949,61 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
                 CapabilitySet{funcDecl->inferredCapabilityRequirements}
                     .join(declaredCaps)
                     .freeze(getASTBuilder());
+        }
+    }
+
+    // For non-static member functions of extensions: verify that the function's
+    // OWN explicitly-declared capabilities are compatible with the extension's
+    // target type's capabilities.
+    //
+    // We check only the function's own [require(...)] attributes rather than the
+    // full declaredCaps (which includes caps inherited from the parent extension)
+    // for two reasons:
+    //  1. Avoids cascading errors: when the extension itself has an incompatible
+    //     [require(X)] (already caught by visitExtensionDecl), members that inherit
+    //     X should not also generate errors — fixing the extension fixes them too.
+    //  2. Catches a case that full declaredCaps misses: if an extension has a
+    //     compatible [require(glsl)] and a member adds its own [require(hlsl)],
+    //     declaredCaps would be {hlsl|glsl} and joining that with {glsl} gives the
+    //     valid {glsl}, hiding the conflict. Using just {hlsl} detects it.
+    //
+    // Note: ExtensionDecl is AggTypeDeclBase but not AggTypeDecl, so
+    // getParentAggTypeDecl returns nullptr for extension members; we use
+    // getParentAggTypeDeclBase instead.
+    if (!isEffectivelyStatic(funcDecl))
+    {
+        CapabilitySet ownDeclaredCaps;
+        for (auto mod : funcDecl->modifiers)
+        {
+            if (auto req = as<RequireCapabilityAttribute>(mod))
+                ownDeclaredCaps.unionWith(req->capabilitySet);
+        }
+        if (!ownDeclaredCaps.isEmpty())
+        {
+            if (auto extensionDecl = as<ExtensionDecl>(getParentAggTypeDeclBase(funcDecl)))
+            {
+                if (auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType.type))
+                {
+                    if (auto targetTypeDecl = targetDeclRefType->getDeclRef().getDecl())
+                    {
+                        // Ensure the target type is capability-checked before reading its
+                        // inferredCapabilityRequirements. _propagateRequirement evaluates
+                        // its nodeCaps argument before its internal ensureDecl call, so we
+                        // must pre-compute it here to avoid reading a null/stale pointer.
+                        if (!targetTypeDecl->checkState.isBeingChecked())
+                            ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
+                        _propagateRequirement(
+                            this,
+                            ownDeclaredCaps,
+                            funcDecl,
+                            targetTypeDecl,
+                            targetTypeDecl->inferredCapabilityRequirements,
+                            funcDecl->loc);
+                        // Intentionally do not use ownDeclaredCaps after this: we only
+                        // called _propagateRequirement for its conflict-detection side-effect.
+                    }
+                }
+            }
         }
     }
 }
