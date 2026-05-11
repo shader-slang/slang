@@ -304,14 +304,6 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 		ScaleSetID: ss.ID,
 	})
 
-	// Clean up scale set on exit
-	defer func() {
-		logger.Info("deleting scale set", "id", ss.ID)
-		if err := ssClient.DeleteRunnerScaleSet(context.WithoutCancel(ctx), ss.ID); err != nil {
-			logger.Error("failed to delete scale set", "error", err)
-		}
-	}()
-
 	// Runner name prefix
 	vmPrefix := cfg.gcpVMPrefix
 	if vmPrefix == "" {
@@ -369,6 +361,29 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 		minRunners:     cfg.minRunners,
 		vmPrefix:       vmPrefix,
 	}
+
+	// Clean up scale set on exit, except after a graceful drain. A scaler
+	// that exits via drain mode (SIGUSR1, --session-max-age, or systemctl
+	// reload) is being restarted, not decommissioned — preserving the scale
+	// set lets the next instance reuse the same ID via GetRunnerScaleSet
+	// above, so any in-flight runners keep their JIT registration valid.
+	// Deleting the scale set under a live runner orphans it in a
+	// "Registration not found" retry loop (#11067).
+	//
+	// This defer is declared before defer gcpScaler.shutdown(...) below so
+	// that LIFO ordering runs shutdown first; isDraining() then reflects
+	// the post-shutdown state.
+	defer func() {
+		if gcpScaler.isDraining() {
+			logger.Info("preserving scale set for next scaler instance",
+				"id", ss.ID, "active_vms", vmManager.ActiveCount())
+			return
+		}
+		logger.Info("deleting scale set", "id", ss.ID)
+		if err := ssClient.DeleteRunnerScaleSet(context.WithoutCancel(ctx), ss.ID); err != nil {
+			logger.Error("failed to delete scale set", "error", err)
+		}
+	}()
 
 	// SIGUSR1 enters drain mode: stop accepting new jobs, wait for running
 	// jobs to finish. This enables seamless binary updates:
