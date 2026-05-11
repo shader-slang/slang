@@ -26,6 +26,9 @@ class ArtifactPostEmitMetadata;
 // `explicitBinding` / `explicitSpace` are the values supplied by
 // `-trace-coverage-binding`; pass `-1` for either to request auto-
 // allocation.
+// `reservedSpaces` is the optional list supplied by
+// `-trace-coverage-reserved-space`; auto-allocation treats each space
+// as externally occupied even if no shader-visible resource uses it.
 //
 // `globalScopeVarLayout` is taken by reference: when the pass extends
 // the program-scope layout to include the synthesized buffer, it
@@ -42,6 +45,8 @@ void instrumentCoverage(
     bool enabled,
     int explicitBinding,
     int explicitSpace,
+    const int* reservedSpaces,
+    int reservedSpaceCount,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata);

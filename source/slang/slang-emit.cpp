@@ -1043,6 +1043,7 @@ Result linkAndOptimizeIR(
         // the synthesis routine.
         int explicitBinding = -1;
         int explicitSpace = -1;
+        List<int> reservedSpaces;
         auto& opts = codeGenContext->getTargetReq()->getOptionSet();
         if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
         {
@@ -1052,12 +1053,22 @@ Result linkAndOptimizeIR(
                 explicitSpace = (int)(*values)[0].intValue2;
             }
         }
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageReservedSpace))
+        {
+            for (auto value : *values)
+            {
+                if (value.kind == CompilerOptionValueKind::Int)
+                    reservedSpaces.add((int)value.intValue);
+            }
+        }
         SLANG_PASS(
             instrumentCoverage,
             sink,
             codeGenContext->shouldTraceCoverage(),
             explicitBinding,
             explicitSpace,
+            reservedSpaces.getBuffer(),
+            (int)reservedSpaces.getCount(),
             targetRequest,
             outLinkedIR.globalScopeVarLayout,
             *metadata);

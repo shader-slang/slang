@@ -497,6 +497,35 @@ static int pickSpaceAfterHighestUsedSpace(List<UsedBindingRange>& ranges)
     return int(maxSpace + 1);
 }
 
+static bool shouldHonorReservedCoverageSpaces(TargetRequest* targetRequest)
+{
+    return isD3DTarget(targetRequest) || isKhronosTarget(targetRequest);
+}
+
+static void addReservedCoverageSpaces(
+    List<UsedBindingRange>& ranges,
+    const int* reservedSpaces,
+    int reservedSpaceCount,
+    IRInst* source)
+{
+    if (!reservedSpaces || reservedSpaceCount <= 0)
+        return;
+
+    for (int i = 0; i < reservedSpaceCount; ++i)
+    {
+        const int space = reservedSpaces[i];
+        if (space < 0)
+            continue;
+
+        // Model a host-reserved descriptor/register space as an
+        // unbounded range starting at binding 0. The allocator then
+        // cannot place coverage into that space even if the current
+        // shader IR does not reference any resource from the host's
+        // pipeline layout.
+        addUsedBindingRange(ranges, (UInt)space, 0, 1, true, source);
+    }
+}
+
 // Pick a `(space, binding)` pair that doesn't collide with any
 // existing layout range for `kind`. Walks program-scope, global, and
 // entry-point layouts, so hidden resources such as `ParameterBlock<T>`
@@ -507,10 +536,20 @@ static bool pickFreeBindingForCoverage(
     TargetRequest* targetRequest,
     IRVarLayout* globalScopeVarLayout,
     LayoutResourceKind kind,
+    const int* reservedSpaces,
+    int reservedSpaceCount,
     int& outSpace,
     int& outBinding)
 {
     auto ranges = collectUsedBindings(module, globalScopeVarLayout, kind);
+    if (shouldHonorReservedCoverageSpaces(targetRequest))
+    {
+        addReservedCoverageSpaces(
+            ranges,
+            reservedSpaces,
+            reservedSpaceCount,
+            module->getModuleInst());
+    }
 
     // For Vulkan/SPIR-V-style descriptor sets, do not extend an
     // existing set with a new binding, and do not fill holes between
@@ -529,7 +568,14 @@ static bool pickFreeBindingForCoverage(
 
     outSpace = 0;
     outBinding = pickFreeBindingInSpace(ranges, 0);
-    return outBinding >= 0;
+    if (outBinding >= 0)
+        return true;
+
+    outSpace = pickSpaceAfterHighestUsedSpace(ranges);
+    if (outSpace < 0)
+        return false;
+    outBinding = 0;
+    return true;
 }
 
 // Construct the layout for the synthesized coverage buffer at the
@@ -577,6 +623,8 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     IRVarLayout* globalScopeVarLayout,
     int explicitBinding,
     int explicitSpace,
+    const int* reservedSpaces,
+    int reservedSpaceCount,
     int& outSpace,
     int& outBinding)
 {
@@ -601,6 +649,8 @@ static IRGlobalParam* synthesizeCoverageBuffer(
                 targetRequest,
                 globalScopeVarLayout,
                 kind,
+                reservedSpaces,
+                reservedSpaceCount,
                 space,
                 binding))
             return nullptr;
@@ -991,6 +1041,8 @@ void instrumentCoverage(
     bool enabled,
     int explicitBinding,
     int explicitSpace,
+    const int* reservedSpaces,
+    int reservedSpaceCount,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata)
@@ -1082,6 +1134,8 @@ void instrumentCoverage(
         globalScopeVarLayout,
         explicitBinding,
         explicitSpace,
+        reservedSpaces,
+        reservedSpaceCount,
         chosenSpace,
         chosenBinding);
 

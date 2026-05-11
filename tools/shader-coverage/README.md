@@ -52,10 +52,7 @@ After the host dispatches the shader and reads the counter buffer
 back, the host can either consume the slot→source attribution
 directly or convert the snapshot to LCOV `.info` via
 [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py). LCOV is
-consumable by `genhtml`, Codecov, VS Code Coverage Gutters, etc. A
-companion C helper library (`slang-coverage-rt`) and an end-to-end
-demo are queued as a follow-up PR for hosts that prefer a linked-in
-runtime over the Python converter.
+consumable by `genhtml`, Codecov, VS Code Coverage Gutters, etc.
 
 For the pipeline architecture, design rationale, and alternatives
 weighed, see
@@ -71,8 +68,13 @@ targets, it uses the descriptor set after the highest shader-visible
 set at binding 0 so coverage does not extend or fill holes in a
 user-owned descriptor set layout. For
 register-space targets such as HLSL, it uses the next free binding in
-space 0. Pass `-trace-coverage-binding <index> <space>` to pin it at
-a specific `(register, space)` pair instead:
+space 0. If the host pipeline layout reserves a descriptor set or
+register space that the shader IR does not reference, pass
+`-trace-coverage-reserved-space <space>` to keep auto-allocation out
+of that space.
+
+Pass `-trace-coverage-binding <index> <space>` to pin the coverage
+buffer at a specific `(register, space)` pair instead:
 
 ```bash
 slangc shader.slang -target spirv -stage compute -entry main \
@@ -86,15 +88,29 @@ the host needs the slot fixed at compile time — for example when
 pre-building a D3D12 root signature before any host reflection /
 metadata reads run.
 
+`-trace-coverage-reserved-space` is repeatable and does not pin a
+specific binding. It is for descriptor-backed hosts whose runtime
+pipeline layout owns spaces that may be invisible to Slang for a
+particular entry point:
+
+```bash
+slangc shader.slang -target spirv -stage compute -entry main \
+    -trace-coverage -trace-coverage-reserved-space 0 -o shader.spv
+# If no higher shader-visible sets exist, __slang_coverage lands at
+# DescriptorSet 1 / Binding 0.
+```
+
 ---
 
 ## Integration workflows
 
 Two equally supported paths, each suited to a different host
 architecture. Both expose the same data: counter count, per-slot
-`(file, line)`, and the coverage buffer's hidden binding. A slot may
-have no real source file/line; that is preserved in the metadata and
-filtered out later when exporting LCOV.
+`(file, line)`, and the coverage buffer's hidden binding. The typed
+API exposes this through `ICoverageTracingMetadata` plus
+`ISyntheticResourceMetadata`; the sidecar serializes the same contract.
+A slot may have no real source file/line; that is preserved in the
+metadata and filtered out later when exporting LCOV.
 
 ### A. In-process compile (Slang C++ API)
 
@@ -163,7 +179,11 @@ If a host wants the same `.coverage-mapping.json` bytes that `slangc`
 writes as a sidecar — for example to feed
 [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py) without
 going through a file, or to ship the manifest to a separate
-analysis process — call `slang_writeCoverageManifestJson`:
+analysis process — call `slang_writeCoverageManifestJson` with the
+coverage interface obtained from the artifact metadata object. The
+serializer includes the buffer binding fields when that same object
+also supports `ISyntheticResourceMetadata`, which is the normal Slang
+artifact case:
 
 ```cpp
 ComPtr<ISlangBlob> manifest;
@@ -174,8 +194,8 @@ slang_writeCoverageManifestJson(coverage, manifest.writeRef());
 
 The output is byte-identical to slangc's sidecar, so anything that
 parses sidecar files (the Python LCOV converter, custom external
-tools, and the forthcoming `slang-coverage-rt` C library) accepts
-the in-memory bytes as well.
+tools, or host-side manifest parsers) accepts the in-memory bytes as
+well.
 
 ### B. Precompiled with sidecar (slangc CLI)
 
@@ -209,11 +229,10 @@ slangc shader.slang -target spirv -stage compute -entry main \
 ```
 
 Hosts that aren't linked against Slang still get the data: the
-[`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py) Python
-script consumes this format today, and the fields match the
-in-process API one-for-one. A companion C helper library
-(`slang-coverage-rt`) for hosts that prefer a linked-in runtime
-ships in a follow-up PR.
+sidecar contains both the hidden binding and the slot attribution.
+The [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py) Python
+script consumes this format after dispatch when converting readback
+counters to LCOV.
 
 `slang-coverage-to-lcov.py` applies gcov/LCOV-style reporting rules
 at export time: entries without a real source file or with a
@@ -232,6 +251,7 @@ sidecar shape.
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `-trace-coverage`                         | Enables the feature. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites counter ops to atomic increments, and emits `<output>.coverage-mapping.json` sidecar when writing to a file.          |
 | `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time (e.g. for a pre-built D3D12 root signature). |
+| `-trace-coverage-reserved-space <space>`  | Marks a descriptor/register space as externally occupied during auto-allocation. Repeat the option for multiple spaces. Use it when the host pipeline layout reserves spaces not visible in the compiled shader IR.                                                              |
 
 ---
 
@@ -269,18 +289,18 @@ coverage semantics.
 ## Supported features
 
 The compiler-side instrumentation (counter ops, buffer synthesis,
-metadata generation) works across all backends. End-to-end host
-dispatch is the host's responsibility — the host reads the hidden
-resource location from `ISyntheticResourceMetadata` and declares the
-slot in its own pipeline layout / root signature.
+metadata generation) works across the supported backends listed below.
+End-to-end host dispatch is the host's responsibility — the host reads
+the hidden resource location from `ISyntheticResourceMetadata` and
+declares the slot in its own pipeline layout / root signature.
 
 ### Compiler instrumentation
 
 | Backend                                   | Default `-trace-coverage`                                                                                                                                                                                                                                                                         | `-trace-coverage-binding=N:0`          | `-trace-coverage-binding=N:M` (M ≠ 0) |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
 | CPU                                       | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
-| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the descriptor set after the highest shader-visible set at binding 0.                                                                                                                                                                                              | Supported                              | Compiler-side decoration correct      |
-| D3D12 / HLSL                              | Supported                                                                                                                                                                                                                                                                                         | Supported                              | Supported                             |
+| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the descriptor set after the highest shader-visible or host-reserved set at binding 0.                                                                                                                                                                             | Supported                              | Compiler-side decoration correct      |
+| D3D12 / HLSL                              | Supported. `-trace-coverage-reserved-space` can keep auto-allocation out of host-owned register spaces.                                                                                                                                                                                             | Supported                              | Supported                             |
 | CUDA                                      | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
 | Metal (direct)                            | Compiles. End-to-end dispatch is unreliable due to a pre-existing slang-rhi Metal binding quirk ([shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724)) — not a coverage-feature defect.                                                                             | (untested)                             | (untested)                            |
 | GLSL                                      | Supported codegen                                                                                                                                                                                                                                                                                 | (untested)                             | (untested)                            |
@@ -316,3 +336,5 @@ slot in its own pipeline layout / root signature.
   Direct hosts must include the reported coverage `(set, binding)` in
   their pipeline layout and bind the counter buffer there. Hosts that
   require a fixed existing set can use `-trace-coverage-binding`.
+  Hosts that reserve descriptor sets outside the shader IR can use
+  `-trace-coverage-reserved-space`.

@@ -17,11 +17,14 @@ These are handled by two different mechanisms:
 
 - IR-time synthesis of `RWStructuredBuffer<uint> __slang_coverage`
   in the `slang-ir-coverage-instrument` pass
-- post-emit coverage metadata exposed as `ICoverageTracingMetadata`
+- post-emit metadata exposed as `ICoverageTracingMetadata` for
+  counter attribution and `ISyntheticResourceMetadata` for hidden
+  resource binding
 
 The first is about getting the buffer into the compiled shader. The
-second is about letting the host discover where the buffer lives and
-attribute counter values back to source.
+second is about letting the host discover where the buffer lives
+through synthetic-resource metadata and attribute counter values back
+to source through coverage metadata.
 
 Binding and attribution
 -----------------------
@@ -125,12 +128,17 @@ Enabling `-trace-coverage` runs three pipeline stages:
    - **Picks a (set, binding)** — either honoring
      `-trace-coverage-binding <reg> <space>` if supplied, or
      auto-allocating a non-conflicting location for the chosen
-     resource kind. On Khronos / SPIR-V / GLSL descriptor-set
-     targets, auto-allocation picks the descriptor set after the
-     highest shader-visible set and binds coverage at binding 0 so the
-     compiler does not mutate or fill holes in a user-owned set layout.
-     On register-space targets such as HLSL,
-     auto-allocation picks the next free binding in space 0.
+     resource kind. Hosts can also pass
+     `-trace-coverage-reserved-space <space>` one or more times to
+     mark descriptor sets / register spaces that belong to the runtime
+     pipeline layout even if the compiled shader does not reference
+     them. On Khronos / SPIR-V / GLSL descriptor-set targets,
+     auto-allocation picks the descriptor set after the highest
+     shader-visible or host-reserved set and binds coverage at binding
+     0 so the compiler does not mutate or fill holes in a user-owned
+     set layout. On register-space targets such as HLSL,
+     auto-allocation picks the next free binding in space 0 unless
+     that space is reserved or unbounded.
    - **Extends the program-scope var layout** to include the new
      buffer as a struct field so `collectGlobalUniformParameters`
      packs it alongside user globals on targets that pack ordinary
@@ -143,17 +151,17 @@ Enabling `-trace-coverage` runs three pipeline stages:
      keeps the door open for branch/function coverage later).
    - **Rewrites each op as `AtomicAdd(__slang_coverage[slot], 1,
      Relaxed)`**.
-   - **Records `(slot → file, line)` plus the buffer's binding** on
-     the artifact's `ICoverageTracingMetadata`. A slot is
-     unattributable when its `IncrementCoverageCounter` op carried
-     an invalid `sourceLoc`, or one whose humane-loc has no positive
-     line — typically because the underlying statement came from
-     code synthesis (autodiff reverse-mode, generic specialization,
-     struct constructor synthesis) rather than user-authored source.
-     The LCOV converter skips these slots so the report stays line-
-     oriented; consumers reading `ICoverageTracingMetadata` directly
-     see them as `entry.file == nullptr` / `entry.line == 0` after
-     `getEntryInfo`.
+   - **Records `(slot → file, line)` on the artifact's
+     `ICoverageTracingMetadata` and the synthesized buffer binding on
+     `ISyntheticResourceMetadata`.** A slot is unattributable when its
+     `IncrementCoverageCounter` op carried an invalid `sourceLoc`, or
+     one whose humane-loc has no positive line — typically because the
+     underlying statement came from code synthesis (autodiff reverse-
+     mode, generic specialization, struct constructor synthesis)
+     rather than user-authored source. The LCOV converter skips these
+     slots so the report stays line-oriented; consumers reading
+     `ICoverageTracingMetadata` directly see them as
+     `entry.file == nullptr` / `entry.line == 0` after `getEntryInfo`.
 
 3. **Emission.** Each backend already handles `kIROp_AtomicAdd` on
    `RWStructuredBuffer<uint>`:
@@ -161,7 +169,8 @@ Enabling `-trace-coverage` runs three pipeline stages:
    - SPIR-V → `OpAtomicIAdd`
    - GLSL → `atomicAdd`
    - Metal → Metal atomic builtins
-   - WGSL → `atomicAdd`
+   - WGSL → not reached today; coverage instrumentation is skipped
+     before rewrite for WGSL targets
    - CUDA → `atomicAdd`
    - CPU → `_slang_atomic_add_u32` prelude helper (GCC/Clang
      `__atomic_fetch_add`, MSVC `_InterlockedExchangeAdd`)
@@ -178,8 +187,8 @@ Where each stage lives
 | `source/slang/slang-ir-coverage-instrument.{h,cpp}` | IR pass — synthesizes the buffer, extends program-scope layout, rewrites counter ops, writes metadata |
 | `source/slang/slang-ir-insts.lua` | Declares the `IncrementCoverageCounter` IR op |
 | `source/slang/slang-lower-to-ir.cpp` | Emits counter ops during AST lowering; filters `BlockStmt` / `SeqStmt` / `EmptyStmt` |
-| `source/slang/slang-emit.cpp` | Integrates the pass into the pipeline + allocates metadata + plumbs `-trace-coverage-binding` |
-| `source/slang/slang-options.cpp` | Registers the `-trace-coverage` and `-trace-coverage-binding` CLI flags |
+| `source/slang/slang-emit.cpp` | Integrates the pass into the pipeline + allocates metadata + plumbs `-trace-coverage-binding` / `-trace-coverage-reserved-space` |
+| `source/slang/slang-options.cpp` | Registers the `-trace-coverage`, `-trace-coverage-binding`, and `-trace-coverage-reserved-space` CLI flags |
 | `source/slang/slang-end-to-end-request.cpp` | Writes the `.coverage-mapping.json` sidecar from slangc |
 | `include/slang.h` | `slang::ICoverageTracingMetadata` public interface |
 | `source/compiler-core/slang-artifact-associated-impl.{h,cpp}` | `ArtifactPostEmitMetadata` implements the interface |
@@ -204,19 +213,20 @@ shader in the same process: test runners, in-engine compile
 pipelines, slangpy bindings, JIT compilers. They hold the compiled
 artifact in memory, the canonical metadata is right there, and they
 need typed access without going through serialization, schema
-versioning, or file I/O. `ICoverageTracingMetadata` is exactly that
-shape: a query interface on the artifact's `IMetadata`, returning
-counter count, per-slot `(file, line)`, and the chosen
-`(space, binding)`.
+versioning, or file I/O. The artifact's `IMetadata` exposes the two
+query interfaces needed by the host: `ICoverageTracingMetadata`
+returns counter count and per-slot `(file, line)`, while
+`ISyntheticResourceMetadata` returns the chosen hidden-resource
+binding.
 
 A companion free function — `slang_writeCoverageManifestJson` —
 serializes an `ICoverageTracingMetadata` to the canonical
-`.coverage-mapping.json` shape on demand, byte-identical to what
-`slangc` writes as a sidecar. Hosts that want the sidecar bytes
-without going through disk (to feed the Python LCOV converter, a
-network channel, or — once it ships in a follow-up PR — the
-`slang-coverage-rt` C parser) call it directly; hosts that consume
-the typed accessors don't need it.
+`.coverage-mapping.json` shape on demand. When the same metadata object
+also supports `ISyntheticResourceMetadata` (the normal Slang artifact
+case), the serializer includes the buffer binding fields as well.
+Hosts that want the sidecar bytes without going through disk (to feed
+the Python LCOV converter or a network channel) call it directly;
+hosts that consume the typed accessors don't need it.
 
 Today the in-tree consumer is:
 
@@ -227,8 +237,8 @@ Today the in-tree consumer is:
   public serializer.
 
 A reference end-to-end host integration that uses both the typed
-metadata path and `slang_writeCoverageManifestJson` is queued as a
-follow-up PR (`examples/shader-coverage-demo`).
+metadata path and `slang_writeCoverageManifestJson` is planned as a
+follow-up.
 
 The intended longer-term audience is in-process integrators that
 don't exist in-tree today: slangpy bindings, in-engine compile
@@ -262,9 +272,9 @@ Today the in-tree consumer is:
   emits LCOV consumable by `genhtml`, `reportgenerator`, VS Code
   Coverage Gutters, Codecov.
 
-A C helper library (`source/slang-coverage-rt/`) for hosts that want
-to accumulate hits and emit reports programmatically without linking
-the Slang compiler is queued as a follow-up PR.
+A helper library for hosts that want to accumulate hits and emit
+reports programmatically without linking the Slang compiler is a
+possible follow-up.
 
 The intended longer-term audience is external integrators and CI
 pipelines that need to attribute coverage values without linking
@@ -293,7 +303,8 @@ Host integration workflows
 Two equally-supported workflows, each suited to a different host
 architecture. In-process hosts query `ICoverageTracingMetadata` for
 counter attribution and `ISyntheticResourceMetadata` for binding;
-offline hosts consume the serialized sidecar with the same information.
+offline hosts consume the serialized sidecar produced from those same
+metadata interfaces.
 
 ### A. In-process compile (Slang C++ API)
 
@@ -321,20 +332,19 @@ with prebuilt shaders, vendor runtimes, CI pipelines.
 
 `slangc` writes `<output>.coverage-mapping.json` next to each
 compiled artifact when `-trace-coverage` is on. The sidecar is the
-on-disk serialization of the same fields the in-process API
-returns. The dispatching host reads the sidecar (e.g. via the
-Python LCOV converter under `tools/shader-coverage/`), declares the
-slot in its pipeline layout, and proceeds as in workflow A.
+on-disk serialization of the coverage attribution plus synthetic
+resource binding metadata. The dispatching host reads the sidecar,
+declares the slot in its pipeline layout, and proceeds as in workflow
+A. The Python LCOV converter under `tools/shader-coverage/` consumes
+the same sidecar later when converting readback counters to LCOV.
 
 ### Convenience layers (planned follow-up)
 
-A separate companion library `slang-coverage-rt` is queued as a
-follow-up PR. It will provide a C ABI that handles
+A helper library could provide a C ABI that handles
 `.coverage-mapping.json` parsing, counter accumulation across
 dispatches, and LCOV serialization for hosts that want LCOV output
-without implementing the format themselves. It will not be required
-for either workflow above. A reference end-to-end host integration
-(`examples/shader-coverage-demo`) ships with the same follow-up.
+without implementing the format themselves. It would not be required
+for either workflow above.
 
 Roadmap
 -------

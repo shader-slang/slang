@@ -553,6 +553,13 @@ void initCommandOptions(CommandOptions& options)
          "Useful when the host needs the binding fixed at compile time "
          "(e.g. for a pre-built D3D12 root signature). Implies "
          "`-trace-coverage`."},
+        {OptionKind::TraceCoverageReservedSpace,
+         "-trace-coverage-reserved-space",
+         "-trace-coverage-reserved-space <space>",
+         "Reserve a descriptor/register space when auto-allocating the "
+         "synthesized `__slang_coverage` buffer. Use this when the host "
+         "pipeline layout owns descriptor sets or register spaces that are "
+         "not visible in the compiled shader IR."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -2834,6 +2841,16 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     (int)bindingSpace);
                 // Implies -trace-coverage so users don't have to spell both.
                 linkage->m_optionSet.set(OptionKind::TraceCoverage, true);
+                break;
+            }
+        case OptionKind::TraceCoverageReservedSpace:
+            {
+                // -trace-coverage-reserved-space <space>
+                Int bindingSpace;
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindingSpace));
+                linkage->m_optionSet.add(
+                    OptionKind::TraceCoverageReservedSpace,
+                    (int)bindingSpace);
                 break;
             }
         case OptionKind::Profile:

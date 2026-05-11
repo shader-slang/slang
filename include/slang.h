@@ -1167,7 +1167,13 @@ typedef uint32_t SlangSizeT;
         TraceCoverage = 145, // bool: insert per-statement execution counters
         TraceCoverageBinding =
             146, // intValue0: register index; intValue1: register space — explicit
-                 //   binding for the synthesized __slang_coverage buffer
+                 //   binding for the synthesized __slang_coverage buffer. Consumed
+                 //   only when TraceCoverage is enabled; the slangc CLI spelling also
+                 //   enables TraceCoverage.
+        TraceCoverageReservedSpace =
+            147, // intValue0: descriptor/register space reserved by the host when
+                 //   auto-allocating the synthesized __slang_coverage buffer. This is
+                 //   a repeatable hint consumed only when TraceCoverage is enabled.
 
         CountOf,
     };
@@ -4530,11 +4536,14 @@ by calling `castAs` / `queryInterface` on the artifact-associated
 
 Intended use:
   - use `ICoverageTracingMetadata` for coverage-specific semantics:
-    counter count, slot-to-source attribution, manifest serialization,
-    and future coverage-entry semantics
+    counter count, slot-to-source attribution, input to manifest
+    serialization, and future coverage-entry semantics
   - use `ISyntheticResourceMetadata` for the generic hidden binding
     contract when the host needs to bind compiler-synthesized resources
     without relying on normal public reflection
+  - this interface does not report the coverage buffer binding; query
+    `ISyntheticResourceMetadata` for descriptor/register or CPU/CUDA
+    marshaling location
 
 Lifetime and ownership:
   - the metadata object is owned by the compiled artifact / `IMetadata`
@@ -5369,15 +5378,17 @@ struct SlangGlobalSessionDesc
  */
 SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t size);
 
-/* Serialize an `ICoverageTracingMetadata` artifact into the canonical
+/* Serialize coverage metadata into the canonical
  * `.coverage-mapping.json` shape. Same bytes that `slangc` writes
  * alongside compiled output when `-trace-coverage` is on, available
  * in-process for hosts compiling via the C++ API.
  *
- * The returned JSON is consumable by:
- * - `slang-coverage-rt` (C library) for accumulation + LCOV emission
- * - `tools/shader-coverage/slang-coverage-to-lcov.py` (Python)
- * - any tool expecting the version-1 manifest format
+ * The returned JSON is consumable by
+ * `tools/shader-coverage/slang-coverage-to-lcov.py` and any tool
+ * expecting the version-1 manifest format. If `metadata` is the
+ * artifact metadata object returned by Slang, it also supports
+ * `ISyntheticResourceMetadata`, and the serializer includes the
+ * coverage buffer's descriptor-facing binding fields when available.
  *
  * @param metadata The coverage metadata, obtained via
  *                 `castAs<ICoverageTracingMetadata>` on the artifact's

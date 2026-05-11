@@ -34,7 +34,8 @@ uses two explicit metadata channels:
 
 - how many counters exist
 - what source file/line each counter maps to
-- how to serialize the canonical coverage manifest
+- the typed input used by `slang_writeCoverageManifestJson` to
+  serialize the canonical coverage manifest
 
 This is the coverage-specific reporting layer.
 
@@ -67,7 +68,7 @@ Its intended use is:
 
 - coverage reporting
 - slot-to-source attribution
-- coverage manifest serialization
+- coverage manifest serialization through `slang_writeCoverageManifestJson`
 
 The coverage query methods are:
 
@@ -151,6 +152,21 @@ For hosts that already own their runtime binding logic,
 `getResourceInfo()` is the primary low-level API. The descriptor helper
 functions below are an optional convenience layer built on top of the
 same metadata.
+
+### Host-reserved spaces
+
+`ISyntheticResourceMetadata` reports the final binding Slang chose. It
+does not, by itself, know descriptor sets or register spaces that only
+exist in the host's runtime pipeline layout and are not referenced by
+the compiled shader IR. Descriptor-backed hosts with such externally
+owned spaces should pass `-trace-coverage-reserved-space <space>` when
+compiling, or set `CompilerOptionName::TraceCoverageReservedSpace`
+through the API while also enabling `CompilerOptionName::TraceCoverage`.
+The option is repeatable. It is an auto-allocation hint for Khronos
+descriptor sets and D3D register spaces; explicit
+`-trace-coverage-binding` still wins. Auto-allocation treats each
+reserved space as occupied, then reports the resulting coverage binding
+through `ISyntheticResourceMetadata`.
 
 ### Slang helper functions for descriptor-backed hosts
 
