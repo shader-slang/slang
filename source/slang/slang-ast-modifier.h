@@ -1031,7 +1031,7 @@ class UnscopedEnumAttribute : public Attribute
 };
 
 // Marker for enum class declarations, used to detect conflicting explicit
-// unscoped/scoped enum declarations. This attribute has no further semantics.
+// unscoped/scoped enum declarations. This modifier has no further semantics.
 FIDDLE()
 class EnumClassModifier : public Modifier
 {
