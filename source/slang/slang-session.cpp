@@ -1802,10 +1802,10 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
     String moduleSrcPath = "";
 
     auto dependencyChunks = moduleChunk->getFileDependencies();
-    // The first dependency is the module's own source file. Keep track of it separately so
-    // that if the original source is unavailable, we can still accept a standalone
-    // precompiled module. Missing later dependencies still indicate a stale source-backed
-    // module cache.
+    // The first dependency is the module's own source file. We still check it like the rest of
+    // the dependencies, but if that primary source is unavailable we accept the standalone
+    // precompiled module instead of treating it as stale. Missing later dependencies still
+    // indicate a stale source-backed module cache.
     auto firstDependencyChunk = dependencyChunks.getFirst();
     if (firstDependencyChunk)
     {
@@ -1838,11 +1838,16 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
         if (!sourceFile)
         {
             if (dependencyIndex == 0)
+            {
                 // If the module's own source file is unavailable, we can't prove staleness, so
                 // fall back to accepting the standalone precompiled module. Missing later
                 // dependencies still indicate a stale source-backed module cache.
                 return true;
-            return false;
+            }
+            else
+            {
+                return false;
+            }
         }
         digestBuilder.append(sourceFile->getDigest());
         dependencyIndex++;
