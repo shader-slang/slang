@@ -79,6 +79,9 @@ type Manager struct {
 	deleteVMFunc    func(context.Context, string, string) error
 	selectZonesFunc func(context.Context) ([]zoneCandidate, error)
 	insertVMFunc    func(context.Context, *computepb.InsertInstanceRequest) error
+	// beforeOrphanDelete is a test hook used to simulate races between the
+	// orphan candidate snapshot and the pre-delete revalidation.
+	beforeOrphanDelete func(orphanCandidate)
 	// nowFunc is overridable in tests to control the clock used for
 	// orphan eviction. Use m.now() at call sites — that falls back to
 	// time.Now when this is nil so existing tests that construct
@@ -794,6 +797,25 @@ type orphanCandidate struct {
 	age        time.Duration
 }
 
+func (m *Manager) orphanCandidateStillIdle(c orphanCandidate) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	vm, ok := m.vms[c.runnerName]
+	return ok && !vm.busy && vm.vmName == c.vmName && vm.zone == c.zone
+}
+
+func (m *Manager) removeOrphanCandidateIfIdle(c orphanCandidate) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if vm, ok := m.vms[c.runnerName]; ok && !vm.busy && vm.vmName == c.vmName && vm.zone == c.zone {
+		delete(m.vms, c.runnerName)
+		return true
+	}
+	return false
+}
+
 // evictStaleOrphans tears down tracked VMs that have been idle (never
 // marked busy by HandleJobStarted) for longer than OrphanGracePeriod.
 //
@@ -842,7 +864,22 @@ func (m *Manager) evictStaleOrphans(ctx context.Context) {
 	}
 	m.mu.Unlock()
 
+	deleted := 0
+	skipped := 0
 	for _, c := range candidates {
+		if m.beforeOrphanDelete != nil {
+			m.beforeOrphanDelete(c)
+		}
+		if !m.orphanCandidateStillIdle(c) {
+			skipped++
+			slog.Info("skipping orphan VM eviction: tracked VM changed or went busy",
+				"runner", c.runnerName,
+				"vm", c.vmName,
+				"zone", c.zone,
+			)
+			continue
+		}
+
 		slog.Warn("evicting orphan VM: tracked but never went busy",
 			"runner", c.runnerName,
 			"vm", c.vmName,
@@ -859,20 +896,18 @@ func (m *Manager) evictStaleOrphans(ctx context.Context) {
 				"vm", c.vmName, "zone", c.zone, "error", err)
 			continue
 		}
+		deleted++
 
-		// Drop the tracked entry. Re-check busy and the same vmInfo
-		// pointer under the lock in case HandleJobStarted raced us
-		// between the snapshot and the delete.
-		m.mu.Lock()
-		if vm, ok := m.vms[c.runnerName]; ok && !vm.busy && vm.vmName == c.vmName {
-			delete(m.vms, c.runnerName)
-		}
-		m.mu.Unlock()
+		// Drop the tracked entry. Re-check under the lock in case the entry
+		// changed while the GCP delete was in flight.
+		m.removeOrphanCandidateIfIdle(c)
 	}
 
 	if len(candidates) > 0 {
 		slog.Info("orphan eviction pass completed",
-			"orphans_evicted", len(candidates),
+			"orphan_candidates", len(candidates),
+			"orphans_deleted", deleted,
+			"orphans_skipped", skipped,
 			"tracked_after", m.ActiveCount(),
 		)
 	}

@@ -626,7 +626,36 @@ func TestEvictStaleOrphansSparesEntriesWithoutCreatedAt(t *testing.T) {
 	}
 }
 
-func TestEvictStaleOrphansSkipsWhenBusyRaceAfterDelete(t *testing.T) {
+func TestEvictStaleOrphansSkipsWhenBusyBeforeDelete(t *testing.T) {
+	now := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
+	stale := now.Add(-45 * time.Minute)
+
+	var m *Manager
+	m = &Manager{
+		config:  ManagerConfig{OrphanGracePeriod: 30 * time.Minute},
+		nowFunc: fakeClock(now),
+		vms: map[string]*vmInfo{
+			"runner-orphan": {vmName: "linux-test-orphan", zone: "us-east1-c", createdAt: stale},
+		},
+		beforeOrphanDelete: func(c orphanCandidate) {
+			m.MarkBusy(c.runnerName)
+		},
+		deleteVMFunc: func(context.Context, string, string) error {
+			t.Fatal("delete should not be called after the runner goes busy")
+			return nil
+		},
+	}
+
+	m.evictStaleOrphans(context.Background())
+
+	if vm, ok := m.vms["runner-orphan"]; !ok {
+		t.Fatal("tracking entry should be retained when the VM raced to busy")
+	} else if !vm.busy {
+		t.Fatal("busy flag should have survived")
+	}
+}
+
+func TestEvictStaleOrphansRetainsTrackingWhenBusyDuringDelete(t *testing.T) {
 	now := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
 	stale := now.Add(-45 * time.Minute)
 
