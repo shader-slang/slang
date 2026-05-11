@@ -49,8 +49,8 @@ type ManagerConfig struct {
 	VMPrefix         string // VM name prefix for cleanup (e.g., "win-runner" or "linux-runner")
 	CleanupInterval  time.Duration
 	// OrphanGracePeriod is the maximum time a tracked VM may remain idle
-	// (busy == false) before being evicted as an orphan. Zero disables
-	// the eviction. Unset uses defaultOrphanGracePeriod.
+	// (busy == false) before being evicted as an orphan. A negative value
+	// disables eviction. Zero (unset) uses defaultOrphanGracePeriod.
 	OrphanGracePeriod time.Duration
 }
 
@@ -112,12 +112,7 @@ func NewManager(ctx context.Context, cfg ManagerConfig) (*Manager, error) {
 	if cfg.CleanupInterval <= 0 {
 		cfg.CleanupInterval = defaultCleanupInterval
 	}
-	if cfg.OrphanGracePeriod < 0 {
-		cfg.OrphanGracePeriod = 0
-	}
-	if cfg.OrphanGracePeriod == 0 {
-		cfg.OrphanGracePeriod = defaultOrphanGracePeriod
-	}
+	cfg.OrphanGracePeriod = normalizeOrphanGracePeriod(cfg.OrphanGracePeriod)
 
 	cleanupCtx, cancelCleanup := context.WithCancel(ctx)
 
@@ -140,6 +135,13 @@ func NewManager(ctx context.Context, cfg ManagerConfig) (*Manager, error) {
 	}
 
 	return mgr, nil
+}
+
+func normalizeOrphanGracePeriod(grace time.Duration) time.Duration {
+	if grace == 0 {
+		return defaultOrphanGracePeriod
+	}
+	return grace
 }
 
 // now returns the current time using the injected clock, or time.Now

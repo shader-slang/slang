@@ -100,6 +100,18 @@ func TestRunCleanupLoopRunsImmediatePass(t *testing.T) {
 	}
 }
 
+func TestNormalizeOrphanGracePeriod(t *testing.T) {
+	if got := normalizeOrphanGracePeriod(0); got != defaultOrphanGracePeriod {
+		t.Fatalf("zero grace should use default, got %v", got)
+	}
+	if got := normalizeOrphanGracePeriod(-time.Minute); got != -time.Minute {
+		t.Fatalf("negative grace should remain disabled, got %v", got)
+	}
+	if got := normalizeOrphanGracePeriod(5 * time.Minute); got != 5*time.Minute {
+		t.Fatalf("positive grace should be preserved, got %v", got)
+	}
+}
+
 func TestRunCleanupLoopRunsOnTick(t *testing.T) {
 	m := &Manager{}
 	ticks := make(chan time.Time, 1)
