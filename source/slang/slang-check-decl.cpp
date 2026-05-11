@@ -11508,10 +11508,7 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
 }
 
 // Increments an enumerator value and returns true if there was a wrap-around
-static bool _incrementEnumerator(
-    IntegerLiteralValue& value,
-    BaseType baseType,
-    bool isFlags)
+static bool _incrementEnumerator(IntegerLiteralValue& value, BaseType baseType, bool isFlags)
 {
     const BaseTypeInfo& info = BaseTypeInfo::getInfo(baseType);
 
