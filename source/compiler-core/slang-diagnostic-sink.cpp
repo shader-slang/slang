@@ -455,9 +455,15 @@ static void formatDiagnostic(DiagnosticSink* sink, Diagnostic const& diagnostic,
         {
             SourceView* currentView = sourceView;
 
-            while (currentView && currentView->getInitiatingSourceLoc().isValid() &&
-                   currentView->getSourceFile()->getPathInfo().type == PathInfo::Type::TokenPaste)
+            while (currentView && currentView->getInitiatingSourceLoc().isValid())
             {
+                const PathInfo::Type pathType = currentView->getSourceFile()->getPathInfo().type;
+                if (pathType != PathInfo::Type::TokenPaste &&
+                    pathType != PathInfo::Type::MacroExpansion)
+                {
+                    break;
+                }
+
                 SourceView* initiatingView =
                     sourceManager
                         ? sourceManager->findSourceView(currentView->getInitiatingSourceLoc())
@@ -467,29 +473,35 @@ static void formatDiagnostic(DiagnosticSink* sink, Diagnostic const& diagnostic,
                     break;
                 }
 
-                const DiagnosticInfo& diagnosticInfo = MiscDiagnostics::seeTokenPasteLocation;
+                const DiagnosticInfo& diagnosticInfo = (pathType == PathInfo::Type::MacroExpansion)
+                                                           ? MiscDiagnostics::seeExpandedFromMacro
+                                                           : MiscDiagnostics::seeTokenPasteLocation;
 
-                // Turn the message format into a message. For the moment it assumes no parameters.
                 StringBuilder msg;
-                formatDiagnosticMessage(msg, diagnosticInfo.messageFormat, 0, nullptr);
+                if (pathType == PathInfo::Type::MacroExpansion)
+                {
+                    const String& macroName = currentView->getSourceFile()->getPathInfo().foundPath;
+                    DiagnosticArg arg(macroName);
+                    formatDiagnosticMessage(msg, diagnosticInfo.messageFormat, 1, &arg);
+                }
+                else
+                {
+                    formatDiagnosticMessage(msg, diagnosticInfo.messageFormat, 0, nullptr);
+                }
 
                 // Set up the diagnostic.
                 Diagnostic initiationDiagnostic;
                 initiationDiagnostic.ErrorID = diagnosticInfo.id;
                 initiationDiagnostic.Message = msg.produceString();
-                initiationDiagnostic.loc = sourceView->getInitiatingSourceLoc();
+                initiationDiagnostic.loc = currentView->getInitiatingSourceLoc();
                 initiationDiagnostic.severity = diagnosticInfo.severity;
 
-                // TODO(JS):
-                // Not 100%  clear what the best sourceLoc type is most useful here - we will go
-                // with default for now
-                HumaneSourceLoc pasteHumaneLoc =
-                    initiatingView->getHumaneLoc(sourceView->getInitiatingSourceLoc());
+                HumaneSourceLoc initiatingHumaneLoc =
+                    initiatingView->getHumaneLoc(currentView->getInitiatingSourceLoc());
 
-                // Okay we should output where the token paste took place
-                formatDiagnostic(pasteHumaneLoc, initiationDiagnostic, sink->getFlags(), sb);
+                formatDiagnostic(initiatingHumaneLoc, initiationDiagnostic, sink->getFlags(), sb);
 
-                // Make the initiatingView the current view
+                // Walk up to the next level of the expansion chain.
                 currentView = initiatingView;
             }
         }
@@ -632,6 +644,58 @@ bool DiagnosticSink::diagnoseRichImpl(
     return diagnoseRichImpl(diagnostic, info, getSourceManager());
 }
 
+/// Walk the macro expansion chain rooted at `primaryLoc` and append a note for each level of
+/// macro expansion (MacroExpansion) or token-paste (TokenPaste) that is encountered.
+/// This gives the user the full "expanded from macro 'X'" stack in rich diagnostics.
+static void appendMacroExpansionNotes(
+    SourceManager* sm,
+    SourceLoc primaryLoc,
+    List<DiagnosticNote>& notes)
+{
+    if (!sm || !primaryLoc.isValid())
+        return;
+
+    SourceView* currentView = sm->findSourceView(primaryLoc);
+    while (currentView && currentView->getInitiatingSourceLoc().isValid())
+    {
+        const PathInfo::Type pathType = currentView->getSourceFile()->getPathInfo().type;
+        if (pathType != PathInfo::Type::MacroExpansion && pathType != PathInfo::Type::TokenPaste)
+            break;
+
+        SourceView* initiatingView = sm->findSourceView(currentView->getInitiatingSourceLoc());
+        if (!initiatingView)
+            break;
+
+        DiagnosticNote note;
+        if (pathType == PathInfo::Type::MacroExpansion)
+        {
+            const String& macroName = currentView->getSourceFile()->getPathInfo().foundPath;
+            DiagnosticArg arg(macroName);
+            StringBuilder msg;
+            formatDiagnosticMessage(
+                msg,
+                MiscDiagnostics::seeExpandedFromMacro.messageFormat,
+                1,
+                &arg);
+            note.message = msg.produceString();
+        }
+        else
+        {
+            StringBuilder msg;
+            formatDiagnosticMessage(
+                msg,
+                MiscDiagnostics::seeTokenPasteLocation.messageFormat,
+                0,
+                nullptr);
+            note.message = msg.produceString();
+        }
+        note.span.range = SourceRange{currentView->getInitiatingSourceLoc()};
+        notes.add(std::move(note));
+
+        currentView = initiatingView;
+    }
+}
+
 bool DiagnosticSink::diagnoseRichImpl(
     const GenericDiagnostic& diagnostic,
     const DiagnosticInfo* info,
@@ -651,6 +715,13 @@ bool DiagnosticSink::diagnoseRichImpl(
     // Create a copy with the effective severity for rendering
     GenericDiagnostic effectiveDiagnostic = diagnostic;
     effectiveDiagnostic.severity = effectiveSeverity;
+
+    // Append notes for any macro expansion chain rooted at the primary location.
+    // This gives the user "expanded from macro 'X'" notes for each nesting level.
+    appendMacroExpansionNotes(
+        sourceManager,
+        effectiveDiagnostic.primarySpan.range.begin,
+        effectiveDiagnostic.notes);
 
     if (effectiveSeverity >= Severity::Error)
     {

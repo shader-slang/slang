@@ -14,3 +14,4 @@
 PASTE(A, B)
 //CHECK: unexpected token
 //CHECK: unexpected '++', expected identifier
+//CHECK: see token pasted location

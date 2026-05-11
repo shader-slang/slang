@@ -61,6 +61,11 @@ bool PathInfo::operator==(const ThisType& rhs) const
         {
             return true;
         }
+    case Type::MacroExpansion:
+        {
+            // Two MacroExpansion PathInfos are equal if they name the same macro.
+            return foundPath == rhs.foundPath;
+        }
     case Type::Normal:
         {
             return foundPath == rhs.foundPath && uniqueIdentity == rhs.uniqueIdentity;
@@ -82,6 +87,9 @@ void PathInfo::appendDisplayName(StringBuilder& out) const
 {
     switch (type)
     {
+    case Type::MacroExpansion:
+        out << "macro '" << foundPath << "'";
+        break;
     case Type::TokenPaste:
         out << "[Token Paste]";
         break;

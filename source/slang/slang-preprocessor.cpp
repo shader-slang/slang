@@ -779,6 +779,21 @@ private:
     /// nested macro invocations might be in flight.
     SourceLoc m_initiatingMacroInvocationLoc;
 
+    /// SourceView representing this specific invocation of the macro.
+    /// Its m_initiatingSourceLoc points back to m_macroInvocationLoc, establishing
+    /// the expansion chain used by the diagnostic renderer.
+    SourceView* m_expansionView = nullptr;
+
+    /// The SourceLoc range of the macro's definition view; used to identify
+    /// body tokens that need to be remapped into m_expansionView's range.
+    SourceRange m_definitionRange;
+
+    /// If token.loc falls within m_definitionRange, remap it into m_expansionView's range
+    /// so that the diagnostic chain can walk back to this invocation's call site.
+    /// Tokens from argument substitution or token-paste already have their own locs and
+    /// are left untouched.
+    void _maybeRemapBodyTokenLoc(Token& token) const;
+
     /// One token of lookahead
     Token m_lookaheadToken;
 
@@ -1476,6 +1491,42 @@ MacroInvocation::MacroInvocation(
     m_macroInvocationLoc = macroInvocationLoc;
     m_initiatingMacroInvocationLoc = initiatingMacroInvocationLoc;
     m_isStartOfLine = isStartOfLine;
+
+    // Build a per-invocation SourceView so that the diagnostic renderer can walk the
+    // expansion chain back to the call site (m_macroInvocationLoc).  We only do this
+    // when the macro has body tokens whose definition SourceView we can locate; builtins
+    // and empty macros are left without an expansion view.
+    if (macro->tokens.m_tokens.getCount() > 0 && macroInvocationLoc.isValid())
+    {
+        SourceManager* sm = preprocessor->getSourceManager();
+        SourceLoc firstBodyLoc = macro->tokens.m_tokens[0].loc;
+        SourceView* defView = sm->findSourceView(firstBodyLoc);
+        if (defView && defView->getSourceFile()->getContentBlob())
+        {
+            m_definitionRange = defView->getRange();
+
+            // Create a fresh SourceFile that shares the macro body content but carries
+            // PathInfo::MacroExpansion so the diagnostic chain can distinguish it from
+            // regular files and token-paste synthetic content.
+            PathInfo expansionPathInfo = PathInfo::makeFromMacroExpansion(macro->getName()->text);
+            SourceFile* expansionFile = sm->createSourceFileWithBlob(
+                expansionPathInfo,
+                defView->getSourceFile()->getContentBlob());
+
+            // The expansion view's m_initiatingSourceLoc is the call site; following
+            // this chain across nested expansions gives the full macro expansion stack.
+            m_expansionView = sm->createSourceView(expansionFile, nullptr, macroInvocationLoc);
+        }
+    }
+}
+
+void MacroInvocation::_maybeRemapBodyTokenLoc(Token& token) const
+{
+    if (m_expansionView && m_definitionRange.contains(token.loc))
+    {
+        token.loc = SourceLoc::fromRaw(
+            m_expansionView->getRange().begin.getRaw() + m_definitionRange.getOffset(token.loc));
+    }
 }
 
 void MacroInvocation::prime(MacroInvocation* nextBusyMacroInvocation)
@@ -1997,6 +2048,7 @@ Token MacroInvocation::_readTokenImpl()
                 token.flags |= TokenFlag::AtStartOfLine;
                 m_isStartOfLine = false;
             }
+            _maybeRemapBodyTokenLoc(token);
             return token;
         }
 
@@ -2027,6 +2079,7 @@ Token MacroInvocation::_readTokenImpl()
                 token.flags |= TokenFlag::AtStartOfLine;
                 m_isStartOfLine = false;
             }
+            _maybeRemapBodyTokenLoc(token);
             return token;
         }
 
