@@ -35,10 +35,10 @@ primitive:
   rather than via an AST decl. This keeps it out of Slang's public
   reflection surface (no synthetic decl leaking into IDE / language-
   server / `IComponentType::getLayout()` views) and produces exactly
-  one buffer per linked program by construction. The (set, binding)
-  the buffer ends up at is reported via `ICoverageTracingMetadata`,
-  and hosts use that information to declare the slot in their own
-  pipeline-layout / root-signature / descriptor-set machinery.
+  one buffer per linked program by construction. The binding the buffer
+  ends up at is reported via `ISyntheticResourceMetadata`, and hosts
+  use that information to declare the slot in their own pipeline-layout
+  / root-signature / descriptor-set machinery.
 
 - **Attribution** — turning counter values back into source
   locations. Reflection doesn't carry "slot 7 →
@@ -75,16 +75,16 @@ owns the rest of the feature:
 - **Not in user-facing reflection.** No synthetic decl appears in
   `IModule::getLayout()`, IDE completion, or language-server
   views. Hosts that need to bind the buffer consult
-  `ICoverageTracingMetadata`, which is the same channel that
-  carries the slot-to-source attribution they need anyway.
+  `ISyntheticResourceMetadata`; hosts that need to interpret counter
+  values consult `ICoverageTracingMetadata`.
 - **Self-contained pass.** `slang-ir-coverage-instrument.cpp` owns
   buffer creation, layout assignment, target-policy selection,
   counter-op rewriting, and metadata recording. Disabling
   `-trace-coverage` keeps the rest of the compiler unaware of the
   feature's existence.
 
-Hosts integrate by reading `(set, binding)` from
-`ICoverageTracingMetadata` and declaring the slot in their own
+Hosts integrate by reading the hidden binding record from
+`ISyntheticResourceMetadata` and declaring the slot in their own
 pipeline-layout / root-signature / descriptor-set code, just like
 they would for any user-declared resource — the metadata-driven
 binding info is the canonical source for any compiler-synthesized
@@ -126,9 +126,10 @@ Enabling `-trace-coverage` runs three pipeline stages:
      `-trace-coverage-binding <reg> <space>` if supplied, or
      auto-allocating a non-conflicting location for the chosen
      resource kind. On Khronos / SPIR-V / GLSL descriptor-set
-     targets, auto-allocation picks the first unused descriptor set
-     and binds coverage at binding 0 so the compiler does not mutate
-     a user-owned set layout. On register-space targets such as HLSL,
+     targets, auto-allocation picks the descriptor set after the
+     highest shader-visible set and binds coverage at binding 0 so the
+     compiler does not mutate or fill holes in a user-owned set layout.
+     On register-space targets such as HLSL,
      auto-allocation picks the next free binding in space 0.
    - **Extends the program-scope var layout** to include the new
      buffer as a struct field so `collectGlobalUniformParameters`
@@ -290,9 +291,9 @@ Host integration workflows
 --------------------------
 
 Two equally-supported workflows, each suited to a different host
-architecture. Both expose the same data through
-`ICoverageTracingMetadata`; they differ only in *when* and *where*
-the host queries it.
+architecture. In-process hosts query `ICoverageTracingMetadata` for
+counter attribution and `ISyntheticResourceMetadata` for binding;
+offline hosts consume the serialized sidecar with the same information.
 
 ### A. In-process compile (Slang C++ API)
 
@@ -300,10 +301,11 @@ Audience: applications that compile shaders at runtime via Slang's
 C++ API — production engines, custom shader runtimes, content-
 creation applications, compute applications.
 
-The host queries `ICoverageTracingMetadata` directly from the
-compiled artifact, reads `(set, binding)` and per-slot
-`(file, line)`, and declares the slot in its own pipeline-layout /
-root-signature code. No file I/O is involved; the
+The host queries metadata directly from the compiled artifact, reads
+the hidden resource binding from `ISyntheticResourceMetadata` and
+per-slot `(file, line)` attribution from `ICoverageTracingMetadata`,
+and declares the slot in its own pipeline-layout / root-signature code.
+No file I/O is involved; the
 `.coverage-mapping.json` sidecar is not produced or read.
 
 The host is free to consume the per-slot attribution in whatever

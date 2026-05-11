@@ -18,7 +18,8 @@ using namespace Slang;
 //   - invoke every virtual method in the vtable and check basic
 //     invariants: counter count is non-zero for an instrumented
 //     shader, per-entry `(file, line)` strings/values are populated,
-//     and buffer binding is reported
+//     and hidden buffer binding is available through synthetic
+//     resource metadata
 //
 // This is an ABI-level smoke test: if a future change reorders or
 // changes the signature of any virtual method in
@@ -158,14 +159,6 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(coverage->getEntryInfo(0, &entry) == SLANG_E_INVALID_ARG);
     }
 
-    // Buffer binding info: for a CPU target, space/binding values may
-    // be -1, but the call must succeed.
-    {
-        slang::CoverageBufferInfo bufferInfo;
-        SLANG_CHECK(coverage->getBufferInfo(&bufferInfo) == SLANG_OK);
-    }
-    SLANG_CHECK(coverage->getBufferInfo(nullptr) == SLANG_E_INVALID_ARG);
-
     // Synthetic resource metadata: coverage should surface one hidden
     // mutable structured buffer resource that hosts can use as a
     // binding helper bridge.
@@ -200,6 +193,24 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(lookedUpIndex == coverageResourceIndex);
     }
 
+    // CUDA follows the same synthetic-resource marshaling contract as
+    // CPU: the coverage buffer is discoverable through a concrete
+    // uniform payload offset/stride rather than through descriptor
+    // metadata.
+    {
+        auto cudaBundle = createMetadataBundle(SLANG_CUDA_SOURCE, "sm_5_0");
+        auto* cudaSyntheticResources = cudaBundle.syntheticResources;
+
+        SLANG_CHECK(cudaSyntheticResources->getResourceCount() == 1);
+
+        slang::SyntheticResourceInfo info;
+        SLANG_CHECK(cudaSyntheticResources->getResourceInfo(0, &info) == SLANG_OK);
+        SLANG_CHECK(info.id != 0);
+        SLANG_CHECK(info.bindingType == slang::BindingType::MutableRawBuffer);
+        SLANG_CHECK(info.uniformOffset >= 0);
+        SLANG_CHECK(info.uniformStride > 0);
+    }
+
     // Descriptor-backed targets should expose descriptor-facing binding
     // information while leaving CPU/CUDA uniform marshaling fields at their
     // documented sentinel values.
@@ -223,6 +234,11 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
             slang::SyntheticResourceDescriptorClass::Unsupported;
         SLANG_CHECK(slang::getSyntheticResourceDescriptorClass(info.bindingType, &descriptorClass));
         SLANG_CHECK(descriptorClass == slang::SyntheticResourceDescriptorClass::StorageBuffer);
+        const auto expectedDescriptorClass = descriptorClass;
+        SLANG_CHECK(!slang::getSyntheticResourceDescriptorClass(
+            slang::BindingType::Unknown,
+            &descriptorClass));
+        SLANG_CHECK(descriptorClass == slang::SyntheticResourceDescriptorClass::Unsupported);
 
         slang::SyntheticResourceDescriptorRange descriptorRange = {};
         SLANG_CHECK(
@@ -232,7 +248,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
                 &descriptorRange) == SLANG_OK);
         SLANG_CHECK(descriptorRange.id == info.id);
         SLANG_CHECK(descriptorRange.bindingType == info.bindingType);
-        SLANG_CHECK(descriptorRange.descriptorClass == descriptorClass);
+        SLANG_CHECK(descriptorRange.descriptorClass == expectedDescriptorClass);
         SLANG_CHECK(descriptorRange.space == info.space);
         SLANG_CHECK(descriptorRange.binding == info.binding);
         SLANG_CHECK(descriptorRange.arraySize == info.arraySize);
@@ -280,6 +296,15 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(descriptorRangeCount == 1);
         SLANG_CHECK(descriptorRanges[0].binding == descriptorRange.binding);
         SLANG_CHECK(descriptorRanges[0].space == descriptorRange.space);
+
+        descriptorRangeCount = 0;
+        SLANG_CHECK(
+            slang::getSyntheticResourceDescriptorRangesForSpace(
+                spirvSyntheticResources,
+                uint32_t(info.space + 1),
+                &descriptorRangeCount,
+                nullptr) == SLANG_OK);
+        SLANG_CHECK(descriptorRangeCount == 0);
     }
 
     {

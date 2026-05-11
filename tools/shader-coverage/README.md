@@ -36,13 +36,10 @@ Every executable statement in the shader gets instrumented to
 increment a counter at runtime. The compiler synthesizes a
 `RWStructuredBuffer<uint> __slang_coverage` directly in the IR
 coverage pass — no AST decl, so it does not appear in Slang's
-public reflection. Hosts discover the buffer's `(set, binding)`
-through `slang::ICoverageTracingMetadata` (queried in-process from
-the compiled artifact) and declare the slot in their own pipeline-
-layout / root-signature / descriptor-set machinery before binding
-the counter buffer at dispatch time. The same metadata tells the
-host how many counters to allocate and which source line each slot
-corresponds to.
+public reflection. Hosts discover the hidden resource binding through
+`slang::ISyntheticResourceMetadata` and use
+`slang::ICoverageTracingMetadata` to learn how many counters to
+allocate and which source line each slot corresponds to.
 
 The `.coverage-mapping.json` sidecar is **optional** — it's a
 serialization of the same metadata for cross-process / offline
@@ -70,8 +67,9 @@ and
 
 By default the IR coverage pass auto-allocates a non-conflicting
 location for `__slang_coverage`. For Vulkan / SPIR-V descriptor-set
-targets, it uses the first unused descriptor set at binding 0 so
-coverage does not extend a user-owned descriptor set layout. For
+targets, it uses the descriptor set after the highest shader-visible
+set at binding 0 so coverage does not extend or fill holes in a
+user-owned descriptor set layout. For
 register-space targets such as HLSL, it uses the next free binding in
 space 0. Pass `-trace-coverage-binding <index> <space>` to pin it at
 a specific `(register, space)` pair instead:
@@ -94,9 +92,9 @@ metadata reads run.
 
 Two equally supported paths, each suited to a different host
 architecture. Both expose the same data: counter count, per-slot
-`(file, line)`, and the coverage buffer's `(set, binding)`. A slot
-may have no real source file/line; that is preserved in the metadata
-and filtered out later when exporting LCOV.
+`(file, line)`, and the coverage buffer's hidden binding. A slot may
+have no real source file/line; that is preserved in the metadata and
+filtered out later when exporting LCOV.
 
 ### A. In-process compile (Slang C++ API)
 
@@ -104,7 +102,8 @@ and filtered out later when exporting LCOV.
 shader.slang ── compile (C++ API) ──► in-memory artifact + IMetadata
                                                  │
                                        castAs<ICoverageTracingMetadata>
-                                       → (set, binding), slot→(file, line)
+                                       castAs<ISyntheticResourceMetadata>
+                                       → binding, slot→(file, line)
                                                  ▼
                                        host: allocate, bind, dispatch,
                                              readback, consume directly
@@ -271,8 +270,8 @@ coverage semantics.
 
 The compiler-side instrumentation (counter ops, buffer synthesis,
 metadata generation) works across all backends. End-to-end host
-dispatch is the host's responsibility — the host reads
-`(set, binding)` from `ICoverageTracingMetadata` and declares the
+dispatch is the host's responsibility — the host reads the hidden
+resource location from `ISyntheticResourceMetadata` and declares the
 slot in its own pipeline layout / root signature.
 
 ### Compiler instrumentation
@@ -280,7 +279,7 @@ slot in its own pipeline layout / root signature.
 | Backend                                   | Default `-trace-coverage`                                                                                                                                                                                                                                                                         | `-trace-coverage-binding=N:0`          | `-trace-coverage-binding=N:M` (M ≠ 0) |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
 | CPU                                       | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
-| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the first unused descriptor set at binding 0.                                                                                                                                                                                                                      | Supported                              | Compiler-side decoration correct      |
+| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the descriptor set after the highest shader-visible set at binding 0.                                                                                                                                                                                              | Supported                              | Compiler-side decoration correct      |
 | D3D12 / HLSL                              | Supported                                                                                                                                                                                                                                                                                         | Supported                              | Supported                             |
 | CUDA                                      | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
 | Metal (direct)                            | Compiles. End-to-end dispatch is unreliable due to a pre-existing slang-rhi Metal binding quirk ([shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724)) — not a coverage-feature defect.                                                                             | (untested)                             | (untested)                            |

@@ -362,9 +362,8 @@ uint32_t ArtifactPostEmitMetadata::getCounterCount()
 }
 
 // ABI versioning: minimum `structSize` we accept for the v1 shape of
-// `CoverageEntryInfo` / `CoverageBufferInfo`. These constants are
-// frozen at the offsets of the LAST field shipped in v1 (file+line for
-// the entry struct, space+binding for the buffer struct) and **must
+// `CoverageEntryInfo`. This constant is frozen at the offset of the
+// LAST field shipped in v1 (file+line for the entry struct) and **must
 // not be updated when fields are added later** — that's the whole
 // point of `structSize` versioning. Newer callers with larger structs
 // pass through; older callers feeding a future v2+ implementation
@@ -374,8 +373,6 @@ uint32_t ArtifactPostEmitMetadata::getCounterCount()
 // + sizeof(newField)`.)
 static constexpr size_t kCoverageEntryInfoV1MinSize =
     offsetof(slang::CoverageEntryInfo, line) + sizeof(uint32_t);
-static constexpr size_t kCoverageBufferInfoV1MinSize =
-    offsetof(slang::CoverageBufferInfo, binding) + sizeof(int32_t);
 static constexpr size_t kSyntheticResourceInfoV1MinSize =
     offsetof(slang::SyntheticResourceInfo, debugName) + sizeof(const char*);
 
@@ -399,20 +396,9 @@ SlangResult ArtifactPostEmitMetadata::getEntryInfo(
     return SLANG_OK;
 }
 
-SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* outInfo)
-{
-    if (!outInfo)
-        return SLANG_E_INVALID_ARG;
-    if (outInfo->structSize < kCoverageBufferInfoV1MinSize)
-        return SLANG_E_INVALID_ARG;
-    outInfo->space = m_coverageBufferSpace;
-    outInfo->binding = m_coverageBufferBinding;
-    return SLANG_OK;
-}
-
 uint32_t ArtifactPostEmitMetadata::getResourceCount()
 {
-    m_syntheticResourcesPublished = true;
+    m_syntheticResourcesPublished.store(true);
     return (uint32_t)m_syntheticResources.getCount();
 }
 
@@ -420,8 +406,10 @@ SlangResult ArtifactPostEmitMetadata::findResourceIndexByID(uint32_t id, uint32_
 {
     if (!outIndex)
         return SLANG_E_INVALID_ARG;
+    if (id == 0)
+        return SLANG_E_NOT_FOUND;
 
-    m_syntheticResourcesPublished = true;
+    m_syntheticResourcesPublished.store(true);
     for (Index i = 0; i < m_syntheticResources.getCount(); ++i)
     {
         if (m_syntheticResources[i].id == id)
@@ -445,7 +433,7 @@ SlangResult ArtifactPostEmitMetadata::getResourceInfo(
     if (index >= (uint32_t)m_syntheticResources.getCount())
         return SLANG_E_INVALID_ARG;
 
-    m_syntheticResourcesPublished = true;
+    m_syntheticResourcesPublished.store(true);
     auto& record = m_syntheticResources[index];
     outInfo->id = record.id;
     outInfo->bindingType = record.bindingType;

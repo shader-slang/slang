@@ -52,7 +52,9 @@ void instrumentCoverage(
 // be determined from the post-packing IR layout.
 void finalizeCoverageInstrumentationMetadata(
     IRModule* module,
+    DiagnosticSink* sink,
     bool enabled,
+    IRVarLayout* globalScopeVarLayout,
     TargetRequest* targetRequest,
     ArtifactPostEmitMetadata& outMetadata);
 

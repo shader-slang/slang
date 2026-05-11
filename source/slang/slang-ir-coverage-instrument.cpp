@@ -20,7 +20,6 @@ namespace
 // Well-known buffer name. Surfaced via `IRNameHintDecoration` and
 // matches the manifest / sidecar key that hosts read.
 static const char kCoverageBufferName[] = "__slang_coverage";
-static const char kGlobalParamsName[] = "globalParams";
 // Synthetic resource ids are stable, non-zero feature-local
 // constants. Additional synthetic instrumentation resources should
 // claim their own ids alongside this one.
@@ -48,7 +47,7 @@ static SyntheticResourceRecord* findSyntheticResourceRecordById(
 static SyntheticResourceRecord& getOrAddCoverageSyntheticResourceRecord(
     ArtifactPostEmitMetadata& metadata)
 {
-    SLANG_RELEASE_ASSERT(!metadata.m_syntheticResourcesPublished);
+    SLANG_RELEASE_ASSERT(!metadata.m_syntheticResourcesPublished.load());
     if (auto existing = findSyntheticResourceRecordById(metadata, kCoverageSyntheticResourceID))
         return *existing;
 
@@ -103,35 +102,18 @@ static IRGlobalParam* findUserDeclaredCoverageBuffer(IRModule* module)
     return nullptr;
 }
 
-static IRGlobalParam* findLastGlobalParamByName(
-    IRModule* module,
-    UnownedTerminatedStringSlice expectedName)
-{
-    IRGlobalParam* result = nullptr;
-    for (auto inst : module->getGlobalInsts())
-    {
-        if (auto param = as<IRGlobalParam>(inst))
-        {
-            if (hasNameHint(param, expectedName))
-                result = param;
-        }
-    }
-    return result;
-}
-
-static IRStructField* findLastStructFieldByName(
+static IRStructField* findStructFieldByKey(
     IRType* type,
-    UnownedTerminatedStringSlice expectedName)
+    IRInst* expectedKey)
 {
     if (auto structType = as<IRStructType>(type))
     {
-        IRStructField* result = nullptr;
         for (auto field : structType->getFields())
         {
-            if (hasNameHint(field->getKey(), expectedName))
-                result = field;
+            if (field->getKey() == expectedKey)
+                return field;
         }
-        return result;
+        return nullptr;
     }
 
     if (auto specialize = as<IRSpecialize>(type))
@@ -139,7 +121,7 @@ static IRStructField* findLastStructFieldByName(
         if (auto generic = as<IRGeneric>(specialize->getBase()))
         {
             if (auto genericStructType = as<IRStructType>(findInnerMostGenericReturnVal(generic)))
-                return findLastStructFieldByName(genericStructType, expectedName);
+                return findStructFieldByKey(genericStructType, expectedKey);
         }
     }
 
@@ -151,15 +133,28 @@ struct UsedBindingRange
     UInt space = 0;
     UInt binding = 0;
     UInt count = 0;
+    bool isUnbounded = false;
     IRInst* source = nullptr;
 };
 
-static UInt getResourceCount(IRTypeLayout* typeLayout, LayoutResourceKind kind)
+static UInt getResourceCount(
+    IRTypeLayout* typeLayout,
+    LayoutResourceKind kind,
+    bool& outIsUnbounded)
 {
+    outIsUnbounded = false;
     if (!typeLayout)
         return 0;
     if (auto sizeAttr = typeLayout->findSizeAttr(kind))
-        return (UInt)sizeAttr->getSize().getFiniteValueOr(0);
+    {
+        auto size = sizeAttr->getSize();
+        if (size.isInfinite())
+        {
+            outIsUnbounded = true;
+            return 1;
+        }
+        return (UInt)size.getFiniteValueOr(0);
+    }
     return 0;
 }
 
@@ -168,6 +163,19 @@ static IRInst* selectBindingSource(IRInst* candidate, IRInst* fallback)
     if (candidate && candidate->sourceLoc.isValid())
         return candidate;
     return fallback ? fallback : candidate;
+}
+
+static bool isUnsizedArrayResourceSource(IRInst* source)
+{
+    if (!source)
+        return false;
+
+    // Layout lowering currently records an unsized descriptor array as
+    // an array type layout with a scalar resource count. Preserve the
+    // source variable's IR type so explicit coverage bindings do not
+    // get placed after a Vulkan variable-descriptor-count binding in
+    // the same descriptor set.
+    return as<IRUnsizedArrayType>(source->getDataType()) != nullptr;
 }
 
 static void collectUsedBindingsFromTypeLayout(
@@ -183,6 +191,7 @@ static void addUsedBindingRange(
     UInt space,
     UInt binding,
     UInt count,
+    bool isUnbounded,
     IRInst* source)
 {
     if (count == 0)
@@ -192,6 +201,7 @@ static void addUsedBindingRange(
     range.space = space;
     range.binding = binding;
     range.count = count;
+    range.isUnbounded = isUnbounded;
     range.source = source;
     outRanges.add(range);
 }
@@ -219,13 +229,16 @@ static void collectUsedBindingsFromVarLayout(
         localBinding += offsetAttr->getOffset();
         localSpace += offsetAttr->getSpace();
 
-        UInt count = getResourceCount(typeLayout, kind);
+        bool isUnbounded = false;
+        UInt count = getResourceCount(typeLayout, kind, isUnbounded);
         // If a layout carries an explicit resource-kind offset but
         // its type layout does not expose a finite size, reserve the
         // base slot rather than pretending the offset is unused.
         if (count == 0)
             count = 1;
-        addUsedBindingRange(outRanges, localSpace, localBinding, count, source);
+        if (isUnsizedArrayResourceSource(source))
+            isUnbounded = true;
+        addUsedBindingRange(outRanges, localSpace, localBinding, count, isUnbounded, source);
     }
 
     if (auto groupLayout = as<IRParameterGroupTypeLayout>(typeLayout))
@@ -408,6 +421,8 @@ static bool bindingRangeContains(const UsedBindingRange& range, int space, int b
         return false;
     if (range.space != (UInt)space || binding < (int)range.binding)
         return false;
+    if (range.isUnbounded)
+        return true;
     return (UInt)(binding - (int)range.binding) < range.count;
 }
 
@@ -442,6 +457,8 @@ static int pickFreeBindingInSpace(List<UsedBindingRange>& ranges, UInt space)
     {
         if (range.space != space || range.count == 0)
             continue;
+        if (range.isUnbounded)
+            return -1;
         if (range.binding > std::numeric_limits<UInt>::max() - (range.count - 1))
             return -1;
         UInt lastBinding = range.binding + range.count - 1;
@@ -460,17 +477,7 @@ static int pickFreeBindingInSpace(List<UsedBindingRange>& ranges, UInt space)
     return maxOccupied + 1;
 }
 
-static bool containsUsedSpace(List<UsedBindingRange>& ranges, UInt space)
-{
-    for (auto& range : ranges)
-    {
-        if (range.space == space)
-            return true;
-    }
-    return false;
-}
-
-static int pickFirstUnusedSpace(List<UsedBindingRange>& ranges)
+static int pickSpaceAfterHighestUsedSpace(List<UsedBindingRange>& ranges)
 {
     UInt maxSpace = 0;
     bool hasAnyRange = false;
@@ -487,13 +494,7 @@ static int pickFirstUnusedSpace(List<UsedBindingRange>& ranges)
         return 0;
     if (maxSpace == (UInt)std::numeric_limits<int>::max())
         return -1;
-
-    for (UInt candidate = 0; candidate <= maxSpace + 1; ++candidate)
-    {
-        if (!containsUsedSpace(ranges, candidate))
-            return (int)candidate;
-    }
-    return -1;
+    return int(maxSpace + 1);
 }
 
 // Pick a `(space, binding)` pair that doesn't collide with any
@@ -512,15 +513,14 @@ static bool pickFreeBindingForCoverage(
     auto ranges = collectUsedBindings(module, globalScopeVarLayout, kind);
 
     // For Vulkan/SPIR-V-style descriptor sets, do not extend an
-    // existing set with a new binding. Many hosts build descriptor
-    // set layouts directly from parameter blocks or other reflection
-    // data, so appending coverage to set 0 can require mutating an
-    // unrelated user-owned set layout. A fresh set keeps coverage as
-    // a standalone synthetic resource whose complete binding location
-    // is reported through metadata.
+    // existing set with a new binding, and do not fill holes between
+    // existing sets. Many hosts build descriptor set layouts directly
+    // from parameter blocks or other reflection data, so coverage is
+    // appended as a new synthetic-resource set after all shader-visible
+    // sets. The complete location is reported through metadata.
     if (kind == LayoutResourceKind::DescriptorTableSlot && isKhronosTarget(targetRequest))
     {
-        outSpace = pickFirstUnusedSpace(ranges);
+        outSpace = pickSpaceAfterHighestUsedSpace(ranges);
         if (outSpace < 0)
             return false;
         outBinding = 0;
@@ -620,8 +620,7 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     // space/set dimension (Metal uses `[[buffer(N)]]` only). The IR
     // varLayout above still carries `space = 0` for Metal because the
     // emitter walks the layout's RegisterSpace offset; the public
-    // `CoverageBufferInfo.space` is documented as -1 in those cases
-    // and hosts shouldn't see a bogus 0.
+    // synthetic resource metadata should not expose a bogus 0.
     outSpace = isMetalTarget(targetRequest) ? -1 : space;
     outBinding = binding;
     return param;
@@ -892,36 +891,6 @@ static bool tryFillUniformInfoFromField(
     return true;
 }
 
-static bool tryFillUniformInfoFromDirectBuffer(
-    TargetRequest* targetRequest,
-    IRGlobalParam* directBuffer,
-    int32_t& outUniformOffset,
-    int32_t& outUniformStride)
-{
-    if (!directBuffer || !targetRequest)
-        return false;
-
-    IRSizeAndAlignment bufferSizeAlignment;
-    if (SLANG_FAILED(getNaturalSizeAndAlignment(
-            targetRequest,
-            directBuffer->getDataType(),
-            &bufferSizeAlignment)))
-    {
-        return false;
-    }
-
-    if (bufferSizeAlignment.size == IRSizeAndAlignment::kIndeterminateSize)
-        return false;
-
-    int32_t narrowStride = 0;
-    if (!tryNarrowToInt32(bufferSizeAlignment.getStride(), narrowStride))
-        return false;
-
-    outUniformOffset = 0;
-    outUniformStride = narrowStride;
-    return true;
-}
-
 static IRType* getParameterGroupElementType(IRType* type)
 {
     if (auto parameterGroupType = as<IRParameterGroupType>(type))
@@ -929,8 +898,63 @@ static IRType* getParameterGroupElementType(IRType* type)
     return type;
 }
 
+static IRTypeLayout* getParameterGroupElementTypeLayout(IRTypeLayout* typeLayout)
+{
+    if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+        return parameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
+    return typeLayout;
+}
+
+static IRInst* findUniqueCoverageFieldKey(IRVarLayout* globalScopeVarLayout)
+{
+    if (!globalScopeVarLayout)
+        return nullptr;
+
+    auto globalScopeTypeLayout =
+        getParameterGroupElementTypeLayout(globalScopeVarLayout->getTypeLayout());
+    auto globalScopeStructLayout = as<IRStructTypeLayout>(globalScopeTypeLayout);
+    if (!globalScopeStructLayout)
+        return nullptr;
+
+    IRInst* result = nullptr;
+    for (auto fieldAttr : globalScopeStructLayout->getFieldLayoutAttrs())
+    {
+        auto key = fieldAttr->getFieldKey();
+        if (!hasNameHint(key, UnownedTerminatedStringSlice(kCoverageBufferName)))
+            continue;
+        if (result)
+            return nullptr;
+        result = key;
+    }
+    return result;
+}
+
+static IRStructField* findUniqueStructFieldByKeyInGlobalParams(IRModule* module, IRInst* key)
+{
+    if (!key)
+        return nullptr;
+
+    IRStructField* result = nullptr;
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto param = as<IRGlobalParam>(inst);
+        if (!param)
+            continue;
+
+        auto wrapperValueType = getParameterGroupElementType(param->getDataType());
+        auto field = findStructFieldByKey(wrapperValueType, key);
+        if (!field)
+            continue;
+        if (result && result != field)
+            return nullptr;
+        result = field;
+    }
+    return result;
+}
+
 static bool tryGetCoverageUniformBindingInfo(
     IRModule* module,
+    IRVarLayout* globalScopeVarLayout,
     TargetRequest* targetRequest,
     int32_t& outUniformOffset,
     int32_t& outUniformStride)
@@ -941,13 +965,9 @@ static bool tryGetCoverageUniformBindingInfo(
     if (!targetRequest || !(isCPUTarget(targetRequest) || isCUDATarget(targetRequest)))
         return false;
 
-    if (auto wrapperParam =
-            findLastGlobalParamByName(module, UnownedTerminatedStringSlice(kGlobalParamsName)))
+    if (auto fieldKey = findUniqueCoverageFieldKey(globalScopeVarLayout))
     {
-        auto wrapperValueType = getParameterGroupElementType(wrapperParam->getDataType());
-        if (auto field = findLastStructFieldByName(
-                wrapperValueType,
-                UnownedTerminatedStringSlice(kCoverageBufferName)))
+        if (auto field = findUniqueStructFieldByKeyInGlobalParams(module, fieldKey))
         {
             if (tryFillUniformInfoFromField(
                     targetRequest,
@@ -958,16 +978,6 @@ static bool tryGetCoverageUniformBindingInfo(
                 return true;
             }
         }
-    }
-
-    if (auto directBuffer =
-            findLastGlobalParamByName(module, UnownedTerminatedStringSlice(kCoverageBufferName)))
-    {
-        return tryFillUniformInfoFromDirectBuffer(
-            targetRequest,
-            directBuffer,
-            outUniformOffset,
-            outUniformStride);
     }
 
     return false;
@@ -1115,8 +1125,6 @@ void instrumentCoverage(
         }
     }
 
-    outMetadata.m_coverageBufferSpace = chosenSpace;
-    outMetadata.m_coverageBufferBinding = chosenBinding;
     auto& syntheticResource = getOrAddCoverageSyntheticResourceRecord(outMetadata);
     syntheticResource.space = chosenSpace;
     syntheticResource.binding = chosenBinding;
@@ -1133,7 +1141,9 @@ void instrumentCoverage(
 
 void finalizeCoverageInstrumentationMetadata(
     IRModule* module,
+    DiagnosticSink* sink,
     bool enabled,
+    IRVarLayout* globalScopeVarLayout,
     TargetRequest* targetRequest,
     ArtifactPostEmitMetadata& outMetadata)
 {
@@ -1144,12 +1154,27 @@ void finalizeCoverageInstrumentationMetadata(
     if (!record)
         return;
 
+    SLANG_RELEASE_ASSERT(!outMetadata.m_syntheticResourcesPublished.load());
+
     int32_t uniformOffset = -1;
     int32_t uniformStride = 0;
-    if (tryGetCoverageUniformBindingInfo(module, targetRequest, uniformOffset, uniformStride))
+    if (tryGetCoverageUniformBindingInfo(
+            module,
+            globalScopeVarLayout,
+            targetRequest,
+            uniformOffset,
+            uniformStride))
     {
         record->uniformOffset = uniformOffset;
         record->uniformStride = uniformStride;
+    }
+    else if (targetRequest && (isCPUTarget(targetRequest) || isCUDATarget(targetRequest)))
+    {
+        if (sink)
+            sink->diagnose(Diagnostics::CoverageUniformLayoutUnavailable{});
+        else
+            SLANG_ASSERT_FAILURE(
+                "coverage uniform layout should be available on CPU/CUDA targets");
     }
 }
 

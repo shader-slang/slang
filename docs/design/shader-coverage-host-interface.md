@@ -34,7 +34,6 @@ uses two explicit metadata channels:
 
 - how many counters exist
 - what source file/line each counter maps to
-- what buffer binding was assigned for coverage
 - how to serialize the canonical coverage manifest
 
 This is the coverage-specific reporting layer.
@@ -69,23 +68,19 @@ Its intended use is:
 - coverage reporting
 - slot-to-source attribution
 - coverage manifest serialization
-- coverage-specific buffer information
 
 The coverage query methods are:
 
 - `getCounterCount()`
 - `getEntryInfo(index, ...)`
-- `getBufferInfo(...)`
 
 These answer:
 
 - how many counters exist
 - what each counter slot means
-- what coverage-specific buffer binding was assigned
 
 Hosts use `ICoverageTracingMetadata` when they need to interpret the
-counter values they read back, emit LCOV or manifest output, or inspect
-the coverage-specific buffer view directly.
+counter values they read back, or emit LCOV or manifest output.
 
 ### Synthetic resource metadata object
 
@@ -177,7 +172,7 @@ descriptor-layout construction.
 | ------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Vulkan / Metal / D3D12 / direct descriptor-backed hosts | `getResourceInfo(...)`                                                      | `getSyntheticResourceDescriptorRange(...)`, `findSyntheticResourceDescriptorRangeByID(...)`, `getSyntheticResourceDescriptorRangesForSpace(...)` |
 | CUDA / CPU-style marshaling hosts                       | `getResourceInfo(...)`                                                      | read `uniformOffset` / `uniformStride` from `SyntheticResourceInfo`                                                                              |
-| `slang-rhi` Vulkan / CUDA backends                      | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location                                                               |
+| `slang-rhi` Vulkan / CUDA backends                      | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location; provided by the companion `slang-rhi` PR                     |
 
 ## `slang-rhi` consumption model
 
@@ -237,6 +232,10 @@ The host uses helper functions layered on top of the same metadata:
 - `slang-rhi` hosts can use:
   - `bindSyntheticResource(...)`
 
+The `slang-rhi` symbols in this section are companion-PR interfaces
+tracked in `shader-slang/slang-rhi#739`; this Slang PR defines only the
+metadata contract they consume.
+
 This path is meant to reduce the amount of raw binding code a
 reflection-driven codebase has to write, while still keeping the
 resource out of normal reflection.
@@ -253,8 +252,6 @@ For direct hosts, the intended usage is:
 4. query `ICoverageTracingMetadata` for:
    - counter count
    - slot-to-source attribution
-   - coverage buffer info when the host wants the coverage-specific
-     binding view
 5. query `ISyntheticResourceMetadata` for the hidden binding contract:
    - `getResourceCount()`
    - `getResourceInfo(...)`

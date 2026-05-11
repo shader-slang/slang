@@ -4531,7 +4531,7 @@ by calling `castAs` / `queryInterface` on the artifact-associated
 Intended use:
   - use `ICoverageTracingMetadata` for coverage-specific semantics:
     counter count, slot-to-source attribution, manifest serialization,
-    and the coverage-specific buffer view
+    and future coverage-entry semantics
   - use `ISyntheticResourceMetadata` for the generic hidden binding
     contract when the host needs to bind compiler-synthesized resources
     without relying on normal public reflection
@@ -4552,8 +4552,8 @@ Future coverage modes:
     count
 
 Extensible without ABI breakage in two ways:
-  - tail-extending the `CoverageEntryInfo` / `CoverageBufferInfo`
-    structs (gated by their leading `structSize` field), or
+  - tail-extending the `CoverageEntryInfo` struct (gated by its
+    leading `structSize` field), or
   - adding a derived `ICoverageTracingMetadataN` interface with a
     new UUID, queryable through `castAs`.
 The vtable of `ICoverageTracingMetadata` itself is fixed; new
@@ -4584,30 +4584,6 @@ struct CoverageEntryInfo
     uint32_t line = 0;
 };
 
-/// Coverage-buffer binding info returned by
-/// `ICoverageTracingMetadata::getBufferInfo`. Same `structSize`-
-/// versioning pattern as `CoverageEntryInfo`.
-///
-/// Sentinel conventions:
-///   - `space == -1` means no descriptor-facing location is assigned
-///     for the current target
-///   - `binding == -1` means no descriptor-facing location is assigned
-///     for the current target
-struct CoverageBufferInfo
-{
-    size_t structSize = sizeof(CoverageBufferInfo);
-
-    /// Register space the coverage buffer is bound to (D3D12
-    /// `space`, Vulkan descriptor set), or -1 if not assigned for
-    /// this target.
-    int32_t space = -1;
-
-    /// Binding index the coverage buffer is bound at (D3D12
-    /// `register`, Vulkan `binding`), or -1 if not assigned for
-    /// this target.
-    int32_t binding = -1;
-};
-
 struct ICoverageTracingMetadata : public ISlangCastable
 {
     SLANG_COM_INTERFACE(
@@ -4629,17 +4605,6 @@ struct ICoverageTracingMetadata : public ISlangCastable
     /// `structSize`, or out-of-range `index`.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getEntryInfo(uint32_t index, CoverageEntryInfo* outInfo) = 0;
-
-    /// Populate `outInfo` with the coverage buffer's binding info.
-    /// The caller must pre-set `outInfo->structSize =
-    /// sizeof(CoverageBufferInfo)`. Returns `SLANG_OK` on success,
-    /// `SLANG_E_INVALID_ARG` for null `outInfo` or mismatched
-    /// `structSize`.
-    ///
-    /// This is the coverage-specific view of the hidden buffer. Hosts
-    /// that want the generic hidden binding contract should query
-    /// `ISyntheticResourceMetadata` from the same `IMetadata` object.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo* outInfo) = 0;
 };
     #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()
 
@@ -4675,6 +4640,11 @@ Lifetime and ownership:
   - pointers returned through `SyntheticResourceInfo` remain valid for
     the lifetime of that metadata object
   - callers do not own returned strings and must not free them
+
+Thread safety:
+  - metadata objects are immutable once returned to the host; concurrent
+    read-only queries are allowed as long as callers keep the owning
+    COM object alive
 */
 enum class SyntheticResourceScope : uint32_t
 {
@@ -5366,9 +5336,7 @@ enum SlangLanguageVersion
     SLANG_LANGUAGE_VERSION_LEGACY = 2018,
     SLANG_LANGUAGE_VERSION_2025 = 2025,
     SLANG_LANGUAGE_VERSION_2026 = 2026,
-    /* Deprecated: retained for source compatibility; prefer SLANG_LANGUAGE_VERSION_DEFAULT. */
     SLANG_LANGAUGE_VERSION_DEFAULT = SLANG_LANGUAGE_VERSION_LEGACY,
-    SLANG_LANGUAGE_VERSION_DEFAULT = SLANG_LANGUAGE_VERSION_LEGACY,
     SLANG_LANGUAGE_VERSION_LATEST = SLANG_LANGUAGE_VERSION_2026,
 };
 
@@ -5707,6 +5675,7 @@ enum class SyntheticResourceDescriptorClass : uint32_t
     InputAttachment = 8,
     AccelerationStructure = 9,
     UniformBuffer = 10,
+    Count,
 };
 
 struct SyntheticResourceDescriptorRange
@@ -5725,6 +5694,11 @@ struct SyntheticResourceDescriptorRange
     int32_t entryPointIndex = -1;
     int32_t space = -1;
     int32_t binding = -1;
+
+    /// Optional debug name copied from `SyntheticResourceInfo`. When
+    /// non-null, aliases storage owned by the `ISyntheticResourceMetadata`
+    /// object passed to the helper and is valid only for that metadata
+    /// object's lifetime.
     const char* debugName = nullptr;
 };
 
@@ -5786,6 +5760,10 @@ inline bool getSyntheticResourceDescriptorClass(
    backed targets may not use a descriptor-space concept; in that case
    the helper still succeeds and reports `space == -1`.
 
+   `outRange->debugName`, when non-null, aliases storage owned by
+   `metadata` and remains valid only for the lifetime of that metadata
+   object.
+
    Returns:
      - `SLANG_OK` on success
      - `SLANG_E_INVALID_ARG` for null inputs or mismatched `structSize`
@@ -5835,6 +5813,9 @@ inline SlangResult getSyntheticResourceDescriptorRange(
 
    This is equivalent to `findResourceIndexByID(...)` followed by
    `getSyntheticResourceDescriptorRange(...)`.
+   `outRange->debugName`, when non-null, aliases storage owned by
+   `metadata` and remains valid only for the lifetime of that metadata
+   object.
 */
 inline SlangResult findSyntheticResourceDescriptorRangeByID(
     ISyntheticResourceMetadata* metadata,
@@ -5871,6 +5852,9 @@ inline SlangResult findSyntheticResourceDescriptorRangeByID(
    Resources for which `getSyntheticResourceDescriptorRange(...)`
    returns `SLANG_E_NOT_AVAILABLE`, or which report `space == -1`, are
    skipped.
+   Each returned `debugName`, when non-null, aliases storage owned by
+   `metadata` and remains valid only for the lifetime of that metadata
+   object.
 */
 inline SlangResult getSyntheticResourceDescriptorRangesForSpace(
     ISyntheticResourceMetadata* metadata,

@@ -10,6 +10,8 @@
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 
+#include <atomic>
+
 namespace Slang
 {
 
@@ -232,8 +234,6 @@ public:
     SLANG_NO_THROW virtual uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE;
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL
     getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
-        SLANG_OVERRIDE;
 
     // ISyntheticResourceMetadata
     SLANG_NO_THROW virtual uint32_t SLANG_MCALL getResourceCount() SLANG_OVERRIDE;
@@ -281,8 +281,6 @@ public:
     // Coverage tracing data, populated by `instrumentCoverage` when
     // `-trace-coverage` is active. Empty otherwise.
     List<CoverageTracingEntry> m_coverageEntries;
-    int32_t m_coverageBufferSpace = -1;
-    int32_t m_coverageBufferBinding = -1;
 
     // Generic compiler-synthesized bindable resources, including
     // coverage's hidden buffer. Empty when the compiled target does
@@ -291,7 +289,7 @@ public:
     // pointers into the stored `String`s, so adding new records after
     // publication would invalidate that contract.
     List<SyntheticResourceRecord> m_syntheticResources;
-    bool m_syntheticResourcesPublished = false;
+    std::atomic<bool> m_syntheticResourcesPublished{false};
 };
 
 } // namespace Slang

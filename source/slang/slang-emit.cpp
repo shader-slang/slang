@@ -1071,7 +1071,9 @@ Result linkAndOptimizeIR(
     {
         SLANG_PASS(
             finalizeCoverageInstrumentationMetadata,
+            sink,
             codeGenContext->shouldTraceCoverage(),
+            outLinkedIR.globalScopeVarLayout,
             targetRequest,
             *metadata);
         validateIRModuleIfEnabled(codeGenContext, irModule);

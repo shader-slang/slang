@@ -4629,6 +4629,12 @@ err(
     "`-trace-coverage` cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation"
 )
 
+err(
+    "coverage-uniform-layout-unavailable",
+    45105,
+    "could not resolve the CPU/CUDA uniform layout for `__slang_coverage`"
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(
@@ -5416,4 +5422,3 @@ if #validation_errors > 0 then
 end
 
 return processed_diagnostics
-
