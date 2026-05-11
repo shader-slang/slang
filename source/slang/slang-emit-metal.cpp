@@ -136,18 +136,27 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
     if (!layoutDecoration)
+    {
+        if (param->findDecoration<IRTargetSystemValueDecoration>())
+            maybeEmitSystemSemantic(param);
         return;
+    }
     auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
     if (!layout)
         return;
+
+    // DescriptorHandle<T> is bindless on Metal and has T's layout, so unwrap
+    // it before the per-kind type tests below.
+    IRType* paramType = param->getDataType();
+    if (auto handleType = as<IRDescriptorHandleType>(paramType))
+        paramType = handleType->getResourceType();
 
     for (auto rr : layout->getOffsetAttrs())
     {
         switch (rr->getResourceKind())
         {
         case LayoutResourceKind::MetalTexture:
-            if (as<IRTextureTypeBase>(param->getDataType()) ||
-                as<IRTextureBufferType>(param->getDataType()))
+            if (as<IRTextureTypeBase>(paramType) || as<IRTextureBufferType>(paramType))
             {
                 m_writer->emit(" [[texture(");
                 m_writer->emit(rr->getOffset());
@@ -155,11 +164,10 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::MetalBuffer:
-            if (as<IRPtrTypeBase>(param->getDataType()) ||
-                as<IRHLSLStructuredBufferTypeBase>(param->getDataType()) ||
-                as<IRByteAddressBufferTypeBase>(param->getDataType()) ||
-                as<IRUniformParameterGroupType>(param->getDataType()) ||
-                as<IRRaytracingAccelerationStructureType>(param->getDataType()))
+            if (as<IRPtrTypeBase>(paramType) || as<IRHLSLStructuredBufferTypeBase>(paramType) ||
+                as<IRByteAddressBufferTypeBase>(paramType) ||
+                as<IRUniformParameterGroupType>(paramType) ||
+                as<IRRaytracingAccelerationStructureType>(paramType))
             {
                 m_writer->emit(" [[buffer(");
                 m_writer->emit(rr->getOffset());
@@ -167,7 +175,7 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::SamplerState:
-            if (as<IRSamplerStateTypeBase>(param->getDataType()))
+            if (as<IRSamplerStateTypeBase>(paramType))
             {
                 m_writer->emit(" [[sampler(");
                 m_writer->emit(rr->getOffset());
@@ -421,6 +429,12 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
     case kIROp_Discard:
         m_writer->emit("discard_fragment();\n");
+        return true;
+    case kIROp_SubpassLoad:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            inst,
+            "SubpassLoad should have been lowered before Metal emission");
         return true;
     case kIROp_MetalAtomicCast:
         {
@@ -1019,6 +1033,12 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit("nullptr");
             return true;
         }
+    case kIROp_SubpassLoad:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            inst,
+            "SubpassLoad should have been lowered before Metal emission");
+        return true;
     default:
         break;
     }
@@ -1347,6 +1367,12 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             ensurePrelude(kMetalBuiltinPreludeSimdgroupMatrixOps);
             return;
         }
+    case kIROp_SubpassInputType:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            type,
+            "SubpassInputType should have been lowered before Metal emission");
+        return;
     default:
         break;
     }
