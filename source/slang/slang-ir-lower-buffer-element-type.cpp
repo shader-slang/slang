@@ -1,6 +1,5 @@
 #include "slang-ir-lower-buffer-element-type.h"
 
-#include "slang-ir-check-recursion.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
@@ -1151,11 +1150,6 @@ struct LoweredElementTypeContext
     {
         IRBuilder builder(module);
 
-        // We have to avoid deferring casts into recursive functions, as the
-        // chain of deferring would never end.
-        HashSet<IRFunc*> recursiveFuncs;
-        collectRecursiveFunctions(module, recursiveFuncs);
-
         while (castInstWorkList.getCount())
         {
             // We process call instructions after other instructions, so we
@@ -1304,9 +1298,7 @@ struct LoweredElementTypeContext
                                 // and push the cast to inside the callee.
                                 // We will process calls after other gep insts, so for now just add
                                 // it into a separate worklist.
-                                IRCall* call = (IRCall*)user;
-                                if (!recursiveFuncs.contains(as<IRFunc>(call->getCallee())))
-                                    callWorkListSet.add(call);
+                                callWorkListSet.add((IRCall*)user);
                                 break;
                             }
                         case kIROp_Load:
@@ -1786,7 +1778,13 @@ struct LoweredElementTypeContext
         // This means that `FieldAddr(CastStorageToLogical(buffer), field0))` is translated to
         // `CastStorageToLogical(FieldAddr(buffer, field0))`. This way we can be sure that we are
         // doing minimal packing/unpacking.
-        deferStorageToLogicalCasts(module, _Move(castInstWorkList));
+        //
+        // This operation is problematic on recursive functions, which are
+        // allowed by CPU targets. Luckily, such targets also have downstream
+        // compilers with further optimizations, rendering this pass unnecessary
+        // there.
+        if (!isCPUTarget(target->getTargetReq()))
+            deferStorageToLogicalCasts(module, _Move(castInstWorkList));
 
         // Now translate the `CastStorageToLogical` into actual packing/unpacking code.
         materializeStorageToLogicalCasts(module->getModuleInst());
