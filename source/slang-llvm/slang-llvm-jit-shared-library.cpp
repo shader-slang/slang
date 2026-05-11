@@ -11,15 +11,16 @@
 namespace slang_llvm
 {
 
-void disableHostSpecificFeaturesForJIT(llvm::orc::LLJITBuilder& jitBuilder)
+void disableAVX512ForJIT(llvm::orc::LLJITBuilder& jitBuilder)
 {
-    // Opt-in mitigation: avoid host-specific features in the JIT TargetMachine
+    // Opt-in mitigation: only subtract AVX-512 from the JIT TargetMachine
     // when SLANG_DISABLE_AVX512=1 in the environment. Default is to leave
-    // host codegen alone, so production builds keep native codegen on capable
-    // hosts. CI workflows that hit #11062 set the env var on the test step.
-    // When LLVM 22 lands (#11017) and its host detection no longer mis-reports
-    // unsupported features on the GitHub-Azure runners, the env var can be
-    // dropped from the workflows and this whole helper becomes dead code.
+    // AVX-512 alone, so production builds keep AVX-512 codegen on capable
+    // hosts. CI workflows that hit #11062 set the env var on the test
+    // step. When LLVM 22 lands (#11017) and its host detection no longer
+    // mis-reports AVX-512 on the GitHub-Azure runners, the env var can
+    // be dropped from the workflows and this whole helper becomes dead
+    // code.
     Slang::StringBuilder envValue;
     if (SLANG_FAILED(Slang::PlatformUtil::getEnvironmentVariable(
             Slang::UnownedStringSlice("SLANG_DISABLE_AVX512"),
@@ -37,33 +38,52 @@ void disableHostSpecificFeaturesForJIT(llvm::orc::LLJITBuilder& jitBuilder)
         // SIGILL recurrence here is traceable to this branch via grep, and
         // leave the LLJITBuilder at its default. The default will run
         // detectHost() again inside LLJIT::Create, so if that path produces
-        // a JTMB with unsupported features enabled, the SIGILL we're trying
-        // to neutralise will reappear. Practically
+        // a JTMB with AVX-512 enabled on a CPU that can't execute it, the
+        // SIGILL we're trying to neutralise will reappear. Practically
         // unreachable on the x86_64-linux runners we care about (#11062),
         // but worth flagging if it ever does fire.
-        llvm::errs()
-            << "slang-llvm[#11062]: JITTargetMachineBuilder::detectHost() failed: "
-            << llvm::toString(expectJTMB.takeError())
-            << " -- leaving LLJITBuilder at default; host-feature mitigation NOT applied\n";
+        llvm::errs() << "slang-llvm[#11062]: JITTargetMachineBuilder::detectHost() failed: "
+                     << llvm::toString(expectJTMB.takeError())
+                     << " — leaving LLJITBuilder at default; AVX-512 mitigation NOT applied\n";
         return;
     }
     if (expectJTMB->getTargetTriple().getArch() != llvm::Triple::x86_64)
     {
-        // This mitigation is only needed for the x86_64 GitHub-Azure runners.
+        // No AVX-512 to worry about on non-x86_64 hosts.
         return;
     }
-    // Do not try to subtract a growing list of feature names from a host CPU
-    // model. Some features are implied by the CPU name, and LLVM can learn new
-    // feature spellings. Use a baseline x86-64 target for this CI-only path.
-    expectJTMB->setCPU("x86-64");
-    expectJTMB->setFeatures("");
+    // Disable the AVX-512 family on x86_64. We list the family extensions
+    // explicitly rather than relying on -avx512f to imply them, so that if a
+    // future LLVM weakens the implication chain the mitigation still holds.
+    // LLVM-22-only feature names (avx512er, avx512pf, avx512_4fmaps,
+    // avx512_4vnniw — all KNL/KNM Xeon Phi) are deliberately omitted: on
+    // LLVM 21 they hit the unknown-feature warning path and pollute stderr
+    // with one line per JIT compilation (~hundreds of lines per CI run).
+    // Any chip that would need those is unreachable from our deployment, so
+    // the perfect-coverage gain isn't worth the log noise.
+    expectJTMB->addFeatures({
+        "-avx512f",
+        "-avx512cd",
+        "-avx512dq",
+        "-avx512bw",
+        "-avx512vl",
+        "-avx512vbmi",
+        "-avx512vbmi2",
+        "-avx512vnni",
+        "-avx512bitalg",
+        "-avx512vpopcntdq",
+        "-avx512ifma",
+        "-avx512vp2intersect",
+        "-avx512fp16",
+        "-avx512bf16",
+    });
     jitBuilder.setJITTargetMachineBuilder(std::move(*expectJTMB));
 }
 
 llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> createAVX512SafeLLJIT()
 {
     llvm::orc::LLJITBuilder jitBuilder;
-    disableHostSpecificFeaturesForJIT(jitBuilder);
+    disableAVX512ForJIT(jitBuilder);
     return jitBuilder.create();
 }
 
