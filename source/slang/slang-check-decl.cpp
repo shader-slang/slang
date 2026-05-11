@@ -3215,6 +3215,104 @@ static Decl* findLegacyBwdDiffFunc(SemanticsVisitor* visitor, ExtensionDecl* ext
 
 void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
 
+/// Returns true if `expr` is a runtime value that cannot be a compile-time constant.
+/// This is called only after constant folding has already failed (`varDecl->val` is null),
+/// so any surviving function call is known to be non-const-evaluable — if it were a
+/// constant-foldable intrinsic applied to constant arguments, folding would have succeeded.
+/// Used to distinguish "folding failed because of a runtime reference or call" from
+/// "folding failed because the folder doesn't handle this form" (e.g. unsupported literal type).
+static bool _initExprIsRuntimeValue(Expr* expr)
+{
+    if (!expr)
+        return false;
+    if (as<ErrorType>(expr->type.type))
+        return false;
+    if (auto memberExpr = as<MemberExpr>(expr))
+        return _initExprIsRuntimeValue(memberExpr->baseExpression);
+    if (auto derefExpr = as<DerefExpr>(expr))
+        return _initExprIsRuntimeValue(derefExpr->base);
+    if (auto builtinCastExpr = as<BuiltinCastExpr>(expr))
+        return _initExprIsRuntimeValue(builtinCastExpr->base);
+    if (auto swizzleExpr = as<SwizzleExpr>(expr))
+        return _initExprIsRuntimeValue(swizzleExpr->base);
+    if (auto matSwizzleExpr = as<MatrixSwizzleExpr>(expr))
+        return _initExprIsRuntimeValue(matSwizzleExpr->base);
+    if (auto indexExpr = as<IndexExpr>(expr))
+    {
+        if (_initExprIsRuntimeValue(indexExpr->baseExpression))
+            return true;
+        for (auto idx : indexExpr->indexExprs)
+            if (_initExprIsRuntimeValue(idx))
+                return true;
+        return false;
+    }
+    if (auto declRefExpr = as<DeclRefExpr>(expr))
+    {
+        if (auto varDecl = as<VarDeclBase>(declRefExpr->declRef.getDecl()))
+        {
+            // References to static const globals are fine — compile-time constants.
+            if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
+                return false;
+            // Any other global variable (including plain `static float foo`) is mutable.
+            if (isGlobalDecl(varDecl))
+                return true;
+        }
+        return false;
+    }
+    if (auto invokeExpr = as<InvokeExpr>(expr))
+    {
+        // Determine whether the callee is a "pure" callable whose result depends only
+        // on its arguments and cannot read or write arbitrary runtime state. For pure
+        // callables, the call is a runtime value only when one of its arguments is.
+        // User-defined functions without an explicit purity annotation are treated
+        // conservatively as runtime values (they could read buffers, globals, etc.).
+        //
+        // We check for purity explicitly rather than relying on constant-folding failure
+        // because the AST constant folder does not handle all pure forms (e.g. min(1,2)).
+        // IR-level folding will handle them; we only need to block user-defined calls.
+        bool isPure = false;
+        if (auto calleeDeclRef = as<DeclRefExpr>(invokeExpr->functionExpr))
+        {
+            if (auto callable = as<CallableDecl>(calleeDeclRef->declRef.getDecl()))
+            {
+                // Constructor calls (e.g. float2(x, y), MyStruct(val)) are always pure:
+                // their result depends only on their arguments.
+                if (as<ConstructorDecl>(callable))
+                    isPure = true;
+                // Builtin IR operations (e.g. integer arithmetic, vector ops).
+                else if (callable->findModifier<IntrinsicOpModifier>())
+                    isPure = true;
+                // Target-specific intrinsics (__intrinsic_asm) are also pure.
+                else if (callable->findModifier<TargetIntrinsicModifier>())
+                    isPure = true;
+                // Functions explicitly declared [__readNone] (e.g. min, max).
+                else if (callable->findModifier<ReadNoneAttribute>())
+                    isPure = true;
+            }
+        }
+        if (isPure)
+        {
+            // Pure callable: runtime only when an argument is runtime.
+            for (auto arg : invokeExpr->arguments)
+                if (_initExprIsRuntimeValue(arg))
+                    return true;
+            return false;
+        }
+        // User-defined or unrecognized function call — always a runtime value.
+        return true;
+    }
+    if (auto parenExpr = as<ParenExpr>(expr))
+        return _initExprIsRuntimeValue(parenExpr->base);
+    if (auto initListExpr = as<InitializerListExpr>(expr))
+    {
+        for (auto arg : initListExpr->args)
+            if (_initExprIsRuntimeValue(arg))
+                return true;
+        return false;
+    }
+    return false;
+}
+
 void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     DiagnoseIsAllowedInitExpr(varDecl, getSink());
@@ -3241,6 +3339,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // then we simply need to check that expression and coerce
         // it to the type of the variable.
         //
+        // Capture the error count before checking the initializer so that errors from
+        // CheckTerm or coerce (e.g. undefined identifier) suppress downstream diagnostics.
+        auto errorCountBeforeInitCheck = getSink()->getErrorCount();
         initExpr = subVisitor.CheckTerm(initExpr);
 
         if (initExpr->type.isWriteOnly)
@@ -3259,6 +3360,21 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         if (!varDecl->val)
         {
             varDecl->val = _validateCircularVarDefinition(varDecl);
+            // If this is a global `static const` variable and we still couldn't constant-fold
+            // its initializer (and no new error was emitted during init checking, e.g. for an
+            // undefined identifier, a circular definition, or a type error), check whether the
+            // initializer is a runtime value (mutable global reference or function call). If so,
+            // diagnose now rather than crashing or silently misbehaving in IR code generation.
+            // Note: for non-integer types, _validateCircularVarDefinition always returns nullptr,
+            // so !varDecl->val is expected for non-constant expressions; _initExprIsRuntimeValue
+            // distinguishes the problematic cases from forms the constant folder simply doesn't
+            // handle (e.g. unsupported literal types).
+            if (isStaticConst && isGlobalDecl(varDecl) && !varDecl->val &&
+                getSink()->getErrorCount() == errorCountBeforeInitCheck &&
+                _initExprIsRuntimeValue(initExpr))
+            {
+                getSink()->diagnose(Diagnostics::StaticConstGlobalNonConstantInit{.decl = varDecl});
+            }
         }
     }
     else
