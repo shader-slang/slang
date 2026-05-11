@@ -1585,6 +1585,30 @@ struct LoweredElementTypeContext
         auto clonedFunc = as<IRFunc>(cloneInst(&cloneEnv, &builder, call->getCallee()));
         List<IRUse*> uses;
 
+        // If our cloned function has uses already, that means it's calling
+        // itself (= is recursive). Such uses are problematic, as the
+        // `specializedFunc` cache won't contain the newly cloned function,
+        // causing an infinite loop of specialization. The original has already
+        // been handled though, so we can just swap the calls back to calling
+        // the original function and avoid such loops.
+        if (clonedFunc->hasUses())
+        {
+            // Replace all self-calls with the original function. This cuts
+            // the loop, as `specializedFunc` cache contains the original
+            // function now.
+            cloneEnv.mapOldValToNew.remove(clonedFunc);
+            cloneEnv.mapOldValToNew.add(clonedFunc, call->getCallee());
+            traverseUsers<IRCall>(
+                clonedFunc,
+                [&](IRCall* user)
+                {
+                    builder.setInsertBefore(user);
+                    auto newCall = cloneInst(&cloneEnv, &builder, user);
+                    user->replaceUsesWith(newCall);
+                    user->removeAndDeallocate();
+                });
+        }
+
         // If a parameter is being translated to storage type,
         // insert a cast to convert it to logical type.
         List<IRParam*> params;
@@ -1778,13 +1802,7 @@ struct LoweredElementTypeContext
         // This means that `FieldAddr(CastStorageToLogical(buffer), field0))` is translated to
         // `CastStorageToLogical(FieldAddr(buffer, field0))`. This way we can be sure that we are
         // doing minimal packing/unpacking.
-        //
-        // This operation is problematic on recursive functions, which are
-        // allowed by CPU targets. Luckily, such targets also have downstream
-        // compilers with further optimizations, rendering this pass unnecessary
-        // there.
-        if (!isCPUTarget(target->getTargetReq()))
-            deferStorageToLogicalCasts(module, _Move(castInstWorkList));
+        deferStorageToLogicalCasts(module, _Move(castInstWorkList));
 
         // Now translate the `CastStorageToLogical` into actual packing/unpacking code.
         materializeStorageToLogicalCasts(module->getModuleInst());
