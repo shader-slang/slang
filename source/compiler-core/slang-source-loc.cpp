@@ -22,6 +22,7 @@ const String PathInfo::getMostUniqueIdentity() const
         return uniqueIdentity;
     case Type::FoundPath:
     case Type::FromString:
+    case Type::MacroExpansion:
         {
             return foundPath;
         }
@@ -37,6 +38,7 @@ String PathInfo::getName() const
     case Type::Normal:
     case Type::FromString:
     case Type::FoundPath:
+    case Type::MacroExpansion:
         {
             return foundPath;
         }

@@ -784,11 +784,18 @@ private:
     /// the expansion chain used by the diagnostic renderer.
     SourceView* m_expansionView = nullptr;
 
-    /// The SourceLoc range of the macro's definition view; used to identify
-    /// body tokens that need to be remapped into m_expansionView's range.
-    SourceRange m_definitionRange;
+    /// The full range of the definition SourceView.  Used as the offset base in
+    /// _maybeRemapBodyTokenLoc so that byte offsets within the expansion view
+    /// align with the same bytes in the shared content blob.
+    SourceRange m_definitionViewRange;
 
-    /// If token.loc falls within m_definitionRange, remap it into m_expansionView's range
+    /// The SourceLoc range spanned by the macro's actual body tokens (first to last).
+    /// Only tokens whose loc falls in this tighter range are remapped; this prevents
+    /// argument tokens from a same-file invocation from being incorrectly attributed
+    /// to the macro expansion when they happen to fall within the definition view range.
+    SourceRange m_bodyTokenRange;
+
+    /// If token.loc falls within m_bodyTokenRange, remap it into m_expansionView's range
     /// so that the diagnostic chain can walk back to this invocation's call site.
     /// Tokens from argument substitution or token-paste already have their own locs and
     /// are left untouched.
@@ -1503,7 +1510,19 @@ MacroInvocation::MacroInvocation(
         SourceView* defView = sm->findSourceView(firstBodyLoc);
         if (defView && defView->getSourceFile()->getContentBlob())
         {
-            m_definitionRange = defView->getRange();
+            m_definitionViewRange = defView->getRange();
+
+            // Compute the tight body-token range: from the first body token to the last.
+            // This is used in _maybeRemapBodyTokenLoc to avoid remapping argument tokens
+            // that happen to share the same source file as the definition.
+            SourceLoc bodyBegin = firstBodyLoc;
+            SourceLoc bodyEnd = firstBodyLoc;
+            for (const Token& t : macro->tokens.m_tokens)
+            {
+                if (t.type != TokenType::EndOfFile && t.loc.isValid() && t.loc > bodyEnd)
+                    bodyEnd = t.loc;
+            }
+            m_bodyTokenRange = SourceRange{bodyBegin, bodyEnd};
 
             // Create a fresh SourceFile that shares the macro body content but carries
             // PathInfo::MacroExpansion so the diagnostic chain can distinguish it from
@@ -1522,10 +1541,11 @@ MacroInvocation::MacroInvocation(
 
 void MacroInvocation::_maybeRemapBodyTokenLoc(Token& token) const
 {
-    if (m_expansionView && m_definitionRange.contains(token.loc))
+    if (m_expansionView && m_bodyTokenRange.contains(token.loc))
     {
         token.loc = SourceLoc::fromRaw(
-            m_expansionView->getRange().begin.getRaw() + m_definitionRange.getOffset(token.loc));
+            m_expansionView->getRange().begin.getRaw() +
+            m_definitionViewRange.getOffset(token.loc));
     }
 }
 

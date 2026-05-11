@@ -655,14 +655,15 @@ static void appendMacroExpansionNotes(
     if (!sm || !primaryLoc.isValid())
         return;
 
-    SourceView* currentView = sm->findSourceView(primaryLoc);
+    SourceView* currentView = sm->findSourceViewRecursively(primaryLoc);
     while (currentView && currentView->getInitiatingSourceLoc().isValid())
     {
         const PathInfo::Type pathType = currentView->getSourceFile()->getPathInfo().type;
         if (pathType != PathInfo::Type::MacroExpansion && pathType != PathInfo::Type::TokenPaste)
             break;
 
-        SourceView* initiatingView = sm->findSourceView(currentView->getInitiatingSourceLoc());
+        SourceView* initiatingView =
+            sm->findSourceViewRecursively(currentView->getInitiatingSourceLoc());
         if (!initiatingView)
             break;
 
