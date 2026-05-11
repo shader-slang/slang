@@ -939,7 +939,8 @@ class NamedExpressionType : public Type
 ///
 ParamPassingMode adjustParamPassingModeBasedOnParamType(
     ParamPassingMode originalMode,
-    Type* paramType);
+    Type* paramType,
+    ASTBuilder* astBuilder);
 
 // A function type is defined by its parameter types
 // and its result type.

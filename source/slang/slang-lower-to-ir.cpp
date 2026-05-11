@@ -3459,6 +3459,9 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 /// if null, substitutions are skipped (generic cases may be missed).
 static bool typeContainsNonCopyable(Type* type, ASTBuilder* astBuilder)
 {
+    // Unwrap modifier wrappers (e.g. NoDiffType applied to `this` by autodiff)
+    // so the underlying DeclRefType is visible.
+    type = unwrapModifiedType(type);
     auto declRefType = as<DeclRefType>(type);
     if (!declRefType)
         return false;
