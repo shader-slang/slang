@@ -20,8 +20,7 @@ namespace
 // Well-known buffer name. Surfaced via `IRNameHintDecoration` and
 // matches the manifest / sidecar key that hosts read.
 static const char kCoverageBufferName[] = "__slang_coverage";
-static const uint32_t kCoverageSyntheticResourceID =
-    uint32_t(SyntheticResourceKnownID::Coverage);
+static const uint32_t kCoverageSyntheticResourceID = uint32_t(SyntheticResourceKnownID::Coverage);
 
 static bool hasNameHint(IRInst* inst, UnownedTerminatedStringSlice expectedName)
 {
@@ -101,9 +100,7 @@ static IRGlobalParam* findUserDeclaredCoverageBuffer(IRModule* module)
     return nullptr;
 }
 
-static IRStructField* findStructFieldByKey(
-    IRType* type,
-    IRInst* expectedKey)
+static IRStructField* findStructFieldByKey(IRType* type, IRInst* expectedKey)
 {
     if (auto structType = as<IRStructType>(type))
     {
@@ -1226,8 +1223,7 @@ void finalizeCoverageInstrumentationMetadata(
         if (sink)
             sink->diagnose(Diagnostics::CoverageUniformLayoutUnavailable{});
         else
-            SLANG_ASSERT_FAILURE(
-                "coverage uniform layout should be available on CPU/CUDA targets");
+            SLANG_ASSERT_FAILURE("coverage uniform layout should be available on CPU/CUDA targets");
     }
 }
 

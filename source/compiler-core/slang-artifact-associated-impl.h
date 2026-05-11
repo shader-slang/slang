@@ -244,8 +244,8 @@ public:
     SLANG_NO_THROW virtual uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE;
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL
     getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE;
-    SLANG_NO_THROW virtual SlangResult SLANG_MCALL
-    getBufferInfo(slang::CoverageBufferInfo* outInfo) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
+        SLANG_OVERRIDE;
 
     // ISyntheticResourceMetadata
     SLANG_NO_THROW virtual uint32_t SLANG_MCALL getResourceCount() SLANG_OVERRIDE;

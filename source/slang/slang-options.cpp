@@ -2848,9 +2848,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // -trace-coverage-reserved-space <space>
                 Int bindingSpace;
                 SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindingSpace));
-                linkage->m_optionSet.add(
-                    OptionKind::TraceCoverageReservedSpace,
-                    (int)bindingSpace);
+                linkage->m_optionSet.add(OptionKind::TraceCoverageReservedSpace, (int)bindingSpace);
                 break;
             }
         case OptionKind::Profile:
