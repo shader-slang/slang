@@ -90,3 +90,96 @@ SLANG_UNIT_TEST(modulePtr)
         SLANG_CHECK(code->getBufferSize() > 0);
     }
 }
+
+SLANG_UNIT_TEST(precompiledModuleWithoutSourceWithUpToDateCheck)
+{
+    const char* testModuleSource = R"(
+        module test_module;
+
+        public int getValue()
+        {
+            return 7;
+        }
+    )";
+
+    const char* testSource = R"(
+        import "test_module";
+
+        [shader("compute")]
+        [numthreads(1,1,1)]
+        void computeMain(uint3 workGroup : SV_GroupID)
+        {
+            int value = getValue();
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::IBlob> moduleBlob;
+
+    {
+        ComPtr<ISlangMutableFileSystem> memoryFileSystem =
+            ComPtr<ISlangMutableFileSystem>(new Slang::MemoryFileSystem());
+
+        ComPtr<slang::ISession> session;
+        sessionDesc.fileSystem = memoryFileSystem;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IBlob> diagnosticBlob;
+        auto module = session->loadModuleFromSourceString(
+            "test_module",
+            "test_module.slang",
+            testModuleSource,
+            diagnosticBlob.writeRef());
+        SLANG_CHECK(module != nullptr);
+        SLANG_CHECK(module->serialize(moduleBlob.writeRef()) == SLANG_OK);
+    }
+
+    {
+        ComPtr<ISlangMutableFileSystem> memoryFileSystem =
+            ComPtr<ISlangMutableFileSystem>(new Slang::MemoryFileSystem());
+        memoryFileSystem->saveFileBlob("test_module.slang-module", moduleBlob);
+
+        slang::CompilerOptionEntry compilerOption = {};
+        compilerOption.name = slang::CompilerOptionName::UseUpToDateBinaryModule;
+        compilerOption.value.kind = slang::CompilerOptionValueKind::Int;
+        compilerOption.value.intValue0 = 1;
+
+        sessionDesc.fileSystem = memoryFileSystem;
+        sessionDesc.compilerOptionEntries = &compilerOption;
+        sessionDesc.compilerOptionEntryCount = 1;
+
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        SLANG_CHECK(session->isBinaryModuleUpToDate("test_module.slang", moduleBlob));
+
+        ComPtr<slang::IBlob> diagnosticBlob;
+        auto precompiledModule = session->loadModule("test_module", diagnosticBlob.writeRef());
+        SLANG_CHECK(precompiledModule != nullptr);
+
+        auto module = session->loadModuleFromSourceString(
+            "test",
+            "test.slang",
+            testSource,
+            diagnosticBlob.writeRef());
+        SLANG_CHECK(module != nullptr);
+
+        ComPtr<slang::IComponentType> linkedProgram;
+        module->link(linkedProgram.writeRef());
+
+        ComPtr<slang::IBlob> code;
+        linkedProgram->getTargetCode(0, code.writeRef(), diagnosticBlob.writeRef());
+
+        SLANG_CHECK(code->getBufferSize() > 0);
+    }
+}

@@ -1802,7 +1802,8 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
     String moduleSrcPath = "";
 
     auto dependencyChunks = moduleChunk->getFileDependencies();
-    if (auto firstDependencyChunk = dependencyChunks.getFirst())
+    auto firstDependencyChunk = dependencyChunks.getFirst();
+    if (firstDependencyChunk)
     {
         moduleSrcPath = firstDependencyChunk->getValue();
 
@@ -1830,7 +1831,11 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
                 sourceFile = loadSourceFile(moduleSrcPath, file);
         }
         if (!sourceFile)
+        {
+            if (dependencyChunk == firstDependencyChunk)
+                return true;
             return false;
+        }
         digestBuilder.append(sourceFile->getDigest());
     }
     return digestBuilder.finalize() == existingDigest;
