@@ -667,6 +667,7 @@ static void appendMacroExpansionNotes(
             break;
 
         DiagnosticNote note;
+        SourceLoc callSiteLoc = currentView->getInitiatingSourceLoc();
         if (pathType == PathInfo::Type::MacroExpansion)
         {
             const String& macroName = currentView->getSourceFile()->getPathInfo().foundPath;
@@ -678,6 +679,9 @@ static void appendMacroExpansionNotes(
                 1,
                 &arg);
             note.message = msg.produceString();
+            // Span the full macro name token at the call site so the renderer
+            // can underline it without relying on the lexer fallback.
+            note.span.range = SourceRange{callSiteLoc, callSiteLoc + (Int)macroName.getLength()};
         }
         else
         {
@@ -688,8 +692,8 @@ static void appendMacroExpansionNotes(
                 0,
                 nullptr);
             note.message = msg.produceString();
+            note.span.range = SourceRange{callSiteLoc};
         }
-        note.span.range = SourceRange{currentView->getInitiatingSourceLoc()};
         notes.add(std::move(note));
 
         currentView = initiatingView;
