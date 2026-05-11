@@ -325,6 +325,38 @@ static List<UsedBindingRange> collectUsedBindings(
         collectUsedBindingsFromVarLayout(varLayout, kind, 0, 0, param, ranges);
     }
 
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(inst);
+        if (!func)
+            continue;
+        auto layoutDecor = func->findDecoration<IRLayoutDecoration>();
+        if (!layoutDecor)
+            continue;
+        auto entryPointLayout = as<IREntryPointLayout>(layoutDecor->getLayout());
+        if (!entryPointLayout)
+            continue;
+
+        // Entry-point uniform parameters are not `IRGlobalParam`s yet
+        // when coverage instrumentation runs. Later parameter-collection
+        // passes flatten them into globals using this entry-point layout,
+        // so the auto allocator must reserve their eventual slots here.
+        collectUsedBindingsFromVarLayout(
+            entryPointLayout->getParamsLayout(),
+            kind,
+            0,
+            0,
+            func,
+            ranges);
+        collectUsedBindingsFromVarLayout(
+            entryPointLayout->getResultLayout(),
+            kind,
+            0,
+            0,
+            func,
+            ranges);
+    }
+
     return ranges;
 }
 
