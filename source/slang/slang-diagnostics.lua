@@ -2796,6 +2796,13 @@ err(
     span { loc = "decl:Decl", message = "static const variable '~decl' must have an initializer" }
 )
 
+err(
+    "static-const-global-non-constant-init",
+    31226,
+    "static const global initializer must be a compile-time constant",
+    span { loc = "decl:Decl", message = "initializer of static const global '~decl' does not evaluate to a compile-time constant" }
+)
+
 -- 3123x - Modifiers and Deprecation (part 2)
 
 err(
@@ -4584,6 +4591,13 @@ warning(
     41030,
     "left shift overflow",
     span { loc = "location", message = "left shift amount exceeds the number of bits and the result will be always zero, (`~lhsType:IRInst' << `~shiftAmount:Int`)." }
+)
+
+warning(
+    "operator-shift-on-narrow-type",
+    41034,
+    "left shift on narrow integer type",
+    span { loc = "location", message = "left shift on narrow integer type '~lhsType:IRInst'; unlike C/C++, Slang does not promote narrow integers before shifting. If a wider result is needed, cast the left operand to a wider type first (e.g., uint(x) << n)." }
 )
 
 err(
