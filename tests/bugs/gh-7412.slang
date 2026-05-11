@@ -1,6 +1,6 @@
 // GH Issue #7412: Capabilities of `extension` should be a subset of the target type's capabilities.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 [require(glsl)]
 struct Bar
@@ -11,6 +11,7 @@ struct Bar
 [require(hlsl)]
 extension Bar
 //CHECK:  ^^^ conflicting capability requirement
+//CHECK:  ^^^ requires capability
 {
 }
 
@@ -20,6 +21,7 @@ extension Bar
     [require(hlsl)]
     void foo2(){}
 //CHECK: ^^^^ conflicting capability requirement
+//CHECK: ^^^^ requires capability
 }
 
 // ext3: extension has compatible [require(glsl)], but member function has [require(hlsl)] -- should error
@@ -34,4 +36,5 @@ extension Baz
     [require(hlsl)]
     void foo3(){}
 //CHECK: ^^^^ conflicting capability requirement
+//CHECK: ^^^^ requires capability
 }
