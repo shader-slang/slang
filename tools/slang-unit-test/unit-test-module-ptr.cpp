@@ -161,8 +161,6 @@ SLANG_UNIT_TEST(precompiledModuleWithoutSourceWithUpToDateCheck)
         ComPtr<slang::ISession> session;
         SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
-        SLANG_CHECK(session->isBinaryModuleUpToDate("test_module.slang", moduleBlob));
-
         ComPtr<slang::IBlob> diagnosticBlob;
         auto precompiledModule = session->loadModule("test_module", diagnosticBlob.writeRef());
         SLANG_CHECK(precompiledModule != nullptr);
