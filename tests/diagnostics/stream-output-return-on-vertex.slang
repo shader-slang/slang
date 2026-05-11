@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -O0 -skip-spirv-validation
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -O0 -skip-spirv-validation -warnings-disable 38052
 
 // Companion to stream-output-on-vertex.slang, exercising the same
 // rule applied via the entry-point return type rather than a
