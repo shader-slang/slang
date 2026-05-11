@@ -1,6 +1,6 @@
 #ifdef SLANG_IN_SPIRV_EMIT_CONTEXT
 
-// https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc#DebugCompilationUnit
+// https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.asciidoc#DebugCompilationUnit
 template<typename T>
 SpvInst* emitOpDebugCompilationUnit(
     SpvInstParent* parent,
@@ -27,7 +27,7 @@ SpvInst* emitOpDebugCompilationUnit(
         language);
 }
 
-// https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc#DebugSource
+// https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.asciidoc#DebugSource
 template<typename T>
 SpvInst* emitOpDebugSource(
     SpvInstParent* parent,
@@ -73,7 +73,7 @@ SpvInst* emitOpDebugSourceContinued(
     return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(102), text);
 }
 
-// https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc#DebugLine
+// https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.asciidoc#DebugLine
 template<typename T>
 SpvInst* emitOpDebugLine(
     SpvInstParent* parent,
@@ -125,7 +125,7 @@ SpvInst* emitOpDebugEntryPoint(
         args);
 }
 
-// https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc#DebugFunction
+// https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.asciidoc#DebugFunction
 template<typename T>
 SpvInst* emitOpDebugFunction(
     SpvInstParent* parent,

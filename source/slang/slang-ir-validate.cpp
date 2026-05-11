@@ -49,7 +49,7 @@ private:
 
     bool containsOpaqueHandleTypeCached(IRType* type);
     bool containsOpaqueHandleTypeInternal(IRType* type, HashSet<IRType*>& visitedInCurrentCheck);
-    void validateStructuredBufferVariable(IRInst* inst);
+    void validateStructuredBufferVariable(IRType* type, SourceLoc loc);
 };
 
 void validateIRInst(IRValidateContext* context, IRInst* inst);
@@ -737,28 +737,32 @@ bool StructuredBufferValidationContext::containsOpaqueHandleTypeInternal(
     return false;
 }
 
-void StructuredBufferValidationContext::validateStructuredBufferVariable(IRInst* inst)
+void StructuredBufferValidationContext::validateStructuredBufferVariable(
+    IRType* type,
+    SourceLoc loc)
 {
-    IRType* type = inst->getDataType();
-
-    // Unwrap arrays if present
-    type = unwrapArrayAndPointers(type);
-
-    // Check if this is a structured buffer type
-    auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
-    if (!structuredBufferType)
-        return;
-
-    // Get the element type
-    auto elementType = structuredBufferType->getElementType();
-
-    // Check if the element type contains any resource/opaque handle types
-    if (containsOpaqueHandleTypeCached(elementType))
+    while (type)
     {
-        m_sink->diagnose(Diagnostics::CannotUseResourceTypeInStructuredBuffer{
-            .type = elementType,
-            .location = inst->sourceLoc});
-        m_hasErrors = true;
+        if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+        {
+            auto elementType = structuredBufferType->getElementType();
+            if (containsOpaqueHandleTypeCached(elementType))
+            {
+                m_sink->diagnose(Diagnostics::CannotUseResourceTypeInStructuredBuffer{
+                    .type = elementType,
+                    .location = loc});
+                m_hasErrors = true;
+            }
+            return;
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
+            type = arrayType->getElementType();
+        else if (auto ptrType = as<IRPtrTypeBase>(type))
+            type = ptrType->getValueType();
+        else if (auto groupType = as<IRParameterGroupType>(type))
+            type = groupType->getElementType();
+        else
+            return;
     }
 }
 
@@ -768,18 +772,30 @@ bool StructuredBufferValidationContext::validate(IRModule* module)
     if (m_targetRequest && areResourceTypesBindlessOnTarget(m_targetRequest))
         return true;
 
-    // Iterate through all global instructions
+    // `getGlobalInsts()` only yields direct children of the module. That is
+    // sufficient by the time this pass runs (after `specializeModule`),
+    // because concrete struct types have already been hoisted to module
+    // scope. Any unspecialized `IRStructType` parented under an `IRGeneric`
+    // is unreachable from here, which is fine since its
+    // `StructuredBuffer<T>` fields have no concrete `T` to validate yet.
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (auto globalVar = as<IRGlobalParam>(globalInst))
+        if (auto globalParam = as<IRGlobalParam>(globalInst))
         {
-            validateStructuredBufferVariable(globalVar);
+            validateStructuredBufferVariable(globalParam->getDataType(), globalParam->sourceLoc);
+        }
+        else if (auto structType = as<IRStructType>(globalInst))
+        {
+            for (auto field : structType->getFields())
+            {
+                validateStructuredBufferVariable(field->getFieldType(), field->sourceLoc);
+            }
         }
         else if (auto func = as<IRFunc>(globalInst))
         {
             for (auto param : func->getParams())
             {
-                validateStructuredBufferVariable(param);
+                validateStructuredBufferVariable(param->getDataType(), param->sourceLoc);
             }
         }
     }

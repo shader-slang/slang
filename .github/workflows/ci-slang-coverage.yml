@@ -293,6 +293,18 @@ jobs:
             # the test entirely until we understand the root cause
             # (tracked in issue #10810).
             '-exclude-prefix', 'slang-unit-test-tool/RecordReplayApiTypeOperations'
+            # tests/autodiff/global-param-hoisting.slang.* intermittently
+            # crashes slang-test with the same EXCEPTION_ILLEGAL_INSTRUCTION
+            # on windows-latest, ~50% of master nightlies, always after
+            # `global-param-hoisting.slang.1 (vk)` at exactly 610 test
+            # results in. With server-count=1 there is no test-server
+            # subprocess isolation, so the crash kills the runner and Pass 1
+            # ends early -- collapses Windows full coverage from ~55% to
+            # ~31% on the affected runs. Skip until the underlying crash
+            # is root-caused or until the workflow moves to test-server
+            # isolation. Coverage skiplist also documented in
+            # tests/expected-failure-coverage.txt.
+            '-exclude-prefix', 'tests/autodiff/global-param-hoisting'
           )
           if ([int]'${{ inputs.server-count }}' -gt 1) {
             $testArgs += @('-use-test-server', '-server-count', '${{ inputs.server-count }}')
