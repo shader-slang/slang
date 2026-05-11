@@ -74,11 +74,13 @@ The coverage query methods are:
 
 - `getCounterCount()`
 - `getEntryInfo(index, ...)`
+- `getBufferInfo(...)`
 
 These answer:
 
 - how many counters exist
 - what each counter slot means
+- the legacy coverage-specific descriptor binding view
 
 Line counters are source-location based. If generic specialization,
 inlining, or other IR cloning creates multiple executable copies of
@@ -87,6 +89,10 @@ line's counter rather than receiving per-specialization counters.
 
 Hosts use `ICoverageTracingMetadata` when they need to interpret the
 counter values they read back, or emit LCOV or manifest output.
+`getBufferInfo()` remains available for ABI compatibility with
+coverage-specific descriptor-binding callers, but new host integration
+should use `ISyntheticResourceMetadata` for binding because it reports
+both descriptor bindings and CPU/CUDA marshaling locations.
 
 ### Synthetic resource metadata object
 
@@ -160,9 +166,10 @@ For CPU/CUDA-style marshaling paths:
   - returns `uniformOffset` and `uniformStride`
 
 For hosts that already own their runtime binding logic,
-`getResourceInfo()` is the primary low-level API. The descriptor helper
-functions below are an optional convenience layer built on top of the
-same metadata.
+`getResourceInfo()` is the binding API. Slang does not add a second
+descriptor-layout helper abstraction in this header; direct hosts map
+the reported `bindingType`, `space`, and `binding` into their own
+runtime descriptor model.
 
 ### Host-reserved spaces
 
@@ -179,30 +186,13 @@ descriptor sets and D3D register spaces; explicit
 reserved space as occupied, then reports the resulting coverage binding
 through `ISyntheticResourceMetadata`.
 
-### Slang helper functions for descriptor-backed hosts
-
-To reduce host-side duplication of `BindingType -> descriptor class`
-logic, Slang also provides helper functions in `slang.h`:
-
-- `getSyntheticResourceDescriptorClass(...)`
-- `getSyntheticResourceDescriptorRange(...)`
-- `findSyntheticResourceDescriptorRangeByID(...)`
-- `getSyntheticResourceDescriptorRangesForSpace(...)`
-
-These are not a second metadata channel. They are convenience helpers
-on top of `ISyntheticResourceMetadata`, mainly for Vulkan-style
-descriptor-layout construction.
-Enumeration helpers skip resources that are not descriptor-
-representable for the target, but propagate real metadata query
-failures instead of hiding them.
-
 ## Backend usage
 
-| Backend / host style                                    | Primary query path                                                          | Typical helper path                                                                                                                              |
-| ------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Vulkan / Metal / D3D12 / direct descriptor-backed hosts | `getResourceInfo(...)`                                                      | `getSyntheticResourceDescriptorRange(...)`, `findSyntheticResourceDescriptorRangeByID(...)`, `getSyntheticResourceDescriptorRangesForSpace(...)` |
-| CUDA / CPU-style marshaling hosts                       | `getResourceInfo(...)`                                                      | read `uniformOffset` / `uniformStride` from `SyntheticResourceInfo`                                                                              |
-| `slang-rhi` Vulkan / CUDA backends                      | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location; provided by companion `slang-rhi` PR #739, not this PR       |
+| Backend / host style                                    | Query path                                                                  | Binding action                                                                                                                                 |
+| ------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vulkan / Metal / D3D12 / direct descriptor-backed hosts | `getResourceInfo(...)`                                                      | read `space` / `binding` and bind the coverage buffer using the host's descriptor-layout model                                                |
+| CUDA / CPU-style marshaling hosts                       | `getResourceInfo(...)`                                                      | read `uniformOffset` / `uniformStride` from `SyntheticResourceInfo`                                                                            |
+| `slang-rhi` Vulkan / CUDA backends                      | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location; provided by companion `slang-rhi` PR #739, not this PR     |
 
 ## `slang-rhi` consumption model
 
@@ -231,11 +221,10 @@ it maps hidden resources into ordinary resolved `ShaderOffset`s.
 
 That keeps the runtime binding model uniform.
 
-## Binding styles
+## Binding Style
 
-The current interface supports two host-side binding styles.
-
-### 1. Explicit binding
+The current Slang interface exposes explicit binding metadata. It does
+not define a second descriptor-layout abstraction in `slang.h`.
 
 The host reads the hidden resource location and binds it directly:
 
@@ -252,24 +241,9 @@ This is the lowest-level path. It is appropriate for hosts that
 already own their descriptor layout or parameter-marshaling logic and
 just need an accurate hidden-resource contract from Slang.
 
-### 2. Helper-assisted binding
-
-The host uses helper functions layered on top of the same metadata:
-
-- direct descriptor-backed hosts can use:
-  - `getSyntheticResourceDescriptorRange(...)`
-  - `findSyntheticResourceDescriptorRangeByID(...)`
-  - `getSyntheticResourceDescriptorRangesForSpace(...)`
-- `slang-rhi` hosts can use:
-  - `bindSyntheticResource(...)` (provided by `slang-rhi` PR #739)
-
-The `slang-rhi` symbols in this section are companion-PR interfaces
-tracked in `shader-slang/slang-rhi#739`; this Slang PR defines only the
-metadata contract they consume.
-
-This path is meant to reduce the amount of raw binding code a
-reflection-driven codebase has to write, while still keeping the
-resource out of normal reflection.
+The `slang-rhi` helper symbols in this section are companion-PR
+interfaces tracked in `shader-slang/slang-rhi#739`; this Slang PR
+defines only the metadata contract they consume.
 
 ## Direct-host model without `slang-rhi`
 
@@ -289,13 +263,8 @@ For direct hosts, the intended usage is:
    - read `space` / `binding` for descriptor-backed paths
    - read `uniformOffset` / `uniformStride` for CPU/CUDA-style
      marshaling paths
-6. if the host wants a higher-level descriptor helper layer, call the
-   free helper functions in `slang.h` on the same metadata object:
-   - `getSyntheticResourceDescriptorRange(...)`
-   - `findSyntheticResourceDescriptorRangeByID(...)`
-   - `getSyntheticResourceDescriptorRangesForSpace(...)`
-7. allocate and bind the hidden coverage buffer
-8. dispatch
-9. read counters back
-10. use `ICoverageTracingMetadata` for reporting, LCOV, or manifest
+6. allocate and bind the hidden coverage buffer
+7. dispatch
+8. read counters back
+9. use `ICoverageTracingMetadata` for reporting, LCOV, or manifest
     generation

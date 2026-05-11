@@ -361,18 +361,18 @@ uint32_t ArtifactPostEmitMetadata::getCounterCount()
     return (uint32_t)m_coverageEntries.getCount();
 }
 
-// ABI versioning: minimum `structSize` we accept for the v1 shape of
-// `CoverageEntryInfo`. This constant is frozen at the offset of the
-// LAST field shipped in v1 (file+line for the entry struct) and **must
-// not be updated when fields are added later** — that's the whole
-// point of `structSize` versioning. Newer callers with larger structs
-// pass through; older callers feeding a future v2+ implementation
-// will likewise be accepted, with the impl writing only the v1 fields
-// the caller has space for. (When v2 fields are added, write them
-// conditionally based on `outInfo->structSize >= offsetof(struct, newField)
-// + sizeof(newField)`.)
+// ABI versioning: minimum `structSize` we accept for v1 public structs.
+// These constants are frozen at the offset of the LAST field shipped
+// in v1 and **must not be updated when fields are added later**. Newer
+// callers with larger structs pass through; older callers feeding a
+// future v2+ implementation will likewise be accepted, with the impl
+// writing only the v1 fields the caller has space for. When v2 fields
+// are added, write them conditionally based on
+// `outInfo->structSize >= offsetof(struct, newField) + sizeof(newField)`.
 static constexpr size_t kCoverageEntryInfoV1MinSize =
     offsetof(slang::CoverageEntryInfo, line) + sizeof(uint32_t);
+static constexpr size_t kCoverageBufferInfoV1MinSize =
+    offsetof(slang::CoverageBufferInfo, binding) + sizeof(int32_t);
 static constexpr size_t kSyntheticResourceInfoV1MinSize =
     offsetof(slang::SyntheticResourceInfo, debugName) + sizeof(const char*);
 
@@ -393,6 +393,29 @@ SlangResult ArtifactPostEmitMetadata::getEntryInfo(
     // valid (but empty) path to consumers.
     outInfo->file = entry.file.getLength() ? entry.file.getBuffer() : nullptr;
     outInfo->line = entry.line;
+    return SLANG_OK;
+}
+
+SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* outInfo)
+{
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize < kCoverageBufferInfoV1MinSize)
+        return SLANG_E_INVALID_ARG;
+
+    outInfo->space = -1;
+    outInfo->binding = -1;
+
+    m_syntheticResourcesPublished.store(true);
+    for (auto& record : m_syntheticResources)
+    {
+        if (record.id == uint32_t(SyntheticResourceKnownID::Coverage))
+        {
+            outInfo->space = record.space;
+            outInfo->binding = record.binding;
+            break;
+        }
+    }
     return SLANG_OK;
 }
 

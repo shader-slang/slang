@@ -188,6 +188,11 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(info.uniformOffset >= 0);
         SLANG_CHECK(info.uniformStride > 0);
 
+        slang::CoverageBufferInfo bufferInfo;
+        SLANG_CHECK(coverage->getBufferInfo(&bufferInfo) == SLANG_OK);
+        SLANG_CHECK(bufferInfo.space == info.space);
+        SLANG_CHECK(bufferInfo.binding == info.binding);
+
         uint32_t lookedUpIndex = ~0u;
         SLANG_CHECK(syntheticResources->findResourceIndexByID(info.id, &lookedUpIndex) == SLANG_OK);
         SLANG_CHECK(lookedUpIndex == coverageResourceIndex);
@@ -227,84 +232,25 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
             spirvSyntheticResources->getResourceInfo(coverageResourceIndex, &info) == SLANG_OK);
         SLANG_CHECK(info.binding >= 0);
         SLANG_CHECK(info.space >= 0);
+        SLANG_CHECK(info.bindingType == slang::BindingType::MutableRawBuffer);
+        SLANG_CHECK(info.arraySize == 1);
+        SLANG_CHECK(info.scope == slang::SyntheticResourceScope::Global);
+        SLANG_CHECK(info.access == slang::SyntheticResourceAccess::ReadWrite);
+        SLANG_CHECK(info.entryPointIndex == -1);
+        SLANG_CHECK(info.debugName != nullptr);
+        SLANG_CHECK(UnownedStringSlice(info.debugName) == toSlice("__slang_coverage"));
         SLANG_CHECK(info.uniformOffset == -1);
         SLANG_CHECK(info.uniformStride == 0);
 
-        slang::SyntheticResourceDescriptorClass descriptorClass =
-            slang::SyntheticResourceDescriptorClass::Unsupported;
-        SLANG_CHECK(slang::getSyntheticResourceDescriptorClass(info.bindingType, &descriptorClass));
-        SLANG_CHECK(descriptorClass == slang::SyntheticResourceDescriptorClass::StorageBuffer);
-        const auto expectedDescriptorClass = descriptorClass;
-        SLANG_CHECK(!slang::getSyntheticResourceDescriptorClass(
-            slang::BindingType::Unknown,
-            &descriptorClass));
-        SLANG_CHECK(descriptorClass == slang::SyntheticResourceDescriptorClass::Unsupported);
+        slang::CoverageBufferInfo bufferInfo;
+        SLANG_CHECK(spirvBundle.coverage->getBufferInfo(&bufferInfo) == SLANG_OK);
+        SLANG_CHECK(bufferInfo.space == info.space);
+        SLANG_CHECK(bufferInfo.binding == info.binding);
 
-        slang::SyntheticResourceDescriptorRange descriptorRange = {};
+        uint32_t lookedUpIndex = ~0u;
         SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorRange(
-                spirvSyntheticResources,
-                coverageResourceIndex,
-                &descriptorRange) == SLANG_OK);
-        SLANG_CHECK(descriptorRange.id == info.id);
-        SLANG_CHECK(descriptorRange.bindingType == info.bindingType);
-        SLANG_CHECK(descriptorRange.descriptorClass == expectedDescriptorClass);
-        SLANG_CHECK(descriptorRange.space == info.space);
-        SLANG_CHECK(descriptorRange.binding == info.binding);
-        SLANG_CHECK(descriptorRange.arraySize == info.arraySize);
-        SLANG_CHECK(descriptorRange.scope == info.scope);
-        SLANG_CHECK(descriptorRange.access == info.access);
-        SLANG_CHECK(descriptorRange.entryPointIndex == info.entryPointIndex);
-        SLANG_CHECK(descriptorRange.debugName != nullptr);
-        SLANG_CHECK(UnownedStringSlice(descriptorRange.debugName) == toSlice("__slang_coverage"));
-
-        slang::SyntheticResourceDescriptorRange foundDescriptorRange = {};
-        SLANG_CHECK(
-            slang::findSyntheticResourceDescriptorRangeByID(
-                spirvSyntheticResources,
-                info.id,
-                &foundDescriptorRange) == SLANG_OK);
-        SLANG_CHECK(foundDescriptorRange.space == descriptorRange.space);
-        SLANG_CHECK(foundDescriptorRange.binding == descriptorRange.binding);
-
-        uint32_t descriptorRangeCount = 0;
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorRangesForSpace(
-                spirvSyntheticResources,
-                uint32_t(info.space),
-                &descriptorRangeCount,
-                nullptr) == SLANG_OK);
-        SLANG_CHECK(descriptorRangeCount == 1);
-
-        descriptorRangeCount = 0;
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorRangesForSpace(
-                spirvSyntheticResources,
-                uint32_t(info.space),
-                &descriptorRangeCount,
-                &descriptorRange) == SLANG_E_BUFFER_TOO_SMALL);
-        SLANG_CHECK(descriptorRangeCount == 1);
-
-        descriptorRangeCount = 1;
-        slang::SyntheticResourceDescriptorRange descriptorRanges[1] = {};
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorRangesForSpace(
-                spirvSyntheticResources,
-                uint32_t(info.space),
-                &descriptorRangeCount,
-                descriptorRanges) == SLANG_OK);
-        SLANG_CHECK(descriptorRangeCount == 1);
-        SLANG_CHECK(descriptorRanges[0].binding == descriptorRange.binding);
-        SLANG_CHECK(descriptorRanges[0].space == descriptorRange.space);
-
-        descriptorRangeCount = 0;
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorRangesForSpace(
-                spirvSyntheticResources,
-                uint32_t(info.space + 1),
-                &descriptorRangeCount,
-                nullptr) == SLANG_OK);
-        SLANG_CHECK(descriptorRangeCount == 0);
+            spirvSyntheticResources->findResourceIndexByID(info.id, &lookedUpIndex) == SLANG_OK);
+        SLANG_CHECK(lookedUpIndex == coverageResourceIndex);
     }
 
     {
@@ -321,39 +267,17 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         uint32_t index = 0;
         SLANG_CHECK(
             noCoverageSyntheticResources->findResourceIndexByID(1, &index) == SLANG_E_NOT_FOUND);
+        slang::CoverageBufferInfo bufferInfo;
+        SLANG_CHECK(noCoverageBundle.coverage->getBufferInfo(&bufferInfo) == SLANG_OK);
+        SLANG_CHECK(bufferInfo.space == -1);
+        SLANG_CHECK(bufferInfo.binding == -1);
     }
+    SLANG_CHECK(coverage->getBufferInfo(nullptr) == SLANG_E_INVALID_ARG);
     {
-        slang::SyntheticResourceDescriptorRange descriptorRange = {};
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorRange(nullptr, 0, &descriptorRange) ==
-            SLANG_E_INVALID_ARG);
-        descriptorRange.structSize = 0;
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorRange(syntheticResources, 0, &descriptorRange) ==
-            SLANG_E_INVALID_ARG);
-        SLANG_CHECK(
-            slang::findSyntheticResourceDescriptorRangeByID(nullptr, 1, &descriptorRange) ==
-            SLANG_E_INVALID_ARG);
-        descriptorRange.structSize = sizeof(descriptorRange);
-        SLANG_CHECK(
-            slang::findSyntheticResourceDescriptorRangeByID(
-                syntheticResources,
-                0,
-                &descriptorRange) == SLANG_E_NOT_FOUND);
+        slang::CoverageBufferInfo bufferInfo;
+        bufferInfo.structSize = 0;
+        SLANG_CHECK(coverage->getBufferInfo(&bufferInfo) == SLANG_E_INVALID_ARG);
     }
-    {
-        uint32_t count = 0;
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorRangesForSpace(nullptr, 0, &count, nullptr) ==
-            SLANG_E_INVALID_ARG);
-        SLANG_CHECK(
-            slang::getSyntheticResourceDescriptorRangesForSpace(
-                syntheticResources,
-                0,
-                nullptr,
-                nullptr) == SLANG_E_INVALID_ARG);
-    }
-
     {
         slang::SyntheticResourceInfo info;
         SLANG_CHECK(
