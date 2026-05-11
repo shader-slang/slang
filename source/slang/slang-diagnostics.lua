@@ -1043,6 +1043,13 @@ err(
     span { loc = "location", message = "cannot use a stage name in '__target_switch', use '__stage_switch' for stage-specific code." }
 )
 
+warning(
+    "spirv-layout-sensitive-type-in-asm",
+    29116,
+    "layout-sensitive SPIR-V type declaration in spirv_asm",
+    span { loc = "location", message = "layout-sensitive SPIR-V type declaration '~opcode' in spirv_asm may not preserve Slang data-layout information; form layout-sensitive pointers/values with Slang types or expressions and pass them into spirv_asm instead" }
+)
+
 
 -- Load semantic checking diagnostics (part 1)
 -- (inlined from slang-diagnostics-semantic-checking-1.lua)
@@ -3184,6 +3191,13 @@ warning(
     span { loc = "expr:Expr", message = "initializing an interface variable with defaults is deprecated and may cause unexpected behavior. Please provide a compatible initializer or leave the variable uninitialized" }
 )
 
+err(
+    "interface-default-initializer-error",
+    30524,
+    "cannot initialize an interface variable with defaults",
+    span { loc = "expr:Expr", message = "initializing an interface variable with defaults is not supported. Please provide a compatible initializer or leave the variable uninitialized" }
+)
+
 --
 -- 3062x: variables
 --
@@ -5000,7 +5014,7 @@ fatal(
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 
--- Metal and WGSL (56101-56105)
+-- Metal or WGSL (56101-56109)
 
 err(
     "resource-types-in-constant-buffer-in-parameter-block-not-allowed-on-metal",
@@ -5042,6 +5056,27 @@ err(
     56106,
     "texture format '~format' does not support '~accessMode' access for storage textures in WGSL",
     span { loc = "location" }  -- No span message: source location is not available at emit time
+)
+
+warning(
+    "multisampled-subpass-input-not-supported-on-metal",
+    56107,
+    "Metal does not support per-sample SubpassLoad; the sample index will be ignored",
+    span { loc = "location", message = "Metal framebuffer fetch does not support per-sample reads. The sample index is ignored and the resolved value is returned." }
+)
+
+err(
+    "subpass-input-used-outside-entry-point",
+    56108,
+    "SubpassInput used outside of the fragment entry point function",
+    span { loc = "location", message = "on Metal, SubpassInput can only be used from the fragment entry point or from functions that are inlined into it. If this reference is inside a helper function, ensure it is not marked [noinline]." }
+)
+
+err(
+    "subpass-input-in-parameter-block-not-allowed-on-metal",
+    56109,
+    "SubpassInput in ParameterBlock not supported on Metal",
+    span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
 )
 
 -- SPIRV (57001-57004)
