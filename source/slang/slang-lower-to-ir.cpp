@@ -5573,8 +5573,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitApplyForBwdExpr(ApplyForBwdExpr* expr)
     {
-        context->getSink()->diagnose(Diagnostics::ApplyForBwdExpressionRequiresInvocation{
-            .expr = expr});
+        context->getSink()->diagnose(
+            Diagnostics::ApplyForBwdExpressionRequiresInvocation{.expr = expr});
         return LoweredValInfo::simple(getBuilder()->getVoidValue());
     }
 

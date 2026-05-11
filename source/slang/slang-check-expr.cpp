@@ -1105,6 +1105,103 @@ bool SemanticsVisitor::isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scop
             if (s->containerDecl == parentContainer)
                 return true;
         }
+
+        auto parentAggTypeDecl = as<AggTypeDeclBase>(parentContainer);
+        if (!parentAggTypeDecl)
+            return false;
+
+        // If the decl isn't in the same syntactic container as the scope, we still need to
+        // consider extensions that apply to the same type.
+        //
+        // An `ExtensionDecl` is represented as its own `AggTypeDeclBase`, but extension members
+        // are semantically members of the type being extended. For private access, that means
+        // `extension S { private ... }` should be visible from `S` and from other extensions that
+        // apply to `S`, even though the declaration's parent is the extension node rather than the
+        // original `S` declaration.
+        //
+        struct ContainerTargetTypeResolver
+        {
+            SemanticsVisitor* visitor;
+            ASTBuilder* astBuilder;
+
+            Type* getTargetTypeForContainer(AggTypeDeclBase* containerDecl)
+            {
+                if (auto extensionDecl = as<ExtensionDecl>(containerDecl))
+                {
+                    auto extensionDeclRef =
+                        visitor->getDefaultDeclRef(extensionDecl).as<ExtensionDecl>();
+                    if (!extensionDeclRef)
+                        return nullptr;
+
+                    auto targetType = getTargetType(astBuilder, extensionDeclRef);
+                    if (auto targetDeclRefType = as<DeclRefType>(targetType))
+                    {
+                        if (auto targetCallableDeclRef =
+                                targetDeclRefType->getDeclRef().as<CallableDecl>())
+                        {
+                            // Auto-diff synthesizes derivative members as extensions on a
+                            // function-as-type. When that function is a member of an aggregate,
+                            // private access should still be governed by the member function's
+                            // owning aggregate, not by the synthetic function type itself.
+                            //
+                            // The callable can itself be declared in an extension, so resolve the
+                            // parent aggregate through this helper recursively rather than using
+                            // the extension declaration as the semantic container.
+                            if (auto parentAggTypeDecl =
+                                    getParentAggTypeDeclBase(targetCallableDeclRef.getDecl()))
+                            {
+                                return getTargetTypeForContainer(parentAggTypeDecl);
+                            }
+                        }
+                    }
+
+                    return targetType;
+                }
+
+                return DeclRefType::create(astBuilder, visitor->getDefaultDeclRef(containerDecl));
+            }
+        };
+
+        ContainerTargetTypeResolver targetTypeResolver = {this, m_astBuilder};
+
+        auto privateDeclContainerType =
+            targetTypeResolver.getTargetTypeForContainer(parentAggTypeDecl);
+        if (!privateDeclContainerType)
+            return false;
+
+        auto doesContainerTargetTypeMatch = [&](AggTypeDeclBase* scopeAggTypeDecl) -> bool
+        {
+            auto scopeContainerType =
+                targetTypeResolver.getTargetTypeForContainer(scopeAggTypeDecl);
+            if (!scopeContainerType)
+                return false;
+
+            if (privateDeclContainerType->equals(scopeContainerType))
+                return true;
+
+            if (auto parentExtensionDecl = as<ExtensionDecl>(parentAggTypeDecl))
+            {
+                if (applyExtensionToType(parentExtensionDecl, scopeContainerType))
+                    return true;
+            }
+
+            return false;
+        };
+
+        // Walk the lexical scope chain looking for an enclosing aggregate/extension and compare
+        // its semantic type with the declaration's semantic type.
+        // `applyExtensionToType` handles generic extensions whose target can be specialized to the
+        // current scope's aggregate type.
+        //
+        for (auto s = scope; s; s = s->parent)
+        {
+            if (auto scopeAggTypeDecl = as<AggTypeDeclBase>(s->containerDecl))
+            {
+                if (doesContainerTargetTypeMatch(scopeAggTypeDecl))
+                    return true;
+            }
+        }
+        return false;
     }
     return false;
 }
@@ -3760,10 +3857,8 @@ static Expr* convertHigherOrderExprToLookup(
             LookupOptions::NoDeref);
         result = visitor->resolveOverloadedLookup(result);
         bool diagnosed = false;
-        result = visitor->filterLookupResultByVisibilityAndDiagnose(
-            result,
-            resultExpr->loc,
-            diagnosed);
+        result =
+            visitor->filterLookupResultByVisibilityAndDiagnose(result, resultExpr->loc, diagnosed);
         result = visitor->filterLookupResultByCheckedOptionalAndDiagnose(
             result,
             resultExpr->loc,
@@ -4658,18 +4753,18 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
     {
         if (auto diffPairType = tryGetDifferentialPairType(thisQualType.type))
         {
-            paramTypes.add(thisQualType.isLeftValue
-                               ? m_astBuilder->getBorrowInOutParamType(diffPairType)
-                               : diffPairType);
+            paramTypes.add(
+                thisQualType.isLeftValue ? m_astBuilder->getBorrowInOutParamType(diffPairType)
+                                         : diffPairType);
         }
         else
         {
             auto noDiffThisType = m_astBuilder->getModifiedType(
                 thisQualType.type,
                 {m_astBuilder->getNoDiffModifierVal()});
-            paramTypes.add(thisQualType.isLeftValue
-                               ? m_astBuilder->getBorrowInOutParamType(noDiffThisType)
-                               : noDiffThisType);
+            paramTypes.add(
+                thisQualType.isLeftValue ? m_astBuilder->getBorrowInOutParamType(noDiffThisType)
+                                         : noDiffThisType);
         }
     }
 
@@ -5050,9 +5145,10 @@ struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
         if (thisType.type)
         {
             List<Type*> paramTypes;
-            paramTypes.add(thisType.isLeftValue
-                               ? semantics->getASTBuilder()->getBorrowInOutParamType(thisType.type)
-                               : thisType.type);
+            paramTypes.add(
+                thisType.isLeftValue
+                    ? semantics->getASTBuilder()->getBorrowInOutParamType(thisType.type)
+                    : thisType.type);
             for (Index i = 0; i < baseFuncType->getParamCount(); i++)
                 paramTypes.add(baseFuncType->getParamTypeWithModeWrapper(i));
 

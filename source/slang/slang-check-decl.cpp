@@ -11811,16 +11811,16 @@ void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     decl->body = maybeParseStmt(decl->body, newContext);
     if (const auto body = decl->body)
     {
-        bool isSynthesizedDiffMethod = decl->findModifier<SynthesizedModifier>() &&
-                                       decl->findModifier<BackwardDifferentiableAttribute>();
-        auto errorCountBefore = isSynthesizedDiffMethod ? getSink()->getErrorCount() : 0;
+        auto parentDecl = decl->parentDecl;
+        bool isSynthesizedMethod =
+            decl->findModifier<SynthesizedModifier>() && as<AggTypeDeclBase>(parentDecl);
+        auto errorCountBefore = isSynthesizedMethod ? getSink()->getErrorCount() : 0;
 
         checkStmt(body, newContext);
 
-        if (isSynthesizedDiffMethod && getSink()->getErrorCount() > errorCountBefore)
+        if (isSynthesizedMethod && getSink()->getErrorCount() > errorCountBefore)
         {
-            auto parentDecl = decl->parentDecl;
-            getSink()->diagnose(Diagnostics::NoteSynthesizingDifferentialMethod{
+            getSink()->diagnose(Diagnostics::NoteSynthesizingMethod{
                 .methodName = decl->getName(),
                 .typeName = parentDecl->getName(),
                 .location = parentDecl->loc});
@@ -14815,8 +14815,7 @@ bool SemanticsDeclBasesVisitor::_funcExtensionApply(
     auto tupleType = as<TupleType>(returnType);
     if (!tupleType || tupleType->getMemberCount() != 2)
     {
-        getSink()->diagnose(Diagnostics::FuncExtensionApplyReturnType{
-            .location = loc});
+        getSink()->diagnose(Diagnostics::FuncExtensionApplyReturnType{.location = loc});
         return false;
     }
     auto ctxType = tupleType->getMember(1);
@@ -14934,8 +14933,11 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     auto diffExpr = as<DifferentiateExpr>(decl->targetExpr);
     if (!diffExpr)
     {
-        getSink()->diagnose(Diagnostics::FuncExtensionUnsupportedTarget{
-            .location = decl->loc});
+        if (as<HigherOrderInvokeExpr>(decl->targetExpr))
+            getSink()->diagnose(
+                Diagnostics::FuncExtensionUnsupportedOperator{.location = decl->loc});
+        else
+            getSink()->diagnose(Diagnostics::FuncExtensionUnsupportedTarget{.location = decl->loc});
         return;
     }
 
@@ -14982,10 +14984,9 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
                 applyFuncType->getParamCount() == fakeArgs.getCount() + 1)
             {
                 auto thisArg = astBuilder->create<VarExpr>();
-                auto [thisArgType, thisArgDirection] =
-                    splitParameterTypeAndDirection(
-                        astBuilder,
-                        applyFuncType->getParamTypeWithModeWrapper(0));
+                auto [thisArgType, thisArgDirection] = splitParameterTypeAndDirection(
+                    astBuilder,
+                    applyFuncType->getParamTypeWithModeWrapper(0));
                 thisArg->type.type = thisArgType;
                 thisArg->type.isLeftValue = thisArgDirection == ParamPassingMode::Out ||
                                             thisArgDirection == ParamPassingMode::BorrowInOut ||
@@ -15011,8 +15012,8 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     {
         if (getSink()->getErrorCount() == errorCountBeforeResolve)
         {
-            getSink()->diagnose(Diagnostics::FuncExtensionUnresolvedFunction{
-                .location = decl->loc});
+            getSink()->diagnose(
+                Diagnostics::FuncExtensionUnresolvedFunction{.location = decl->loc});
         }
         return;
     }
@@ -15051,21 +15052,12 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     if (as<ForwardDifferentiateExpr>(diffExpr))
         success = _funcExtensionForwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
     else if (as<BackwardDifferentiateExpr>(diffExpr))
-        success = _funcExtensionBackwardDiff(
-            extensionDecl,
-            innerFunc,
-            baseFuncAsType,
-            visibility);
+        success = _funcExtensionBackwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
     else if (as<ApplyForBwdExpr>(diffExpr))
-        success = _funcExtensionApply(
-            extensionDecl,
-            innerFunc,
-            baseFuncAsType,
-            visibility,
-            decl->loc);
+        success =
+            _funcExtensionApply(extensionDecl, innerFunc, baseFuncAsType, visibility, decl->loc);
     else
-        getSink()->diagnose(Diagnostics::FuncExtensionUnsupportedOperator{
-            .location = decl->loc});
+        getSink()->diagnose(Diagnostics::FuncExtensionUnsupportedOperator{.location = decl->loc});
     if (!success)
     {
         if (genericParent && genericParent->inner == extensionDecl)

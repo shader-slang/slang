@@ -1132,9 +1132,9 @@ err(
 )
 
 standalone_note(
-    "note-synthesizing-differential-method",
+    "note-synthesizing-method",
     30022,
-    "some of the above errors may have been produced while synthesizing '~methodName:Name' for 'IDifferentiable' conformance of '~typeName:Name'",
+    "some of the above errors may have been produced while synthesizing method '~methodName:Name' of '~typeName:Name'",
     span { loc = "location" }
 )
 
