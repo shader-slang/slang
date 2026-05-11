@@ -11592,11 +11592,17 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
 
     auto isEnumFlags = decl->hasModifier<FlagsAttribute>();
 
-    // Resolve the underlying integer kind once, so we can range-check the
-    // implicit tag advancement against the user-declared tag type.
-    BaseType tagBaseType = BaseType::Int;
+    // Resolve the underlying integer kind
+    BaseType tagBaseType;
     if (auto basicTagType = as<BasicExpressionType>(unwrapModifiedType(tagType)))
         tagBaseType = basicTagType->getBaseType();
+    else
+    {
+        getSink()->diagnose(Diagnostics::Unexpected{
+            .message = "Unexpected enumeration tag type",
+            .location = decl->getNameLoc()});
+        return;
+    }
 
     // Check the enum cases in order.
     for (auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())

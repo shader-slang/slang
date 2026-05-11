@@ -1,4 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -stage compute -entry main -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_WARNING_DISABLED): -stage compute -entry main -target spirv -warnings-disable 32006
 
 enum TestEnumBool : bool
 {
