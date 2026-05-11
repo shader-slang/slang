@@ -3528,13 +3528,6 @@ ParamPassingMode adjustParamPassingModeBasedOnParamType(
         // with a non-copyable type.
         //
         return ParamPassingMode::BorrowIn;
-
-    case ParamPassingMode::BorrowInOut:
-        // A `[mutating]` method on an explicitly non-copyable type cannot use
-        // copy-in/copy-out semantics. Promote to true reference (`Ref`) so the
-        // caller passes a pointer to the original storage rather than a local copy.
-        //
-        return ParamPassingMode::Ref;
     }
 }
 
