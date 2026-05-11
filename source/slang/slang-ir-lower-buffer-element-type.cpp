@@ -1602,10 +1602,14 @@ struct LoweredElementTypeContext
                 clonedFunc,
                 [&](IRCall* user)
                 {
-                    builder.setInsertBefore(user);
-                    auto newCall = cloneInst(&cloneEnv, &builder, user);
-                    user->replaceUsesWith(newCall);
-                    user->removeAndDeallocate();
+                    // Ensure that the use is specifically as the callee.
+                    if (user->getCallee() == clonedFunc)
+                    {
+                        builder.setInsertBefore(user);
+                        auto newCall = cloneInst(&cloneEnv, &builder, user);
+                        user->replaceUsesWith(newCall);
+                        user->removeAndDeallocate();
+                    }
                 });
         }
 
