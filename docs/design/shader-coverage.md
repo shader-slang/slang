@@ -124,9 +124,12 @@ Enabling `-trace-coverage` runs three pipeline stages:
      synthesized type is wrapped in `Atomic<...>`.
    - **Picks a (set, binding)** — either honoring
      `-trace-coverage-binding <reg> <space>` if supplied, or
-     auto-allocating an offset in space 0 that doesn't collide with
-     any existing global param's offsets for the chosen resource
-     kind.
+     auto-allocating a non-conflicting location for the chosen
+     resource kind. On Khronos / SPIR-V / GLSL descriptor-set
+     targets, auto-allocation picks the first unused descriptor set
+     and binds coverage at binding 0 so the compiler does not mutate
+     a user-owned set layout. On register-space targets such as HLSL,
+     auto-allocation picks the next free binding in space 0.
    - **Extends the program-scope var layout** to include the new
      buffer as a struct field so `collectGlobalUniformParameters`
      packs it alongside user globals on targets that pack ordinary

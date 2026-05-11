@@ -68,10 +68,13 @@ and
 
 ## Pinning the coverage buffer at an explicit slot
 
-By default the IR coverage pass auto-allocates a slot in space 0
-for `__slang_coverage` that doesn't collide with any other global
-parameter's offset. Pass `-trace-coverage-binding <index> <space>`
-to pin it at a specific `(register, space)` pair instead:
+By default the IR coverage pass auto-allocates a non-conflicting
+location for `__slang_coverage`. For Vulkan / SPIR-V descriptor-set
+targets, it uses the first unused descriptor set at binding 0 so
+coverage does not extend a user-owned descriptor set layout. For
+register-space targets such as HLSL, it uses the next free binding in
+space 0. Pass `-trace-coverage-binding <index> <space>` to pin it at
+a specific `(register, space)` pair instead:
 
 ```bash
 slangc shader.slang -target spirv -stage compute -entry main \
@@ -277,7 +280,7 @@ slot in its own pipeline layout / root signature.
 | Backend                                   | Default `-trace-coverage`                                                                                                                                                                                                                                                                         | `-trace-coverage-binding=N:0`          | `-trace-coverage-binding=N:M` (M ≠ 0) |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
 | CPU                                       | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
-| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported                                                                                                                                                                                                                                                                                         | Supported                              | Compiler-side decoration correct      |
+| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the first unused descriptor set at binding 0.                                                                                                                                                                                                                      | Supported                              | Compiler-side decoration correct      |
 | D3D12 / HLSL                              | Supported                                                                                                                                                                                                                                                                                         | Supported                              | Supported                             |
 | CUDA                                      | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
 | Metal (direct)                            | Compiles. End-to-end dispatch is unreliable due to a pre-existing slang-rhi Metal binding quirk ([shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724)) — not a coverage-feature defect.                                                                             | (untested)                             | (untested)                            |
@@ -310,10 +313,7 @@ slot in its own pipeline layout / root signature.
   wrong buffer. Not a coverage-feature defect; tracked at
   [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724).
   On Apple silicon, use Vulkan via MoltenVK.
-- **Entry-point uniform parameters can collide with the auto-allocated
-  coverage buffer.** The coverage pass's auto-allocator walks
-  module-scope globals only, so a shader that declares uniforms as
-  parameters of the entry-point function (HLSL-legacy `void main(uniform
-Buf b, ...)` style) may end up sharing a register slot with
-  `__slang_coverage`. Workaround: declare uniforms at module scope
-  (modern Slang convention) — that path works correctly.
+- **Auto-allocation can add a descriptor set on Vulkan / SPIR-V.**
+  Direct hosts must include the reported coverage `(set, binding)` in
+  their pipeline layout and bind the counter buffer there. Hosts that
+  require a fixed existing set can use `-trace-coverage-binding`.
