@@ -2054,7 +2054,7 @@ Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
     auto paramValueType = getParamValueType(astBuilder, paramDeclRef);
-    auto paramMode = getParamPassingMode(paramDeclRef.getDecl(), astBuilder);
+    auto paramMode = getParamPassingMode(paramDeclRef, astBuilder);
     return getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
 }
 

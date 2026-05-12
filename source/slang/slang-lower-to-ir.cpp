@@ -3460,8 +3460,12 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 static bool typeContainsNonCopyable(Type* type, ASTBuilder* astBuilder)
 {
     // Unwrap modifier wrappers (e.g. NoDiffType applied to `this` by autodiff)
-    // so the underlying DeclRefType is visible.
+    // so the underlying type is visible.
     type = unwrapModifiedType(type);
+    // Recurse into array element types (ArrayExpressionType is a DeclRefType,
+    // but its decl is not a StructDecl, so the struct branch below would miss it).
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return typeContainsNonCopyable(arrayType->getElementType(), astBuilder);
     auto declRefType = as<DeclRefType>(type);
     if (!declRefType)
         return false;
@@ -3534,11 +3538,14 @@ ParamPassingMode adjustParamPassingModeBasedOnParamType(
     }
 }
 
-ParamPassingMode getParamPassingMode(ParamDecl* paramDecl, ASTBuilder* astBuilder)
+ParamPassingMode getParamPassingMode(DeclRef<ParamDecl> paramDeclRef, ASTBuilder* astBuilder)
 {
+    auto paramDecl = paramDeclRef.getDecl();
     auto declaredMode = getExplicitlyDeclaredParamPassingMode(paramDecl);
-    auto actualMode =
-        adjustParamPassingModeBasedOnParamType(declaredMode, paramDecl->getType(), astBuilder);
+    auto actualMode = adjustParamPassingModeBasedOnParamType(
+        declaredMode,
+        getParamValueType(astBuilder, paramDeclRef),
+        astBuilder);
     return actualMode;
 }
 
@@ -5030,8 +5037,7 @@ struct ExprLoweringContext
         Count argCounter = 0;
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(getASTBuilder(), funcDeclRef))
         {
-            auto paramDecl = paramDeclRef.getDecl();
-            auto paramDirection = getParamPassingMode(paramDecl, getASTBuilder());
+            auto paramDirection = getParamPassingMode(paramDeclRef, getASTBuilder());
 
             Index argIndex = argCounter++;
             addDirectCallArgs(expr, argIndex, paramDirection, paramDeclRef, ioArgs, ioFixups);

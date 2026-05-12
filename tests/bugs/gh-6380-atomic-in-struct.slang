@@ -5,6 +5,7 @@
 // [mutating] this-parameters on types containing Atomic<T> fields to [__ref] semantics.
 
 //CHECK: OpEntryPoint
+//CHECK: OpAtomicIIncrement
 
 struct Test {
     Atomic<int> test;

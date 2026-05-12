@@ -932,10 +932,15 @@ class NamedExpressionType : public Type
 ///
 /// The `paramType` should be the declared type of the parameter, not including
 /// any of the wrapper types that are used to represent parameter-passing modes.
+/// Modifier wrappers (e.g. from autodiff) are stripped internally.
 ///
-/// This function is primarily concerned with adjusting a parameter-passing
-/// mode to account for non-copyable types, which may need different defaults
-/// than a copyable type.
+/// This function adjusts the mode to account for non-copyable types and for
+/// types that transitively contain non-copyable fields (e.g. a struct whose
+/// field is `Atomic<T>`), which cannot use copy-in/copy-out semantics.
+///
+/// `astBuilder` is used to apply generic substitutions when inspecting field
+/// types. Passing null is accepted but may miss non-copyable fields inside
+/// generic field types.
 ///
 ParamPassingMode adjustParamPassingModeBasedOnParamType(
     ParamPassingMode originalMode,

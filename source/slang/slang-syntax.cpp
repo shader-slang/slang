@@ -1058,8 +1058,7 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
             paramValueType = astBuilder->getErrorType();
         }
 
-        auto paramDecl = paramDeclRef.getDecl();
-        auto paramMode = getParamPassingMode(paramDecl, astBuilder);
+        auto paramMode = getParamPassingMode(paramDeclRef, astBuilder);
         auto paramType = getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
 
         paramTypes.add(paramType);
