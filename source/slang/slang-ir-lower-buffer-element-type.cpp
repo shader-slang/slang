@@ -410,19 +410,27 @@ void maybeAddPhysicalTypeDecoration(IRBuilder& builder, IRInst* type, TypeLoweri
         builder.addPhysicalTypeDecoration(type);
 }
 
-static bool metalContainsMultiLevelPointer(IRType* type)
+static bool metalContainsMultiLevelPointerImpl(IRType* type, HashSet<IRType*>& visited)
 {
     if (auto ptrType = as<IRPtrType>(type))
         return as<IRPtrType>(ptrType->getValueType()) != nullptr;
     if (auto structType = as<IRStructType>(type))
     {
+        if (!visited.add(type))
+            return false;
         for (auto field : structType->getFields())
-            if (metalContainsMultiLevelPointer(field->getFieldType()))
+            if (metalContainsMultiLevelPointerImpl(field->getFieldType(), visited))
                 return true;
     }
     if (auto arrayType = as<IRArrayType>(type))
-        return metalContainsMultiLevelPointer(arrayType->getElementType());
+        return metalContainsMultiLevelPointerImpl(arrayType->getElementType(), visited);
     return false;
+}
+
+static bool metalContainsMultiLevelPointer(IRType* type)
+{
+    HashSet<IRType*> visited;
+    return metalContainsMultiLevelPointerImpl(type, visited);
 }
 
 struct LoweredElementTypeContext
