@@ -1511,7 +1511,7 @@ MacroInvocation::MacroInvocation(
     {
         SourceManager* sm = preprocessor->getSourceManager();
         SourceLoc firstBodyLoc = macro->tokens.m_tokens[0].loc;
-        SourceView* defView = sm->findSourceView(firstBodyLoc);
+        SourceView* defView = sm->findSourceViewRecursively(firstBodyLoc);
         if (defView && defView->getSourceFile()->getContentBlob())
         {
             m_definitionViewRange = defView->getRange();

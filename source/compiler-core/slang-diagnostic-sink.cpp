@@ -455,8 +455,14 @@ static void formatDiagnostic(DiagnosticSink* sink, Diagnostic const& diagnostic,
         {
             SourceView* currentView = sourceView;
 
-            while (currentView && currentView->getInitiatingSourceLoc().isValid())
+            for (int expansionDepth = 0;
+                 currentView && currentView->getInitiatingSourceLoc().isValid();
+                 ++expansionDepth)
             {
+                // Guard against a malformed cycle in the initiating-loc chain.
+                if (expansionDepth >= 1024)
+                    break;
+
                 const PathInfo::Type pathType = currentView->getSourceFile()->getPathInfo().type;
                 if (pathType != PathInfo::Type::TokenPaste &&
                     pathType != PathInfo::Type::MacroExpansion)
@@ -464,10 +470,10 @@ static void formatDiagnostic(DiagnosticSink* sink, Diagnostic const& diagnostic,
                     break;
                 }
 
-                SourceView* initiatingView =
-                    sourceManager
-                        ? sourceManager->findSourceView(currentView->getInitiatingSourceLoc())
-                        : nullptr;
+                SourceView* initiatingView = sourceManager
+                                                 ? sourceManager->findSourceViewRecursively(
+                                                       currentView->getInitiatingSourceLoc())
+                                                 : nullptr;
                 if (initiatingView == nullptr)
                 {
                     break;
@@ -656,8 +662,13 @@ static void appendMacroExpansionNotes(
         return;
 
     SourceView* currentView = sm->findSourceViewRecursively(primaryLoc);
-    while (currentView && currentView->getInitiatingSourceLoc().isValid())
+    for (int expansionDepth = 0; currentView && currentView->getInitiatingSourceLoc().isValid();
+         ++expansionDepth)
     {
+        // Guard against a malformed cycle in the initiating-loc chain.
+        if (expansionDepth >= 1024)
+            break;
+
         const PathInfo::Type pathType = currentView->getSourceFile()->getPathInfo().type;
         if (pathType != PathInfo::Type::MacroExpansion && pathType != PathInfo::Type::TokenPaste)
             break;
