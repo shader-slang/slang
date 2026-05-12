@@ -3,6 +3,7 @@
 
 #include "../compiler-core/slang-artifact-associated-impl.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-uniform-usage.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 
@@ -215,6 +216,33 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
         if (!param)
             continue;
         collectMetadataFromInst(param, outMetadata);
+    }
+
+    Dictionary<IRGlobalParam*, List<UniformUsageRange>> uniformUsage;
+    collectUniformUsage(const_cast<IRModule*>(irModule), uniformUsage);
+    for (auto& kv : uniformUsage)
+    {
+        auto* param = kv.first;
+        auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
+        if (!layoutDecoration)
+            continue;
+        auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
+        if (!varLayout)
+            continue;
+
+        UInt spaceOffset = 0;
+        if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+            spaceOffset = spaceAttr->getOffset();
+
+        for (auto& range : kv.second)
+        {
+            _insertBinding(
+                outMetadata.m_usedBindings,
+                LayoutResourceKind::Uniform,
+                spaceOffset,
+                range.byteOffset,
+                range.byteSize);
+        }
     }
 }
 

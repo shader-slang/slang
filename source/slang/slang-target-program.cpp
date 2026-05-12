@@ -49,6 +49,13 @@ IArtifact* TargetProgram::_createWholeProgramResult(
         std::lock_guard<std::mutex> lock(m_resultCacheMutex);
         if (m_wholeProgramResult)
             return m_wholeProgramResult;
+
+        for (uint32_t i = 0; i < m_entryPointResults.getCount(); ++i)
+        {
+            if (SLANG_FAILED(codeGenContext.emitEntryPoints(m_entryPointResults[i])))
+                m_entryPointResults[i].setNull();
+        }
+
         m_wholeProgramResult = artifact;
         return m_wholeProgramResult;
     }
