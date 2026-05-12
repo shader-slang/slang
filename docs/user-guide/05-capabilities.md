@@ -151,6 +151,39 @@ struct Foo1 : IFoo1
 }
 ```
 
+## Capabilities of Extensions
+
+An `extension` declaration adds members to an existing type. Because the extension can only be used
+where its target type is available, the capabilities declared on the extension itself must be
+compatible with the capabilities of the target type. Declaring an incompatible capability on an
+extension or on one of its non-static member functions is an error.
+
+```csharp
+[require(glsl)]
+struct MyType {}
+
+// Error: extension requires hlsl, but MyType only supports glsl.
+[require(hlsl)]
+extension MyType {}
+
+// Error: member requires hlsl, but MyType only supports glsl.
+extension MyType
+{
+    [require(hlsl)]
+    void foo() {}
+}
+
+// OK: member requires glsl, which is compatible with MyType's glsl requirement.
+extension MyType
+{
+    [require(glsl)]
+    void bar() {}
+}
+```
+
+Static extension members are exempt from this check because they do not carry an implicit `this`
+parameter and therefore do not require the type to be available in any particular capability context.
+
 ## Capabilities Between Requirement and Implementation
 
 We require that all requirement capabilities are supersets of their implementation (only required if capabilities are explicitly annotated).

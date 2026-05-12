@@ -65,3 +65,18 @@ extension<T> Box<T>
     [require(hlsl)]
     void doThing() {}
 }
+
+// Case 7: Static extension member with incompatible [require] on the target type.
+// Static members do not carry an implicit 'this' constraint, so the subset check
+// is intentionally not applied to them (consistent with how static struct methods
+// are handled). No error expected.
+[require(glsl)]
+struct StaticHost
+{
+}
+
+extension StaticHost
+{
+    [require(hlsl)]
+    static void staticHelper() {}
+}

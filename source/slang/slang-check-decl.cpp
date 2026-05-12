@@ -18829,9 +18829,10 @@ void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extension
 
     // Ensure the target type is capability-checked before reading its
     // inferredCapabilityRequirements, since _propagateRequirement's internal ensureDecl
-    // call happens after its nodeCaps argument is already evaluated.
-    if (!targetTypeDecl->checkState.isBeingChecked())
-        ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
+    // call happens after its nodeCaps argument is already evaluated. We call ensureDecl
+    // unconditionally (matching the pattern at the non-static-member path below), relying
+    // on _propagateRequirement's own isBeingChecked() early-exit to handle true cycles.
+    ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
 
     CapabilitySet checkCapSet{extensionDecl->inferredCapabilityRequirements};
     _propagateRequirement(
@@ -18990,8 +18991,9 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
                         // inferredCapabilityRequirements. _propagateRequirement evaluates
                         // its nodeCaps argument before its internal ensureDecl call, so we
                         // must pre-compute it here to avoid reading a null/stale pointer.
-                        if (!targetTypeDecl->checkState.isBeingChecked())
-                            ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
+                        // Call unconditionally; _propagateRequirement's own isBeingChecked()
+                        // early-exit handles genuine cycles without needing a guard here.
+                        ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
                         _propagateRequirement(
                             this,
                             ownDeclaredCaps,
