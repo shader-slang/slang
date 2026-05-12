@@ -5,7 +5,8 @@
 // 3. Ptr<struct> -> Ptr<struct>    (no struct inheritance in Slang)
 // 4. Ptr<interface supertype> -> Ptr<interface subtype> (narrowing)
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_2026,non-exhaustive): -std 2026 -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_2025,non-exhaustive): -std 2025 -target spirv
 
 interface IBase
 {
@@ -36,30 +37,43 @@ void computeMain()
 {
     Foo f;
     f.val = 5;
-    // CHECK: error[E31207]
+    // CHECK_2026: error[E31207]
+    // CHECK_2025: warning[E31200]
     Foo* pf = &f;
 
     // 1. Ptr<struct> -> Ptr<interface>: rejected (layout mismatch)
-    // CHECK: error[E30019]
-    // CHECK: not bit equivalent
+    // CHECK_2026: error[E30019]
+    // CHECK_2026: not bit equivalent
+    // CHECK_2025: error[E30019]
+    // CHECK_2025: not bit equivalent
     IBase* ip = pf;
 
     // 2. Ptr<interface> -> Ptr<struct>: rejected
-    // CHECK: error[E30019]
-    // CHECK-NOT: not bit equivalent
+    // CHECK_2026: error[E30019]
+    // CHECK_2026-NOT: not bit equivalent
+    // CHECK_2025: error[E30019]
+    // CHECK_2025-NOT: not bit equivalent
     Foo* pf2 = ip;
 
     // 3. Ptr<struct> -> Ptr<another struct>: rejected (no struct inheritance)
     Bar b;
-    // CHECK: error[E30019]
-    // CHECK-NOT: not bit equivalent
+    // CHECK_2026: error[E31207]
+    // CHECK_2026: error[E30019]
+    // CHECK_2026-NOT: not bit equivalent
+    // CHECK_2025: warning[E31200]
+    // CHECK_2025: error[E30019]
+    // CHECK_2025-NOT: not bit equivalent
     Foo* pf3 = &b;
 
     // 4. Ptr<interface supertype> -> Ptr<interface subtype>: rejected (narrowing)
     IBase ib;
+    // CHECK_2026: error[E31207]
+    // CHECK_2025: warning[E31200]
     IBase* ibp = &ib;
-    // CHECK: error[E30019]
-    // CHECK-NOT: not bit equivalent
+    // CHECK_2026: error[E30019]
+    // CHECK_2026-NOT: not bit equivalent
+    // CHECK_2025: error[E30019]
+    // CHECK_2025-NOT: not bit equivalent
     IDerived* dp = ibp;
 
     outputBuffer[0] = 0;

@@ -2937,7 +2937,8 @@ __generic<T>
 __intrinsic_op(0)
 [KnownBuiltin( $((int)KnownBuiltinDeclName::OperatorAddressOf))]
 [require(cpp_cuda_spirv_llvm)]
-[RemovedSince(-1, "the '&' operator for taking addresses is no longer supported in Slang")]
+[deprecated("the '&' operator for taking addresses is deprecated in Slang and will be removed in language version 2026; assign to a `Ptr` typed variable or pass to a function expecting a `Ptr` instead")]
+[RemovedSince(2026, "the '&' operator for taking addresses is no longer supported in Slang")]
 __prefix Ptr<T, Access::ReadWrite, AddressSpace::Device> operator&(__ref T value);
 
 __generic<$(ptrTypeParameterList), TInt : __BuiltinIntegerType>
