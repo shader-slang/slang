@@ -180,10 +180,12 @@ the compiled shader IR. Descriptor-backed hosts with such externally
 owned spaces should pass `-trace-coverage-reserved-space <space>` when
 compiling, or set `CompilerOptionName::TraceCoverageReservedSpace`
 through the API while also enabling `CompilerOptionName::TraceCoverage`.
-The option is repeatable. It is an auto-allocation hint for Khronos
-descriptor sets and D3D register spaces; explicit
-`-trace-coverage-binding` still wins. Auto-allocation treats each
-reserved space as occupied, then reports the resulting coverage binding
+The option is repeatable and duplicate values are idempotent. It is an
+auto-allocation hint for whole Khronos descriptor sets and whole D3D
+register spaces; explicit `-trace-coverage-binding` still wins. Metal,
+CPU, and CUDA targets do not use descriptor-space auto-allocation, so
+the option is ignored with a warning for those targets. Auto-allocation
+treats each reserved space as occupied, then reports the resulting coverage binding
 through `ISyntheticResourceMetadata`.
 
 ## Backend usage

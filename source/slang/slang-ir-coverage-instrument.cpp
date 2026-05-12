@@ -44,7 +44,6 @@ static SyntheticResourceRecord* findSyntheticResourceRecordById(
 static SyntheticResourceRecord& getOrAddCoverageSyntheticResourceRecord(
     ArtifactPostEmitMetadata& metadata)
 {
-    SLANG_RELEASE_ASSERT(!metadata.m_syntheticResourcesPublished.load());
     if (auto existing = findSyntheticResourceRecordById(metadata, kCoverageSyntheticResourceID))
         return *existing;
 
@@ -507,11 +506,24 @@ static void addReservedCoverageSpaces(
     if (!reservedSpaces || reservedSpaceCount <= 0)
         return;
 
+    List<int> uniqueSpaces;
     for (int i = 0; i < reservedSpaceCount; ++i)
     {
         const int space = reservedSpaces[i];
         if (space < 0)
             continue;
+        bool alreadyAdded = false;
+        for (auto uniqueSpace : uniqueSpaces)
+        {
+            if (uniqueSpace == space)
+            {
+                alreadyAdded = true;
+                break;
+            }
+        }
+        if (alreadyAdded)
+            continue;
+        uniqueSpaces.add(space);
 
         // Model a host-reserved descriptor/register space as an
         // unbounded range starting at binding 0. The allocator then
@@ -1078,6 +1090,12 @@ void instrumentCoverage(
         return;
     }
 
+    if (reservedSpaceCount > 0 && !shouldHonorReservedCoverageSpaces(targetRequest))
+    {
+        if (sink)
+            sink->diagnose(Diagnostics::CoverageReservedSpaceIgnored{});
+    }
+
     // Surface a warning if the user has declared a global parameter
     // named `__slang_coverage`. The IR coverage pass synthesizes its
     // own buffer with that name and the user declaration is silently
@@ -1204,8 +1222,6 @@ void finalizeCoverageInstrumentationMetadata(
     if (!record)
         return;
 
-    SLANG_RELEASE_ASSERT(!outMetadata.m_syntheticResourcesPublished.load());
-
     int32_t uniformOffset = -1;
     int32_t uniformStride = 0;
     if (tryGetCoverageUniformBindingInfo(
@@ -1222,8 +1238,6 @@ void finalizeCoverageInstrumentationMetadata(
     {
         if (sink)
             sink->diagnose(Diagnostics::CoverageUniformLayoutUnavailable{});
-        else
-            SLANG_ASSERT_FAILURE("coverage uniform layout should be available on CPU/CUDA targets");
     }
 }
 

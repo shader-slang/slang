@@ -52,9 +52,9 @@ void instrumentCoverage(
     ArtifactPostEmitMetadata& outMetadata);
 
 // Finalize coverage-related synthetic resource metadata after global
-// and entry-point uniform packing has run. This updates backend-
-// independent marshaling fields, such as CPU/CUDA uniform offsets,
-// that can only be determined from the final post-packing IR layout.
+// and entry-point uniform packing has run. This updates CPU/CUDA
+// uniform-marshaling fields that can only be determined from the
+// final post-packing IR layout.
 void finalizeCoverageInstrumentationMetadata(
     IRModule* module,
     DiagnosticSink* sink,

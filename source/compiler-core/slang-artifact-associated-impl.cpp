@@ -406,7 +406,6 @@ SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* o
     outInfo->space = -1;
     outInfo->binding = -1;
 
-    m_syntheticResourcesPublished.store(true);
     for (auto& record : m_syntheticResources)
     {
         if (record.id == uint32_t(SyntheticResourceKnownID::Coverage))
@@ -421,7 +420,6 @@ SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* o
 
 uint32_t ArtifactPostEmitMetadata::getResourceCount()
 {
-    m_syntheticResourcesPublished.store(true);
     return (uint32_t)m_syntheticResources.getCount();
 }
 
@@ -432,7 +430,6 @@ SlangResult ArtifactPostEmitMetadata::findResourceIndexByID(uint32_t id, uint32_
     if (id == 0)
         return SLANG_E_NOT_FOUND;
 
-    m_syntheticResourcesPublished.store(true);
     for (Index i = 0; i < m_syntheticResources.getCount(); ++i)
     {
         if (m_syntheticResources[i].id == id)
@@ -456,7 +453,6 @@ SlangResult ArtifactPostEmitMetadata::getResourceInfo(
     if (index >= (uint32_t)m_syntheticResources.getCount())
         return SLANG_E_INVALID_ARG;
 
-    m_syntheticResourcesPublished.store(true);
     auto& record = m_syntheticResources[index];
     outInfo->id = record.id;
     outInfo->bindingType = record.bindingType;

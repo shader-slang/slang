@@ -4635,6 +4635,19 @@ err(
     "could not resolve the CPU/CUDA uniform layout for `__slang_coverage`"
 )
 
+err(
+    "coverage-binding-option-out-of-range",
+    45106,
+    "coverage binding option value is out of range",
+    span { loc = "location", message = "option '~option' expects a value in range 0..2147483647, but got '~parsedValue:Int'." }
+)
+
+warning(
+    "coverage-reserved-space-ignored",
+    45107,
+    "`-trace-coverage-reserved-space` does not apply to this target; ignoring reserved spaces"
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(

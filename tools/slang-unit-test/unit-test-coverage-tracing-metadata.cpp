@@ -254,6 +254,41 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     }
 
     {
+        auto hlslBundle = createMetadataBundle(SLANG_HLSL, "cs_5_0");
+        auto* hlslSyntheticResources = hlslBundle.syntheticResources;
+
+        SLANG_CHECK(hlslSyntheticResources->getResourceCount() == 1);
+
+        slang::SyntheticResourceInfo info;
+        SLANG_CHECK(hlslSyntheticResources->getResourceInfo(0, &info) == SLANG_OK);
+        SLANG_CHECK(info.binding >= 0);
+        SLANG_CHECK(info.space >= 0);
+        SLANG_CHECK(info.bindingType == slang::BindingType::MutableRawBuffer);
+        SLANG_CHECK(info.uniformOffset == -1);
+        SLANG_CHECK(info.uniformStride == 0);
+    }
+
+    {
+        auto metalBundle = createMetadataBundle(SLANG_METAL, "metal");
+        auto* metalSyntheticResources = metalBundle.syntheticResources;
+
+        SLANG_CHECK(metalSyntheticResources->getResourceCount() == 1);
+
+        slang::SyntheticResourceInfo info;
+        SLANG_CHECK(metalSyntheticResources->getResourceInfo(0, &info) == SLANG_OK);
+        SLANG_CHECK(info.space == -1);
+        SLANG_CHECK(info.binding >= 0);
+        SLANG_CHECK(info.bindingType == slang::BindingType::MutableRawBuffer);
+        SLANG_CHECK(info.uniformOffset == -1);
+        SLANG_CHECK(info.uniformStride == 0);
+
+        slang::CoverageBufferInfo bufferInfo;
+        SLANG_CHECK(metalBundle.coverage->getBufferInfo(&bufferInfo) == SLANG_OK);
+        SLANG_CHECK(bufferInfo.space == info.space);
+        SLANG_CHECK(bufferInfo.binding == info.binding);
+    }
+
+    {
         uint32_t index = 0;
         SLANG_CHECK(syntheticResources->findResourceIndexByID(0, &index) == SLANG_E_NOT_FOUND);
         SLANG_CHECK(syntheticResources->findResourceIndexByID(1, nullptr) == SLANG_E_INVALID_ARG);
@@ -307,6 +342,8 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(json.indexOf(toSlice("\"version\": 1")) != -1);
         SLANG_CHECK(json.indexOf(toSlice("\"counters\"")) != -1);
         SLANG_CHECK(json.indexOf(toSlice("__slang_coverage")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"uniform_offset\"")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"uniform_stride\"")) != -1);
         SLANG_CHECK(json.indexOf(toSlice("\"entries\"")) != -1);
     }
 

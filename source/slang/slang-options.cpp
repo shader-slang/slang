@@ -31,6 +31,7 @@
 #include "slang.h"
 
 #include <assert.h>
+#include <limits>
 
 namespace Slang
 {
@@ -559,7 +560,8 @@ void initCommandOptions(CommandOptions& options)
          "Reserve a descriptor/register space when auto-allocating the "
          "synthesized `__slang_coverage` buffer. Use this when the host "
          "pipeline layout owns descriptor sets or register spaces that are "
-         "not visible in the compiled shader IR."},
+         "not visible in the compiled shader IR. Repeat for multiple spaces; "
+         "duplicates are idempotent. Applies to Khronos and D3D targets."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -2835,6 +2837,24 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 Int bindingIndex, bindingSpace;
                 SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindingIndex));
                 SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindingSpace));
+                if (bindingIndex > std::numeric_limits<int>::max())
+                {
+                    m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                        .option = arg.value,
+                        .parsedValue = bindingIndex,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
+                if (bindingSpace > std::numeric_limits<int>::max())
+                {
+                    m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                        .option = arg.value,
+                        .parsedValue = bindingSpace,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
                 linkage->m_optionSet.set(
                     OptionKind::TraceCoverageBinding,
                     (int)bindingIndex,
@@ -2848,6 +2868,15 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // -trace-coverage-reserved-space <space>
                 Int bindingSpace;
                 SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindingSpace));
+                if (bindingSpace > std::numeric_limits<int>::max())
+                {
+                    m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                        .option = arg.value,
+                        .parsedValue = bindingSpace,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
                 linkage->m_optionSet.add(OptionKind::TraceCoverageReservedSpace, (int)bindingSpace);
                 break;
             }

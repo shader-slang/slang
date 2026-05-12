@@ -132,7 +132,10 @@ Enabling `-trace-coverage` runs three pipeline stages:
      `-trace-coverage-reserved-space <space>` one or more times to
      mark descriptor sets / register spaces that belong to the runtime
      pipeline layout even if the compiled shader does not reference
-     them. On Khronos / SPIR-V / GLSL descriptor-set targets,
+     them. Duplicate reserved spaces are idempotent. The option applies
+     to Khronos descriptor-set targets and D3D register-space targets;
+     Metal, CPU, and CUDA ignore it with a warning. On Khronos /
+     SPIR-V / GLSL descriptor-set targets,
      auto-allocation picks the descriptor set after the highest
      shader-visible or host-reserved set and binds coverage at binding
      0 so the compiler does not mutate or fill holes in a user-owned
@@ -223,7 +226,10 @@ A companion free function — `slang_writeCoverageManifestJson` —
 serializes an `ICoverageTracingMetadata` to the canonical
 `.coverage-mapping.json` shape on demand. When the same metadata object
 also supports `ISyntheticResourceMetadata` (the normal Slang artifact
-case), the serializer includes the buffer binding fields as well.
+case), the serializer includes the buffer binding fields as well:
+`space` / `binding` for descriptor-backed targets and
+`uniform_offset` / `uniform_stride` for CPU/CUDA uniform-marshaling
+targets when those locations are available.
 Hosts that want the sidecar bytes without going through disk (to feed
 the Python LCOV converter or a network channel) call it directly;
 hosts that consume the typed accessors don't need it.

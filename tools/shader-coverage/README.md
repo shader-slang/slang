@@ -88,10 +88,14 @@ the host needs the slot fixed at compile time — for example when
 pre-building a D3D12 root signature before any host reflection /
 metadata reads run.
 
-`-trace-coverage-reserved-space` is repeatable and does not pin a
-specific binding. It is for descriptor-backed hosts whose runtime
-pipeline layout owns spaces that may be invisible to Slang for a
-particular entry point:
+`-trace-coverage-reserved-space` is repeatable and idempotent; passing
+the same space more than once has the same effect as passing it once.
+It does not pin a specific binding. It is for descriptor-backed hosts
+whose runtime pipeline layout owns whole descriptor/register spaces
+that may be invisible to Slang for a particular entry point. It applies
+to Khronos descriptor-set targets and D3D register-space targets.
+Metal, CPU, and CUDA do not have this descriptor-space auto-allocation
+model, so the option is ignored with a warning for those targets:
 
 ```bash
 slangc shader.slang -target spirv -stage compute -entry main \
@@ -183,7 +187,9 @@ analysis process — call `slang_writeCoverageManifestJson` with the
 coverage interface obtained from the artifact metadata object. The
 serializer includes the buffer binding fields when that same object
 also supports `ISyntheticResourceMetadata`, which is the normal Slang
-artifact case:
+artifact case: `space` / `binding` for descriptor-backed targets and
+`uniform_offset` / `uniform_stride` for CPU/CUDA uniform-marshaling
+targets when available.
 
 ```cpp
 ComPtr<ISlangBlob> manifest;
@@ -251,7 +257,7 @@ sidecar shape.
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `-trace-coverage`                         | Enables the feature. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites counter ops to atomic increments, and emits `<output>.coverage-mapping.json` sidecar when writing to a file.          |
 | `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time (e.g. for a pre-built D3D12 root signature). |
-| `-trace-coverage-reserved-space <space>`  | Marks a descriptor/register space as externally occupied during auto-allocation. Repeat the option for multiple spaces. Use it when the host pipeline layout reserves spaces not visible in the compiled shader IR.                                                              |
+| `-trace-coverage-reserved-space <space>`  | Marks a whole descriptor/register space as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent. Applies to Khronos descriptor-set targets and D3D register-space targets.                                             |
 
 ---
 

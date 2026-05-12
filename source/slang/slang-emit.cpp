@@ -142,6 +142,7 @@
 #include "slang-vm-bytecode.h"
 
 #include <assert.h>
+#include <limits>
 Slang::String get_slang_cpp_host_prelude();
 Slang::String get_slang_torch_prelude();
 
@@ -1057,8 +1058,20 @@ Result linkAndOptimizeIR(
         {
             for (auto value : *values)
             {
-                if (value.kind == CompilerOptionValueKind::Int)
-                    reservedSpaces.add((int)value.intValue);
+                if (value.kind != CompilerOptionValueKind::Int)
+                    continue;
+                if (value.intValue < 0 || value.intValue > std::numeric_limits<int>::max())
+                {
+                    if (sink)
+                    {
+                        sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                            .option = "-trace-coverage-reserved-space",
+                            .parsedValue = value.intValue,
+                        });
+                    }
+                    return SLANG_FAIL;
+                }
+                reservedSpaces.add((int)value.intValue);
             }
         }
         SLANG_PASS(

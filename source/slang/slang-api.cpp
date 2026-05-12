@@ -1,5 +1,6 @@
 // slang-api.cpp
 
+#include "../compiler-core/slang-artifact-associated-impl.h"
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-platform.h"
 #include "../core/slang-rtti-info.h"
@@ -1146,22 +1147,22 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
     if (auto syntheticResources = (slang::ISyntheticResourceMetadata*)metadata->castAs(
             slang::ISyntheticResourceMetadata::getTypeGuid()))
     {
-        const uint32_t resourceCount = syntheticResources->getResourceCount();
-        for (uint32_t i = 0; i < resourceCount; ++i)
+        uint32_t coverageResourceIndex = 0;
+        if (SLANG_SUCCEEDED(syntheticResources->findResourceIndexByID(
+                uint32_t(Slang::SyntheticResourceKnownID::Coverage),
+                &coverageResourceIndex)))
         {
             slang::SyntheticResourceInfo resourceInfo;
-            SLANG_RETURN_ON_FAIL(syntheticResources->getResourceInfo(i, &resourceInfo));
-            const bool isCoverageResource =
-                resourceCount == 1 ||
-                (resourceInfo.debugName && strcmp(resourceInfo.debugName, "__slang_coverage") == 0);
-            if (!isCoverageResource)
-                continue;
-
+            SLANG_RETURN_ON_FAIL(
+                syntheticResources->getResourceInfo(coverageResourceIndex, &resourceInfo));
             if (resourceInfo.space >= 0)
                 out << ",\n    \"space\": " << (int64_t)resourceInfo.space;
             if (resourceInfo.binding >= 0)
                 out << ",\n    \"binding\": " << (int64_t)resourceInfo.binding;
-            break;
+            if (resourceInfo.uniformOffset >= 0)
+                out << ",\n    \"uniform_offset\": " << (int64_t)resourceInfo.uniformOffset;
+            if (resourceInfo.uniformStride > 0)
+                out << ",\n    \"uniform_stride\": " << (int64_t)resourceInfo.uniformStride;
         }
     }
     out << "\n  },\n";

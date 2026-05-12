@@ -318,7 +318,7 @@ Bind the synthesized `__slang_coverage` buffer at an explicit (register index, s
 
 **-trace-coverage-reserved-space &lt;space&gt;**
 
-Reserve a descriptor/register space when auto-allocating the synthesized `__slang_coverage` buffer. Use this when the host pipeline layout owns descriptor sets or register spaces that are not visible in the compiled shader IR. Repeat the option for multiple spaces.
+Reserve a descriptor/register space when auto-allocating the synthesized `__slang_coverage` buffer. Use this when the host pipeline layout owns descriptor sets or register spaces that are not visible in the compiled shader IR. Repeat the option for multiple spaces; duplicate values are idempotent. The option applies to Khronos descriptor-set targets and D3D register-space targets. Metal, CPU, and CUDA targets ignore it with a warning because they do not use descriptor-space auto-allocation.
 
 
 <a id="report-dynamic-dispatch-sites"></a>

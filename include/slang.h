@@ -4650,8 +4650,9 @@ struct ICoverageTracingMetadata : public ISlangCastable
     getEntryInfo(uint32_t index, CoverageEntryInfo* outInfo) = 0;
 
     /// Populate `outInfo` with the coverage buffer's descriptor
-    /// binding info. The caller should zero-initialize `outInfo`, then
-    /// set `outInfo->structSize = sizeof(CoverageBufferInfo)`.
+    /// binding info. The caller should default-initialize `outInfo`
+    /// (for example `CoverageBufferInfo info;`) so `structSize` is
+    /// set to `sizeof(CoverageBufferInfo)`.
     /// Returns `SLANG_OK` on success, `SLANG_E_INVALID_ARG` for null
     /// `outInfo` or mismatched `structSize`.
     ///
@@ -4738,13 +4739,16 @@ struct SyntheticResourceInfo
     uint32_t arraySize = 1;
 
     /// Whether the resource is global/root-scoped or attached to a
-    /// specific entry point.
+    /// specific entry point. Coverage currently reports a global
+    /// resource; entry-point scoped resources are reserved for future
+    /// synthetic-resource producers.
     SyntheticResourceScope scope = SyntheticResourceScope::Global;
 
     /// Intended access pattern for the resource.
     SyntheticResourceAccess access = SyntheticResourceAccess::Read;
 
     /// Entry point index when `scope == EntryPoint`, else `-1`.
+    /// No current coverage resource uses entry-point scope.
     int32_t entryPointIndex = -1;
 
     /// Sentinel conventions:
@@ -4754,8 +4758,10 @@ struct SyntheticResourceInfo
     ///     this target
     ///   - `uniformOffset == -1` means CPU/CUDA-style marshaling
     ///     location is unavailable for this target
-    ///   - `uniformStride == 0` means no array stride is applicable or
-    ///     available
+    ///   - `uniformStride == 0` means CPU/CUDA-style marshaling
+    ///     location is unavailable or no stride applies; when
+    ///     `uniformOffset >= 0`, a non-zero stride may be reported
+    ///     even for scalar resources
     /// `0` is a valid value for `space`, `binding`, and
     /// `uniformOffset`.
     ///
@@ -4769,7 +4775,7 @@ struct SyntheticResourceInfo
     int32_t uniformOffset = -1;
 
     /// Byte stride between adjacent logical elements when
-    /// `arraySize > 1`.
+    /// CPU/CUDA-style marshaling is reported.
     int32_t uniformStride = 0;
 
     /// Optional stable debug name for the synthetic resource. The
@@ -4791,8 +4797,9 @@ struct ISyntheticResourceMetadata : public ISlangCastable
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getResourceCount() = 0;
 
     /// Populate `outInfo` with the metadata for synthetic resource
-    /// `index`. The caller should zero-initialize `outInfo`, then set
-    /// `outInfo->structSize = sizeof(SyntheticResourceInfo)`.
+    /// `index`. The caller should default-initialize `outInfo` (for
+    /// example `SyntheticResourceInfo info;`) so `structSize` is set
+    /// to `sizeof(SyntheticResourceInfo)`.
     /// Returns `SLANG_OK` on success,
     /// `SLANG_E_INVALID_ARG` for null `outInfo`, mismatched
     /// `structSize`, or out-of-range `index`.
