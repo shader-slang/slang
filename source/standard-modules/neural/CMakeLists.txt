@@ -60,16 +60,15 @@ elseif(NOT SLANG_EMBED_CORE_MODULE)
     set(SLANG_COMPILER_EXTRA_DEPS generate_core_module_headers)
 elseif(SLANG_ENABLE_SLANGC)
     set(SLANG_COMPILER "$<TARGET_FILE:slangc>")
-    set(SLANG_COMPILER_DEPENDENCY
-        slangc
-        slang
-    )
+    set(SLANG_COMPILER_DEPENDENCY slangc slang)
     set(SLANG_COMPILER_EXTRA_DEPS)
 else()
-    # As a fallback, use the system-installed `slangc` compiler
-    set(SLANG_COMPILER slangc)
-    set(SLANG_COMPILER_DEPENDENCY)
-    set(SLANG_COMPILER_EXTRA_DEPS)
+    # When SLANG_ENABLE_SLANGC is OFF, slangc is not built as a target. Fall back
+    # to slang-bootstrap (a generator always built regardless of SLANG_ENABLE_SLANGC)
+    # rather than a system-installed slangc that may not be present.
+    set(SLANG_COMPILER slang-bootstrap)
+    set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
+    set(SLANG_COMPILER_EXTRA_DEPS generate_core_module_headers)
 endif()
 
 # Determine compiler flags based on build type
@@ -96,15 +95,9 @@ add_custom_command(
 )
 
 # Create a target to ensure the neural module is built.
-# When SLANG_EMBED_CORE_MODULE=OFF the compiler runs slang-bootstrap from source and currently
-# crashes (exit 0xC0000005) when processing neural.slang's CoopMat/spirv_asm code. Exclude the
-# module from the default ALL build in that configuration so development builds with
-# SLANG_EMBED_CORE_MODULE=OFF do not fail. The target can still be built explicitly.
-if(SLANG_EMBED_CORE_MODULE)
-    add_custom_target(slang-neural-module ALL DEPENDS ${neural_module_file})
-else()
-    add_custom_target(slang-neural-module DEPENDS ${neural_module_file})
-endif()
+# The prelinkIR crashes that previously blocked SLANG_EMBED_CORE_MODULE=OFF builds
+# are fixed (PRs #10835, #10847). Build the neural module unconditionally.
+add_custom_target(slang-neural-module ALL DEPENDS ${neural_module_file})
 set_target_properties(slang-neural-module PROPERTIES FOLDER generated)
 
 # Install the neural directory to the configured location in the release package

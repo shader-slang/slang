@@ -58,6 +58,7 @@ jobs:
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
         -v /usr/share/nvidia:/usr/share/nvidia:ro
+        -v /var/cores:/var/cores
 
     defaults:
       run:
@@ -108,8 +109,21 @@ jobs:
           # Display environment configuration
           print-env-info
 
+      # Cores are written to /var/cores by kernel.core_pattern (set in the
+      # scaler's startup.sh on the host before this container started).
+      # /var/cores is bind-mounted in via container.options. Install gdb so
+      # the post-test step can extract backtraces.
+      - name: Install gdb for core extraction
+        run: |
+          if ! command -v gdb >/dev/null 2>&1; then
+            apt-get update && apt-get install -y --no-install-recommends gdb
+          fi
+
       - name: Test Slang
         run: |
+          # ulimit is per-step in GitHub Actions, so each step that runs a
+          # binary we want cores from must raise it locally.
+          ulimit -c unlimited
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
 
@@ -161,11 +175,13 @@ jobs:
       - name: Run slangc tests
         if: inputs.gpu-tier == 't4'
         run: |
+          ulimit -c unlimited
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
 
       - name: Test Slang via glsl
         if: inputs.gpu-tier == 't4' && inputs.config == 'release' && github.event_name == 'pull_request'
         run: |
+          ulimit -c unlimited
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
           "$bin_dir/slang-test" \
@@ -179,6 +195,64 @@ jobs:
             -expected-failure-list tests/expected-failure-github.txt \
             -expected-failure-list tests/expected-failure-linux.txt \
             -expected-failure-list tests/expected-failure-linux-gpu.txt
+
+      # Extract gdb backtraces from any cores written to /var/cores during
+      # the test steps above. /var/cores lives on the host (bind-mounted in
+      # via container.options) and is configured by the scaler startup
+      # script's `kernel.core_pattern` write.
+      - name: Capture core dump backtraces
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          # Drop known-benign cores from intentional unit-test crashes
+          # (test-process exercises subprocess management; gfx-smoke fails
+          # to load a GPU driver in some configurations). Keeps the artifact
+          # focused on real crashes.
+          for benign in test-process gfx-smoke; do
+            rm -f "/var/cores/core.$benign".*
+          done
+          cores=(/var/cores/core.*)
+          if [ "${#cores[@]}" -eq 0 ]; then
+            echo "No interesting core dumps captured."
+            exit 0
+          fi
+          echo "Captured ${#cores[@]} core dump(s):"
+          ls -lh "${cores[@]}"
+          mkdir -p backtraces
+          for c in "${cores[@]}"; do
+            name=$(basename "$c")
+            exe_name=${name#core.}
+            exe_name=${exe_name%.*}
+            exe_path="$bin_dir/$exe_name"
+            if [ ! -x "$exe_path" ]; then
+              exe_path=""
+            fi
+            bt_file="backtraces/$name.bt.txt"
+            echo "=== Backtrace for $name (exe=$exe_path) ===" | tee "$bt_file"
+            gdb -batch \
+              -ex "set pagination off" \
+              -ex "set print pretty on" \
+              -ex "thread apply all bt full" \
+              -ex "info registers" \
+              -ex "x/i \$pc" \
+              -ex "x/16i \$pc-32" \
+              -ex "info sharedlibrary" \
+              -ex "maintenance info sections" \
+              ${exe_path:+"$exe_path"} "$c" 2>&1 | tee -a "$bt_file" || true
+          done
+
+      # Upload only the gdb-extracted backtraces, not raw cores. Raw cores
+      # contain full process memory which can include credentials or other
+      # sensitive in-memory state.
+      - name: Upload core dump backtraces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cores-test-slang-${{ inputs.config }}-${{ inputs.gpu-tier }}
+          path: backtraces/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: GPU post-test diagnostics
         if: failure()
@@ -231,6 +305,7 @@ jobs:
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
         -v /usr/share/nvidia:/usr/share/nvidia:ro
+        -v /var/cores:/var/cores
 
     defaults:
       run:
@@ -281,18 +356,77 @@ jobs:
           # Display environment configuration
           print-env-info
 
+      # Cores land in /var/cores via the host's kernel.core_pattern (set in
+      # the scaler's startup.sh on the host). gdb is needed to extract them.
+      - name: Install gdb for core extraction
+        run: |
+          if ! command -v gdb >/dev/null 2>&1; then
+            apt-get update && apt-get install -y --no-install-recommends gdb
+          fi
+
       - name: Run slang-rhi tests
         run: |
+          ulimit -c unlimited
           export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
           "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
 
       - name: Run slang-rhi tests (OptiX 8.0)
         run: |
+          ulimit -c unlimited
           "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80000 -tc="ray-tracing-*.cuda"
 
       - name: Run slang-rhi tests (OptiX 8.1)
         run: |
+          ulimit -c unlimited
           "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
+
+      # Same gdb-extraction logic as the test-slang job; see commentary there.
+      - name: Capture core dump backtraces
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for benign in test-process gfx-smoke; do
+            rm -f "/var/cores/core.$benign".*
+          done
+          cores=(/var/cores/core.*)
+          if [ "${#cores[@]}" -eq 0 ]; then
+            echo "No interesting core dumps captured."
+            exit 0
+          fi
+          echo "Captured ${#cores[@]} core dump(s):"
+          ls -lh "${cores[@]}"
+          mkdir -p backtraces
+          for c in "${cores[@]}"; do
+            name=$(basename "$c")
+            exe_name=${name#core.}
+            exe_name=${exe_name%.*}
+            exe_path="$bin_dir/$exe_name"
+            if [ ! -x "$exe_path" ]; then
+              exe_path=""
+            fi
+            bt_file="backtraces/$name.bt.txt"
+            echo "=== Backtrace for $name (exe=$exe_path) ===" | tee "$bt_file"
+            gdb -batch \
+              -ex "set pagination off" \
+              -ex "set print pretty on" \
+              -ex "thread apply all bt full" \
+              -ex "info registers" \
+              -ex "x/i \$pc" \
+              -ex "x/16i \$pc-32" \
+              -ex "info sharedlibrary" \
+              -ex "maintenance info sections" \
+              ${exe_path:+"$exe_path"} "$c" 2>&1 | tee -a "$bt_file" || true
+          done
+
+      - name: Upload core dump backtraces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cores-test-slang-rhi-${{ inputs.config }}
+          path: backtraces/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: GPU post-test diagnostics
         if: failure()

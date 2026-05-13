@@ -64,7 +64,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
-          fetch-depth: "2"
+          fetch-depth: "250"
+          fetch-tags: true
 
       # Restore sccache local cache from master
       - name: Restore sccache cache
