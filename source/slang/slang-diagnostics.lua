@@ -2835,6 +2835,16 @@ err(
     span { loc = "expr:Expr", message = "unexpected form for 'enum' tag value expression" }
 )
 
+warning(
+    "enum-case-implicit-tag-value-overflow",
+    32006,
+    "implicit enum case value overflows underlying tag type",
+    span {
+        loc = "decl:Decl",
+        message = "implicit value for enum case '~decl' overflows tag type '~tagType:Type' and wraps around",
+    }
+)
+
 -- 303xx: interfaces and associated types
 
 err(
@@ -5309,6 +5319,13 @@ fatal(
     span { loc = "location", message = "'CoopMat.MapElement' per-element function cannot capture buffers, resources or any opaque type values. Consider pre-loading the content of any referenced buffers into a local variable before calling 'CoopMat.MapElement', or moving any referenced resources to global scope." }
 )
 
+
+err(
+    "class-type-not-supported",
+    39031,
+    "class types are not supported in type layout",
+    span { loc = "location", message = "class type '~name' is not supported; use 'struct' instead" }
+)
 
 -- Load semantic checking diagnostics (part 17) - Standalone notes for cross-referencing
 -- (inlined from slang-diagnostics-semantic-checking-17.lua)

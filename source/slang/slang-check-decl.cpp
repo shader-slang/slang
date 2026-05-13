@@ -11623,6 +11623,78 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
     }
 }
 
+// Increments an enumerator value and returns true if there was a wrap-around
+static bool _incrementEnumerator(IntegerLiteralValue& value, BaseType baseType, bool isFlags)
+{
+    const BaseTypeInfo& info = BaseTypeInfo::getInfo(baseType);
+
+    // calculate the mask of significant bits for the type
+    uint64_t mask;
+    unsigned significantBits;
+
+    if (baseType == BaseType::Bool)
+    {
+        significantBits = 1U;
+    }
+    else
+    {
+        // generic numeric types
+        significantBits = (8U * info.sizeInBytes);
+    }
+
+    mask = std::numeric_limits<uint64_t>::max();
+    mask >>= 64U - significantBits;
+
+    if (isFlags)
+    {
+        // zero increments to 1, never overflows
+        if (value == 0)
+        {
+            value = 1;
+            return false;
+        }
+
+        // now shift left and detect overflow (note: correctness requires C++20)
+        value = (value << 1) & mask;
+        if (value == 0)
+        {
+            value = 1;
+            return true;
+        }
+
+        return false;
+    }
+    else
+    {
+        // detect overflow
+        if (info.flags & BaseTypeInfo::Flag::Signed)
+        {
+            unsigned excessBits = 64U - significantBits;
+            int64_t currentValue = value;
+
+            // do sign extension (note: correctness requires C++20)
+            currentValue <<= excessBits;
+            currentValue >>= excessBits;
+
+            // increment and do sign extension (note: correctness requires C++20)
+            int64_t nextValue = static_cast<uint64_t>(currentValue) + 1;
+            nextValue <<= excessBits;
+            nextValue >>= excessBits;
+
+            value = nextValue;
+            return currentValue > nextValue;
+        }
+        else
+        {
+            const uint64_t currentValue = static_cast<uint64_t>(value) & mask;
+            const uint64_t nextValue = (currentValue + 1U) & mask;
+
+            value = nextValue;
+            return currentValue > nextValue;
+        }
+    }
+}
+
 void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
 {
     SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
@@ -11635,6 +11707,18 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
         return;
 
     auto isEnumFlags = decl->hasModifier<FlagsAttribute>();
+
+    // Resolve the underlying integer kind
+    BaseType tagBaseType;
+    if (auto basicTagType = as<BasicExpressionType>(unwrapModifiedType(tagType)))
+        tagBaseType = basicTagType->getBaseType();
+    else
+    {
+        getSink()->diagnose(Diagnostics::Unexpected{
+            .message = "Unexpected enumeration tag type",
+            .location = decl->getNameLoc()});
+        return;
+    }
 
     // Check the enum cases in order.
     for (auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
@@ -11656,6 +11740,7 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
     // For any enum case that didn't provide an explicit
     // tag value, derived an appropriate tag value.
     IntegerLiteralValue defaultTag = isEnumFlags ? 1 : 0;
+    bool defaultTagWrappedAround = false;
     for (auto caseDecl : decl->getMembersOfType<EnumCaseDecl>())
     {
         if (auto explicitTagValExpr = caseDecl->tagExpr)
@@ -11691,7 +11776,17 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
         else
         {
             // This tag has no initializer, so it should use
-            // the default tag value we are tracking.
+            // the default tag value we are tracking. If the implicit
+            // counter wrapped around past the underlying tag type's
+            // range on the previous step, this is the case that ends
+            // up consuming the wrapped value, so warn here.
+            if (defaultTagWrappedAround)
+            {
+                getSink()->diagnose(Diagnostics::EnumCaseImplicitTagValueOverflow{
+                    .tagType = tagType,
+                    .decl = caseDecl});
+            }
+
             IntegerLiteralExpr* tagValExpr = m_astBuilder->create<IntegerLiteralExpr>();
             tagValExpr->loc = caseDecl->loc;
             tagValExpr->type = QualType(tagType);
@@ -11700,18 +11795,8 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
             caseDecl->tagVal = m_astBuilder->getIntVal(enumType, defaultTag);
         }
 
-        // Default tag for the next case will be one more than
-        // for the most recent case.
-        //
-        if (!isEnumFlags)
-            defaultTag++;
-        else
-        {
-            if (defaultTag == 0)
-                defaultTag = 1;
-            else
-                defaultTag <<= 1;
-        }
+        // compute the next default tag value with the info whether it overflowed
+        defaultTagWrappedAround = _incrementEnumerator(defaultTag, tagBaseType, isEnumFlags);
     }
 }
 

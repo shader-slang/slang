@@ -854,6 +854,26 @@ static bool _matchVectorBoolType(Type* type)
     return elemType->getBaseType() == BaseType::Bool;
 }
 
+static bool _matchHLSLStreamOutputType(Type* type)
+{
+    return as<HLSLStreamOutputType>(type) != nullptr;
+}
+
+static bool _matchMeshOutputType(Type* type)
+{
+    return as<MeshOutputType>(type) != nullptr;
+}
+
+static bool _isNonGeometryStage(Stage stage)
+{
+    return stage != Stage::Geometry && stage != Stage::Unknown;
+}
+
+static bool _isNonMeshStage(Stage stage)
+{
+    return stage != Stage::Mesh && stage != Stage::Unknown;
+}
+
 static bool _matchMatrixWithOutOfRangeDimensions(Type* type)
 {
     // Row and column counts outside the 1..4 range break downstream codegen
@@ -940,6 +960,25 @@ static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
      "matrix row and column counts must be between 1 and 4 inclusive",
      nullptr,
      _isInterfaceBlockVaryingStage},
+
+    // Geometry-shader stream output wrappers
+    // (`PointStream`/`LineStream`/`TriangleStream<T>`) only make sense on
+    // a `[shader("geometry")]` entry point. Using them on any other stage
+    // segfaults during code generation (issue #9430).
+    {_matchHLSLStreamOutputType,
+     "stream output types are only valid on a geometry shader entry point",
+     nullptr,
+     _isNonGeometryStage},
+
+    // Mesh-shader output wrappers
+    // (`OutputVertices`/`OutputIndices`/`OutputPrimitives<T>`) only make
+    // sense on a `[shader("mesh")]` entry point. The mesh-side counterpart
+    // of #9430 — without this rule the SPIR-V generator produces invalid
+    // or crashing output.
+    {_matchMeshOutputType,
+     "mesh output types are only valid on a mesh shader entry point",
+     nullptr,
+     _isNonMeshStage},
 };
 
 struct VaryingTypeValidationContext
