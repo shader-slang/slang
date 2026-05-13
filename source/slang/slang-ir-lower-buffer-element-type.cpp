@@ -703,7 +703,7 @@ struct LoweredElementTypeContext
                     loweredInnerTypeInfo.loweredType,
                     arrayType->getElementCount(),
                     needExplicitLayout ? builder.getIntValue(
-                                             builder.getIntType(),
+                                             builder.getUIntType(),
                                              elementSizeAlignment.getStride())
                                        : nullptr);
                 builder.createStructField(loweredType, structKey, innerArrayType);
@@ -729,7 +729,7 @@ struct LoweredElementTypeContext
                     loweredInnerTypeInfo.loweredType,
                     nullptr,
                     needExplicitLayout ? builder.getIntValue(
-                                             builder.getIntType(),
+                                             builder.getUIntType(),
                                              elementSizeAlignment.getStride())
                                        : nullptr);
                 maybeAddPhysicalTypeDecoration(builder, innerArrayType, config);
@@ -1749,14 +1749,8 @@ struct LoweredElementTypeContext
                     // derived from some other base address. We will let
                     // the later part of the pass to systematically propagate
                     // the cast through them.
-                    switch (user->getOp())
-                    {
-                    case kIROp_FieldAddress:
-                    case kIROp_GetElementPtr:
-                    case kIROp_GetOffsetPtr:
-                    case kIROp_RWStructuredBufferGetElementPtr:
+                    if (isAddressInst(user))
                         return;
-                    }
                     auto ptrVal = use->getUser();
                     setInsertAfterOrdinaryInst(&builder, ptrVal);
                     builder.replaceOperand(use, loweredBufferType);
@@ -2389,6 +2383,12 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
                                                      : kIROp_DefaultBufferLayoutType;
 
         IRTypeLayoutRuleName defaultRule = IRTypeLayoutRuleName::Natural;
+        // SPIR-V storage-buffer pointers inherit the same std430 default as
+        // GLSLShaderStorageBuffer when no explicit data layout is attached, so stride
+        // computations match the ArrayStride decorations emitted later.
+        if (target->shouldEmitSPIRVDirectly() &&
+            ptrType->getAddressSpace() == AddressSpace::StorageBuffer)
+            defaultRule = IRTypeLayoutRuleName::Std430;
         if (isCPUTargetViaLLVM(targetReq))
             defaultRule = IRTypeLayoutRuleName::LLVM;
 
@@ -2683,7 +2683,7 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
                 vectorType,
                 isColMajor ? matrixType->getColumnCount() : matrixType->getRowCount(),
                 needExplicitLayout
-                    ? builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride())
+                    ? builder.getIntValue(builder.getUIntType(), elementSizeAlignment.getStride())
                     : nullptr);
             builder.createStructField(loweredType, structKey, arrayType);
 

@@ -702,7 +702,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
         TypeExp type,
         DiagnosticSink* sink = nullptr);
 
-    void checkForwardReferencesInGenericConstraint(GenericTypeConstraintDecl* decl);
+    void checkForwardReferencesInGenericDecl(Decl* decl, Expr* expr, Val* val);
 
     void visitGenericDecl(GenericDecl* genericDecl);
 
@@ -717,8 +717,13 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkInterfaceRequirement(Decl* decl);
 
     void checkCallableDeclCommon(CallableDecl* decl);
+    void checkPublicCallableOperandVisibility(CallableDecl* decl);
 
     void checkCallableConstraints(CallableDecl* decl);
+
+    void visitCallableDecl(CallableDecl* decl);
+
+    void visitFunctionDeclBase(FunctionDeclBase* decl);
 
     void visitFuncDecl(FuncDecl* funcDecl);
 
@@ -3210,6 +3215,104 @@ static Decl* findLegacyBwdDiffFunc(SemanticsVisitor* visitor, ExtensionDecl* ext
 
 void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
 
+/// Returns true if `expr` is a runtime value that cannot be a compile-time constant.
+/// This is called only after constant folding has already failed (`varDecl->val` is null),
+/// so any surviving function call is known to be non-const-evaluable — if it were a
+/// constant-foldable intrinsic applied to constant arguments, folding would have succeeded.
+/// Used to distinguish "folding failed because of a runtime reference or call" from
+/// "folding failed because the folder doesn't handle this form" (e.g. unsupported literal type).
+static bool _initExprIsRuntimeValue(Expr* expr)
+{
+    if (!expr)
+        return false;
+    if (as<ErrorType>(expr->type.type))
+        return false;
+    if (auto memberExpr = as<MemberExpr>(expr))
+        return _initExprIsRuntimeValue(memberExpr->baseExpression);
+    if (auto derefExpr = as<DerefExpr>(expr))
+        return _initExprIsRuntimeValue(derefExpr->base);
+    if (auto builtinCastExpr = as<BuiltinCastExpr>(expr))
+        return _initExprIsRuntimeValue(builtinCastExpr->base);
+    if (auto swizzleExpr = as<SwizzleExpr>(expr))
+        return _initExprIsRuntimeValue(swizzleExpr->base);
+    if (auto matSwizzleExpr = as<MatrixSwizzleExpr>(expr))
+        return _initExprIsRuntimeValue(matSwizzleExpr->base);
+    if (auto indexExpr = as<IndexExpr>(expr))
+    {
+        if (_initExprIsRuntimeValue(indexExpr->baseExpression))
+            return true;
+        for (auto idx : indexExpr->indexExprs)
+            if (_initExprIsRuntimeValue(idx))
+                return true;
+        return false;
+    }
+    if (auto declRefExpr = as<DeclRefExpr>(expr))
+    {
+        if (auto varDecl = as<VarDeclBase>(declRefExpr->declRef.getDecl()))
+        {
+            // References to static const globals are fine — compile-time constants.
+            if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
+                return false;
+            // Any other global variable (including plain `static float foo`) is mutable.
+            if (isGlobalDecl(varDecl))
+                return true;
+        }
+        return false;
+    }
+    if (auto invokeExpr = as<InvokeExpr>(expr))
+    {
+        // Determine whether the callee is a "pure" callable whose result depends only
+        // on its arguments and cannot read or write arbitrary runtime state. For pure
+        // callables, the call is a runtime value only when one of its arguments is.
+        // User-defined functions without an explicit purity annotation are treated
+        // conservatively as runtime values (they could read buffers, globals, etc.).
+        //
+        // We check for purity explicitly rather than relying on constant-folding failure
+        // because the AST constant folder does not handle all pure forms (e.g. min(1,2)).
+        // IR-level folding will handle them; we only need to block user-defined calls.
+        bool isPure = false;
+        if (auto calleeDeclRef = as<DeclRefExpr>(invokeExpr->functionExpr))
+        {
+            if (auto callable = as<CallableDecl>(calleeDeclRef->declRef.getDecl()))
+            {
+                // Constructor calls (e.g. float2(x, y), MyStruct(val)) are always pure:
+                // their result depends only on their arguments.
+                if (as<ConstructorDecl>(callable))
+                    isPure = true;
+                // Builtin IR operations (e.g. integer arithmetic, vector ops).
+                else if (callable->findModifier<IntrinsicOpModifier>())
+                    isPure = true;
+                // Target-specific intrinsics (__intrinsic_asm) are also pure.
+                else if (callable->findModifier<TargetIntrinsicModifier>())
+                    isPure = true;
+                // Functions explicitly declared [__readNone] (e.g. min, max).
+                else if (callable->findModifier<ReadNoneAttribute>())
+                    isPure = true;
+            }
+        }
+        if (isPure)
+        {
+            // Pure callable: runtime only when an argument is runtime.
+            for (auto arg : invokeExpr->arguments)
+                if (_initExprIsRuntimeValue(arg))
+                    return true;
+            return false;
+        }
+        // User-defined or unrecognized function call — always a runtime value.
+        return true;
+    }
+    if (auto parenExpr = as<ParenExpr>(expr))
+        return _initExprIsRuntimeValue(parenExpr->base);
+    if (auto initListExpr = as<InitializerListExpr>(expr))
+    {
+        for (auto arg : initListExpr->args)
+            if (_initExprIsRuntimeValue(arg))
+                return true;
+        return false;
+    }
+    return false;
+}
+
 void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     DiagnoseIsAllowedInitExpr(varDecl, getSink());
@@ -3236,6 +3339,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // then we simply need to check that expression and coerce
         // it to the type of the variable.
         //
+        // Capture the error count before checking the initializer so that errors from
+        // CheckTerm or coerce (e.g. undefined identifier) suppress downstream diagnostics.
+        auto errorCountBeforeInitCheck = getSink()->getErrorCount();
         initExpr = subVisitor.CheckTerm(initExpr);
 
         if (initExpr->type.isWriteOnly)
@@ -3254,6 +3360,21 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         if (!varDecl->val)
         {
             varDecl->val = _validateCircularVarDefinition(varDecl);
+            // If this is a global `static const` variable and we still couldn't constant-fold
+            // its initializer (and no new error was emitted during init checking, e.g. for an
+            // undefined identifier, a circular definition, or a type error), check whether the
+            // initializer is a runtime value (mutable global reference or function call). If so,
+            // diagnose now rather than crashing or silently misbehaving in IR code generation.
+            // Note: for non-integer types, _validateCircularVarDefinition always returns nullptr,
+            // so !varDecl->val is expected for non-constant expressions; _initExprIsRuntimeValue
+            // distinguishes the problematic cases from forms the constant folder simply doesn't
+            // handle (e.g. unsupported literal types).
+            if (isStaticConst && isGlobalDecl(varDecl) && !varDecl->val &&
+                getSink()->getErrorCount() == errorCountBeforeInitCheck &&
+                _initExprIsRuntimeValue(initExpr))
+            {
+                getSink()->diagnose(Diagnostics::StaticConstGlobalNonConstantInit{.decl = varDecl});
+            }
         }
     }
     else
@@ -3510,6 +3631,7 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
 
     auto targetFuncDeclRef =
         as<DeclRefType>(context->conformingType)->getDeclRef().as<FunctionDeclBase>();
+    auto synthesizedLoc = getDiagnosticPos(requirementDeclRef.getDecl());
 
     // We currently support this type of synthesis only for extensions.
     SLANG_ASSERT(as<ExtensionDecl>(context->parentDecl));
@@ -3521,6 +3643,8 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
         // pass will later determine exactly what goes in the minimal context.
         auto synStructDecl = getCurrentASTBuilder()->create<SynthesizedStructDecl>();
         synStructDecl->irOp = kIROp_BackwardDiffMinimalContextType;
+        synStructDecl->loc = synthesizedLoc;
+        synStructDecl->nameAndLoc.loc = synthesizedLoc;
 
         synStructDecl->parentDecl = context->parentDecl;
         synStructDecl->ownedScope = m_astBuilder->create<Scope>();
@@ -3552,6 +3676,8 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
 
         SLANG_ASSERT(requirementKind == BuiltinRequirementKind::BwdCallableContextType);
         synStructDecl->irOp = kIROp_BackwardDiffIntermediateContextType;
+        synStructDecl->loc = synthesizedLoc;
+        synStructDecl->nameAndLoc.loc = synthesizedLoc;
 
         // Put the synthesized struct in the same scope as the requirement.
         // This is technically improper since struct types shouldn't be defined
@@ -3579,6 +3705,7 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
         // Insert an InheritanceDecl for SynStruct : IBwdCallable<Self>
         auto ctxTypeInheritanceDecl = getCurrentASTBuilder()->create<InheritanceDecl>();
         ctxTypeInheritanceDecl->parentDecl = synStructDecl;
+        ctxTypeInheritanceDecl->loc = synthesizedLoc;
 
         ctxTypeInheritanceDecl->base.type = getBwdCallableBaseType(DeclRefType::create(
             getCurrentASTBuilder(),
@@ -3958,41 +4085,48 @@ bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
     return true;
 }
 
-// General utility function to collect all referenced declarations from a value
-void collectReferencedDecls(Val* val, HashSet<Decl*>& outDecls)
+struct CollectReferencedDeclsVisitor
+    : public SemanticsDeclReferenceVisitor<CollectReferencedDeclsVisitor>
 {
-    if (!val)
+    typedef SemanticsDeclReferenceVisitor<CollectReferencedDeclsVisitor> Base;
+
+    HashSet<Decl*>* outDecls;
+
+    CollectReferencedDeclsVisitor(HashSet<Decl*>& outDecls, SemanticsContext& outer)
+        : Base(outer), outDecls(&outDecls)
+    {
+    }
+
+    virtual void processReferencedDecl(Decl* decl) override { outDecls->add(decl); }
+
+    virtual void processDeclModifiers(Decl*, SourceLoc) override {}
+};
+
+// General utility function to collect all referenced declarations from a syntax node
+void collectReferencedDecls(SemanticsVisitor* context, NodeBase* node, HashSet<Decl*>& outDecls)
+{
+    if (!node)
         return;
 
-    // Process operands to find declaration references
-    for (Index i = 0; i < val->getOperandCount(); i++)
-    {
-        auto& operand = val->m_operands[i];
-        if (operand.kind == ValNodeOperandKind::ValNode)
-        {
-            // ValNode operands contain Val* nodes that we recursively
-            // traverse to find nested declaration references. For example, in the
-            // constraint expression IFoo<IBar<T>>, we need to traverse the nested
-            // type structure to find the reference to declaration T.
-            collectReferencedDecls(val->getOperand(i), outDecls);
-        }
-        else if (operand.kind == ValNodeOperandKind::ASTNode)
-        {
-            // ASTNode operands are leaf cases. They can contain any NodeBase*,
-            // so we need to check if the referenced astnode is actually a Decl*.
-            if (auto declOperand = as<Decl>(operand.values.nodeOperand))
-            {
-                outDecls.add(declOperand);
-            }
-        }
-    }
+    CollectReferencedDeclsVisitor visitor(outDecls, *context);
+
+    if (auto val = as<Val>(node))
+        visitor.dispatchIfNotNull(val);
+    else if (auto stmt = as<Stmt>(node))
+        visitor.dispatchIfNotNull(stmt);
+    else if (auto expr = as<Expr>(node))
+        visitor.dispatchIfNotNull(expr);
+    else if (auto decl = as<Decl>(node))
+        visitor.dispatchIfNotNull(decl);
 }
 
-void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(
-    GenericTypeConstraintDecl* decl)
+void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericDecl(
+    Decl* decl,
+    Expr* expr,
+    Val* val)
 {
-    // Check if this constraint references type parameters that appear later
-    // in the same GenericDecl's parameter list and report a forward reference error
+    // Check if this decl references type parameters that appear later in the
+    // same GenericDecl's parameter list and report a forward reference error
     // if it does.
 
     // Only applies to constraints within GenericDecl contexts where declaration order matters.
@@ -4023,6 +4157,10 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(
         {
             declaredBeforeConstraint.add(typeParam);
         }
+        else if (auto valueParam = as<GenericValueParamDecl>(member))
+        {
+            declaredBeforeConstraint.add(valueParam);
+        }
     }
 
     // This probably shouldn't happen, but if the constraint is not found in parent GenericDecl,
@@ -4032,24 +4170,35 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(
 
     // Collect all referenced declarations from the constraint's superior type
     HashSet<Decl*> referencedDecls;
-    collectReferencedDecls(decl->sup.type, referencedDecls);
+    collectReferencedDecls(this, val ? as<NodeBase>(val) : as<NodeBase>(expr), referencedDecls);
 
     // Check if any of the referenced declarations are forward references (not in our "declared so
     // far" set)
     for (auto referencedDecl : referencedDecls)
     {
-        if (auto typeParam = as<GenericTypeParamDeclBase>(referencedDecl))
+        // If this type parameter doesn't belong to the same generic or is in
+        // our "declared so far" set, it's OK.
+        if (referencedDecl->parentDecl != parentGeneric ||
+            declaredBeforeConstraint.contains(referencedDecl))
+            continue;
+
+        // Found a forward reference, report an error.
+        if (as<GenericTypeParamDeclBase>(referencedDecl) ||
+            as<GenericValueParamDecl>(referencedDecl))
         {
-            // Check if this type parameter belongs to the same generic but is NOT in our "declared
-            // so far" set
-            if (typeParam->parentDecl == parentGeneric &&
-                !declaredBeforeConstraint.contains(typeParam))
+            if (auto typeConstraint = as<GenericTypeConstraintDecl>(decl))
             {
-                // Found a forward reference, report an error.
                 getSink()->diagnose(Diagnostics::ForwardReferenceInGenericConstraint{
-                    .param = decl->sub.type,
-                    .referenced = typeParam,
-                    .expr = decl->sup.exp});
+                    .param = typeConstraint->sub.type,
+                    .referenced = referencedDecl,
+                    .expr = expr});
+            }
+            else if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl))
+            {
+                getSink()->diagnose(Diagnostics::ForwardReferenceInGenericDefaultInitializer{
+                    .param = decl,
+                    .referenced = referencedDecl,
+                    .expr = expr});
             }
         }
     }
@@ -4218,7 +4367,7 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
     if (getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
         // Check for forward references in generic constraints after type translation
-        checkForwardReferencesInGenericConstraint(decl);
+        checkForwardReferencesInGenericDecl(decl, decl->sup.exp, decl->sup.type);
 
         if (decl->isEqualityConstraint)
         {
@@ -4339,6 +4488,9 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeParamDecl(GenericTypeParamDecl*
     // for a generic type parameter later.
     //
     decl->initType = CheckProperType(decl->initType);
+
+    if (decl->initType && getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
+        checkForwardReferencesInGenericDecl(decl, decl->initType.exp, decl->initType.type);
 }
 
 void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDecl* decl)
@@ -4355,6 +4507,12 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
                 .decl = decl});
         }
     }
+
+    if (decl->initExpr)
+        decl->initExpr = CheckTerm(decl->initExpr);
+
+    if (decl->initExpr && getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
+        checkForwardReferencesInGenericDecl(decl, decl->initExpr, nullptr);
 }
 
 void SemanticsDeclHeaderVisitor::visitGenericValuePackParamDecl(GenericValuePackParamDecl* decl)
@@ -6487,10 +6645,14 @@ static void populateParams(
     FuncType* funcType,
     List<Expr*>& synArgs)
 {
+    auto synthesizedLoc = getDiagnosticPos(decl);
+
     // Insert synthesized param-decls.
     for (auto paramType : funcType->getParamTypes())
     {
         auto paramDecl = astBuilder->create<ParamDecl>();
+        paramDecl->loc = synthesizedLoc;
+        paramDecl->nameAndLoc.loc = synthesizedLoc;
 
         if (auto outType = as<OutParamType>(paramType))
         {
@@ -6528,6 +6690,7 @@ static void populateParams(
         auto synArg = astBuilder->create<VarExpr>();
         synArg->declRef = makeDeclRef(paramDecl);
         synArg->type = paramType;
+        synArg->loc = synthesizedLoc;
         synArgs.add(synArg);
     }
 }
@@ -8556,18 +8719,22 @@ static DeclRef<ExtensionDecl> extendContainerDecl(
     ContainerDecl* decl,
     Type* targetType,
     SubstitutionSet& outSubstSet,
-    DeclVisibility visibility,
+    DeclVisibility extensionVisibility,
+    SourceLoc sourceLoc = SourceLoc(),
     IROp synthesisOp = kIROp_Nop,
     UCount extraArgCount = 0,
     Val* const* extraArgs = nullptr)
 {
     auto astBuilder = getCurrentASTBuilder();
+    auto synthesizedLoc = sourceLoc.isValid() ? sourceLoc : getDiagnosticPos(decl);
 
     auto funcAsType = DeclRefType::create(astBuilder, decl->getDefaultDeclRef());
 
     auto extensionDecl = astBuilder->create<ExtensionDecl>();
     extensionDecl->parentDecl = decl;
-    visitor->addVisibilityModifier(extensionDecl, visibility);
+    extensionDecl->loc = synthesizedLoc;
+    extensionDecl->nameAndLoc.loc = synthesizedLoc;
+    visitor->addVisibilityModifier(extensionDecl, extensionVisibility);
 
     SubstitutionSet substSet;
     auto extDeclRef = visitor->liftDeclFromGenericContainers(extensionDecl, substSet);
@@ -8578,12 +8745,14 @@ static DeclRef<ExtensionDecl> extendContainerDecl(
     extensionDecl->targetType.exp->type = astBuilder->getOrCreate<TypeType>(funcAsType);
 
     auto fwdDiffInheritanceDecl = astBuilder->create<InheritanceDecl>();
+    fwdDiffInheritanceDecl->loc = synthesizedLoc;
     fwdDiffInheritanceDecl->base.type = as<Type>(targetType->substitute(astBuilder, substSet));
     extensionDecl->addMember(fwdDiffInheritanceDecl);
 
     if (synthesisOp != kIROp_Nop)
     {
         auto synthesizedModifier = astBuilder->create<SynthesizedModifier>();
+        synthesizedModifier->loc = synthesizedLoc;
         synthesizedModifier->op = synthesisOp;
         addModifier(fwdDiffInheritanceDecl, synthesizedModifier);
         for (UCount aa = 0; aa < extraArgCount; ++aa)
@@ -8604,14 +8773,196 @@ static DeclRef<ExtensionDecl> extendContainerDecl(
     return extDeclRef.as<ExtensionDecl>();
 }
 
+struct SynthesizedExtensionVisibility
+{
+    DeclVisibility extensionVisibility = DeclVisibility::Default;
+    DeclVisibility memberVisibility = DeclVisibility::Default;
+};
+
+static DeclVisibility getMoreRestrictiveVisibility(
+    DeclVisibility leftVisibility,
+    DeclVisibility rightVisibility)
+{
+    auto normalizeVisibility = [](DeclVisibility visibility)
+    {
+        if (visibility == DeclVisibility::Default)
+            return DeclVisibility::Internal;
+
+        switch (visibility)
+        {
+        case DeclVisibility::Private:
+        case DeclVisibility::Internal:
+        case DeclVisibility::Public:
+            return visibility;
+        default:
+            SLANG_UNEXPECTED("unexpected visibility type");
+        }
+    };
+
+    leftVisibility = normalizeVisibility(leftVisibility);
+    rightVisibility = normalizeVisibility(rightVisibility);
+
+    if (leftVisibility == DeclVisibility::Private || rightVisibility == DeclVisibility::Private)
+        return DeclVisibility::Private;
+
+    if (leftVisibility == DeclVisibility::Internal || rightVisibility == DeclVisibility::Internal)
+        return DeclVisibility::Internal;
+
+    return DeclVisibility::Public;
+}
+
+static SynthesizedExtensionVisibility getSynthesizedExtensionVisibility(
+    DeclVisibility targetVisibility)
+{
+    SynthesizedExtensionVisibility result;
+    switch (targetVisibility)
+    {
+    case DeclVisibility::Public:
+        result.extensionVisibility = DeclVisibility::Public;
+        result.memberVisibility = DeclVisibility::Public;
+        break;
+    case DeclVisibility::Internal:
+        result.extensionVisibility = DeclVisibility::Internal;
+        result.memberVisibility = DeclVisibility::Internal;
+        break;
+    case DeclVisibility::Private:
+        // Extensions are hoisted to module scope, where `private` is not legal.
+        // Keep the extension module-visible so synthesis can attach to it, while
+        // the synthesized members stay private to preserve the callable's API.
+        result.extensionVisibility = DeclVisibility::Internal;
+        result.memberVisibility = DeclVisibility::Private;
+        break;
+    default:
+        SLANG_UNEXPECTED("unexpected visibility type");
+    }
+    return result;
+}
+
+static bool isModuleReachableViaExportedImports(
+    ModuleDecl* sourceModule,
+    ModuleDecl* targetModule,
+    HashSet<ModuleDecl*>& visitedModules)
+{
+    if (!sourceModule || !targetModule)
+        return false;
+    if (sourceModule == targetModule)
+        return true;
+    if (!visitedModules.add(sourceModule))
+        return false;
+
+    for (auto importDecl : sourceModule->getMembersOfType<ImportDecl>())
+    {
+        if (!importDecl->hasModifier<ExportedModifier>())
+            continue;
+
+        if (isModuleReachableViaExportedImports(
+                importDecl->importedModuleDecl,
+                targetModule,
+                visitedModules))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool isDeclReachableViaExportedImports(
+    SemanticsVisitor* visitor,
+    Decl* sourceDecl,
+    Decl* targetDecl)
+{
+    auto sourceModule = getModuleDecl(sourceDecl);
+    auto targetModule = getModuleDecl(targetDecl);
+    if (!sourceModule || !targetModule || sourceModule == targetModule)
+        return true;
+
+    for (auto module : visitor->getSession()->coreModules)
+    {
+        if (module->getModuleDecl() == targetModule)
+            return true;
+    }
+
+    HashSet<ModuleDecl*> visitedModules;
+    return isModuleReachableViaExportedImports(sourceModule, targetModule, visitedModules);
+}
+
+static Decl* getDeclFromCallableOperand(Val* operand)
+{
+    if (auto declRef = as<DeclRefBase>(operand))
+        return declRef->getDecl();
+    if (auto declRefType = as<DeclRefType>(operand))
+        return declRefType->getDeclRef().getDecl();
+    return nullptr;
+}
+
+static bool validatePublicCallableOperandVisibility(SemanticsVisitor* visitor, CallableDecl* decl)
+{
+    if (!decl || getDeclVisibility(decl) != DeclVisibility::Public)
+        return true;
+
+    auto diagnoseHiddenOperand = [&](Decl* operandDecl)
+    {
+        visitor->getSink()->diagnose(Diagnostics::PublicCustomDerivativeUsesNonExportedImport{
+            .derivative = operandDecl,
+            .attr = getDiagnosticPos(decl)});
+        return false;
+    };
+
+    if (auto funcAliasDecl = as<FuncAliasDecl>(decl))
+    {
+        auto targetDecl = funcAliasDecl->targetDeclRef.getDecl();
+        if (!targetDecl)
+            return true;
+
+        if (getDeclVisibility(targetDecl) != DeclVisibility::Public)
+            return diagnoseHiddenOperand(targetDecl);
+
+        if (!isDeclReachableViaExportedImports(visitor, decl, targetDecl))
+            return diagnoseHiddenOperand(targetDecl);
+
+        return true;
+    }
+
+    auto synthesizedFuncDecl = as<SynthesizedFuncDecl>(decl);
+    if (!synthesizedFuncDecl)
+        return true;
+
+    bool hasViolation = false;
+    HashSet<Decl*> seenDecls;
+    for (auto operand : synthesizedFuncDecl->operands)
+    {
+        auto operandDecl = getDeclFromCallableOperand(operand);
+        if (!operandDecl || !seenDecls.add(operandDecl))
+            continue;
+
+        if (getDeclVisibility(operandDecl) != DeclVisibility::Public)
+        {
+            diagnoseHiddenOperand(operandDecl);
+            hasViolation = true;
+            continue;
+        }
+
+        if (!isDeclReachableViaExportedImports(visitor, decl, operandDecl))
+        {
+            diagnoseHiddenOperand(operandDecl);
+            hasViolation = true;
+        }
+    }
+
+    return !hasViolation;
+}
+
 bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
     ConformanceCheckingContext* context,
     DeclRef<Decl> requirementDeclRef,
     RefPtr<WitnessTable> witnessTable,
     BuiltinRequirementKind kind)
 {
+    auto synthesizedLoc = getDiagnosticPos(requirementDeclRef.getDecl());
     auto synFunc = m_astBuilder->create<SynthesizedFuncDecl>();
     synFunc->nameAndLoc = requirementDeclRef.getDecl()->getNameAndLoc();
+    synFunc->loc = synthesizedLoc;
     auto funcType = as<FuncType>(
         as<Type>(getTypeForDeclRef(m_astBuilder, requirementDeclRef, requirementDeclRef.getLoc()))
             ->resolve());
@@ -8845,6 +9196,9 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
 
     if (kind == BuiltinRequirementKind::ForwardDerivativeFunc)
     {
+        auto higherOrderVisibility =
+            getSynthesizedExtensionVisibility(getDeclVisibility(context->parentDecl));
+
         // Add in a conformance for "fwdDiffFunc : IForwardDifferentiable<fwdDiffFunc>"
         // for higher-order differentiation.
         //
@@ -8858,7 +9212,8 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
                 synFunc,
                 fwdDiffFuncAsType,
                 substSet,
-                getDeclVisibility(context->parentDecl),
+                higherOrderVisibility.extensionVisibility,
+                SourceLoc(),
                 kIROp_SynthesizedForwardDerivativeWitnessTable);
             this->ensureDecl(higherOrderFwdDiffExtension, DeclCheckState::ReadyForLookup);
         }
@@ -8875,7 +9230,8 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
                 synFunc,
                 fwdDiffFuncAsType,
                 substSet,
-                getDeclVisibility(context->parentDecl),
+                higherOrderVisibility.extensionVisibility,
+                SourceLoc(),
                 kIROp_SynthesizedBackwardDerivativeWitnessTable);
             this->ensureDecl(higherOrderBwdDiffExtension, DeclCheckState::ReadyForLookup);
         }
@@ -10802,7 +11158,7 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
                 }
                 else
                 {
-                    // For legacy langauge versions, we still allow struct inheritance to avoid
+                    // For legacy language versions, we still allow struct inheritance to avoid
                     // breaking existing code, but we will emit a warning to inform the user
                     // that this feature is unstable and may be removed in the future.
                     getSink()->diagnose(
@@ -11092,6 +11448,7 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
     Index inheritanceClauseCounter = 0;
     Type* tagType = nullptr;
     InheritanceDecl* tagTypeInheritanceDecl = nullptr;
+    bool hasBaseError = false;
     for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
     {
         Index inheritanceClauseIndex = inheritanceClauseCounter++;
@@ -11114,6 +11471,7 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
                 .decl = decl,
                 .baseType = baseType,
                 .inheritanceDecl = inheritanceDecl});
+            hasBaseError = true;
             continue;
         }
 
@@ -11157,8 +11515,15 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
                 .decl = decl,
                 .baseType = baseType,
                 .inheritanceDecl = inheritanceDecl});
+            hasBaseError = true;
             continue;
         }
+    }
+
+    if (hasBaseError)
+    {
+        decl->tagType = m_astBuilder->getErrorType();
+        return;
     }
 
     // If a tag type has not been set, then we
@@ -11266,6 +11631,9 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
 
     auto tagType = decl->tagType;
 
+    if (as<ErrorType>(tagType))
+        return;
+
     auto isEnumFlags = decl->hasModifier<FlagsAttribute>();
 
     // Check the enum cases in order.
@@ -11363,6 +11731,9 @@ void SemanticsDeclBodyVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
     // the surrounding `enum` declaration.
     auto tagType = parentEnumDecl->tagType;
     SLANG_ASSERT(tagType);
+
+    if (as<ErrorType>(tagType))
+        return;
 
     // Need to check the init expression, if present, since
     // that represents the explicit tag for this case.
@@ -13207,12 +13578,16 @@ static DeclRef<SynthesizedFuncDecl> addSynthesizedFunc(
     List<DeclRefBase*> operands,
     FuncType* targetFuncType,
     bool isStatic,
-    DeclVisibility visibility)
+    DeclVisibility visibility,
+    SourceLoc sourceLoc = SourceLoc())
 {
     auto astBuilder = getCurrentASTBuilder();
+    auto synthesizedLoc = sourceLoc.isValid() ? sourceLoc : getDiagnosticPos(parentDecl);
 
     auto synFunc = astBuilder->create<SynthesizedFuncDecl>();
     synFunc->parentDecl = parentDecl;
+    synFunc->loc = synthesizedLoc;
+    synFunc->nameAndLoc.loc = synthesizedLoc;
     visitor->addVisibilityModifier(synFunc, visibility);
 
     for (auto operand : operands)
@@ -13258,9 +13633,12 @@ static DeclRef<SynthesizedStructDecl> addOrExtendSynthesizedStruct(
     IROp opCode,
     List<DeclRefBase*> operands,
     List<Type*> conformances,
-    DeclVisibility visibility)
+    DeclVisibility structVisibility,
+    DeclVisibility aliasVisibility,
+    SourceLoc sourceLoc = SourceLoc())
 {
     auto astBuilder = getCurrentASTBuilder();
+    auto synthesizedLoc = sourceLoc.isValid() ? sourceLoc : getDiagnosticPos(parentDecl);
 
     auto irInfo = getIROpInfo(opCode);
     auto mangledName = visitor->getName(
@@ -13336,6 +13714,7 @@ static DeclRef<SynthesizedStructDecl> addOrExtendSynthesizedStruct(
                 }
 
                 auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
+                inheritanceDecl->loc = synthesizedLoc;
                 inheritanceDecl->base.type = conformance;
                 synStruct->addMember(inheritanceDecl);
             }
@@ -13351,7 +13730,9 @@ static DeclRef<SynthesizedStructDecl> addOrExtendSynthesizedStruct(
 
         auto synStruct = astBuilder->create<SynthesizedStructDecl>();
         synStruct->nameAndLoc.name = mangledName;
-        visitor->addVisibilityModifier(synStruct, visibility);
+        synStruct->loc = synthesizedLoc;
+        synStruct->nameAndLoc.loc = synthesizedLoc;
+        visitor->addVisibilityModifier(synStruct, structVisibility);
 
         synStruct->parentDecl = parentDecl;
         SubstitutionSet substSet;
@@ -13365,6 +13746,7 @@ static DeclRef<SynthesizedStructDecl> addOrExtendSynthesizedStruct(
         for (auto conformance : conformances)
         {
             auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
+            inheritanceDecl->loc = synthesizedLoc;
             inheritanceDecl->base.type = substituteType(substSet, astBuilder, conformance);
             synStruct->addMember(inheritanceDecl);
         }
@@ -13381,7 +13763,9 @@ static DeclRef<SynthesizedStructDecl> addOrExtendSynthesizedStruct(
 
     auto synContextTypeAliasDecl = astBuilder->create<TypeAliasDecl>();
     synContextTypeAliasDecl->nameAndLoc.name = name;
-    visitor->addVisibilityModifier(synContextTypeAliasDecl, visibility);
+    synContextTypeAliasDecl->loc = synthesizedLoc;
+    synContextTypeAliasDecl->nameAndLoc.loc = synthesizedLoc;
+    visitor->addVisibilityModifier(synContextTypeAliasDecl, aliasVisibility);
     auto synStructType = DeclRefType::create(astBuilder, synStructDeclRef);
     synContextTypeAliasDecl->type.type = synStructType;
 
@@ -13526,13 +13910,14 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 for (auto _decl : declsToExtend)
                 {
                     auto visibility = getDeclVisibility(_decl);
+                    auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
                     SubstitutionSet substSet;
                     auto fwdDiffExtension = extendContainerDecl(
                         this,
                         _decl,
                         getForwardDiffFuncInterfaceType(funcAsType),
                         substSet,
-                        visibility);
+                        synthesizedVisibility.extensionVisibility);
 
 
                     auto funcAsTypeFromExtension =
@@ -13545,7 +13930,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                         {funcAsTypeFromExtension->getDeclRefBase()},
                         getCalculatedDiffFuncType("FwdDiffFuncType", funcAsTypeFromExtension),
                         true,
-                        visibility);
+                        synthesizedVisibility.memberVisibility);
 
                     // Add in a conformance for "fwdDiffFunc : IForwardDifferentiable<fwdDiffFunc>"
                     // for higher-order differentiation.
@@ -13560,7 +13945,8 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                             synFuncDeclRef.getDecl(),
                             fwdDiffFuncAsType,
                             substSet,
-                            visibility,
+                            synthesizedVisibility.extensionVisibility,
+                            SourceLoc(),
                             kIROp_SynthesizedForwardDerivativeWitnessTable);
                         this->ensureDecl(
                             higherOrderFwdDiffExtension,
@@ -13578,7 +13964,8 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                             synFuncDeclRef.getDecl(),
                             fwdDiffFuncAsType,
                             substSet,
-                            visibility,
+                            synthesizedVisibility.extensionVisibility,
+                            SourceLoc(),
                             kIROp_SynthesizedBackwardDerivativeWitnessTable);
                         this->ensureDecl(
                             higherOrderBwdDiffExtension,
@@ -13600,13 +13987,14 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                     SLANG_ASSERT(_decl);
 
                     auto visibility = getDeclVisibility(_decl);
+                    auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
                     SubstitutionSet substSet;
                     auto bwdDiffExtension = extendContainerDecl(
                         this,
                         _decl,
                         getBackwardDiffFuncInterfaceType(funcAsType),
                         substSet,
-                        visibility);
+                        synthesizedVisibility.extensionVisibility);
                     auto funcAsTypeFromExtension =
                         as<DeclRefType>(funcAsType->substitute(getCurrentASTBuilder(), substSet));
 
@@ -13617,7 +14005,8 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                         kIROp_BackwardDiffIntermediateContextType,
                         {funcAsTypeFromExtension->getDeclRefBase()},
                         {getBwdCallableBaseType(funcAsTypeFromExtension)},
-                        visibility);
+                        synthesizedVisibility.extensionVisibility,
+                        synthesizedVisibility.memberVisibility);
 
                     auto synMinimalContextStruct = addOrExtendSynthesizedStruct(
                         this,
@@ -13626,7 +14015,8 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                         kIROp_BackwardDiffMinimalContextType,
                         {funcAsTypeFromExtension->getDeclRefBase()},
                         {},
-                        visibility);
+                        synthesizedVisibility.extensionVisibility,
+                        synthesizedVisibility.memberVisibility);
 
                     auto minimalCtxType =
                         DeclRefType::create(getCurrentASTBuilder(), synMinimalContextStruct);
@@ -13644,7 +14034,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                             funcAsTypeFromExtension,
                             minimalCtxType),
                         false,
-                        visibility);
+                        synthesizedVisibility.memberVisibility);
 
                     addSynthesizedFunc(
                         this,
@@ -13658,7 +14048,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                             minimalCtxType,
                             fullCtxType),
                         false,
-                        visibility);
+                        synthesizedVisibility.memberVisibility);
 
                     this->ensureDecl(bwdDiffExtension.getDecl(), DeclCheckState::ReadyForLookup);
                 }
@@ -13681,13 +14071,14 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                     SLANG_ASSERT(_decl);
 
                     auto visibility = getDeclVisibility(_decl);
+                    auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
                     SubstitutionSet substSet;
                     auto bwdDiffExtension = extendContainerDecl(
                         this,
                         _decl,
                         getBackwardDiffFuncInterfaceType(funcAsType),
                         substSet,
-                        visibility);
+                        synthesizedVisibility.extensionVisibility);
                     auto funcAsTypeFromExtension =
                         as<DeclRefType>(funcAsType->substitute(getCurrentASTBuilder(), substSet));
 
@@ -13698,7 +14089,8 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                         kIROp_TrivialBackwardDiffIntermediateContextType,
                         {funcAsTypeFromExtension->getDeclRefBase()},
                         {getBwdCallableBaseType(funcAsTypeFromExtension)},
-                        visibility);
+                        synthesizedVisibility.extensionVisibility,
+                        synthesizedVisibility.memberVisibility);
 
                     auto synMinimalContextStruct = addOrExtendSynthesizedStruct(
                         this,
@@ -13707,7 +14099,8 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                         kIROp_TrivialBackwardDiffMinimalContextType,
                         {funcAsTypeFromExtension->getDeclRefBase()},
                         {},
-                        visibility);
+                        synthesizedVisibility.extensionVisibility,
+                        synthesizedVisibility.memberVisibility);
 
                     auto minimalCtxType =
                         DeclRefType::create(getCurrentASTBuilder(), synMinimalContextStruct);
@@ -13725,7 +14118,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                             funcAsTypeFromExtension,
                             minimalCtxType),
                         false,
-                        visibility);
+                        synthesizedVisibility.memberVisibility);
 
                     addSynthesizedFunc(
                         this,
@@ -13739,7 +14132,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                             minimalCtxType,
                             fullCtxType),
                         false,
-                        visibility);
+                        synthesizedVisibility.memberVisibility);
 
                     this->ensureDecl(bwdDiffExtension.getDecl(), DeclCheckState::ReadyForLookup);
                 }
@@ -13755,13 +14148,14 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 for (auto _decl : declsToExtend)
                 {
                     auto visibility = getDeclVisibility(_decl);
+                    auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
                     SubstitutionSet substSet;
                     auto fwdDiffExtension = extendContainerDecl(
                         this,
                         _decl,
                         getForwardDiffFuncInterfaceType(funcAsType),
                         substSet,
-                        visibility);
+                        synthesizedVisibility.extensionVisibility);
 
                     auto funcAsTypeFromExtension =
                         as<DeclRefType>(funcAsType->substitute(getCurrentASTBuilder(), substSet));
@@ -13773,7 +14167,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                         {funcAsTypeFromExtension->getDeclRefBase()},
                         getCalculatedDiffFuncType("FwdDiffFuncType", funcAsTypeFromExtension),
                         true,
-                        visibility);
+                        synthesizedVisibility.memberVisibility);
 
                     this->ensureDecl(fwdDiffExtension.getDecl(), DeclCheckState::ReadyForLookup);
                 }
@@ -13993,6 +14387,29 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     }
 
     checkInterfaceRequirement(decl);
+    checkVisibility(decl);
+}
+
+void SemanticsDeclHeaderVisitor::checkPublicCallableOperandVisibility(CallableDecl* decl)
+{
+    validatePublicCallableOperandVisibility(this, decl);
+}
+
+void SemanticsDeclHeaderVisitor::visitCallableDecl(CallableDecl* decl)
+{
+    if (!as<FuncAliasDecl>(decl))
+        return;
+
+    checkPublicCallableOperandVisibility(decl);
+    checkVisibility(decl);
+}
+
+void SemanticsDeclHeaderVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
+{
+    if (!as<SynthesizedFuncDecl>(decl))
+        return;
+
+    checkPublicCallableOperandVisibility(decl);
     checkVisibility(decl);
 }
 
@@ -14255,7 +14672,7 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
 
         // Collect all declarations referenced by the target type
         HashSet<Decl*> genericParamsReferencedByTargetType;
-        collectReferencedDecls(decl->targetType.type, genericParamsReferencedByTargetType);
+        collectReferencedDecls(this, decl->targetType.type, genericParamsReferencedByTargetType);
 
         HashSet<Decl*> genericParamsReferencedByConstraints;
 
@@ -14264,6 +14681,7 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
              getMembersOfType<GenericTypeConstraintDecl>(getASTBuilder(), genericDecl))
         {
             collectReferencedDecls(
+                this,
                 constraint.getDecl()->sup.type,
                 genericParamsReferencedByConstraints);
         }
@@ -16825,6 +17243,21 @@ static T* _findModifier(Decl* decl)
     return decl->findModifier<T>();
 }
 
+static void checkDerivativeAttribute(
+    SemanticsVisitor* visitor,
+    FunctionDeclBase* funcDecl,
+    ForwardDerivativeAttribute* attr);
+
+static void checkDerivativeAttribute(
+    SemanticsVisitor* visitor,
+    FunctionDeclBase* funcDecl,
+    BackwardDerivativeAttribute* attr);
+
+static void checkDerivativeAttribute(
+    SemanticsVisitor* visitor,
+    FunctionDeclBase* funcDecl,
+    PrimalSubstituteAttribute* attr);
+
 template<typename TDerivativeAttr, typename TDifferentiateExpr, typename TDerivativeOfAttr>
 void checkDerivativeOfAttributeImpl(
     SemanticsVisitor* visitor,
@@ -16990,10 +17423,16 @@ static void translateFwdDerivativeAttributeToAD2(
     auto funcDeclRef = funcDecl->getDefaultDeclRef();
     funcDeclRef = createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), visitor, funcDeclRef);
     auto funcAsType = DeclRefType::create(astBuilder, funcDeclRef);
+    auto userDefinedFwdDiffFunc = as<DeclRefExpr>(attr->funcExpr)->declRef.as<CallableDecl>();
+    auto visibility = getMoreRestrictiveVisibility(
+        getDeclVisibility(funcDecl),
+        getDeclVisibility(userDefinedFwdDiffFunc.getDecl()));
+    auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
 
     fwdDiffExtension->parentDecl = funcDecl;
     fwdDiffExtension->loc = attr->loc;
-    visitor->addVisibilityModifier(fwdDiffExtension, getDeclVisibility(funcDecl));
+    fwdDiffExtension->nameAndLoc.loc = attr->loc;
+    visitor->addVisibilityModifier(fwdDiffExtension, synthesizedVisibility.extensionVisibility);
 
     SubstitutionSet substSet;
     visitor->liftDeclFromGenericContainers(fwdDiffExtension, substSet);
@@ -17004,17 +17443,19 @@ static void translateFwdDerivativeAttributeToAD2(
     fwdDiffExtension->targetType.exp->type = astBuilder->getOrCreate<TypeType>(funcAsType);
 
     auto fwdDiffInheritanceDecl = astBuilder->create<InheritanceDecl>();
+    fwdDiffInheritanceDecl->loc = attr->loc;
     fwdDiffInheritanceDecl->base.type = visitor->getForwardDiffFuncInterfaceType(funcAsType);
     fwdDiffExtension->addMember(fwdDiffInheritanceDecl);
-
-    auto userDefinedFwdDiffFunc =
+    userDefinedFwdDiffFunc =
         substituteDeclRef(substSet, astBuilder, as<DeclRefExpr>(attr->funcExpr)->declRef)
             .as<CallableDecl>();
 
 
     auto funcAliasDecl = astBuilder->create<FuncAliasDecl>();
+    funcAliasDecl->loc = attr->loc;
     funcAliasDecl->nameAndLoc.name = astBuilder->getNamePool()->getName("fwd_diff");
-    visitor->addVisibilityModifier(funcAliasDecl, getDeclVisibility(funcDecl));
+    funcAliasDecl->nameAndLoc.loc = attr->loc;
+    visitor->addVisibilityModifier(funcAliasDecl, synthesizedVisibility.memberVisibility);
     funcAliasDecl->targetDeclRef = userDefinedFwdDiffFunc;
 
     if (userDefinedFwdDiffFunc.getDecl()->findModifier<HLSLStaticModifier>() ||
@@ -17048,13 +17489,17 @@ static void translateBwdDerivativeAttributeToAD2(
     SubstitutionSet substSet;
     DeclRef<Decl> bwdDiffFunc = as<DeclRefExpr>(attr->funcExpr)->declRef;
 
-    auto visibility = getDeclVisibility(targetFuncDecl);
+    auto visibility = getMoreRestrictiveVisibility(
+        getDeclVisibility(targetFuncDecl),
+        getDeclVisibility(bwdDiffFunc.getDecl()));
+    auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
     auto bwdDiffExtension = extendContainerDecl(
         visitor,
         targetFuncDecl,
         visitor->getBackwardDiffFuncInterfaceType(funcAsType),
         substSet,
-        visibility);
+        synthesizedVisibility.extensionVisibility,
+        attr->loc);
 
     auto substFuncAsTypeFromExtension =
         as<DeclRefType>(substFuncAsType->substitute(getCurrentASTBuilder(), substSet));
@@ -17071,7 +17516,8 @@ static void translateBwdDerivativeAttributeToAD2(
         {legacyBwdDiffFuncFromExtension},
         visitor->getCalculatedDiffFuncType("BwdDiffFuncType", funcAsTypeFromExtension),
         false,
-        visibility);
+        synthesizedVisibility.memberVisibility,
+        attr->loc);
 
     synBwdDiffFunc =
         createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), visitor, synBwdDiffFunc)
@@ -17083,7 +17529,9 @@ static void translateBwdDerivativeAttributeToAD2(
         kIROp_BackwardContextFromLegacyBwdDiffFunc,
         {substFuncAsTypeFromExtension->getDeclRefBase(), synBwdDiffFunc},
         {visitor->getBwdCallableBaseType(funcAsTypeFromExtension)},
-        visibility);
+        synthesizedVisibility.extensionVisibility,
+        synthesizedVisibility.memberVisibility,
+        attr->loc);
 
     auto synMinimalContextStruct = addOrExtendSynthesizedStruct(
         visitor,
@@ -17092,7 +17540,9 @@ static void translateBwdDerivativeAttributeToAD2(
         kIROp_BackwardMinimalContextFromLegacyBwdDiffFunc,
         {substFuncAsTypeFromExtension->getDeclRefBase(), synBwdDiffFunc},
         {},
-        visibility);
+        synthesizedVisibility.extensionVisibility,
+        synthesizedVisibility.memberVisibility,
+        attr->loc);
 
     auto minimalCtxType = DeclRefType::create(getCurrentASTBuilder(), synMinimalContextStruct);
     auto fullCtxType = DeclRefType::create(getCurrentASTBuilder(), synContextStruct);
@@ -17109,7 +17559,8 @@ static void translateBwdDerivativeAttributeToAD2(
         {substFuncAsTypeFromExtension->getDeclRefBase(), synBwdDiffFunc},
         applyBwdFuncType,
         false,
-        visibility);
+        synthesizedVisibility.memberVisibility,
+        attr->loc);
 
     addSynthesizedFunc(
         visitor,
@@ -17123,7 +17574,8 @@ static void translateBwdDerivativeAttributeToAD2(
             minimalCtxType,
             fullCtxType),
         false,
-        visibility);
+        synthesizedVisibility.memberVisibility,
+        attr->loc);
 }
 
 static void checkDerivativeAttribute(
@@ -17290,13 +17742,14 @@ static void checkDerivativeAttribute(
                     DeclRefType::create(getCurrentASTBuilder(), funcDecl->getDefaultDeclRef());
 
                 auto visibility = getDeclVisibility(funcDecl);
+                auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
                 SubstitutionSet substSet;
                 auto fwdDiffExtension = extendContainerDecl(
                     visitor,
                     funcDecl,
                     visitor->getForwardDiffFuncInterfaceType(funcAsType),
                     substSet,
-                    visibility);
+                    synthesizedVisibility.extensionVisibility);
 
                 auto substFuncAsTypeFromExtension =
                     as<DeclRefType>(substFuncAsType->substitute(getCurrentASTBuilder(), substSet));
@@ -17310,7 +17763,7 @@ static void checkDerivativeAttribute(
                     {substFuncAsTypeFromExtension->getDeclRefBase()},
                     visitor->getCalculatedDiffFuncType("FwdDiffFuncType", funcAsTypeFromExtension),
                     true,
-                    visibility);
+                    synthesizedVisibility.memberVisibility);
             }
 
             if (substDecl->findModifier<BackwardDifferentiableAttribute>())
@@ -17320,13 +17773,14 @@ static void checkDerivativeAttribute(
                     DeclRefType::create(getCurrentASTBuilder(), funcDecl->getDefaultDeclRef());
 
                 auto visibility = getDeclVisibility(funcDecl);
+                auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
                 SubstitutionSet substSet;
                 auto bwdDiffExtension = extendContainerDecl(
                     visitor,
                     funcDecl,
                     visitor->getBackwardDiffFuncInterfaceType(funcAsType),
                     substSet,
-                    visibility);
+                    synthesizedVisibility.extensionVisibility);
 
                 auto substFuncAsTypeFromExtension =
                     as<DeclRefType>(substFuncAsType->substitute(getCurrentASTBuilder(), substSet));
@@ -17340,7 +17794,8 @@ static void checkDerivativeAttribute(
                     kIROp_BackwardDiffIntermediateContextType,
                     {substFuncAsTypeFromExtension->getDeclRefBase()},
                     {visitor->getBwdCallableBaseType(funcAsTypeFromExtension)},
-                    visibility);
+                    synthesizedVisibility.extensionVisibility,
+                    synthesizedVisibility.memberVisibility);
 
                 auto synMinimalContextStruct = addOrExtendSynthesizedStruct(
                     visitor,
@@ -17349,7 +17804,8 @@ static void checkDerivativeAttribute(
                     kIROp_BackwardDiffMinimalContextType,
                     {substFuncAsTypeFromExtension->getDeclRefBase()},
                     {},
-                    visibility);
+                    synthesizedVisibility.extensionVisibility,
+                    synthesizedVisibility.memberVisibility);
 
                 auto minimalCtxType =
                     DeclRefType::create(getCurrentASTBuilder(), synMinimalContextStruct);
@@ -17366,7 +17822,7 @@ static void checkDerivativeAttribute(
                         funcAsTypeFromExtension,
                         minimalCtxType),
                     false,
-                    visibility);
+                    synthesizedVisibility.memberVisibility);
 
                 addSynthesizedFunc(
                     visitor,
@@ -17380,7 +17836,7 @@ static void checkDerivativeAttribute(
                         minimalCtxType,
                         fullCtxType),
                     false,
-                    visibility);
+                    synthesizedVisibility.memberVisibility);
             }
         }
     }
