@@ -9035,6 +9035,9 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
                     .location = context->parentDecl->loc});
                 return false;
             }
+            auto synthesizedVisibility =
+                getSynthesizedExtensionVisibility(getDeclVisibility(synStructDecl));
+            addVisibilityModifier(synFunc, synthesizedVisibility.memberVisibility);
             break;
         }
     case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
@@ -9162,6 +9165,15 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
             synFunc->operands.add(applyBwdDeclRef);
             synFunc->operands.add(rematFuncDeclRef);
             synFunc->operands.add(bwdPropFnDeclRef);
+
+            auto synthesizedVisibility =
+                getSynthesizedExtensionVisibility(getDeclVisibility(context->parentDecl));
+            if (auto targetCallableDeclRef = declRefType->getDeclRef().as<CallableDecl>())
+            {
+                synthesizedVisibility = getSynthesizedExtensionVisibility(
+                    getDeclVisibility(targetCallableDeclRef.getDecl()));
+            }
+            addVisibilityModifier(synFunc, synthesizedVisibility.memberVisibility);
             break;
         }
     case BuiltinRequirementKind::BwdCallableRematFunc:
