@@ -16,7 +16,11 @@ void exp_BackwardAutoDiff<T : __BuiltinFloatingPointType, let K : int>(
 [Differentiable]
 CoopVec<float, 2> addCV(CoopVec<float, 2> a, CoopVec<float, 2> b)
 {
-    return a + b;
+    // CoopVec arithmetic is not auto-differentiable, so the primal body is a
+    // placeholder that satisfies the [Differentiable] requirement. The custom
+    // backward below is what the autodiff pass uses; it propagates dResult to
+    // both inputs, exercising the emitDAdd path for CoopVec.
+    return a;
 }
 
 [BackwardDerivativeOf(addCV)]
