@@ -6,13 +6,10 @@
 // quite yet fully supported
 [UnscopedEnum]
 /*CHECK:
- ^^^^^^^^^^^^ 'UnscopedEnum' specifies an unscoped enumeration
+ ^^^^^^^^^^^^ duplicate modifier
+ ^^^^^^^^^^^^ modifier 'UnscopedEnum' is redundant or conflicting with existing modifier 'class'
 */
 enum class GenericEnum<T>
-/*CHECK:
-     ^^^^^ conflicting scoped/unscoped declarations for an enum
-     ^^^^^ 'class' keyword for 'GenericEnum' specifies a scoped enumeration
-*/
 {
 }
 

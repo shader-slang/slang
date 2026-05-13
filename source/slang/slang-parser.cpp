@@ -5950,8 +5950,8 @@ static Decl* parseEnumDecl(Parser* parser)
     // TODO: diagnose this with a warning some day, and move
     // toward deprecating it.
     //
-    SourceLoc enumClassLoc = parser->tokenReader.peekLoc();
-    bool isEnumClass = AdvanceIf(parser, "class");
+    Token classToken{};
+    bool isEnumClass = AdvanceIf(parser, "class", &classToken);
     bool isUnscoped = false;
 
     if (!isEnumClass)
@@ -5978,7 +5978,7 @@ static Decl* parseEnumDecl(Parser* parser)
         else
         {
             // enum class cannot be anonymous
-            parser->sink->diagnose(Diagnostics::AnonymousScopedEnum{.classLocation = enumClassLoc});
+            parser->sink->diagnose(Diagnostics::AnonymousScopedEnum{.classLocation = classToken.loc});
         }
     }
     else
@@ -6002,7 +6002,8 @@ static Decl* parseEnumDecl(Parser* parser)
             if (isEnumClass)
             {
                 auto enumClassModifier = parser->astBuilder->create<EnumClassModifier>();
-                enumClassModifier->loc = enumClassLoc;
+                enumClassModifier->loc = classToken.loc;
+                enumClassModifier->keywordName = getName(parser, classToken.getContent());
                 addModifier(decl, enumClassModifier);
             }
 

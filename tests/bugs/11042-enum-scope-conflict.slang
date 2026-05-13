@@ -4,13 +4,10 @@
 
 [UnscopedEnum]
 /*CHECK:
- ^^^^^^^^^^^^ 'UnscopedEnum' specifies an unscoped enumeration
+ ^^^^^^^^^^^^ duplicate modifier
+ ^^^^^^^^^^^^ modifier 'UnscopedEnum' is redundant or conflicting with existing modifier 'class'
 */
 enum class TestEnum
-/*CHECK:
-     ^^^^^ conflicting scoped/unscoped declarations for an enum
-     ^^^^^ 'class' keyword for 'TestEnum' specifies a scoped enumeration
-*/
 {
     Value1,
 }

@@ -10,11 +10,10 @@ struct GenericContainer<T>
 {
     [UnscopedEnum]
 /*CHECK:
-     ^^^^^^^^^^^^ 'UnscopedEnum' specifies an unscoped enumeration
+     ^^^^^^^^^^^^ duplicate modifier
+     ^^^^^^^^^^^^ modifier 'UnscopedEnum' is redundant or conflicting with existing modifier 'class'
 */
     enum class NestedEnum
-//CHECK: ^^^^^ conflicting scoped/unscoped declarations for an enum
-//CHECK: ^^^^^ 'class' keyword for 'NestedEnum' specifies a scoped enumeration
     {
     }
 }
