@@ -2796,6 +2796,13 @@ err(
     span { loc = "decl:Decl", message = "static const variable '~decl' must have an initializer" }
 )
 
+err(
+    "static-const-global-non-constant-init",
+    31226,
+    "static const global initializer must be a compile-time constant",
+    span { loc = "decl:Decl", message = "initializer of static const global '~decl' does not evaluate to a compile-time constant" }
+)
+
 -- 3123x - Modifiers and Deprecation (part 2)
 
 err(
@@ -4601,6 +4608,13 @@ warning(
     span { loc = "location", message = "left shift amount exceeds the number of bits and the result will be always zero, (`~lhsType:IRInst' << `~shiftAmount:Int`)." }
 )
 
+warning(
+    "operator-shift-on-narrow-type",
+    41034,
+    "left shift on narrow integer type",
+    span { loc = "location", message = "left shift on narrow integer type '~lhsType:IRInst'; unlike C/C++, Slang does not promote narrow integers before shifting. If a wider result is needed, cast the left operand to a wider type first (e.g., uint(x) << n)." }
+)
+
 err(
     "unsupported-use-of-l-value-for-auto-diff",
     41901,
@@ -5310,6 +5324,13 @@ fatal(
     span { loc = "location", message = "'CoopMat.MapElement' per-element function cannot capture buffers, resources or any opaque type values. Consider pre-loading the content of any referenced buffers into a local variable before calling 'CoopMat.MapElement', or moving any referenced resources to global scope." }
 )
 
+
+err(
+    "class-type-not-supported",
+    39031,
+    "class types are not supported in type layout",
+    span { loc = "location", message = "class type '~name' is not supported; use 'struct' instead" }
+)
 
 -- Load semantic checking diagnostics (part 17) - Standalone notes for cross-referencing
 -- (inlined from slang-diagnostics-semantic-checking-17.lua)
