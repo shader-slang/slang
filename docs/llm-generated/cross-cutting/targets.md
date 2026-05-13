@@ -188,6 +188,31 @@ profile (e.g. an HLSL Shader Model gate). The orchestrator that
 picks which passes run is `linkAndOptimizeIR` in
 [slang-emit.cpp](../../../source/slang/slang-emit.cpp).
 
+## Per-target pass pipelines
+
+For an ordered, control-flow-graph view of the IR passes that run
+end-to-end for each shader target (Phase A link/prep → Phase B
+specialization → Phase C target legalization → Phase D emit and
+downstream tools), see the per-target pages under
+[../target-pipelines/](../target-pipelines/):
+
+- [../target-pipelines/index.md](../target-pipelines/index.md) —
+  cross-target navigation hub with comparison table.
+- [../target-pipelines/spirv.md](../target-pipelines/spirv.md) —
+  SPIR-V direct-emit path.
+- [../target-pipelines/hlsl.md](../target-pipelines/hlsl.md) —
+  HLSL plus DXC / fxc downstream.
+- [../target-pipelines/metal.md](../target-pipelines/metal.md) —
+  Metal plus Apple `metal` downstream.
+- [../target-pipelines/wgsl.md](../target-pipelines/wgsl.md) —
+  WGSL plus Tint downstream.
+- [../target-pipelines/cuda.md](../target-pipelines/cuda.md) —
+  CUDA plus nvrtc downstream.
+
+This page (`cross-cutting/targets.md`) describes the per-target
+options, capability sets, and predicate functions; the
+`target-pipelines/` pages describe the ordered pass sequence.
+
 ## Adding a new target
 
 The full checklist:

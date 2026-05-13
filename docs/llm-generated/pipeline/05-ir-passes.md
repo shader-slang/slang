@@ -44,9 +44,35 @@ instrumentation all change the sequence. The authoritative ordering
 is the body of `linkAndOptimizeIR`; this document reflects categories,
 not order.
 
-A small number of passes also run *before* `linkAndOptimizeIR` (e.g.
-the early raytracing intrinsic simplification that participates in
-checking) — those are noted in their categories.
+For an ordered control-flow-graph view of every pass that runs for a
+specific target, see the `target-pipelines/` subtree. The first
+concrete per-target CFG is
+[../target-pipelines/spirv.md](../target-pipelines/spirv.md), which
+diagrams every `SLANG_PASS` reachable for `CodeGenTarget::SPIRV`
+under the direct-emit path, with conditional gates and the
+iterative `simplifyIRForSpirvLegalization` loop drawn explicitly.
+
+A substantial number of passes also run *before* `linkAndOptimizeIR`,
+inside `generateIRForTranslationUnit` on the per-translation-unit IR
+module before it is cached on the `Module`. Those are documented in
+[04b-pre-link-passes.md](04b-pre-link-passes.md) as an ordered,
+target-agnostic pipeline (Phase A AST walk → Phase B mandatory
+lowering → Phase C mandatory optimization, including the
+`performMandatoryEarlyInlining` fixed-point loop → Phase D
+non-essential validation and stripping). The per-target IR module
+that carries `IRLayoutDecoration`s is built separately by
+`TargetProgram::createIRModuleForLayout` and documented in
+[04c-layout-ir.md](04c-layout-ir.md); it is **not** fed into
+`linkAndOptimizeIR`.
+
+Individual category tables below still list a pass even when its
+*primary* call site is in the pre-link region above (for example,
+`constructSSA`, `propagateConstExpr`, `eliminateDeadCode`,
+`simplifyCFG`, and `peepholeOptimize` are all invoked both in
+`generateIRForTranslationUnit` and again from `linkAndOptimizeIR`).
+Treat 04b as the authoritative ordering for the pre-link region and
+the per-target pages under [../target-pipelines/](../target-pipelines/)
+as the authoritative ordering for the post-link region.
 
 ## Pass categories
 

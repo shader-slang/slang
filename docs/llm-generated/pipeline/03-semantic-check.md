@@ -87,20 +87,14 @@ on demand. The deeper rationale is in
 
 ## Name lookup and `DeclRef`
 
-Slang's name resolution produces `DeclRef`s rather than raw `Decl*`
-pointers. A `DeclRef` is a decl plus a substitution that records how
-its generic parameters / outer-context parameters have been bound in
-the reference. Implementation:
-[slang-ast-decl-ref.cpp](../../../source/slang/slang-ast-decl-ref.cpp).
-For the deeper rationale see
+Name resolution produces `DeclRef`s — a decl plus a substitution that
+records how its generic and outer-context parameters have been bound.
+The algorithmic rules — scope construction, the lookup algorithm,
+shadowing, visibility filtering, and overload resolution — live in
+the dedicated [../name-resolution/](../name-resolution/) subtree.
+Start at [../name-resolution/index.md](../name-resolution/index.md).
+For the deeper rationale on decl-refs themselves see
 [../../design/decl-refs.md](../../design/decl-refs.md).
-
-Lookup is carried out through `Scope` chains attached to AST nodes;
-the checker pushes scopes as it descends container decls. Local-
-variable visibility within a `BlockStmt` is enforced by a per-decl
-`hiddenFromLookup` flag (set on entry to the block, cleared as the
-checker walks past each `DeclStmt`) — described in detail in
-[../../design/parsing.md](../../design/parsing.md).
 
 ## Generic specialization and constraints
 

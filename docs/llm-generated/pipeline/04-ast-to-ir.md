@@ -154,3 +154,21 @@ artefacts on the surrounding `Module` and component types:
 
 After lowering, the IR module is the input to the IR-pass pipeline
 described in [05-ir-passes.md](05-ir-passes.md).
+
+## Adjacent pipelines
+
+Two adjacent pipelines run before and alongside the post-link
+IR-pass pipeline:
+
+- [04b-pre-link-passes.md](04b-pre-link-passes.md) — the
+  per-translation-unit, target-agnostic mandatory pass sequence
+  inside `generateIRForTranslationUnit`, executed before the IR
+  module is cached on the `Module` and pulled into
+  `linkAndOptimizeIR` by `linkIR`. This is the page to consult
+  when asking "where do `lowerErrorHandling`, `synthesizeBitFieldAccessors`,
+  or `performMandatoryEarlyInlining` run, and what gates them?".
+- [04c-layout-ir.md](04c-layout-ir.md) — `TargetProgram::createIRModuleForLayout`
+  builds a separate, per-target IR module whose only contents are
+  `IRLayoutDecoration`s on stub globals and entry points. It does
+  not run the mandatory passes above and is not fed into
+  `linkAndOptimizeIR`.

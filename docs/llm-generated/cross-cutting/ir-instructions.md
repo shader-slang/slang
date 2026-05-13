@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-07T14:35:56+00:00
-source_commit: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
+generated_at: 2026-05-12T12:40:00+00:00
+source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
 watched_paths_digest: 2573e0c7179a260716d90aeee42b77115f5e2f23215d0751dba306d6cdebf933
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
@@ -72,273 +72,47 @@ blocks, modules).
 
 ## Instruction families
 
-The Lua file groups instructions into a small number of top-level
-families. Counts here are approximate at `source_commit`; consult
-[slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua) for
-the authoritative list.
+The per-opcode catalog lives in the
+[../ir-reference/](../ir-reference/) subtree. Each family page
+tabulates every opcode in that family with its C++ wrapper, operand
+shape, op-flags, AST origin, and a one-line summary; notable opcodes
+have short callouts. Start at
+[../ir-reference/index.md](../ir-reference/index.md) for the family
+taxonomy and approximate per-family opcode counts. The family pages
+are:
 
-### Special / boundary
+- [../ir-reference/types.md](../ir-reference/types.md) — `Type`
+  family (basic scalar, packed FP, strings, composite/parametric,
+  pointer/address-space, resource, differentiation, existential,
+  rate/kind).
+- [../ir-reference/values.md](../ir-reference/values.md) — constant
+  literals, arithmetic/logic/comparison/bit ops, conversions,
+  memory, aggregate constructors.
+- [../ir-reference/control-flow.md](../ir-reference/control-flow.md)
+  — `block`, `Param`, and the `TerminatorInst` family.
+- [../ir-reference/structure.md](../ir-reference/structure.md) —
+  module/function/generic/struct/interface/witness-table opcodes.
+- [../ir-reference/generics-and-existentials.md](../ir-reference/generics-and-existentials.md)
+  — `specialize`, `lookupWitness`, `MakeExistential` /
+  `ExtractExistential*`, RTTI.
+- [../ir-reference/resources-and-atomics.md](../ir-reference/resources-and-atomics.md)
+  — image / buffer / sampler ops, shader IO, `AtomicOperation`
+  family, barriers, wave intrinsics, raytracing.
+- [../ir-reference/differentiation.md](../ir-reference/differentiation.md)
+  — differential pairs, `ForwardDifferentiate`,
+  `BackwardDifferentiate`, reverse-mode contexts.
+- [../ir-reference/decorations.md](../ir-reference/decorations.md)
+  — the `Decoration` family.
+- [../ir-reference/metadata.md](../ir-reference/metadata.md) —
+  `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` families.
+- [../ir-reference/misc.md](../ir-reference/misc.md) — pack /
+  expansion helpers, type queries, size / alignment / count,
+  liveness markers, descriptor heaps, kernel launch.
 
-| Opcode | Notes |
-| --- | --- |
-| `nop` | Placeholder; no semantic effect |
-| `Unrecognized` | Placeholder used during deserialization for opcodes unknown to this version of the compiler (per the comment at the top of the Lua file). Must not survive past deserialization |
-
-### Type instructions
-
-The largest family. Every type in the language is an instruction.
-
-#### Basic scalar types
-
-`BasicType` group: `Void`, `Bool`, `Int8`, `Int16`, `Int`, `Int64`,
-`UInt8`, `UInt16`, `UInt`, `UInt64`, `Half`, `Float`, `Double`,
-`Char`, `IntPtr`, `UIntPtr`. Each has a struct name like
-`VoidType`, `BoolType`, ..., `IntType`. All are `hoistable`.
-
-#### Floating-point storage-only types
-
-`PackedFloatType` group: `FloatE4M3Type`, `FloatE5M2Type`,
-`BFloat16Type`. Hoistable, used as restricted (storage-only) FP
-formats.
-
-#### Strings
-
-`StringTypeBase`: `String`, `NativeString` (both hoistable).
-
-#### Composite and parametric types
-
-| Opcode | C++ wrapper | Operands |
-| --- | --- | --- |
-| `Vec` | `VectorType` | element type, element count |
-| `Mat` | `MatrixType` | element type, row count, column count, layout |
-| `Array` | `ArrayType` | element type, element count, optional stride |
-| `UnsizedArray` | `UnsizedArrayType` | element type, optional stride |
-| `Func` | `FuncType` | result type, variadic parameter types |
-| `BasicBlock` | `BasicBlockType` | (none) |
-| `Tuple` | `TupleType` | (variadic) field types |
-| `Optional` | `OptionalType` | value type |
-| `Result` | `ResultType` | value type, error type |
-| `Conditional` | `ConditionalType` | value type, has-value flag |
-| `Enum` | `EnumType` | tag type (parent inst — owns enum-case children) |
-| `Atomic` | `AtomicType` | element type |
-| `Conjunction` | `ConjunctionType` | (intersection of constraints) |
-| `Attributed` | `AttributedType` | base type, attribute |
-| `RateQualified` | `RateQualifiedType` | rate, value type |
-
-(Each row is hoistable unless noted.)
-
-#### Pointer / address-space types
-
-`PtrTypeBase` group: `Ptr` (`PtrType`), plus address-space-tagged
-pointer variants for the various memory spaces. The full list (uniform,
-storage, group-shared, etc.) lives in the Lua file under
-`PtrTypeBase`.
-
-#### Resource types
-
-GPU-specific types: `Texture*`, `RWTexture*`, `SamplerState`,
-`SamplerComparisonState`, `Buffer`, `RWBuffer`, `StructuredBuffer`,
-`RWStructuredBuffer`, `ByteAddressBuffer`,
-`RWByteAddressBuffer`, `RaytracingAccelerationStructure`, etc. All
-are hoistable.
-
-#### Differentiation types
-
-`DifferentialPairTypeBase`: `DiffPair` (`DifferentialPairType`),
-`DiffRefPair` (`DifferentialPtrPairType`). Plus
-`TranslatedTypeBase` containing the various
-`BackwardDiff*ContextType` opcodes used by the autodiff passes
-(see [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md)).
-
-Function-type variants for differentiation:
-`ForwardDiffFuncType`, `BackwardDiffFuncType`,
-`ApplyForBwdFuncType`, `BwdCallableFuncType`, `RematFuncType`. All
-hoistable.
-
-#### Existentials
-
-`BindExistentialsTypeBase`: `BindExistentials`,
-`BoundInterface`. Used to encode dynamic-dispatch interfaces; see
-[../../design/existential-types.md](../../design/existential-types.md)
-for the language-level model.
-
-#### Rates and kinds
-
-`Rate` group: `ConstExpr`, `SpecConst`, `GroupShared`,
-`ActualGlobalRate`. `Kind` group: `Type`, `TypeParameterPack`,
-`Rate`, `Generic` ("types of types").
-
-#### Capability sets and other specialized types
-
-`CapabilitySet` / `CapabilitySetType` (hoistable),
-`AnyValueType` (size-parameterized), `RawPointerType`,
-`RTTIPointerType`, `DynamicType`, `TensorViewType`,
-`TorchTensorType`, `ArrayListType`, `BackwardDiffMinimalContextType`,
-plus a long tail of target / specialization-specific types. The full
-list is in the Lua file.
-
-### Value-producing instructions
-
-#### Constant literals
-
-| Opcode | C++ wrapper | Notes |
-| --- | --- | --- |
-| `IntLit` | `IRIntLit` | Integer literal; value stored inline |
-| `FloatLit` | `IRFloatLit` | Floating-point literal |
-| `BoolLit` | `IRBoolLit` | `true` / `false` |
-| `StringLit` | `IRStringLit` | String constant |
-| `PtrLit` | `IRPtrLit` | Pointer constant (e.g. `nullptr`) |
-| `VoidLit` | | Placeholder void value |
-| `MakeWitnessPack` / similar | | Pack / structural literal construction |
-
-Literal storage is the only place where `IRInst` carries
-"semantically relevant data not captured by the operand list" (see
-[../../design/ir.md](../../design/ir.md)).
-
-#### Arithmetic and logic
-
-`Add`, `Sub`, `Mul`, `Div`, `Mod`, `Neg`,
-`And`, `Or`, `Not`, `Xor`,
-`Lsh`, `Rsh`, `BitAnd`, `BitOr`, `BitXor`, `BitNot`,
-`Eql`, `Neq`, `Less`, `LessEqual`, `Greater`, `GreaterEqual`,
-`Select` (ternary). All take two or three operands; results have the
-appropriate scalar / vector / matrix type.
-
-#### Conversions
-
-`Cast`, `BitCast`, `IntCast`, `FloatCast`, `IntToFloat`,
-`FloatToInt`, `Reinterpret`, plus a number of lowering-helper
-`Pack` / `Unpack` opcodes used by `slang-ir-any-value-marshalling`.
-
-#### Memory
-
-| Opcode | Notes |
-| --- | --- |
-| `Var` | Allocates a local variable; type is `Ptr<T>` |
-| `GlobalVar` | Module-scope variable |
-| `Load` / `Store` | Through any pointer |
-| `FieldAddress` / `FieldExtract` | Member access (lvalue / rvalue) |
-| `GetElementPtr` / `GetElement` | Array indexing (lvalue / rvalue) |
-| `Swizzle*` | Vector / matrix swizzles |
-
-### Control-flow instructions
-
-Slang IR uses block parameters instead of phi nodes (see
-[../../design/ir.md](../../design/ir.md)).
-
-| Opcode | Notes |
-| --- | --- |
-| `Block` (parent) | Basic block; first N instructions are `Param` |
-| `Param` | Block parameter (the SSA-without-phi encoding) |
-| `unconditionalBranch` | Branch to a target with arguments |
-| `conditionalBranch` | Two-way conditional branch (no arguments — critical edges are forbidden) |
-| `loop` | Loop entry; encodes the join (`break`) target |
-| `ifElse` | Structured `if`-`else`; encodes the join target as an explicit operand |
-| `Switch` | N-way switch; per-case targets |
-| `Return` | Function return |
-| `Unreachable` | No reachable continuation |
-| `Discard` | HLSL-style fragment discard |
-| `Throw` | Error-handling throw |
-
-Structured-control-flow join points are explicit operands on the
-relevant terminator, not metadata — described in
-[../../design/ir.md](../../design/ir.md).
-
-### Function and module structure
-
-| Opcode | C++ wrapper | Notes |
-| --- | --- | --- |
-| `Func` (parent) | `IRFunc` | Function; children are blocks |
-| `Generic` (parent) | `IRGeneric` | Function-shaped instruction whose body computes type-level values |
-| `Module` (parent) | `IRModule` | Top-level container |
-| `StructType` (parent) | `IRStructType` | Struct; children are `StructField` and `StructKey` |
-| `StructField` | `IRStructField` | Struct member declaration |
-| `StructKey` | `IRStructKey` | Identity for a struct member |
-| `InterfaceType` (parent) | `IRInterfaceType` | Interface; children are requirement keys |
-| `InterfaceRequirementEntry` | | Interface method slot |
-| `RTTIObject` | | Runtime type information for an existential |
-| `WitnessTable` (parent) | `IRWitnessTable` | Maps interface requirements to concrete impls |
-| `WitnessTableEntry` | | Single witness mapping |
-
-### Specialization and existentials
-
-| Opcode | Notes |
-| --- | --- |
-| `Specialize` | Apply generic arguments to a generic |
-| `LookupWitnessMethod` | Resolve an interface method through a witness table |
-| `ExtractExistentialValue` | Pull the underlying value out of an existential |
-| `ExtractExistentialType` | Pull the type out of an existential |
-| `ExtractExistentialWitnessTable` | Pull the witness table out of an existential |
-| `MakeExistential` | Pack a value, type, and witness into an existential |
-| `BindExistentialsType` | Construct a `BindExistentials<...>` type |
-| `BoundInterface` | Specialized form for known-interface bind |
-
-These opcodes are produced by the lowering step and consumed by the
-specialization passes documented in
-[../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md).
-
-### Decorations
-
-Decorations attach metadata to other instructions. They are listed as
-their own family in the Lua file with names ending in `Decoration`.
-Examples (the full list is sizeable):
-
-- `NameHintDecoration` — preserves a human-readable name across passes
-- `LayoutDecoration` — attaches layout information to a type or var
-- `EntryPointDecoration` — marks a function as an entry point
-- `BindingDecoration` — register / binding assignment
-- `RequireCapabilityAtomDecoration` — capability requirement
-- `TargetIntrinsicDecoration` — declares the per-target spelling of
-  an intrinsic
-- `KeepAliveDecoration` — prevents DCE for module-public symbols
-- `LoopUnrollDecoration` / `LoopUnrollMaxIterationsDecoration` —
-  loop-unroll attributes
-
-Some decorations are conceptually instructions today; the long-term
-plan recorded in [../../design/ir.md](../../design/ir.md) is to
-unify them more cleanly.
-
-### Resource and shader-IO opcodes
-
-Operations on resource handles: `ImageLoad`, `ImageStore`,
-`ImageSubscript`, `SampleImplicit`, `SampleExplicit`,
-`StructuredBufferLoad`, `StructuredBufferStore`,
-`ByteAddressBufferLoad`, `ByteAddressBufferStore`,
-`AppendStructuredBuffer`, `ConsumeStructuredBuffer`. Shader-IO
-opcodes for entry-point parameters: `EntryPointParam`,
-`GlobalParam`, `Vertex*` / `Fragment*` outputs, etc. The full list
-is in the Lua file.
-
-### Atomics and synchronization
-
-`AtomicLoad`, `AtomicStore`, `AtomicAdd`, `AtomicMin`, `AtomicMax`,
-`AtomicCAS`, plus barrier opcodes (`MemoryBarrier`, `GroupBarrier`,
-...). Memory ordering is encoded with the
-`IRMemoryOrder` enum from
-[slang-ir.h](../../../source/slang/slang-ir.h):
-
-```cpp
-enum IRMemoryOrder
-{
-    kIRMemoryOrder_Relaxed = 0,
-    kIRMemoryOrder_Acquire = 1,
-    kIRMemoryOrder_Release = 2,
-    kIRMemoryOrder_AcquireRelease = 3,
-    kIRMemoryOrder_SeqCst = 4,
-};
-```
-
-### Differentiation opcodes
-
-The autodiff machinery
-([../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md))
-introduces dedicated opcodes used between the various stages of
-forward / reverse / unzipping: `ForwardDifferentiate`,
-`BackwardDifferentiate`, `MakeDifferentialPair`,
-`DifferentialPairGetPrimal`, `DifferentialPairGetDifferential`, and
-the `BackwardDiff*Context` family. The deeper user-level
-documentation is in
-[../../design/autodiff.md](../../design/autodiff.md).
+This document keeps the *conventions* — schema, op-flag bits,
+hoistable / global deduplication, module versioning, the workflow
+for adding a new opcode — that every family page assumes you have
+read.
 
 ## Hoistable / global / deduplicated values
 

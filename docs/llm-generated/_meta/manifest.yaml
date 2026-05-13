@@ -139,6 +139,35 @@ documents:
       - cross-cutting/ir-instructions.md
     size_cap_bytes: 32768
 
+  pipeline/04b-pre-link-passes.md:
+    prompt: prompts/pipeline-04b-pre-link-passes.md
+    watched_paths:
+      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/slang-lower-to-ir.h
+      - source/slang/slang-ir-link.cpp
+      - source/slang/slang-ir-link.h
+      - source/slang/slang-compiler-options.h
+    depends_on:
+      - pipeline/03-semantic-check.md
+      - pipeline/04-ast-to-ir.md
+      - pipeline/05-ir-passes.md
+      - ir-reference/index.md
+    size_cap_bytes: 65536
+
+  pipeline/04c-layout-ir.md:
+    prompt: prompts/pipeline-04c-layout-ir.md
+    watched_paths:
+      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/slang-target-program.h
+      - source/slang/slang-parameter-binding.cpp
+      - source/slang/slang-compiler-options.h
+    depends_on:
+      - pipeline/04-ast-to-ir.md
+      - pipeline/04b-pre-link-passes.md
+      - cross-cutting/targets.md
+      - ir-reference/index.md
+    size_cap_bytes: 32768
+
   pipeline/05-ir-passes.md:
     prompt: prompts/pipeline-05-ir-passes.md
     watched_paths:
@@ -254,6 +283,487 @@ documents:
     depends_on:
       - architecture/overview.md
     size_cap_bytes: 24576
+
+  # --- ast-reference/ ----------------------------------------------------
+
+  ast-reference/index.md:
+    prompt: prompts/ast-reference-index.md
+    watched_paths:
+      - source/slang/slang-ast-base.h
+      - docs/llm-generated/ast-reference/*.md
+    depends_on:
+      - ast-reference/base.md
+      - ast-reference/declarations.md
+      - ast-reference/expressions.md
+      - ast-reference/statements.md
+      - ast-reference/types.md
+      - ast-reference/modifiers.md
+      - ast-reference/values.md
+    size_cap_bytes: 32768
+
+  ast-reference/base.md:
+    prompt: prompts/ast-reference-base.md
+    watched_paths:
+      - source/slang/slang-ast-base.h
+      - source/slang/slang-ast-forward-declarations.h
+      - source/slang/slang-ast-support-types.h
+    depends_on:
+      - pipeline/02-parse-ast.md
+    size_cap_bytes: 49152
+
+  ast-reference/declarations.md:
+    prompt: prompts/ast-reference-declarations.md
+    watched_paths:
+      - source/slang/slang-ast-decl.h
+      - source/slang/slang-ast-base.h
+      - source/slang/slang-parser.cpp
+    depends_on:
+      - ast-reference/base.md
+      - syntax-reference/grammar.md
+    size_cap_bytes: 98304
+
+  ast-reference/expressions.md:
+    prompt: prompts/ast-reference-expressions.md
+    watched_paths:
+      - source/slang/slang-ast-expr.h
+      - source/slang/slang-ast-base.h
+      - source/slang/slang-parser.cpp
+    depends_on:
+      - ast-reference/base.md
+      - syntax-reference/grammar.md
+    size_cap_bytes: 98304
+
+  ast-reference/statements.md:
+    prompt: prompts/ast-reference-statements.md
+    watched_paths:
+      - source/slang/slang-ast-stmt.h
+      - source/slang/slang-ast-base.h
+      - source/slang/slang-parser.cpp
+    depends_on:
+      - ast-reference/base.md
+      - syntax-reference/grammar.md
+    size_cap_bytes: 49152
+
+  ast-reference/types.md:
+    prompt: prompts/ast-reference-types.md
+    watched_paths:
+      - source/slang/slang-ast-type.h
+      - source/slang/slang-ast-base.h
+      - source/slang/slang-ast-val.h
+    depends_on:
+      - ast-reference/base.md
+      - ast-reference/values.md
+    size_cap_bytes: 65536
+
+  ast-reference/modifiers.md:
+    prompt: prompts/ast-reference-modifiers.md
+    watched_paths:
+      - source/slang/slang-ast-modifier.h
+      - source/slang/slang-ast-base.h
+      - source/slang/slang-parser.cpp
+    depends_on:
+      - ast-reference/base.md
+      - syntax-reference/grammar.md
+    size_cap_bytes: 65536
+
+  ast-reference/values.md:
+    prompt: prompts/ast-reference-values.md
+    watched_paths:
+      - source/slang/slang-ast-val.h
+      - source/slang/slang-ast-base.h
+    depends_on:
+      - ast-reference/base.md
+    size_cap_bytes: 49152
+
+  # --- name-resolution/ --------------------------------------------------
+
+  name-resolution/index.md:
+    prompt: prompts/name-resolution-index.md
+    watched_paths:
+      - source/slang/slang-lookup.h
+      - source/slang/slang-ast-support-types.h
+      - docs/llm-generated/name-resolution/*.md
+    depends_on:
+      - name-resolution/scopes.md
+      - name-resolution/lookup.md
+      - name-resolution/visibility.md
+      - name-resolution/overload-resolution.md
+    size_cap_bytes: 32768
+
+  name-resolution/scopes.md:
+    prompt: prompts/name-resolution-scopes.md
+    watched_paths:
+      - source/slang/slang-ast-base.h
+      - source/slang/slang-ast-decl.h
+      - source/slang/slang-ast-stmt.h
+      - source/slang/slang-parser.cpp
+    depends_on:
+      - ast-reference/base.md
+      - ast-reference/declarations.md
+      - ast-reference/statements.md
+    size_cap_bytes: 49152
+
+  name-resolution/lookup.md:
+    prompt: prompts/name-resolution-lookup.md
+    watched_paths:
+      - source/slang/slang-lookup.h
+      - source/slang/slang-lookup.cpp
+      - source/slang/slang-ast-support-types.h
+      - source/slang/slang-ast-base.h
+      - source/slang/slang-ast-decl.h
+      - source/slang/slang-ast-modifier.h
+    depends_on:
+      - name-resolution/scopes.md
+      - ast-reference/values.md
+      - glossary.md
+    size_cap_bytes: 65536
+
+  name-resolution/visibility.md:
+    prompt: prompts/name-resolution-visibility.md
+    watched_paths:
+      - source/slang/slang-ast-modifier.h
+      - source/slang/slang-ast-decl.h
+      - source/slang/slang-check-decl.cpp
+      - source/slang/slang-check-modifier.cpp
+    depends_on:
+      - ast-reference/modifiers.md
+      - ast-reference/declarations.md
+      - name-resolution/scopes.md
+    size_cap_bytes: 32768
+
+  name-resolution/overload-resolution.md:
+    prompt: prompts/name-resolution-overload-resolution.md
+    watched_paths:
+      - source/slang/slang-check-overload.cpp
+      - source/slang/slang-check-impl.h
+      - source/slang/slang-check-conversion.cpp
+      - source/slang/slang-ast-support-types.h
+      - source/slang/slang-ast-expr.h
+    depends_on:
+      - name-resolution/lookup.md
+      - name-resolution/visibility.md
+      - ast-reference/expressions.md
+      - ast-reference/values.md
+      - glossary.md
+    size_cap_bytes: 65536
+
+  # --- ir-reference/ -----------------------------------------------------
+
+  ir-reference/index.md:
+    prompt: prompts/ir-reference-index.md
+    watched_paths:
+      - source/slang/slang-ir-insts.lua
+      - docs/llm-generated/ir-reference/*.md
+    depends_on:
+      - ir-reference/types.md
+      - ir-reference/values.md
+      - ir-reference/control-flow.md
+      - ir-reference/structure.md
+      - ir-reference/generics-and-existentials.md
+      - ir-reference/resources-and-atomics.md
+      - ir-reference/differentiation.md
+      - ir-reference/decorations.md
+      - ir-reference/metadata.md
+      - ir-reference/misc.md
+    size_cap_bytes: 32768
+
+  ir-reference/types.md:
+    prompt: prompts/ir-reference-types.md
+    watched_paths:
+      - source/slang/slang-ir-insts.lua
+      - source/slang/slang-ir-insts.h
+      - source/slang/slang-ir.h
+      - source/slang/slang-ir.cpp
+      - source/slang/slang-lower-to-ir.cpp
+    depends_on:
+      - cross-cutting/ir-instructions.md
+      - pipeline/04-ast-to-ir.md
+      - ast-reference/types.md
+    size_cap_bytes: 98304
+
+  ir-reference/values.md:
+    prompt: prompts/ir-reference-values.md
+    watched_paths:
+      - source/slang/slang-ir-insts.lua
+      - source/slang/slang-ir-insts.h
+      - source/slang/slang-ir.h
+      - source/slang/slang-ir.cpp
+      - source/slang/slang-lower-to-ir.cpp
+    depends_on:
+      - cross-cutting/ir-instructions.md
+      - pipeline/04-ast-to-ir.md
+      - ast-reference/expressions.md
+      - ir-reference/types.md
+    size_cap_bytes: 65536
+
+  ir-reference/control-flow.md:
+    prompt: prompts/ir-reference-control-flow.md
+    watched_paths:
+      - source/slang/slang-ir-insts.lua
+      - source/slang/slang-ir-insts.h
+      - source/slang/slang-ir.h
+      - source/slang/slang-ir.cpp
+      - source/slang/slang-lower-to-ir.cpp
+    depends_on:
+      - cross-cutting/ir-instructions.md
+      - pipeline/04-ast-to-ir.md
+      - ast-reference/statements.md
+    size_cap_bytes: 65536
+
+  ir-reference/structure.md:
+    prompt: prompts/ir-reference-structure.md
+    watched_paths:
+      - source/slang/slang-ir-insts.lua
+      - source/slang/slang-ir-insts.h
+      - source/slang/slang-ir.h
+      - source/slang/slang-ir.cpp
+      - source/slang/slang-lower-to-ir.cpp
+    depends_on:
+      - cross-cutting/ir-instructions.md
+      - pipeline/04-ast-to-ir.md
+      - ast-reference/declarations.md
+    size_cap_bytes: 65536
+
+  ir-reference/generics-and-existentials.md:
+    prompt: prompts/ir-reference-generics-and-existentials.md
+    watched_paths:
+      - source/slang/slang-ir-insts.lua
+      - source/slang/slang-ir-insts.h
+      - source/slang/slang-ir.h
+      - source/slang/slang-ir.cpp
+      - source/slang/slang-lower-to-ir.cpp
+    depends_on:
+      - cross-cutting/ir-instructions.md
+      - pipeline/04-ast-to-ir.md
+      - ast-reference/declarations.md
+      - ir-reference/types.md
+      - ir-reference/structure.md
+    size_cap_bytes: 65536
+
+  ir-reference/resources-and-atomics.md:
+    prompt: prompts/ir-reference-resources-and-atomics.md
+    watched_paths:
+      - source/slang/slang-ir-insts.lua
+      - source/slang/slang-ir-insts.h
+      - source/slang/slang-ir.h
+      - source/slang/slang-ir.cpp
+      - source/slang/slang-lower-to-ir.cpp
+    depends_on:
+      - cross-cutting/ir-instructions.md
+      - pipeline/04-ast-to-ir.md
+      - ast-reference/expressions.md
+      - ir-reference/types.md
+    size_cap_bytes: 65536
+
+  ir-reference/differentiation.md:
+    prompt: prompts/ir-reference-differentiation.md
+    watched_paths:
+      - source/slang/slang-ir-insts.lua
+      - source/slang/slang-ir-insts.h
+      - source/slang/slang-ir.h
+      - source/slang/slang-ir.cpp
+      - source/slang/slang-lower-to-ir.cpp
+    depends_on:
+      - cross-cutting/ir-instructions.md
+      - pipeline/04-ast-to-ir.md
+      - ir-reference/types.md
+      - ir-reference/values.md
+    size_cap_bytes: 65536
+
+  ir-reference/decorations.md:
+    prompt: prompts/ir-reference-decorations.md
+    watched_paths:
+      - source/slang/slang-ir-insts.lua
+      - source/slang/slang-ir-insts.h
+      - source/slang/slang-ir-insts-info.cpp
+      - source/slang/slang-ir.h
+      - source/slang/slang-ir.cpp
+      - source/slang/slang-lower-to-ir.cpp
+    depends_on:
+      - cross-cutting/ir-instructions.md
+      - pipeline/04-ast-to-ir.md
+      - ast-reference/modifiers.md
+    size_cap_bytes: 98304
+
+  ir-reference/metadata.md:
+    prompt: prompts/ir-reference-metadata.md
+    watched_paths:
+      - source/slang/slang-ir-insts.lua
+      - source/slang/slang-ir-insts.h
+      - source/slang/slang-ir-insts-info.cpp
+      - source/slang/slang-ir.h
+      - source/slang/slang-ir.cpp
+      - source/slang/slang-lower-to-ir.cpp
+    depends_on:
+      - cross-cutting/ir-instructions.md
+      - pipeline/04-ast-to-ir.md
+    size_cap_bytes: 65536
+
+  ir-reference/misc.md:
+    prompt: prompts/ir-reference-misc.md
+    watched_paths:
+      - source/slang/slang-ir-insts.lua
+      - source/slang/slang-ir-insts.h
+      - source/slang/slang-ir.h
+      - source/slang/slang-ir.cpp
+      - source/slang/slang-lower-to-ir.cpp
+    depends_on:
+      - cross-cutting/ir-instructions.md
+      - pipeline/04-ast-to-ir.md
+    size_cap_bytes: 32768
+
+  # --- target-pipelines/ -------------------------------------------------
+
+  target-pipelines/index.md:
+    prompt: prompts/target-pipelines-index.md
+    watched_paths:
+      - docs/llm-generated/target-pipelines/*.md
+      - source/slang/slang-emit.cpp
+    depends_on:
+      - target-pipelines/spirv.md
+      - target-pipelines/hlsl.md
+      - target-pipelines/metal.md
+      - target-pipelines/wgsl.md
+      - target-pipelines/cuda.md
+    size_cap_bytes: 32768
+
+  target-pipelines/spirv.md:
+    prompt: prompts/target-pipelines-spirv.md
+    watched_paths:
+      - source/slang/slang-emit.cpp
+      - source/slang/slang-emit-spirv.cpp
+      - source/slang/slang-ir-spirv-legalize.cpp
+      - source/slang/slang-ir-spirv-snippet.cpp
+      - source/slang/slang-ir-glsl-legalize.cpp
+      - source/slang/slang-ir-legalize-binary-operator.cpp
+      - source/slang/slang-target-program.h
+      - source/slang/slang-compiler-options.h
+    depends_on:
+      - pipeline/04-ast-to-ir.md
+      - pipeline/05-ir-passes.md
+      - pipeline/06-emit.md
+      - ir-reference/index.md
+      - cross-cutting/targets.md
+    size_cap_bytes: 98304
+
+  target-pipelines/hlsl.md:
+    prompt: prompts/target-pipelines-hlsl.md
+    watched_paths:
+      - source/slang/slang-emit.cpp
+      - source/slang/slang-emit-hlsl.cpp
+      - source/slang/slang-emit-hlsl-prelude.cpp
+      - source/slang/slang-emit-c-like.cpp
+      - source/slang/slang-ir-hlsl-legalize.cpp
+      - source/slang/slang-ir-legalize-binary-operator.cpp
+      - source/slang/slang-target-program.h
+      - source/slang/slang-compiler-options.h
+    depends_on:
+      - pipeline/04-ast-to-ir.md
+      - pipeline/05-ir-passes.md
+      - pipeline/06-emit.md
+      - ir-reference/index.md
+      - cross-cutting/targets.md
+    size_cap_bytes: 98304
+
+  target-pipelines/metal.md:
+    prompt: prompts/target-pipelines-metal.md
+    watched_paths:
+      - source/slang/slang-emit.cpp
+      - source/slang/slang-emit-metal.cpp
+      - source/slang/slang-emit-metal-prelude.cpp
+      - source/slang/slang-emit-c-like.cpp
+      - source/slang/slang-ir-metal-legalize.cpp
+      - source/slang/slang-ir-legalize-varying-params.cpp
+      - source/slang/slang-ir-legalize-binary-operator.cpp
+      - source/slang/slang-target-program.h
+      - source/slang/slang-compiler-options.h
+    depends_on:
+      - pipeline/04-ast-to-ir.md
+      - pipeline/05-ir-passes.md
+      - pipeline/06-emit.md
+      - ir-reference/index.md
+      - cross-cutting/targets.md
+    size_cap_bytes: 98304
+
+  target-pipelines/wgsl.md:
+    prompt: prompts/target-pipelines-wgsl.md
+    watched_paths:
+      - source/slang/slang-emit.cpp
+      - source/slang/slang-emit-wgsl.cpp
+      - source/slang/slang-emit-c-like.cpp
+      - source/slang/slang-ir-wgsl-legalize.cpp
+      - source/slang/slang-ir-legalize-varying-params.cpp
+      - source/slang/slang-ir-legalize-binary-operator.cpp
+      - source/slang/slang-target-program.h
+      - source/slang/slang-compiler-options.h
+    depends_on:
+      - pipeline/04-ast-to-ir.md
+      - pipeline/05-ir-passes.md
+      - pipeline/06-emit.md
+      - ir-reference/index.md
+      - cross-cutting/targets.md
+    size_cap_bytes: 98304
+
+  target-pipelines/cuda.md:
+    prompt: prompts/target-pipelines-cuda.md
+    watched_paths:
+      - source/slang/slang-emit.cpp
+      - source/slang/slang-emit-cuda.cpp
+      - source/slang/slang-emit-cpp.cpp
+      - source/slang/slang-emit-c-like.cpp
+      - source/slang/slang-ir-cuda-immutable-load.cpp
+      - source/slang/slang-ir-legalize-varying-params.cpp
+      - source/slang/slang-ir-optix-entry-point-uniforms.cpp
+      - source/slang/slang-ir-pytorch-cpp-binding.cpp
+      - source/slang/slang-target-program.h
+      - source/slang/slang-compiler-options.h
+    depends_on:
+      - pipeline/04-ast-to-ir.md
+      - pipeline/05-ir-passes.md
+      - pipeline/06-emit.md
+      - ir-reference/index.md
+      - cross-cutting/targets.md
+    size_cap_bytes: 98304
+
+  # --- top-level reference -----------------------------------------------
+
+  glossary.md:
+    prompt: prompts/glossary.md
+    watched_paths:
+      - docs/llm-generated/architecture/*.md
+      - docs/llm-generated/pipeline/*.md
+      - docs/llm-generated/syntax-reference/*.md
+      - docs/llm-generated/cross-cutting/*.md
+      - docs/llm-generated/name-resolution/*.md
+      - docs/llm-generated/ir-reference/*.md
+      - source/slang/slang-ir.h
+      - source/slang/slang-ir-insts.lua
+      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/slang-ast-base.h
+      - source/slang/slang-ast-decl.h
+      - source/slang/slang-ast-expr.h
+      - source/slang/slang-ast-type.h
+      - source/slang/slang-ast-modifier.h
+      - source/slang/slang-ast-support-types.h
+      - source/slang/slang-syntax.h
+      - source/slang/slang-syntax.cpp
+      - source/slang/slang-capability.h
+      - source/slang/slang-profile.h
+      - source/slang/slang-lookup.h
+      - source/slang/slang-check-overload.cpp
+      - source/slang/slang-check-impl.h
+      - source/slang/slang-check-conversion.cpp
+      - source/compiler-core/slang-token.h
+      - source/compiler-core/slang-token-defs.h
+      - source/compiler-core/slang-source-loc.h
+    depends_on:
+      - architecture/overview.md
+      - pipeline/overview.md
+      - cross-cutting/ir-instructions.md
+      - syntax-reference/keywords-and-builtins.md
+      - name-resolution/index.md
+      - ir-reference/index.md
+    size_cap_bytes: 102400
 
   cross-cutting/serialization.md:
     prompt: prompts/cross-cutting-serialization.md
