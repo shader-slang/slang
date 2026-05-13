@@ -592,7 +592,7 @@ IRInst* DifferentiableTypeConformanceContext::emitDAddOfDiffInstType(
     }
 
     auto diffType = (IRType*)this->getDifferentialForType(primalType);
-    if (as<IRCoopVectorType>(diffType))
+    if (as<IRCoopVectorType>(diffType) || as<IRCoopMatrixType>(diffType))
     {
         return builder->emitAdd(diffType, op1, op2);
     }
@@ -649,16 +649,13 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
             zeroElements.getBuffer());
     }
 
-    //
-    // Default case: look up zero method and emit call.
-    //
-
     auto diffType = (IRType*)this->getDifferentialForType(primalType);
-    if (as<IRCoopVectorType>(diffType))
+    if (as<IRCoopVectorType>(diffType) || as<IRCoopMatrixType>(diffType))
     {
         return builder->emitDefaultConstruct(diffType);
     }
 
+    // Default case: look up zero method and emit call.
     auto zeroMethod = this->getZeroMethodForType(builder, primalType);
 
     // Should exist.
