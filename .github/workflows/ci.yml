@@ -13,7 +13,7 @@ concurrency:
 jobs:
   filter:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       should-run: ${{ steps.filter.outputs.should-run }}
     steps:
@@ -318,7 +318,7 @@ jobs:
         test-materialx-windows-release,
         sanitizer-linux-clang-x86_64,
       ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
     steps:
       - name: Check CI Results
@@ -374,7 +374,7 @@ jobs:
   retry-on-gpu-failure:
     needs: [check-ci]
     if: failure() && github.event_name == 'merge_group' && fromJSON(github.run_attempt) < 3
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       actions: write
     steps:

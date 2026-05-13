@@ -125,7 +125,7 @@ jobs:
         windows-vs2022-debug,
         windows-vs2022-release,
       ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: always()
     steps:
       - name: Check CI Results

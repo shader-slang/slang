@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   check-changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       should-build: ${{ steps.check.outputs.should-build }}
       last-commit: ${{ steps.check.outputs.last-commit }}

@@ -4,7 +4,7 @@ on:
     types: [regenerate-cmdline-ref-command]
 jobs:
   regenerate-cmdline-ref:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4

@@ -9,7 +9,7 @@ on:
 
 jobs:
   rerun:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Wait for run to complete and rerun failed jobs
         env:

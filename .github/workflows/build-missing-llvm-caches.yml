@@ -15,7 +15,7 @@ on:
 jobs:
   # Check which LLVM caches are missing
   check-caches:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       matrix: ${{ steps.check.outputs.matrix }}
     steps:

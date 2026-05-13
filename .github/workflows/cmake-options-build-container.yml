@@ -24,7 +24,7 @@ on:
 jobs:
   # Read the shared option list once; downstream jobs use fromJSON on the output.
   setup:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:

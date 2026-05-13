@@ -38,7 +38,7 @@ jobs:
         !contains(github.event.pull_request.user.login, '[bot]') &&
         !startsWith(github.event.pull_request.head.ref, 'claude/')
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
 
     # Centralized auth configuration
