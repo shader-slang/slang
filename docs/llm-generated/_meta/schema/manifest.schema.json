@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shader-slang.github.io/llm-generated/manifest.schema.json",
+  "title": "LLM-generated docs manifest",
+  "type": "object",
+  "required": ["version", "documents"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "default_size_cap_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "documents": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/document"
+      }
+    }
+  },
+  "$defs": {
+    "document": {
+      "type": "object",
+      "required": ["prompt", "watched_paths"],
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "description": "Path (relative to _meta/) of the prompt template for this document."
+        },
+        "watched_paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "description": "Workspace-relative shell-style glob."
+          }
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "Doc path (manifest key) of another generated document used as input context."
+          },
+          "default": []
+        },
+        "size_cap_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

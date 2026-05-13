@@ -1,0 +1,421 @@
+---
+generated: true
+model: claude-opus-4.7
+generated_at: 2026-05-07T14:35:56+00:00
+source_commit: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
+watched_paths_digest: 40df0e0f2fba874f2bb1d1a886aacac0f20100fdb9c27817c150f2b7ecea2322
+warning: "Auto-generated. May drift from source. Do not edit by hand."
+---
+
+# Slang Grammar (Reverse-Engineered)
+
+This document is an EBNF-style approximation of the surface syntax
+that Slang's parser accepts. It is **reverse-engineered** from
+[slang-parser.cpp](../../../source/slang/slang-parser.cpp), not
+designed; mismatches with the implementation are bugs in this
+grammar. The intended reader is a tooling developer (syntax
+highlighter, formatter, language server) who needs an approximate
+grammar for offline reasoning.
+
+## Caveats
+
+- Slang has no formal grammar. Several productions below are
+  context-sensitive and the parser disambiguates them with
+  heuristics, lookups in the active environment, or the two-stage
+  parsing strategy described in
+  [../pipeline/02-parse-ast.md](../pipeline/02-parse-ast.md). Such
+  productions are flagged inline with a "context-sensitive" note.
+- The token-level vocabulary (terminals) is the catalog in
+  [tokens.md](tokens.md). The keywords used as terminals come from
+  [keywords-and-builtins.md](keywords-and-builtins.md).
+- Functions, methods, and other declaration bodies are captured as
+  raw token spans in stage 1 and re-parsed during checking. This
+  document describes the surface syntax of bodies as if they were
+  parsed in one pass.
+
+## Notation
+
+```
+RULE        ::= ALTERNATIVES
+ALTERNATIVES ::= ALT ('|' ALT)*
+A?          – zero or one A
+A*          – zero or more A
+A+          – one or more A
+(A B)       – grouping
+'foo'       – literal token text (terminal)
+KIND        – a token kind from tokens.md (terminal)
+```
+
+Identifiers in `UpperCamelCase` are non-terminals defined in this
+document. Terminals are either literal strings (the spelling of the
+keyword or operator) or token-kind names from
+[tokens.md](tokens.md) (`IDENT`, `INT_LIT`, `FLOAT_LIT`,
+`STRING_LIT`, `CHAR_LIT`).
+
+For brevity, every non-terminal cites the parser function that
+implements it (in
+[slang-parser.cpp](../../../source/slang/slang-parser.cpp)).
+
+## Top-level structure
+
+```
+SourceFile      ::= ModuleHeader? TopDecl* EOF
+ModuleHeader    ::= ('module' | 'implementing') IDENT ';'?
+                                              -- parseModuleDeclarationDecl,
+                                              --   parseImplementingDecl
+
+TopDecl         ::= ImportDecl
+                  | NamespaceDecl
+                  | UsingDecl
+                  | FileDecl
+                  | Decl
+
+ImportDecl      ::= ('import' | '__import') ImportPath ';'  -- parseImportDecl
+                  | '__include' ImportPath ';'              -- parseIncludeDecl
+ImportPath      ::= IDENT ('.' IDENT)*                       -- context-sensitive
+
+NamespaceDecl   ::= 'namespace' IDENT '{' TopDecl* '}'      -- parseNamespaceDecl
+UsingDecl       ::= 'using' QualifiedName ';'                -- parseUsingDecl
+FileDecl        ::= '__file_decl' '{' TopDecl* '}'           -- parseFileDecl
+
+QualifiedName   ::= IDENT ('::' IDENT)*
+```
+
+## Declarations
+
+```
+Decl            ::= ModifierList? CoreDecl                   -- parseDecl
+
+CoreDecl        ::= TypedefDecl | TypeAliasDecl
+                  | StructDecl  | ClassDecl
+                  | EnumDecl
+                  | InterfaceDecl
+                  | ExtensionDecl
+                  | GenericDecl
+                  | FuncDecl    | ConstructorDecl | SubscriptDecl | PropertyDecl
+                  | VarDecl     | LetDecl
+                  | AssocTypeDecl
+                  | RequireCapabilityDecl
+                  | SyntaxDecl
+                  | AttributeSyntaxDecl
+                  | CBufferDecl | TBufferDecl
+                  | NamespaceDecl
+                  | UsingDecl
+```
+
+### Type-defining declarations
+
+```
+TypedefDecl     ::= 'typedef' Type IDENT ';'                  -- parseTypeDef
+TypeAliasDecl   ::= 'typealias' IDENT ('<' GenericParams '>')? '=' Type ';'
+                                                              -- parseTypeAliasDecl
+
+StructDecl      ::= 'struct' IDENT GenericParams? Inheritance? StructBody
+ClassDecl       ::= 'class'  IDENT GenericParams? Inheritance? StructBody
+StructBody      ::= '{' StructMember* '}'
+StructMember    ::= ModifierList? (VarDecl | FuncDecl | TypedefDecl | TypeAliasDecl
+                                  | ConstructorDecl | SubscriptDecl | PropertyDecl
+                                  | AssocTypeDecl)
+
+EnumDecl        ::= 'enum' IDENT (':' Type)? '{' EnumCase (',' EnumCase)* ','? '}'
+EnumCase        ::= IDENT ('=' Expr)?
+
+InterfaceDecl   ::= 'interface' IDENT GenericParams? Inheritance?
+                    '{' InterfaceMember* '}'                  -- parseInterfaceDecl
+InterfaceMember ::= ModifierList? (FuncDecl | AssocTypeDecl | PropertyDecl
+                                  | SubscriptDecl | ConstructorDecl)
+
+ExtensionDecl   ::= ('extension' | '__extension') Type
+                    Inheritance? '{' StructMember* '}'        -- parseExtensionDecl
+
+AssocTypeDecl   ::= 'associatedtype' IDENT (':' TypeList)? ';'  -- parseAssocType
+
+Inheritance     ::= ':' TypeList
+TypeList        ::= Type (',' Type)*
+```
+
+### Function-style declarations
+
+```
+FuncDecl        ::= 'func' IDENT GenericParams? '(' ParamList? ')' (':' ResultClause)?
+                    WhereClause? FuncBody                      -- parseFuncDecl
+                  | Type IDENT GenericParams? '(' ParamList? ')' (':' ResultClause)?
+                    WhereClause? FuncBody                      -- C-style header (context-sensitive)
+                                                              -- the type-vs-name disambiguation is heuristic;
+                                                              -- see ../pipeline/02-parse-ast.md
+
+ConstructorDecl ::= '__init' GenericParams? '(' ParamList? ')'
+                    WhereClause? FuncBody                      -- parseConstructorDecl
+SubscriptDecl   ::= '__subscript' GenericParams? '(' ParamList? ')' '->' Type
+                    AccessorBlock                              -- parseSubscriptDecl
+PropertyDecl    ::= 'property' IDENT ':' Type AccessorBlock    -- parsePropertyDecl
+
+ParamList       ::= Param (',' Param)*
+Param           ::= ModifierList? Type IDENT ('=' Expr)?       -- context-sensitive (modifiers vs type)
+ResultClause    ::= Type                                       -- single-return path
+                  | 'throws' Type                              -- error-returning function
+
+WhereClause     ::= 'where' WhereTerm (',' WhereTerm)*
+WhereTerm       ::= Type ':' Type                              -- conformance constraint
+                  | Type '==' Type                             -- equality constraint
+
+FuncBody        ::= ';'                                        -- prototype only
+                  | '{' BodyTokens '}'                         -- captured as UnparsedStmt in stage 1
+BodyTokens      ::= (anything but unbalanced '{' / '}')*       -- see two-stage parsing
+
+AccessorBlock   ::= ';' | '{' AccessorDecl* '}'
+AccessorDecl    ::= ModifierList? AccessorName FuncBody
+AccessorName    ::= 'get' | 'set' | 'modify' | 'ref'
+```
+
+### Generic declarations
+
+```
+GenericDecl     ::= '__generic' '<' GenericParams '>' Decl     -- parseGenericDecl
+                                                              --   ALSO inline form on FuncDecl etc.
+GenericParams   ::= GenericParam (',' GenericParam)*
+GenericParam    ::= IDENT (':' TypeList)?                      -- type parameter
+                  | 'let' IDENT ':' Type ('=' Expr)?           -- value parameter
+                  | 'each' IDENT (':' TypeList)?               -- pack parameter
+```
+
+### Variable / binding declarations
+
+```
+VarDecl         ::= 'var' IDENT (':' Type)? ('=' Expr)? ';'    -- parseVarDecl
+                  | Type VarDeclarator (',' VarDeclarator)* ';' -- C-style; context-sensitive
+LetDecl         ::= 'let' IDENT (':' Type)? '=' Expr ';'        -- parseLetDecl
+VarDeclarator   ::= IDENT ArraySuffix? Initializer?
+ArraySuffix     ::= '[' Expr? ']' ArraySuffix?
+Initializer     ::= '=' Expr | '{' InitList '}'
+InitList        ::= Expr (',' Expr)* ','?
+```
+
+### HLSL-compatibility declarations
+
+```
+CBufferDecl     ::= 'cbuffer' IDENT (':' Register)? '{' StructMember* '}'  -- parseHLSLCBufferDecl
+TBufferDecl     ::= 'tbuffer' IDENT (':' Register)? '{' StructMember* '}'  -- parseHLSLTBufferDecl
+Register        ::= 'register' '(' RegToken ')'
+```
+
+### User-defined syntax
+
+```
+SyntaxDecl          ::= 'syntax' IDENT '=' QualifiedName ';'    -- parseSyntaxDecl
+AttributeSyntaxDecl ::= 'attribute_syntax' '[' IDENT ']' '=' QualifiedName ';'
+                                                              -- parseAttributeSyntaxDecl
+RequireCapabilityDecl ::= '__require_capability' '(' CapabilityExpr ')' ';'
+                                                              -- parseRequireCapabilityDecl
+```
+
+## Modifiers and attributes
+
+```
+ModifierList    ::= (Modifier | Attribute)+
+Modifier        ::= ModifierKeyword ModifierTail?
+ModifierKeyword ::= 'in' | 'out' | 'inout' | 'const' | 'static' | 'inline'
+                  | 'public' | 'private' | 'internal' | 'extern' | 'export'
+                  | 'uniform' | 'groupshared' | 'precise'
+                  | 'nointerpolation' | 'noperspective' | 'linear' | 'sample' | 'centroid'
+                  | 'row_major' | 'column_major'
+                  | 'point' | 'line' | 'triangle' | 'lineadj' | 'triangleadj'
+                  | 'vertices' | 'indices' | 'primitives' | 'payload'
+                  | 'override' | 'dynamic_uniform' | 'param' | 'require'
+                  | 'dyn' | 'highp' | 'lowp' | 'mediump'
+                  | 'volatile' | 'coherent' | 'restrict' | 'readonly' | 'writeonly'
+                  | 'shared' | 'layout' | 'hitAttributeEXT'
+                  | '__ref' | '__constref' | '__builtin' | '__global' | '__exported'
+                  | '__prefix' | '__postfix'
+                  | '__intrinsic_op' | '__target_intrinsic'
+                  | '__specialized_for_target' | '__attributeTarget'
+                  | '__glsl_extension' | '__glsl_version' | '__spirv_version'
+                  | '__wgsl_extension' | '__cuda_sm_version'
+                  | '__builtin_type' | '__builtin_requirement'
+                  | '__magic_type' | '__magic_enum' | '__intrinsic_type'
+                  | '__implicit_conversion'
+
+ModifierTail    ::= '(' ArgList? ')'                          -- per-modifier; see keywords-and-builtins.md
+
+Attribute       ::= '[' AttributeBody ']'
+AttributeBody   ::= AttributeName ('(' ArgList? ')')?
+                  | AttributeBody ',' AttributeBody           -- multiple attributes per bracket
+AttributeName   ::= IDENT ('::' IDENT)*
+
+ArgList         ::= Expr (',' Expr)*
+```
+
+The complete keyword inventory is in
+[keywords-and-builtins.md](keywords-and-builtins.md).
+
+## Statements
+
+```
+Stmt            ::= Block
+                  | IfStmt | ForStmt | WhileStmt | DoWhileStmt
+                  | SwitchStmt | CaseStmt | DefaultStmt
+                  | BreakStmt | ContinueStmt | ReturnStmt
+                  | DiscardStmt | DeferStmt
+                  | ThrowStmt | TryStmt
+                  | DeclStmt | ExprStmt | EmptyStmt
+
+Block           ::= '{' Stmt* '}'                              -- parseBlockStmt
+IfStmt          ::= 'if' '(' Expr ')' Stmt ('else' Stmt)?      -- around line 6358
+ForStmt         ::= 'for' '(' (DeclStmt | ExprStmt | ';') Expr? ';' Expr? ')' Stmt
+                                                              -- around line 6298
+WhileStmt       ::= 'while' '(' Expr ')' Stmt                  -- around line 6898
+DoWhileStmt     ::= 'do' Stmt 'while' '(' Expr ')' ';'         -- around line 6373
+
+SwitchStmt      ::= 'switch' '(' Expr ')' '{' SwitchCase* '}'  -- around line 6014
+SwitchCase      ::= ('case' Expr ':' | 'default' ':') Stmt*
+
+BreakStmt       ::= 'break' IDENT? ';'                          -- around line 6979
+ContinueStmt    ::= 'continue' IDENT? ';'                       -- around line 6992
+ReturnStmt      ::= 'return' Expr? ';'                          -- around line 7001
+DiscardStmt     ::= 'discard' ';'                               -- around line 6381
+DeferStmt       ::= 'defer' Stmt                                -- around line 6406
+ThrowStmt       ::= 'throw' Expr ';'                            -- around line 6414
+TryStmt         ::= 'try' Block CatchClause+
+CatchClause     ::= 'catch' '(' Param ')' Block                 -- around line 6964
+
+DeclStmt        ::= Decl
+ExprStmt        ::= Expr ';'
+EmptyStmt       ::= ';'
+```
+
+## Expressions
+
+The expression grammar follows a precedence ladder implemented by a
+family of `parse...Expr` functions in
+[slang-parser.cpp](../../../source/slang/slang-parser.cpp). Lower
+numbers in the table below bind tighter (atom-level), higher numbers
+bind looser (assignment).
+
+| Level | Operators | Associativity |
+| --- | --- | --- |
+| 0 | atoms (literals, names, parenthesized, builtin keyword expressions) | — |
+| 1 | postfix `()` `[]` `.` `++` `--` `<...>` (generic specialization, context-sensitive) | left |
+| 2 | unary `+` `-` `!` `~` `++` `--` `*` `&` | right |
+| 3 | `*` `/` `%` | left |
+| 4 | `+` `-` | left |
+| 5 | `<<` `>>` | left |
+| 6 | `<` `<=` `>` `>=` | left |
+| 7 | `==` `!=` | left |
+| 8 | `&` | left |
+| 9 | `^` | left |
+| 10 | `\|` | left |
+| 11 | `&&` | left |
+| 12 | `\|\|` | left |
+| 13 | `?:` ternary | right |
+| 14 | `=` `+=` `-=` `*=` `/=` `%=` `<<=` `>>=` `&=` `\|=` `^=` | right |
+| 15 | `,` (only inside argument lists, not a top-level expression operator) | — |
+
+```
+Expr            ::= AssignExpr
+AssignExpr      ::= TernaryExpr (AssignOp AssignExpr)?
+TernaryExpr     ::= LogicalOrExpr ('?' Expr ':' AssignExpr)?
+LogicalOrExpr   ::= LogicalAndExpr ('||' LogicalAndExpr)*
+LogicalAndExpr  ::= BitOrExpr ('&&' BitOrExpr)*
+BitOrExpr       ::= BitXorExpr ('|' BitXorExpr)*
+BitXorExpr      ::= BitAndExpr ('^' BitAndExpr)*
+BitAndExpr      ::= EqualityExpr ('&' EqualityExpr)*
+EqualityExpr    ::= RelationalExpr (('==' | '!=') RelationalExpr)*
+RelationalExpr  ::= ShiftExpr (('<' | '<=' | '>' | '>=') ShiftExpr)*
+                                                              -- '<' is context-sensitive (generic vs comparison)
+ShiftExpr       ::= AddExpr (('<<' | '>>') AddExpr)*
+AddExpr         ::= MulExpr (('+' | '-') MulExpr)*
+MulExpr         ::= UnaryExpr (('*' | '/' | '%') UnaryExpr)*
+UnaryExpr       ::= UnaryOp UnaryExpr | PostfixExpr
+UnaryOp         ::= '+' | '-' | '!' | '~' | '++' | '--' | '*' | '&'
+PostfixExpr     ::= AtomExpr PostfixSuffix*
+PostfixSuffix   ::= '(' ArgList? ')'                           -- call
+                  | '[' Expr ']'                                -- subscript
+                  | '.' IDENT                                   -- member access
+                  | '++' | '--'                                 -- postfix inc/dec
+                  | GenericSpecialization                       -- '<' Type/Expr (',' Type/Expr)* '>'  context-sensitive
+AtomExpr        ::= Literal
+                  | QualifiedName
+                  | '(' Expr ')'                                -- parenthesized
+                  | '(' Expr (',' Expr)+ ')'                    -- tuple
+                  | InitListExpr
+                  | KeywordExpr
+                  | LambdaExpr
+                  | NewExpr
+KeywordExpr     ::= 'this' | 'true' | 'false' | 'nullptr' | 'none'
+                  | 'try' Expr
+                  | 'no_diff' Expr
+                  | ('fwd_diff'|'__fwd_diff') '(' Expr ')'
+                  | ('bwd_diff'|'__bwd_diff') '(' Expr ')'
+                  | 'sizeof' '(' Type ')'
+                  | 'alignof' '(' Type ')'
+                  | 'countof' '(' Expr ')'
+                  | '__dispatch_kernel' '(' ArgList ')'
+                  | '__getAddress' '(' Expr ')'
+                  | '__floatAsInt' '(' Expr ')'
+                  | other __-prefixed compiler-internal forms; see keywords-and-builtins.md
+LambdaExpr      ::= '(' ParamList? ')' '=>' Expr
+                  | IDENT '=>' Expr
+NewExpr         ::= 'new' Type ('(' ArgList? ')')?
+Literal         ::= INT_LIT | FLOAT_LIT | STRING_LIT | CHAR_LIT
+InitListExpr    ::= '{' (Expr (',' Expr)* ','?)? '}'
+
+AssignOp        ::= '=' | '+=' | '-=' | '*=' | '/=' | '%='
+                  | '<<=' | '>>=' | '&=' | '|=' | '^='
+```
+
+### `<` disambiguation
+
+`PostfixExpr` may be followed by `<` to start a generic argument
+list. The parser uses the strategy described in
+[../pipeline/02-parse-ast.md](../pipeline/02-parse-ast.md): try to
+parse as a generic argument list and check the token after the
+matching `>`; if that token is in the "generic-followers" set
+(`::`, `.`, `(`, `)`, `[`, `]`, `:`, `,`, `?`, `;`, `==`, `!=`,
+`>`, `>>`) treat the `<` as a generic application, otherwise back
+out and parse as a comparison. In body-parse mode (function bodies)
+the parser also asks the semantic checker whether the preceding
+expression resolves to a generic, and uses that as the primary
+signal.
+
+## Types
+
+```
+Type            ::= ModifierList? CoreType
+CoreType        ::= QualifiedName GenericArgs?
+                  | Type '[' Expr? ']'                          -- array
+                  | Type '*'                                    -- pointer-to-T (where supported)
+                  | Type '?'                                    -- Optional<T>
+                  | Type '&'                                    -- reference (where supported)
+                  | '(' Type (',' Type)+ ')'                    -- tuple type
+                  | 'func' '(' Type (',' Type)* ')' '->' Type   -- function type
+                  | 'each' Type                                 -- pack type
+GenericArgs     ::= '<' GenericArg (',' GenericArg)* '>'        -- context-sensitive
+GenericArg      ::= Type | Expr                                 -- ambiguous; resolved at check time
+```
+
+Built-in concrete type names (`int`, `float`, `vector<T,N>`,
+`Texture2D<T>`, `RWStructuredBuffer<T>`, ...) are not part of the
+grammar; they are identifiers brought into scope by the meta-modules
+documented in [keywords-and-builtins.md](keywords-and-builtins.md).
+
+## Constraints solved at check time
+
+The grammar above intentionally accepts strings the parser will
+build into an AST that the semantic checker
+([../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md))
+later rejects. Examples:
+
+- `Type Identifier` declarations are syntactically valid but the
+  decision between "this is a function declaration" and "this is a
+  variable declaration" is decided by what follows the identifier;
+  the parser uses local lookahead.
+- A name that resolves to neither a type nor a function is rejected
+  at check time, not at parse time.
+- Generic argument lists may contain expressions that look like
+  comparisons; the disambiguation note above explains how the
+  parser breaks the tie.
+
+These compromises are intentional: deferring the rejection lets the
+parser produce a recoverable AST that yields better diagnostics. The
+authoritative description of when each construct is rejected is the
+checker, not this grammar.

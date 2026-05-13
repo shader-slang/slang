@@ -1,0 +1,275 @@
+# Manifest mapping each generated document to its prompt, watched source
+# paths, dependencies, and size cap. Consumed by _meta/regenerate.py.
+#
+# Schema: _meta/schema/manifest.schema.json
+#
+# Conventions:
+#   - watched_paths globs are workspace-relative.
+#   - Globs use shell-style wildcards (*, **, ?). They are expanded at the
+#     current commit when computing the freshness digest.
+#   - depends_on lists other generated docs whose output is used as input
+#     context for the agent generating this doc (Phase 3 cross-linking).
+#   - size_cap_bytes is a soft cap; the lint pass warns above it.
+
+version: 1
+default_size_cap_bytes: 32768
+
+documents:
+
+  # --- architecture/ -----------------------------------------------------
+
+  architecture/overview.md:
+    prompt: prompts/architecture-overview.md
+    watched_paths:
+      - source/slang/CMakeLists.txt
+      - source/slang/slang-compile-request.h
+      - source/slang/slang-compile-request.cpp
+      - source/slang/slang-module.h
+      - source/slang/slang-module.cpp
+      - source/core/CMakeLists.txt
+      - source/compiler-core/CMakeLists.txt
+      - include/slang.h
+      - CLAUDE.md
+    depends_on: []
+    size_cap_bytes: 16384
+
+  architecture/module-map.md:
+    prompt: prompts/architecture-module-map.md
+    watched_paths:
+      - source/*/CMakeLists.txt
+      - source/slang/CMakeLists.txt
+      - prelude/*.h
+      - source/slang/slang-*.h
+      - source/compiler-core/slang-*.h
+      - source/core/slang-*.h
+    depends_on:
+      - architecture/overview.md
+    size_cap_bytes: 32768
+
+  architecture/dependency-graph.md:
+    prompt: prompts/architecture-dependency-graph.md
+    watched_paths:
+      - source/*/CMakeLists.txt
+    depends_on:
+      - architecture/module-map.md
+    size_cap_bytes: 16384
+
+  # --- pipeline/ ---------------------------------------------------------
+
+  pipeline/overview.md:
+    prompt: prompts/pipeline-overview.md
+    watched_paths:
+      - source/slang/slang-compile-request.cpp
+      - source/slang/slang-compile-request.h
+      - source/slang/slang-emit.cpp
+      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/slang-check.cpp
+      - source/slang/slang-parser.cpp
+      - source/slang/slang-preprocessor.cpp
+      - source/compiler-core/slang-lexer.cpp
+    depends_on:
+      - architecture/overview.md
+    size_cap_bytes: 24576
+
+  pipeline/01-lex-preprocess.md:
+    prompt: prompts/pipeline-01-lex-preprocess.md
+    watched_paths:
+      - source/compiler-core/slang-lexer.h
+      - source/compiler-core/slang-lexer.cpp
+      - source/compiler-core/slang-token.h
+      - source/compiler-core/slang-token.cpp
+      - source/compiler-core/slang-token-defs.h
+      - source/compiler-core/slang-source-loc.h
+      - source/compiler-core/slang-source-loc.cpp
+      - source/slang/slang-preprocessor.h
+      - source/slang/slang-preprocessor.cpp
+    depends_on:
+      - pipeline/overview.md
+    size_cap_bytes: 24576
+
+  pipeline/02-parse-ast.md:
+    prompt: prompts/pipeline-02-parse-ast.md
+    watched_paths:
+      - source/slang/slang-parser.h
+      - source/slang/slang-parser.cpp
+      - source/slang/slang-ast-base.h
+      - source/slang/slang-ast-base.cpp
+      - source/slang/slang-ast-decl.h
+      - source/slang/slang-ast-expr.h
+      - source/slang/slang-ast-stmt.h
+      - source/slang/slang-ast-type.h
+      - source/slang/slang-ast-modifier.h
+      - source/slang/slang-ast-builder.h
+      - source/slang/slang-ast-builder.cpp
+    depends_on:
+      - pipeline/01-lex-preprocess.md
+    size_cap_bytes: 32768
+
+  pipeline/03-semantic-check.md:
+    prompt: prompts/pipeline-03-semantic-check.md
+    watched_paths:
+      - source/slang/slang-check.h
+      - source/slang/slang-check.cpp
+      - source/slang/slang-check-impl.h
+      - source/slang/slang-check-decl.cpp
+      - source/slang/slang-check-expr.cpp
+      - source/slang/slang-check-stmt.cpp
+      - source/slang/slang-check-type.cpp
+      - source/slang/slang-check-overload.cpp
+      - source/slang/slang-check-conformance.cpp
+      - source/slang/slang-check-conversion.cpp
+      - source/slang/slang-check-inheritance.cpp
+      - source/slang/slang-check-modifier.cpp
+      - source/slang/slang-check-shader.cpp
+    depends_on:
+      - pipeline/02-parse-ast.md
+    size_cap_bytes: 32768
+
+  pipeline/04-ast-to-ir.md:
+    prompt: prompts/pipeline-04-ast-to-ir.md
+    watched_paths:
+      - source/slang/slang-lower-to-ir.h
+      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/slang-ir.h
+      - source/slang/slang-ir.cpp
+      - source/slang/slang-ir-insts.h
+      - source/slang/slang-ir-insts.lua
+    depends_on:
+      - pipeline/03-semantic-check.md
+      - cross-cutting/ir-instructions.md
+    size_cap_bytes: 32768
+
+  pipeline/05-ir-passes.md:
+    prompt: prompts/pipeline-05-ir-passes.md
+    watched_paths:
+      - source/slang/slang-ir-*.h
+      - source/slang/slang-ir-*.cpp
+      - source/slang/slang-emit.cpp
+    depends_on:
+      - pipeline/04-ast-to-ir.md
+    size_cap_bytes: 65536
+
+  pipeline/06-emit.md:
+    prompt: prompts/pipeline-06-emit.md
+    watched_paths:
+      - source/slang/slang-emit.cpp
+      - source/slang/slang-emit-*.h
+      - source/slang/slang-emit-*.cpp
+    depends_on:
+      - pipeline/05-ir-passes.md
+    size_cap_bytes: 32768
+
+  # --- syntax-reference/ ------------------------------------------------
+
+  syntax-reference/tokens.md:
+    prompt: prompts/syntax-tokens.md
+    watched_paths:
+      - source/compiler-core/slang-lexer.h
+      - source/compiler-core/slang-lexer.cpp
+      - source/compiler-core/slang-token.h
+      - source/compiler-core/slang-token.cpp
+      - source/compiler-core/slang-token-defs.h
+    depends_on: []
+    size_cap_bytes: 24576
+
+  syntax-reference/keywords-and-builtins.md:
+    prompt: prompts/syntax-keywords-and-builtins.md
+    watched_paths:
+      - source/slang/slang-parser.cpp
+      - source/slang/slang-syntax.cpp
+      - source/slang/slang-syntax.h
+      - source/slang/core.meta.slang
+      - source/slang/hlsl.meta.slang
+      - source/slang/glsl.meta.slang
+      - source/slang/diff.meta.slang
+    depends_on:
+      - syntax-reference/tokens.md
+    size_cap_bytes: 32768
+
+  syntax-reference/grammar.md:
+    prompt: prompts/syntax-grammar.md
+    watched_paths:
+      - source/slang/slang-parser.h
+      - source/slang/slang-parser.cpp
+      - source/compiler-core/slang-lexer.cpp
+    depends_on:
+      - syntax-reference/tokens.md
+      - syntax-reference/keywords-and-builtins.md
+    size_cap_bytes: 49152
+
+  # --- cross-cutting/ ---------------------------------------------------
+
+  cross-cutting/diagnostics.md:
+    prompt: prompts/cross-cutting-diagnostics.md
+    watched_paths:
+      - source/compiler-core/slang-diagnostic-sink.h
+      - source/compiler-core/slang-diagnostic-sink.cpp
+      - source/compiler-core/slang-core-diagnostics.h
+      - source/compiler-core/slang-core-diagnostics.cpp
+      - source/slang/slang-diagnostics.h
+      - source/slang/slang-diagnostics.cpp
+      - source/slang/slang-diagnostics.lua
+      - source/slang/diagnostics/*.lua
+    depends_on:
+      - architecture/overview.md
+    size_cap_bytes: 24576
+
+  cross-cutting/ir-instructions.md:
+    prompt: prompts/cross-cutting-ir-instructions.md
+    watched_paths:
+      - source/slang/slang-ir-insts.lua
+      - source/slang/slang-ir-insts.h
+      - source/slang/slang-ir.h
+      - source/slang/slang-ir.cpp
+    depends_on:
+      - architecture/overview.md
+    size_cap_bytes: 49152
+
+  cross-cutting/targets.md:
+    prompt: prompts/cross-cutting-targets.md
+    watched_paths:
+      - source/slang/slang-emit-*.h
+      - source/slang/slang-emit-*.cpp
+      - source/slang/slang-capability.h
+      - source/slang/slang-capability.cpp
+      - source/slang/slang-capabilities.capdef
+      - source/slang/slang-profile.h
+      - source/slang/slang-profile.cpp
+    depends_on:
+      - architecture/overview.md
+      - pipeline/06-emit.md
+    size_cap_bytes: 24576
+
+  cross-cutting/core-module.md:
+    prompt: prompts/cross-cutting-core-module.md
+    watched_paths:
+      - prelude/*.h
+      - source/slang-core-module/*
+      - source/slang-glsl-module/*
+      - source/standard-modules/**
+      - source/slang/core.meta.slang
+      - source/slang/hlsl.meta.slang
+      - source/slang/glsl.meta.slang
+      - source/slang/diff.meta.slang
+    depends_on:
+      - architecture/overview.md
+    size_cap_bytes: 24576
+
+  cross-cutting/serialization.md:
+    prompt: prompts/cross-cutting-serialization.md
+    watched_paths:
+      - source/slang/slang-serialize.h
+      - source/slang/slang-serialize.cpp
+      - source/slang/slang-serialize-ir.h
+      - source/slang/slang-serialize-ir.cpp
+      - source/slang/slang-serialize-ast.h
+      - source/slang/slang-serialize-ast.cpp
+      - source/slang/slang-serialize-container.h
+      - source/slang/slang-serialize-container.cpp
+      - source/slang/slang-serialize-fossil.h
+      - source/slang/slang-serialize-fossil.cpp
+      - source/slang/slang-serialize-riff.h
+      - source/slang/slang-serialize-riff.cpp
+    depends_on:
+      - architecture/overview.md
+    size_cap_bytes: 24576
