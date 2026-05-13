@@ -591,13 +591,19 @@ IRInst* DifferentiableTypeConformanceContext::emitDAddOfDiffInstType(
         SLANG_UNEXPECTED("unexpected associated type during transposition");
     }
 
+    auto diffType = (IRType*)this->getDifferentialForType(primalType);
+    if (as<IRCoopVectorType>(diffType))
+    {
+        return builder->emitAdd(diffType, op1, op2);
+    }
+
     auto addMethod = this->getAddMethodForType(builder, primalType);
 
     // Should exist.
     SLANG_ASSERT(addMethod);
 
     return builder->emitCallInst(
-        (IRType*)this->getDifferentialForType(primalType),
+        diffType,
         addMethod,
         List<IRInst*>(op1, op2));
 }
@@ -650,13 +656,19 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
     // Default case: look up zero method and emit call.
     //
 
+    auto diffType = (IRType*)this->getDifferentialForType(primalType);
+    if (as<IRCoopVectorType>(diffType))
+    {
+        return builder->emitDefaultConstruct(diffType);
+    }
+
     auto zeroMethod = this->getZeroMethodForType(builder, primalType);
 
     // Should exist.
     SLANG_ASSERT(zeroMethod);
 
     return builder->emitCallInst(
-        (IRType*)this->getDifferentialForType(primalType),
+        diffType,
         zeroMethod,
         List<IRInst*>());
 }
