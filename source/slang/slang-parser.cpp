@@ -5978,7 +5978,8 @@ static Decl* parseEnumDecl(Parser* parser)
         else
         {
             // enum class cannot be anonymous
-            parser->sink->diagnose(Diagnostics::AnonymousScopedEnum{.classLocation = classToken.loc});
+            parser->sink->diagnose(
+                Diagnostics::AnonymousScopedEnum{.classLocation = classToken.loc});
         }
     }
     else
