@@ -833,6 +833,15 @@ func (m *Manager) removeOrphanCandidateIfIdle(c orphanCandidate) bool {
 // Operationally that's been <5 min; defaultOrphanGracePeriod=30m gives
 // a wide margin while still catching wedges before --session-max-age=2h
 // fires.
+//
+// Race note: orphanCandidateStillIdle is rechecked under the lock just
+// before each delete, but MarkBusy can still fire while the GCP delete
+// is in flight. In that case removeOrphanCandidateIfIdle preserves
+// tracking (busy stays true) even though the VM is already gone in
+// GCP; reconcileTrackedVMs reaps the now-stale entry on the next pass.
+// For the orphan scenario this targets (runner registered with empty
+// labels, never receives a job, MarkBusy never fires) this race is
+// essentially unreachable.
 func (m *Manager) evictStaleOrphans(ctx context.Context) {
 	grace := m.config.OrphanGracePeriod
 	if grace <= 0 {
