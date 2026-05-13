@@ -6,6 +6,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK_SET0):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-reserved-space 0
 //TEST:SIMPLE(filecheck=CHECK_SET0_SET1):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-reserved-space 0 -trace-coverage-reserved-space 1
+//TEST:SIMPLE(filecheck=CHECK_DUP):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-reserved-space 0 -trace-coverage-reserved-space 0
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
@@ -21,3 +22,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 //CHECK_SET0_SET1-DAG: OpDecorate %__slang_coverage Binding 0
 //CHECK_SET0_SET1-DAG: OpDecorate %__slang_coverage DescriptorSet 2
+
+//CHECK_DUP-DAG: OpDecorate %__slang_coverage Binding 0
+//CHECK_DUP-DAG: OpDecorate %__slang_coverage DescriptorSet 1

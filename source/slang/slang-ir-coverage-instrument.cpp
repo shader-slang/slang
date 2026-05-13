@@ -494,7 +494,7 @@ static int pickSpaceAfterHighestUsedSpace(List<UsedBindingRange>& ranges)
 
 static bool shouldHonorReservedCoverageSpaces(TargetRequest* targetRequest)
 {
-    return isD3DTarget(targetRequest) || isKhronosTarget(targetRequest);
+    return isKhronosTarget(targetRequest);
 }
 
 static void addReservedCoverageSpaces(

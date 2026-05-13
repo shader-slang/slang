@@ -1,7 +1,7 @@
 // Verifies that `-trace-coverage-reserved-space` is explicit about
 // target applicability. Metal has buffer indices but no descriptor
-// space dimension, so reserved descriptor/register spaces do not
-// affect auto-allocation.
+// set dimension, so reserved descriptor sets do not affect
+// auto-allocation.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -stage compute -entry computeMain -trace-coverage -trace-coverage-reserved-space 0
 

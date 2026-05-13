@@ -130,18 +130,17 @@ Enabling `-trace-coverage` runs three pipeline stages:
      auto-allocating a non-conflicting location for the chosen
      resource kind. Hosts can also pass
      `-trace-coverage-reserved-space <space>` one or more times to
-     mark descriptor sets / register spaces that belong to the runtime
+     mark descriptor sets that belong to the runtime
      pipeline layout even if the compiled shader does not reference
      them. Duplicate reserved spaces are idempotent. The option applies
-     to Khronos descriptor-set targets and D3D register-space targets;
-     Metal, CPU, and CUDA ignore it with a warning. On Khronos /
+     to Khronos descriptor-set targets; Metal, CPU, CUDA, and D3D
+     ignore it with a warning. On Khronos /
      SPIR-V / GLSL descriptor-set targets,
      auto-allocation picks the descriptor set after the highest
      shader-visible or host-reserved set and binds coverage at binding
      0 so the compiler does not mutate or fill holes in a user-owned
-     set layout. On register-space targets such as HLSL,
-     auto-allocation picks the next free binding in space 0 unless
-     that space is reserved or unbounded.
+     set layout. D3D register-space reservation is left to a follow-up
+     design so this PR does not freeze D3D allocation policy.
    - **Extends the program-scope var layout** to include the new
      buffer as a struct field so `collectGlobalUniformParameters`
      packs it alongside user globals on targets that pack ordinary

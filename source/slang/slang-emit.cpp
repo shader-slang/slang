@@ -1059,7 +1059,16 @@ Result linkAndOptimizeIR(
             for (auto value : *values)
             {
                 if (value.kind != CompilerOptionValueKind::Int)
-                    continue;
+                {
+                    if (sink)
+                    {
+                        SLANG_DIAGNOSE_UNEXPECTED(
+                            sink,
+                            SourceLoc(),
+                            "TraceCoverageReservedSpace option value must be an integer");
+                    }
+                    return SLANG_FAIL;
+                }
                 if (value.intValue < 0 || value.intValue > std::numeric_limits<int>::max())
                 {
                     if (sink)
@@ -1182,7 +1191,6 @@ Result linkAndOptimizeIR(
             outLinkedIR.globalScopeVarLayout,
             targetRequest,
             *metadata);
-        validateIRModuleIfEnabled(codeGenContext, irModule);
     }
 
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)

@@ -174,27 +174,32 @@ runtime descriptor model.
 ### Host-reserved spaces
 
 `ISyntheticResourceMetadata` reports the final binding Slang chose. It
-does not, by itself, know descriptor sets or register spaces that only
+does not, by itself, know descriptor sets that only
 exist in the host's runtime pipeline layout and are not referenced by
-the compiled shader IR. Descriptor-backed hosts with such externally
-owned spaces should pass `-trace-coverage-reserved-space <space>` when
+the compiled shader IR. Khronos descriptor-set hosts with such externally
+owned sets should pass `-trace-coverage-reserved-space <space>` when
 compiling, or set `CompilerOptionName::TraceCoverageReservedSpace`
 through the API while also enabling `CompilerOptionName::TraceCoverage`.
 The option is repeatable and duplicate values are idempotent. It is an
-auto-allocation hint for whole Khronos descriptor sets and whole D3D
-register spaces; explicit `-trace-coverage-binding` still wins. Metal,
-CPU, and CUDA targets do not use descriptor-space auto-allocation, so
-the option is ignored with a warning for those targets. Auto-allocation
-treats each reserved space as occupied, then reports the resulting coverage binding
+auto-allocation hint for whole Khronos descriptor sets; explicit
+`-trace-coverage-binding` still wins. Metal, CPU, CUDA, and D3D targets
+do not use this Khronos descriptor-set reservation policy in this PR, so
+the option is ignored with a warning for those targets. D3D register-space
+reservation is left to a follow-up design. Auto-allocation treats each
+reserved space as occupied, then reports the resulting coverage binding
 through `ISyntheticResourceMetadata`.
 
 ## Backend usage
 
 | Backend / host style                                    | Query path                                                                  | Binding action                                                                                                                                 |
 | ------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Vulkan / Metal / D3D12 / direct descriptor-backed hosts | `getResourceInfo(...)`                                                      | read `space` / `binding` and bind the coverage buffer using the host's descriptor-layout model                                                |
+| Vulkan / Metal / direct descriptor-backed hosts         | `getResourceInfo(...)`                                                      | read `space` / `binding` and bind the coverage buffer using the host's descriptor-layout model                                                |
 | CUDA / CPU-style marshaling hosts                       | `getResourceInfo(...)`                                                      | read `uniformOffset` / `uniformStride` from `SyntheticResourceInfo`                                                                            |
 | `slang-rhi` Vulkan / CUDA backends                      | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location; provided by companion `slang-rhi` PR #739, not this PR     |
+
+D3D12 / HLSL hosts are expected to use the same `space` / `binding`
+metadata shape in a follow-up, but this PR does not define D3D register-space
+auto-allocation or reservation policy.
 
 ## `slang-rhi` consumption model
 

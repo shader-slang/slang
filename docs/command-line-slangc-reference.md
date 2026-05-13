@@ -310,7 +310,7 @@ Instrument the shader with per-statement execution counters. When writing compil
 
 **-trace-coverage-binding &lt;index&gt; &lt;space&gt;**
 
-Bind the synthesized `__slang_coverage` buffer at an explicit (register index, space) instead of auto-allocating a slot. Useful when the host needs the binding fixed at compile time (e.g. for a pre-built D3D12 root signature). Implies `-trace-coverage`. 
+Bind the synthesized `__slang_coverage` buffer at an explicit (register index, space) instead of auto-allocating a slot. Useful when the host needs the binding fixed at compile time before any host metadata reads run. Implies `-trace-coverage`. 
 
 
 <a id="trace-coverage-reserved-space"></a>
@@ -318,7 +318,7 @@ Bind the synthesized `__slang_coverage` buffer at an explicit (register index, s
 
 **-trace-coverage-reserved-space &lt;space&gt;**
 
-Reserve a descriptor/register space when auto-allocating the synthesized `__slang_coverage` buffer. Use this when the host pipeline layout owns descriptor sets or register spaces that are not visible in the compiled shader IR. Repeat the option for multiple spaces; duplicate values are idempotent. The option applies to Khronos descriptor-set targets and D3D register-space targets. Metal, CPU, and CUDA targets ignore it with a warning because they do not use descriptor-space auto-allocation.
+Reserve a descriptor set when auto-allocating the synthesized `__slang_coverage` buffer. Use this when the host pipeline layout owns descriptor sets that are not visible in the compiled shader IR. Repeat for multiple spaces; duplicates are idempotent. Applies to Khronos descriptor-set targets. 
 
 
 <a id="report-dynamic-dispatch-sites"></a>
@@ -1848,3 +1848,4 @@ Available help categories for the [-h](#h) option
 * `capability` : A capability describes an optional feature that a target may or may not support. When a [-capability](#capability-1) is specified, the compiler may assume that the target supports that capability, and generate code accordingly. 
 * `file-extension` : A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) may be inferred from the extension of an input or [-o](#o) path 
 * `help-category` : Available help categories for the [-h](#h) option 
+

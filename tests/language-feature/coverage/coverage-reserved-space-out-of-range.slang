@@ -1,4 +1,4 @@
-// Verifies that reserved descriptor/register spaces are rejected
+// Verifies that reserved descriptor-set values are rejected
 // before they can truncate through the compiler's internal `int`
 // option storage.
 

@@ -552,16 +552,15 @@ void initCommandOptions(CommandOptions& options)
          "Bind the synthesized `__slang_coverage` buffer at an explicit "
          "(register index, space) instead of auto-allocating a slot. "
          "Useful when the host needs the binding fixed at compile time "
-         "(e.g. for a pre-built D3D12 root signature). Implies "
-         "`-trace-coverage`."},
+         "before any host metadata reads run. Implies `-trace-coverage`."},
         {OptionKind::TraceCoverageReservedSpace,
          "-trace-coverage-reserved-space",
          "-trace-coverage-reserved-space <space>",
-         "Reserve a descriptor/register space when auto-allocating the "
+         "Reserve a descriptor set when auto-allocating the "
          "synthesized `__slang_coverage` buffer. Use this when the host "
-         "pipeline layout owns descriptor sets or register spaces that are "
+         "pipeline layout owns descriptor sets that are "
          "not visible in the compiled shader IR. Repeat for multiple spaces; "
-         "duplicates are idempotent. Applies to Khronos and D3D targets."},
+         "duplicates are idempotent. Applies to Khronos descriptor-set targets."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,

@@ -66,10 +66,8 @@ By default the IR coverage pass auto-allocates a non-conflicting
 location for `__slang_coverage`. For Vulkan / SPIR-V descriptor-set
 targets, it uses the descriptor set after the highest shader-visible
 set at binding 0 so coverage does not extend or fill holes in a
-user-owned descriptor set layout. For
-register-space targets such as HLSL, it uses the next free binding in
-space 0. If the host pipeline layout reserves a descriptor set or
-register space that the shader IR does not reference, pass
+user-owned descriptor set layout. If the host pipeline layout reserves
+a descriptor set that the shader IR does not reference, pass
 `-trace-coverage-reserved-space <space>` to keep auto-allocation out
 of that space.
 
@@ -79,22 +77,20 @@ buffer at a specific `(register, space)` pair instead:
 ```bash
 slangc shader.slang -target spirv -stage compute -entry main \
     -trace-coverage-binding 7 0 -o shader.spv
-# __slang_coverage lands at register(u7) on HLSL,
-# DescriptorSet 0 / Binding 7 on SPIR-V.
+# __slang_coverage lands at DescriptorSet 0 / Binding 7 on SPIR-V.
 ```
 
 `-trace-coverage-binding` implies `-trace-coverage`. Use this when
-the host needs the slot fixed at compile time — for example when
-pre-building a D3D12 root signature before any host reflection /
-metadata reads run.
+the host needs the slot fixed at compile time before any host
+reflection / metadata reads run.
 
 `-trace-coverage-reserved-space` is repeatable and idempotent; passing
 the same space more than once has the same effect as passing it once.
 It does not pin a specific binding. It is for descriptor-backed hosts
-whose runtime pipeline layout owns whole descriptor/register spaces
+whose runtime pipeline layout owns whole descriptor sets
 that may be invisible to Slang for a particular entry point. It applies
-to Khronos descriptor-set targets and D3D register-space targets.
-Metal, CPU, and CUDA do not have this descriptor-space auto-allocation
+to Khronos descriptor-set targets. Metal, CPU, CUDA, and D3D do not
+use this Khronos descriptor-set auto-allocation
 model, so the option is ignored with a warning for those targets:
 
 ```bash
@@ -256,8 +252,8 @@ sidecar shape.
 | Flag                                      | Effect                                                                                                                                                                                                                                                                         |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `-trace-coverage`                         | Enables the feature. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites counter ops to atomic increments, and emits `<output>.coverage-mapping.json` sidecar when writing to a file.          |
-| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time (e.g. for a pre-built D3D12 root signature). |
-| `-trace-coverage-reserved-space <space>`  | Marks a whole descriptor/register space as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent. Applies to Khronos descriptor-set targets and D3D register-space targets.                                             |
+| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                      |
+| `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                   |
 
 ---
 
@@ -306,7 +302,7 @@ declares the slot in its own pipeline layout / root signature.
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
 | CPU                                       | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
 | Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the descriptor set after the highest shader-visible or host-reserved set at binding 0.                                                                                                                                                                             | Supported                              | Compiler-side decoration correct      |
-| D3D12 / HLSL                              | Supported. `-trace-coverage-reserved-space` can keep auto-allocation out of host-owned register spaces.                                                                                                                                                                                             | Supported                              | Supported                             |
+| D3D12 / HLSL                              | Follow-up. The metadata shape leaves room for D3D register-space binding, but this PR does not define the D3D auto-allocation or reservation policy.                                                                                                                                              | Follow-up                              | Follow-up                             |
 | CUDA                                      | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
 | Metal (direct)                            | Compiles. End-to-end dispatch is unreliable due to a pre-existing slang-rhi Metal binding quirk ([shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724)) — not a coverage-feature defect.                                                                             | (untested)                             | (untested)                            |
 | GLSL                                      | Supported codegen                                                                                                                                                                                                                                                                                 | (untested)                             | (untested)                            |
