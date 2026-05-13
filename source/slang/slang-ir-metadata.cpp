@@ -219,7 +219,7 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
     }
 
     Dictionary<IRGlobalParam*, List<UniformUsageRange>> uniformUsage;
-    collectUniformUsage(const_cast<IRModule*>(irModule), uniformUsage);
+    collectUniformUsage(irModule, uniformUsage);
     for (auto& kv : uniformUsage)
     {
         auto* param = kv.first;

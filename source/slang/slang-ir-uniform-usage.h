@@ -13,7 +13,7 @@ struct UniformUsageRange
 };
 
 void collectUniformUsage(
-    IRModule* module,
+    const IRModule* module,
     Dictionary<IRGlobalParam*, List<UniformUsageRange>>& outUsage);
 
 } // namespace Slang

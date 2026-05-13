@@ -122,7 +122,7 @@ static void _walkUses(
 }
 
 void collectUniformUsage(
-    IRModule* module,
+    const IRModule* module,
     Dictionary<IRGlobalParam*, List<UniformUsageRange>>& outUsage)
 {
     for (auto inst : module->getGlobalInsts())
