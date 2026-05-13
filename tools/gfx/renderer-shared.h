@@ -429,7 +429,7 @@ public:
             case slang::TypeReflection::Kind::Resource:
                 {
                     if (typeLayout->getResourceShape() != SLANG_STRUCTURED_BUFFER)
-                        break;
+                        return typeLayout;
                     SLANG_ASSERT(outContainerType == ShaderObjectContainerType::None);
                     outContainerType = ShaderObjectContainerType::StructuredBuffer;
                     typeLayout = typeLayout->getElementTypeLayout();
