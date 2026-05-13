@@ -602,10 +602,7 @@ IRInst* DifferentiableTypeConformanceContext::emitDAddOfDiffInstType(
     // Should exist.
     SLANG_ASSERT(addMethod);
 
-    return builder->emitCallInst(
-        diffType,
-        addMethod,
-        List<IRInst*>(op1, op2));
+    return builder->emitCallInst(diffType, addMethod, List<IRInst*>(op1, op2));
 }
 
 IRInst* DifferentiableTypeConformanceContext::emitDAddForExistentialType(
@@ -667,10 +664,7 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
     // Should exist.
     SLANG_ASSERT(zeroMethod);
 
-    return builder->emitCallInst(
-        diffType,
-        zeroMethod,
-        List<IRInst*>());
+    return builder->emitCallInst(diffType, zeroMethod, List<IRInst*>());
 }
 
 

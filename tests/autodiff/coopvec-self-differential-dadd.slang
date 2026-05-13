@@ -16,8 +16,7 @@ void exp_BackwardAutoDiff<T : __BuiltinFloatingPointType, let K : int>(
 [Differentiable]
 CoopVec<float, 2> addCV(CoopVec<float, 2> a, CoopVec<float, 2> b)
 {
-    // The custom backward below is what matters; the primal just keeps this test compile-only.
-    return a;
+    return a + b;
 }
 
 [BackwardDerivativeOf(addCV)]
