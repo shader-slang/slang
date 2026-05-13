@@ -1,0 +1,14 @@
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  // Kramdown renders ```mermaid ... ``` as <pre><code class="language-mermaid">...</code></pre>.
+  // Mermaid expects <pre class="mermaid"> whose textContent is the diagram source.
+  document.querySelectorAll('pre > code.language-mermaid').forEach((code) => {
+    const pre = code.parentNode;
+    const target = document.createElement('pre');
+    target.className = 'mermaid';
+    target.textContent = code.textContent;
+    pre.replaceWith(target);
+  });
+  mermaid.initialize({ startOnLoad: false });
+  await mermaid.run({ querySelector: 'pre.mermaid' });
+</script>
