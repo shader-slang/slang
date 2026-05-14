@@ -671,9 +671,7 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
         if (auto coopVec = as<IRCoopVectorType>(diffType))
             SLANG_RELEASE_ASSERT(as<IRIntLit>(coopVec->getElementCount()));
         else if (auto coopMat = as<IRCoopMatrixType>(diffType))
-            SLANG_RELEASE_ASSERT(
-                as<IRIntLit>(coopMat->getRowCount()) &&
-                as<IRIntLit>(coopMat->getColumnCount()));
+            SLANG_RELEASE_ASSERT(as<IRIntLit>(coopMat->getRowCount()) && as<IRIntLit>(coopMat->getColumnCount()));
         return builder->emitDefaultConstruct(diffType);
     }
 
