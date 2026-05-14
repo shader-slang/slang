@@ -190,7 +190,7 @@ struct ByteAddressBuffer
     /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint Load(int location)
     {
         __target_switch
@@ -229,7 +229,7 @@ struct ByteAddressBuffer
     /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint2 Load2(uint location)
     {
         __target_switch
@@ -242,7 +242,7 @@ struct ByteAddressBuffer
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -271,7 +271,7 @@ struct ByteAddressBuffer
     ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint2 Load2Aligned(uint location)
     {
         __target_switch
@@ -298,7 +298,7 @@ struct ByteAddressBuffer
     /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint3 Load3(uint location)
     {
         __target_switch
@@ -311,7 +311,7 @@ struct ByteAddressBuffer
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -339,7 +339,7 @@ struct ByteAddressBuffer
     ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint3 Load3Aligned(uint location)
     {
         __target_switch
@@ -365,7 +365,7 @@ struct ByteAddressBuffer
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint4 Load4(uint location)
     {
         __target_switch
@@ -378,7 +378,7 @@ struct ByteAddressBuffer
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -406,7 +406,7 @@ struct ByteAddressBuffer
     ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint4 Load4Aligned(uint location)
     {
         __target_switch
