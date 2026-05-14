@@ -516,10 +516,8 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_writer->emit("u32");
         break;
     case kIROp_UInt64Type:
-        {
-            m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
-            return;
-        }
+        m_writer->emit("u64");
+        return;
     case kIROp_Int16Type:
         diagnoseOnce(Diagnostics::Int16NotSupportedInWgsl{.typeName = "int16_t"});
         return;
