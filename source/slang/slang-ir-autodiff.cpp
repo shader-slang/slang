@@ -665,10 +665,15 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
     auto diffType = (IRType*)this->getDifferentialForType(primalType);
     if (isSelfDifferentialOpaqueType(diffType))
     {
-        // Assert the specialization precondition: CoopVec element counts must be
-        // concrete so emitDefaultConstruct produces a real zero, not OpUndef.
+        // Assert the specialization precondition: all dimension operands must be
+        // concrete IRIntLit so emitDefaultConstruct produces a real zero, not OpUndef.
+        // Use SLANG_RELEASE_ASSERT so violations surface in release builds too.
         if (auto coopVec = as<IRCoopVectorType>(diffType))
-            SLANG_ASSERT(as<IRIntLit>(coopVec->getElementCount()));
+            SLANG_RELEASE_ASSERT(as<IRIntLit>(coopVec->getElementCount()));
+        else if (auto coopMat = as<IRCoopMatrixType>(diffType))
+            SLANG_RELEASE_ASSERT(
+                as<IRIntLit>(coopMat->getRowCount()) &&
+                as<IRIntLit>(coopMat->getColumnCount()));
         return builder->emitDefaultConstruct(diffType);
     }
 

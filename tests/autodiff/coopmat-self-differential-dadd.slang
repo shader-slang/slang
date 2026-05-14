@@ -58,9 +58,9 @@ void computeMain(uint id: SV_DispatchThreadID)
     output[0] = x.d[id];
 }
 
+// Anchor checks inside the function body so the global-scope OpUndef emitted for
+// unrelated IR (which precedes OpFunction in the module) is outside the scan window.
+// CHECK-LABEL: %computeMain = OpFunction
 // CHECK: OpCompositeConstruct
 // CHECK-NOT: OpUndef
 // CHECK: OpFAdd
-// OpFAdd is the key regression guard: the buggy (pre-fix) code emitted OpUndef in
-// place of gradient accumulation, so the absence of OpFAdd (or its presence with
-// an OpUndef operand) on a regressed compiler causes one of these CHECKs to fail.
