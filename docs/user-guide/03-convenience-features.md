@@ -1002,9 +1002,10 @@ Slang supports lambda expressions for passing small callable values to higher-or
 
 ```csharp
 (parameterList) => expression
+(parameterList) => { statements; return expression; }
 ```
 
-Parameter types must be written explicitly. The expression is the body and its type is the return type of the lambda.
+Parameter types must be written explicitly. In the single-expression form, the expression's type is the return type. In the block form, all `return` statements must return the same type.
 
 ### Basic usage
 
@@ -1030,9 +1031,23 @@ void scale(inout Matrix m)
 }
 ```
 
+### Coercion to `IFunc`
+
+A lambda is implicitly converted to `IFunc<TReturn, TArgs...>` when passed to a function expecting that interface. Lambdas passed as `IFunc` may capture variables from the enclosing scope:
+
+```csharp
+func apply(f: IFunc<float, float>) -> float
+{
+    return f(2.0);
+}
+
+float scale = 3;
+let result = apply((float x) => x * scale);  // OK: 'scale' is captured
+```
+
 ### Coercion to `functype`
 
-Lambdas also coerce to an explicit function type spelled with the `functype` keyword:
+Lambdas can also be passed to functions expecting an explicit function type spelled with the `functype` keyword. Unlike `IFunc`, `functype` is more restrictive: only **non-capturing** lambdas can coerce to `functype`. A lambda that references any variable from the enclosing scope cannot coerce and the compiler reports an error:
 
 ```csharp
 func sum(f: functype(int, int) -> float) -> float
@@ -1040,10 +1055,13 @@ func sum(f: functype(int, int) -> float) -> float
     return f(2, 3);
 }
 
-let result = sum((int x, int y) => x + y); // result == 5.0
+let result = sum((int x, int y) => x + y); // OK: no captures, result == 5.0
+
+int bias = 1;
+let result2 = sum((int x, int y) => x + y + bias); // error: capturing lambda cannot coerce to functype
 ```
 
-The lambda's parameter and return types must match the `functype` signature exactly; implicit widening is not applied here. If the signature does not match, the compiler reports an error at the call site.
+Parameter types must also match the `functype` signature exactly. The return type may be implicitly converted (for example, a lambda returning `int` can satisfy a `functype` with return type `float`).
 
 ### Capture semantics
 
@@ -1066,7 +1084,7 @@ func foo<let N : int>(f: functype() -> vector<float, N>) -> vector<float, N>
     return f();
 }
 
-let v1 = foo(() => 2);                    // infers N = 1, returns vector<float, 1>
+let v1 = foo(() => 2);                    // 2 is implicitly converted to vector<float, 1>; infers N = 1
 let v2 = foo(() => vector<float, 1>(3));  // infers N = 1 explicitly
 ```
 
