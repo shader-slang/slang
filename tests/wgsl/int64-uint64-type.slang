@@ -5,6 +5,11 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry computeMain
 
+// Negative assertions: HLSL-style names must never appear in WGSL output.
+// Placed before all positive checks so they scan the entire output.
+//CHECK-NOT: uint64_t
+//CHECK-NOT: int64_t
+
 RWStructuredBuffer<uint64_t> outputU64;
 RWStructuredBuffer<int64_t> outputI64;
 
