@@ -52,7 +52,10 @@ void computeMain(uint id: SV_DispatchThreadID)
 }
 
 // CHECK: OpCompositeConstructReplicateEXT
+// CHECK-NOT: OpUndef
 // CHECK: OpFAdd
 // OpFAdd is the key regression guard: the buggy (pre-fix) code emitted OpUndef in
-// place of gradient accumulation instead of a real add, so the absence of OpFAdd
-// on the regressed compiler causes this CHECK to fail.
+// place of gradient accumulation, so the absence of OpFAdd (or its presence with
+// an OpUndef operand) on a regressed compiler causes one of these CHECKs to fail.
+// (The global-scope OpUndef from an unrelated IR node appears before the first
+// CHECK match and is therefore outside the CHECK-NOT scan window.)

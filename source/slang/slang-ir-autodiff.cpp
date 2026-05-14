@@ -657,11 +657,11 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
             zeroElements.getBuffer());
     }
 
-    // When reached from finalizeAutoDiffPass, specializeModule has already run
-    // (slang-emit.cpp:1237 < 1248), so CoopVec element counts are IRIntLit and
-    // emitDefaultConstruct produces a real zero. Callers from earlier autodiff
-    // passes must ensure specialization has completed before CoopVec/CoopMat
-    // types can appear as differentials.
+    // When reached from finalizeAutoDiffPass, specializeModule has already run,
+    // so CoopVec element counts are IRIntLit and emitDefaultConstruct produces
+    // a real zero. Callers from earlier autodiff passes must ensure
+    // specialization has completed before CoopVec/CoopMat types can appear
+    // as differentials.
     auto diffType = (IRType*)this->getDifferentialForType(primalType);
     if (isSelfDifferentialOpaqueType(diffType))
     {
