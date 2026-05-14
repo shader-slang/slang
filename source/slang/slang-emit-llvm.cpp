@@ -1465,6 +1465,8 @@ struct LLVMEmitter
                 emitDecomposedStructValues(op, f->getFieldType(), args, argIsSigned);
             }
         }
+        else if (as<IRVoidType>(type))
+            return;
         else
         {
             args.add(inst);
