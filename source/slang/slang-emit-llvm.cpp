@@ -1450,7 +1450,11 @@ struct LLVMEmitter
         SLANG_UNIMPLEMENTED_X("Unexpected terminator in global scope!");
     }
 
-    void emitDecomposedStructValues(LLVMInst* inst, IRType* type, List<LLVMInst*>& args, List<bool>& argIsSigned)
+    void emitDecomposedStructValues(
+        LLVMInst* inst,
+        IRType* type,
+        List<LLVMInst*>& args,
+        List<bool>& argIsSigned)
     {
         if (auto structType = as<IRStructType>(type))
         {
