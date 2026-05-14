@@ -2103,6 +2103,21 @@ struct LLVMEmitter
                             argIsSigned.add(isSigned(op));
                         }
                     }
+                    else if (auto structType = as<IRStructType>(operand->getDataType()))
+                    {
+                        // The variadic pack was materialized through a temporary
+                        // (e.g. an IRLoad) rather than reaching us as an IRMakeStruct
+                        // directly. Flatten by extracting each struct field.
+                        auto llvmBase = findValue(operand);
+                        for (auto field : structType->getFields())
+                        {
+                            LLVMInst* ptr =
+                                emitStructGetElementPtr(llvmBase, field, defaultPointerRules);
+                            auto fieldType = field->getFieldType();
+                            args.add(emitLoad(ptr, fieldType, defaultPointerRules));
+                            argIsSigned.add(isSignedType(fieldType));
+                        }
+                    }
                 }
 
                 llvmInst = builder->emitPrintf(

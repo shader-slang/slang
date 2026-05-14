@@ -3090,6 +3090,19 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
                         emitOperand(makeStruct->getOperand(bb), getInfo(EmitOp::General));
                     }
                 }
+                else if (auto structType = as<IRStructType>(operand->getDataType()))
+                {
+                    // The variadic pack was materialized through a temporary
+                    // (e.g. an IRLoad) rather than reaching us as an IRMakeStruct
+                    // directly. Flatten by accessing each struct field.
+                    for (auto field : structType->getFields())
+                    {
+                        m_writer->emit(", ");
+                        emitOperand(operand, getInfo(EmitOp::Postfix));
+                        m_writer->emit(".");
+                        m_writer->emit(getName(field->getKey()));
+                    }
+                }
             }
             m_writer->emit(")");
             break;
