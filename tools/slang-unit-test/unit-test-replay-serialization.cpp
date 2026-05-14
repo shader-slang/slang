@@ -10,7 +10,6 @@
 SLANG_UNIT_TEST(replayContextInt8)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<int8_t>(0));
     SLANG_CHECK(roundTripCheck<int8_t>(127));
     SLANG_CHECK(roundTripCheck<int8_t>(-128));
@@ -20,7 +19,6 @@ SLANG_UNIT_TEST(replayContextInt8)
 SLANG_UNIT_TEST(replayContextInt16)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<int16_t>(0));
     SLANG_CHECK(roundTripCheck<int16_t>(32767));
     SLANG_CHECK(roundTripCheck<int16_t>(-32768));
@@ -30,7 +28,6 @@ SLANG_UNIT_TEST(replayContextInt16)
 SLANG_UNIT_TEST(replayContextInt32)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<int32_t>(0));
     SLANG_CHECK(roundTripCheck<int32_t>(2147483647));
     SLANG_CHECK(roundTripCheck<int32_t>(-2147483648));
@@ -40,7 +37,6 @@ SLANG_UNIT_TEST(replayContextInt32)
 SLANG_UNIT_TEST(replayContextInt64)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<int64_t>(0));
     SLANG_CHECK(roundTripCheck<int64_t>(9223372036854775807LL));
     SLANG_CHECK(roundTripCheck<int64_t>(-9223372036854775807LL - 1));
@@ -50,7 +46,6 @@ SLANG_UNIT_TEST(replayContextInt64)
 SLANG_UNIT_TEST(replayContextUInt8)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<uint8_t>(0));
     SLANG_CHECK(roundTripCheck<uint8_t>(255));
     SLANG_CHECK(roundTripCheck<uint8_t>(128));
@@ -59,7 +54,6 @@ SLANG_UNIT_TEST(replayContextUInt8)
 SLANG_UNIT_TEST(replayContextUInt16)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<uint16_t>(0));
     SLANG_CHECK(roundTripCheck<uint16_t>(65535));
     SLANG_CHECK(roundTripCheck<uint16_t>(32768));
@@ -68,7 +62,6 @@ SLANG_UNIT_TEST(replayContextUInt16)
 SLANG_UNIT_TEST(replayContextUInt32)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<uint32_t>(0));
     SLANG_CHECK(roundTripCheck<uint32_t>(4294967295U));
     SLANG_CHECK(roundTripCheck<uint32_t>(2147483648U));
@@ -77,7 +70,6 @@ SLANG_UNIT_TEST(replayContextUInt32)
 SLANG_UNIT_TEST(replayContextUInt64)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<uint64_t>(0));
     SLANG_CHECK(roundTripCheck<uint64_t>(18446744073709551615ULL));
     SLANG_CHECK(roundTripCheck<uint64_t>(9223372036854775808ULL));
@@ -90,7 +82,6 @@ SLANG_UNIT_TEST(replayContextUInt64)
 SLANG_UNIT_TEST(replayContextFloat)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<float>(0.0f));
     SLANG_CHECK(roundTripCheck<float>(3.14159f));
     SLANG_CHECK(roundTripCheck<float>(-2.71828f));
@@ -101,7 +92,6 @@ SLANG_UNIT_TEST(replayContextFloat)
 SLANG_UNIT_TEST(replayContextDouble)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<double>(0.0));
     SLANG_CHECK(roundTripCheck<double>(3.141592653589793));
     SLANG_CHECK(roundTripCheck<double>(-2.718281828459045));
@@ -116,7 +106,6 @@ SLANG_UNIT_TEST(replayContextDouble)
 SLANG_UNIT_TEST(replayContextBool)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<bool>(true));
     SLANG_CHECK(roundTripCheck<bool>(false));
 }
@@ -128,7 +117,6 @@ SLANG_UNIT_TEST(replayContextBool)
 SLANG_UNIT_TEST(replayContextString)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     auto testString = [](const char* str)
     {
@@ -162,7 +150,6 @@ SLANG_UNIT_TEST(replayContextString)
 SLANG_UNIT_TEST(replayContextSlangEnums)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Test a selection of Slang enum types
     {
@@ -215,7 +202,6 @@ SLANG_UNIT_TEST(replayContextSlangEnums)
 SLANG_UNIT_TEST(replayContextSlangUUID)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     SlangUUID writeValue =
         {0x12345678, 0x1234, 0x5678, {0x9A, 0xBC, 0xDE, 0xF0, 0x12, 0x34, 0x56, 0x78}};
@@ -242,7 +228,6 @@ SLANG_UNIT_TEST(replayContextSlangUUID)
 SLANG_UNIT_TEST(replayContextCompilerOptionValue)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     slang::CompilerOptionValue writeValue = {};
     writeValue.kind = slang::CompilerOptionValueKind::Int;
@@ -274,7 +259,6 @@ SLANG_UNIT_TEST(replayContextCompilerOptionValue)
 SLANG_UNIT_TEST(replayContextPreprocessorMacroDesc)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     slang::PreprocessorMacroDesc writeValue = {};
     writeValue.name = "MY_MACRO";
@@ -300,7 +284,6 @@ SLANG_UNIT_TEST(replayContextPreprocessorMacroDesc)
 SLANG_UNIT_TEST(replayContextTargetDesc)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     slang::TargetDesc writeValue = {};
     writeValue.structureSize = sizeof(slang::TargetDesc);
@@ -336,7 +319,6 @@ SLANG_UNIT_TEST(replayContextTargetDesc)
 SLANG_UNIT_TEST(replayContextMultipleValues)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Write multiple values of different types
     ctx().reset();
@@ -383,7 +365,6 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
 SLANG_UNIT_TEST(replayContextTypeMismatch)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Write an int32, try to read a string - should throw
     ctx().reset();

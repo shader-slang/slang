@@ -140,7 +140,6 @@ private:
 SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Reset test state
     s_testCalcLastA = 0;
@@ -219,7 +218,6 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
 SLANG_UNIT_TEST(replayContextMemberFunctionTraits)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Test arity detection
     using AddTraits = MemberFunctionTraits<decltype(&TestCalculatorProxy::add)>;
@@ -250,7 +248,6 @@ SLANG_UNIT_TEST(replayContextMemberFunctionTraits)
 SLANG_UNIT_TEST(replayContextFullRoundTrip)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Reset test state
     s_testCalcLastA = 0;
@@ -351,7 +348,6 @@ SLANG_UNIT_TEST(replayContextFullRoundTrip)
 SLANG_UNIT_TEST(replayContextParseSignature)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     char buffer[256];
 
@@ -402,7 +398,6 @@ SLANG_UNIT_TEST(replayContextParseSignature)
 SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Start recording
     ctx().setMode(Mode::Record);

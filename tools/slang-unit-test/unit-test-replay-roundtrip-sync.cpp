@@ -20,7 +20,6 @@ SLANG_UNIT_TEST(replayContextLoadReplayNonExistentPath)
     // corrupt-data and truncated-stream cases live in
     // unit-test-replay-stream-corruption.cpp.
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Point at a path that definitely doesn't exist and try to load it.
     SlangResult result = ctx().loadReplay("/nonexistent/path/that/should/not/exist");
@@ -42,7 +41,6 @@ SLANG_UNIT_TEST(replayContextSyncModeStringMismatch)
 {
     // Issue #10479 sync-mode bullet (mismatch-detection arm).
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Record a reference string. The stream now contains a single String
     // entry with this value.
@@ -78,7 +76,6 @@ SLANG_UNIT_TEST(replayContextSyncModeMultipleValuesMatch)
     // tests above and in unit-test-replay-modes.cpp to cover both arms of
     // sync-mode comparison.
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     ctx().setMode(Mode::Record);
 
@@ -129,7 +126,6 @@ SLANG_UNIT_TEST(replayContextNullHandleRoundTrip)
     // "empty") would silently break any API that accepts nullable
     // interface arguments.
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     ctx().setMode(Mode::Record);
 

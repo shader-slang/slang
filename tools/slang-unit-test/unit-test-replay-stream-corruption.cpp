@@ -27,7 +27,6 @@ SLANG_UNIT_TEST(replayContextLoadReplayCorruptStream)
     // change adds content validation to loadReplay(): if loadReplay starts
     // rejecting garbage up front, that's also acceptable.
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Per-test directory holding the corrupt stream.bin.
     const char* testDir = ".slang-replays-corrupt-test";
@@ -74,7 +73,6 @@ SLANG_UNIT_TEST(replayContextLoadReplayTruncatedStream)
     // sweep in unit-test-replay-fuzz.cpp (which sweeps every prefix
     // length): this pins one representative case for fast feedback.
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Build a real recording in memory: createGlobalSession2 + findProfile.
     ctx().setMode(Mode::Record);

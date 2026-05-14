@@ -24,7 +24,6 @@ SLANG_UNIT_TEST(replayContextScaleConcurrentBlobHashingDedup)
     // would produce 2-8 files instead of 1. Issue #10479 thread-safety
     // bullet, dedup arm.
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Per-test directory so the file count we assert on isn't mixed with
     // other tests' output.

@@ -33,7 +33,7 @@ public:
 // Force the singleton ReplayContext back to a clean state on entry and exit so
 // the test sees Mode::Idle regardless of how the previous test in this process
 // finished (including aborts or assertion paths that skipped the dtor).
-#define REPLAY_TEST ScopedReplayContext _scopedReplayContext;
+#define REPLAY_TEST ScopedReplayContext _scopedReplayContext
 
 // =============================================================================
 // Helper: Round-trip test template

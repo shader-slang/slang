@@ -20,7 +20,6 @@ SLANG_UNIT_TEST(replayContextProxyReleaseToZero)
     // change that introduced a `this->...` access after release would crash
     // here, especially under ASan.
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     ctx().setMode(Mode::Record);
 

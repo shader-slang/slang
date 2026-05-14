@@ -17,7 +17,6 @@ SLANG_UNIT_TEST(replayContextLoadLatestReplayNoFolders)
     // subfolders, so the function must return a SlangResult failure code
     // rather than throwing or asserting.
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Create an empty directory and point the replay context at it.
     const char* dir = ".slang-replays-misuse-empty-latest";
@@ -43,7 +42,6 @@ SLANG_UNIT_TEST(replayContextLoadLatestReplayMissingDirectory)
     // not exist at all. Same SlangResult-failure contract, but guards the
     // path where stat() of the parent directory itself fails.
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Point at a path we know doesn't exist (no creation step).
     ctx().reset();

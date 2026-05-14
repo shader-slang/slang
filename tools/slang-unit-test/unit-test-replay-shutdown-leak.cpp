@@ -14,7 +14,6 @@
 SLANG_UNIT_TEST(replayResetHandlersClearsDictionary)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     auto& replayCtx = ctx();
 
@@ -46,7 +45,6 @@ SLANG_UNIT_TEST(replayResetHandlersClearsDictionary)
 SLANG_UNIT_TEST(replayTryGetSkipsConstruction)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // The singleton already exists in this process, so tryGet() must return it.
     auto* ptr = ReplayContext::tryGet();
@@ -58,7 +56,6 @@ SLANG_UNIT_TEST(replayTryGetSkipsConstruction)
 SLANG_UNIT_TEST(replayContextDestroyedByShutdown)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     ReplayContext::get();
     SLANG_CHECK(ReplayContext::tryGet() != nullptr);

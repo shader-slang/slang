@@ -37,7 +37,6 @@ SLANG_UNIT_TEST(replayContextConcurrentRecording)
     // internals. This is the simplest form of that test; the API-call and
     // stress variants below add depth.
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     ctx().setMode(Mode::Record);
 
@@ -104,7 +103,6 @@ SLANG_UNIT_TEST(replayContextConcurrentApiCalls)
     // shape. This is essentially a contention check on the per-context
     // lock under steady-state recording load.
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     ctx().setMode(Mode::Record);
 
@@ -165,7 +163,6 @@ SLANG_UNIT_TEST(replayContextConcurrentApiCallsStress)
     // and SLANG_UNIT_TEST_REPLAY_THREAD_STRESS_CALLS_PER_THREAD. Defaults
     // are CI-friendly; override at compile time for serious stress runs.
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     ctx().setMode(Mode::Record);
 
