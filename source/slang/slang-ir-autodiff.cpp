@@ -665,6 +665,10 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
     auto diffType = (IRType*)this->getDifferentialForType(primalType);
     if (isSelfDifferentialOpaqueType(diffType))
     {
+        // Assert the specialization precondition: CoopVec element counts must be
+        // concrete so emitDefaultConstruct produces a real zero, not OpUndef.
+        if (auto coopVec = as<IRCoopVectorType>(diffType))
+            SLANG_ASSERT(as<IRIntLit>(coopVec->getElementCount()));
         return builder->emitDefaultConstruct(diffType);
     }
 
@@ -955,6 +959,7 @@ bool canTypeBeStored(IRInst* type)
     case kIROp_FloatType:
     case kIROp_VectorType:
     case kIROp_CoopVectorType:
+    case kIROp_CoopMatrixType:
     case kIROp_MatrixType:
     case kIROp_BackwardDiffIntermediateContextType:
     case kIROp_BackwardDiffMinimalContextType:
