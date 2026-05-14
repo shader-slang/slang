@@ -591,6 +591,9 @@ IRInst* DifferentiableTypeConformanceContext::emitDAddOfDiffInstType(
         SLANG_UNEXPECTED("unexpected associated type during transposition");
     }
 
+    // CoopVec/CoopMat are self-differential opaque types with no recursable fields;
+    // synthesized dadd helpers degenerate to uninitialized values. Emit a primitive
+    // add directly and bypass the witness-table lookup.
     auto diffType = (IRType*)this->getDifferentialForType(primalType);
     if (as<IRCoopVectorType>(diffType) || as<IRCoopMatrixType>(diffType))
     {
@@ -649,6 +652,9 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
             zeroElements.getBuffer());
     }
 
+    // CoopVec/CoopMat are self-differential opaque types with no recursable fields;
+    // synthesized dzero helpers degenerate to uninitialized values. Emit a primitive
+    // default-construct directly and bypass the witness-table lookup.
     auto diffType = (IRType*)this->getDifferentialForType(primalType);
     if (as<IRCoopVectorType>(diffType) || as<IRCoopMatrixType>(diffType))
     {

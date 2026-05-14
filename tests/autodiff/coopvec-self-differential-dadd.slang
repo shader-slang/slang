@@ -53,6 +53,7 @@ void computeMain(uint id: SV_DispatchThreadID)
 
 // CHECK: OpCompositeConstructReplicateEXT
 // CHECK: OpFAdd
-// Verify the short-circuit fired: no calls to synthesized dadd/dzero helpers.
-// CHECK-NOT: OpFunctionCall {{.*}}dadd
-// CHECK-NOT: OpFunctionCall {{.*}}dzero
+// Verify the short-circuit fired: no synthesized dadd/dzero function is emitted.
+// (OpFunctionCall references functions by result-id, not name; OpName is reliable.)
+// CHECK-NOT: OpName {{.*}} "{{.*}}dadd{{.*}}"
+// CHECK-NOT: OpName {{.*}} "{{.*}}dzero{{.*}}"
