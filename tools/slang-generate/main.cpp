@@ -5,6 +5,7 @@
 #include "../../source/core/slang-secure-crt.h"
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-string.h"
+#include "../../source/core/slang-test-tool-util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -855,8 +856,7 @@ List<RefPtr<SourceFile>> gSourceFiles;
 int main(int argc, const char* const* argv)
 {
 #if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
-    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
-    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+    TestToolUtil::disableAssertMessageBoxes();
 #endif
 
     // Parse command-line arguments.

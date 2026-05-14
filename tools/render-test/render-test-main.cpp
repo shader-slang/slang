@@ -2066,8 +2066,7 @@ int main(int argc, char** argv)
     using namespace Slang;
 
 #if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
-    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
-    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+    TestToolUtil::disableAssertMessageBoxes();
 #endif
 
     SlangSession* session = spCreateSession(nullptr);

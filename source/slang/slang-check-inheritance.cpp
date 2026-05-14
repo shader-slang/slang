@@ -1669,12 +1669,24 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     {
         auto baseInheritanceInfo = _calcInheritanceInfo(modifiedType->getBase(), circularityInfo);
 
-        if (modifiedType->findModifier<NoDiffModifierVal>())
+        auto projectSubtypeWitness = [&](SubtypeWitness* witness) -> SubtypeWitness*
         {
-            // Create a filtered facet list that excludes facets whose
-            // origin matches the `IDifferentiable` or `IDifferentiablePtrType`
-            // interface types.
-            //
+            if (!witness)
+                return nullptr;
+
+            if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
+            {
+                return astBuilder->getDeclaredSubtypeWitness(
+                    type,
+                    declaredWitness->getSup(),
+                    declaredWitness->getDeclRef());
+            }
+
+            return witness;
+        };
+
+        auto projectBaseFacetsForModifiedType = [&](bool excludeDifferentiableFacets)
+        {
             SemanticsVisitor visitor(this);
             auto directFacet = new (arena) Facet::Impl(
                 astBuilder,
@@ -1694,28 +1706,28 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 if (facet->directness == Facet::Directness::Self)
                     continue;
 
-                // Check if this facet corresponds to IDifferentiable or IDifferentiablePtrType
-                bool shouldExclude = false;
-                if (auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>())
+                if (excludeDifferentiableFacets)
                 {
-                    auto interfaceDecl = interfaceDeclRef.getDecl();
-                    if (interfaceDecl == diffInterfaceDecl || interfaceDecl == diffRefInterfaceDecl)
+                    // Check if this facet corresponds to IDifferentiable or
+                    // IDifferentiablePtrType.
+                    if (auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>())
                     {
-                        shouldExclude = true;
+                        auto interfaceDecl = interfaceDeclRef.getDecl();
+                        if (interfaceDecl == diffInterfaceDecl ||
+                            interfaceDecl == diffRefInterfaceDecl)
+                        {
+                            continue;
+                        }
                     }
                 }
 
-                if (shouldExclude)
-                    continue;
-
-                // Copy the facet with updated structure
                 auto newFacet = new (arena) Facet::Impl(
                     astBuilder,
                     facet->kind,
                     facet->directness,
                     facet->origin.declRef,
                     facet->origin.type,
-                    facet->subtypeWitness);
+                    projectSubtypeWitness(facet->subtypeWitness));
                 tail->next = newFacet;
                 tail = newFacet;
             }
@@ -1723,9 +1735,14 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             InheritanceInfo info;
             info.facets = FacetList(directFacet);
             return info;
+        };
+
+        if (modifiedType->findModifier<NoDiffModifierVal>())
+        {
+            return projectBaseFacetsForModifiedType(true);
         }
 
-        return baseInheritanceInfo;
+        return projectBaseFacetsForModifiedType(false);
     }
     else
     {

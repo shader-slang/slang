@@ -27,6 +27,7 @@ tests/neural/mma-helper-test-transpose-single-warp.slang
 tests/neural/neural-module-discovery-diagnose.slang
 tests/neural/outerproduct-accumulate-test-arbitrary-size.slang
 tests/neural/outerproduct-accumulate-test.slang
+tests/neural/outerproduct-accumulate-tiled-test.slang
 tests/neural/shared-memory-size.slang
 tests/neural/test1.slang
 tests/neural/tiled-mma-load-test-aligned.slang

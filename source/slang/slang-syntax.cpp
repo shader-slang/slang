@@ -675,6 +675,31 @@ RequirementWitness RequirementWitness::specialize(
     }
 }
 
+static RequirementWitness _maybeLiftBaseTypeWitnessForModifiedType(
+    SubtypeWitness* witness,
+    RequirementWitness requirementWitness)
+{
+    auto declaredWitness = as<DeclaredSubtypeWitness>(witness);
+    if (!declaredWitness)
+        return requirementWitness;
+
+    auto modifiedSubType = as<ModifiedType>(declaredWitness->getSub());
+    if (!modifiedSubType)
+        return requirementWitness;
+
+    if (requirementWitness.getFlavor() != RequirementWitness::Flavor::val)
+        return requirementWitness;
+
+    auto satisfyingType = as<Type>(requirementWitness.getVal()->resolve());
+    if (!satisfyingType)
+        return requirementWitness;
+
+    if (!satisfyingType->equals(modifiedSubType->getBase()))
+        return requirementWitness;
+
+    return RequirementWitness(modifiedSubType);
+}
+
 // TODO: Make it so we can handle a recursive lookup (don't substitute the entire
 // table at each lookup, just find the entry and make all the substitutions at once).
 //
@@ -763,7 +788,7 @@ RequirementWitness tryLookUpRequirementWitness(
                 requirementWitness =
                     requirementWitness.specialize(astBuilder, SubstitutionSet(inheritanceDeclRef));
 
-                return requirementWitness;
+                return _maybeLiftBaseTypeWitnessForModifiedType(subtypeWitness, requirementWitness);
             }
         }
     }

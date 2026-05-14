@@ -3,8 +3,7 @@ layout: user-guide
 permalink: /user-guide/conventional-features
 ---
 
-Conventional Language Features
-==============================
+# Conventional Language Features
 
 Many of the language concepts in Slang are similar to those in other real-time shading languages like HLSL and GLSL, and also to general-purpose programming languages in the "C family."
 This chapter covers those parts of the Slang language that are _conventional_ and thus unlikely to surprise users who are already familiar with other shading languages, or languages in the C family.
@@ -12,12 +11,12 @@ This chapter covers those parts of the Slang language that are _conventional_ an
 Readers who are comfortable with HLSL variables, types, functions, statements, as well as conventions for shader parameters and entry points may prefer to skip this chapter.
 Readers who are not familiar with HLSL, but who are comfortable with GLSL and/or C/C++, may want to carefully read the sections on types, expressions, shader parameters, and entry points while skimming the others.
 
-Types
------
+## Types
 
 Slang supports conventional shading language types including scalars, vectors, matrices, arrays, structures, enumerations, and resources.
 
-> #### Note ####
+> #### Note
+>
 > Slang has limited support for pointers when targeting platforms with native pointer support, including SPIR-V, C++, and CUDA.
 
 ### Scalar Types
@@ -26,16 +25,16 @@ Slang supports conventional shading language types including scalars, vectors, m
 
 The following integer types are provided:
 
-| Name          | Description |
-|---------------|-------------|
-| `int8_t`      | 8-bit signed integer |
-| `int16_t`     | 16-bit signed integer |
-| `int`         | 32-bit signed integer |
-| `int64_t`     | 64-bit signed integer |
-| `uint8_t`     | 8-bit unsigned integer |
-| `uint16_t`    | 16-bit unsigned integer |
-| `uint`        | 32-bit unsigned integer |
-| `uint64_t`    | 64-bit unsigned integer |
+| Name       | Description             |
+| ---------- | ----------------------- |
+| `int8_t`   | 8-bit signed integer    |
+| `int16_t`  | 16-bit signed integer   |
+| `int`      | 32-bit signed integer   |
+| `int64_t`  | 64-bit signed integer   |
+| `uint8_t`  | 8-bit unsigned integer  |
+| `uint16_t` | 16-bit unsigned integer |
+| `uint`     | 32-bit unsigned integer |
+| `uint64_t` | 64-bit unsigned integer |
 
 All targets support the 32-bit `int` and `uint` types, but support for the other types depends on the capabilities of each target platform.
 
@@ -47,11 +46,11 @@ a `uint64_t` and a warning is given. The type of a hexadecimal non-suffixed inte
 
 The following floating-point types are provided:
 
-| Name          | Description                  |
-|---------------|------------------------------|
-| `half`        | 16-bit floating-point number |
-| `float`       | 32-bit floating-point number |
-| `double`      | 64-bit floating-point number |
+| Name     | Description                  |
+| -------- | ---------------------------- |
+| `half`   | 16-bit floating-point number |
+| `float`  | 32-bit floating-point number |
+| `double` | 64-bit floating-point number |
 
 All targets support the 32-bit `float`, but support for the other types depends on the capabilities of each target platform.
 
@@ -61,13 +60,14 @@ The type `bool` is used to represent Boolean truth values: `true` and `false`.
 
 For compatibility reasons, the `sizeof(bool)` depends on the target.
 
-| Target |      sizeof(bool)      |
-|--------| ---------------------- |
+| Target | sizeof(bool)           |
+| ------ | ---------------------- |
 | GLSL   | 4 bytes / 32-bit value |
 | HLSL   | 4 bytes / 32-bit value |
-| CUDA   | 1 byte  /  8-bit value |
+| CUDA   | 1 byte / 8-bit value   |
 
-> #### Note ####
+> #### Note
+>
 > When storing bool types in structures, make sure to either pad host-side data structures accordingly, or store booleans as, e.g., `uint8_t`, to guarantee
 > consistency with the host language's boolean type.
 
@@ -93,8 +93,9 @@ The type `matrix<T,R,C>` is a matrix with _elements_ of type `T`, and comprising
 As a convenience, pre-defined matrix types exist for each scalar type and valid row/column count, with a name using the formula `<<scalar-type>><<row-count>>x<<column-count>>`.
 For example, a `float3x4` is a convenient name for `matrix<float,3,4>`.
 
-> #### Note ####
-> Readers familiar with GLSL should be aware that a Slang `float3x4` represents a matrix with three rows and four columns, while a GLSL `mat3x4` represents a matrix with three *columns* and four *rows*.
+> #### Note
+>
+> Readers familiar with GLSL should be aware that a Slang `float3x4` represents a matrix with three rows and four columns, while a GLSL `mat3x4` represents a matrix with three _columns_ and four _rows_.
 > In most cases, this difference is immaterial because the subscript expression `m[i]` returns a `float4` (`vec4`) in either language.
 > For now, it is enough to be aware that there is a difference in convention between Slang/HLSL/D3D and GLSL/OpenGL.
 
@@ -166,7 +167,8 @@ void test()
 
 There are more limits on how runtime-sized arrays can be used than on arrays of statically-known element count.
 
-> #### Note ####
+> #### Note
+>
 > In Slang, arrays are _value types_, meaning that assignment, parameter passing, etc. semantically copy values of array type.
 > In some languages -- notably C, C++, C#, and Java -- assignment and parameter passing treat arrays as _reference types_,
 > meaning that these operations assign/pass a reference to the same underlying storage.
@@ -183,13 +185,16 @@ struct MyData
 }
 ```
 
-> #### Note ####
+> #### Note
+>
 > Unlike C, and like most other C-family languages, the `struct` keyword in Slang introduces a type directly, and there is no need to combine it with a `typedef`.
 
-> #### Note ####
+> #### Note
+>
 > Slang allows for a trailing semicolon (`;`) on `struct` declarations, but does not require it.
 
-> #### Note ####
+> #### Note
+>
 > Unlike C/C++, `class` is not a valid keyword for GPU code and it is reserved for CPU/host side logic.
 
 Structure types can have constructors. Constructors are defined with the `__init` keyword:
@@ -272,6 +277,7 @@ void test()
 ```
 
 You can explicitly assign values to each enum case:
+
 ```csharp
 enum Channel
 {
@@ -280,10 +286,12 @@ enum Channel
     Blue     // = 7
 }
 ```
+
 Slang automatically assigns integer values to enum cases without an explicit value. By default, the value starts from 0 and is incremented by 1 for each
 enum case.
 
 You can override the implicit value assignment behavior with the `[Flags]` attribute, which will make value assignment start from 1 and increment by power of 2, making it suitable for enums that represent bit flags. For example:
+
 ```csharp
 [Flags]
 enum Channel
@@ -302,9 +310,9 @@ The Slang core module defines a large number of _opaque_ types which provide acc
 What all opaque types have in common is that they are not "first-class" types on most platforms.
 Opaque types (and structure or array types that contain them) may be limited in the following ways (depending on the platform):
 
-* Functions that return opaque types may not be allowed
-* Global and `static` variables that use opaque types may not be allowed
-* Opaque types may not appear in the element types of buffers, except where explicitly noted as allowed
+- Functions that return opaque types may not be allowed
+- Global and `static` variables that use opaque types may not be allowed
+- Opaque types may not appear in the element types of buffers, except where explicitly noted as allowed
 
 #### Texture Types
 
@@ -316,13 +324,22 @@ The full space of texture types follows the formula:
 
 where:
 
-* The _access_ can be read-only (no prefix), read-write (`RW`), or read-write with a guarantee of rasterization order for operations on the given resource (`RasterizerOrdered`).
-* The _base shape_ can be `1D`, `2D`, `3D`, or `Cube`.
-* The _multisample-ness_ can be non-multisampled, or multisampled (`MS`).
-* The _array-ness_ can either be non-arrayed, or arrayed (`Array`).
-* The _element type_ can either be explicitly specified (`<T>`) or left as the default of `float4`
+- The _access_ can be read-only (no prefix), read-write (`RW`), or read-write with a guarantee of rasterization order for operations on the given resource (`RasterizerOrdered`).
+- The _base shape_ can be `1D`, `2D`, `3D`, or `Cube`.
+- The _multisample-ness_ can be non-multisampled, or multisampled (`MS`).
+- The _array-ness_ can either be non-arrayed, or arrayed (`Array`).
+- The _element type_ can either be explicitly specified (`<T>`) or left as the default of `float4`
 
 Not all combinations of these options are supported, and some combinations may be unsupported on some targets.
+
+When the storage format of a texture is known, prefer using an explicit texture format type as the element type.
+For example, `RWTexture2D<rgba16f>` declares a read-write 2D texture whose storage format is `rgba16f`, and whose loads and stores use `float4` values.
+Similarly, `RWTexture2D<rgba8ui>` uses `uint4` values.
+The available format type names match the supported texture format strings, with names such as `rgba32f`, `rg16f`, `r32ui`, `rgba8_snorm`, and `bgra8`.
+
+The plain scalar and vector element types, such as `float4`, `int4`, and `uint4`, are still supported for compatibility and for cases where the storage format is provided externally.
+They do not encode a specific storage format in the texture type.
+Using explicit format types whenever possible makes declarations easier to read and lets the type system distinguish textures that have the same data type but different storage formats.
 
 #### Sampler
 
@@ -330,7 +347,8 @@ Sampler types encapsulate parameters that control addressing and filtering for t
 There are two sampler types: `SamplerState` and `SamplerComparisonState`.
 `SamplerState` is applicable to most texture sampling operations, while `SamplerComparisonState` is used for "shadow" texture sampling operations which compare texels to a reference value before filtering.
 
-> #### Note ####
+> #### Note
+>
 > Some target platforms and graphics APIs do not support separation of textures and sampling state into distinct types in shader code.
 > On these platforms the Slang texture types include their own sampling state, and the sampler types are placeholder types that carry no data.
 
@@ -362,38 +380,39 @@ Both structured and byte-addressed buffers can use an _access_ to distinguish be
 
 Constant buffers (sometimes also called "uniform buffers") are typically used to pass immutable parameter data from a host application to GPU code.
 The constant buffer type `ConstantBuffer<T>` includes an explicit element type.
-Unlike formatted or flat buffers, a constant buffer conceptually contains only a *single* value of its element type, rather than one or more values.
+Unlike formatted or flat buffers, a constant buffer conceptually contains only a _single_ value of its element type, rather than one or more values.
 
-Expressions
------------
+## Expressions
 
 Slang supports the following expression forms with nearly identical syntax to HLSL, GLSL, and C/C++:
 
-* Literals: `123`, `4.56`, `false`
+- Literals: `123`, `4.56`, `false`
 
-> #### Note ####
+> #### Note
+>
 > Unlike C/C++, but like HLSL/GLSL, an unsuffixed floating-point literal has the `float` type in Slang, rather than `double`.
 
-* Member lookup: `structValue.someField`, `MyEnumType.FirstCase`
+- Member lookup: `structValue.someField`, `MyEnumType.FirstCase`
 
-* Function calls: `sin(a)`
+- Function calls: `sin(a)`
 
-* Vector/matrix initialization: `int4(1, 2, 3, 4)`
+- Vector/matrix initialization: `int4(1, 2, 3, 4)`
 
-* Casts: `(int)x`, `double(0.0)`
+- Casts: `(int)x`, `double(0.0)`
 
-* Subscript (indexing): `a[i]`
+- Subscript (indexing): `a[i]`
 
-* Initializer lists: `int b[] = { 1, 2, 3 };`
+- Initializer lists: `int b[] = { 1, 2, 3 };`
 
-* Assignment: `l = r`
+- Assignment: `l = r`
 
-* Operators: `-a`, `b + c`, `d++`, `e %= f`
+- Operators: `-a`, `b + c`, `d++`, `e %= f`
 
-> #### Note ####
-> Like HLSL but unlike most other C-family languages, the `&&` and `||` operators do *not* currently perform "short-circuiting".
+> #### Note
+>
+> Like HLSL but unlike most other C-family languages, the `&&` and `||` operators do _not_ currently perform "short-circuiting".
 > They evaluate all of their operands unconditionally.
-> However, the `?:` operator does perform short-circuiting if the condition is a scalar. Use of `?:` where the condition is a vector is deprecated in Slang. The vector version of `?:` operator does *not* perform short-circuiting, and the user is advised to call `select` instead.
+> However, the `?:` operator does perform short-circuiting if the condition is a scalar. Use of `?:` where the condition is a vector is deprecated in Slang. The vector version of `?:` operator does _not_ perform short-circuiting, and the user is advised to call `select` instead.
 > The default behavior of these operators is likely to change in a future Slang release.
 
 Additional expression forms specific to shading languages follow.
@@ -402,7 +421,8 @@ Additional expression forms specific to shading languages follow.
 
 The ordinary unary and binary operators can also be applied to vectors and matrices, where they apply element-wise.
 
-> #### Note ####
+> #### Note
+>
 > In GLSL, most operators apply component-wise to vectors and matrices, but the multiplication operator `*` computes the traditional linear-algebraic product of two matrices, or a matrix and a vector.
 > Where a GLSL programmer would write `m * v` to multiply a `mat3x4` by a `vec3`, a Slang programmer should write `mul(v,m)` to multiply a `float3` by a `float3x4`.
 > In this example, the order of operands is reversed to account for the difference in row/column conventions.
@@ -413,55 +433,60 @@ Given a value of vector type, a _swizzle_ expression extracts one or more of the
 For example, if `v` is a vector of type `float4`, then `v.xy` is a `float2` consisting of the `x` and `y` elements of `v`.
 Swizzles can reorder elements (`v.yx`) or include duplicate elements (`v.yyy`).
 
-> #### Note ####
+> #### Note
+>
 > Unlike GLSL, Slang only supports `xyzw` and `rgba` as swizzle elements, and not the seldom-used `stpq`.
 
-> #### Note ####
+> #### Note
+>
 > Unlike HLSL, Slang does not currently support matrix swizzle syntax.
 
-Statements
-----------
+## Statements
 
 Slang supports the following statement forms with nearly identical syntax to HLSL, GLSL, and C/C++:
 
-* Expression statements: `f(a, 3);`, `a = b * c;`
+- Expression statements: `f(a, 3);`, `a = b * c;`
 
-* Local variable declarations: `int x = 99;`
+- Local variable declarations: `int x = 99;`
 
-* Blocks: `{ ... }`
+- Blocks: `{ ... }`
 
-* Empty statement: `;`
+- Empty statement: `;`
 
-* `if` statements
+- `if` statements
 
-* `switch` statements
+- `switch` statements
 
-> #### Note ####
+> #### Note
+>
 > Unlike C/C++, `case` and `default` statements must be directly nested under a `switch`, rather than being allowed under nested control flow (Duff's Device and similar idioms are not allowed).
 > In addition, while multiple `case`s can be grouped together, all other forms of "fall through" are unsupported.
 
-* `for` statements
+- `for` statements
 
-* `while` statements
+- `while` statements
 
-* `do`-`while` statements
+- `do`-`while` statements
 
-* `break` statements
+- `break` statements
 
-* `continue` statements
+- `continue` statements
 
-* `return` statements
+- `return` statements
 
-* `defer` statements
+- `defer` statements
 
-> #### Note ####
+> #### Note
+>
 > The `defer` statement in Slang is tied to scope. The deferred statement runs at the end of the scope like in Swift, not just at the end of the function like in Go.
 > `defer` supports but does not require block statements: both `defer f();` and `defer { f(); g(); }` are legal.
 
-> #### Note ####
+> #### Note
+>
 > Slang does not support the C/C++ `goto` keyword.
 
-> #### Note ####
+> #### Note
+>
 > Slang does not support the C++ `throw` keyword.
 
 Additional statement forms specific to shading languages follow.
@@ -470,8 +495,7 @@ Additional statement forms specific to shading languages follow.
 
 A `discard` statement can be used in the context of a fragment shader to terminate shader execution for the current fragment, and to cause the graphics system to discard the corresponding fragment.
 
-Functions
----------
+## Functions
 
 Slang supports function definitions with traditional C syntax:
 
@@ -483,6 +507,7 @@ float addSomeThings(int x, float y)
 ```
 
 In addition to the traditional C syntax, you can use the modern syntax to define functions with the `func` keyword:
+
 ```swift
 func addSomeThings(x : int, y : float) -> float
 {
@@ -494,39 +519,39 @@ Slang supports overloading of functions based on parameter types.
 
 Function parameters may be marked with a _direction_ qualifier:
 
-* `in` (the default) indicates a by-value input parameter
-* `out` indicates an output parameter
-* `inout` or `in out` indicates an input/output parameter
+- `in` (the default) indicates a by-value input parameter
+- `out` indicates an output parameter
+- `inout` or `in out` indicates an input/output parameter
 
-> #### Note ####
+> #### Note
+>
 > The `out` and `inout` directions are superficially similar to non-`const` reference parameters in C++.
 > In cases that do not involve aliasing of mutable memory, the semantics should be equivalent.
 
-Preprocessor
-------------
+## Preprocessor
 
 Slang supports a C-style preprocessor with the following directives:
 
-* `#include`
-* `#define`
-* `#undef`
-* `#if`, `#ifdef`, `#ifndef`
-* `#else`, `#elif`
-* `#endif`
-* `#error`
-* `#warning`
-* `#line`
-* `#pragma`, including `#pragma once`
+- `#include`
+- `#define`
+- `#undef`
+- `#if`, `#ifdef`, `#ifndef`
+- `#else`, `#elif`
+- `#endif`
+- `#error`
+- `#warning`
+- `#line`
+- `#pragma`, including `#pragma once`
 
 Variadic macros are supported by the Slang preprocessor.
 
-> #### Note ####
+> #### Note
+>
 > The use of `#include` in new code is discouraged as this functionality has
 > been superseded by the module system, please refer to
 > [Modules and Access Control](04-modules-and-access-control.md)
 
-Attributes
-----------
+## Attributes
 
 _Attributes_ are a general syntax for decorating declarations and statements with additional semantic information or metadata.
 Attributes are surrounded with square brackets (`[]`) and prefix the declaration or statement they apply to.
@@ -539,14 +564,14 @@ for(int i = 0; i < n; i++)
 { /* ... */ }
 ```
 
-> #### Note ####
+> #### Note
+>
 > Traditionally, all attributes in HLSL used a single layer of `[]` brackets, matching C#.
 > Later, C++ borrowed the idea from C# but used two layers of brackets (`[[]]`).
 > Some recent extensions to HLSL have used the C++-style double brackets instead of the existing single-bracket syntax.
 > Slang tries to support both alternatives uniformly.
 
-Global Variables and Shader Parameters
---------------------------------------
+## Global Variables and Shader Parameters
 
 By default, global-scope variable declarations in Slang represent _shader parameters_ passed from host application code into GPU code.
 Programmers must explicitly mark a global-scope variable with `static` for it not to be treated as a shader parameter, even if the variable is marked `const`:
@@ -571,10 +596,11 @@ A global-scope `static const` variable defines a compile-time constant for use i
 
 ### Global-Scope Static Variables
 
-A non-`const` global-scope `static` variable is conceptually similar to a global variable in C/C++, with the key difference that it has distinct storage per *thread* rather than being truly global.
+A non-`const` global-scope `static` variable is conceptually similar to a global variable in C/C++, with the key difference that it has distinct storage per _thread_ rather than being truly global.
 Each logical thread of shader execution initiated by the GPU will be allocated fresh storage for these `static` variables, and values written to those variables will be lost when a shader thread terminates.
 
-> #### Note ####
+> #### Note
+>
 > Some target platforms do not support `static` global variables in all use cases.
 > Support for `static` global variables should be seen as a legacy feature, and further use is discouraged.
 
@@ -647,13 +673,13 @@ Texture2D b;
 
 A single parameter may use both the D3D-style and Vulkan-style markup, but in each case explicit binding markup only applies to the API family for which it was designed.
 
-> #### Note ####
+> #### Note
+>
 > Explicit binding markup is tedious to write and error-prone to maintain.
 > It is almost never required in Slang codebases.
 > The Slang compiler can automatically synthesize bindings in a completely deterministic fashion and in most cases the bindings it generates are what a programmer would have written manually.
 
-Shader Entry Points
--------------------
+## Shader Entry Points
 
 An _entry point_ is a function that can be used as the starting point for execution of a GPU thread.
 
@@ -681,7 +707,8 @@ For compatibility with legacy codebases, Slang supports code that leaves off `[s
 Such entry points will not be found via `IModule::findEntryPointByName()`. Instead `IModule::findAndCheckEntryPoint()` must be used, and a stage must be specified.
 It is recommended that new codebases always use `[shader(...)]` attributes both to simplify their workflow, and to make code more explicit and "self-documenting."
 
-> #### Note ####
+> #### Note
+>
 > In GLSL, a file of shader code may only include one entry point, and all code `#include`d into that file must be compatible with the stage of that entry point. By default, GLSL requires that an entry point be called `main`.
 > Slang allows for multiple entry points to appear in a file, for any combination of stage, and with any valid identifier as a name.
 
@@ -715,7 +742,8 @@ For example, in a vertex shader the `SV_Position` binding semantic on an output 
 The set of allowed system-defined binding semantics for inputs and outputs depends on the pipeline and stage of an entry point.
 Some system-defined binding semantics may only be available on specific targets or specific versions of those targets.
 
-> #### Note ####
+> #### Note
+>
 > Instead of using ordinary function parameters with system-defined binding semantics, GLSL uses special system-defined global variables with the `gl_` name prefix.
 > Some recent HLSL features have introduced special globally-defined functions that behave similarly to these `gl_` globals.
 
@@ -730,13 +758,14 @@ Whether or not inputs and outputs with user-defined binding semantics are allowe
 
 Different APIs and different stages within the same API may match up entry point inputs/outputs with user-defined binding semantics in one of two ways:
 
-* By-index matching: user-defined outputs from one stage and inputs to the next are matched up by order of declaration. The types of matching output/input parameters must either be identical or compatible (according to API-specific rules). Some APIs also require that the binding semantics of matching output/input parameters are identical.
+- By-index matching: user-defined outputs from one stage and inputs to the next are matched up by order of declaration. The types of matching output/input parameters must either be identical or compatible (according to API-specific rules). Some APIs also require that the binding semantics of matching output/input parameters are identical.
 
-* By-name matching: user-defined outputs from one stage and inputs to the next are matched up by their binding semantics. The types of matching output/input parameters must either be identical or compatible (according to API-specific rules). The order of declaration of the parameters need not match.
+- By-name matching: user-defined outputs from one stage and inputs to the next are matched up by their binding semantics. The types of matching output/input parameters must either be identical or compatible (according to API-specific rules). The order of declaration of the parameters need not match.
 
-Because the matching policy may differ across APIs, the only completely safe option is for parameters passed between pipeline stages to match in terms of order, type, *and* binding semantic.
+Because the matching policy may differ across APIs, the only completely safe option is for parameters passed between pipeline stages to match in terms of order, type, _and_ binding semantic.
 
-> #### Note ####
+> #### Note
+>
 > Instead of using ordinary function parameters for user-defined varying inputs/outputs, GLSL uses global-scope variable declarations marked with the `in` or `out` modifier.
 
 ### Entry-Point Uniform Parameters
@@ -745,12 +774,12 @@ In the `vertexMain` entry point, the `mvp` parameter is an _entry-point uniform 
 
 Entry-point uniform parameters are semantically similar to global-scope shader parameters, but do not pollute the global scope.
 
-> #### Note ####
+> #### Note
+>
 > GLSL does not support entry-point `uniform` parameters; all shader parameters must be declared at the global scope.
 > Historically, HLSL has supported entry-point `uniform` parameters, but this feature was dropped by recent compilers.
 
-Mixed Shader Entry Points
---------------------------
+## Mixed Shader Entry Points
 
 Through the `[shader(...)]` syntax, users of Slang can freely combine multiple entry points into the same file. This can be especially convenient for reuse between entry points which have a logical connection.
 
@@ -778,7 +807,8 @@ void missProgram(out Payload payload) {
 }
 ```
 
-> #### Note ####
+> #### Note
+>
 > GLSL does not support multiple entry points; however, SPIR-V does. Vulkan users wanting to take advantage of Slang mixed entry points must pass `-fvk-use-entrypoint-name` and `-emit-spirv-directly` as compiler arguments.
 
 ### Mixed Entry-Point Uniform Parameters
@@ -822,15 +852,16 @@ Compute entry points lack "local root signatures" in D3D12, and likewise Vulkan 
 Leaving that entry point scope "pops" that global uniform parameter such that `localUniform2` can reuse the same binding location for `computeMain2`.
 However, local uniforms for ray tracing shaders map to the corresponding "local" hit records in the shader binding table, and so no "push" or "pop" to the global root signature / pipeline layouts occurs for these parameters.
 
-Auto-Generated Constructors
-----------
+## Auto-Generated Constructors
 
 ### Auto-Generated Constructors - Struct
 
 Slang has the following rules:
+
 1. Auto-generate a `__init()` if not already defined.
 
    Assume:
+
    ```csharp
    struct DontGenerateCtor
    {
@@ -838,7 +869,7 @@ Slang has the following rules:
        int b = 5;
 
        // Since the user has explicitly defined a constructor
-       // here, Slang will not synthesize a conflicting 
+       // here, Slang will not synthesize a conflicting
        // constructor.
        __init()
        {
@@ -852,7 +883,7 @@ Slang has the following rules:
    {
        int a;
        int b = 5;
-   
+
        // Slang will automatically generate an implicit constructor:
        // __init()
        // {
@@ -862,6 +893,7 @@ Slang has the following rules:
    ```
 
 2. If all members have equal visibility, auto-generate a 'member-wise constructor' if it does not conflict with a user-defined constructor.
+
    ```csharp
    struct GenerateCtorInner
    {
@@ -894,20 +926,20 @@ Slang has the following rules:
 3. If not all members have equal visibility, auto-generate a 'member-wise constructor' based on member visibility if it does not conflict with a user-defined constructor.
 
    We generate 3 different visibilities of 'member-wise constructors' in order:
-      1. `public` 'member-wise constructor'
-         - Contains members of visibility: `public`
-         - Do not generate if `internal` or `private` member lacks an init expression
-      2. `internal` 'member-wise constructor'
-         - Contains members of visibility: `internal`, `public`
-         - Do not generate if `private` member lacks an init expression
-      3. `private` 'member-wise constructor'
-         - Contains members of visibility: `private`, `internal`, `public`
+   1. `public` 'member-wise constructor'
+      - Contains members of visibility: `public`
+      - Do not generate if `internal` or `private` member lacks an init expression
+   2. `internal` 'member-wise constructor'
+      - Contains members of visibility: `internal`, `public`
+      - Do not generate if `private` member lacks an init expression
+   3. `private` 'member-wise constructor'
+      - Contains members of visibility: `private`, `internal`, `public`
 
    ```csharp
    struct GenerateCtorInner1
    {
        internal int a = 0;
-    
+
        // Slang will automatically generate an implicit
        // internal __init(int in_a)
        // {
@@ -970,8 +1002,8 @@ Slang has the following rules:
    };
    ```
 
-Initializer Lists
-----------
+## Initializer Lists
+
 Initializer Lists are an expression of the form `{...}`.
 
 ```csharp
@@ -1021,11 +1053,12 @@ float3 a[2] = {1,2,3, 4,5,6};
 ### Initializer Lists - Struct
 
 In most scenarios, using an initializer list to create a struct typed value is equivalent to calling the struct's constructor using the elements in the initializer list as arguments for the constructor, for example:
+
 ```csharp
 struct GenerateCtorInner1
 {
     internal int a = 0;
-    
+
     // Slang will automatically generate an implicit
     // internal __init(int in_a)
     // {
@@ -1085,6 +1118,7 @@ GenerateCtor1 val[2] = { { 3 }, { 2 } };
 In addition, Slang also provides compatibility support for C-style initializer lists with `struct`s. C-style initializer lists can use [Partial Initializer Lists](#Partial-Initializer-Lists) and [Flattened Array Initializer With Structs](#Flattened-Array-Initializer-With-Structs).
 
 A struct is considered a C-style struct if:
+
 1. User never defines a custom constructor with **more than** 0 parameters
 2. All member variables in a `struct` have the same visibility (`public` or `internal` or `private`).
 
@@ -1123,7 +1157,6 @@ struct Foo
 Foo val[2] = {0,1,2, 3,4,5};
 ```
 
-
 ### Initializer Lists - Default Initializer
 
 `{}` will default initialize a value:
@@ -1131,6 +1164,7 @@ Foo val[2] = {0,1,2, 3,4,5};
 #### Non-Struct Type
 
 Value will zero-initialize
+
 ```csharp
 // Equivalent to `int val1 = 0;`
 int val1 = {};

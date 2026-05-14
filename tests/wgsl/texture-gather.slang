@@ -83,15 +83,15 @@ SamplerState samplerState;
 SamplerComparisonState depthSampler;
 
 
-bool TEST_textureGather<T>(
+bool TEST_textureGather<T:ITexelElement>(
     Texture2D<T> t2D,
     TextureCube<T> tCube,
     Texture2DArray<T> t2DArray,
     TextureCubeArray<T> tCubeArray)
-    where T:IArithmetic,ITexelElement
+    where T.DataType : IArithmetic
 {
     // WGSL-LABEL: TEST_textureGather
-    typealias Tv4 = vector<T.Element,4>;
+    typealias Tv4 = vector<T.DataType.Element,4>;
 
     float u = 0;
     float u2 = 0.5;
@@ -103,90 +103,90 @@ bool TEST_textureGather<T>(
         // ==================================
 
         // WGSL-COUNT-2: textureGather({{.*}}0{{.*}}t2D
-        && all(Tv4(T.Element(0)) == t2D.Gather(samplerState, float2(u, u)))
-        && all(Tv4(T.Element(0)) == t2D.Gather(samplerState, float2(u2, u), int2(0,0)))
+        && all(Tv4(T.DataType.Element(0)) == t2D.Gather(samplerState, float2(u, u)))
+        && all(Tv4(T.DataType.Element(0)) == t2D.Gather(samplerState, float2(u2, u), int2(0,0)))
 
         // WGSL: textureGather({{.*}}0{{.*}}tCube
-        && all(Tv4(T.Element(0)) == tCube.Gather(samplerState, normalize(float3(u, 1 - u, u))))
+        && all(Tv4(T.DataType.Element(0)) == tCube.Gather(samplerState, normalize(float3(u, 1 - u, u))))
 
         // WGSL-COUNT-2: textureGather({{.*}}0{{.*}}t2DArray
-        && all(Tv4(T.Element(0)) == t2DArray.Gather(samplerState, float3(u, u, 0)))
-        && all(Tv4(T.Element(0)) == t2DArray.Gather(samplerState, float3(u2, u, 0), int2(0,0)))
+        && all(Tv4(T.DataType.Element(0)) == t2DArray.Gather(samplerState, float3(u, u, 0)))
+        && all(Tv4(T.DataType.Element(0)) == t2DArray.Gather(samplerState, float3(u2, u, 0), int2(0,0)))
 
         // WGSL: textureGather({{.*}}0{{.*}}tCubeArray
-        && all(Tv4(T.Element(0)) == tCubeArray.Gather(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
+        && all(Tv4(T.DataType.Element(0)) == tCubeArray.Gather(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
         // ==================================
         // vector<T,4> GatherRed()
         // ==================================
 
         // WGSL-COUNT-2: textureGather({{.*}}0{{.*}}t2D
-        && all(Tv4(T.Element(0)) == t2D.GatherRed(samplerState, float2(u, u)))
-        && all(Tv4(T.Element(0)) == t2D.GatherRed(samplerState, float2(u2, u), int2(0,0)))
+        && all(Tv4(T.DataType.Element(0)) == t2D.GatherRed(samplerState, float2(u, u)))
+        && all(Tv4(T.DataType.Element(0)) == t2D.GatherRed(samplerState, float2(u2, u), int2(0,0)))
 
         // WGSL: textureGather({{.*}}0{{.*}}tCube
-        && all(Tv4(T.Element(0)) == tCube.GatherRed(samplerState, normalize(float3(u, 1 - u, u))))
+        && all(Tv4(T.DataType.Element(0)) == tCube.GatherRed(samplerState, normalize(float3(u, 1 - u, u))))
 
         // WGSL-COUNT-2: textureGather({{.*}}0{{.*}}t2DArray
-        && all(Tv4(T.Element(0)) == t2DArray.GatherRed(samplerState, float3(u, u, 0)))
-        && all(Tv4(T.Element(0)) == t2DArray.GatherRed(samplerState, float3(u2, u, 0), int2(0,0)))
+        && all(Tv4(T.DataType.Element(0)) == t2DArray.GatherRed(samplerState, float3(u, u, 0)))
+        && all(Tv4(T.DataType.Element(0)) == t2DArray.GatherRed(samplerState, float3(u2, u, 0), int2(0,0)))
 
         // WGSL: textureGather({{.*}}0{{.*}}tCubeArray
-        && all(Tv4(T.Element(0)) == tCubeArray.GatherRed(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
+        && all(Tv4(T.DataType.Element(0)) == tCubeArray.GatherRed(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
         // ==================================
         // vector<T,4> GatherGreen()
         // ==================================
 
         // WGSL-COUNT-2: textureGather({{.*}}1{{.*}}t2D
-        && all(Tv4(T.Element(0)) == t2D.GatherGreen(samplerState, float2(u, u)))
-        && all(Tv4(T.Element(0)) == t2D.GatherGreen(samplerState, float2(u2, u), int2(0,0)))
+        && all(Tv4(T.DataType.Element(0)) == t2D.GatherGreen(samplerState, float2(u, u)))
+        && all(Tv4(T.DataType.Element(0)) == t2D.GatherGreen(samplerState, float2(u2, u), int2(0,0)))
 
         // WGSL: textureGather({{.*}}1{{.*}}tCube
-        && all(Tv4(T.Element(0)) == tCube.GatherGreen(samplerState, normalize(float3(u, 1 - u, u))))
+        && all(Tv4(T.DataType.Element(0)) == tCube.GatherGreen(samplerState, normalize(float3(u, 1 - u, u))))
 
         // WGSL-COUNT-2: textureGather({{.*}}1{{.*}}t2DArray
-        && all(Tv4(T.Element(0)) == t2DArray.GatherGreen(samplerState, float3(u, u, 0)))
-        && all(Tv4(T.Element(0)) == t2DArray.GatherGreen(samplerState, float3(u2, u, 0), int2(0,0)))
+        && all(Tv4(T.DataType.Element(0)) == t2DArray.GatherGreen(samplerState, float3(u, u, 0)))
+        && all(Tv4(T.DataType.Element(0)) == t2DArray.GatherGreen(samplerState, float3(u2, u, 0), int2(0,0)))
 
         // WGSL: textureGather({{.*}}1{{.*}}tCubeArray
-        && all(Tv4(T.Element(0)) == tCubeArray.GatherGreen(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
+        && all(Tv4(T.DataType.Element(0)) == tCubeArray.GatherGreen(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
         // ==================================
         // vector<T,4> GatherBlue()
         // ==================================
 
         // WGSL-COUNT-2: textureGather({{.*}}2{{.*}}t2D
-        && all(Tv4(T.Element(0)) == t2D.GatherBlue(samplerState, float2(u, u)))
-        && all(Tv4(T.Element(0)) == t2D.GatherBlue(samplerState, float2(u2, u), int2(0,0)))
+        && all(Tv4(T.DataType.Element(0)) == t2D.GatherBlue(samplerState, float2(u, u)))
+        && all(Tv4(T.DataType.Element(0)) == t2D.GatherBlue(samplerState, float2(u2, u), int2(0,0)))
 
         // WGSL: textureGather({{.*}}2{{.*}}tCube
-        && all(Tv4(T.Element(0)) == tCube.GatherBlue(samplerState, normalize(float3(u, 1 - u, u))))
+        && all(Tv4(T.DataType.Element(0)) == tCube.GatherBlue(samplerState, normalize(float3(u, 1 - u, u))))
 
         // WGSL-COUNT-2: textureGather({{.*}}2{{.*}}t2DArray
-        && all(Tv4(T.Element(0)) == t2DArray.GatherBlue(samplerState, float3(u, u, 0)))
-        && all(Tv4(T.Element(0)) == t2DArray.GatherBlue(samplerState, float3(u2, u, 0), int2(0,0)))
+        && all(Tv4(T.DataType.Element(0)) == t2DArray.GatherBlue(samplerState, float3(u, u, 0)))
+        && all(Tv4(T.DataType.Element(0)) == t2DArray.GatherBlue(samplerState, float3(u2, u, 0), int2(0,0)))
 
         // WGSL: textureGather({{.*}}2{{.*}}tCubeArray
-        && all(Tv4(T.Element(0)) == tCubeArray.GatherBlue(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
+        && all(Tv4(T.DataType.Element(0)) == tCubeArray.GatherBlue(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
         // ==================================
         // vector<T,4> GatherAlpha()
         // ==================================
 
         // WGSL-COUNT-2: textureGather({{.*}}3{{.*}}t2D
-        && all(Tv4(T.Element(0)) == t2D.GatherAlpha(samplerState, float2(u, u)))
-        && all(Tv4(T.Element(0)) == t2D.GatherAlpha(samplerState, float2(u2, u), int2(0,0)))
+        && all(Tv4(T.DataType.Element(0)) == t2D.GatherAlpha(samplerState, float2(u, u)))
+        && all(Tv4(T.DataType.Element(0)) == t2D.GatherAlpha(samplerState, float2(u2, u), int2(0,0)))
 
         // WGSL: textureGather({{.*}}3{{.*}}tCube
-        && all(Tv4(T.Element(0)) == tCube.GatherAlpha(samplerState, normalize(float3(u, 1 - u, u))))
+        && all(Tv4(T.DataType.Element(0)) == tCube.GatherAlpha(samplerState, normalize(float3(u, 1 - u, u))))
 
         // WGSL-COUNT-2: textureGather({{.*}}3{{.*}}t2DArray
-        && all(Tv4(T.Element(0)) == t2DArray.GatherAlpha(samplerState, float3(u, u, 0)))
-        && all(Tv4(T.Element(0)) == t2DArray.GatherAlpha(samplerState, float3(u2, u, 0), int2(0,0)))
+        && all(Tv4(T.DataType.Element(0)) == t2DArray.GatherAlpha(samplerState, float3(u, u, 0)))
+        && all(Tv4(T.DataType.Element(0)) == t2DArray.GatherAlpha(samplerState, float3(u2, u, 0), int2(0,0)))
 
         // WGSL: textureGather({{.*}}3{{.*}}tCubeArray
-        && all(Tv4(T.Element(0)) == tCubeArray.GatherAlpha(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
+        && all(Tv4(T.DataType.Element(0)) == tCubeArray.GatherAlpha(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
         ;
 }
 

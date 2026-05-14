@@ -190,6 +190,16 @@ void DeclRefIntVal::_toTextOverride(StringBuilder& out)
     }
 }
 
+Val* DeclRefIntVal::_resolveImplOverride()
+{
+    // A value-level member lookup such as `T.format` can resolve through an interface witness to
+    // the concrete integer value supplied by a conforming type.
+    auto resolvedDeclRef = getDeclRef().declRefBase->resolve();
+    if (auto resolvedVal = as<IntVal>(resolvedDeclRef))
+        return resolvedVal;
+    return this;
+}
+
 Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet subst, int* ioDiff)
 {
     // search for a substitution that might apply to us

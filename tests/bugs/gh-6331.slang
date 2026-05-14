@@ -47,18 +47,9 @@ public struct RWRenderBuffer2D<T : ITexelElement> {
     [ForceInline] public uint64_t getPixelCount() { return (uint64_t)(size[0]) * (uint64_t)(size[1]); }
 }
 
-__generic<T : __BuiltinFloatingPointType>
-public extension RWRenderBuffer2D<T> where T : ITexelElement {
+public extension RWRenderBuffer2D<float4> {
     [ForceInline]
-    public void accumulate(uint32_t2 pDestIdx, uint64_t pSampleIdx, T pSampleValue) {
-        uint32_t2 lIndex = offset + pDestIdx;
-        handle[lIndex] = accumulateSample(pSampleIdx, handle[lIndex], pSampleValue);
-    }
-}
-__generic<T : __BuiltinFloatingPointType, let N : int>
-public extension RWRenderBuffer2D<vector<T, N>> where vector<T,N>:ITexelElement {
-    [ForceInline]
-    public void accumulate(uint32_t2 pDestIdx, uint64_t pSampleIdx, vector<T, N> pSampleValue) {
+    public void accumulate(uint32_t2 pDestIdx, uint64_t pSampleIdx, float4 pSampleValue) {
         uint32_t2 lIndex = offset + pDestIdx;
         handle[lIndex] = accumulateSample(pSampleIdx, handle[lIndex], pSampleValue);
     }

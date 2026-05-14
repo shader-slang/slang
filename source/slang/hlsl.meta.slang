@@ -537,10 +537,10 @@ __generic<T, let N:int>
 vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 
 //@public:
-/// Represent types that can be used as texel element.
+/// Represents data types that can be used to read, write, or sample texels.
 [sealed]
 [builtin]
-interface ITexelElement
+interface ITexelDataType
 {
     associatedtype Element : __BuiltinArithmeticType;
     static const int elementCount;
@@ -548,11 +548,29 @@ interface ITexelElement
     __init(Element x);
 }
 
-extension<T:__BuiltinArithmeticType> T : ITexelElement
+/// Represents types that can be used as public texture type arguments.
+///
+/// A texel element can be a concrete data type such as `float4`, or a storage
+/// format descriptor such as `rgba16f`.
+[sealed]
+[builtin]
+interface ITexelElement
+{
+    associatedtype Element : __BuiltinArithmeticType;
+    static const int elementCount;
+    associatedtype DataType : ITexelDataType where DataType.Element == Element;
+    static const int format;
+    [OverloadRank(-1)]
+    __init(Element x);
+}
+
+extension<T:__BuiltinArithmeticType> T : ITexelDataType, ITexelElement
 {
     typealias Element = T;
+    typealias DataType = T;
     static const int elementCount = 1;
-    __intrinsic_op(0) __init(Element x);
+    static const int format = 0;
+    __intrinsic_op(0) __init(T x);
 }
 
 ${
@@ -570,53 +588,163 @@ const char* texeElementScalarTypes[] = {
 for (auto elementType : texeElementScalarTypes)
 {
 $}
-extension<int N> vector<$(elementType), N> : ITexelElement
+extension<int N> vector<$(elementType), N> : ITexelDataType, ITexelElement
 {
     typealias Element = $(elementType);
+    typealias DataType = vector<$(elementType), N>;
     static const int elementCount = N;
-    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
+    static const int format = 0;
+    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init($(elementType) x);
 }
 ${
 } // end for texelElementScalarTypes.
 $}
 
 // Additional 64-bit types that can be used as texel element.
-extension double:ITexelElement
+extension double : ITexelDataType, ITexelElement
 {
     typealias Element = double;
+    typealias DataType = double;
     static const int elementCount = 1;
-    __intrinsic_op(0) __init(Element x);
+    static const int format = 0;
+    __intrinsic_op(0) __init(double x);
 }
-extension double2:ITexelElement
+extension double2 : ITexelDataType, ITexelElement
 {
     typealias Element = double;
+    typealias DataType = double2;
     static const int elementCount = 2;
-    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
+    static const int format = 0;
+    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(double x);
 }
-extension uint64_t:ITexelElement
+extension uint64_t : ITexelDataType, ITexelElement
 {
     typealias Element = uint64_t;
+    typealias DataType = uint64_t;
     static const int elementCount = 1;
-    __intrinsic_op(0) __init(Element x);
+    static const int format = 0;
+    __intrinsic_op(0) __init(uint64_t x);
 }
-extension int64_t:ITexelElement
+extension int64_t : ITexelDataType, ITexelElement
 {
     typealias Element = int64_t;
+    typealias DataType = int64_t;
     static const int elementCount = 1;
-    __intrinsic_op(0) __init(Element x);
+    static const int format = 0;
+    __intrinsic_op(0) __init(int64_t x);
 }
-extension vector<uint64_t,2>:ITexelElement
+extension vector<uint64_t,2> : ITexelDataType, ITexelElement
 {
     typealias Element = uint64_t;
+    typealias DataType = vector<uint64_t,2>;
     static const int elementCount = 2;
-    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
+    static const int format = 0;
+    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(uint64_t x);
 }
-extension vector<int64_t,2>:ITexelElement
+extension vector<int64_t,2> : ITexelDataType, ITexelElement
 {
     typealias Element = int64_t;
+    typealias DataType = vector<int64_t,2>;
     static const int elementCount = 2;
-    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
+    static const int format = 0;
+    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(int64_t x);
 }
+
+${
+struct TexelFormatTypeInfo
+{
+    const char* name;
+    int elementCount;
+    int format;
+};
+
+enum class TexelImageFormat
+{
+#define SLANG_FORMAT(NAME, DESC) NAME,
+#include "slang-image-format-defs.h"
+};
+
+auto strEqual = [](const char* left, const char* right)
+{
+    for (; *left || *right; left++, right++)
+    {
+        if (*left != *right)
+            return false;
+    }
+    return true;
+};
+
+auto strEndsWith = [](const char* text, const char* suffix)
+{
+    const char* textEnd = text;
+    const char* suffixEnd = suffix;
+    while (*textEnd)
+        textEnd++;
+    while (*suffixEnd)
+        suffixEnd++;
+
+    for (; suffixEnd != suffix; textEnd--, suffixEnd--)
+    {
+        if (textEnd == text || textEnd[-1] != suffixEnd[-1])
+            return false;
+    }
+    return true;
+};
+
+auto getTexelFormatElementType = [&](const char* name) -> const char*
+{
+    if (strEqual(name, "r64ui"))
+        return "uint64_t";
+    if (strEqual(name, "r64i"))
+        return "int64_t";
+    if (strEqual(name, "rgb10_a2ui") || strEndsWith(name, "ui"))
+        return "uint";
+    if (strEndsWith(name, "i"))
+        return "int";
+    return "float";
+};
+
+auto getTexelFormatDataType = [](const char* elementType, int elementCount) -> String
+{
+    if (elementCount == 1)
+        return String(elementType);
+
+    StringBuilder sb;
+    sb << elementType << elementCount;
+    return sb.produceString();
+};
+
+#define SLANG_TEXEL_FORMAT_ELEMENT_COUNT(TYPE, COUNT, SIZE) COUNT
+#define SLANG_FORMAT(NAME, DESC) \
+    {#NAME, SLANG_TEXEL_FORMAT_ELEMENT_COUNT DESC, int(TexelImageFormat::NAME)},
+TexelFormatTypeInfo texelFormatTypes[] =
+{
+#include "slang-image-format-defs.h"
+};
+#undef SLANG_TEXEL_FORMAT_ELEMENT_COUNT
+
+for (auto texelFormatType : texelFormatTypes)
+{
+    if (texelFormatType.elementCount == 0)
+        continue;
+
+    const char* elementType = getTexelFormatElementType(texelFormatType.name);
+    String dataType = getTexelFormatDataType(elementType, texelFormatType.elementCount);
+$}
+/// Represents the `$(texelFormatType.name)` storage format for texture type parameters.
+/// @category texture_types
+[sealed]
+struct $(texelFormatType.name) : ITexelElement
+{
+    typealias Element = $(elementType);
+    typealias DataType = $(dataType);
+    static const int elementCount = $(texelFormatType.elementCount);
+    static const int format = $(texelFormatType.format);
+    __intrinsic_op(0) __init($(elementType) x) {}
+}
+${
+}
+$}
 
 //@public:
 /// A parameterized type that represents all flavors of texture types supported by the Slang language.
@@ -624,7 +752,7 @@ extension vector<int64_t,2>:ITexelElement
 /// of the generic arguments are valid.
 /// Instead, use the specific texture types such as `Texture1D`, `Texture2DArray` and `Sampler2D` etc.
 /// This documentation is provided for reference purposes only.
-/// @param T The element type of the texture. Must be a scalar or vector type.
+/// @param T The data type used to read, write, or sample texels. Must be a scalar or vector type.
 /// @param Shape The shape of the texture. Must be one of `__Shape1D`, `__Shape2D`, `__Shape3D`, `__ShapeCube` or `__ShapeBuffer`.
 /// @param isArray Indicates whether the texture is an array texture.
 /// @param isMS Indicates whether the texture is a multisampled texture.
@@ -632,7 +760,7 @@ extension vector<int64_t,2>:ITexelElement
 /// @param access The access mode of the texture. 0 for read-only, 1 for read-write, 2 for write-only, 3 for rasterizer-ordered, 4 for feedback.
 /// @param isShadow Indicates whether the texture is a depth texture (`isCombined==0`) or a shadow texture (`isCombined==1`).
 /// @param isCombined Indicates whether the texture is a combined texture-sampler.
-/// @param format The storage format of the texture. Users should specify the format using an `[format("...")]` attribute instead.
+/// @param format The storage format of the texture. Users should use public texture format types such as `rgba16f` instead.
 /// @see `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`, `Texture1DArray`,
 /// `Texture2DArray`, `TextureCubeArray`, `Sampler1D`, `Sampler2D`, `Sampler3D`, `SamplerCube`, `Sampler1DArray`, `Sampler2DArray`, `SamplerCubeArray`,
 /// `Texture2DMS`, `Texture2DMSArray`, `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `RWTexture1DArray`, `RWTexture2DArray`,
@@ -641,9 +769,9 @@ extension vector<int64_t,2>:ITexelElement
 /// HLSL texture types are implemented as typealiases to the builtin `_Texture` type. Users
 /// are advised to use the HLSL-specific texture types instead of `_Texture` directly.
 ///
-/// For read-write textures, Slang will automatically infer `format` from `T`.
-/// To explicitly specify texel storage formats for read-write textures,
-/// use the `[format("formatString")]` attribute on the texture parameter declaration.
+/// For public texture aliases, Slang infers `format` from explicit texture format types such as `rgba16f`.
+/// Plain scalar and vector types use an unknown format. The `[format("formatString")]` attribute remains supported
+/// for compatibility with existing declarations.
 /// Allowed `formatString` values are:
 ///
 /// |id | Format string        | Meaning           |
@@ -781,7 +909,7 @@ extension vector<int64_t,2>:ITexelElement
 /// @category texture_types Texture types
 __magic_type(TextureType)
 __intrinsic_type($(kIROp_TextureType))
-struct _Texture<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+struct _Texture<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 {
 }
 
@@ -1050,11 +1178,11 @@ float __glsl_texture_level_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture 
 }
 
 __intrinsic_op($(kIROp_MetalCastToDepthTexture))
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 _Texture<T,Shape,isArray,isMS,sampleCount,access,1,isCombined,format> __metal_asDepthTexture(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> tex);
 
 [require(wgsl)]
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 void __wgsl_check_texture_type()
 {
     // Texel element type checks
@@ -1093,7 +1221,7 @@ void __wgsl_check_texture_type()
         , "WGSL: unhandled texture access type");
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 void __wgsl_check_texture_type_texel_offset()
 {
      __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -1104,7 +1232,7 @@ void __wgsl_check_texture_type_texel_offset()
 
 //@public:
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 {
     //@hidden:
@@ -2195,7 +2323,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
 // Non-combined texture types specific functions
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
 {
     typealias TextureCoord = vector<float, Shape.dimensions>;
@@ -2292,7 +2420,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
         }
     }
 }
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let format:int>
 float __metal_SampleCmp(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,format> t, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
 {
     if (isArray == 1)
@@ -2316,7 +2444,7 @@ float __metal_SampleCmp(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,format> 
     }
     __intrinsic_asm "<invalid intrinsic>";
 }
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let format:int>
 float __metal_SampleCmp(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,format> t, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
 {
     if (isArray == 1)
@@ -2338,7 +2466,7 @@ float __metal_SampleCmp(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,format> 
     __intrinsic_asm "<invalid intrinsic>";
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let format:int>
 float __metal_SampleCmpLevel(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,format> t, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level)
 {
     if (isArray == 1)
@@ -2362,7 +2490,7 @@ float __metal_SampleCmpLevel(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,for
     }
     __intrinsic_asm "<invalid intrinsic>";
 }
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let format:int>
 float __metal_SampleCmpLevel(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,format> t, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset)
 {
     switch (Shape.flavor)
@@ -2383,7 +2511,7 @@ float __metal_SampleCmpLevel(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,for
     __intrinsic_asm "<invalid intrinsic>";
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
     //@hidden:
@@ -3697,7 +3825,7 @@ for (int isMS = 0; isMS <= 1; isMS++) {
     TextureTypeInfo textureTypeInfo(kBaseTextureShapes[shapeIndex], isArray, isMS, 0, sb, path);
 $}
 
-__generic<T:ITexelElement, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+__generic<T:ITexelDataType, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 extension _Texture<T,$(shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined,format>
 {
     ${
@@ -3710,7 +3838,7 @@ ${
 $}
 
 // Texture.GetSamplePosition(int s);
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 extension _Texture<T,Shape,isArray,1,sampleCount,access,isShadow,isCombined,format>
 {
     [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_vertex_fragment_geometry)]
@@ -3722,7 +3850,7 @@ Array<T,4> __makeArray<T>(T v0, T v1, T v2, T v3);
 
 
 // Beginning of Texture Gather
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<T.Element,4> __texture_gather(
@@ -3800,7 +3928,7 @@ vector<T.Element,4> __texture_gather(
     }
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<T.Element,4> __texture_gather(
@@ -3819,7 +3947,7 @@ vector<T.Element,4> __texture_gather(
     }
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<T.Element,4> __texture_gather_offset(
@@ -3888,7 +4016,7 @@ vector<T.Element,4> __texture_gather_offset(
     }
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<T.Element,4> __texture_gather_offset(
@@ -3909,7 +4037,7 @@ vector<T.Element,4> __texture_gather_offset(
     }
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<T.Element,4> __texture_gather_offsets(
@@ -3936,7 +4064,7 @@ vector<T.Element,4> __texture_gather_offsets(
     }
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<T.Element,4> __texture_gather_offsets(
@@ -3961,7 +4089,7 @@ vector<T.Element,4> __texture_gather_offsets(
     }
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<T.Element,4> __texture_gatherCmp(
@@ -4018,7 +4146,7 @@ vector<T.Element,4> __texture_gatherCmp(
     }
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<T.Element,4> __texture_gatherCmp(
@@ -4037,7 +4165,7 @@ vector<T.Element,4> __texture_gatherCmp(
     }
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<T.Element,4> __texture_gatherCmp_offset(
@@ -4089,7 +4217,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
     }
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<T.Element,4> __texture_gatherCmp_offset(
@@ -4109,7 +4237,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
     }
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<T.Element,4> __texture_gatherCmp_offsets(
@@ -4136,7 +4264,7 @@ vector<T.Element,4> __texture_gatherCmp_offsets(
     }
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<T.Element,4> __texture_gatherCmp_offsets(
@@ -4167,7 +4295,7 @@ for (int isCombined = 0; isCombined < 2; isCombined++)
 $}
 // Gather for [isCombined = $(isCombined)]
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,$(isCombined),format>
 {
 ${
@@ -4345,7 +4473,7 @@ $}
 
 // Load/Subscript for readonly, no MS textures
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
 extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 {
 //@hidden:
@@ -4638,7 +4766,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 
 // Texture Load/Subscript for readonly, MS textures
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
 extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 {
 //@hidden:
@@ -4858,7 +4986,7 @@ ${
         const char* glslIntrinsicMSOffset = "$cimageLoad($0, ($1)+($3), $2)$z";
 $}
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
 {
     //@hidden:
@@ -5200,7 +5328,7 @@ $}
 
 // RW MS textures.
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
 {
     //@hidden:
@@ -5357,7 +5485,7 @@ ${
 $}
 
 // Definitions to support the legacy texture .mips[][] operator.
-struct __TextureMip<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+struct __TextureMip<T:ITexelDataType, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
     _Texture<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
     int mip;
@@ -5368,7 +5496,7 @@ struct __TextureMip<T:ITexelElement, Shape : __ITextureShape, let isArray : int,
     }
 }
 
-struct __TextureMips<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+struct __TextureMips<T:ITexelDataType, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
     _Texture<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
     __subscript(int mip)->__TextureMip<T, Shape, isArray, isCombined, format>
@@ -5379,7 +5507,7 @@ struct __TextureMips<T:ITexelElement, Shape : __ITextureShape, let isArray : int
 }
 
 //@hidden:
-__generic<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+__generic<T:ITexelDataType, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 extension _Texture<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
 {
     property __TextureMips<T, Shape, isArray, isCombined, format> mips
@@ -5390,7 +5518,7 @@ extension _Texture<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*
 }
 
 // Definitions to support the .sample[][] operator.
-struct __TextureSample<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+struct __TextureSample<T:ITexelDataType, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
     _Texture<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
     int sample;
@@ -5401,7 +5529,7 @@ struct __TextureSample<T:ITexelElement, Shape : __ITextureShape, let isArray : i
     }
 }
 
-struct __TextureSampleMS<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+struct __TextureSampleMS<T:ITexelDataType, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
     _Texture<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
     __subscript(int sample)->__TextureSample<T, Shape, isArray, isCombined, format>
@@ -5411,7 +5539,7 @@ struct __TextureSampleMS<T:ITexelElement, Shape : __ITextureShape, let isArray :
     }
 }
 
-__generic<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+__generic<T:ITexelDataType, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 extension _Texture<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
 {
     property __TextureSampleMS<T, Shape, isArray, isCombined, format> sample
@@ -5468,7 +5596,7 @@ $}
 /// @param format The storage format of the texture.
 /// @see Please refer to `_Texture` for more information about texture types.
 /// @category texture_types
-typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T:ITexelElement=float4, let sampleCount:int=0, let format:int=0> = _Texture<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
+typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T:ITexelElement=float4, let sampleCount:int=0> = _Texture<T.DataType, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), T.format>;
 ${
 }
 $}
@@ -18990,10 +19118,10 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 {
     auto access = kBaseBufferAccessLevels[aa].access;
     sb << "/// @category texture_types\n";
-    sb << "__generic<T:ITexelElement,let format:int=0>\n";
+    sb << "__generic<T:ITexelElement>\n";
     sb << "typealias ";
     sb << kBaseBufferAccessLevels[aa].name;
-    sb << "Buffer = _Texture<T, __ShapeBuffer, 0, 0, 0, " << aa << ", 0, 0, format>;\n";
+    sb << "Buffer = _Texture<T.DataType, __ShapeBuffer, 0, 0, 0, " << aa << ", 0, 0, T.format>;\n";
 
     bool isReadOnly = aa == 0;
 
@@ -19005,7 +19133,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     char const* requireToSet_onlyHLSL = (isReadOnly) ? "[require(hlsl, texture_sm_4_1)]" : "[require(hlsl, texture_sm_4_1_compute_fragment)]";
 $}
 
-__generic<T:ITexelElement, let format:int>
+__generic<T:ITexelDataType, let format:int>
 extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 {
     [__readNone]
@@ -20549,9 +20677,11 @@ interface __BuiltinSamplerFeedbackType {};
 [sealed]
 __magic_type(FeedbackType, $(int(FeedbackType::Kind::MinMip)))
 __target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIN_MIP)
-struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType, ITexelElement {
+struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType, ITexelDataType, ITexelElement {
     typealias Element = float;
+    typealias DataType = SAMPLER_FEEDBACK_MIN_MIP;
     static const int elementCount = 1;
+    static const int format = 0;
     __intrinsic_op(0) __init(float x){}
 };
 
@@ -20559,23 +20689,25 @@ struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType, ITexelElement {
 [sealed]
 __magic_type(FeedbackType, $(int(FeedbackType::Kind::MipRegionUsed)))
 __target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIP_REGION_USED)
-struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType, ITexelElement
+struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType, ITexelDataType, ITexelElement
 {
     typealias Element = float;
+    typealias DataType = SAMPLER_FEEDBACK_MIP_REGION_USED;
     static const int elementCount = 1;
+    static const int format = 0;
     __intrinsic_op(0) __init(float x){}
 };
 
 // All of these objects are write-only resources that point to a special kind of unordered access view meant for sampler feedback.
 
 extension<T> _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback), 0, 0, 0>
-    where T:ITexelElement
+    where T:ITexelDataType
     where T:__BuiltinSamplerFeedbackType
 {
     // With Clamp
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedback<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location, float clamp)
+    void WriteSamplerFeedback<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 0, 0, 0, 0, 0, 0, textureFormat> tex, SamplerState samp, float2 location, float clamp)
     {
         __target_switch
         {
@@ -20585,7 +20717,7 @@ extension<T> _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackBias<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location, float bias, float clamp)
+    void WriteSamplerFeedbackBias<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 0, 0, 0, 0, 0, 0, textureFormat> tex, SamplerState samp, float2 location, float bias, float clamp)
     {
         __target_switch
         {
@@ -20595,7 +20727,7 @@ extension<T> _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackGrad<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy, float clamp)
+    void WriteSamplerFeedbackGrad<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 0, 0, 0, 0, 0, 0, textureFormat> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy, float clamp)
     {
         __target_switch
         {
@@ -20607,7 +20739,7 @@ extension<T> _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback
     // Level
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackLevel<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location, float lod)
+    void WriteSamplerFeedbackLevel<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 0, 0, 0, 0, 0, 0, textureFormat> tex, SamplerState samp, float2 location, float lod)
     {
         __target_switch
         {
@@ -20619,7 +20751,7 @@ extension<T> _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback
     // Without Clamp
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedback<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location)
+    void WriteSamplerFeedback<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 0, 0, 0, 0, 0, 0, textureFormat> tex, SamplerState samp, float2 location)
     {
         __target_switch
         {
@@ -20629,7 +20761,7 @@ extension<T> _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackBias<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location, float bias)
+    void WriteSamplerFeedbackBias<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 0, 0, 0, 0, 0, 0, textureFormat> tex, SamplerState samp, float2 location, float bias)
     {
         __target_switch
         {
@@ -20639,7 +20771,7 @@ extension<T> _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackGrad<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy)
+    void WriteSamplerFeedbackGrad<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 0, 0, 0, 0, 0, 0, textureFormat> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy)
     {
         __target_switch
         {
@@ -20651,12 +20783,12 @@ extension<T> _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback
 
 extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback), 0, 0, 0>
     where T:__BuiltinSamplerFeedbackType
-    where T:ITexelElement
+    where T:ITexelDataType
 {
     // With Clamp
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedback<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float clamp)
+    void WriteSamplerFeedback<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 1, 0, 0, 0, 0, 0, textureFormat> texArray, SamplerState samp, float3 location, float clamp)
     {
         __target_switch
         {
@@ -20666,7 +20798,7 @@ extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackBias<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias, float clamp)
+    void WriteSamplerFeedbackBias<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 1, 0, 0, 0, 0, 0, textureFormat> texArray, SamplerState samp, float3 location, float bias, float clamp)
     {
         __target_switch
         {
@@ -20676,7 +20808,7 @@ extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackGrad<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy, float clamp)
+    void WriteSamplerFeedbackGrad<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 1, 0, 0, 0, 0, 0, textureFormat> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy, float clamp)
     {
         __target_switch
         {
@@ -20688,7 +20820,7 @@ extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback
     // Level
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackLevel<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float lod)
+    void WriteSamplerFeedbackLevel<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 1, 0, 0, 0, 0, 0, textureFormat> texArray, SamplerState samp, float3 location, float lod)
     {
         __target_switch
         {
@@ -20700,7 +20832,7 @@ extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback
     // Without Clamp
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedback<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location)
+    void WriteSamplerFeedback<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 1, 0, 0, 0, 0, 0, textureFormat> texArray, SamplerState samp, float3 location)
     {
         __target_switch
         {
@@ -20710,7 +20842,7 @@ extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackBias<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias)
+    void WriteSamplerFeedbackBias<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 1, 0, 0, 0, 0, 0, textureFormat> texArray, SamplerState samp, float3 location, float bias)
     {
         __target_switch
         {
@@ -20720,7 +20852,7 @@ extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackGrad<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy)
+    void WriteSamplerFeedbackGrad<S:ITexelDataType, let textureFormat:int>(_Texture<S, __Shape2D, 1, 0, 0, 0, 0, 0, textureFormat> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy)
     {
         __target_switch
         {
@@ -25701,10 +25833,10 @@ func saturated_cooperation_using<A, B, C>(
 // types conform to, so that we can define builtins that work
 // for any resource type.
 
-__intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
+__intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
 __intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace(SamplerState sampler);
 
-__intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
+__intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex<T:ITexelDataType, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
 __intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex(SamplerState sampler);
 
 //@public:
@@ -25890,7 +26022,7 @@ typealias TextureFootprint3D = TextureFootprint<3>;
 // on the relevant texture type(s), rather than
 // further clutter the original type declarations.
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:ITexelDataType, Shape: __ITextureShape, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
 {
     // We introduce a few convenience type aliases here,
@@ -26668,7 +26800,7 @@ enum __DynamicResourceKind
     Sampler = 1
 }
 
-__generic<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isMS : int, let sampleCount : int, let access : int, let isShadow : int, let isCombined : int, let format : int>
+__generic<T:ITexelDataType, Shape : __ITextureShape, let isArray : int, let isMS : int, let sampleCount : int, let access : int, let isShadow : int, let isCombined : int, let format : int>
 extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format> : __IDynamicResourceCastable<__DynamicResourceKind.General>
 {
     __intrinsic_op($(kIROp_CastDynamicResource))

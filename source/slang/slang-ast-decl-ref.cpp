@@ -57,6 +57,31 @@ DeclRefBase* _resolveAsDeclRef(DeclRefBase* declRefToResolve)
     return declRefToResolve;
 }
 
+static RequirementWitness _maybeLiftBaseTypeWitnessForModifiedType(
+    SubtypeWitness* witness,
+    RequirementWitness requirementWitness)
+{
+    auto declaredWitness = as<DeclaredSubtypeWitness>(witness);
+    if (!declaredWitness)
+        return requirementWitness;
+
+    auto modifiedSubType = as<ModifiedType>(declaredWitness->getSub());
+    if (!modifiedSubType)
+        return requirementWitness;
+
+    if (requirementWitness.getFlavor() != RequirementWitness::Flavor::val)
+        return requirementWitness;
+
+    auto satisfyingType = as<Type>(requirementWitness.getVal()->resolve());
+    if (!satisfyingType)
+        return requirementWitness;
+
+    if (!satisfyingType->equals(modifiedSubType->getBase()))
+        return requirementWitness;
+
+    return RequirementWitness(modifiedSubType);
+}
+
 DeclRefBase* MemberDeclRef::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
@@ -334,20 +359,23 @@ RequirementWitness specializeLookedUpRec(
         {
             lookedUpVal =
                 specializeLookedUpRec(astBuilder, nestedLookupDeclRef->getWitness(), lookedUpVal);
-            return lookedUpVal.specialize(
+            auto result = lookedUpVal.specialize(
                 astBuilder,
                 SubstitutionSet(declaredSubtypeWitness->getDeclRef()));
+            return _maybeLiftBaseTypeWitnessForModifiedType(witness, result);
         }
         else if (
             auto inheritanceDeclRef = declaredSubtypeWitness->getDeclRef().as<InheritanceDecl>())
         {
-            return lookedUpVal.specialize(astBuilder, SubstitutionSet(inheritanceDeclRef));
+            auto result = lookedUpVal.specialize(astBuilder, SubstitutionSet(inheritanceDeclRef));
+            return _maybeLiftBaseTypeWitnessForModifiedType(witness, result);
         }
         else if (
             auto constraintDeclRef =
                 declaredSubtypeWitness->getDeclRef().as<GenericTypeConstraintDecl>())
         {
-            return lookedUpVal.specialize(astBuilder, SubstitutionSet(constraintDeclRef));
+            auto result = lookedUpVal.specialize(astBuilder, SubstitutionSet(constraintDeclRef));
+            return _maybeLiftBaseTypeWitnessForModifiedType(witness, result);
         }
     }
 

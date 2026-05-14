@@ -196,8 +196,7 @@ SlangResult TestServer::init(int argc, const char* const* argv)
     m_exePath = argv[0];
 
 #if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
-    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
-    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+    TestToolUtil::disableAssertMessageBoxes();
 #endif
 
     String canonicalPath;

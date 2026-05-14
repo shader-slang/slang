@@ -49,8 +49,8 @@ buffer MyBlockName
 
 uniform sampler1D uniform_sampler1D;
 
-__generic<T : ITexelElement>
-bool textureFuncs(Sampler1D<T> gsampler1D)
+__generic<T : ITexelDataType, let sampleCount:int, let format:int>
+bool textureFuncs(_Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gsampler1D)
 {
     typealias gvec4 = vector<T.Element,4>;
 

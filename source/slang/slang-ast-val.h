@@ -177,6 +177,7 @@ class DeclRefIntVal : public IntVal
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
     DeclRefIntVal(Type* inType, DeclRef<VarDeclBase> inDeclRef) { setOperands(inType, inDeclRef); }
