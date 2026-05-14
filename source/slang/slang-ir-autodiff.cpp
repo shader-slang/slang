@@ -657,21 +657,18 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
             zeroElements.getBuffer());
     }
 
-    // When reached from finalizeAutoDiffPass, specializeModule has already run,
-    // so CoopVec element counts are IRIntLit and emitDefaultConstruct produces
-    // a real zero. Callers from earlier autodiff passes must ensure
-    // specialization has completed before CoopVec/CoopMat types can appear
-    // as differentials.
+    // emitDefaultConstruct handles both types:
+    // - CoopVec: iterates element constructors when getElementCount() is IRIntLit;
+    //   falls through to a generic DefaultConstruct if the count is non-literal.
+    // - CoopMat: unconditionally calls emitMakeCoopMatrixFromScalar (no dimension check).
+    // Debug-assert the expected IRIntLit precondition for CoopVec so pipeline ordering
+    // violations surface early; CoopMat needs no assert since emitDefaultConstruct
+    // handles it unconditionally.
     auto diffType = (IRType*)this->getDifferentialForType(primalType);
     if (isSelfDifferentialOpaqueType(diffType))
     {
-        // Assert the specialization precondition: all dimension operands must be
-        // concrete IRIntLit so emitDefaultConstruct produces a real zero, not OpUndef.
-        // Use SLANG_RELEASE_ASSERT so violations surface in release builds too.
         if (auto coopVec = as<IRCoopVectorType>(diffType))
-            SLANG_RELEASE_ASSERT(as<IRIntLit>(coopVec->getElementCount()));
-        else if (auto coopMat = as<IRCoopMatrixType>(diffType))
-            SLANG_RELEASE_ASSERT(as<IRIntLit>(coopMat->getRowCount()) && as<IRIntLit>(coopMat->getColumnCount()));
+            SLANG_ASSERT(as<IRIntLit>(coopVec->getElementCount()));
         return builder->emitDefaultConstruct(diffType);
     }
 

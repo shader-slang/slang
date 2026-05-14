@@ -3083,6 +3083,16 @@ struct ForwardDiffTranslationContext
                 return result;
             }
 
+            // Same fast-path as emitDZeroOfDiffInstType: bypass the synthesized
+            // dzero witness for CoopVec/CoopMat self-differential opaque types,
+            // which degenerate to uninitialized values.
+            if (as<IRCoopVectorType>(diffType) || as<IRCoopMatrixType>(diffType))
+            {
+                auto result = builder->emitDefaultConstruct((IRType*)diffType);
+                builder->markInstAsDifferential(result, primalType);
+                return result;
+            }
+
             auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, originalType);
             SLANG_RELEASE_ASSERT(zeroMethod);
 
