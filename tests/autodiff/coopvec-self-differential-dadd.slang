@@ -51,9 +51,12 @@ void computeMain(uint id: SV_DispatchThreadID)
     output[0] = x.d[0];
 }
 
-// Anchor checks inside the function body so the global-scope OpUndef emitted for
-// unrelated IR (which precedes OpFunction in the module) is outside the scan window.
+// Anchor all checks inside computeMain so the global-scope OpUndef (emitted before
+// OpFunction in the module) is outside the scan window, and the entire function
+// body is covered.
 // CHECK-LABEL: %computeMain = OpFunction
 // CHECK: OpCompositeConstructReplicateEXT
 // CHECK-NOT: OpUndef
 // CHECK: OpFAdd
+// CHECK-NOT: OpUndef
+// CHECK: OpFunctionEnd

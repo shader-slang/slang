@@ -673,4 +673,12 @@ inline bool isMixedDifferentialInst(IRInst* inst)
     return inst->findDecoration<IRMixedDifferentialInstDecoration>();
 }
 
+// CoopVec/CoopMat are self-differential opaque types with no recursable fields;
+// synthesized dadd/dzero helpers degenerate to uninitialized values for them.
+// emitDefaultConstruct already has a dedicated fast-path for both (slang-ir.cpp).
+inline bool isSelfDifferentialOpaqueType(IRType* type)
+{
+    return as<IRCoopVectorType>(type) || as<IRCoopMatrixType>(type);
+}
+
 }; // namespace Slang

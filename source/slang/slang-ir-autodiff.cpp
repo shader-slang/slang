@@ -570,13 +570,6 @@ IRInst* DifferentiableTypeConformanceContext::buildDifferentiablePairWitness(
     return table;
 }
 
-// CoopVec/CoopMat are self-differential opaque types with no recursable fields;
-// synthesized dadd/dzero helpers degenerate to uninitialized values for them.
-// emitDefaultConstruct also has a dedicated fast-path for both (slang-ir.cpp).
-static bool isSelfDifferentialOpaqueType(IRType* type)
-{
-    return as<IRCoopVectorType>(type) || as<IRCoopMatrixType>(type);
-}
 
 IRInst* DifferentiableTypeConformanceContext::emitDAddOfDiffInstType(
     IRBuilder* builder,
@@ -659,18 +652,22 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
 
     // emitDefaultConstruct handles both types:
     // - CoopVec: iterates element constructors when getElementCount() is IRIntLit;
-    //   falls through to a generic DefaultConstruct if the count is non-literal.
+    //   falls through to a generic DefaultConstruct if the count is non-literal
+    //   (which is not guaranteed to produce zero). Guard and fall through to the
+    //   witness method for non-literal counts.
     // - CoopMat: unconditionally calls emitMakeCoopMatrixFromScalar (no dimension check).
-    // Debug-assert the expected IRIntLit precondition for CoopVec so pipeline ordering
-    // violations surface early; CoopMat needs no assert since emitDefaultConstruct
-    // handles it unconditionally.
     auto diffType = (IRType*)this->getDifferentialForType(primalType);
     if (isSelfDifferentialOpaqueType(diffType))
     {
         if (auto coopVec = as<IRCoopVectorType>(diffType))
-            SLANG_ASSERT(as<IRIntLit>(coopVec->getElementCount()));
+        {
+            // Only take the fast-path when the element count is concrete.
+            if (!as<IRIntLit>(coopVec->getElementCount()))
+                goto witnessLookup;
+        }
         return builder->emitDefaultConstruct(diffType);
     }
+witnessLookup:
 
     // Default case: look up zero method and emit call.
     auto zeroMethod = this->getZeroMethodForType(builder, primalType);

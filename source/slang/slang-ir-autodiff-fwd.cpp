@@ -3086,15 +3086,18 @@ struct ForwardDiffTranslationContext
             // Same fast-path as emitDZeroOfDiffInstType: bypass the synthesized
             // dzero witness for CoopVec/CoopMat self-differential opaque types,
             // which degenerate to uninitialized values.
-            if (as<IRCoopVectorType>(diffType) || as<IRCoopMatrixType>(diffType))
+            if (isSelfDifferentialOpaqueType((IRType*)diffType))
             {
-                // Mirror the reverse-mode specialization-ordering invariant.
+                // Guard: CoopVec requires a concrete element count; fall through
+                // to the witness method for non-literal counts.
                 if (auto coopVec = as<IRCoopVectorType>(diffType))
-                    SLANG_ASSERT(as<IRIntLit>(coopVec->getElementCount()));
+                    if (!as<IRIntLit>(coopVec->getElementCount()))
+                        goto witnessLookup;
                 auto result = builder->emitDefaultConstruct((IRType*)diffType);
                 builder->markInstAsDifferential(result, primalType);
                 return result;
             }
+            witnessLookup:
 
             auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, originalType);
             SLANG_RELEASE_ASSERT(zeroMethod);
