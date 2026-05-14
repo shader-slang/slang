@@ -1450,6 +1450,46 @@ struct LLVMEmitter
         SLANG_UNIMPLEMENTED_X("Unexpected terminator in global scope!");
     }
 
+    void emitDecomposedStructValues(LLVMInst* inst, IRType* type, List<LLVMInst*>& args, List<bool>& argIsSigned)
+    {
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (IRStructField* f : structType->getFields())
+            {
+                LLVMInst* ptr = emitStructGetElementPtr(inst, f, defaultPointerRules);
+                LLVMInst* op = emitLoad(ptr, f->getFieldType(), defaultPointerRules);
+                emitDecomposedStructValues(op, f->getFieldType(), args, argIsSigned);
+            }
+        }
+        else
+        {
+            args.add(inst);
+            argIsSigned.add(isSignedType(type));
+        }
+    }
+
+    void emitDecomposedStructValues(IRInst* inst, List<LLVMInst*>& args, List<bool>& argIsSigned)
+    {
+        auto type = inst->getDataType();
+        if (auto makeStruct = as<IRMakeStruct>(inst))
+        {
+            // Easy & common case, we can just pick the entries from the
+            // MakeStruct.
+            for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
+            {
+                auto op = makeStruct->getOperand(bb);
+                emitDecomposedStructValues(op, args, argIsSigned);
+            }
+        }
+        else
+        {
+            // Unfortunate & rare situation where some compiler optimization
+            // hid the MakeStruct behind some load/store/whatever operation.
+            LLVMInst* llvmStruct = findValue(inst);
+            emitDecomposedStructValues(llvmStruct, type, args, argIsSigned);
+        }
+    }
+
     // Caution! This is only for emitting things which are considered
     // instructions in LLVM! It won't work for IRBlocks, IRFuncs & such.
     LLVMInst* emitLLVMInstruction(
@@ -2090,19 +2130,7 @@ struct LLVMEmitter
                 if (inst->getOperandCount() == 2)
                 {
                     auto operand = inst->getOperand(1);
-                    if (auto makeStruct = as<IRMakeStruct>(operand))
-                    {
-                        // Flatten the tuple resulting from the variadic pack.
-                        for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
-                        {
-                            auto op = makeStruct->getOperand(bb);
-                            op->getDataType();
-                            auto llvmValue = findValue(op);
-
-                            args.add(llvmValue);
-                            argIsSigned.add(isSigned(op));
-                        }
-                    }
+                    emitDecomposedStructValues(operand, args, argIsSigned);
                 }
 
                 llvmInst = builder->emitPrintf(
