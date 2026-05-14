@@ -570,6 +570,14 @@ IRInst* DifferentiableTypeConformanceContext::buildDifferentiablePairWitness(
     return table;
 }
 
+// CoopVec/CoopMat are self-differential opaque types with no recursable fields;
+// synthesized dadd/dzero helpers degenerate to uninitialized values for them.
+// emitDefaultConstruct also has a dedicated fast-path for both (slang-ir.cpp).
+static bool isSelfDifferentialOpaqueType(IRType* type)
+{
+    return as<IRCoopVectorType>(type) || as<IRCoopMatrixType>(type);
+}
+
 IRInst* DifferentiableTypeConformanceContext::emitDAddOfDiffInstType(
     IRBuilder* builder,
     IRType* primalType,
@@ -591,11 +599,8 @@ IRInst* DifferentiableTypeConformanceContext::emitDAddOfDiffInstType(
         SLANG_UNEXPECTED("unexpected associated type during transposition");
     }
 
-    // CoopVec/CoopMat are self-differential opaque types with no recursable fields;
-    // synthesized dadd helpers degenerate to uninitialized values. Emit a primitive
-    // add directly and bypass the witness-table lookup.
     auto diffType = (IRType*)this->getDifferentialForType(primalType);
-    if (as<IRCoopVectorType>(diffType) || as<IRCoopMatrixType>(diffType))
+    if (isSelfDifferentialOpaqueType(diffType))
     {
         return builder->emitAdd(diffType, op1, op2);
     }
@@ -652,13 +657,13 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
             zeroElements.getBuffer());
     }
 
-    // CoopVec/CoopMat are self-differential opaque types with no recursable fields;
-    // synthesized dzero helpers degenerate to uninitialized values. Emit a primitive
-    // default-construct directly and bypass the witness-table lookup.
-    // Specialization runs before this pass (slang-emit.cpp: specializeModule before
-    // finalizeAutoDiffPass), so CoopVec element counts are always IRIntLit here.
+    // When reached from finalizeAutoDiffPass, specializeModule has already run
+    // (slang-emit.cpp:1237 < 1248), so CoopVec element counts are IRIntLit and
+    // emitDefaultConstruct produces a real zero. Callers from earlier autodiff
+    // passes must ensure specialization has completed before CoopVec/CoopMat
+    // types can appear as differentials.
     auto diffType = (IRType*)this->getDifferentialForType(primalType);
-    if (as<IRCoopVectorType>(diffType) || as<IRCoopMatrixType>(diffType))
+    if (isSelfDifferentialOpaqueType(diffType))
     {
         return builder->emitDefaultConstruct(diffType);
     }
