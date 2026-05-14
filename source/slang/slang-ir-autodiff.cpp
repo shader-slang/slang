@@ -655,6 +655,8 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
     // CoopVec/CoopMat are self-differential opaque types with no recursable fields;
     // synthesized dzero helpers degenerate to uninitialized values. Emit a primitive
     // default-construct directly and bypass the witness-table lookup.
+    // Specialization runs before this pass (slang-emit.cpp: specializeModule before
+    // finalizeAutoDiffPass), so CoopVec element counts are always IRIntLit here.
     auto diffType = (IRType*)this->getDifferentialForType(primalType);
     if (as<IRCoopVectorType>(diffType) || as<IRCoopMatrixType>(diffType))
     {

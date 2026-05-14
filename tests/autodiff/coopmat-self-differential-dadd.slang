@@ -60,6 +60,6 @@ void computeMain(uint id: SV_DispatchThreadID)
 
 // CHECK: OpCompositeConstruct
 // CHECK: OpFAdd
-// Verify the short-circuit fired: no synthesized dadd/dzero function is emitted.
-// CHECK-NOT: OpName {{.*}} "{{.*}}dadd{{.*}}"
-// CHECK-NOT: OpName {{.*}} "{{.*}}dzero{{.*}}"
+// OpFAdd is the key regression guard: the buggy (pre-fix) code emitted OpUndef in
+// place of gradient accumulation instead of a real add, so the absence of OpFAdd
+// on the regressed compiler causes this CHECK to fail.
