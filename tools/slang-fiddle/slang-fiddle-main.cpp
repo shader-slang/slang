@@ -1,6 +1,7 @@
 // slang-fiddle-main.cpp
 
 #include "core/slang-io.h"
+#include "core/slang-test-tool-util.h"
 #include "slang-fiddle-diagnostics.h"
 #include "slang-fiddle-options.h"
 #include "slang-fiddle-scrape.h"
@@ -408,8 +409,7 @@ int main(int argc, char const* const* argv)
     using namespace Slang;
 
 #if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
-    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
-    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+    TestToolUtil::disableAssertMessageBoxes();
 #endif
 
     ComPtr<ISlangWriter> writer(

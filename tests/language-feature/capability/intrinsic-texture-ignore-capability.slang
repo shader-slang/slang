@@ -50,16 +50,16 @@ uniform usampler2DArray uniform_usampler2DArray;
 uniform usamplerCubeArray uniform_usamplerCubeArray;
 uniform usamplerBuffer uniform_usamplerBuffer;
 
-__generic<T : ITexelElement>
-bool textureFuncs( Sampler1D<T> gsampler1D
-    , Sampler2D<T> gsampler2D
-    , Sampler2DRect<T> gsampler2DRect
-    , Sampler3D<T> gsampler3D
-    , SamplerCube<T> gsamplerCube
-    , Sampler1DArray<T> gsampler1DArray
-    , Sampler2DArray<T> gsampler2DArray
-    , SamplerCubeArray<T> gsamplerCubeArray
-    , SamplerBuffer<T> gsamplerBuffer
+__generic<T : ITexelElement, let sampleCount:int, let format:int>
+bool textureFuncs( _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gsampler1D
+    , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2D
+    , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2DRect
+    , _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> gsampler3D
+    , _Texture<T, __ShapeCube, 0, 0, sampleCount, 0, 0, 1, format> gsamplerCube
+    , _Texture<T, __Shape1D, 1, 0, sampleCount, 0, 0, 1, format> gsampler1DArray
+    , _Texture<T, __Shape2D, 1, 0, sampleCount, 0, 0, 1, format> gsampler2DArray
+    , _Texture<T, __ShapeCube, 1, 0, sampleCount, 0, 0, 1, format> gsamplerCubeArray
+    , _Texture<T, __ShapeBuffer, 0, 0, 0, 1, 0, 0, format> gsamplerBuffer
 )
 {
     typealias gvec4 = vector<T.Element,4>;
@@ -359,16 +359,16 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         ;
 }
 
-__generic<T : ITexelElement>
-bool itextureFuncs(Sampler1D<T> gsampler1D
-    , Sampler2D<T> gsampler2D
-    , Sampler2DRect<T> gsampler2DRect
-    , Sampler3D<T> gsampler3D
-    , SamplerCube<T> gsamplerCube
-    , Sampler1DArray<T> gsampler1DArray
-    , Sampler2DArray<T> gsampler2DArray
-    , SamplerCubeArray<T> gsamplerCubeArray
-    , SamplerBuffer<T> gsamplerBuffer
+__generic<T : ITexelElement, let sampleCount:int, let format:int>
+bool itextureFuncs(_Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gsampler1D
+    , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2D
+    , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2DRect
+    , _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> gsampler3D
+    , _Texture<T, __ShapeCube, 0, 0, sampleCount, 0, 0, 1, format> gsamplerCube
+    , _Texture<T, __Shape1D, 1, 0, sampleCount, 0, 0, 1, format> gsampler1DArray
+    , _Texture<T, __Shape2D, 1, 0, sampleCount, 0, 0, 1, format> gsampler2DArray
+    , _Texture<T, __ShapeCube, 1, 0, sampleCount, 0, 0, 1, format> gsamplerCubeArray
+    , _Texture<T, __ShapeBuffer, 0, 0, 0, 1, 0, 0, format> gsamplerBuffer
 )
 {
     typealias gvec4 = vector<T.Element, 4>;
@@ -495,4 +495,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     //outputBuffer[0] = float(r);
     //o_color[0] = float(r);
 }
-

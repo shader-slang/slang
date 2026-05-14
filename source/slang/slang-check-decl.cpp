@@ -2325,9 +2325,10 @@ ImageFormat inferImageFormatFromTextureType(
 {
     outIsInferred = false;
     ImageFormat format = ImageFormat::unknown;
-    if (auto formatVal = as<ConstantIntVal>(textureType->getFormat()))
+    IntegerLiteralValue formatValue = 0;
+    if (tryGetConstantIntVal(textureType->getFormat(), formatValue))
     {
-        format = (ImageFormat)formatVal->getValue();
+        format = (ImageFormat)formatValue;
     }
     if (format != ImageFormat::unknown)
         return format;
@@ -2359,6 +2360,29 @@ ImageFormat inferImageFormatFromTextureType(
         {
             switch (basicType->getBaseType())
             {
+            case BaseType::Float:
+                switch (textureType->getAccess())
+                {
+                case SLANG_RESOURCE_ACCESS_WRITE:
+                case SLANG_RESOURCE_ACCESS_READ_WRITE:
+                case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+                    switch (vectorWidth)
+                    {
+                    case 1:
+                        format = ImageFormat::r32f;
+                        break;
+                    case 2:
+                        format = ImageFormat::rg32f;
+                        break;
+                    case 4:
+                        format = ImageFormat::rgba32f;
+                        break;
+                    }
+                    break;
+                default:
+                    break;
+                }
+                break;
             case BaseType::UInt:
                 switch (vectorWidth)
                 {
