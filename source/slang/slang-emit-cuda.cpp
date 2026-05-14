@@ -65,6 +65,16 @@ static UnownedStringSlice getOptixCoopVecMatrixLayoutName(int matrixLayout)
     }
 }
 
+struct FragmentShape
+{
+    int m, n, k;
+
+    bool isValid() const { return m > 0 && n > 0 && k > 0; }
+};
+
+inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col);
+static bool coopMatMulAddTypeCombinationIsValid(IROp aType, IROp bType, IROp cType, IROp dType);
+
 static CUDAExtensionTracker::BaseTypeFlags _findBaseTypesUsed(IRModule* module)
 {
     typedef CUDAExtensionTracker::BaseTypeFlags Flags;
@@ -328,9 +338,16 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
         }
     case kIROp_CoopMatrixType:
         {
-            // CUDA wmma require SM 7.5+
-            m_extensionTracker->requireSMVersion(SemanticVersion(7, 5));
-            return emitWMMAFragmentType(as<IRCoopMatrixType>(type), out);
+            auto coopType = as<IRCoopMatrixType>(type);
+            auto result = emitWMMAFragmentType(coopType, out);
+            m_extensionTracker->requireSMVersion(SemanticVersion(8, 0));
+            // FP8 mma instructions (mma.sync.m16n8k16 with .e4m3/.e5m2) were
+            // introduced in PTX ISA 8.7 / SM 8.9 (Ada Lovelace).  Earlier SM
+            // targets reject the PTX as invalid at JIT time.
+            auto elemOp = coopType->getElementType()->getOp();
+            if (elemOp == kIROp_FloatE4M3Type || elemOp == kIROp_FloatE5M2Type)
+                m_extensionTracker->requireSMVersion(SemanticVersion(8, 9));
+            return result;
         }
     case kIROp_FloatE4M3Type:
         out << "__nv_fp8_e4m3";
@@ -1095,6 +1112,41 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto saturatingAccumulation =
                 cast<IRBoolLit>(coopMatMulAdd->getSaturatingAccumulation())->getValue();
 
+            auto aElemType = cast<IRCoopMatrixType>(matA->getDataType())->getElementType();
+            auto bElemType = cast<IRCoopMatrixType>(matB->getDataType())->getElementType();
+            auto cElemType = cast<IRCoopMatrixType>(matC->getDataType())->getElementType();
+            auto dElemType = cast<IRCoopMatrixType>(coopMatMulAdd->getDataType())->getElementType();
+            if (!coopMatMulAddTypeCombinationIsValid(
+                    aElemType->getOp(),
+                    bElemType->getOp(),
+                    cElemType->getOp(),
+                    dElemType->getOp()))
+            {
+                auto formatElem = [&](IRType* type) -> String
+                {
+                    StringBuilder sb;
+                    calcTypeName(type, CodeGenTarget::CUDASource, sb);
+                    return sb.toString();
+                };
+                getSink()->diagnose(Diagnostics::CooperativeMatrixInvalidMmaTypeCombination{
+                    .aType = formatElem(aElemType),
+                    .bType = formatElem(bElemType),
+                    .cType = formatElem(cElemType),
+                    .dType = formatElem(dElemType),
+                    .location = inst->sourceLoc});
+                // The DiagnosticSink has already recorded the error, but the
+                // surrounding statement-emit path expects an expression to
+                // follow `Type _Sname = ` (otherwise we'd emit the syntactically
+                // invalid `Type _Sname = ;`).  Emit a default-constructed
+                // value of the result type as a placeholder; the recorded
+                // error makes the overall compile fail anyway, so the
+                // placeholder never reaches NVRTC.
+                m_writer->emit("(");
+                emitType(inst->getDataType());
+                m_writer->emit("{})");
+                return true;
+            }
+
             m_writer->emit("Slang_CUDA_WMMA::coopMatMulAdd<");
             emitType(matA->getDataType());
             m_writer->emit("::ElementType, ");
@@ -1531,12 +1583,60 @@ static bool typeCheck(IROp op, uint32_t matrixUse)
     {
     case SLANG_COOPERATIVE_MATRIX_USE_A:
     case SLANG_COOPERATIVE_MATRIX_USE_B:
-        return op == kIROp_UInt8Type || op == kIROp_Int8Type || op == kIROp_HalfType ||
-               op == kIROp_BFloat16Type || op == kIROp_FloatE4M3Type || op == kIROp_FloatE5M2Type;
+        // PTX m16n8k16 supports f16, bf16, 8-bit integer (s8 / u8), and 8-bit
+        // float (e4m3 / e5m2) inputs.
+        return op == kIROp_HalfType || op == kIROp_BFloat16Type || op == kIROp_Int8Type ||
+               op == kIROp_UInt8Type || op == kIROp_FloatE4M3Type || op == kIROp_FloatE5M2Type;
     case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR:
-        return op == kIROp_IntType || op == kIROp_HalfType || op == kIROp_FloatType;
+        // Union of the legal accumulator element types across all
+        // currently-supported A/B element types: half/float (for f16, bf16, f8
+        // inputs) and int (for s8 / u8 inputs).  The full A/B/C/D combination
+        // is checked separately by `coopMatMulAddTypeCombinationIsValid`
+        // before code emission.
+        return op == kIROp_HalfType || op == kIROp_FloatType || op == kIROp_IntType;
     }
     return false;
+}
+
+// Validate that a `coopMatMulAdd` (A * B + C -> D) is one of the legal
+// (AType, BType, CType, DType) tuples for the CUDA backend.  The helper
+// templates in `prelude/slang-cuda-prelude.h` only have specializations for
+// these tuples; without this check, an illegal combination would compile
+// through Slang and only fail later inside NVRTC with a hard-to-read C++
+// template error.
+static bool coopMatMulAddTypeCombinationIsValid(IROp aType, IROp bType, IROp cType, IROp dType)
+{
+    // Both A and B must share the same element type — every supported
+    // CUDA mma form has matching `.atype` and `.btype`.
+    if (aType != bType)
+        return false;
+
+    auto isHalfOrFloat = [](IROp t) { return t == kIROp_HalfType || t == kIROp_FloatType; };
+    auto isFloat = [](IROp t) { return t == kIROp_FloatType; };
+    auto isInt32 = [](IROp t) { return t == kIROp_IntType; };
+
+    switch (aType)
+    {
+    case kIROp_HalfType:
+        // f16 mma supports both f16 and f32 accumulator/output, and CType
+        // and DType may be picked independently from {half, float}.
+        return isHalfOrFloat(cType) && isHalfOrFloat(dType);
+    case kIROp_BFloat16Type:
+        // bf16 mma only allows an f32 accumulator and output on PTX.
+        return isFloat(cType) && isFloat(dType);
+    case kIROp_Int8Type:
+    case kIROp_UInt8Type:
+        // Integer mma only allows an s32 accumulator and output.
+        return isInt32(cType) && isInt32(dType);
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+        // fp8 mma supports half or float accumulator/output; the prelude only
+        // provides specializations where CType == DType for these.
+        return (cType == kIROp_HalfType && dType == kIROp_HalfType) ||
+               (cType == kIROp_FloatType && dType == kIROp_FloatType);
+    default:
+        return false;
+    }
 }
 
 static UnownedStringSlice getMatrixUseName(uint32_t matrixUse)
@@ -1554,80 +1654,19 @@ static UnownedStringSlice getMatrixUseName(uint32_t matrixUse)
     }
 }
 
-struct FragmentShape
-{
-    int m, n, k;
-
-    bool isValid() const { return m > 0 && n > 0 && k > 0; }
-};
-
 /*
- * Strict Shape Validation Strategy:
- * Users must provide exact dimensions that match one of the allowed WMMA shapes:
- *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16)
- *   - m8n32k16:  Matrix A (8x16),  Matrix B (16x32), Matrix C/D (8x32)
- *   - m32n8k16:  Matrix A (32x16), Matrix B (16x8),  Matrix C/D (32x8)
+ * Shape Validation Strategy:
+ * Maps CoopMat dimensions to the canonical MMA shape (m, n, k).
+ * Only m16n16k16 is supported (internally uses 2x mma.sync.m16n8k16).
  *
- * Note: k dimension is always 16 for all shapes.
+ * Supported shapes:
+ *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16)
  */
-inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col)
+inline FragmentShape computeShapeCombination(uint32_t /*matrixUse*/, uint32_t row, uint32_t col)
 {
-    switch (matrixUse)
-    {
-    case SLANG_COOPERATIVE_MATRIX_USE_A: // Matrix A: row=m, col=k
-        {
-            // k must always be 16
-            if (col != 16)
-            {
-                return {0, 0, 0}; // Invalid
-            }
-            // Check exact m values
-            switch (row)
-            {
-            case 16:
-                return {16, 16, 16};
-            case 8:
-                return {8, 32, 16};
-            case 32:
-                return {32, 8, 16};
-            default:
-                return {0, 0, 0}; // Invalid
-            }
-        }
-    case SLANG_COOPERATIVE_MATRIX_USE_B: // Matrix B: row=k, col=n
-        {
-            // k must always be 16
-            if (row != 16)
-            {
-                return {0, 0, 0}; // Invalid
-            }
-            // Check exact n values
-            switch (col)
-            {
-            case 16:
-                return {16, 16, 16};
-            case 32:
-                return {8, 32, 16};
-            case 8:
-                return {32, 8, 16};
-            default:
-                return {0, 0, 0}; // Invalid
-            }
-        }
-    case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR: // Matrix C/D: row=m, col=n
-    default:
-        {
-            // Check exact (m, n) combinations
-            if (row == 16 && col == 16)
-                return {16, 16, 16};
-            else if (row == 8 && col == 32)
-                return {8, 32, 16};
-            else if (row == 32 && col == 8)
-                return {32, 8, 16};
-            else
-                return {0, 0, 0}; // Invalid
-        }
-    }
+    if (row == 16 && col == 16)
+        return {16, 16, 16};
+    return {0, 0, 0};
 }
 
 SlangResult CUDASourceEmitter::emitWMMAFragmentType(

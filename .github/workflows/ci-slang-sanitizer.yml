@@ -85,9 +85,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /tmp/.cache/sccache
-          key: sccache-linux-clang-18-x86_64-asan-${{ github.sha }}
+          key: sccache-linux-clang-18-x86_64-asan-v2-${{ github.sha }}
           restore-keys: |
-            sccache-linux-clang-18-x86_64-asan-
+            sccache-linux-clang-18-x86_64-asan-v2-
 
       - name: Setup LLVM from GCS
         uses: ./.github/actions/setup-llvm-from-gcs
@@ -153,7 +153,7 @@ jobs:
             -DSLANG_ENABLE_EXAMPLES=OFF \
             "${cmake_launcher_defines[@]}"
 
-          cmake --build --preset releaseWithDebugInfo -j$(nproc)
+          cmake --build --preset releaseWithDebugInfo -j$(nproc) --verbose
 
           if command -v sccache &> /dev/null; then
             echo "sccache statistics (post-build):"
@@ -165,7 +165,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /tmp/.cache/sccache
-          key: sccache-linux-clang-18-x86_64-asan-${{ github.sha }}
+          key: sccache-linux-clang-18-x86_64-asan-v2-${{ github.sha }}
 
       - name: Verify sanitizer runtime is active
         if: steps.build.outcome == 'success'

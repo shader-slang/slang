@@ -390,15 +390,18 @@ float sin(float x)
 }
 ```
 
+
 > Note that the signature of the provided forward or backward derivative function must match the expected signature from invoking `fwd_diff(fn)`/`bwd_diff(fn)`.
 > For a full list of signature rules, see the reference section for the [auto-diff operators](#fwd_difff--slang_function---slang_function).
+
+> Note that the effective visibility of a custom-derivative autodiff surface is the more restrictive of the primal function's visibility and the referenced derivative function's visibility. For example, if `sin_bwd` was `internal`, then `sin` is considered differentiable only within the module. If the derivative comes from another module and the primal is part of this module's public API, that dependency must come from a re-exported module (i.e. `__exported import`).
 
 ### Back-referencing User Derivative Attributes.
 Sometimes, the original function's definition might be inaccessible, so it can be tricky to add an attribute to create the association.
 
 For such cases, Slang provides the `[ForwardDerivativeOf(primal_fn)]` and `[BackwardDerivativeOf(primal_fn)]` attributes that can be used
 on the derivative function and contain a reference to the function for which they are providing a derivative implementation.
-As long as the derivative function is in scope, the primal function will be considered differentiable.
+The primal function will be considered differentiable wherever both the primal function and the derivative function are visible according to the standard visibility rules (`private`/`internal`/`public`). For cross-module custom derivatives on a public API, any imported derivative implementation must also be reachable through `__exported import`.
 
 Example:
 ```csharp

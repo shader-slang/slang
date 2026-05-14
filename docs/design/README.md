@@ -16,6 +16,8 @@ The [Declaration References](decl-refs.md) document is intended to help out deve
 
 The [Intermediate Representation (IR)](ir.md) document describes the design of Slang's internal IR.
 
+The [Shader Coverage](shader-coverage.md) document describes the current architecture for shader coverage instrumentation, including the interaction between IR-time buffer synthesis and post-emit metadata.
+
 The [Existential Types](existential-types.md) document goes into some detail about what "existential types" are in the context of the Slang language, and explains how we may go about supporting them.
 
 The [Capabilities](capabilities.md) document explains the proposed model for how Slang will support general notions of profile- or capability-based overloading/dispatch.
