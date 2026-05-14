@@ -3088,6 +3088,9 @@ struct ForwardDiffTranslationContext
             // which degenerate to uninitialized values.
             if (as<IRCoopVectorType>(diffType) || as<IRCoopMatrixType>(diffType))
             {
+                // Mirror the reverse-mode specialization-ordering invariant.
+                if (auto coopVec = as<IRCoopVectorType>(diffType))
+                    SLANG_ASSERT(as<IRIntLit>(coopVec->getElementCount()));
                 auto result = builder->emitDefaultConstruct((IRType*)diffType);
                 builder->markInstAsDifferential(result, primalType);
                 return result;
