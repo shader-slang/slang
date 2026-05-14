@@ -919,9 +919,17 @@ float __glsl_shadow_lod_texture_level_cube_array_shadow<TSampler, TCoord>(TSampl
     }
 }
 
-__glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLodOffset($0, $1, $2, $3)";
+    }
+}
+
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
     {
@@ -930,12 +938,14 @@ float __glsl_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord 
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLodOffset($0, $1, $2, $3)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLodOffset($0, $1, $2, $3)";
     }
 }
 
@@ -1029,9 +1039,17 @@ float __glsl_shadow_lod_texture_level_cube_array_shadow<TTexture, TCoord>(TTextu
     }
 }
 
-__glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLodOffset($p, $2, $3, $4)";
+    }
+}
+
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
     {
@@ -1040,12 +1058,14 @@ float __glsl_texture_level_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerC
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLodOffset($p, $2, $3, $4)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLodOffset($p, $2, $3, $4)";
     }
 }
 
@@ -1700,19 +1720,38 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLodOffset(sampler1DShadow sampler, vec3 P, float lod, int offset)
+            // - float textureLodOffset(sampler1DArrayShadow sampler, vec3 P, float lod, int offset)
+            // - float textureLodOffset(sampler2DShadow sampler, vec3 P, float lod, ivec2 offset)
+            //
+            // GL_EXT_texture_shadow_lod adds the following variant:
+            // - float textureLodOffset(sampler2DArrayShadow sampler, vec4 P, float lod, ivec2 offset)
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_offset_1d_shadow(this, __makeVector(__makeVector(location,0.0), compareValue), level, offset);
+                if (isArray == 0)
+                    return __glsl150_texture_level_offset_1d_shadow(this, __makeVector(__makeVector(location,0.0), compareValue), level, offset);
+                else
+                    return __glsl150_texture_level_offset(this, __makeVector(location, compareValue), level, offset);
+            }
+            else if (Shape.dimensions == 2)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_level_offset(this, __makeVector(location, compareValue), level, offset);
+                else
+                    return __glsl_shadow_lod_texture_level_offset(this, __makeVector(location, compareValue), level, offset);
             }
             else
             {
-                return __glsl_texture_level_offset(this, __makeVector(location, compareValue), level, offset);
+                static_assert(Shape.dimensions != 3, "_Texture::SampleCmpLevel with offset: cube shadow types do not support textureLodOffset in GLSL");
+                return 0.0;
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
@@ -3068,19 +3107,38 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1)]
     float SampleCmpLevel(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLodOffset(sampler1DShadow sampler, vec3 P, float lod, int offset)
+            // - float textureLodOffset(sampler1DArrayShadow sampler, vec3 P, float lod, int offset)
+            // - float textureLodOffset(sampler2DShadow sampler, vec3 P, float lod, ivec2 offset)
+            //
+            // GL_EXT_texture_shadow_lod adds the following variant:
+            // - float textureLodOffset(sampler2DArrayShadow sampler, vec4 P, float lod, ivec2 offset)
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_offset_1d_shadow(this, s, __makeVector(__makeVector(location,0.0),compareValue), level, offset);
+                if (isArray == 0)
+                    return __glsl150_texture_level_offset_1d_shadow(this, s, __makeVector(__makeVector(location,0.0),compareValue), level, offset);
+                else
+                    return __glsl150_texture_level_offset(this, s, __makeVector(location, compareValue), level, offset);
+            }
+            else if (Shape.dimensions == 2)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_level_offset(this, s, __makeVector(location,compareValue), level, offset);
+                else
+                    return __glsl_shadow_lod_texture_level_offset(this, s, __makeVector(location, compareValue), level, offset);
             }
             else
             {
-                return __glsl_texture_level_offset(this, s, __makeVector(location,compareValue), level, offset);
+                static_assert(Shape.dimensions != 3, "_Texture::SampleCmpLevel with offset: cube shadow types do not support textureLodOffset in GLSL");
+                return 0.0;
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>

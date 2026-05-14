@@ -2455,7 +2455,7 @@ public vector<T.Element,4> textureLod(_Texture<
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
 {
     __target_switch
@@ -2473,13 +2473,16 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
     }
 }
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_shadowlod_ext)]
 public float textureLod(sampler2DArrayShadow sampler, vec4 p, float lod)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod";
     case spirv:
     {
         float compareValue = p.w;
@@ -2492,22 +2495,38 @@ public float textureLod(sampler2DArrayShadow sampler, vec4 p, float lod)
     }
 }
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_shadowlod_ext)]
 public float textureLod(samplerCubeShadow sampler, vec4 p, float lod)
 {
-    return sampler.SampleCmpLevel(p.xyz, p.w, lod);
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        return sampler.SampleCmpLevel(p.xyz, p.w, lod);
+    default:
+        return sampler.SampleCmpLevel(p.xyz, p.w, lod);
+    }
 }
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_shadowlod_ext)]
 public float textureLod(samplerCubeArrayShadow sampler, vec4 p, float compareValue, float lod)
 {
-    return sampler.SampleCmpLevel(p, compareValue, lod);
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        return sampler.SampleCmpLevel(p, compareValue, lod);
+    default:
+        return sampler.SampleCmpLevel(p, compareValue, lod);
+    }
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 {
     __target_switch
@@ -2526,7 +2545,7 @@ public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLod(sampler1DArrayShadow sampler, vec3 p, float lod)
 {
     __target_switch
@@ -3194,7 +3213,7 @@ public vector<T.Element,4> textureLodOffset(_Texture<
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, constexpr int offset)
 {
     __target_switch
@@ -3214,7 +3233,7 @@ public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, conste
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, constexpr ivec2 offset)
 {
     __target_switch
@@ -3234,7 +3253,7 @@ public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, conste
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLodOffset(sampler1DArrayShadow sampler, vec3 p, float lod, constexpr int offset)
 {
     __target_switch
