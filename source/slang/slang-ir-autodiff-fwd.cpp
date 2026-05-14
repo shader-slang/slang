@@ -3097,7 +3097,7 @@ struct ForwardDiffTranslationContext
                 builder->markInstAsDifferential(result, primalType);
                 return result;
             }
-            witnessLookup:
+        witnessLookup:
 
             auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, originalType);
             SLANG_RELEASE_ASSERT(zeroMethod);
