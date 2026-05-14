@@ -428,8 +428,13 @@ public:
                 return typeLayout;
             case slang::TypeReflection::Kind::Resource:
                 {
+                    // For any Resource kind that isn't a StructuredBuffer (e.g.
+                    // a Buffer<T>/TextureBuffer wrapped in a ParameterBlock on
+                    // bindless targets) unwrapping is finished. A `break` here
+                    // would only exit the switch and re-enter the for(;;)
+                    // loop with `typeLayout` unchanged → infinite loop (#8455).
                     if (typeLayout->getResourceShape() != SLANG_STRUCTURED_BUFFER)
-                        break;
+                        return typeLayout;
                     SLANG_ASSERT(outContainerType == ShaderObjectContainerType::None);
                     outContainerType = ShaderObjectContainerType::StructuredBuffer;
                     typeLayout = typeLayout->getElementTypeLayout();
