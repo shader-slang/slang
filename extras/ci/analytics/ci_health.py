@@ -621,7 +621,9 @@ def _build_hosted_runner_chart(snapshots):
     total_series = []
     for s in snapshots:
         usage = s.get("hosted_runner_usage")
-        if not usage:
+        # Partial samples are known undercounts; plot them as gaps so a
+        # transient Actions API failure doesn't render as a fake dip.
+        if not usage or usage.get("partial"):
             for lbl in sorted_labels:
                 label_series[lbl].append(None)
             queued_series.append(None)
@@ -1023,11 +1025,18 @@ def render_hosted_runner_usage(hosted_runner_usage):
     in_use = in_progress.get("total", 0)
     queued_total = queued.get("total", 0)
     pct = (in_use / cap * 100) if cap else 0
+    partial = hosted_runner_usage.get("partial", False)
 
     # Severity thresholds match shader-slang/slang#11142:
     #   warn  at >=80% of cap
     #   alarm at  100% of cap with queued > 0
-    if in_use >= cap and queued_total > 0:
+    # A partial sample is a known undercount; show PARTIAL instead of
+    # OK/HIGH/AT CAP so the dashboard doesn't reassure operators with a
+    # false-healthy banner during an Actions API failure.
+    if partial:
+        banner_fg, banner_bg = "#6c757d", "#e2e3e5"
+        banner_label = "PARTIAL"
+    elif in_use >= cap and queued_total > 0:
         banner_fg, banner_bg = "#dc3545", "#f8d7da"
         banner_label = "AT CAP"
     elif in_use >= 0.8 * cap:
@@ -1044,6 +1053,13 @@ def render_hosted_runner_usage(hosted_runner_usage):
   &nbsp;&nbsp;<span style="color:#6c757d">queued jobs: {queued_total}</span>
 </div>
 """
+    if partial:
+        html += (
+            '<p style="color:#6c757d;margin-top:-8px">'
+            "Sample is partial and may undercount usage "
+            "(GitHub Actions API failure during collection)."
+            "</p>\n"
+        )
 
     def _render_table(rows, name_key, name_header):
         out = f'<table><tr><th>{name_header}</th><th>Jobs</th></tr>\n'

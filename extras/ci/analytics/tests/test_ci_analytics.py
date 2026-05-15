@@ -1242,6 +1242,25 @@ class TestHostedRunnerUsage(unittest.TestCase):
         self.assertEqual(snap["queued"]["total"], 0)
         self.assertIn("HTTP 502 listing in_progress runs", snap.get("list_errors", []))
 
+    def test_format_summary_surfaces_partial(self):
+        """`--json` and the human-readable summary must carry the same
+        degraded signal — the text mode previously printed `0 / cap`
+        without any indication the sample was undercounted.
+        """
+        snapshot = {
+            "cap": 20,
+            "in_progress": {"total": 0, "by_workflow": [], "by_label": []},
+            "queued": {"total": 0, "by_workflow": [], "by_label": []},
+            "partial": True,
+            "fetch_errors": 2,
+            "list_errors": ["HTTP 502 listing in_progress runs"],
+        }
+        out = ci_hosted_runner_usage.format_summary(snapshot)
+        self.assertIn("WARNING", out)
+        self.assertIn("partial", out.lower())
+        self.assertIn("job fetch failures: 2", out)
+        self.assertIn("HTTP 502 listing in_progress runs", out)
+
     def test_sample_dedupe_skips_runs_with_missing_id(self):
         """Don't collapse multiple `id: None` runs into one entry."""
 
@@ -1418,6 +1437,19 @@ class TestHostedRunnerRender(unittest.TestCase):
         html = ci_health.render_hosted_runner_usage(None)
         self.assertIn("unavailable", html.lower())
 
+    def test_render_banner_partial_overrides_severity(self):
+        """A partial sample is a known undercount — render PARTIAL
+        instead of computing OK/HIGH/AT CAP from numbers we know are
+        low. Otherwise the dashboard reads false-healthy during an
+        Actions API failure.
+        """
+        snap = self._snapshot(in_use=2, queued=0)
+        snap["partial"] = True
+        html = ci_health.render_hosted_runner_usage(snap)
+        self.assertIn("PARTIAL", html)
+        self.assertNotIn("OK", html)
+        self.assertIn("partial", html.lower())
+
     def test_build_hosted_runner_chart_none_when_no_data(self):
         snapshots = [{"timestamp": "2026-05-13T10:00:00Z"}]
         self.assertIsNone(ci_health._build_hosted_runner_chart(snapshots))
@@ -1466,6 +1498,43 @@ class TestHostedRunnerRender(unittest.TestCase):
         self.assertEqual(chart["label_series"]["windows-latest"], [0, 2])
         self.assertEqual(chart["queued_series"], [2, 0])
         self.assertEqual(chart["total_series"], [4, 6])
+
+    def test_build_hosted_runner_chart_partial_renders_as_gap(self):
+        """A partial sample is a known undercount; the history chart
+        must plot None (a gap) rather than the false-low number.
+        """
+        snapshots = [
+            {
+                "timestamp": "2026-05-13T10:00:00Z",
+                "hosted_runner_usage": {
+                    "cap": 20,
+                    "in_progress": {
+                        "total": 5,
+                        "by_label": [{"label": "ubuntu-latest", "count": 5}],
+                        "by_workflow": [],
+                    },
+                    "queued": {"total": 0, "by_workflow": [], "by_label": []},
+                },
+            },
+            {
+                "timestamp": "2026-05-13T10:15:00Z",
+                "hosted_runner_usage": {
+                    "cap": 20,
+                    "partial": True,
+                    "in_progress": {
+                        "total": 0,
+                        "by_label": [],
+                        "by_workflow": [],
+                    },
+                    "queued": {"total": 0, "by_workflow": [], "by_label": []},
+                },
+            },
+        ]
+        chart = ci_health._build_hosted_runner_chart(snapshots)
+        self.assertIsNotNone(chart)
+        self.assertEqual(chart["total_series"], [5, None])
+        self.assertEqual(chart["queued_series"], [0, None])
+        self.assertEqual(chart["label_series"]["ubuntu-latest"], [5, None])
 
     def test_build_hosted_runner_chart_marks_missing_snapshots_as_gap(self):
         # Older snapshots without the new field should be rendered as

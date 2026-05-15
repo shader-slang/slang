@@ -286,6 +286,14 @@ def format_summary(snapshot):
         f"Hosted runners in use: {in_use} / {cap} ({pct:.0f}%)   "
         f"queued: {queued}"
     )
+    if snapshot.get("partial"):
+        lines.append(
+            "WARNING: sample is partial and may undercount hosted-runner usage."
+        )
+        if snapshot.get("fetch_errors"):
+            lines.append(f"  job fetch failures: {snapshot['fetch_errors']}")
+        for err in snapshot.get("list_errors", []):
+            lines.append(f"  list failure: {err}")
     lines.append("")
     if snapshot["in_progress"]["by_label"]:
         lines.append("In use by label:")
