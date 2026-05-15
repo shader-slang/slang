@@ -55,7 +55,21 @@ static DWORD WINAPI _parentMonitorThreadProc(void* data)
     return 0;
 }
 
-static void _startParentMonitor(DWORD parentProcessId)
+static void _signalParentMonitorReady(const char* readyEventName)
+{
+    if (!readyEventName || !readyEventName[0])
+        return;
+
+    OSString readyEventNameString = String(readyEventName).toWString();
+    HANDLE readyEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, readyEventNameString.begin());
+    if (readyEvent)
+    {
+        SetEvent(readyEvent);
+        CloseHandle(readyEvent);
+    }
+}
+
+static void _startParentMonitor(DWORD parentProcessId, const char* readyEventName)
 {
     // Keep this scoped to test-server instead of changing shared process-launch plumbing. The PID
     // is captured immediately before spawning this process and consumed during init, so the reuse
@@ -75,27 +89,48 @@ static void _startParentMonitor(DWORD parentProcessId)
         return;
     }
     CloseHandle(thread);
+    _signalParentMonitorReady(readyEventName);
 }
 
 static void _startParentMonitorFromArgs(int argc, const char* const* argv)
 {
-    for (int i = 1; i + 1 < argc; ++i)
+    bool hasParentProcessId = false;
+    const char* parentProcessIdArg = nullptr;
+    const char* readyEventName = nullptr;
+
+    for (int i = 1; i < argc; ++i)
     {
-        if (strcmp(argv[i], "-parent-pid") != 0)
-            continue;
-
-        Int parentProcessId = 0;
-        if (SLANG_SUCCEEDED(
-                StringUtil::parseInt(UnownedStringSlice(argv[i + 1]), parentProcessId)) &&
-            parentProcessId > 0 && parentProcessId <= Int(MAXDWORD))
+        if (strcmp(argv[i], "-parent-pid") == 0)
         {
-            _startParentMonitor(DWORD(parentProcessId));
-            return;
+            hasParentProcessId = true;
+            if (i + 1 >= argc)
+                break;
+            parentProcessIdArg = argv[++i];
+            continue;
         }
+        if (strcmp(argv[i], "-parent-monitor-ready-event") == 0)
+        {
+            if (i + 1 >= argc)
+                break;
+            readyEventName = argv[++i];
+            continue;
+        }
+    }
 
-        TerminateProcess(GetCurrentProcess(), 0);
+    if (!hasParentProcessId)
+        return;
+
+    Int parentProcessId = 0;
+    if (parentProcessIdArg &&
+        SLANG_SUCCEEDED(
+            StringUtil::parseInt(UnownedStringSlice(parentProcessIdArg), parentProcessId)) &&
+        parentProcessId > 0 && parentProcessId <= Int(MAXDWORD))
+    {
+        _startParentMonitor(DWORD(parentProcessId), readyEventName);
         return;
     }
+
+    TerminateProcess(GetCurrentProcess(), 0);
 }
 #endif
 

@@ -182,7 +182,93 @@ static SlangResult _createWindowsProcess(const CommandLine& cmdLine, PROCESS_INF
     return success ? SLANG_OK : SLANG_FAIL;
 }
 
-static SlangResult _parentMonitorTest(UnitTestContext* context)
+static SlangResult _expectTestServerTerminates(UnitTestContext* context, const List<String>& args)
+{
+    CommandLine serverCmdLine;
+    serverCmdLine.setExecutableLocation(
+        ExecutableLocation(context->executableDirectory, "test-server"));
+    serverCmdLine.m_args.addRange(args.getBuffer(), args.getCount());
+
+    RefPtr<Process> testServerProcess;
+    SLANG_RETURN_ON_FAIL(Process::create(
+        serverCmdLine,
+        Process::Flag::AttachDebugger | Process::Flag::DisableStdErrRedirection,
+        testServerProcess));
+
+    if (!testServerProcess->waitForTermination(5 * 1000))
+    {
+        testServerProcess->kill(-1);
+        return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
+static SlangResult _parentMonitorFailureModeTests(UnitTestContext* context)
+{
+    {
+        List<String> args;
+        args.add("-parent-pid");
+        args.add("abc");
+        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args));
+    }
+
+    {
+        List<String> args;
+        args.add("-parent-pid");
+        args.add("0");
+        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args));
+    }
+
+    {
+        List<String> args;
+        args.add("-parent-pid");
+        args.add("4294967296");
+        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args));
+    }
+
+    {
+        List<String> args;
+        args.add("-parent-pid");
+        args.add(String(uint32_t(MAXDWORD)));
+        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args));
+    }
+
+    {
+        List<String> args;
+        args.add("-parent-pid");
+        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args));
+    }
+
+    // Without -parent-pid, test-server should keep its normal RPC wait behavior.
+    CommandLine serverCmdLine;
+    serverCmdLine.setExecutableLocation(
+        ExecutableLocation(context->executableDirectory, "test-server"));
+
+    RefPtr<Process> testServerProcess;
+    SLANG_RETURN_ON_FAIL(Process::create(
+        serverCmdLine,
+        Process::Flag::AttachDebugger | Process::Flag::DisableStdErrRedirection,
+        testServerProcess));
+
+    if (testServerProcess->waitForTermination(500))
+    {
+        return SLANG_FAIL;
+    }
+    testServerProcess->kill(0);
+
+    return SLANG_OK;
+}
+
+static String _makeParentMonitorReadyEventName()
+{
+    StringBuilder builder;
+    builder << "Local\\SlangParentMonitorReady-" << Process::getId() << "-"
+            << Process::getClockTick();
+    return builder.produceString();
+}
+
+static SlangResult _parentMonitorHappyPathTest(UnitTestContext* context)
 {
     CommandLine parentCmdLine;
     parentCmdLine.setExecutableLocation(
@@ -195,11 +281,23 @@ static SlangResult _parentMonitorTest(UnitTestContext* context)
     ScopedWinHandle parentProcess(parentProcessInfo.hProcess);
     ScopedWinHandle parentThread(parentProcessInfo.hThread);
 
+    String readyEventName = _makeParentMonitorReadyEventName();
+    OSString readyEventOSName = readyEventName.toWString();
+    ScopedWinHandle readyEvent(CreateEventW(nullptr, TRUE, FALSE, readyEventOSName.begin()));
+    if (!readyEvent.handle)
+    {
+        TerminateProcess(parentProcess.handle, 0);
+        WaitForSingleObject(parentProcess.handle, INFINITE);
+        return SLANG_FAIL;
+    }
+
     CommandLine serverCmdLine;
     serverCmdLine.setExecutableLocation(
         ExecutableLocation(context->executableDirectory, "test-server"));
     serverCmdLine.addArg("-parent-pid");
     serverCmdLine.addArg(String(uint32_t(parentProcessInfo.dwProcessId)));
+    serverCmdLine.addArg("-parent-monitor-ready-event");
+    serverCmdLine.addArg(readyEventName);
 
     RefPtr<Process> testServerProcess;
     SlangResult createServerResult = Process::create(
@@ -220,10 +318,8 @@ static SlangResult _parentMonitorTest(UnitTestContext* context)
         return SLANG_FAIL;
     }
 
-    // Give test-server time to open the parent handle. The fail-closed path is also acceptable,
-    // but the normal monitor-thread path is what this regression test is meant to exercise.
-    Process::sleepCurrentThread(250);
-    if (testServerProcess->isTerminated())
+    if (WaitForSingleObject(readyEvent.handle, 5 * 1000) != WAIT_OBJECT_0 ||
+        testServerProcess->isTerminated())
     {
         TerminateProcess(parentProcess.handle, 0);
         WaitForSingleObject(parentProcess.handle, INFINITE);
@@ -239,6 +335,13 @@ static SlangResult _parentMonitorTest(UnitTestContext* context)
         return SLANG_FAIL;
     }
 
+    return SLANG_OK;
+}
+
+static SlangResult _parentMonitorTest(UnitTestContext* context)
+{
+    SLANG_RETURN_ON_FAIL(_parentMonitorHappyPathTest(context));
+    SLANG_RETURN_ON_FAIL(_parentMonitorFailureModeTests(context));
     return SLANG_OK;
 }
 #endif
