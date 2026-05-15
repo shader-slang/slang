@@ -51,18 +51,18 @@ Wait for all 6 background agents to complete. You will be automatically notified
 
 Once ALL 6 have returned findings, build the editorial table below, **fill every column for every Keep row**, and post only Keep rows.
 
-| Source agent | file:line | Severity | Confidence | Evidence quote | User-visible impact | Keep / Drop |
+| Source agent | file:line | Severity | Confidence | Evidence / verification quote | User-visible impact | Keep / Drop |
 
 Rules (applied in order, before any posting):
 
-1. **Evidence quote is mandatory for every Keep row.** Paste a verbatim snippet from the diff or surrounding source that _supports the title's claim of a plausible bug mechanism on the quoted lines_. The quote does not have to prove the full causal chain end-to-end; it must make the title plausible on the quoted code. If the quote cannot support the title as written, rewrite the title to match the quote, or mark Drop. No Keep row may ship with an empty Evidence quote.
+1. **Evidence quote is mandatory for every Keep row.** Paste a verbatim snippet from the diff or surrounding source that _supports the title's claim of a plausible bug mechanism on the quoted lines_. The quote does not have to prove the full causal chain end-to-end; it must make the title plausible on the quoted code. If the quote cannot support the title as written, rewrite the title to match the quote, or mark Drop. No Keep row may ship with an empty Evidence quote. **If Rule 4 applies** (the finding depends on unverified language/runtime semantics), include the verification quote from source/test/doc in the same column, prefixed with `Verification:` so both quotes are distinguishable.
 
 2. **Severity rules (applied strictly):**
    - 🔴 **Bug** — requires a concrete failing input, UB, crash, data loss, or public API-contract break. State the input and the wrong behavior. "Could be wrong" or "might break" is not a bug.
    - 🟡 **Gap** — requires one of: (a) missing test for a changed behavior, naming the new behavior; (b) public API contradiction (docstring vs impl, interface vs default), naming the contradicting lines; (c) **silent behavior change in an IR pass, emitter, peephole, or layout/legalization rule, even without a concrete failing test** — quote the diff line that changes the behavior and name the visible difference (e.g. `sizeof(T, DefaultDataLayout)` returning Natural-rule size before, LLVM-rule size after). Vague "inconsistency" without a named behavior → Drop.
    - 🔵 **Question** — post ONLY if the PR cannot be judged without author intent AND you name the exact binary decision the author must make. "Is this intentional?" without a decision → convert to a Gap with a concrete expected-vs-actual mismatch, or Drop.
 
-3. **Confidence floor (applied after severity):** Drop Bug/Gap with confidence < 85. Drop Question with confidence < 90. Confidence is _your model confidence that the severity rule above is satisfied_, not how likely the author agrees. **Multi-subagent override:** if two or more subagents independently flag the same file:line cluster (±5 lines) with compatible severity, keep at confidence ≥ 75 even if any individual subagent confidence is lower — convergence is signal.
+3. **Confidence floor (applied after severity):** Drop Bug/Gap with confidence < 85. Drop Question with confidence < 90. Confidence is _your model confidence that the severity rule above is satisfied_, not how likely the author agrees. **Multi-subagent override:** if two or more subagents independently flag the same file:line cluster (±5 lines) with compatible severity, and at least one subagent reports confidence ≥ 75, keep the finding even if other subagents report lower confidence — convergence is signal.
 
 4. **Verification gate:** Drop any finding that depends on unverified language/runtime semantics (Slang exceptions, interface conformance, CUDA capability gates, target prelude availability) unless you quoted the source/test/doc that verifies it. No verification quote → Drop.
 
