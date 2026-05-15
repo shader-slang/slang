@@ -21,11 +21,12 @@ show_help() {
   cat <<EOF
 $me: Format or check formatting of files in this repo
 
-Usage: $me [--check-only] [--no-version-check] [--source <path>] [--cpp] [--yaml] [--md] [--sh] [--cmake] [--since <rev>] [-- file1 file2 ...]
+Usage: $me [--check-only] [--no-version-check] [--modified] [--source <path>] [--cpp] [--yaml] [--md] [--sh] [--cmake] [--since <rev>] [-- file1 file2 ...]
 
 Options:
     --check-only       Check formatting without modifying files
     --no-version-check Skip version compatibility checks
+    --modified         Only format files modified from HEAD
     --source          Path to source directory to format (defaults to parent of script directory)
     --cpp             Format only C++ files
     --yaml            Format only YAML/JSON files
