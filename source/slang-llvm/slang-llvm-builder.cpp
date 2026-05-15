@@ -1802,7 +1802,10 @@ LLVMDebugNode* LLVMBuilder::getDebugStructType(
         fieldTypes);
 }
 
-LLVMDebugNode* LLVMBuilder::getDebugForwardDeclareType(CharSlice name, LLVMDebugNode* file, int line)
+LLVMDebugNode* LLVMBuilder::getDebugForwardDeclareType(
+    CharSlice name,
+    LLVMDebugNode* file,
+    int line)
 {
     if (!file)
         file = compileUnit->getFile();
