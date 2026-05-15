@@ -43,7 +43,7 @@ void test(uint val)
 	tmp = (quad.x + quad.y + quad.z + quad.w) & 0xF;
 
 #ifdef LOAD_COVERAGE
-    if (val == 0xFFFFFFFF)
+    if (val == 0)
     {
         uint coverage = 0;
 
@@ -83,7 +83,8 @@ void test(uint val)
         float4 naturalFloatQuad = inputBuffer.LoadAligned<float4>(16);
         coverage += asuint(naturalFloatQuad.x);
 
-        outputBuffer.Store(0, coverage);
+        // Keep the shared expected output while making coverage mismatches visible.
+        tmp = coverage == 94 ? tmp : 0xFFFFFFFF;
     }
 #endif
 
