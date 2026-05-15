@@ -214,7 +214,7 @@ struct ByteAddressBuffer
     }
 
     /// Load two 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes, which must be a multiple of 8.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return Two 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -230,8 +230,8 @@ struct ByteAddressBuffer
     }
 
     /// Load two 32-bit unsigned integers from the buffer at the specified location with a known alignment.
-    ///@param location The input address in bytes, which must be a multiple of 8.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 8.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
     ///@return Two 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -247,7 +247,7 @@ struct ByteAddressBuffer
     }
 
     /// Load two 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes, which must be a multiple of 8.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@param[out] status The status of the operation.
     ///@return Two 32-bit unsigned integers loaded from the buffer.
     ///
@@ -286,7 +286,7 @@ struct ByteAddressBuffer
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -302,8 +302,8 @@ struct ByteAddressBuffer
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location with a known alignment.
-    ///@param location The input address in bytes, which must be a multiple of 12.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 12.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
     ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -319,7 +319,7 @@ struct ByteAddressBuffer
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@param[out] status The status of the operation.
     ///@return Three 32-bit unsigned integers loaded from the buffer.
     ///
@@ -358,7 +358,7 @@ struct ByteAddressBuffer
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes, which must be a multiple of 16.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -374,8 +374,8 @@ struct ByteAddressBuffer
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location with a known alignment.
-    ///@param location The input address in bytes, which must be a multiple of 16.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 16.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
     ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -391,7 +391,7 @@ struct ByteAddressBuffer
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes, which must be a multiple of 16.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@param[out] status The status of the operation.
     ///@return Four 32-bit unsigned integers loaded from the buffer.
     ///
@@ -431,7 +431,7 @@ struct ByteAddressBuffer
 
     /// Load a value with type `T` from the buffer at the specified location.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return The value loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -443,8 +443,8 @@ struct ByteAddressBuffer
 
     /// Load a value with type `T` from the buffer at the specified location with a known alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes.
-    ///@param alignment The known alignment of `location`, which must be compatible with `T`.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
     ///@return The value loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -6051,7 +6051,7 @@ struct $(item.name)
     }
 
     /// Load two 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes, which must be a multiple of 8.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return Two 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -6067,8 +6067,8 @@ struct $(item.name)
     }
 
     /// Load two 32-bit unsigned integers from the buffer at the specified location with a known alignment.
-    ///@param location The input address in bytes, which must be a multiple of 8.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 8.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
     ///@return Two 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -6100,7 +6100,7 @@ struct $(item.name)
     }
 
     /// Load two 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes, which must be a multiple of 8.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@param[out] status The status of the operation.
     ///@return Two 32-bit unsigned integers loaded from the buffer.
     ///
@@ -6123,7 +6123,7 @@ struct $(item.name)
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -6139,8 +6139,8 @@ struct $(item.name)
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location with a known alignment.
-    ///@param location The input address in bytes, which must be a multiple of 12.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 12.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
     ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -6172,7 +6172,7 @@ struct $(item.name)
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@param[out] status The status of the operation.
     ///@return Three 32-bit unsigned integers loaded from the buffer.
     ///
@@ -6195,7 +6195,7 @@ struct $(item.name)
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes, which must be a multiple of 16.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -6211,8 +6211,8 @@ struct $(item.name)
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location with a known alignment.
-    ///@param location The input address in bytes, which must be a multiple of 16.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 16.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
     ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -6244,7 +6244,7 @@ struct $(item.name)
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes, which must be a multiple of 16.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@param[out] status The status of the operation.
     ///@return Four 32-bit unsigned integers loaded from the buffer.
     ///
@@ -6268,7 +6268,7 @@ struct $(item.name)
 
     /// Load a value with type `T` from the buffer at the specified location.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return The value loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -6280,8 +6280,8 @@ struct $(item.name)
 
     /// Load a value with type `T` from the buffer at the specified location with a known alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes.
-    ///@param alignment The known alignment of `location`, which must be compatible with `T`.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
     ///@return The value loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -7071,6 +7071,7 @@ struct $(item.name) : IRWArray<T>
     /// @return The element at the specified index.
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoad))
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, rwstructuredbuffer)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location);
 
     /// Load an element from the buffer at the specified location.
@@ -7088,7 +7089,7 @@ struct $(item.name) : IRWArray<T>
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoadStatus))
-    [require(hlsl)]
+    [require(hlsl, rwstructuredbuffer)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
     /// Load an element from the buffer at the specified location.
