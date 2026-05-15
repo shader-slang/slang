@@ -26,9 +26,8 @@
 #endif
 
 #if defined(_WIN32)
-#include <windows.h>
-
 #include <slang-rhi/agility-sdk.h>
+#include <windows.h>
 SLANG_RHI_EXPORT_AGILITY_SDK
 #endif
 
@@ -82,7 +81,7 @@ static void _startParentMonitorFromArgs(int argc, const char* const* argv)
         Int parentProcessId = 0;
         if (SLANG_SUCCEEDED(
                 StringUtil::parseInt(UnownedStringSlice(argv[i + 1]), parentProcessId)) &&
-            parentProcessId > 0)
+            parentProcessId > 0 && parentProcessId <= Int(MAXDWORD))
         {
             _startParentMonitor(DWORD(parentProcessId));
         }
