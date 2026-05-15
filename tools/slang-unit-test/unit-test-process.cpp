@@ -177,6 +177,15 @@ struct ScopedWinEnvironmentVariable
     }
 };
 
+static void _terminateWindowsProcessAndWait(HANDLE process)
+{
+    if (process)
+    {
+        TerminateProcess(process, 0);
+        WaitForSingleObject(process, INFINITE);
+    }
+}
+
 static SlangResult _createWindowsProcess(const CommandLine& cmdLine, PROCESS_INFORMATION& out)
 {
     STARTUPINFOW startupInfo;
@@ -216,7 +225,10 @@ static SlangResult _createWindowsProcess(const CommandLine& cmdLine, PROCESS_INF
     return success ? SLANG_OK : SLANG_FAIL;
 }
 
-static SlangResult _expectTestServerTerminates(UnitTestContext* context, const List<String>& args)
+static SlangResult _expectTestServerTerminates(
+    UnitTestContext* context,
+    const List<String>& args,
+    int32_t expectedReturnCode)
 {
     CommandLine serverCmdLine;
     serverCmdLine.setExecutableLocation(
@@ -234,6 +246,10 @@ static SlangResult _expectTestServerTerminates(UnitTestContext* context, const L
         testServerProcess->kill(-1);
         return SLANG_FAIL;
     }
+    if (testServerProcess->getReturnValue() != expectedReturnCode)
+    {
+        return SLANG_FAIL;
+    }
 
     return SLANG_OK;
 }
@@ -244,34 +260,34 @@ static SlangResult _parentMonitorFailureModeTests(UnitTestContext* context)
         List<String> args;
         args.add("-parent-pid");
         args.add("abc");
-        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args));
+        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args, 1));
     }
 
     {
         List<String> args;
         args.add("-parent-pid");
         args.add("0");
-        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args));
+        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args, 1));
     }
 
     {
         List<String> args;
         args.add("-parent-pid");
         args.add("4294967296");
-        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args));
+        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args, 1));
     }
 
     {
         List<String> args;
         args.add("-parent-pid");
         args.add(String(uint32_t(MAXDWORD)));
-        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args));
+        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args, 1));
     }
 
     {
         List<String> args;
         args.add("-parent-pid");
-        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args));
+        SLANG_RETURN_ON_FAIL(_expectTestServerTerminates(context, args, 1));
     }
 
     // Without -parent-pid, test-server should keep its normal RPC wait behavior.
@@ -294,21 +310,33 @@ static SlangResult _parentMonitorFailureModeTests(UnitTestContext* context)
     return SLANG_OK;
 }
 
-static String _makeParentMonitorReadyEventName()
+static String _makeParentMonitorEventName(const char* label)
 {
     StringBuilder builder;
-    builder << "Local\\SlangParentMonitorReady-" << Process::getId() << "-"
+    builder << "Local\\SlangParentMonitor-" << label << "-" << Process::getId() << "-"
             << Process::getClockTick();
     return builder.produceString();
 }
 
-static SlangResult _parentMonitorHappyPathTest(UnitTestContext* context)
+static String _makeParentMonitorReadyEventName()
 {
+    return _makeParentMonitorEventName("ready");
+}
+
+static SlangResult _parentMonitorParentExitTest(UnitTestContext* context, bool terminateParent)
+{
+    String parentExitEventName = _makeParentMonitorEventName("parent-exit");
+    OSString parentExitEventOSName = parentExitEventName.toWString();
+    ScopedWinHandle parentExitEvent(
+        CreateEventW(nullptr, TRUE, FALSE, parentExitEventOSName.begin()));
+    if (!parentExitEvent.isValid())
+        return SLANG_FAIL;
+
     CommandLine parentCmdLine;
     parentCmdLine.setExecutableLocation(
         ExecutableLocation(context->executableDirectory, "test-process"));
-    parentCmdLine.addArg("sleep");
-    parentCmdLine.addArg("30000");
+    parentCmdLine.addArg("wait-event");
+    parentCmdLine.addArg(parentExitEventName);
 
     PROCESS_INFORMATION parentProcessInfo;
     SLANG_RETURN_ON_FAIL(_createWindowsProcess(parentCmdLine, parentProcessInfo));
@@ -318,10 +346,9 @@ static SlangResult _parentMonitorHappyPathTest(UnitTestContext* context)
     String readyEventName = _makeParentMonitorReadyEventName();
     OSString readyEventOSName = readyEventName.toWString();
     ScopedWinHandle readyEvent(CreateEventW(nullptr, TRUE, FALSE, readyEventOSName.begin()));
-    if (!readyEvent.handle)
+    if (!readyEvent.isValid())
     {
-        TerminateProcess(parentProcess.handle, 0);
-        WaitForSingleObject(parentProcess.handle, INFINITE);
+        _terminateWindowsProcessAndWait(parentProcess.handle);
         return SLANG_FAIL;
     }
 
@@ -340,32 +367,49 @@ static SlangResult _parentMonitorHappyPathTest(UnitTestContext* context)
         testServerProcess);
     if (SLANG_FAILED(createServerResult))
     {
-        TerminateProcess(parentProcess.handle, 0);
-        WaitForSingleObject(parentProcess.handle, INFINITE);
+        _terminateWindowsProcessAndWait(parentProcess.handle);
         return createServerResult;
     }
 
     if (testServerProcess->isTerminated())
     {
-        TerminateProcess(parentProcess.handle, 0);
-        WaitForSingleObject(parentProcess.handle, INFINITE);
+        _terminateWindowsProcessAndWait(parentProcess.handle);
         return SLANG_FAIL;
     }
 
     if (WaitForSingleObject(readyEvent.handle, 5 * 1000) != WAIT_OBJECT_0 ||
         testServerProcess->isTerminated())
     {
-        TerminateProcess(parentProcess.handle, 0);
-        WaitForSingleObject(parentProcess.handle, INFINITE);
+        _terminateWindowsProcessAndWait(parentProcess.handle);
         return SLANG_FAIL;
     }
 
-    TerminateProcess(parentProcess.handle, 0);
-    WaitForSingleObject(parentProcess.handle, INFINITE);
+    if (terminateParent)
+    {
+        TerminateProcess(parentProcess.handle, 0);
+    }
+    else
+    {
+        if (!SetEvent(parentExitEvent.handle))
+        {
+            _terminateWindowsProcessAndWait(parentProcess.handle);
+            return SLANG_FAIL;
+        }
+    }
+
+    if (WaitForSingleObject(parentProcess.handle, 5 * 1000) != WAIT_OBJECT_0)
+    {
+        _terminateWindowsProcessAndWait(parentProcess.handle);
+        return SLANG_FAIL;
+    }
 
     if (!testServerProcess->waitForTermination(5 * 1000))
     {
         testServerProcess->kill(-1);
+        return SLANG_FAIL;
+    }
+    if (testServerProcess->getReturnValue() != 0)
+    {
         return SLANG_FAIL;
     }
 
@@ -374,7 +418,8 @@ static SlangResult _parentMonitorHappyPathTest(UnitTestContext* context)
 
 static SlangResult _parentMonitorTest(UnitTestContext* context)
 {
-    SLANG_RETURN_ON_FAIL(_parentMonitorHappyPathTest(context));
+    SLANG_RETURN_ON_FAIL(_parentMonitorParentExitTest(context, true));
+    SLANG_RETURN_ON_FAIL(_parentMonitorParentExitTest(context, false));
     SLANG_RETURN_ON_FAIL(_parentMonitorFailureModeTests(context));
     return SLANG_OK;
 }
@@ -394,7 +439,7 @@ static SlangResult _findChildTestServerProcessIds(DWORD parentProcessId, List<DW
     do
     {
         if (entry.th32ParentProcessID == parentProcessId &&
-            wcscmp(entry.szExeFile, L"test-server.exe") == 0)
+            _wcsicmp(entry.szExeFile, L"test-server.exe") == 0)
         {
             outProcessIds.add(entry.th32ProcessID);
         }

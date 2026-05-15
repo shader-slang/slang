@@ -36,6 +36,8 @@ namespace TestServer
 using namespace Slang;
 
 #if defined(_WIN32)
+static const UINT kParentMonitorFailedExitCode = 1;
+
 // This monitor is Windows-only because issue #10109 is specifically about orphaned test-server
 // processes holding DLLs open after slang-test crashes. Unix platforms do not prevent loaded
 // shared libraries from being replaced in the same way.
@@ -71,13 +73,15 @@ static void _signalParentMonitorReady(const char* readyEventName)
 
 static void _startParentMonitor(DWORD parentProcessId, const char* readyEventName)
 {
-    // Keep this scoped to test-server instead of changing shared process-launch plumbing. The PID
-    // is captured immediately before spawning this process and consumed during init, so the reuse
-    // window is tiny; if we cannot open it at all, avoid leaving an unmonitored orphan.
+    // Keep this scoped to test-server instead of changing shared process-launch plumbing. A
+    // duplicated inheritable parent handle would remove PID reuse entirely, but Process::create
+    // does not currently expose selective handle inheritance. The PID is captured immediately
+    // before spawning this process and consumed during init, so the reuse window is tiny; if we
+    // cannot open it at all, avoid leaving an unmonitored orphan.
     HANDLE parentProcess = OpenProcess(SYNCHRONIZE, FALSE, parentProcessId);
     if (!parentProcess)
     {
-        TerminateProcess(GetCurrentProcess(), 0);
+        TerminateProcess(GetCurrentProcess(), kParentMonitorFailedExitCode);
         return;
     }
 
@@ -85,7 +89,7 @@ static void _startParentMonitor(DWORD parentProcessId, const char* readyEventNam
     if (!thread)
     {
         CloseHandle(parentProcess);
-        TerminateProcess(GetCurrentProcess(), 0);
+        TerminateProcess(GetCurrentProcess(), kParentMonitorFailedExitCode);
         return;
     }
     CloseHandle(thread);
@@ -130,7 +134,7 @@ static void _startParentMonitorFromArgs(int argc, const char* const* argv)
         return;
     }
 
-    TerminateProcess(GetCurrentProcess(), 0);
+    TerminateProcess(GetCurrentProcess(), kParentMonitorFailedExitCode);
 }
 #endif
 
