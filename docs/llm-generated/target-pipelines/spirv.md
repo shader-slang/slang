@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-13T12:15:00+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 97cfbc0548dd84c39d91f578db3c4d946f205497d55bc09b086faf4e9e0beb95
+generated_at: 2026-05-15T14:35:00+00:00
+source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
+watched_paths_digest: 53da5869f5a58254bbc9a0c88fc65eedfa8ce235904015ea404b227a8501d13e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -33,19 +33,19 @@ tables below; that filter is documented per-phase.
 ## Source
 
 - [slang-emit.cpp](../../../source/slang/slang-emit.cpp)
-  — `linkAndOptimizeIR` (line ~892) is the orchestrator;
-  `emitSPIRVForEntryPointsDirectly` (line ~3075) is the SPIR-V
-  entry point; `createArtifactFromIR` (line ~2910) wraps the
+  — `linkAndOptimizeIR` (line ~893) is the orchestrator;
+  `emitSPIRVForEntryPointsDirectly` (line ~3122) is the SPIR-V
+  entry point; `createArtifactFromIR` (line ~2957) wraps the
   post-emit downstream chain (spirv-link, spirv-val,
   `optimizeSPIRV` currently disabled by `#if 0`).
 - [slang-emit-spirv.cpp](../../../source/slang/slang-emit-spirv.cpp)
-  — `emitSPIRVFromIR` (line ~11104) calls `legalizeIRForSPIRV`,
+  — `emitSPIRVFromIR` (line ~11314) calls `legalizeIRForSPIRV`,
   iterates the forward-declared-pointer fixup loop, and emits the
   SPIR-V words.
 - [slang-ir-spirv-legalize.cpp](../../../source/slang/slang-ir-spirv-legalize.cpp)
-  — `legalizeIRForSPIRV` (line 2935) is the top-level legalizer;
-  `legalizeSPIRV` (line 2696) drives `SPIRVLegalizationContext::processModule`;
-  `simplifyIRForSpirvLegalization` (line 2709) is the iterative
+  — `legalizeIRForSPIRV` (line 2977) is the top-level legalizer;
+  `legalizeSPIRV` (line 2738) drives `SPIRVLegalizationContext::processModule`;
+  `simplifyIRForSpirvLegalization` (line 2751) is the iterative
   simplification loop (outer bound 8, inner bound 16);
   `removeUnreachableCodeAfterDiscardForOpKill` and
   `insertFragmentShaderInterlock` are SPIR-V-specific finalization
@@ -82,13 +82,13 @@ for Phase D, which starts inside `linkAndOptimizeIR`
 
 ## Phase A: Link and entry-point prep
 
-Spans roughly lines 927-1170 of
+Spans roughly lines 928-1205 of
 [slang-emit.cpp](../../../source/slang/slang-emit.cpp). The phase
 takes the just-linked IR module, runs structural validators, and
 prepares the entry-point shape: global varying variables, coverage
-instrumentation, layout, and uniform-parameter collection. SPIR-V
-is reached via the `default` arm of every per-target switch in this
-phase.
+instrumentation, layout, uniform-parameter collection, and the
+post-packing coverage-metadata finalize. SPIR-V is reached via the
+`default` arm of every per-target switch in this phase.
 
 ```mermaid
 flowchart TD
@@ -116,6 +116,8 @@ flowchart TD
   cEPUP[collectEntryPointUniformParams]
   mEPUP[moveEntryPointUniformParamsToGlobalScope]
   rTCEP[removeTorchAndCUDAEntryPoints]
+  covGate2{reqSet.coverageTracing}
+  fCIM[finalizeCoverageInstrumentationMetadata]
   lLVC[lowerLValueCast]
   enumGate{reqSet.enumType}
   lET[lowerEnumType]
@@ -136,7 +138,10 @@ flowchart TD
   beGate -->|false| covGate
   covGate -->|true| iC --> cGUP
   covGate -->|false| cGUP
-  cGUP --> cEPD --> aDMD --> cEPUP --> mEPUP --> rTCEP --> lLVC --> enumGate
+  cGUP --> cEPD --> aDMD --> cEPUP --> mEPUP --> rTCEP --> covGate2
+  covGate2 -->|true| fCIM --> lLVC
+  covGate2 -->|false| lLVC
+  lLVC --> enumGate
   enumGate -->|true| lET
 ```
 
@@ -161,8 +166,9 @@ Validation calls `validateIRModuleIfEnabled` run after most
 | 14 | `collectEntryPointUniformParams` | [slang-ir-entry-point-uniforms.cpp](../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, SPIR-V via `default` arm) | |
 | 15 | `moveEntryPointUniformParamsToGlobalScope` | [slang-ir-entry-point-uniforms.cpp](../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, SPIR-V via `default` arm) | |
 | 16 | `removeTorchAndCUDAEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | (always, SPIR-V via `default` arm) | |
-| 17 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../source/slang/slang-ir-lower-l-value-cast.cpp) | (always) | |
-| 18 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | Runs early so enum casts don't block specialization. |
+| 17 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Runs after entry-point uniform packing so the post-packing `globalScopeVarLayout` can fill in the CPU/CUDA uniform-marshaling fields on the coverage `ArtifactPostEmitMetadata` produced by step 10. Effectively a no-op on SPIR-V (no CPU/CUDA marshaling), but the call site is shared. |
+| 18 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../source/slang/slang-ir-lower-l-value-cast.cpp) | (always) | |
+| 19 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | Runs early so enum casts don't block specialization. |
 
 Filtered out for SPIR-V in this phase: the
 `!isKhronosTarget && reqSet.glslSSBO` branch (line 979,
@@ -172,7 +178,7 @@ Filtered out for SPIR-V in this phase: the
 
 ## Phase B: Specialization and type legalization
 
-Spans roughly lines 1172-1714 of
+Spans roughly lines 1207-1773 of
 [slang-emit.cpp](../../../source/slang/slang-emit.cpp). The phase
 runs the main simplification pass, drives generic / existential
 specialization, finalizes autodiff, lowers high-level types
@@ -295,17 +301,17 @@ flowchart TD
   fADP --> mssGate
   mssGate -->|true| lMSS --> dce1
   mssGate -->|false| dce1
-  dce1 --> fS --> lDTI --> rtGate
-  rtGate -->|true| lRT --> ctGate
-  rtGate -->|false| ctGate
+  dce1 --> fS --> lDTI --> ctGate
   ctGate -->|true| lCT --> otGate1
   ctGate -->|false| otGate1
   otGate1 -->|true| lRO --> nevGate
   otGate1 -->|false| nevGate
   nevGate -->|true| cONU --> otGate2
   nevGate -->|false| otGate2
-  otGate2 -->|true| lOT --> reqSet2
-  otGate2 -->|false| reqSet2
+  otGate2 -->|true| lOT --> rtGate
+  otGate2 -->|false| rtGate
+  rtGate -->|true| lRT --> reqSet2
+  rtGate -->|false| reqSet2
   reqSet2 --> dUR --> raidGate
   raidGate -->|true| rAIDD --> nevGate2
   raidGate -->|false| nevGate2
@@ -362,11 +368,11 @@ flowchart TD
 | 11 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../source/slang/slang-ir-dce.cpp) | (always) | |
 | 12 | `finalizeSpecialization` | [slang-ir-specialize.cpp](../../../source/slang/slang-ir-specialize.cpp) | (always) | |
 | 13 | `lowerDiffTypeInfoInsts` | [slang-ir-autodiff.cpp](../../../source/slang/slang-ir-autodiff.cpp) | (always) | Direct call (`DiffTypeInfo` is hoistable, must run after specialization). |
-| 14 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | |
-| 15 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../source/slang/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
-| 16 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
-| 17 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../source/slang/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | Must run after `simplifyIR` but before `lowerOptionalType`. |
-| 18 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../source/slang/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
+| 14 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../source/slang/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
+| 15 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
+| 16 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../source/slang/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | Must run after `simplifyIR` but before `lowerOptionalType`. |
+| 17 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../source/slang/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
+| 18 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | Now runs **after** `lowerOptionalType`: `lowerResultType` depends on accurate `getAnyValueSize()` results, which requires Optional types to be lowered first (so that a throwing function returning `Optional<T>` keeps the result-struct shape stable). |
 | 19 | `detectUninitializedResources` | [slang-ir-detect-uninitialized-resources.cpp](../../../source/slang/slang-ir-detect-uninitialized-resources.cpp) | (always) | After `calcRequiredLoweringPassSet` rebuilds gates. |
 | 20 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-strip.cpp](../../../source/slang/slang-ir-strip.cpp) | `codeGenContext->removeAvailableInDownstreamIR` | |
 | 21 | `checkForRecursiveTypes` | [slang-ir-check-recursion.cpp](../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
@@ -434,7 +440,7 @@ Metal switch arm).
 
 ## Phase C: SPIR-V legalization, lowering, phi elimination
 
-Spans roughly lines 1745-2360 of
+Spans roughly lines 1798-2413 of
 [slang-emit.cpp](../../../source/slang/slang-emit.cpp). The phase
 runs the byte-address-buffer legalization (with SPIR-V-specific
 options), the entry-point parameter rewriting shared with GLSL,
@@ -611,16 +617,16 @@ inside `legalizeIRForSPIRV`); the `CPPSource` /
 ## Phase D: IR-to-SPIR-V emit, simplification loop, downstream tools
 
 Starts immediately after `linkAndOptimizeIR` returns to
-`emitSPIRVForEntryPointsDirectly` (line ~3075 of
+`emitSPIRVForEntryPointsDirectly` (line ~3122 of
 [slang-emit.cpp](../../../source/slang/slang-emit.cpp)). The
-SPIR-V backend in `emitSPIRVFromIR` (line ~11104 of
+SPIR-V backend in `emitSPIRVFromIR` (line ~11314 of
 [slang-emit-spirv.cpp](../../../source/slang/slang-emit-spirv.cpp))
-calls the top-level `legalizeIRForSPIRV` (line 2935 of
+calls the top-level `legalizeIRForSPIRV` (line 2977 of
 [slang-ir-spirv-legalize.cpp](../../../source/slang/slang-ir-spirv-legalize.cpp))
 which runs the SPIR-V-specific IR passes and the iterative
 `simplifyIRForSpirvLegalization` loop. After SPIR-V word emission
 the artifact passes through the optional downstream chain in
-`createArtifactFromIR` (line ~2910): `spirv-link` for embedded-
+`createArtifactFromIR` (line ~2957): `spirv-link` for embedded-
 module merging and `spirv-val` for validation.
 
 ```mermaid
@@ -738,7 +744,7 @@ pass on the SPIR-V path are listed.
 | `globalVaryingVar` | `translateGlobalVaryingVar`. |
 | `resolveVaryingInputRef` | `resolveVaryingInputRef`. |
 | `bindExistential` | `bindExistentialSlots`. |
-| `coverageTracing` | `instrumentCoverage`. |
+| `coverageTracing` | `instrumentCoverage` (Phase A step 10) **and** `finalizeCoverageInstrumentationMetadata` (Phase A step 17). |
 | `enumType` | `lowerEnumType`. |
 | `autodiff` | `checkAutodiffPatterns`. |
 | `higherOrderFunc` | `specializeHigherOrderParameters`. |
@@ -811,7 +817,7 @@ Two iterative passes execute in the SPIR-V pipeline. No other
 
 ### `simplifyIRForSpirvLegalization` (Phase D, step 5)
 
-Defined at line 2709 of
+Defined at line 2751 of
 [slang-ir-spirv-legalize.cpp](../../../source/slang/slang-ir-spirv-legalize.cpp).
 
 - Outer loop: `while (changed && iterationCounter < kMaxIterations)`
@@ -837,7 +843,7 @@ loops settle within 2-3 outer iterations.
 
 ### Forward-declared pointer fixup (Phase D, step 12)
 
-Defined around line 11265 of
+Defined around line 11475 of
 [slang-emit-spirv.cpp](../../../source/slang/slang-emit-spirv.cpp).
 
 - Form: `do { ... } while (context.m_forwardDeclaredPointers.getCount() != 0)`.
@@ -854,7 +860,7 @@ Defined around line 11265 of
 ### `legalizeIRForSPIRV`
 
 The single SPIR-V-only entry point inside `emitSPIRVFromIR`,
-defined at line 2935 of
+defined at line 2977 of
 [slang-ir-spirv-legalize.cpp](../../../source/slang/slang-ir-spirv-legalize.cpp).
 It is *not* a single pass: it sequences `legalizeSPIRV`
 (`SPIRVLegalizationContext::processModule`) followed by the

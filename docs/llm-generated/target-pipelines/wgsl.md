@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-13T14:50:00+00:00
-source_commit: 07b911645ab895c59decdcc25c6c56ee245833af
-watched_paths_digest: 1d8644fd55c2239e3fae8d7ec287dec261eb618469008523d6dc46e640e88a4e
+generated_at: 2026-05-15T14:50:00+00:00
+source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
+watched_paths_digest: 323d0d6bf3081ae64a8d0fdc99266b419b8fb4f43b1b32319dc97caae7f78a6c
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -30,8 +30,8 @@ and tables below.
 ## Source
 
 - [slang-emit.cpp](../../../source/slang/slang-emit.cpp) —
-  `linkAndOptimizeIR` (line ~892) is the orchestrator;
-  `emitEntryPointsSourceFromIR` (line ~2365) constructs the
+  `linkAndOptimizeIR` (line ~893) is the orchestrator;
+  `emitEntryPointsSourceFromIR` (line ~2418) constructs the
   `WGSLSourceEmitter` and emits WGSL text.
 - [slang-emit-wgsl.cpp](../../../source/slang/slang-emit-wgsl.cpp)
   — `WGSLSourceEmitter` implementation.
@@ -69,7 +69,7 @@ Phase C.
 
 ## Phase A: Link and entry-point prep
 
-Spans roughly lines 927-1170 of
+Spans roughly lines 928-1205 of
 [slang-emit.cpp](../../../source/slang/slang-emit.cpp). WGSL hits
 the `default` arm of every per-target switch in this phase. One
 WGSL-relevant difference from SPIR-V: WGSL is non-Khronos, so the
@@ -105,6 +105,8 @@ flowchart TD
   cEPUP[collectEntryPointUniformParams]
   mEPUP[moveEntryPointUniformParamsToGlobalScope]
   rTCEP[removeTorchAndCUDAEntryPoints]
+  covGate2{reqSet.coverageTracing}
+  fCIM[finalizeCoverageInstrumentationMetadata]
   lLVC[lowerLValueCast]
   enumGate{reqSet.enumType}
   lET[lowerEnumType]
@@ -127,7 +129,10 @@ flowchart TD
   beGate -->|false| covGate
   covGate -->|true| iC --> cGUP
   covGate -->|false| cGUP
-  cGUP --> cEPD --> aDMD --> cEPUP --> mEPUP --> rTCEP --> lLVC --> enumGate
+  cGUP --> cEPD --> aDMD --> cEPUP --> mEPUP --> rTCEP --> covGate2
+  covGate2 -->|true| fCIM --> lLVC
+  covGate2 -->|false| lLVC
+  lLVC --> enumGate
   enumGate -->|true| lET
 ```
 
@@ -150,8 +155,9 @@ flowchart TD
 | 15 | `collectEntryPointUniformParams` | [slang-ir-entry-point-uniforms.cpp](../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, WGSL via `default` arm) | |
 | 16 | `moveEntryPointUniformParamsToGlobalScope` | [slang-ir-entry-point-uniforms.cpp](../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, WGSL via `default` arm) | |
 | 17 | `removeTorchAndCUDAEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | (always, WGSL via `default` arm) | |
-| 18 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../source/slang/slang-ir-lower-l-value-cast.cpp) | (always) | |
-| 19 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | |
+| 18 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Post-packing pass that fills CPU/CUDA uniform-marshaling fields on the coverage `ArtifactPostEmitMetadata`. No-op for WGSL. |
+| 19 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../source/slang/slang-ir-lower-l-value-cast.cpp) | (always) | |
+| 20 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | |
 
 Filtered out for WGSL in this phase: the CUDA / CUDAHeader arm of
 the entry-point-param switch
@@ -159,7 +165,7 @@ the entry-point-param switch
 
 ## Phase B: Specialization and type legalization
 
-Spans roughly lines 1172-1714 of `slang-emit.cpp`. WGSL is in the
+Spans roughly lines 1207-1773 of `slang-emit.cpp`. WGSL is in the
 `default` arm for most decision points; it diverges from SPIR-V at
 `lowerCooperativeVectors` (which runs for WGSL), the
 HLSL-or-SPIR-V byte-address-buffer arms (which don't apply), and
@@ -186,8 +192,6 @@ flowchart TD
   dce1[eliminateDeadCode]
   fS[finalizeSpecialization]
   lDTI["lowerDiffTypeInfoInsts (direct call)"]
-  rtGate{reqSet.resultType}
-  lRT[lowerResultType]
   ctGate{reqSet.conditionalType}
   lCT[lowerConditionalType]
   otGate1{reqSet.optionalType}
@@ -196,6 +200,8 @@ flowchart TD
   cONU[checkForOptionalNoneUsage]
   otGate2{reqSet.optionalType}
   lOT[lowerOptionalType]
+  rtGate{reqSet.resultType}
+  lRT[lowerResultType]
   reqSet2[calcRequiredLoweringPassSet]
   dUR[detectUninitializedResources]
   raidGate{removeAvailableInDownstreamIR}
@@ -281,17 +287,17 @@ flowchart TD
   fADP --> mssGate
   mssGate -->|true| lMSS --> dce1
   mssGate -->|false| dce1
-  dce1 --> fS --> lDTI --> rtGate
-  rtGate -->|true| lRT --> ctGate
-  rtGate -->|false| ctGate
+  dce1 --> fS --> lDTI --> ctGate
   ctGate -->|true| lCT --> otGate1
   ctGate -->|false| otGate1
   otGate1 -->|true| lRO --> nevGate
   otGate1 -->|false| nevGate
   nevGate -->|true| cONU --> otGate2
   nevGate -->|false| otGate2
-  otGate2 -->|true| lOT --> reqSet2
-  otGate2 -->|false| reqSet2
+  otGate2 -->|true| lOT --> rtGate
+  otGate2 -->|false| rtGate
+  rtGate -->|true| lRT --> reqSet2
+  rtGate -->|false| reqSet2
   reqSet2 --> dUR --> raidGate
   raidGate -->|true| rAIDD --> nevGate2
   raidGate -->|false| nevGate2
@@ -350,11 +356,11 @@ flowchart TD
 | 11 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../source/slang/slang-ir-dce.cpp) | (always) | |
 | 12 | `finalizeSpecialization` | [slang-ir-specialize.cpp](../../../source/slang/slang-ir-specialize.cpp) | (always) | |
 | 13 | `lowerDiffTypeInfoInsts` | [slang-ir-autodiff.cpp](../../../source/slang/slang-ir-autodiff.cpp) | (always) | Direct call. |
-| 14 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | |
-| 15 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../source/slang/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
-| 16 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
-| 17 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../source/slang/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | |
-| 18 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../source/slang/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
+| 14 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../source/slang/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
+| 15 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
+| 16 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../source/slang/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | |
+| 17 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../source/slang/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
+| 18 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | Now runs **after** `lowerOptionalType`: depends on accurate `getAnyValueSize()` results. |
 | 19 | `detectUninitializedResources` | [slang-ir-detect-uninitialized-resources.cpp](../../../source/slang/slang-ir-detect-uninitialized-resources.cpp) | (always) | |
 | 20 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-redundancy-removal.cpp](../../../source/slang/slang-ir-redundancy-removal.cpp) | `codeGenContext->removeAvailableInDownstreamIR` | |
 | 21 | `checkForRecursiveTypes` | [slang-ir-check-recursion.cpp](../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
@@ -423,7 +429,7 @@ parameter-block arm; the `isCPUTargetViaLLVM` LLVM arm; the HLSL
 
 ## Phase C: WGSL legalization, lowering, phi elimination
 
-Spans roughly lines 1745-2360 of `slang-emit.cpp`. WGSL's central
+Spans roughly lines 1798-2413 of `slang-emit.cpp`. WGSL's central
 legalizer is `legalizeIRForWGSL` (line ~1970, defined in
 [slang-ir-wgsl-legalize.cpp](../../../source/slang/slang-ir-wgsl-legalize.cpp)),
 which is treated as a single node in the diagram below.
@@ -562,8 +568,8 @@ emit only).
 ## Phase D: WGSL emit and downstream tools
 
 Phase D begins immediately after `linkAndOptimizeIR` returns to
-`emitEntryPointsSourceFromIR` (line ~2365 of `slang-emit.cpp`).
-The `WGSLSourceEmitter` (constructed at line ~2469) walks the IR
+`emitEntryPointsSourceFromIR` (line ~2418 of `slang-emit.cpp`).
+The `WGSLSourceEmitter` (constructed at line ~2522) walks the IR
 and produces WGSL text. After
 `createArtifactFromIR` packages the artifact, the optional
 downstream chain (Tint, for `WGSLSPIRV` / `WGSLSPIRVAssembly`)
@@ -592,8 +598,8 @@ flowchart TD
 
 | # | Pass / step | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | (entry point) | Sets `LineDirectiveMode::None` for WGSL (line ~2398) because WGSL has no `#line` directive. |
-| 2 | `new WGSLSourceEmitter` | [slang-emit-wgsl.cpp](../../../source/slang/slang-emit-wgsl.cpp) | `case SourceLanguage::WGSL` | Constructed at line ~2469 of `slang-emit.cpp`. |
+| 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | (entry point) | Sets `LineDirectiveMode::None` for WGSL (line ~2451) because WGSL has no `#line` directive. |
+| 2 | `new WGSLSourceEmitter` | [slang-emit-wgsl.cpp](../../../source/slang/slang-emit-wgsl.cpp) | `case SourceLanguage::WGSL` | Constructed at line ~2522 of `slang-emit.cpp`. |
 | 3 | `sourceEmitter->init` | [slang-emit-c-like.cpp](../../../source/slang/slang-emit-c-like.cpp) | (always) | |
 | 4 | `linkAndOptimizeIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | (always) | Runs Phases A-C. |
 | 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | Final pre-emit simplification. |
@@ -616,7 +622,7 @@ semantic rules when invoked.
 | `globalVaryingVar` | `translateGlobalVaryingVar`. |
 | `resolveVaryingInputRef` | `resolveVaryingInputRef`. |
 | `bindExistential` | `bindExistentialSlots`. |
-| `coverageTracing` | `instrumentCoverage`. |
+| `coverageTracing` | `instrumentCoverage` and `finalizeCoverageInstrumentationMetadata` (Phase A). |
 | `enumType` | `lowerEnumType`. |
 | `autodiff` | `checkAutodiffPatterns`. |
 | `higherOrderFunc` | `specializeHigherOrderParameters`. |
@@ -670,7 +676,7 @@ Flags that exist but **never gate a WGSL pass**:
 | Gate | Where evaluated | Effect |
 | --- | --- | --- |
 | `isWGPUTarget(targetRequest)` | Multiple sites (line 1984, 1989, 2189) | Selects WGSL-specific arms: `legalizeLogicalAndOr`, `specializeAddressSpaceForWGSL`, `lowerBufferElementTypeToStorageType` policy = `WGSL`, `legalizeByteAddressBufferOps` WGSL options. |
-| `target == CodeGenTarget::WGSL` (vs `WGSLSPIRV*`) | `emitEntryPointsSourceFromIR` line ~2393-2398 | Selects `LineDirectiveMode::None` and the source-only artifact path. |
+| `target == CodeGenTarget::WGSL` (vs `WGSLSPIRV*`) | `emitEntryPointsSourceFromIR` line ~2446-2451 | Selects `LineDirectiveMode::None` and the source-only artifact path. |
 | `target == CodeGenTarget::WGSLSPIRV` / `WGSLSPIRVAssembly` | Downstream compile | Triggers the Tint downstream invocation. |
 
 ## Loops in the pipeline

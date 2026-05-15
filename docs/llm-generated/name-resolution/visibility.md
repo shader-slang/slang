@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-12T11:48:20+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 535bb581207f5682546fe6c5eb08646e48cacc82ae0feba79e0c6010ab59b9b7
+generated_at: 2026-05-15T15:45:00+00:00
+source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
+watched_paths_digest: 7334450582d01cf1d273acf69603e1a99298f518a80c10f85a058fb506f75ff0
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -66,7 +66,7 @@ per-decl visibility validation is in
   815) — the per-module language-version field, set from the
   `module` declaration's version (or the linkage default). The
   legacy version constant `SLANG_LANGUAGE_VERSION_LEGACY` is
-  `2018` in [slang.h](../../../include/slang.h) (line 5186); the
+  `2018` in [slang.h](../../../include/slang.h) (line 5400); the
   default is `SLANG_LANGUAGE_VERSION_2025` for sessions that do not
   override it.
 - `IgnoreForLookupModifier`
@@ -93,23 +93,23 @@ levels:
 
 The mapping is implemented in `getDeclVisibility`
 ([slang-check-decl.cpp](../../../source/slang/slang-check-decl.cpp)
-lines 19050-19103): the function walks `decl->modifiers` and returns
+lines 19309-19362): the function walks `decl->modifiers` and returns
 the first `VisibilityModifier` it finds.
 
 `getDeclVisibility` also implements three structural fall-throughs:
 
 - For an `AccessorDecl` or `EnumCaseDecl`, visibility is inherited
-  from the enclosing decl (lines 19063-19069).
+  from the enclosing decl (lines 19322-19329).
 - For a `GenericDecl`, visibility is taken from its `inner` decl
-  (lines 19061-19062).
+  (lines 19320-19321).
 - For a generic parameter (`isGenericParam` / `GenericTypeConstraintDecl`),
   visibility is the visibility of the generic decl's inner decl
-  (lines 19052-19060).
+  (lines 19311-19319).
 
 If no visibility modifier is present and the decl is not inside an
 interface, the visibility is the module's default (see below). If
 the decl is inside an interface, it inherits the interface's
-visibility (lines 19083-19087).
+visibility (lines 19342-19346).
 
 ### Defaults by language version
 
@@ -117,7 +117,7 @@ visibility (lines 19083-19087).
 members of the module that have no explicit modifier. The default
 is computed in `getDeclVisibility`
 ([slang-check-decl.cpp](../../../source/slang/slang-check-decl.cpp)
-lines 19088-19094):
+lines 19347-19353):
 
 ```cpp
 defaultVis = parentModule->languageVersion == SLANG_LANGUAGE_VERSION_LEGACY
@@ -132,11 +132,11 @@ unless the module is marked `public` at the top:
 `checkModule` flips the module-wide default to `public` when it
 finds a `PublicModifier` on the `ModuleDecl`
 ([slang-check-decl.cpp](../../../source/slang/slang-check-decl.cpp)
-lines 4838-4841).
+lines 4954-4957).
 
 `NamespaceDecl` is unconditionally `Public`
 ([slang-check-decl.cpp](../../../source/slang/slang-check-decl.cpp)
-lines 19098-19101); restricting namespace visibility would be
+lines 19357-19360); restricting namespace visibility would be
 meaningless because namespaces only group named members and do not
 themselves carry behaviour.
 
@@ -240,9 +240,9 @@ A decl that carries `IgnoreForLookupModifier`
 ([slang-ast-modifier.h](../../../source/slang/slang-ast-modifier.h)
 line 248) is skipped by lookup before visibility filtering even
 sees it. Today the only producer of this modifier is the tag-type
-inheritance decl on enums
-([slang-check-decl.cpp](../../../source/slang/slang-check-decl.cpp)
-line 11436), which is excluded from lookup so the enum's tag type
+  inheritance decl on enums
+  ([slang-check-decl.cpp](../../../source/slang/slang-check-decl.cpp)
+  line 11601), which is excluded from lookup so the enum's tag type
 does not appear as a base interface during member lookup
 ([slang-lookup.cpp](../../../source/slang/slang-lookup.cpp) line
 462). Visibility rules therefore never apply to such a decl.

@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-07T14:35:56+00:00
-source_commit: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
-watched_paths_digest: c0f3680cebe06120286ab4f2c6c58248838376e86367dc3471ffaea14914ff35
+generated_at: 2026-05-15T15:42:00+00:00
+source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
+watched_paths_digest: c42e276adc6581c33bb4effaa5201418aa07fde812042c885eb713bf657774c6
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -107,7 +107,7 @@ Detail: [04-ast-to-ir.md](04-ast-to-ir.md).
 ### IR passes
 
 The `linkAndOptimizeIR` function in
-[slang-emit.cpp](../../../source/slang/slang-emit.cpp) (line 892 at
+[slang-emit.cpp](../../../source/slang/slang-emit.cpp) (line 893 at
 `source_commit`) drives a long, target-sensitive sequence of IR
 transformations between lowering and emit. The
 [source/slang/](../../../source/slang/) directory contains roughly 300
@@ -124,7 +124,7 @@ Detail: [05-ir-passes.md](05-ir-passes.md).
 ### Emit
 
 `emitEntryPointsSourceFromIR`
-([slang-emit.cpp](../../../source/slang/slang-emit.cpp) line 2365 at
+([slang-emit.cpp](../../../source/slang/slang-emit.cpp) line 2418 at
 `source_commit`) selects the right backend for each `TargetRequest`
 and produces a target artefact: HLSL, GLSL, SPIR-V, Metal, WGSL, C++,
 CUDA, Torch glue, LLVM IR / native via `slang-llvm`, or VM bytecode.

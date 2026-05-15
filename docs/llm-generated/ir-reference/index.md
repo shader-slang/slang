@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-12T12:35:00+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 5b4ee4198094cc90dc188c2335f6dc4d672c96f8bee25c945729142fc310e1ec
+generated_at: 2026-05-15T15:55:00+00:00
+source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
+watched_paths_digest: 44cc076396b4503f18997a6be579c3163209ab7a24f87f3aae489b26a3963cbd
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -63,12 +63,12 @@ flowchart TD
 | [types.md](types.md) | Type instructions | `Type` (line ~20) | ~160 |
 | [values.md](values.md) | Constants, arithmetic, conversions, memory, aggregate constructors | `Constant` (line ~838) and top-level value opcodes | ~110 |
 | [structure.md](structure.md) | Module structure: functions, generics, globals, structs, interfaces, witness tables | `GlobalValueWithCode` (line ~787), `module` (line ~827) | ~20 |
-| [control-flow.md](control-flow.md) | Block, parameters, branches, function exits | `TerminatorInst` (line ~1292) + `block` / `Param` at top level | ~20 |
-| [generics-and-existentials.md](generics-and-existentials.md) | `specialize`, witness lookup, existential pack/unpack, RTTI | Top-level (e.g. `specialize` ~line 879, `lookupWitness` ~line 962) | ~30 |
+| [control-flow.md](control-flow.md) | Block, parameters, branches, function exits | `TerminatorInst` (line ~1294) + `block` / `Param` at top level | ~20 |
+| [generics-and-existentials.md](generics-and-existentials.md) | `specialize`, witness lookup, existential pack/unpack, RTTI | Top-level (e.g. `specialize` ~line 932, `lookupWitness` ~line 933) | ~30 |
 | [resources-and-atomics.md](resources-and-atomics.md) | Image/buffer/sampler ops, shader IO, atomics, barriers, wave intrinsics, raytracing | `AtomicOperation` (line ~1071) + top-level resource opcodes | ~80 |
 | [differentiation.md](differentiation.md) | Autodiff: differential pairs, forward/backward differentiate, reverse-mode contexts | `MakeDifferentialPairBase` (line ~901) + top-level autodiff opcodes | ~30 |
-| [decorations.md](decorations.md) | Decoration family (metadata attached to instructions) | `Decoration` (line ~1592) | ~180 |
-| [metadata.md](metadata.md) | `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` | `Layout` (line ~2617), `Attr` (line ~2650), `Debug*` (line ~2714), `SPIRVAsmOperand` (line ~2754) | ~60 |
+| [decorations.md](decorations.md) | Decoration family (metadata attached to instructions) | `Decoration` (line ~1594) | ~180 |
+| [metadata.md](metadata.md) | `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` | `Layout` (line ~2619), `Attr` (line ~2652), `Debug*` (line ~2716), `SPIRVAsmOperand` (line ~2756) | ~60 |
 | [misc.md](misc.md) | Pack/expansion, type queries, size/alignment, liveness markers, descriptor heaps, kernel launch | Top-level miscellaneous opcodes | ~50 |
 
 Counts are approximate, rounded to the nearest ten at the

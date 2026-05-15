@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-13T15:30:00+00:00
-source_commit: 07b911645ab895c59decdcc25c6c56ee245833af
-watched_paths_digest: 258044d8f7114df9d91dd9732b53c88c629e2d480fdebc7391cb71f5d40f78f7
+generated_at: 2026-05-15T14:45:00+00:00
+source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
+watched_paths_digest: 37fe61fef33084d2ef7676b9897a7ef8dc2cd50f8e3b6afdd3b425f68b07b571
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -29,8 +29,8 @@ and tables below.
 ## Source
 
 - [slang-emit.cpp](../../../source/slang/slang-emit.cpp) —
-  `linkAndOptimizeIR` (line ~892) is the orchestrator;
-  `emitEntryPointsSourceFromIR` (line ~2365) constructs the
+  `linkAndOptimizeIR` (line ~893) is the orchestrator;
+  `emitEntryPointsSourceFromIR` (line ~2418) constructs the
   `HLSLSourceEmitter` and emits HLSL text.
 - [slang-emit-hlsl.cpp](../../../source/slang/slang-emit-hlsl.cpp)
   — `HLSLSourceEmitter` implementation.
@@ -67,7 +67,7 @@ several individual `SLANG_PASS` calls in Phases B and C.
 
 ## Phase A: Link and entry-point prep
 
-Spans roughly lines 927-1170 of
+Spans roughly lines 928-1205 of
 [slang-emit.cpp](../../../source/slang/slang-emit.cpp). HLSL hits
 the `default` arm of every per-target switch in this phase. HLSL
 is non-Khronos, so the `!isKhronosTarget && reqSet.glslSSBO` gate
@@ -94,10 +94,11 @@ flowchart TD
   cEPUP[collectEntryPointUniformParams]
   mEPUP[moveEntryPointUniformParamsToGlobalScope]
   rTCEP[removeTorchAndCUDAEntryPoints]
+  fCIM[finalizeCoverageInstrumentationMetadata]
   lLVC[lowerLValueCast]
   lET[lowerEnumType]
 
-  linkIRn --> vaaa --> reqSet1 --> stripDI --> ssbo --> tEPInBorrow --> tGVV --> rvir --> fEPC --> rGC --> bES --> iC --> cGUP --> cEPD --> aDMD --> cEPUP --> mEPUP --> rTCEP --> lLVC --> lET
+  linkIRn --> vaaa --> reqSet1 --> stripDI --> ssbo --> tEPInBorrow --> tGVV --> rvir --> fEPC --> rGC --> bES --> iC --> cGUP --> cEPD --> aDMD --> cEPUP --> mEPUP --> rTCEP --> fCIM --> lLVC --> lET
 ```
 
 (Conditional gates are omitted from the diagram for readability;
@@ -122,8 +123,9 @@ see the conditional-gates table below for the full set.)
 | 15 | `collectEntryPointUniformParams` | [slang-ir-entry-point-uniforms.cpp](../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, HLSL via `default` arm) | |
 | 16 | `moveEntryPointUniformParamsToGlobalScope` | [slang-ir-entry-point-uniforms.cpp](../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, HLSL via `default` arm) | |
 | 17 | `removeTorchAndCUDAEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | (always, HLSL via `default` arm) | |
-| 18 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../source/slang/slang-ir-lower-l-value-cast.cpp) | (always) | |
-| 19 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | |
+| 18 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Post-packing pass that fills CPU/CUDA uniform-marshaling fields on the coverage `ArtifactPostEmitMetadata`. No-op for HLSL in practice. |
+| 19 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../source/slang/slang-ir-lower-l-value-cast.cpp) | (always) | |
+| 20 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | |
 
 Filtered out for HLSL in this phase: the CUDA / CUDAHeader arm of
 the entry-point-param switch
@@ -131,7 +133,7 @@ the entry-point-param switch
 
 ## Phase B: Specialization and type legalization
 
-Spans roughly lines 1172-1714 of `slang-emit.cpp`. HLSL hits
+Spans roughly lines 1207-1773 of `slang-emit.cpp`. HLSL hits
 unique arms in several places:
 
 - `legalizeNonVectorCompositeSelect` runs (line ~1285,
@@ -169,11 +171,11 @@ flowchart TD
   dce1[eliminateDeadCode]
   fS[finalizeSpecialization]
   lDTI[lowerDiffTypeInfoInsts]
-  lRT[lowerResultType]
   lCT[lowerConditionalType]
   lRO[lowerReinterpretOptional]
   cONU[checkForOptionalNoneUsage]
   lOT[lowerOptionalType]
+  lRT[lowerResultType]
   lNVCS["legalizeNonVectorCompositeSelect (HLSL only)"]
   reqSet2[calcRequiredLoweringPassSet]
   dUR[detectUninitializedResources]
@@ -221,7 +223,7 @@ flowchart TD
   cSA[checkStaticAssert]
   wSBoM[wrapStructuredBuffersOfMatrices]
 
-  s1 --> vu --> sML --> fSC --> cAP --> dCC --> sM --> sHOP --> fADP --> lMSS --> dce1 --> fS --> lDTI --> lRT --> lCT --> lRO --> cONU --> lOT --> lNVCS --> reqSet2 --> dUR --> rAIDD --> checks --> iAVS --> uPWT --> lSVMI --> s2a --> lTUT --> lUUT --> lR --> lSIDC --> lTI --> lTT --> dce3 --> lE --> rWUI --> pTIN --> cGSHI --> dce4 --> lTu --> gAVMF --> sSS --> lCV_skip --> pFI1 --> s2b --> lACSB_skip --> lCTS --> lEA --> lVT --> iGC --> lERP --> lNSP --> lETL --> vSBRT --> lRTR --> lMT --> s2c --> lDRH --> sRU --> sFBLA1 --> dBL --> sAP --> cSA --> wSBoM
+  s1 --> vu --> sML --> fSC --> cAP --> dCC --> sM --> sHOP --> fADP --> lMSS --> dce1 --> fS --> lDTI --> lCT --> lRO --> cONU --> lOT --> lRT --> lNVCS --> reqSet2 --> dUR --> rAIDD --> checks --> iAVS --> uPWT --> lSVMI --> s2a --> lTUT --> lUUT --> lR --> lSIDC --> lTI --> lTT --> dce3 --> lE --> rWUI --> pTIN --> cGSHI --> dce4 --> lTu --> gAVMF --> sSS --> lCV_skip --> pFI1 --> s2b --> lACSB_skip --> lCTS --> lEA --> lVT --> iGC --> lERP --> lNSP --> lETL --> vSBRT --> lRTR --> lMT --> s2c --> lDRH --> sRU --> sFBLA1 --> dBL --> sAP --> cSA --> wSBoM
 ```
 
 | # | Pass | File | Gate | Notes |
@@ -239,11 +241,11 @@ flowchart TD
 | 11 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../source/slang/slang-ir-dce.cpp) | (always) | |
 | 12 | `finalizeSpecialization` | [slang-ir-specialize.cpp](../../../source/slang/slang-ir-specialize.cpp) | (always) | |
 | 13 | `lowerDiffTypeInfoInsts` | [slang-ir-autodiff.cpp](../../../source/slang/slang-ir-autodiff.cpp) | (always) | Direct call. |
-| 14 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | |
-| 15 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../source/slang/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
-| 16 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
-| 17 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../source/slang/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | |
-| 18 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../source/slang/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
+| 14 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../source/slang/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
+| 15 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
+| 16 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../source/slang/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | |
+| 17 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../source/slang/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
+| 18 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | Now runs **after** `lowerOptionalType`: depends on accurate `getAnyValueSize()` results. |
 | 19 | `legalizeNonVectorCompositeSelect` | [slang-ir-legalize-composite-select.cpp](../../../source/slang/slang-ir-legalize-composite-select.cpp) | `reqSet.nonVectorCompositeSelect && target == HLSL` | **HLSL-only.** DXC's `select` is only defined on vectors. |
 | 20 | `detectUninitializedResources` | [slang-ir-detect-uninitialized-resources.cpp](../../../source/slang/slang-ir-detect-uninitialized-resources.cpp) | (always) | |
 | 21 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-redundancy-removal.cpp](../../../source/slang/slang-ir-redundancy-removal.cpp) | `removeAvailableInDownstreamIR` | |
@@ -303,7 +305,7 @@ invocation; the Metal-only `wrapCBufferElementsForMetal`; CPU-LLVM
 
 ## Phase C: HLSL legalization, lowering, phi elimination
 
-Spans roughly lines 1745-2360 of `slang-emit.cpp`. HLSL has no
+Spans roughly lines 1798-2413 of `slang-emit.cpp`. HLSL has no
 single legalization driver; the target-specific work consists of
 several individual passes spread through this phase. HLSL is in
 the `default` arm of the per-target legalization switch at line
@@ -432,7 +434,7 @@ only); `applyGLSLLiveness` (Khronos only);
 
 Phase D begins immediately after `linkAndOptimizeIR` returns to
 `emitEntryPointsSourceFromIR`. The `HLSLSourceEmitter`
-(constructed at line ~2454 of `slang-emit.cpp`) walks the IR and
+(constructed at line ~2507 of `slang-emit.cpp`) walks the IR and
 produces HLSL text. The downstream chain depends on which
 `CodeGenTarget` was requested:
 
@@ -467,7 +469,7 @@ flowchart TD
 | # | Pass / step | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
 | 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | (entry point) | |
-| 2 | `new HLSLSourceEmitter` | [slang-emit-hlsl.cpp](../../../source/slang/slang-emit-hlsl.cpp) | `case SourceLanguage::HLSL` | Constructed at line ~2454. |
+| 2 | `new HLSLSourceEmitter` | [slang-emit-hlsl.cpp](../../../source/slang/slang-emit-hlsl.cpp) | `case SourceLanguage::HLSL` | Constructed at line ~2507. |
 | 3 | `sourceEmitter->init` | [slang-emit-c-like.cpp](../../../source/slang/slang-emit-c-like.cpp) | (always) | |
 | 4 | `linkAndOptimizeIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | (always) | Runs Phases A-C. |
 | 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
@@ -490,7 +492,7 @@ validation and optimization is delegated to DXC or fxc.
 | `globalVaryingVar` | `translateGlobalVaryingVar`. |
 | `resolveVaryingInputRef` | `resolveVaryingInputRef`. |
 | `bindExistential` | `bindExistentialSlots`. |
-| `coverageTracing` | `instrumentCoverage`. |
+| `coverageTracing` | `instrumentCoverage` and `finalizeCoverageInstrumentationMetadata` (Phase A). |
 | `enumType` | `lowerEnumType`. |
 | `autodiff` | `checkAutodiffPatterns`. |
 | `higherOrderFunc` | `specializeHigherOrderParameters`. |

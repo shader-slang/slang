@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-13T15:00:00+00:00
-source_commit: 07b911645ab895c59decdcc25c6c56ee245833af
-watched_paths_digest: cea74bf18bc995373d3899b3a7b288f89fea41d8fe6d4956bce983724c3565df
+generated_at: 2026-05-15T14:40:00+00:00
+source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
+watched_paths_digest: 59b29fcbbfe59eacb0391650227da5c7ea157b2029936330229cf5160050a70b
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -29,8 +29,8 @@ and tables below.
 ## Source
 
 - [slang-emit.cpp](../../../source/slang/slang-emit.cpp) —
-  `linkAndOptimizeIR` (line ~892) is the orchestrator;
-  `emitEntryPointsSourceFromIR` (line ~2365) constructs the
+  `linkAndOptimizeIR` (line ~893) is the orchestrator;
+  `emitEntryPointsSourceFromIR` (line ~2418) constructs the
   `MetalSourceEmitter` and emits Metal text.
 - [slang-emit-metal.cpp](../../../source/slang/slang-emit-metal.cpp)
   — `MetalSourceEmitter` implementation.
@@ -71,7 +71,7 @@ arm, the `MetalParameterBlock` buffer-element policy).
 
 ## Phase A: Link and entry-point prep
 
-Spans roughly lines 927-1170 of
+Spans roughly lines 928-1205 of
 [slang-emit.cpp](../../../source/slang/slang-emit.cpp). Metal
 hits the `default` arm of every per-target switch in this phase.
 Like WGSL, Metal is non-Khronos, so the
@@ -104,6 +104,8 @@ flowchart TD
   cEPUP[collectEntryPointUniformParams]
   mEPUP[moveEntryPointUniformParamsToGlobalScope]
   rTCEP[removeTorchAndCUDAEntryPoints]
+  covGate2{reqSet.coverageTracing}
+  fCIM[finalizeCoverageInstrumentationMetadata]
   lLVC[lowerLValueCast]
   enumGate{reqSet.enumType}
   lET[lowerEnumType]
@@ -123,7 +125,10 @@ flowchart TD
   beGate -->|false| covGate
   covGate -->|true| iC --> cGUP
   covGate -->|false| cGUP
-  cGUP --> cEPD --> aDMD --> cEPUP --> mEPUP --> rTCEP --> lLVC --> enumGate
+  cGUP --> cEPD --> aDMD --> cEPUP --> mEPUP --> rTCEP --> covGate2
+  covGate2 -->|true| fCIM --> lLVC
+  covGate2 -->|false| lLVC
+  lLVC --> enumGate
   enumGate -->|true| lET
 ```
 
@@ -146,8 +151,9 @@ flowchart TD
 | 15 | `collectEntryPointUniformParams` | [slang-ir-entry-point-uniforms.cpp](../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, Metal via `default` arm) | |
 | 16 | `moveEntryPointUniformParamsToGlobalScope` | [slang-ir-entry-point-uniforms.cpp](../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, Metal via `default` arm) | |
 | 17 | `removeTorchAndCUDAEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | (always, Metal via `default` arm) | |
-| 18 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../source/slang/slang-ir-lower-l-value-cast.cpp) | (always) | |
-| 19 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | |
+| 18 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Runs after entry-point uniform packing; fills CPU/CUDA uniform-marshaling fields on the coverage `ArtifactPostEmitMetadata` produced by step 11. No-op for Metal in practice. |
+| 19 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../source/slang/slang-ir-lower-l-value-cast.cpp) | (always) | |
+| 20 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | |
 
 Filtered out for Metal in this phase: the CUDA / CUDAHeader arm
 of the entry-point-param switch
@@ -155,7 +161,7 @@ of the entry-point-param switch
 
 ## Phase B: Specialization and type legalization
 
-Spans roughly lines 1172-1714 of `slang-emit.cpp`. Metal hits the
+Spans roughly lines 1207-1773 of `slang-emit.cpp`. Metal hits the
 `default` arm at most decision points and runs
 `lowerCooperativeVectors` (the `default` arm of line 1452-1466).
 Metal-specific decisions:
@@ -197,11 +203,11 @@ flowchart TD
   dce1[eliminateDeadCode]
   fS[finalizeSpecialization]
   lDTI[lowerDiffTypeInfoInsts]
-  lRT[lowerResultType]
   lCT[lowerConditionalType]
   lRO[lowerReinterpretOptional]
   cONU[checkForOptionalNoneUsage]
   lOT[lowerOptionalType]
+  lRT[lowerResultType]
   reqSet2[calcRequiredLoweringPassSet]
   dUR[detectUninitializedResources]
   rAIDD[removeAvailableInDownstreamModuleDecorations]
@@ -248,7 +254,7 @@ flowchart TD
   cSA[checkStaticAssert]
   wCBE[wrapCBufferElementsForMetal]
 
-  s1 --> vu --> sML --> fSC --> cAP --> dCC --> sM --> sHOP --> fADP --> lMSS --> dce1 --> fS --> lDTI --> lRT --> lCT --> lRO --> cONU --> lOT --> reqSet2 --> dUR --> rAIDD --> checks --> iAVS --> uPWT --> lSVMI --> s2a --> lTUT --> lUUT --> lR --> lSIDC --> lTI --> lTT --> dce3 --> lE --> rWUI --> pTIN --> cGSHI --> dce4 --> lTu --> gAVMF --> sSS --> lCV --> pFI1 --> s2b --> lACSB --> lCTS --> lEA --> lVT --> iGC --> lBETST_Metal --> lETL --> vSBRT --> lRTR --> lET_Metal --> lMT --> s2c --> lDRH --> sRU --> sFBLA1 --> dBL --> sAP --> cSA --> wCBE
+  s1 --> vu --> sML --> fSC --> cAP --> dCC --> sM --> sHOP --> fADP --> lMSS --> dce1 --> fS --> lDTI --> lCT --> lRO --> cONU --> lOT --> lRT --> reqSet2 --> dUR --> rAIDD --> checks --> iAVS --> uPWT --> lSVMI --> s2a --> lTUT --> lUUT --> lR --> lSIDC --> lTI --> lTT --> dce3 --> lE --> rWUI --> pTIN --> cGSHI --> dce4 --> lTu --> gAVMF --> sSS --> lCV --> pFI1 --> s2b --> lACSB --> lCTS --> lEA --> lVT --> iGC --> lBETST_Metal --> lETL --> vSBRT --> lRTR --> lET_Metal --> lMT --> s2c --> lDRH --> sRU --> sFBLA1 --> dBL --> sAP --> cSA --> wCBE
 ```
 
 (Conditional gates are omitted from the diagram for readability;
@@ -269,11 +275,11 @@ see the conditional-gates table below for the full set.)
 | 11 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../source/slang/slang-ir-dce.cpp) | (always) | |
 | 12 | `finalizeSpecialization` | [slang-ir-specialize.cpp](../../../source/slang/slang-ir-specialize.cpp) | (always) | |
 | 13 | `lowerDiffTypeInfoInsts` | [slang-ir-autodiff.cpp](../../../source/slang/slang-ir-autodiff.cpp) | (always) | Direct call. |
-| 14 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | |
-| 15 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../source/slang/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
-| 16 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
-| 17 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../source/slang/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | |
-| 18 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../source/slang/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
+| 14 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../source/slang/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
+| 15 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
+| 16 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../source/slang/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | |
+| 17 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../source/slang/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
+| 18 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | Now runs **after** `lowerOptionalType`: depends on accurate `getAnyValueSize()` results, which requires Optional lowering first. |
 | 19 | `detectUninitializedResources` | [slang-ir-detect-uninitialized-resources.cpp](../../../source/slang/slang-ir-detect-uninitialized-resources.cpp) | (always) | |
 | 20 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-redundancy-removal.cpp](../../../source/slang/slang-ir-redundancy-removal.cpp) | `removeAvailableInDownstreamIR` | |
 | 21 | `checkForRecursiveTypes` | [slang-ir-check-recursion.cpp](../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
@@ -333,9 +339,9 @@ D3D `legalizeEmptyRayPayloadsForHLSL` arm; the HLSL
 
 ## Phase C: Metal legalization, lowering, phi elimination
 
-Spans roughly lines 1745-2360 of `slang-emit.cpp`. Metal's
-central legalizer is `legalizeIRForMetal` (line ~1942, defined at
-line ~250 of
+Spans roughly lines 1798-2413 of `slang-emit.cpp`. Metal's
+central legalizer is `legalizeIRForMetal` (line ~1995, defined at
+line ~285 of
 [slang-ir-metal-legalize.cpp](../../../source/slang/slang-ir-metal-legalize.cpp)).
 Metal's parameter handling at line ~2041 is more elaborate than
 the other shader targets: Metal goes through `undoParameterCopy`,
@@ -457,10 +463,28 @@ only); `applyGLSLLiveness` (Khronos only);
 
 Phase D begins immediately after `linkAndOptimizeIR` returns to
 `emitEntryPointsSourceFromIR`. The `MetalSourceEmitter`
-(constructed at line ~2464 of `slang-emit.cpp`) walks the IR and
-produces Metal text. For `MetalLib` and `MetalLibAssembly` the
-text is then handed to Apple's `metal` command-line compiler to
-produce a `.metallib` (or its disassembly).
+(constructed at line ~2517 of `slang-emit.cpp`) walks the IR and
+produces Metal text. `MetalSourceEmitter::emitFuncParamLayoutImpl`
+(line ~145 of
+[slang-emit-metal.cpp](../../../source/slang/slang-emit-metal.cpp))
+unwraps `IRDescriptorHandleType` before the per-resource-kind
+attribute selection, so bindless `DescriptorHandle<T>`-wrapped
+buffer / texture / sampler parameters still receive their
+`[[buffer(N)]]` / `[[texture(N)]]` / `[[sampler(N)]]` MSL
+attribute (otherwise they would render as plain pointer arguments
+with no binding slot, even though their layout record carries one).
+For an unlayout-decorated parameter that carries a
+`TargetSystemValueDecoration`, `emitFuncParamLayoutImpl` now falls
+through to `maybeEmitSystemSemantic`, which is what emits the
+`[[color(N)]]` attribute for the fragment parameters
+synthesized by `legalizeSubpassInputsForMetal`.
+`tryEmitInstStmtImpl` rejects any surviving `kIROp_SubpassLoad`
+with `SLANG_DIAGNOSE_UNEXPECTED("SubpassLoad should have been
+lowered before Metal emission")` — by the time emit runs, every
+`SubpassLoad` should already have been replaced by the lowering
+pass above. For `MetalLib` and `MetalLibAssembly` the text is then
+handed to Apple's `metal` command-line compiler to produce a
+`.metallib` (or its disassembly).
 
 ```mermaid
 flowchart TD
@@ -483,7 +507,7 @@ flowchart TD
 | # | Pass / step | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
 | 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | (entry point) | |
-| 2 | `new MetalSourceEmitter` | [slang-emit-metal.cpp](../../../source/slang/slang-emit-metal.cpp) | `case SourceLanguage::Metal` | Constructed at line ~2464. |
+| 2 | `new MetalSourceEmitter` | [slang-emit-metal.cpp](../../../source/slang/slang-emit-metal.cpp) | `case SourceLanguage::Metal` | Constructed at line ~2517. |
 | 3 | `sourceEmitter->init` | [slang-emit-c-like.cpp](../../../source/slang/slang-emit-c-like.cpp) | (always) | |
 | 4 | `linkAndOptimizeIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | (always) | Runs Phases A-C. |
 | 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
@@ -505,7 +529,7 @@ compiler is required only for `MetalLib*`.
 | `globalVaryingVar` | `translateGlobalVaryingVar`. |
 | `resolveVaryingInputRef` | `resolveVaryingInputRef`. |
 | `bindExistential` | `bindExistentialSlots`. |
-| `coverageTracing` | `instrumentCoverage`. |
+| `coverageTracing` | `instrumentCoverage` and `finalizeCoverageInstrumentationMetadata` (Phase A). |
 | `enumType` | `lowerEnumType`. |
 | `autodiff` | `checkAutodiffPatterns`. |
 | `higherOrderFunc` | `specializeHigherOrderParameters`. |
@@ -573,11 +597,26 @@ optimization loops, but those are out of scope.
 
 ### `legalizeIRForMetal`
 
-The single Metal-only legalization driver, defined at line ~250
+The single Metal-only legalization driver, defined at line ~285
 of
 [slang-ir-metal-legalize.cpp](../../../source/slang/slang-ir-metal-legalize.cpp).
 It walks the module once and performs:
 
+- **Subpass-input lowering for frame-buffer fetch** via
+  `legalizeSubpassInputsForMetal` (defined in the same file).
+  Each `IRGlobalParam` of type `IRSubpassInputType` is turned
+  into an entry-point fragment parameter with a
+  `[[color(N)]]` system-value decoration (where `N` is the
+  `InputAttachmentIndex` from the layout decoration), and every
+  `kIROp_SubpassLoad` use is rewritten into a direct reference
+  to that new parameter. Subpass inputs reachable from a
+  non-fragment entry point produce
+  `Diagnostics::SubpassInputUsedOutsideEntryPoint`;
+  multisampled subpass loads produce
+  `Diagnostics::MultisampledSubpassInputNotSupportedOnMetal`.
+  Metal does not have a native `subpassLoad` intrinsic; instead
+  Slang maps the construct onto Metal's frame-buffer-fetch
+  feature (the per-fragment `[[color(N)]]` input).
 - Entry-point varying-param legalization via
   `legalizeEntryPointVaryingParamsForMetal` (defined in
   [slang-ir-legalize-varying-params.cpp](../../../source/slang/slang-ir-legalize-varying-params.cpp)).
@@ -651,6 +690,23 @@ target-appropriate texture-access form before emit.
 Metal accepts the default `PhiEliminationOptions`. The emitted
 MSL uses explicit per-branch assignments to function-local
 variables, which is what the default elimination produces.
+
+### `DescriptorHandle<T>` parameter-binding emission
+
+`MetalSourceEmitter::emitFuncParamLayoutImpl` (line ~145 of
+[slang-emit-metal.cpp](../../../source/slang/slang-emit-metal.cpp))
+unwraps `IRDescriptorHandleType` before the per-resource-kind
+type tests. `DescriptorHandle<T>` is Slang's bindless wrapper for
+resource types: on Metal it is laid out as if it were `T` and
+must take the same `[[buffer(N)]]` / `[[texture(N)]]` /
+`[[sampler(N)]]` attribute as `T` would. Without this unwrap,
+the per-kind `as<IRPtrTypeBase>` / `as<IRHLSLStructuredBufferTypeBase>`
+checks would fall through, the `if` body would not fire, and the
+parameter would be emitted without any binding-slot annotation —
+which the Apple `metal` compiler then rejects (or silently
+mis-binds). The fix preserves every other entry-point layout
+decision; bindless `DescriptorHandle` parameters now look
+identical to their bindful equivalents in the emitted MSL.
 
 ### Downstream Apple `metal` compiler
 

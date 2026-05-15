@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-13T16:00:00+00:00
-source_commit: 07b911645ab895c59decdcc25c6c56ee245833af
-watched_paths_digest: 3b51ceb33ab7ffcede61e897e0c27c66ea4e88143bb581b9440bf890788fd48e
+generated_at: 2026-05-15T14:55:00+00:00
+source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
+watched_paths_digest: a0dbd58860550ec4de9722b99c186511cb3c877a447630a808184906b9592c17
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -33,8 +33,8 @@ documented on their own pages.
 ## Source
 
 - [slang-emit.cpp](../../../source/slang/slang-emit.cpp) —
-  `linkAndOptimizeIR` (line ~892) is the orchestrator;
-  `emitEntryPointsSourceFromIR` (line ~2365) constructs the
+  `linkAndOptimizeIR` (line ~893) is the orchestrator;
+  `emitEntryPointsSourceFromIR` (line ~2418) constructs the
   `CUDASourceEmitter` and emits CUDA C++ text.
 - [slang-emit-cuda.cpp](../../../source/slang/slang-emit-cuda.cpp)
   — `CUDASourceEmitter` implementation.
@@ -79,7 +79,7 @@ arm, which causes several Phase-B passes inside
 
 ## Phase A: Link and entry-point prep
 
-Spans roughly lines 927-1170 of
+Spans roughly lines 928-1205 of
 [slang-emit.cpp](../../../source/slang/slang-emit.cpp). CUDA has
 two arms it hits in this phase that other shader targets do not:
 
@@ -117,10 +117,11 @@ flowchart TD
   cOEPUP[collectOptiXEntryPointUniformParams]
   skip_mEPUP["(skipped) moveEntryPointUniformParamsToGlobalScope"]
   skip_rTCEP["(skipped) removeTorchAndCUDAEntryPoints"]
+  fCIM["finalizeCoverageInstrumentationMetadata<br/>(reqSet.coverageTracing)"]
   lLVC[lowerLValueCast]
   lET[lowerEnumType]
 
-  linkIRn --> vaaaCuda --> reqSet1 --> stripDI --> ssbo --> tEPInBorrow --> tGVV --> rvir --> fEPC --> rGC --> bES --> iC --> cGUP --> cEPD --> aDMD --> cOEPUP --> skip_mEPUP --> skip_rTCEP --> lLVC --> lET
+  linkIRn --> vaaaCuda --> reqSet1 --> stripDI --> ssbo --> tEPInBorrow --> tGVV --> rvir --> fEPC --> rGC --> bES --> iC --> cGUP --> cEPD --> aDMD --> cOEPUP --> skip_mEPUP --> skip_rTCEP --> fCIM --> lLVC --> lET
 ```
 
 | # | Pass | File | Gate | Notes |
@@ -142,8 +143,9 @@ flowchart TD
 | 15 | `collectOptiXEntryPointUniformParams` | [slang-ir-optix-entry-point-uniforms.cpp](../../../source/slang/slang-ir-optix-entry-point-uniforms.cpp) | `case CUDASource / CUDAHeader` (line ~1097) | **CUDA-only.** Replaces the `collectEntryPointUniformParams` that the other shader targets run. |
 | - | *(skip)* `moveEntryPointUniformParamsToGlobalScope` | [slang-ir-entry-point-uniforms.cpp](../../../source/slang/slang-ir-entry-point-uniforms.cpp) | CUDA in the explicit skip list (line ~1126) | Other shader targets run this; CUDA's params remain on the entry point. |
 | - | *(skip)* `removeTorchAndCUDAEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | CUDA in the explicit skip list (line ~1140) | CUDA's entry points are valid CUDA kernels. |
-| 16 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../source/slang/slang-ir-lower-l-value-cast.cpp) | (always) | |
-| 17 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | |
+| 16 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | **Material on CUDA.** Runs after entry-point uniform packing (where the coverage buffer is folded into `GlobalParams`) to fill `coverageBufferUniformOffset`/`coverageBufferUniformSize` on `ArtifactPostEmitMetadata`. The CUDA host runtime reads those fields to bind the coverage buffer at dispatch time. |
+| 17 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../source/slang/slang-ir-lower-l-value-cast.cpp) | (always) | |
+| 18 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | |
 
 Filtered out for CUDA in this phase: the HostCPPSource / HostVM /
 HostLLVMIR / HostObjectCode / HostHostCallable arm of the
@@ -154,7 +156,7 @@ with `alwaysCreateCollectedParam = true`).
 
 ## Phase B: Specialization and type legalization
 
-Spans roughly lines 1172-1714 of `slang-emit.cpp`. CUDA's
+Spans roughly lines 1207-1773 of `slang-emit.cpp`. CUDA's
 divergence from the SPIR-V / Metal / WGSL / HLSL paths is most
 visible here:
 
@@ -211,11 +213,11 @@ flowchart TD
   dce1[eliminateDeadCode]
   fS[finalizeSpecialization]
   lDTI[lowerDiffTypeInfoInsts]
-  lRT[lowerResultType]
   lCT[lowerConditionalType]
   lRO[lowerReinterpretOptional]
   cONU[checkForOptionalNoneUsage]
   lOT[lowerOptionalType]
+  lRT[lowerResultType]
   reqSet2[calcRequiredLoweringPassSet]
   lBTK["lowerBuiltinTypesForKernelEntryPoints (CUDA arm)"]
   rTK[removeTorchKernels]
@@ -262,7 +264,7 @@ flowchart TD
   sAP[specializeArrayParameters]
   cSA[checkStaticAssert]
 
-  s1 --> vu --> sML --> fSC --> gDW --> cAP --> dCC --> sM --> sHOP --> fADP --> lMSS --> dce1 --> fS --> lDTI --> lRT --> lCT --> lRO --> cONU --> lOT --> reqSet2 --> lBTK --> rTK --> hABN --> dUR --> rAIDD --> checks --> iAVS --> uPWT --> lSVMI --> s2a --> lTUT --> lUUT --> lR --> lSIDC --> lTI --> lTT --> dce3 --> lE --> rWUI --> pTIN --> cGSHI --> dce4 --> lTu --> gAVMF --> sSS --> lCV --> pFI1 --> s2b --> lACSB --> lCTS --> lEA --> lVT --> iGC --> skipETL --> skipRT --> lET_cpu --> lMT --> s2c --> lDRH --> sRU --> sFBLA1 --> dBL --> sAP --> cSA
+  s1 --> vu --> sML --> fSC --> gDW --> cAP --> dCC --> sM --> sHOP --> fADP --> lMSS --> dce1 --> fS --> lDTI --> lCT --> lRO --> cONU --> lOT --> lRT --> reqSet2 --> lBTK --> rTK --> hABN --> dUR --> rAIDD --> checks --> iAVS --> uPWT --> lSVMI --> s2a --> lTUT --> lUUT --> lR --> lSIDC --> lTI --> lTT --> dce3 --> lE --> rWUI --> pTIN --> cGSHI --> dce4 --> lTu --> gAVMF --> sSS --> lCV --> pFI1 --> s2b --> lACSB --> lCTS --> lEA --> lVT --> iGC --> skipETL --> skipRT --> lET_cpu --> lMT --> s2c --> lDRH --> sRU --> sFBLA1 --> dBL --> sAP --> cSA
 ```
 
 (Conditional gates omitted from the diagram for readability;
@@ -284,11 +286,11 @@ see the conditional-gates table.)
 | 12 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../source/slang/slang-ir-dce.cpp) | (always) | |
 | 13 | `finalizeSpecialization` | [slang-ir-specialize.cpp](../../../source/slang/slang-ir-specialize.cpp) | (always) | |
 | 14 | `lowerDiffTypeInfoInsts` | [slang-ir-autodiff.cpp](../../../source/slang/slang-ir-autodiff.cpp) | (always) | Direct call. |
-| 15 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | |
-| 16 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../source/slang/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
-| 17 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
-| 18 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../source/slang/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | |
-| 19 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../source/slang/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
+| 15 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../source/slang/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
+| 16 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
+| 17 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../source/slang/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | |
+| 18 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../source/slang/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
+| 19 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | Now runs **after** `lowerOptionalType`: depends on accurate `getAnyValueSize()` results, which requires Optional lowering first. |
 | 20 | `lowerBuiltinTypesForKernelEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | `case CUDASource / CUDAHeader` (line ~1320) | **CUDA-arm + PyTorch arm.** Strips Slang shader types from kernel signatures. |
 | 21 | `removeTorchKernels` | [slang-ir-pytorch-cpp-binding.cpp](../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | `case CUDASource / CUDAHeader` (line ~1321) | Removes any PyTorch entry points still present. |
 | 22 | `handleAutoBindNames` | [slang-ir-pytorch-cpp-binding.cpp](../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | `case CUDASource / CUDAHeader` (line ~1322) | |
@@ -355,7 +357,7 @@ invocation; the CPU-LLVM
 
 ## Phase C: CUDA legalization, lowering, phi elimination
 
-Spans roughly lines 1745-2360 of `slang-emit.cpp`. CUDA has
+Spans roughly lines 1798-2413 of `slang-emit.cpp`. CUDA has
 **no single legalization driver** function; the target-specific
 work is concentrated in three passes: `synthesizeActiveMask`
 (line ~1890), `legalizeEntryPointVaryingParamsForCUDA` (line
@@ -511,8 +513,8 @@ flowchart TD
 
 | # | Pass / step | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | (entry point) | Sets `shouldLegalizeExistentialAndResourceTypes = false` for the CUDA arm at line ~2504. |
-| 2 | `new CUDASourceEmitter` | [slang-emit-cuda.cpp](../../../source/slang/slang-emit-cuda.cpp) | `case SourceLanguage::CUDA` | Constructed at line ~2459. |
+| 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | (entry point) | Sets `shouldLegalizeExistentialAndResourceTypes = false` for the CUDA arm at line ~2557. |
+| 2 | `new CUDASourceEmitter` | [slang-emit-cuda.cpp](../../../source/slang/slang-emit-cuda.cpp) | `case SourceLanguage::CUDA` | Constructed at line ~2512. |
 | 3 | `sourceEmitter->init` | [slang-emit-c-like.cpp](../../../source/slang/slang-emit-c-like.cpp) | (always) | |
 | 4 | `linkAndOptimizeIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | (always) | Runs Phases A-C. |
 | 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
@@ -574,7 +576,7 @@ These adjacent targets are not drawn in the CUDA diagrams above.
 | `globalVaryingVar` | `translateGlobalVaryingVar`. |
 | `resolveVaryingInputRef` | `resolveVaryingInputRef`. |
 | `bindExistential` | `bindExistentialSlots`. |
-| `coverageTracing` | `instrumentCoverage`. |
+| `coverageTracing` | `instrumentCoverage` and `finalizeCoverageInstrumentationMetadata` (Phase A). |
 | `enumType` | `lowerEnumType`. |
 | `autodiff` | `checkAutodiffPatterns`. |
 | `higherOrderFunc` | `specializeHigherOrderParameters`. |

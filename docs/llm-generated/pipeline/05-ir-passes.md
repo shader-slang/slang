@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-07T14:35:56+00:00
-source_commit: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
-watched_paths_digest: 12fcf49448fba5b8573da915930674f755e02a4594148d88c8909e74e5d0b827
+generated_at: 2026-05-15T14:30:00+00:00
+source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
+watched_paths_digest: 8749b5a60327ef9aea96c0b02a10d643c2d39d04195e7cbd40904b69dabc7f6e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -297,7 +297,8 @@ These passes run only for their named target.
 
 | Pass | File | Purpose |
 | --- | --- | --- |
-| Coverage instrument | [slang-ir-coverage-instrument.cpp](../../../source/slang/slang-ir-coverage-instrument.cpp) | Instruments shaders for coverage tracking |
+| Coverage instrument | [slang-ir-coverage-instrument.cpp](../../../source/slang/slang-ir-coverage-instrument.cpp) | Instruments shaders for coverage tracking; honors `-trace-coverage-binding` and `-trace-coverage-reserved-space` for explicit / reserved binding-slot control |
+| Finalize coverage metadata | [slang-ir-coverage-instrument.cpp](../../../source/slang/slang-ir-coverage-instrument.cpp) | `finalizeCoverageInstrumentationMetadata`; runs after global / entry-point uniform packing to fill in CPU/CUDA uniform-marshaling fields determined by the final post-packing layout |
 | Insert debug value store | [slang-ir-insert-debug-value-store.cpp](../../../source/slang/slang-ir-insert-debug-value-store.cpp) | Debug-info preservation across optimization |
 | Liveness | [slang-ir-liveness.cpp](../../../source/slang/slang-ir-liveness.cpp) | Liveness analysis used by debug info |
 | Obfuscate loc | [slang-ir-obfuscate-loc.cpp](../../../source/slang/slang-ir-obfuscate-loc.cpp) | Optional source-loc obfuscation for distributed modules |

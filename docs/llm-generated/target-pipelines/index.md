@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-13T16:30:00+00:00
-source_commit: 07b911645ab895c59decdcc25c6c56ee245833af
-watched_paths_digest: 7532e7bf149144a93210a030f872f283de9ddb9dfafdf5293db3ee653732d2ad
+generated_at: 2026-05-15T15:50:00+00:00
+source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
+watched_paths_digest: 562a0873aae2e59ee7743d5a1b0d436fb33c759dbcab165ff574e19fbf111219
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -13,7 +13,7 @@ This page is a navigation hub for the per-target pipeline pages
 in `target-pipelines/`. Each peer page documents one target's
 ordered IR-pass and downstream-tool sequence as a four-phase
 control-flow-graph view of the shared orchestrator
-`linkAndOptimizeIR` (line ~892 of
+`linkAndOptimizeIR` (line ~893 of
 [../../../source/slang/slang-emit.cpp](../../../source/slang/slang-emit.cpp)).
 For an unordered, topical catalog of every IR pass — grouped by
 category rather than by execution order — see
@@ -46,23 +46,23 @@ four phases:
   (`collectEntryPointUniformParams` /
   `moveEntryPointUniformParamsToGlobalScope` /
   `collectOptiXEntryPointUniformParams`) up to the first
-  `simplifyIR`. Roughly lines 927-1170.
+  `simplifyIR`. Roughly lines 928-1205.
 - **Phase B — Specialization and type legalization.** From the
   first `simplifyIR` through `specializeArrayParameters` /
-  `checkStaticAssert`. Roughly lines 1172-1714. The big
+  `checkStaticAssert`. Roughly lines 1207-1773. The big
   cross-target divergences (existential and resource-type
   legalization, cooperative-vector lowering, target-specific
   wrappers) live here.
 - **Phase C — Target legalization, lowering, phi elimination.**
   From `legalizeByteAddressBufferOps` through `simplifyNonSSAIR`,
   `applyVariableScopeCorrection`, and `collectMetadata`. Roughly
-  lines 1745-2360. The target-specific legalization driver
+  lines 1798-2413. The target-specific legalization driver
   (`legalizeIRForSPIRV` / `legalizeIRForMetal` /
   `legalizeIRForWGSL`) lives here, where one exists.
 - **Phase D — Emit and downstream tools.** From
-  `emitEntryPointsSourceFromIR` (line ~2365) through the
+  `emitEntryPointsSourceFromIR` (line ~2418) through the
   per-target `SourceEmitter` and `createArtifactFromIR` (line
-  ~2910), then into the downstream compiler chain
+  ~2957), then into the downstream compiler chain
   (spirv-link / DXC / Apple `metal` / Tint / nvrtc).
 
 Reading any single per-target page yields the **filtered** view
@@ -100,7 +100,7 @@ the CPU / Host / LLVM variants, etc.). A glance at one page does
 **not** show the global ordering of `linkAndOptimizeIR`; it shows
 only the passes reachable for that target. Where two targets
 share an arm (for example, CUDA, Metal, and CPU all hit the
-`undoParameterCopy` arm at line ~2041), each page that lists the
+`undoParameterCopy` arm at line ~2095), each page that lists the
 pass also documents the shared arm in its prose.
 
 For a single, unfiltered view of every pass — independent of

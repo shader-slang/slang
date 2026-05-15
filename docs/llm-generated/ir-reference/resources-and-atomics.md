@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-12T12:27:10+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 316c66a9e8bb426433e8c411cda902011d9e27e49f21a44f2d13ebaea5451e56
+generated_at: 2026-05-15T15:15:00+00:00
+source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
+watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -92,6 +92,7 @@ flowchart TD
 | `imageSubscript` | — | `image, coord, sampleCoord?` | | `IndexExpr` on a `RWTexture*` in `slang-lower-to-ir.cpp` | Returns a pointer-like value for a texel of an image; used as the lvalue side of `image[coord] = ...`. |
 | `imageLoad` | — | `image, coord, auxCoord1?, auxCoord2?` | | `Texture*::Load` method invocations | Loads a texel from an image. |
 | `imageStore` | — | `image, coord, value` | | `RWTexture*` element-store lowering | Stores a value to a texel of an image. |
+| `SubpassLoad` | `SubpassLoad` | `subpassInput, sample?` | | `SubpassInput*::SubpassLoad` method (raster-input attachment access) | Loads a fragment-shader input attachment value. On Vulkan / SPIR-V this maps to `OpImageRead` on the `SubpassInput` storage class. On Metal, `legalizeSubpassInputsForMetal` (Phase C of [../target-pipelines/metal.md](../target-pipelines/metal.md)) rewrites this opcode into a `[[color(N)]]` fragment-input parameter; a multisampled subpass load (`sample` operand present) is diagnosed as unsupported on Metal. The optional `sample` operand selects an MSAA sample. |
 | `MetalCastToDepthTexture` | — | `texture` | | (synthesized) | Metal-backend-specific cast from a regular texture to a depth texture. |
 | `IsTextureAccess` | — | (variadic, `min=1`) | | (synthesized) | True if the operand was produced by a texture-access opcode; used by the texture-access legalization pass. |
 | `IsTextureScalarAccess` | — | (variadic, `min=1`) | | (synthesized) | True if the texture access yields a scalar element. |
