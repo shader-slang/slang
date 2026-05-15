@@ -40,8 +40,11 @@ documents:
       - source/slang/CMakeLists.txt
       - prelude/*.h
       - source/slang/slang-*.h
+      - source/slang/slang-*.cpp
       - source/compiler-core/slang-*.h
+      - source/compiler-core/slang-*.cpp
       - source/core/slang-*.h
+      - source/core/slang-*.cpp
     depends_on:
       - architecture/overview.md
     size_cap_bytes: 32768
@@ -239,6 +242,9 @@ documents:
       - source/slang/slang-diagnostics.cpp
       - source/slang/slang-diagnostics.lua
       - source/slang/diagnostics/*.lua
+      - source/slang/slang-rich-diagnostics.h
+      - source/slang/slang-rich-diagnostics.cpp
+      - source/core/slang-common.h
     depends_on:
       - architecture/overview.md
     size_cap_bytes: 24576
@@ -397,6 +403,11 @@ documents:
       - source/slang/slang-ast-decl.h
       - source/slang/slang-ast-stmt.h
       - source/slang/slang-parser.cpp
+      - source/slang/slang-check-decl.cpp
+      - source/slang/slang-check-stmt.cpp
+      - source/slang/slang-check-expr.cpp
+      - source/slang/slang-session.cpp
+      - source/slang/slang-lookup.cpp
     depends_on:
       - ast-reference/base.md
       - ast-reference/declarations.md
@@ -411,7 +422,12 @@ documents:
       - source/slang/slang-ast-support-types.h
       - source/slang/slang-ast-base.h
       - source/slang/slang-ast-decl.h
+      - source/slang/slang-ast-decl.cpp
       - source/slang/slang-ast-modifier.h
+      - source/slang/slang-check-decl.cpp
+      - source/slang/slang-check-inheritance.cpp
+      - source/slang/slang-check-stmt.cpp
+      - source/slang/slang-diagnostics.lua
     depends_on:
       - name-resolution/scopes.md
       - ast-reference/values.md
@@ -423,8 +439,13 @@ documents:
     watched_paths:
       - source/slang/slang-ast-modifier.h
       - source/slang/slang-ast-decl.h
+      - source/slang/slang-ast-support-types.h
       - source/slang/slang-check-decl.cpp
       - source/slang/slang-check-modifier.cpp
+      - source/slang/slang-check-expr.cpp
+      - source/slang/slang-lookup.cpp
+      - source/slang/slang-diagnostics.lua
+      - include/slang.h
     depends_on:
       - ast-reference/modifiers.md
       - ast-reference/declarations.md
@@ -780,6 +801,10 @@ documents:
       - source/slang/slang-serialize-fossil.cpp
       - source/slang/slang-serialize-riff.h
       - source/slang/slang-serialize-riff.cpp
+      - source/slang/slang-serialize-ir-types.h
+      - source/slang/slang-serialize-ir-types.cpp
+      - source/slang/slang-serialize-source-loc.h
+      - source/slang/slang-serialize-source-loc.cpp
     depends_on:
       - architecture/overview.md
     size_cap_bytes: 24576

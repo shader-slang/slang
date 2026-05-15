@@ -303,19 +303,6 @@ These passes run only for their named target.
 | Liveness | [slang-ir-liveness.cpp](../../../source/slang/slang-ir-liveness.cpp) | Liveness analysis used by debug info |
 | Obfuscate loc | [slang-ir-obfuscate-loc.cpp](../../../source/slang/slang-ir-obfuscate-loc.cpp) | Optional source-loc obfuscation for distributed modules |
 
-### Shared utilities (not passes)
-
-These files do not implement transformations but are linked into
-many passes.
-
-| Module | File |
-| --- | --- |
-| Clone | [slang-ir-clone.cpp](../../../source/slang/slang-ir-clone.cpp) |
-| Dominators | [slang-ir-dominators.cpp](../../../source/slang/slang-ir-dominators.cpp) |
-| Util | [slang-ir-util.cpp](../../../source/slang/slang-ir-util.cpp) |
-| Insts info | [slang-ir-insts-info.cpp](../../../source/slang/slang-ir-insts-info.cpp) |
-| Insts stable names | [slang-ir-insts-stable-names.cpp](../../../source/slang/slang-ir-insts-stable-names.cpp) |
-
 ### Other passes
 
 A handful of passes do not fit the categories above. They are still
@@ -324,6 +311,20 @@ listed for completeness.
 | Pass | File | Purpose |
 | --- | --- | --- |
 | SPIR-V opcode info / snippet | [slang-ir-spirv-snippet.cpp](../../../source/slang/slang-ir-spirv-snippet.cpp) | SPIR-V code-snippet helpers used by SPIR-V passes |
+
+## Pass utilities
+
+These files do not implement transformations but are linked into
+many passes. They provide IR walking, instruction-info lookup, and
+cloning support that the categorized passes above rely on.
+
+| Module | File | Purpose |
+| --- | --- | --- |
+| Clone | [slang-ir-clone.cpp](../../../source/slang/slang-ir-clone.cpp) | Generic IR clone helpers (used by inlining, specialization, generics) |
+| Dominators | [slang-ir-dominators.cpp](../../../source/slang/slang-ir-dominators.cpp) | Dominator-tree construction; used by SSA construction, loop and SCCP passes |
+| Util | [slang-ir-util.cpp](../../../source/slang/slang-ir-util.cpp) | Common IR walking / mutation primitives |
+| Insts info | [slang-ir-insts-info.cpp](../../../source/slang/slang-ir-insts-info.cpp) | Opcode tables, name lookup, and per-opcode metadata used by the pretty printer and passes that switch on opcode |
+| Insts stable names | [slang-ir-insts-stable-names.cpp](../../../source/slang/slang-ir-insts-stable-names.cpp) | Maps between opcode enum values and serialization-stable string names |
 
 ## Adding a new pass
 

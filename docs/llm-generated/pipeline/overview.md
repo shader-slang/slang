@@ -110,8 +110,8 @@ The `linkAndOptimizeIR` function in
 [slang-emit.cpp](../../../source/slang/slang-emit.cpp) (line 893 at
 `source_commit`) drives a long, target-sensitive sequence of IR
 transformations between lowering and emit. The
-[source/slang/](../../../source/slang/) directory contains roughly 300
-`slang-ir-*.cpp` files implementing analyses, validations,
+[source/slang/](../../../source/slang/) directory contains roughly
+160 `slang-ir-*.cpp` files implementing analyses, validations,
 specializations, legalizations, and target-specific lowerings.
 
 Driven by:
@@ -143,10 +143,17 @@ The high-level objects that orchestrate the stages above live in
 [source/slang/](../../../source/slang/):
 
 - [slang-compile-request.h](../../../source/slang/slang-compile-request.h)
-  declares `FrontEndCompileRequest` / `CompileRequestBase`.
-  `slang-end-to-end-request.cpp` declares `EndToEndCompileRequest`,
-  which is what a single `slangc` invocation (or
-  `slang::ICompileRequest`) becomes.
+  declares `FrontEndCompileRequest` / `CompileRequestBase`;
+  [slang-compile-request.cpp](../../../source/slang/slang-compile-request.cpp)
+  implements them and orchestrates the per-translation-unit front-
+  end work, including the `checkAllTranslationUnits` /
+  `checkTranslationUnit` loop (around line 513) that drives semantic
+  checking before lowering.
+- [slang-end-to-end-request.h](../../../source/slang/slang-end-to-end-request.h)
+  declares `EndToEndCompileRequest`, which is what a single `slangc`
+  invocation (or `slang::ICompileRequest`) becomes. Its
+  implementation lives in
+  [slang-end-to-end-request.cpp](../../../source/slang/slang-end-to-end-request.cpp).
 - [slang-module.h](../../../source/slang/slang-module.h) declares
   `Module`, the result object the front-end produces (AST + IR) and
   the implementation of `IModule` from

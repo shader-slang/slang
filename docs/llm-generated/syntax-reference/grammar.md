@@ -48,9 +48,19 @@ KIND        – a token kind from tokens.md (terminal)
 
 Identifiers in `UpperCamelCase` are non-terminals defined in this
 document. Terminals are either literal strings (the spelling of the
-keyword or operator) or token-kind names from
-[tokens.md](tokens.md) (`IDENT`, `INT_LIT`, `FLOAT_LIT`,
-`STRING_LIT`, `CHAR_LIT`).
+keyword or operator) or short aliases for token kinds from
+[tokens.md](tokens.md):
+
+| Alias used here | `TokenType` in tokens.md |
+| --- | --- |
+| `IDENT` | `Identifier` |
+| `INT_LIT` | `IntegerLiteral` |
+| `FLOAT_LIT` | `FloatingPointLiteral` |
+| `STRING_LIT` | `StringLiteral` |
+| `CHAR_LIT` | `CharLiteral` |
+
+The aliases are used purely to keep the grammar tables readable; the
+canonical names are the `TokenType` enumerators.
 
 For brevity, every non-terminal cites the parser function that
 implements it (in
@@ -168,17 +178,6 @@ AccessorDecl    ::= ModifierList? AccessorName FuncBody
 AccessorName    ::= 'get' | 'set' | 'modify' | 'ref'
 ```
 
-### Generic declarations
-
-```
-GenericDecl     ::= '__generic' '<' GenericParams '>' Decl     -- parseGenericDecl
-                                                              --   ALSO inline form on FuncDecl etc.
-GenericParams   ::= GenericParam (',' GenericParam)*
-GenericParam    ::= IDENT (':' TypeList)?                      -- type parameter
-                  | 'let' IDENT ':' Type ('=' Expr)?           -- value parameter
-                  | 'each' IDENT (':' TypeList)?               -- pack parameter
-```
-
 ### Variable / binding declarations
 
 ```
@@ -209,7 +208,7 @@ RequireCapabilityDecl ::= '__require_capability' '(' CapabilityExpr ')' ';'
                                                               -- parseRequireCapabilityDecl
 ```
 
-## Modifiers and attributes
+## Modifiers
 
 ```
 ModifierList    ::= (Modifier | Attribute)+
@@ -236,7 +235,14 @@ ModifierKeyword ::= 'in' | 'out' | 'inout' | 'const' | 'static' | 'inline'
                   | '__implicit_conversion'
 
 ModifierTail    ::= '(' ArgList? ')'                          -- per-modifier; see keywords-and-builtins.md
+```
 
+The complete keyword inventory is in
+[keywords-and-builtins.md](keywords-and-builtins.md).
+
+## Attributes and decorations
+
+```
 Attribute       ::= '[' AttributeBody ']'
 AttributeBody   ::= AttributeName ('(' ArgList? ')')?
                   | AttributeBody ',' AttributeBody           -- multiple attributes per bracket
@@ -245,18 +251,55 @@ AttributeName   ::= IDENT ('::' IDENT)*
 ArgList         ::= Expr (',' Expr)*
 ```
 
-The complete keyword inventory is in
-[keywords-and-builtins.md](keywords-and-builtins.md).
+The bracket form `[name(args)]` is identical to a modifier in the
+AST representation — `_parseAttribute` constructs `UncheckedAttribute`
+nodes that flow through the same `Modifier` chain as keyword
+modifiers (see [../ast-reference/modifiers.md](../ast-reference/modifiers.md)).
+The attribute name resolves through the same syntax-decl lookup
+the parser uses for keyword modifiers, with `attribute_syntax`
+declarations supplying the mapping from name to attribute class.
+Inside a single bracket, multiple attributes may appear separated by
+commas.
+
+## Generics and where-clauses
+
+```
+GenericDecl     ::= '__generic' '<' GenericParams '>' Decl     -- parseGenericDecl
+                                                              --   ALSO inline form on FuncDecl, StructDecl,
+                                                              --   InterfaceDecl, ClassDecl, ExtensionDecl
+GenericParams   ::= GenericParam (',' GenericParam)*
+GenericParam    ::= IDENT (':' TypeList)?                      -- type parameter
+                  | 'let' IDENT ':' Type ('=' Expr)?           -- value parameter
+                  | 'each' IDENT (':' TypeList)?               -- pack parameter
+
+WhereClause     ::= 'where' WhereTerm (',' WhereTerm)*         -- see FuncDecl
+WhereTerm       ::= Type ':' Type                              -- conformance constraint
+                  | Type '==' Type                             -- equality constraint
+```
+
+Where-clauses appear after the parameter list (or after the result
+clause for function-style declarations) and are syntactically optional
+on every kind of generic declaration. The body that follows is
+captured as raw tokens during stage-1 parsing and is re-parsed lazily
+during checking, so the body sees a fully-resolved generic
+parameter list — see
+[../pipeline/02-parse-ast.md](../pipeline/02-parse-ast.md).
 
 ## Statements
 
+Slang's exception-like control flow appears in two distinct places.
+`try` is an **expression** keyword (`'try' Expr`, listed under
+`KeywordExpr` in the next section); the statement-level handler is
+`do ... catch`, modelled after the loop forms. There is no
+`try { ... } catch { ... }` statement.
+
 ```
 Stmt            ::= Block
-                  | IfStmt | ForStmt | WhileStmt | DoWhileStmt
+                  | IfStmt | ForStmt | WhileStmt | DoWhileStmt | DoCatchStmt
                   | SwitchStmt | CaseStmt | DefaultStmt
                   | BreakStmt | ContinueStmt | ReturnStmt
                   | DiscardStmt | DeferStmt
-                  | ThrowStmt | TryStmt
+                  | ThrowStmt
                   | DeclStmt | ExprStmt | EmptyStmt
 
 Block           ::= '{' Stmt* '}'                              -- parseBlockStmt
@@ -265,6 +308,7 @@ ForStmt         ::= 'for' '(' (DeclStmt | ExprStmt | ';') Expr? ';' Expr? ')' St
                                                               -- around line 6298
 WhileStmt       ::= 'while' '(' Expr ')' Stmt                  -- around line 6898
 DoWhileStmt     ::= 'do' Stmt 'while' '(' Expr ')' ';'         -- around line 6373
+DoCatchStmt     ::= 'do' Stmt 'catch' '(' Param ')' Block      -- slang-parser.cpp:6919-6967
 
 SwitchStmt      ::= 'switch' '(' Expr ')' '{' SwitchCase* '}'  -- around line 6014
 SwitchCase      ::= ('case' Expr ':' | 'default' ':') Stmt*
@@ -275,8 +319,6 @@ ReturnStmt      ::= 'return' Expr? ';'                          -- around line 7
 DiscardStmt     ::= 'discard' ';'                               -- around line 6381
 DeferStmt       ::= 'defer' Stmt                                -- around line 6406
 ThrowStmt       ::= 'throw' Expr ';'                            -- around line 6414
-TryStmt         ::= 'try' Block CatchClause+
-CatchClause     ::= 'catch' '(' Param ')' Block                 -- around line 6964
 
 DeclStmt        ::= Decl
 ExprStmt        ::= Expr ';'

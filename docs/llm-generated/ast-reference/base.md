@@ -42,7 +42,6 @@ supporting headers belong to this layer:
 ```mermaid
 flowchart TD
   NodeBase
-  NodeBase --> Scope
   NodeBase --> SyntaxNodeBase
   NodeBase --> Val
   Val --> Type

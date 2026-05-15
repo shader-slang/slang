@@ -1,6 +1,19 @@
 {
   "documents": {
     "architecture/dependency-graph.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T21:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/architecture/dependency-graph.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/architecture/dependency-graph.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/architecture/dependency-graph.md.review.md",
@@ -17,6 +30,19 @@
       }
     },
     "architecture/module-map.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T21:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/architecture/module-map.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/architecture/module-map.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/architecture/module-map.md.review.md",
@@ -33,6 +59,19 @@
       }
     },
     "architecture/overview.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T21:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/architecture/overview.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/architecture/overview.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/architecture/overview.md.review.md",
@@ -49,6 +88,19 @@
       }
     },
     "ast-reference/base.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T18:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ast-reference/base.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ast-reference/base.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/ast-reference/base.md.review.md",
@@ -65,6 +117,19 @@
       }
     },
     "ast-reference/declarations.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 0,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:05:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ast-reference/declarations.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ast-reference/declarations.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 0,
         "report_path": "docs/llm-generated/_meta/reviews/ast-reference/declarations.md.review.md",
@@ -81,6 +146,19 @@
       }
     },
     "ast-reference/expressions.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 0,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:05:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ast-reference/expressions.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ast-reference/expressions.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 0,
         "report_path": "docs/llm-generated/_meta/reviews/ast-reference/expressions.md.review.md",
@@ -97,6 +175,19 @@
       }
     },
     "ast-reference/index.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T18:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ast-reference/index.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ast-reference/index.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/ast-reference/index.md.review.md",
@@ -113,6 +204,19 @@
       }
     },
     "ast-reference/modifiers.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T18:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ast-reference/modifiers.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ast-reference/modifiers.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/ast-reference/modifiers.md.review.md",
@@ -129,6 +233,19 @@
       }
     },
     "ast-reference/statements.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T18:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ast-reference/statements.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ast-reference/statements.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/ast-reference/statements.md.review.md",
@@ -145,6 +262,19 @@
       }
     },
     "ast-reference/types.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T18:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ast-reference/types.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ast-reference/types.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/ast-reference/types.md.review.md",
@@ -161,6 +291,19 @@
       }
     },
     "ast-reference/values.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 0,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:05:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ast-reference/values.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ast-reference/values.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 0,
         "report_path": "docs/llm-generated/_meta/reviews/ast-reference/values.md.review.md",
@@ -177,6 +320,19 @@
       }
     },
     "cross-cutting/core-module.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 0,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:05:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/cross-cutting/core-module.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/cross-cutting/core-module.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 0,
         "report_path": "docs/llm-generated/_meta/reviews/cross-cutting/core-module.md.review.md",
@@ -193,6 +349,19 @@
       }
     },
     "cross-cutting/diagnostics.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T18:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/cross-cutting/diagnostics.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/cross-cutting/diagnostics.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/cross-cutting/diagnostics.md.review.md",
@@ -209,6 +378,19 @@
       }
     },
     "cross-cutting/ir-instructions.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T18:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/cross-cutting/ir-instructions.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/cross-cutting/ir-instructions.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/cross-cutting/ir-instructions.md.review.md",
@@ -225,6 +407,19 @@
       }
     },
     "cross-cutting/serialization.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T18:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/cross-cutting/serialization.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/cross-cutting/serialization.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/cross-cutting/serialization.md.review.md",
@@ -241,6 +436,19 @@
       }
     },
     "cross-cutting/targets.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 1,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T18:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/cross-cutting/targets.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/cross-cutting/targets.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/cross-cutting/targets.md.review.md",
@@ -257,6 +465,19 @@
       }
     },
     "glossary.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T21:15:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/glossary.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/glossary.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/glossary.md.review.md",
@@ -273,6 +494,19 @@
       }
     },
     "ir-reference/control-flow.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ir-reference/control-flow.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ir-reference/control-flow.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/ir-reference/control-flow.md.review.md",
@@ -289,6 +523,19 @@
       }
     },
     "ir-reference/decorations.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 0,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:05:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ir-reference/decorations.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ir-reference/decorations.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 0,
         "report_path": "docs/llm-generated/_meta/reviews/ir-reference/decorations.md.review.md",
@@ -305,6 +552,19 @@
       }
     },
     "ir-reference/differentiation.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ir-reference/differentiation.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ir-reference/differentiation.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/ir-reference/differentiation.md.review.md",
@@ -321,6 +581,19 @@
       }
     },
     "ir-reference/generics-and-existentials.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ir-reference/generics-and-existentials.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ir-reference/generics-and-existentials.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/ir-reference/generics-and-existentials.md.review.md",
@@ -337,6 +610,19 @@
       }
     },
     "ir-reference/index.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:45:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ir-reference/index.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ir-reference/index.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/ir-reference/index.md.review.md",
@@ -353,6 +639,19 @@
       }
     },
     "ir-reference/metadata.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ir-reference/metadata.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ir-reference/metadata.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/ir-reference/metadata.md.review.md",
@@ -369,6 +668,19 @@
       }
     },
     "ir-reference/misc.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 3,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ir-reference/misc.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ir-reference/misc.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 3,
         "report_path": "docs/llm-generated/_meta/reviews/ir-reference/misc.md.review.md",
@@ -385,6 +697,19 @@
       }
     },
     "ir-reference/resources-and-atomics.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ir-reference/resources-and-atomics.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ir-reference/resources-and-atomics.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/ir-reference/resources-and-atomics.md.review.md",
@@ -401,6 +726,19 @@
       }
     },
     "ir-reference/structure.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ir-reference/structure.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ir-reference/structure.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/ir-reference/structure.md.review.md",
@@ -417,6 +755,19 @@
       }
     },
     "ir-reference/types.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ir-reference/types.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ir-reference/types.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/ir-reference/types.md.review.md",
@@ -433,6 +784,19 @@
       }
     },
     "ir-reference/values.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 3,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/ir-reference/values.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/ir-reference/values.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 3,
         "report_path": "docs/llm-generated/_meta/reviews/ir-reference/values.md.review.md",
@@ -449,6 +813,19 @@
       }
     },
     "name-resolution/index.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T19:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/name-resolution/index.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/name-resolution/index.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/name-resolution/index.md.review.md",
@@ -465,6 +842,19 @@
       }
     },
     "name-resolution/lookup.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T19:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/name-resolution/lookup.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/name-resolution/lookup.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/name-resolution/lookup.md.review.md",
@@ -481,6 +871,19 @@
       }
     },
     "name-resolution/overload-resolution.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 3,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T19:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/name-resolution/overload-resolution.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/name-resolution/overload-resolution.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 3,
         "report_path": "docs/llm-generated/_meta/reviews/name-resolution/overload-resolution.md.review.md",
@@ -497,6 +900,19 @@
       }
     },
     "name-resolution/scopes.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T19:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/name-resolution/scopes.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/name-resolution/scopes.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/name-resolution/scopes.md.review.md",
@@ -513,6 +929,19 @@
       }
     },
     "name-resolution/visibility.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 3,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T19:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/name-resolution/visibility.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/name-resolution/visibility.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 3,
         "report_path": "docs/llm-generated/_meta/reviews/name-resolution/visibility.md.review.md",
@@ -529,6 +958,19 @@
       }
     },
     "pipeline/01-lex-preprocess.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T19:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/pipeline/01-lex-preprocess.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/pipeline/01-lex-preprocess.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/pipeline/01-lex-preprocess.md.review.md",
@@ -545,6 +987,19 @@
       }
     },
     "pipeline/02-parse-ast.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T19:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/pipeline/02-parse-ast.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/pipeline/02-parse-ast.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/pipeline/02-parse-ast.md.review.md",
@@ -561,6 +1016,19 @@
       }
     },
     "pipeline/03-semantic-check.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 0,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:05:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/pipeline/03-semantic-check.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/pipeline/03-semantic-check.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 0,
         "report_path": "docs/llm-generated/_meta/reviews/pipeline/03-semantic-check.md.review.md",
@@ -577,6 +1045,19 @@
       }
     },
     "pipeline/04-ast-to-ir.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 0,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:05:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/pipeline/04-ast-to-ir.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/pipeline/04-ast-to-ir.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 0,
         "report_path": "docs/llm-generated/_meta/reviews/pipeline/04-ast-to-ir.md.review.md",
@@ -593,6 +1074,19 @@
       }
     },
     "pipeline/04b-pre-link-passes.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 0,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:05:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/pipeline/04b-pre-link-passes.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/pipeline/04b-pre-link-passes.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 0,
         "report_path": "docs/llm-generated/_meta/reviews/pipeline/04b-pre-link-passes.md.review.md",
@@ -609,6 +1103,19 @@
       }
     },
     "pipeline/04c-layout-ir.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T19:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/pipeline/04c-layout-ir.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/pipeline/04c-layout-ir.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/pipeline/04c-layout-ir.md.review.md",
@@ -625,6 +1132,19 @@
       }
     },
     "pipeline/05-ir-passes.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T19:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/pipeline/05-ir-passes.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/pipeline/05-ir-passes.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/pipeline/05-ir-passes.md.review.md",
@@ -641,6 +1161,19 @@
       }
     },
     "pipeline/06-emit.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 0,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T17:05:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/pipeline/06-emit.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/pipeline/06-emit.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 0,
         "report_path": "docs/llm-generated/_meta/reviews/pipeline/06-emit.md.review.md",
@@ -657,6 +1190,19 @@
       }
     },
     "pipeline/overview.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 3,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T19:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/pipeline/overview.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/pipeline/overview.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 3,
         "report_path": "docs/llm-generated/_meta/reviews/pipeline/overview.md.review.md",
@@ -673,6 +1219,19 @@
       }
     },
     "syntax-reference/grammar.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 3,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T20:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/syntax-reference/grammar.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/syntax-reference/grammar.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 3,
         "report_path": "docs/llm-generated/_meta/reviews/syntax-reference/grammar.md.review.md",
@@ -689,6 +1248,19 @@
       }
     },
     "syntax-reference/keywords-and-builtins.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 3,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T20:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/syntax-reference/keywords-and-builtins.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/syntax-reference/keywords-and-builtins.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 3,
         "report_path": "docs/llm-generated/_meta/reviews/syntax-reference/keywords-and-builtins.md.review.md",
@@ -705,6 +1277,19 @@
       }
     },
     "syntax-reference/tokens.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T20:00:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/syntax-reference/tokens.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/syntax-reference/tokens.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/syntax-reference/tokens.md.review.md",
@@ -721,6 +1306,19 @@
       }
     },
     "target-pipelines/cuda.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T20:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/target-pipelines/cuda.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/target-pipelines/cuda.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/llm-generated/_meta/reviews/target-pipelines/cuda.md.review.md",
@@ -737,6 +1335,19 @@
       }
     },
     "target-pipelines/hlsl.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T20:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/target-pipelines/hlsl.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/target-pipelines/hlsl.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/target-pipelines/hlsl.md.review.md",
@@ -753,6 +1364,19 @@
       }
     },
     "target-pipelines/index.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T20:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/target-pipelines/index.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/target-pipelines/index.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/target-pipelines/index.md.review.md",
@@ -769,6 +1393,19 @@
       }
     },
     "target-pipelines/metal.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T20:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/target-pipelines/metal.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/target-pipelines/metal.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/target-pipelines/metal.md.review.md",
@@ -785,6 +1422,19 @@
       }
     },
     "target-pipelines/spirv.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T20:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/target-pipelines/spirv.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/target-pipelines/spirv.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/target-pipelines/spirv.md.review.md",
@@ -801,6 +1451,19 @@
       }
     },
     "target-pipelines/wgsl.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-05-15T20:30:00+00:00",
+        "remediator_model": "claude-opus-4.7",
+        "report_path": "docs/llm-generated/_meta/remediations/target-pipelines/wgsl.md.remediation.md",
+        "review_report_ref": "docs/llm-generated/_meta/reviews/target-pipelines/wgsl.md.review.md"
+      },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/llm-generated/_meta/reviews/target-pipelines/wgsl.md.review.md",

@@ -205,6 +205,18 @@ enum IRMemoryOrder
 | --- | --- | --- | --- | --- | --- |
 | `GroupMemoryBarrierWithGroupSync` | — | — | | `GroupMemoryBarrierWithGroupSync` intrinsic | Memory barrier across the workgroup, with thread-sync. |
 | `ControlBarrier` | — | — | | `ControlBarrier`-style intrinsics | Generic control-flow barrier; backend chooses the concrete fence. |
+| `BeginFragmentShaderInterlock` | — | — | | `BeginFragmentShaderInterlock` intrinsic | Opens a rasterizer-ordered critical section in a fragment shader. |
+| `EndFragmentShaderInterlock` | `EndFragmentShaderInterlock` | — | | `EndFragmentShaderInterlock` intrinsic | Closes the rasterizer-ordered critical section opened by `BeginFragmentShaderInterlock`. |
+
+### Cooperative matrix and vector
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `CoopMatMapElementIFunc` | — | (variadic, `min=2`) | | core-module `CoopMat.mapElement` | Maps a per-element function over a cooperative matrix. |
+| `CoopMatMulAdd` | — | `matA, matB, matC, saturatingAccumulation` | | core-module `CoopMat.mulAdd` | Fused multiply-add on cooperative matrices. |
+| `CoopVecMatMulAdd` | — | `input, inputInterpretation, inputInterpretationPackingFactor, matrixPtr, matrixOffset, matrixInterpretation, k, memoryLayout, transpose, matrixStride, biasPtr?, biasOffset?, biasInterpretation?` | | core-module `CoopVec.matMulAdd` | Cooperative-vector matrix-multiply-add with optional bias. |
+| `CoopVecOuterProductAccumulate` | — | `matrixPtr, matrixOffset, a, b, memoryLayout, matrixInterpretation, matrixStride` | | core-module `CoopVec.outerProductAccumulate` | Outer-product accumulate into a cooperative matrix in memory. |
+| `CoopVecReduceSumAccumulate` | — | `bufferPtr, offset, value` | | core-module `CoopVec.reduceSumAccumulate` | Reduce-sum accumulate of a cooperative vector into a memory location. |
 
 ### Wave intrinsics
 
@@ -238,9 +250,12 @@ enum IRMemoryOrder
 
 ### Binding queries
 
+`BindingQuery` is the grouping parent for `getRegisterIndex` and
+`getRegisterSpace` (see the Lua entry for which targets honor each
+variant); only its concrete children appear in the table.
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `BindingQuery` | — | (parent only) | | — | Parent of the binding-query group; cite the comments in the Lua entry for which targets honor each variant. |
 | `getRegisterIndex` | — | (variadic, `min=1`) | | (synthesized) | Returns the register index a resource is bound to. |
 | `getRegisterSpace` | — | (variadic, `min=1`) | | (synthesized) | Returns the register space a resource is bound to. |
 

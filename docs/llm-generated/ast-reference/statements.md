@@ -111,6 +111,7 @@ from the `## Nodes` table because it is not parsed as a statement.
 | `CatchStmt` | `Stmt` | `errorVar: ParamDecl*`, `tryBody: Stmt*`, `handleBody: Stmt*` | [try-catch](../syntax-reference/grammar.md#statements) | `try { ... } catch (e) { ... }` block; `errorVar == null` means a catch-all. |
 | `ExpressionStmt` | `Stmt` | `expression: Expr*` | [expression stmt](../syntax-reference/grammar.md#statements) | An expression used for its side effects (`f();`, `a = b;`). |
 | `RequireCapabilityStmt` | `Stmt` | `requiredCaps: List<Token>` | [require_capability](../syntax-reference/grammar.md#statements) | Statement-level capability requirement scoped to the enclosing function. |
+| `UniqueStmtIDNode` | `Decl` | (no parsed state) | (none) | Synthesized identity helper that gives a statement a stable unique id; used by serialization and control-flow tracking rather than parsed as a statement. |
 
 ## Notable nodes
 

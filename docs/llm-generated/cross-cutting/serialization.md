@@ -187,9 +187,8 @@ Historical `-dump-repro` / `-load-repro` machinery for capturing a
 single `slangc` invocation as a serialized blob is documented in
 [CLAUDE.md](../../../CLAUDE.md) as **deprecated**: it should not be
 relied on. The watched-paths set for this document does not include
-the repro implementation, so newer alternatives (the round-trip via
-`-target slang` plus the test-server framework) are the supported
-path.
+the repro implementation, so any newer alternative workflow is out
+of scope for this page.
 
 ## Adding a new serialized field
 

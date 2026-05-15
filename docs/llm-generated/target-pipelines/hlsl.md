@@ -347,7 +347,11 @@ flowchart TD
   eMB[eliminateMultiLevelBreak]
   s2d[simplifyIR with removeTrivialSingleIterationLoops]
   lET2[legalizeEmptyTypes]
+  livenessStartGate{shouldTrackLiveness}
+  lStart["LivenessUtil::addVariableRangeStarts"]
   ePhi["eliminatePhis (default options)"]
+  livenessEndGate{shouldTrackLiveness}
+  lEnd["LivenessUtil::addRangeEnds"]
   sNSIR[simplifyNonSSAIR]
   aVSC[applyVariableScopeCorrection]
   cCM[collectCooperativeMetadata]
@@ -369,7 +373,13 @@ flowchart TD
   optYGate -->|false| optWGate
   optWGate -->|true| rcpW --> lBETST_def
   optWGate -->|false| lBETST_def
-  lBETST_def --> pFI2 --> eMB --> s2d --> lET2 --> ePhi --> sNSIR --> aVSC --> cCM --> uNEI --> cM --> cUI
+  lBETST_def --> pFI2 --> eMB --> s2d --> lET2 --> livenessStartGate
+  livenessStartGate -->|true| lStart --> ePhi
+  livenessStartGate -->|false| ePhi
+  ePhi --> livenessEndGate
+  livenessEndGate -->|true| lEnd --> sNSIR
+  livenessEndGate -->|false| sNSIR
+  sNSIR --> aVSC --> cCM --> uNEI --> cM --> cUI
 ```
 
 | # | Pass | File | Gate | Notes |
@@ -396,13 +406,15 @@ flowchart TD
 | 20 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | |
 | 21 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | With `removeTrivialSingleIterationLoops = true`. |
 | 22 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../source/slang/slang-ir-legalize-types.cpp) | (always; for AD 2.0) | |
-| 23 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../source/slang/slang-ir-eliminate-phis.cpp) | (always) | **Default options.** DXC accepts HLSL with explicit temporaries; no register-allocation hint. |
-| 24 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
-| 25 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../source/slang/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` | |
-| 26 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | HLSL exposes cooperative matrices via DXR / DXC extensions. |
-| 27 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | `EmbedDownstreamIR` | |
-| 28 | `collectMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | (always) | |
-| 29 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | |
+| 23 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../source/slang/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` | Inserts `IRLiveRangeStart` markers immediately before `eliminatePhis` so the explicit temporaries it introduces inherit live-range start positions ([slang-emit.cpp lines 2307-2325](../../../source/slang/slang-emit.cpp)). |
+| 24 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../source/slang/slang-ir-eliminate-phis.cpp) | (always) | **Default options.** DXC accepts HLSL with explicit temporaries; no register-allocation hint. |
+| 25 | `LivenessUtil::addRangeEnds` | [slang-ir-liveness.cpp](../../../source/slang/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` | Inserts `IRLiveRangeEnd` markers after phi elimination, paired with the range-start markers added in row 23. |
+| 26 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
+| 27 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../source/slang/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` | |
+| 28 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | HLSL exposes cooperative matrices via DXR / DXC extensions. |
+| 29 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | `EmbedDownstreamIR` | |
+| 30 | `collectMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | (always) | |
+| 31 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | |
 
 Filtered out for HLSL in this phase: `synthesizeActiveMask` (CUDA
 only); `resolveTextureFormat` (GLSL / SPIR-V / WGSL only);

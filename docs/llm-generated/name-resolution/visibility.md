@@ -66,9 +66,14 @@ per-decl visibility validation is in
   815) — the per-module language-version field, set from the
   `module` declaration's version (or the linkage default). The
   legacy version constant `SLANG_LANGUAGE_VERSION_LEGACY` is
-  `2018` in [slang.h](../../../include/slang.h) (line 5400); the
-  default is `SLANG_LANGUAGE_VERSION_2025` for sessions that do not
-  override it.
+  `2018` in [slang.h](../../../include/slang.h); the same header
+  defines `SLANG_LANGUAGE_VERSION_DEFAULT` as
+  `SLANG_LANGUAGE_VERSION_LEGACY` (so the documented language
+  default is still 2018), and `SessionDesc::minLanguageVersion`
+  defaults to `SLANG_LANGUAGE_VERSION_2025`. New sessions therefore
+  reject modules whose declared version is older than 2025 by
+  default, but a host that overrides `minLanguageVersion` can still
+  fall back to the 2018 default.
 - `IgnoreForLookupModifier`
   ([slang-ast-modifier.h](../../../source/slang/slang-ast-modifier.h)
   line 248) — a separate modifier that hides a decl from lookup

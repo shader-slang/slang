@@ -108,11 +108,9 @@ type opcodes via the `Attributed` type wrapper documented in
 | `nonuniform` | `NonUniformAttr` | — | H | `NonuniformResourceIndexModifier` | Marks a resource index value as non-uniform. |
 | `Aligned` | `AlignedAttr` | `alignment` | H | (synthesized) | Records the alignment of a pointer or buffer member. |
 | `MemoryScope` | `MemoryScopeAttr` | (variadic, `min=1`) | H | (synthesized) | Records the memory scope of an atomic / barrier operation. |
-| `SemanticAttr` | — | (parent only) | H | — | Parent of `userSemantic` and `systemValueSemantic`. |
-| `userSemantic` | `UserSemanticAttr` | (variadic, `min=2`) | H | `HLSLSemantic` AST node | User-defined HLSL semantic on a parameter or field. |
+| `userSemantic` | `UserSemanticAttr` | (variadic, `min=2`) | H | `HLSLSemantic` AST node | User-defined HLSL semantic on a parameter or field. (`SemanticAttr` is the grouping parent of `userSemantic` and `systemValueSemantic`; it is not itself an opcode.) |
 | `systemValueSemantic` | `SystemValueSemanticAttr` | (variadic, `min=2`) | H | `HLSLSimpleSemantic` (system-value variant) | System-value semantic (`SV_*`) on a parameter or field. |
-| `LayoutResourceInfoAttr` | — | (parent only) | H | — | Parent of `size` and `offset`. |
-| `size` | `TypeSizeAttr` | (variadic, `min=2`) | H | (synthesized) | Type-size record on a layout, keyed by resource kind. |
+| `size` | `TypeSizeAttr` | (variadic, `min=2`) | H | (synthesized) | Type-size record on a layout, keyed by resource kind. (`LayoutResourceInfoAttr` is the grouping parent of `size` and `offset`; it is not itself an opcode.) |
 | `offset` | `VarOffsetAttr` | (variadic, `min=2`) | H | (synthesized) | Var-offset record on a `varLayout`, keyed by resource kind. |
 | `FuncThrowType` | `FuncThrowTypeAttr` | `errorType: IRType` | H | (synthesized) | Records the error type of a throwing function. |
 
@@ -155,8 +153,7 @@ more `SPIRVAsmOperand` opcodes.
 | --- | --- | --- | --- | --- | --- |
 | `SPIRVAsm` | — | (variadic) | P | (synthesized) | Parent container of an inline-asm block; children are `SPIRVAsmInst`. |
 | `SPIRVAsmInst` | — | (variadic, `min=1`) | | (synthesized) | One SPIR-V instruction inside a `SPIRVAsm` block. |
-| `SPIRVAsmOperand` | — | (parent only) | | — | Parent of every typed asm operand kind. |
-| `SPIRVAsmOperandLiteral` | — | (variadic, `min=1`) | H | (synthesized) | Literal value (integer or string) passed as a SPIR-V operand. |
+| `SPIRVAsmOperandLiteral` | — | (variadic, `min=1`) | H | (synthesized) | Literal value (integer or string) passed as a SPIR-V operand. (`SPIRVAsmOperand` is the grouping parent of every typed asm-operand kind below; it is not itself an opcode.) |
 | `SPIRVAsmOperandInst` | — | (variadic, `min=1`) | | (synthesized) | Reference to a Slang `IRInst` (value or type); not hoistable so that asm-block rewrites can change uses. |
 | `SPIRVAsmOperandConvertTexel` | — | (variadic, `min=1`) | | (synthesized) | Implicit texel-format conversion operand for image instructions. |
 | `SPIRVAsmOperandRayPayloadFromLocation` | — | (variadic, `min=1`) | | (synthesized) | Late-resolving operand for a ray payload referenced by location. |
@@ -168,11 +165,11 @@ more `SPIRVAsmOperand` opcodes.
 | `SPIRVAsmOperandDebugPrintfSet` | — | — | H | (synthesized) | Reference to the NonSemantic.DebugPrintf instruction set. |
 | `SPIRVAsmOperandId` | — | (variadic, `min=1`) | H | (synthesized) | Named id used to refer back to another instruction inside the same asm block. |
 | `SPIRVAsmOperandResult` | — | — | H | (synthesized) | Marker for the place to insert the generated result operand. |
-| `SPIRVAsmOperandTruncate` | `SPIRVAsmOperandTruncate` | — | H | (synthesized) | Type-directed truncation operand (`__truncate`). |
-| `SPIRVAsmOperandEntryPoint` | `SPIRVAsmOperandEntryPoint` | — | H | (synthesized) | Id of an entry point referencing the current function (`__entryPoint`). |
-| `SPIRVAsmOperandSampledType` | `SPIRVAsmOperandSampledType` | (variadic, `min=1`) | H | (synthesized) | Type function returning the sampled-component type (`__sampledType`). |
-| `SPIRVAsmOperandImageType` | `SPIRVAsmOperandImageType` | (variadic, `min=1`) | H | (synthesized) | Type function returning the equivalent `OpTypeImage` (`__imageType`). |
-| `SPIRVAsmOperandSampledImageType` | `SPIRVAsmOperandSampledImageType` | (variadic, `min=1`) | H | (synthesized) | Type function returning the equivalent sampled-image type (`__sampledImageType`). |
+| `__truncate` | `SPIRVAsmOperandTruncate` | — | H | (synthesized) | Type-directed truncation operand. |
+| `__entryPoint` | `SPIRVAsmOperandEntryPoint` | — | H | (synthesized) | Id of an entry point referencing the current function. |
+| `__sampledType` | `SPIRVAsmOperandSampledType` | (variadic, `min=1`) | H | (synthesized) | Type function returning the sampled-component type. |
+| `__imageType` | `SPIRVAsmOperandImageType` | (variadic, `min=1`) | H | (synthesized) | Type function returning the equivalent `OpTypeImage`. |
+| `__sampledImageType` | `SPIRVAsmOperandSampledImageType` | (variadic, `min=1`) | H | (synthesized) | Type function returning the equivalent sampled-image type. |
 
 ## Notable opcodes
 

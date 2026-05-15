@@ -22,24 +22,31 @@ emit is determined by the emit backends linked into the compiler —
 see [../pipeline/06-emit.md](../pipeline/06-emit.md) for the per-
 backend details.
 
-| Target | Output | Emit file |
-| --- | --- | --- |
-| HLSL | HLSL text (typically forwarded to DXC for DXIL) | [slang-emit-hlsl.cpp](../../../source/slang/slang-emit-hlsl.cpp) |
-| GLSL | GLSL text (typically forwarded to glslang for SPIR-V) | [slang-emit-glsl.cpp](../../../source/slang/slang-emit-glsl.cpp) |
-| SPIR-V (direct) | SPIR-V binary | [slang-emit-spirv.cpp](../../../source/slang/slang-emit-spirv.cpp) |
-| Metal Shading Language | MSL text | [slang-emit-metal.cpp](../../../source/slang/slang-emit-metal.cpp) |
-| WGSL | WGSL text | [slang-emit-wgsl.cpp](../../../source/slang/slang-emit-wgsl.cpp) |
-| C++ shader | C++ text linked against `slang-rt` | [slang-emit-cpp.cpp](../../../source/slang/slang-emit-cpp.cpp) |
-| CUDA | CUDA text | [slang-emit-cuda.cpp](../../../source/slang/slang-emit-cuda.cpp) |
-| Torch glue | C++ pytorch binding | [slang-emit-torch.cpp](../../../source/slang/slang-emit-torch.cpp) |
-| LLVM | Native code via `slang-llvm` | [slang-emit-llvm.cpp](../../../source/slang/slang-emit-llvm.cpp) |
-| VM | Slang interpreter bytecode | [slang-emit-vm.cpp](../../../source/slang/slang-emit-vm.cpp) |
-| Slang round-trip | Re-emit Slang source | [slang-emit-slang.cpp](../../../source/slang/slang-emit-slang.cpp) |
+Rows below group the public `SlangCompileTarget` values declared in
+[include/slang.h](../../../include/slang.h) by the emit backend that
+produces them. Several enumerators correspond to format variations
+(text vs binary vs assembly, shader vs host) that flow through the
+same emit file and are dispatched by `CodeGenTarget` further down
+the pipeline.
 
-The full list of `SlangCompileTarget` enumerators visible in the
-public API is in [include/slang.h](../../../include/slang.h); not
-every public target value corresponds to a separate emit file (some
-share a backend with format variations).
+| Target group | Public `SlangCompileTarget` values | Output | Emit file(s) |
+| --- | --- | --- | --- |
+| HLSL | `SLANG_HLSL`, `SLANG_DXBC`, `SLANG_DXBC_ASM`, `SLANG_DXIL`, `SLANG_DXIL_ASM` | HLSL text plus downstream DXBC/DXIL produced via FXC / DXC | [slang-emit-hlsl.cpp](../../../source/slang/slang-emit-hlsl.cpp) (DXBC/DXIL are downstream-compiled) |
+| GLSL | `SLANG_GLSL` (plus the deprecated `SLANG_GLSL_VULKAN_*` aliases) | GLSL text (typically forwarded to glslang for SPIR-V) | [slang-emit-glsl.cpp](../../../source/slang/slang-emit-glsl.cpp) |
+| SPIR-V (direct) | `SLANG_SPIRV`, `SLANG_SPIRV_ASM` | SPIR-V binary or assembly | [slang-emit-spirv.cpp](../../../source/slang/slang-emit-spirv.cpp) |
+| Metal Shading Language | `SLANG_METAL`, `SLANG_METAL_LIB`, `SLANG_METAL_LIB_ASM` | MSL text, Metal library, Metal library assembly | [slang-emit-metal.cpp](../../../source/slang/slang-emit-metal.cpp) (`*_LIB`/`*_LIB_ASM` go through Metal's downstream tools) |
+| WGSL | `SLANG_WGSL`, `SLANG_WGSL_SPIRV`, `SLANG_WGSL_SPIRV_ASM` | WGSL text, plus SPIR-V binary/assembly produced via WGSL | [slang-emit-wgsl.cpp](../../../source/slang/slang-emit-wgsl.cpp) |
+| C++ shader | `SLANG_CPP_SOURCE`, `SLANG_C_SOURCE`, `SLANG_CPP_HEADER` | C/C++ text linked against `slang-rt`; header variant emits a declarations-only file | [slang-emit-cpp.cpp](../../../source/slang/slang-emit-cpp.cpp) |
+| C++ host | `SLANG_HOST_CPP_SOURCE`, `SLANG_HOST_HOST_CALLABLE`, `SLANG_HOST_SHARED_LIBRARY`, `SLANG_SHADER_HOST_CALLABLE`, `SLANG_HOST_EXECUTABLE`, `SLANG_SHADER_SHARED_LIBRARY`, `SLANG_HOST_OBJECT_CODE`, `SLANG_OBJECT_CODE` | Host-side C++ source, callable code, shared libraries, executables, and object code | [slang-emit-cpp.cpp](../../../source/slang/slang-emit-cpp.cpp) (binaries are downstream-compiled) |
+| CUDA | `SLANG_CUDA_SOURCE`, `SLANG_PTX`, `SLANG_CUDA_OBJECT_CODE`, `SLANG_CUDA_HEADER` | CUDA text, PTX, object code, header | [slang-emit-cuda.cpp](../../../source/slang/slang-emit-cuda.cpp) (PTX and object code via NVRTC / nvcc) |
+| Torch glue | `SLANG_CPP_PYTORCH_BINDING` | C++ PyTorch binding | [slang-emit-torch.cpp](../../../source/slang/slang-emit-torch.cpp) |
+| LLVM | `SLANG_HOST_LLVM_IR`, `SLANG_SHADER_LLVM_IR` | Native or LLVM-IR via `slang-llvm` | [slang-emit-llvm.cpp](../../../source/slang/slang-emit-llvm.cpp) |
+| VM | `SLANG_HOST_VM` | Slang interpreter bytecode | [slang-emit-vm.cpp](../../../source/slang/slang-emit-vm.cpp) |
+| Slang round-trip | (no dedicated public target; used internally) | Re-emit Slang source | [slang-emit-slang.cpp](../../../source/slang/slang-emit-slang.cpp) |
+
+`SLANG_TARGET_UNKNOWN` and `SLANG_TARGET_NONE` are sentinel values
+that do not select an emit backend. `SLANG_TARGET_COUNT_OF` is the
+enumerator terminator and is not a usable target.
 
 `SourceLanguage` (input flavor) is declared in
 [slang-profile.h](../../../source/slang/slang-profile.h):

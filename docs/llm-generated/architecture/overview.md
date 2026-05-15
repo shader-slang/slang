@@ -126,6 +126,24 @@ everything else as an immutable boundary.
 - [tools/](../../../tools/) — auxiliary developer tools (testing,
   reflection, code generation, fiddle, embed, profiling).
 
+### Auxiliary trees (outside `source/`)
+
+- [tests/](../../../tests/) — the project's test corpus. Most files
+  are `.slang` inputs driven by `slang-test` (see
+  [tools/slang-test/](../../../tools/slang-test/)). New regression
+  tests live here; the directory structure mirrors the area being
+  tested (e.g. `tests/language-feature/`, `tests/diagnostics/`,
+  `tests/spirv/`).
+- [extras/](../../../extras/) — developer scripts and small helpers
+  that are not built into any binary: formatting
+  ([extras/formatting.sh](../../../extras/formatting.sh)), IR-dump
+  splitting ([extras/split-ir-dump.py](../../../extras/split-ir-dump.py)),
+  Windows sandbox build helpers, etc. Anything in this tree exists
+  only to support developers and is not shipped to end users.
+- [external/](../../../external/) — third-party dependencies and git
+  submodules (spirv-headers, glslang, lz4, miniz, …). Code here is
+  vendored, not modified.
+
 ### Build-time generated code
 
 Slang relies heavily on build-time code generation. The macro
@@ -149,13 +167,20 @@ declarations are clustered in
 
 - `Session` — process-wide compiler state. Owns built-in modules, the
   AST builder, and the global type-checking environment. The COM-style
-  public interface is `slang::ISession`
+  public interface is `slang::IGlobalSession`
   ([include/slang.h](../../../include/slang.h)); the implementation
-  classes use the `Session` name.
+  class is `Session` in
+  [slang-global-session.h](../../../source/slang/slang-global-session.h).
 - `Linkage` — a configuration scope that bundles search paths,
   preprocessor macros, target settings, and a source manager. Multiple
   modules share a `Linkage` so they can resolve `import`s against each
-  other consistently.
+  other consistently. `Linkage` is what the public `slang::ISession`
+  interface ([include/slang.h](../../../include/slang.h)) actually
+  implements — see
+  [slang-session.h](../../../source/slang/slang-session.h). The
+  unfortunate consequence is that "session" means *two different
+  things*: `IGlobalSession` is the process-wide singleton and
+  `ISession` is what most callers think of as a "compile session".
 - `TranslationUnitRequest` — a collection of source files that share a
   namespace. By default, all Slang source files passed to `slangc` go
   into a single `TranslationUnitRequest`; HLSL inputs go one-per-unit.

@@ -136,8 +136,12 @@ flowchart TD
 | `discard` | — | — | | `DiscardStmt` in `slang-lower-to-ir.cpp` | HLSL `discard` for fragment shaders; ends pixel processing. Not technically a terminator in the IR sense — it sits in a block whose ordinary terminator follows. |
 | `gpuForeach` | — | (variadic, `min=3`) | | `GpuForeachStmt` in `slang-lower-to-ir.cpp` | GPU_FOREACH-style loop opcode used by the host-shader lowering; pairs with a backend-specific kernel launch. |
 | `RequirePrelude` | — | (variadic, `min=1`) | | (synthesized) | Marks an instruction as requiring a target-specific prelude snippet; technically a control-flow opcode by file position but functionally a backend hint. |
-| `Printf` | — | `format` | | `PrintfExpr` (HLSL `printf`) | Emits a runtime print operation; some backends model it as a side-effecting control-flow op. |
+| `RequireTargetExtension` | — | `extension` | | (synthesized) | Marks an instruction as requiring a named target extension be enabled. |
+| `RequireComputeDerivative` | — | — | | (synthesized) | Marks an entry point as needing compute-shader derivative support. |
 | `StaticAssert` | — | `condition, message` | | `StaticAssertDecl` in `slang-lower-to-ir.cpp` | Compile-time assertion; consumed by IR passes, never reaches emit. |
+| `Printf` | — | `format` | | `PrintfExpr` (HLSL `printf`) | Emits a runtime print operation; some backends model it as a side-effecting control-flow op. |
+| `RequireMaximallyReconverges` | — | — | | (synthesized) | Marks an entry point as requiring the maximally-reconverges quad execution mode. |
+| `RequireQuadDerivatives` | — | — | | (synthesized) | Marks an entry point as requiring the quad-derivatives execution mode. |
 
 ## Notable opcodes
 

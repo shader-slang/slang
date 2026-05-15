@@ -157,6 +157,24 @@ counterparts.
 | `MakeIDifferentiableWitness` | — | (variadic, `min=1`) | H | (synthesized) | Builds an `IDifferentiable` witness for a type that does not declare one. |
 | `SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc` | — | (variadic, `min=2`) | H | (synthesized) | Bridges legacy combined reverse functions into the modern witness form. |
 
+### Autodiff temporaries
+
+Placeholders created and consumed by the reverse-mode splitting and
+backward auto-diff passes; none survive past those passes.
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `LoadReverseGradient` | — | `value` | | (synthesized) | Placeholder for the currently accumulated derivative to pass as a nested-call `dOut` argument. |
+| `ReverseGradientDiffPairRef` | — | `primal, diff` | | (synthesized) | Placeholder pair carrying the primal and accumulated derivative for an inout argument in a nested call. |
+| `PrimalParamRef` | — | `referencedParam` | | (synthesized) | Reference to an inout parameter for use in the primal portion of the split function. |
+| `DiffParamRef` | — | `referencedParam` | | (synthesized) | Reference to an inout parameter for use in the back-prop portion of the split function. |
+
+### Differential type info
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `DiffTypeInfo` | — | — | H | (synthesized) | Holds witness tables for differential type info (`thisType` witness, return-type witness, parameter witnesses); lowered to a `MakeTuple` after specialization. |
+
 ### Checkpointing and rematerialization
 
 Reverse-mode autodiff frequently needs to read primal values at

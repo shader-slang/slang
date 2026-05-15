@@ -41,29 +41,23 @@ All five pages obey the **Target-pipeline page contract** in
 decompose their target's invocation of `linkAndOptimizeIR` into
 four phases:
 
-- **Phase A — Link and entry-point prep.** From `linkIR` through
-  the per-target entry-point-uniform handling
-  (`collectEntryPointUniformParams` /
-  `moveEntryPointUniformParamsToGlobalScope` /
-  `collectOptiXEntryPointUniformParams`) up to the first
-  `simplifyIR`. Roughly lines 928-1205.
-- **Phase B — Specialization and type legalization.** From the
-  first `simplifyIR` through `specializeArrayParameters` /
-  `checkStaticAssert`. Roughly lines 1207-1773. The big
-  cross-target divergences (existential and resource-type
-  legalization, cooperative-vector lowering, target-specific
-  wrappers) live here.
+- **Phase A — Link and entry-point prep.** Link the per-module IR
+  and prepare entry points for legalization, including the
+  per-target entry-point-uniform handling. See the per-target page
+  for the exact set of passes its target lands on.
+- **Phase B — Specialization and type legalization.** Specialize
+  generics and resolve target-independent type-legalization
+  questions. The big cross-target divergences (existential and
+  resource-type legalization, cooperative-vector lowering,
+  target-specific wrappers) live here.
 - **Phase C — Target legalization, lowering, phi elimination.**
-  From `legalizeByteAddressBufferOps` through `simplifyNonSSAIR`,
-  `applyVariableScopeCorrection`, and `collectMetadata`. Roughly
-  lines 1798-2413. The target-specific legalization driver
-  (`legalizeIRForSPIRV` / `legalizeIRForMetal` /
-  `legalizeIRForWGSL`) lives here, where one exists.
-- **Phase D — Emit and downstream tools.** From
-  `emitEntryPointsSourceFromIR` (line ~2418) through the
-  per-target `SourceEmitter` and `createArtifactFromIR` (line
-  ~2957), then into the downstream compiler chain
-  (spirv-link / DXC / Apple `metal` / Tint / nvrtc).
+  Run the target-specific legalization driver (where one exists)
+  along with shared lowering, then leave SSA via the phi-elimination
+  step.
+- **Phase D — Emit and downstream tools.** Hand the legalized IR
+  to the per-target `SourceEmitter` (or the SPIR-V direct-emit
+  path), wrap the result as a downstream-compiler input, and run
+  the target's external tools.
 
 Reading any single per-target page yields the **filtered** view
 of `linkAndOptimizeIR` — passes that fire only for sibling

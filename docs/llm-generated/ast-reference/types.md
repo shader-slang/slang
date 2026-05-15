@@ -133,7 +133,6 @@ Abstract intermediates: `ArithmeticExpressionType`, `Fp8Type`,
 | `CoopVectorExpressionType` | `ArithmeticExpressionType` | (operand-encoded) | (none) | Cooperative-vector type (subgroup-cooperative math). |
 | `DifferentialPairType` | `ArithmeticExpressionType` | (operand-encoded) | (none) | Differential pair `(primal, differential)` used by autodiff. |
 | `DifferentialPtrPairType` | `ArithmeticExpressionType` | (operand-encoded) | (none) | Differential pair of pointers (for in-place gradients). |
-| `Fp8Type` (abstract) | `DeclRefType` | (operand-encoded) | (none) | Base for 8-bit floating-point types. |
 | `FloatE4M3Type` | `Fp8Type` | (operand-encoded) | (none) | 8-bit float with 4 exponent / 3 mantissa bits. |
 | `FloatE5M2Type` | `Fp8Type` | (operand-encoded) | (none) | 8-bit float with 5 exponent / 2 mantissa bits. |
 | `BFloat16Type` | `DeclRefType` | (operand-encoded) | (none) | 16-bit `bfloat`. |

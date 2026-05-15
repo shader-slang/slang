@@ -107,8 +107,8 @@ container that owns `field` and `key` children.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `StructType` (parent) | `IRStructType` | (children: `field`, `key`) | P | `StructDecl` in `slang-lower-to-ir.cpp` | Owns the struct's field and key children. See [types.md](types.md) for its type-side semantics. |
-| `ClassType` (parent) | `IRClassType` | (children: `field`, `key`) | P | `ClassDecl` in `slang-lower-to-ir.cpp` | Owns the class's field and key children; cross-linked to [types.md](types.md). |
+| `struct` (parent) | `IRStructType` | (children: `field`, `key`) | P | `StructDecl` in `slang-lower-to-ir.cpp` | Owns the struct's field and key children. See [types.md](types.md) for its type-side semantics. |
+| `class` (parent) | `IRClassType` | (children: `field`, `key`) | P | `ClassDecl` in `slang-lower-to-ir.cpp` | Owns the class's field and key children; cross-linked to [types.md](types.md). |
 | `field` | `StructField` | `key, fieldType` | | (synthesized as part of `StructDecl` lowering) | Declares one named member of a `StructType` parent. |
 | `key` | `StructKey` | — | G | Member-name lowering in `slang-lower-to-ir.cpp` | Identity for a field or interface requirement; carries linkage so the field is addressable across compilation units. |
 | `indexedFieldKey` | — | `baseType, index` | H | (synthesized) | Synthetic key for the *n*-th field of a tuple-like type when no named key exists. |
@@ -121,7 +121,7 @@ container that owns `interface_req_entry` children.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `InterfaceType` | `IRInterfaceType` | (children: `interface_req_entry`) | G | `InterfaceDecl` in `slang-lower-to-ir.cpp` | Interface declaration; children are the requirement entries. |
+| `interface` | `IRInterfaceType` | (children: `interface_req_entry`) | G | `InterfaceDecl` in `slang-lower-to-ir.cpp` | Interface declaration; children are the requirement entries. |
 | `interface_req_entry` | `InterfaceRequirementEntry` | `requirementKey, requirementVal` | G | (synthesized as part of `InterfaceDecl` lowering) | One requirement slot of an interface. Cross-link to [generics-and-existentials.md](generics-and-existentials.md). |
 
 ### Witness tables and witness facts

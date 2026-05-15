@@ -40,10 +40,13 @@ flowchart TB
     fiddleOutput[slang-fiddle-output]
     coreModule[slang-core-module]
     glslModule[slang-glsl-module]
+    standardModules["standard-modules<br/>(no observed link edge)"]
     slangLib[slang]
+    slangRecordReplay["slang-record-replay<br/>(folded into slang sources)"]
     slangc[slangc]
     slangDispatcher[slang-dispatcher]
     slangRt[slang-rt]
+    slangLlvm["slang-llvm<br/>(no observed link edge)"]
     slangGlslang[slang-glslang]
     slangWasm[slang-wasm]
 
@@ -65,6 +68,7 @@ flowchart TB
     slangLib --> fiddleOutput
     slangLib --> lookupTables
     slangLib --> coreModule
+    slangLib -.->|source include| slangRecordReplay
 
     slangc --> coreLib
     slangc --> slangLib
@@ -78,6 +82,51 @@ flowchart TB
     slangWasm --> capabilityLookup
     slangWasm --> fiddleOutput
 ```
+
+Three subsystems present in [module-map.md](module-map.md) appear
+above without ordinary `LINK_WITH_*` edges:
+
+- **`source/standard-modules/`** — its
+  [CMakeLists.txt](../../../source/standard-modules/CMakeLists.txt)
+  only `configure_file`s a config header and `add_subdirectory`s the
+  `neural` module; it does not declare a link target of its own. The
+  module products are shipped as standalone `.slang-module` files.
+- **`source/slang-record-replay/`** — has no `CMakeLists.txt` of
+  its own; the sources are pulled directly into `slang` via the
+  `SLANG_RECORD_REPLAY_SYSTEM` variable in
+  [source/slang/CMakeLists.txt lines
+  164-167](../../../source/slang/CMakeLists.txt) (dashed edge
+  above).
+- **`source/slang-llvm/`** — has no `CMakeLists.txt` of its own.
+  `slang-llvm` is produced out-of-tree (or downloaded as a prebuilt
+  binary controlled by `SLANG_SLANG_LLVM_FLAVOR` in the root
+  [CMakeLists.txt](../../../CMakeLists.txt) around line 355); no
+  in-source target links against it directly.
+
+## Edge citations
+
+Every solid edge in the diagram is justified by a `LINK_WITH_PUBLIC`
+or `LINK_WITH_PRIVATE` clause in the cited file.
+
+| Edge | Cited CMakeLists.txt | Clause |
+| --- | --- | --- |
+| `compiler-core → core` | [source/compiler-core/CMakeLists.txt](../../../source/compiler-core/CMakeLists.txt) | `LINK_WITH_PRIVATE core` |
+| `capability-lookup → core` | [source/slang/CMakeLists.txt](../../../source/slang/CMakeLists.txt) | `LINK_WITH_PRIVATE core` on the `slang-capability-lookup` target |
+| `capability-lookup → capability-defs` | [source/slang/CMakeLists.txt](../../../source/slang/CMakeLists.txt) | `LINK_WITH_PRIVATE slang-capability-defs` on the `slang-capability-lookup` target |
+| `capability-defs → core` | [source/slang/CMakeLists.txt](../../../source/slang/CMakeLists.txt) | `LINK_WITH_PUBLIC core` on the `slang-capability-defs` target |
+| `lookup-tables → core` | [source/slang/CMakeLists.txt](../../../source/slang/CMakeLists.txt) | `LINK_WITH_PRIVATE core` on the `slang-lookup-tables` target |
+| `core-module → core`, `core-module → capability-defs`, `core-module → fiddle-output` | [source/slang-core-module/CMakeLists.txt](../../../source/slang-core-module/CMakeLists.txt) | `LINK_WITH_PRIVATE core slang-capability-defs slang-fiddle-output` |
+| `glsl-module → core` | [source/slang-glsl-module/CMakeLists.txt](../../../source/slang-glsl-module/CMakeLists.txt) | `LINK_WITH_PRIVATE core` |
+| `slang → {core, prelude, compiler-core, capability-defs, capability-lookup, fiddle-output, lookup-tables, core-module}` | [source/slang/CMakeLists.txt](../../../source/slang/CMakeLists.txt) | The `slang_add_target(slang ... LINK_WITH_*)` clause near the bottom of the file; `prelude` is a private include dep, not a static link, but is listed here to match `module-map.md` |
+| `slangc → core`, `slangc → slang` | [source/slangc/CMakeLists.txt](../../../source/slangc/CMakeLists.txt) | `LINK_WITH_PRIVATE core slang` |
+| `slang-dispatcher → core` | [source/slang-dispatcher/CMakeLists.txt](../../../source/slang-dispatcher/CMakeLists.txt) | `LINK_WITH_PRIVATE core` |
+| `slang-wasm → {slang, core, compiler-core, capability-defs, capability-lookup, fiddle-output}` | [source/slang-wasm/CMakeLists.txt](../../../source/slang-wasm/CMakeLists.txt) | `LINK_WITH_PRIVATE` clause on the wasm target |
+
+The dashed edge `slang -.-> slang-record-replay` is justified by the
+source-list inclusion at
+[source/slang/CMakeLists.txt lines
+164-167](../../../source/slang/CMakeLists.txt), not by a
+`LINK_WITH_*` clause.
 
 External dependencies (visible in
 [CMakeLists.txt](../../../source/core/CMakeLists.txt) and friends but

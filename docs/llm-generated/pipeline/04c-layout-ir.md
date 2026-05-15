@@ -104,8 +104,8 @@ flowchart TD
 
 ## Per-global-parameter steps
 
-For each `varLayout` in `globalStructLayout->fields` (line
-14374-14394 of `createIRModuleForLayout`):
+For each `varLayout` in `globalStructLayout->fields` (lines
+15374-15394 of `createIRModuleForLayout`):
 
 | # | Step | Function | Notes |
 |---|---|---|---|
@@ -222,7 +222,7 @@ layout IR modules, so a session compiling for both D3D12 and Vulkan
 holds two independent layout IR modules in memory.
 
 Use `getExistingIRModuleForLayout()` if you need to peek at the
-cache without forcing construction (line 15311 of
+cache without forcing construction (declared near line 111 of
 [slang-target-program.h](../../../source/slang/slang-target-program.h));
 it returns `nullptr` when nothing has been built yet.
 

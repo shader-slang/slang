@@ -208,7 +208,30 @@ than C++ RTTI.
 Because `ASTBuilder*` is needed to construct any AST node, the builder
 pointer is threaded through every parsing helper that produces a node.
 
-## Modifiers and attributes
+## Generics ambiguity
+
+A bare `<` after an identifier is syntactically ambiguous: it can
+start a generic argument list (`foo<T>`) or be the less-than
+operator (`foo < bar`). The parser resolves the ambiguity by
+attempting a generic-application parse and rolling back to the
+expression parse if it does not commit cleanly — there is no
+single-token lookahead heuristic that suffices in all cases. Generic
+*declarations* are unambiguous because they appear after a
+declaration keyword (`func`, `struct`, `interface`, …) where `<`
+can only begin a parameter list; the parser collects the parameters
+into a `GenericDecl` and continues with the inner declaration.
+
+An optional `where` clause may follow the parameter list to attach
+type constraints. Parsing only records the syntactic form; constraint
+solving and substitution happen during checking
+([slang-check-constraint.cpp](../../../source/slang/slang-check-constraint.cpp))
+and IR specialization (see
+[../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md)).
+
+The deeper treatment of the disambiguation strategy lives in
+[../../design/parsing.md](../../design/parsing.md).
+
+## Modifier parsing
 
 Modifiers (`in`, `out`, `static`, `const`, ...) and attributes
 (`[unroll]`, `[shader("compute")]`, ...) attach to a `Decl` through
@@ -222,17 +245,6 @@ The list of modifier classes is in
 [slang-ast-modifier.h](../../../source/slang/slang-ast-modifier.h);
 attribute parsing is just modifier parsing in disguise — the
 `[name(args)]` tokens become an `AttributeBase` modifier.
-
-## Generics and where-clauses
-
-Generic declarations parse like ordinary declarations with a
-`<` parameter list before the name and an optional `where`
-constraint suffix. Constraint solving and substitution happen during
-checking
-([slang-check-constraint.cpp](../../../source/slang/slang-check-constraint.cpp))
-and IR specialization (see
-[../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md));
-parsing only records the syntactic form.
 
 ## Failure modes
 

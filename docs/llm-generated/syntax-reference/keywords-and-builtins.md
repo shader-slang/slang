@@ -74,11 +74,15 @@ Cited line numbers refer to
 | `discard` | line 6381 |
 | `defer` | line 6406 |
 | `throw` | line 6414 |
-| `catch` | lines 6945, 6964 (paired with `try`) |
+| `catch` | lines 6919-6967 (the `do ... catch` handler form; `catch` does **not** pair with `try` at statement level) |
 
 These keywords are not in the syntax-decl table because Slang treats
 control-flow as a closed grammar; they cannot be redefined by user
-code.
+code. Note that `try` is an *expression* keyword (see
+`## Expression keywords` below); the statement-level exception
+handler is `do { ... } catch ( ... ) { ... }`, parsed at
+[slang-parser.cpp lines
+6919-6967](../../../source/slang/slang-parser.cpp).
 
 ## Decl keywords
 
@@ -121,10 +125,17 @@ non-stable.
 | `__file_decl` | Compiler-internal per-file decl group |
 | `__require_capability` | Capability requirement (`parseRequireCapabilityDecl`) |
 
-`struct`, `class`, `enum` themselves are also keywords but are
-registered through the AST class-hierarchy registration done by
-`populateBaseLanguageModule` rather than `_makeParseDecl`. See
-[slang-syntax.cpp](../../../source/slang/slang-syntax.cpp).
+`struct`, `class`, and `enum` are also decl keywords, but they are
+**not** registered through `g_parseSyntaxEntries[]` /
+`_makeParseDecl`. Instead the parser dispatches on them via direct
+identifier lookahead in `parseDecl`
+([slang-parser.cpp lines
+3118-3134](../../../source/slang/slang-parser.cpp)) and
+`parseDeclWithModifiers`
+([slang-parser.cpp lines
+10170-10358](../../../source/slang/slang-parser.cpp)). The dedicated
+parse routines (`parseStructDecl`, `parseClassDecl`,
+`parseEnumDecl`) construct the corresponding AST nodes directly.
 
 ## Modifier keywords
 
@@ -208,6 +219,7 @@ Registered through `_makeParseExpr` in
 | `no_diff` | Non-differentiable wrapper (`parseTreatAsDifferentiableExpr`) |
 | `__fwd_diff`, `fwd_diff` | Forward-mode differentiation (`parseForwardDifferentiate`) |
 | `__bwd_diff`, `bwd_diff` | Reverse-mode differentiation (`parseBackwardDifferentiate`) |
+| `new` | Heap-style allocation expression; parsed specially by `parsePrefixExpr` at [slang-parser.cpp lines 9206-9209](../../../source/slang/slang-parser.cpp) (not via `_makeParseExpr`) |
 | `__return_val` | Compiler-internal return-value reference |
 | `__func_as_type` | Function-as-type reflection |
 | `__dispatch_kernel` | Kernel-dispatch primitive |

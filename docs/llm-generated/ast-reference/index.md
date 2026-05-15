@@ -37,7 +37,9 @@ flowchart TD
   NodeBase --> SyntaxNodeBase
   NodeBase --> Val
   Val --> Type
-  Val --> NonTypeVal["DeclRefBase, IntVal, Witness, ..."]
+  Val --> DeclRefBase
+  Val --> IntVal
+  Val --> Witness
   SyntaxNodeBase --> SyntaxNode
   SyntaxNode --> Expr
   SyntaxNode --> Modifier

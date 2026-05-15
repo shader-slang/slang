@@ -402,7 +402,11 @@ flowchart TD
   eMB[eliminateMultiLevelBreak]
   s2d[simplifyIR with removeTrivialSingleIterationLoops]
   lET2[legalizeEmptyTypes]
+  livenessStartGate{shouldTrackLiveness}
+  lStart["LivenessUtil::addVariableRangeStarts"]
   ePhi["eliminatePhis (default options)"]
+  livenessEndGate{shouldTrackLiveness}
+  lEnd["LivenessUtil::addRangeEnds"]
   sNSIR[simplifyNonSSAIR]
   aVSC[applyVariableScopeCorrection]
   cCM[collectCooperativeMetadata]
@@ -419,7 +423,13 @@ flowchart TD
   meshGate -->|false| bcGate
   bcGate -->|true| lBC --> lART
   bcGate -->|false| lART
-  lART --> lUBL_skip --> lBETST_def --> lIBLCUDA --> pFI2 --> eMB --> s2d --> lET2 --> ePhi --> sNSIR --> aVSC --> cCM --> uNEI --> cM --> cUI
+  lART --> lUBL_skip --> lBETST_def --> lIBLCUDA --> pFI2 --> eMB --> s2d --> lET2 --> livenessStartGate
+  livenessStartGate -->|true| lStart --> ePhi
+  livenessStartGate -->|false| ePhi
+  ePhi --> livenessEndGate
+  livenessEndGate -->|true| lEnd --> sNSIR
+  livenessEndGate -->|false| sNSIR
+  sNSIR --> aVSC --> cCM --> uNEI --> cM --> cUI
 ```
 
 | # | Pass | File | Gate | Notes |
@@ -447,13 +457,15 @@ flowchart TD
 | 21 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | |
 | 22 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | With `removeTrivialSingleIterationLoops = true`. |
 | 23 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../source/slang/slang-ir-legalize-types.cpp) | (always; for AD 2.0) | Second invocation (the first ran in Phase B's else branch). |
-| 24 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../source/slang/slang-ir-eliminate-phis.cpp) | (always) | **Default options.** |
-| 25 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
-| 26 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../source/slang/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` (true for CUDA) | |
-| 27 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | OptiX cooperative-vector capability fires this. |
-| 28 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | `EmbedDownstreamIR` | |
-| 29 | `collectMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | (always) | |
-| 30 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | |
+| 24 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../source/slang/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` | Inserts `IRLiveRangeStart` markers immediately before `eliminatePhis` ([slang-emit.cpp lines 2307-2325](../../../source/slang/slang-emit.cpp)). |
+| 25 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../source/slang/slang-ir-eliminate-phis.cpp) | (always) | **Default options.** |
+| 26 | `LivenessUtil::addRangeEnds` | [slang-ir-liveness.cpp](../../../source/slang/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` | Inserts `IRLiveRangeEnd` markers after phi elimination. |
+| 27 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
+| 28 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../source/slang/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` (true for CUDA) | |
+| 29 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | OptiX cooperative-vector capability fires this. |
+| 30 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | `EmbedDownstreamIR` | |
+| 31 | `collectMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | (always) | |
+| 32 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | |
 
 Filtered out for CUDA in this phase: `lowerCPUResourceTypes` (CPU
 LLVM only); `resolveTextureFormat` (GLSL/SPIR-V/WGSL only);
@@ -536,8 +548,10 @@ their own emit arms and are **out of scope** for this page:
   (`generateHostFunctionsForAutoBindCuda`, `generatePyTorchCppBinding`,
   `lowerBuiltinTypesForKernelEntryPoints`, `removeTorchKernels`,
   `handleAutoBindNames`) in Phase B at line ~1311-1317. Emit arm
-  is `CPPSourceEmitter` with the `TorchCppBinding` artifact
-  style.
+  is `TorchCppSourceEmitter` ([slang-emit-torch.cpp](../../../source/slang/slang-emit-torch.cpp)),
+  selected at [slang-emit.cpp lines
+  2523-2525](../../../source/slang/slang-emit.cpp); it extends the
+  C-like emitter family with the `TorchCppBinding` artifact style.
 - **OptiX** — Strictly, OptiX runs through the CUDA targets
   (`CUDASource` / `CUDAHeader` / `PTX`) and is differentiated by
   the `optix_ray_tracing_pipeline` and `optix_coopvec`

@@ -84,8 +84,9 @@ lives in the [pipeline](../pipeline/) and
 | End-to-end compile request | `slang-end-to-end-request.cpp` | Backs a single `slangc` / public-API compile invocation |
 | Module | [slang-module.h](../../../source/slang/slang-module.h), `slang-module.cpp` | Holds AST + IR for a translation unit; implements `IModule` |
 | Module library | `slang-module-library.h`, `slang-module-library.cpp` | Bundles compiled modules into reusable libraries |
-| Linkage | `slang-linkable.h`, `slang-linkable-impl.cpp` (and friends) | Configuration scope for shared compiles; `IComponentType` |
-| Session | `slang-session.h`, `slang-session.cpp` | Process-wide compiler state |
+| Linkage | `slang-session.h`, `slang-session.cpp` | The class behind the public `slang::ISession` — a per-configuration scope owning search paths, target settings, and the source manager |
+| Linkable components | `slang-linkable.h`, `slang-linkable-impl.cpp` (and friends) | `IComponentType` and its composite / specialized variants — the linkable-program abstraction used by the back-end |
+| Session (global) | `slang-global-session.h`, `slang-global-session.cpp` | Process-wide `Session` class behind `slang::IGlobalSession` |
 
 ### Frontend (lex / preprocess / parse)
 

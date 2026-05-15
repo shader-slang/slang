@@ -297,18 +297,19 @@ type per module.
 | `CoopMatrixType` | — | `elementType: IRType, scope, rowCount, columnCount, matrixUse` | H | core-module `CoopMatrix` type | Cooperative matrix type. |
 | `DynamicResource` | `DynamicResourceType` | — | H | (synthesized) | Opaque resource type for dynamic resource casts. |
 
-### Struct, class, interface containers
+### Struct and class containers
 
-The struct / class / interface opcodes act both as types and as
-parent containers for their member declarations. The container
-side is documented in [structure.md](structure.md); the rows here
-describe their role as types.
+The struct and class opcodes act both as types and as parent
+containers for their field and key children. The container side is
+documented in [structure.md](structure.md); the rows here describe
+their role as types. The `interface` opcode is documented above
+under Existentials and interfaces and as a container in
+[structure.md](structure.md).
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `struct` | `StructType` | (children: `field`, `key`) | P | `StructDecl` lowering | User-defined struct type. |
 | `class` | `ClassType` | (children: `field`, `key`) | P | `ClassDecl` lowering | User-defined class type. |
-| `interface` | `InterfaceType` | (children: `interface_req_entry`) | G | `InterfaceDecl` lowering | Interface type; carries linkage. |
 
 ### Tuples, packs, and target tuples
 

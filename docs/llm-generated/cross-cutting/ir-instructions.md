@@ -109,6 +109,103 @@ are:
   expansion helpers, type queries, size / alignment / count,
   liveness markers, descriptor heaps, kernel launch.
 
+Each per-family summary table below is **representative, not
+exhaustive**: it shows a handful of opcodes in each family so that a
+reader can confirm they are on the right page before clicking
+through. The full list of opcodes in each family lives in the
+corresponding `ir-reference/*.md` page; the canonical opcode
+declarations live in
+[slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua).
+
+### Type instructions
+
+| Opcode | `struct_name` | Operands | Notes |
+| --- | --- | --- | --- |
+| `Int`, `Float`, `Bool`, ... | `IntType`, `FloatType`, `BoolType`, ... | — | Basic scalar types; see [../ir-reference/types.md](../ir-reference/types.md). |
+| `vector` | `VectorType` | `elementType, elementCount` | Vector types; hoistable. |
+| `matrix` | `MatrixType` | `elementType, rowCount, columnCount, layout` | Matrix types; hoistable. |
+| `Array` | `ArrayType` | `elementType, elementCount` | Fixed-size array; hoistable. |
+| `Ptr` | `PtrType` | `valueType, accessQualifier?, addressSpace?, dataLayout?` | Pointer type; hoistable. |
+| `Texture` | — | `elementType, shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format` | Texture types; hoistable. |
+| `struct` / `class` / `interface` | `StructType` / `ClassType` / `InterfaceType` | parent of `field` / `key` / `interface_req_entry` | Parent containers; also documented in [../ir-reference/structure.md](../ir-reference/structure.md). |
+| (...plus ~150 more type opcodes; see [../ir-reference/types.md](../ir-reference/types.md) for the full list) | | | |
+
+### Value instructions
+
+| Opcode | `struct_name` | Operands | Notes |
+| --- | --- | --- | --- |
+| `IntLit`, `FloatLit`, `StringLit`, ... | `IntLit`, `FloatLit`, `StringLit`, ... | (payload stored inline on the inst) | Literal constants; hoistable. |
+| `add`, `sub`, `mul`, `div` | `Add`, `Sub`, `Mul`, `Div` | `left, right` | Arithmetic. |
+| `cmpEQ`, `cmpLT`, ... | `Eql`, `Less`, ... | `left, right` | Comparisons. |
+| `bitCast`, `intCast`, `floatCast`, ... | — | `val` | Conversion ops. |
+| `constexprAdd` ... `constexprEnumCast` | — | (variadic) | Compile-time-folded arithmetic / cast variants; hoistable. |
+| (...see [../ir-reference/values.md](../ir-reference/values.md) for the full list) | | | |
+
+### Memory instructions
+
+| Opcode | `struct_name` | Operands | Notes |
+| --- | --- | --- | --- |
+| `var` | `IRVar` | — | Local variable allocation; result is `Ptr<T>`. |
+| `alloca` | — | `allocSize` | Dynamically-sized stack allocation. |
+| `load` / `store` | — | `ptr` / `ptr, val` | Pointer load and store. |
+| `get_field` / `get_field_addr` | `FieldExtract` / `FieldAddress` | `base, key` | Struct member access (rvalue / lvalue). |
+| `getElement` / `getElementPtr` | — | `base, index` | Indexed access. |
+| (...see [../ir-reference/values.md](../ir-reference/values.md) ("Memory") for the full list) | | | |
+
+### Control-flow instructions
+
+| Opcode | `struct_name` | Operands | Notes |
+| --- | --- | --- | --- |
+| `block` | `IRBlock` | parent of `Param`s and instructions | Basic block; first N children are `Param`s. |
+| `param` | `IRParam` | (variadic) | Block or function parameter; replaces SSA `phi`. |
+| `branch` / `condBranch` / `ifElse` / `switch` / `loop` | — | (terminator-specific) | Terminators in the `TerminatorInst` family. |
+| `return_val` / `unreachable` / `discard` | — | (terminator-specific) | Return and exit terminators. |
+| `RequirePrelude`, `RequireTargetExtension`, `Printf`, `StaticAssert`, ... | — | (variadic) | Other control-flow / backend-hint opcodes. |
+| (...see [../ir-reference/control-flow.md](../ir-reference/control-flow.md) for the full list) | | | |
+
+### Function and module structure
+
+| Opcode | `struct_name` | Operands | Notes |
+| --- | --- | --- | --- |
+| `module` | `ModuleInst` | (variadic) | Module root; parent of every top-level inst. |
+| `func` | `IRFunc` | (variadic) | Function; children are blocks. |
+| `generic` | `IRGeneric` | (variadic) | Type-level computation parent ending in `yield`. |
+| `global_var`, `global_param`, `globalConstant` | `IRGlobalVar`, ... | (variadic) | Module-scope storage / parameters; `Global`. |
+| `witness_table` / `witness_table_entry` | — | (variadic) / `requirementKey, satisfyingVal` | Witness table machinery; hoistable. |
+| (...see [../ir-reference/structure.md](../ir-reference/structure.md) for the full list) | | | |
+
+### Specialization and existentials
+
+| Opcode | `struct_name` | Operands | Notes |
+| --- | --- | --- | --- |
+| `specialize` | — | `base, args...` | Applies generic arguments; hoistable. |
+| `lookupWitness` | `LookupWitnessMethod` | `witnessTable, requirementKey` | Resolves an interface requirement; hoistable. |
+| `makeExistential` | `MakeExistential` | `value, witness` | Packs a value plus its witness. |
+| `extractExistentialValue` / `extractExistentialType` / `extractExistentialWitnessTable` | — | `existential` | Existential projections. |
+| `TypeSet`, `FuncSet`, `WitnessTableSet`, `GenericSet`, `GetDispatcher`, ... | — | (variadic) | Type-flow specialization. |
+| (...see [../ir-reference/generics-and-existentials.md](../ir-reference/generics-and-existentials.md) for the full list) | | | |
+
+### Decorations
+
+| Opcode | `struct_name` | Operands | Notes |
+| --- | --- | --- | --- |
+| `NameHintDecoration` | `IRNameHintDecoration` | `name` | Carries an identifier name for debug / link output. |
+| `KeepAliveDecoration` | `IRKeepAliveDecoration` | — | Forbids DCE on the host instruction. |
+| `TargetIntrinsicDecoration` | `IRTargetIntrinsicDecoration` | `targetTokens, definition` | Maps an IR op to a target intrinsic. |
+| `EntryPointDecoration` | `IREntryPointDecoration` | `profile, name, moduleName` | Marks a function as a pipeline entry point. |
+| (...see [../ir-reference/decorations.md](../ir-reference/decorations.md) for the full list of ~180 decorations) | | | |
+
+### Resource and shader-IO opcodes
+
+| Opcode | `struct_name` | Operands | Notes |
+| --- | --- | --- | --- |
+| `imageLoad` / `imageStore` | — | `image, coord, ...` | Image read / write. |
+| `structuredBufferLoad` / `rwstructuredBufferStore` | — | `base, index, val?` | Structured-buffer access. |
+| `atomicLoad` / `atomicStore` / `atomicAdd` / ... | — | `ptr, val?` | `AtomicOperation` family. |
+| `ControlBarrier` / `GroupMemoryBarrierWithGroupSync` / `BeginFragmentShaderInterlock` / `EndFragmentShaderInterlock` | — | — | Barriers and synchronization. |
+| `waveGetActiveMask` / `waveMaskBallot` / ... | — | (variadic) | Wave intrinsics. |
+| (...see [../ir-reference/resources-and-atomics.md](../ir-reference/resources-and-atomics.md) for the full list) | | | |
+
 This document keeps the *conventions* — schema, op-flag bits,
 hoistable / global deduplication, module versioning, the workflow
 for adding a new opcode — that every family page assumes you have

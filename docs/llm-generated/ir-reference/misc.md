@@ -63,6 +63,30 @@ flowchart TD
 
 ## Opcodes
 
+### System opcodes
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `nop` | — | — | | (synthesized) | No-op placeholder. |
+| `Unrecognized` | — | — | | (synthesized) | Placeholder used when deserializing a module containing an opcode the current build does not define; should never appear except immediately after deserialization. |
+
+### Tensor and runtime helpers
+
+These opcodes wrap host-side runtime calls (Torch, CUDA helpers, the
+array-list builder, and the opaque-handle allocator) that the
+non-shader runtime path emits. They belong here because they are
+neither resource opcodes nor part of a richer family on another
+page.
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `makeArrayList` | — | — | | (synthesized) | Materializes an empty array-list builder; consumed by host-side lowering. |
+| `makeTensorView` | — | — | | (synthesized) | Creates a tensor view over an underlying storage block. |
+| `allocTorchTensor` | `AllocateTorchTensor` | — | | (synthesized) | Allocates a Torch tensor on the host runtime side. |
+| `TorchGetCudaStream` | — | — | | (synthesized) | Returns the current Torch CUDA stream handle. |
+| `TorchTensorGetView` | — | — | | (synthesized) | Returns a view over a Torch tensor. |
+| `allocateOpaqueHandle` | — | — | | (synthesized) | Allocates a fresh opaque handle for use by runtime helpers. |
+
 ### Pack and expansion
 
 These opcodes implement the runtime mechanics behind Slang's
@@ -88,7 +112,6 @@ indexing.
 | `ShapeSwap` | — | `pack, dim0, dim1` | H | (synthesized) | Swaps two dimensions of a pack shape. |
 | `ShapeReduce` | — | `pack, axis` | H | (synthesized) | Drops one axis from a pack shape. |
 | `NonEmptyPackWitness` | — | `pack` | H | (synthesized) | Witness value proving a pack has at least one element. |
-| `DiffTypeInfo` | — | (variadic) | H | (synthesized) | Holds witness tables for differential type info; lowered to `MakeTuple` after specialization. Also touched by [differentiation.md](differentiation.md). |
 
 ### Type queries and predicates
 
@@ -129,9 +152,12 @@ required by buffer locations on each target. Descriptor-handle casts
 let the legalizer move between opaque resource handles and the
 `uint64_t` representation some targets use.
 
+`CastStorageToLogicalBase` is the grouping parent of
+`CastStorageToLogical` and `CastStorageToLogicalDeref`; only its
+concrete children are listed here.
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `CastStorageToLogicalBase` | `CastStorageToLogicalBase` | (variadic, `min=2`) | | (synthesized) | Parent of the storage/logical cast pair; never instantiated directly. |
 | `CastStorageToLogical` | `CastStorageToLogical` | (variadic, `min=2`) | | (synthesized) | Converts a value from its storage type to its logical type at a buffer boundary. |
 | `CastStorageToLogicalDeref` | `CastStorageToLogicalDeref` | (variadic, `min=2`) | | (synthesized) | Same as `CastStorageToLogical` but consuming a pointer; produces a value of the logical type. |
 | `MakeStorageTypeLoweringConfig` | — | `addressSpace, layoutRule, lowerToPhysicalType` | H | (synthesized) | Encodes the lowering policy used by the two casts above. Hoistable so identical policies dedupe to one inst. |
@@ -163,9 +189,11 @@ Introduced by the liveness pass to bracket the live range of a
 value; used by later passes (autodiff rematerialization, register
 allocation hints) to reason about lifetimes.
 
+`LiveRangeMarker` is the grouping parent of `liveRangeStart` and
+`liveRangeEnd`; only its concrete children are listed here.
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `LiveRangeMarker` | — | — | | (synthesized) | Parent of the start / end pair; not instantiated directly. |
 | `liveRangeStart` | — | (variadic, `min=2`) | | (synthesized) | Marks the beginning of a value's live range. |
 | `liveRangeEnd` | — | — | | (synthesized) | Marks the end of a value's live range. |
 
@@ -223,15 +251,16 @@ that the pass that lowers existentials can either fold the test to a
 constant (when the target type is statically known to match) or
 emit a runtime tag comparison.
 
-### `CastStorageToLogicalBase`
+### Storage / logical casts
 
-This base opcode (with its `CastStorageToLogical` and
-`CastStorageToLogicalDeref` children) is the IR-level encoding of
-the boundary between a buffer's *storage* layout (governed by target
-data-layout rules) and the *logical* layout the user wrote. Both
-children take a `MakeStorageTypeLoweringConfig` operand that pins
-down the address space, layout rule, and whether the logical type
-should be lowered to its physical form. The casts are introduced by
+The `CastStorageToLogical` and `CastStorageToLogicalDeref` opcodes
+(grouped under the `CastStorageToLogicalBase` hierarchy parent) are
+the IR-level encoding of the boundary between a buffer's *storage*
+layout (governed by target data-layout rules) and the *logical*
+layout the user wrote. Both children take a
+`MakeStorageTypeLoweringConfig` operand that pins down the address
+space, layout rule, and whether the logical type should be lowered
+to its physical form. The casts are introduced by
 `slang-ir-lower-buffer-element-type.cpp` and consumed during emit;
 intermediate passes treat them as opaque conversions.
 

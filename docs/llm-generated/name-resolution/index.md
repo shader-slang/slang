@@ -99,7 +99,7 @@ entries most directly relevant:
   navigation primitives used by lookup.
 - [`transparent member`](../glossary.md) — the modifier that drives
   the `cbuffer`-style member injection rule.
-- [`visibility modifier`](../glossary.md) — `public`, `internal`,
+- [`visibility`](../glossary.md) — `public`, `internal`,
   `private` and the `VisibilityModifier` class hierarchy.
 - [`overload resolution`](../glossary.md),
   [`conversion cost`](../glossary.md),

@@ -384,7 +384,11 @@ flowchart TD
   eMB[eliminateMultiLevelBreak]
   s2d[simplifyIR with removeTrivialSingleIterationLoops]
   lET2[legalizeEmptyTypes]
+  livenessStartGate{shouldTrackLiveness}
+  lStart["LivenessUtil::addVariableRangeStarts"]
   ePhi["eliminatePhis (default options)"]
+  livenessEndGate{shouldTrackLiveness}
+  lEnd["LivenessUtil::addRangeEnds"]
   sNSIR[simplifyNonSSAIR]
   aVSC[applyVariableScopeCorrection]
   cCM[collectCooperativeMetadata]
@@ -401,7 +405,13 @@ flowchart TD
   meshGate -->|false| bcGate
   bcGate -->|true| lBC --> lART
   bcGate -->|false| lART
-  lART --> lBETST_def --> sASMetal --> pFI2 --> eMB --> s2d --> lET2 --> ePhi --> sNSIR --> aVSC --> cCM --> uNEI --> cM --> cUI
+  lART --> lBETST_def --> sASMetal --> pFI2 --> eMB --> s2d --> lET2 --> livenessStartGate
+  livenessStartGate -->|true| lStart --> ePhi
+  livenessStartGate -->|false| ePhi
+  ePhi --> livenessEndGate
+  livenessEndGate -->|true| lEnd --> sNSIR
+  livenessEndGate -->|false| sNSIR
+  sNSIR --> aVSC --> cCM --> uNEI --> cM --> cUI
 ```
 
 | # | Pass | File | Gate | Notes |
@@ -430,13 +440,15 @@ flowchart TD
 | 22 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | |
 | 23 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | With `removeTrivialSingleIterationLoops = true`. |
 | 24 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../source/slang/slang-ir-legalize-types.cpp) | (always; for AD 2.0) | Second invocation; first ran in Phase B. |
-| 25 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../source/slang/slang-ir-eliminate-phis.cpp) | (always) | **Default options** (contrast with SPIR-V). |
-| 26 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
-| 27 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../source/slang/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` | |
-| 28 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | |
-| 29 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | `EmbedDownstreamIR` | |
-| 30 | `collectMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | (always) | |
-| 31 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | |
+| 25 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../source/slang/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` | Inserts `IRLiveRangeStart` markers immediately before `eliminatePhis` ([slang-emit.cpp lines 2307-2325](../../../source/slang/slang-emit.cpp)). |
+| 26 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../source/slang/slang-ir-eliminate-phis.cpp) | (always) | **Default options** (contrast with SPIR-V). |
+| 27 | `LivenessUtil::addRangeEnds` | [slang-ir-liveness.cpp](../../../source/slang/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` | Inserts `IRLiveRangeEnd` markers after phi elimination. |
+| 28 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
+| 29 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../source/slang/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` | |
+| 30 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | |
+| 31 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | `EmbedDownstreamIR` | |
+| 32 | `collectMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | (always) | |
+| 33 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | |
 
 Filtered out for Metal in this phase: `lowerCPUResourceTypes`
 (CPU LLVM only); `synthesizeActiveMask` (CUDA only);

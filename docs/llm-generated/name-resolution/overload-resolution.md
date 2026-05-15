@@ -207,9 +207,20 @@ The individual steps:
    In `ForReal` mode emits diagnostic `decl-is-not-visible`
    (`slang-diagnostics.lua` 30600); in `JustTrying` mode just
    returns false. See [visibility.md](visibility.md) for the rule.
+7. **`TryCheckOverloadCandidateClassNewMatchUp`**
+   ([slang-check-overload.cpp lines
+   1309-1330](../../../source/slang/slang-check-overload.cpp)) —
+   runs only in the finalize / `ForReal` re-check inside
+   `CompleteOverloadCandidate`, not in the probe phase. It
+   distinguishes `Class()` / `Class.new()` syntax from a plain
+   constructor call so the right AST form is emitted. See
+   "Finalize phase" below for the full sequencing.
 
-A candidate that survives every step is tagged `Status::Applicable`
-with its total `conversionCostSum` populated, ready for ranking.
+A candidate that survives every probe-phase step is tagged
+`Status::Applicable` with its total `conversionCostSum` populated,
+ready for ranking. `TryCheckOverloadCandidateClassNewMatchUp` is
+*not* part of probe-phase filtering; it gates only the
+finalize-phase AST construction.
 
 `AddOverloadCandidateInner`
 ([slang-check-impl.h line
@@ -285,24 +296,26 @@ final AST node:
 The `ConversionCost` enum
 ([slang-ast-support-types.h line
 89](../../../source/slang/slang-ast-support-types.h)) is `unsigned
-int`. Costs are summed across all arguments. A non-exhaustive
-ordering, cheapest to most expensive:
+int`. Each per-argument conversion is first vetted by
+`canConvertImplicitly`; only conversions it accepts contribute to
+the candidate's ranking sum. The full enum, in source-declaration
+order:
 
 | Constant | Numeric | Meaning |
 | --- | --- | --- |
 | `kConversionCost_None` | 0 | identity |
 | `kConversionCost_GenericParamUpcast` | 1 | up-cast through a generic parameter |
 | `kConversionCost_LambdaToFunc` | 1 | lambda used where a `Func` value is expected |
+| `kConversionCost_UnconstraintGenericParam` | 20 | binding to an unconstrained generic parameter |
+| `kConversionCost_SizedArrayToUnsizedArray` | 30 | sized -> unsized array |
 | `kConversionCost_MatrixLayout` | 5 | matrix layout adapter |
 | `kConversionCost_GetRef` | 5 | extracting a reference from a buffer-like type |
 | `kConversionCost_ImplicitDereference` | 10 | dereferencing a pointer-like value |
-| `kConversionCost_UnconstraintGenericParam` | 20 | binding to an unconstrained generic parameter |
-| `kConversionCost_MutablePtrToConstPtr` | 20 | mutable ptr -> const ptr |
 | `kConversionCost_InRangeIntLitConversion` | 23 | int literal fits in target integer type |
-| `kConversionCost_SizedArrayToUnsizedArray` | 30 | sized -> unsized array |
 | `kConversionCost_InRangeIntLitSignedToUnsignedConversion` | 32 | signed lit -> unsigned target |
-| `kConversionCost_CastToInterface` | 50 | concrete type -> conforming interface |
 | `kConversionCost_InRangeIntLitUnsignedToSignedConversion` | 81 | unsigned lit -> signed target |
+| `kConversionCost_MutablePtrToConstPtr` | 20 | mutable ptr -> const ptr |
+| `kConversionCost_CastToInterface` | 50 | concrete type -> conforming interface |
 | `kConversionCost_BoolToInt` | 120 | `bool` -> int (deliberately cheaper to break ties) |
 | `kConversionCost_RankPromotion` | 150 | rank-preserving numeric promotion |
 | `kConversionCost_NoneToOptional` | 150 | none -> Optional |
@@ -311,16 +324,25 @@ ordering, cheapest to most expensive:
 | `kConversionCost_PtrToVoidPtr` | 150 | T* -> void* |
 | `kConversionCost_FailedOptionalConstraint` | 150 | optional constraint did not match |
 | `kConversionCost_UnsignedToSignedPromotion` | 200 | promoting unsigned to wider signed |
-| `kConversionCost_SignedToUnsignedConversion` | 250 | signed -> unsigned of same/greater size |
 | `kConversionCost_SameSizeUnsignedToSignedConversion` | 300 | same-size unsigned -> signed |
+| `kConversionCost_SignedToUnsignedConversion` | 250 | signed -> unsigned of same/greater size |
 | `kConversionCost_IntegerToFloatConversion` | 400 | int -> float |
 | `kConversionCost_PtrToBool` | 400 | pointer -> bool |
 | `kConversionCost_IntegerTruncate` | 450 | int -> narrower int |
 | `kConversionCost_IntegerToHalfConversion` | 500 | int -> half |
 | `kConversionCost_ParameterPack` | 500 | binding to a parameter pack |
 | `kConversionCost_Default` | 500 | user-defined conversion default |
-| `kConversionCost_GeneralConversion` | 900 | implicit ceiling (anything >= rejected by `canConvertImplicitly`) |
-| `kConversionCost_Explicit` | 90000 | explicit cast only |
+| `kConversionCost_GeneralConversion` | 900 | implicit ceiling (anything `>=` rejected by `canConvertImplicitly`) |
+| `kConversionCost_Explicit` | 90000 | explicit cast only; never accepted implicitly |
+| `kConversionCost_OneVectorToScalar` | 1 | additive when downcasting a 1-vector to a scalar |
+| `kConversionCost_ScalarToVector` | 2 | additive when promoting a scalar to a vector |
+| `kConversionCost_ScalarToMatrix` | 10 | additive when promoting a scalar to a matrix |
+| `kConversionCost_ScalarIntegerToFloatMatrix` | 410 | `kConversionCost_IntegerToFloatConversion + kConversionCost_ScalarToMatrix`. |
+| `kConversionCost_ScalarToCoopVector` | 1 | additive when promoting a scalar to a cooperative vector |
+| `kConversionCost_LValueCast` | 800 | additive when casting an l-value |
+| `kConversionCost_TypeCoercionConstraint` | 1000 | cost contributed by a type-coercion constraint |
+| `kConversionCost_TypeCoercionConstraintPlusScalarToVector` | 1002 | `kConversionCost_TypeCoercionConstraint + kConversionCost_ScalarToVector`. |
+| `kConversionCost_Impossible` | `0xFFFFFFFF` | "no conversion exists"; never summed because the candidate is rejected before reaching ranking |
 
 `canConvertImplicitly`
 ([slang-check-conversion.cpp line
@@ -462,11 +484,16 @@ overload reject a `const` left operand.
   applicability may still win, so the user sometimes sees the
   invisible-decl diagnostic followed by acceptance of a different
   candidate.
-- **Argument that needs a chain of conversions.** The cost is
-  summed across the chain. If the total reaches
-  `kConversionCost_GeneralConversion` (900) the candidate is
-  rejected by `canConvertImplicitly`. There is no separate per-
-  argument cap; the sum across arguments is the only ceiling.
+- **Argument that needs a chain of conversions.** Each argument's
+  conversion must first be accepted by `canConvertImplicitly`
+  ([slang-check-conversion.cpp lines
+  3103-3108](../../../source/slang/slang-check-conversion.cpp)),
+  which rejects anything at or above
+  `kConversionCost_GeneralConversion` (900). Only the per-argument
+  costs that pass this check are then summed into the candidate's
+  `conversionCostSum` for ranking ([slang-check-overload.cpp lines
+  799-820](../../../source/slang/slang-check-overload.cpp)) — that
+  sum has no separate ceiling.
 - **First-class function value vs declared callable of the same
   signature.** Both are `Applicable` with identical
   `conversionCostSum`; `CompareLookupResultItems` and

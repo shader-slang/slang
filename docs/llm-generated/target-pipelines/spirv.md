@@ -498,6 +498,8 @@ flowchart TD
   ePhi[eliminatePhis]
   livGate2{shouldTrackLiveness}
   lvAre["LivenessUtil::addRangeEnds"]
+  liveKhrGate{shouldTrackLiveness AND isKhronosTarget}
+  aGL[applyGLSLLiveness]
   rLIRO[replaceLocationIntrinsicsWithRaytracingObject]
   sNSIR[simplifyNonSSAIR]
   coopGate{cooperative_matrix or cooperative_vector capability}
@@ -538,8 +540,10 @@ flowchart TD
   livGate -->|true| lvAvrs --> ePhi
   livGate -->|false| ePhi
   ePhi --> livGate2
-  livGate2 -->|true| lvAre --> rLIRO
-  livGate2 -->|false| rLIRO
+  livGate2 -->|true| lvAre --> liveKhrGate
+  livGate2 -->|false| liveKhrGate
+  liveKhrGate -->|true| aGL --> rLIRO
+  liveKhrGate -->|false| rLIRO
   rLIRO --> sNSIR --> coopGate
   coopGate -->|true| cCM --> ediGate
   coopGate -->|false| ediGate
@@ -585,12 +589,13 @@ flowchart TD
 | 32 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../source/slang/slang-ir-liveness.cpp) | `shouldTrackLiveness()` | Liveness mode gating. |
 | 33 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../source/slang/slang-ir-eliminate-phis.cpp) | (always) | SPIR-V-specific: `eliminateCompositeTypedPhiOnly = false`, `useRegisterAllocation = true`. |
 | 34 | `LivenessUtil::addRangeEnds` | [slang-ir-liveness.cpp](../../../source/slang/slang-ir-liveness.cpp) | `shouldTrackLiveness()` | |
-| 35 | `replaceLocationIntrinsicsWithRaytracingObject` | [slang-ir-early-raytracing-intrinsic-simplification.cpp](../../../source/slang/slang-ir-early-raytracing-intrinsic-simplification.cpp) | `isKhronosTarget && emitSpirvDirectly` | |
-| 36 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | After phi elimination. |
-| 37 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | Captures cooperative types that survive lowering. |
-| 38 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | `getBoolOption(EmbedDownstreamIR)` | Static helper at line ~630. |
-| 39 | `collectMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | (always) | Final pass that fills binding / exported-function fields on `metadata`. |
-| 40 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | Last `SLANG_PASS` in `linkAndOptimizeIR`. |
+| 35 | `applyGLSLLiveness` | [slang-ir-glsl-liveness.cpp](../../../source/slang/slang-ir-glsl-liveness.cpp) | `shouldTrackLiveness() && isKhronosTarget(targetRequest)` ([slang-emit.cpp lines 2347-2352](../../../source/slang/slang-emit.cpp)) | Khronos-targets-only pass that translates the `IRLiveRangeStart`/`IRLiveRangeEnd` markers from the previous two rows into the GLSL/SPIR-V liveness encoding. SPIR-V direct-emit and SPIR-V via-GLSL both reach this row because the gate is `isKhronosTarget`, not the direct-emit predicate. |
+| 36 | `replaceLocationIntrinsicsWithRaytracingObject` | [slang-ir-early-raytracing-intrinsic-simplification.cpp](../../../source/slang/slang-ir-early-raytracing-intrinsic-simplification.cpp) | `isKhronosTarget && emitSpirvDirectly` | |
+| 37 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | After phi elimination. |
+| 38 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | Captures cooperative types that survive lowering. |
+| 39 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../source/slang/slang-emit.cpp) | `getBoolOption(EmbedDownstreamIR)` | Static helper at line ~630. |
+| 40 | `collectMetadata` | [slang-ir-metadata.cpp](../../../source/slang/slang-ir-metadata.cpp) | (always) | Final pass that fills binding / exported-function fields on `metadata`. |
+| 41 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | Last `SLANG_PASS` in `linkAndOptimizeIR`. |
 
 Filtered out for SPIR-V in this phase: the CUDA `__ldg` immutable-
 load lowering; `synthesizeActiveMask` (CUDA / PTX);
@@ -605,8 +610,6 @@ and `Metal: wrapCBufferElementsForMetal` arms;
 propagation to its legalization pass);
 `legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL` (only fires
 on the via-GLSL path);
-`applyGLSLLiveness` (only when `shouldTrackLiveness` and Khronos
-non-direct);
 `applyVariableScopeCorrection` (SPIR-V is in the `!=` arm of the
 `(target != SPIRV) && (target != SPIRVAssembly)` test);
 `validateAtomicOperations` (called elsewhere for SPIR-V, namely
@@ -796,7 +799,7 @@ pass for SPIR-V**: `glslSSBO` (only fires for non-Khronos),
 | --- | --- |
 | `!codeGenContext->isSpecializationDisabled()` | `specializeModule`. |
 | `codeGenContext->shouldReportCheckpointIntermediates()` | `reportCheckpointIntermediates` (direct call, prints diagnostic info). |
-| `codeGenContext->shouldTrackLiveness()` | `LivenessUtil::addVariableRangeStarts`, `LivenessUtil::addRangeEnds`, and on the via-GLSL path `applyGLSLLiveness`. |
+| `codeGenContext->shouldTrackLiveness()` | `LivenessUtil::addVariableRangeStarts`, `LivenessUtil::addRangeEnds`, and on every Khronos target (SPIR-V direct-emit and via-GLSL) `applyGLSLLiveness`. |
 | `codeGenContext->removeAvailableInDownstreamIR` | `removeAvailableInDownstreamModuleDecorations`. |
 | `codeGenContext->shouldSkipDownstreamLinking()` | Negated factor of the spirv-link gate. |
 | `spirvFiles.getCount() > 1` | spirv-link invocation. |

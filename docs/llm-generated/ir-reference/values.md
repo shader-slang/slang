@@ -95,9 +95,11 @@ on the `IRInst`, *not* in the operand list.
 
 ### Undefined and default-construct
 
+`Undefined` is the grouping parent of `LoadFromUninitializedMemory`
+and `Poison`; only its concrete children are listed here.
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `Undefined` | — | (parent only) | | — | Parent of the two undefined-value opcodes. |
 | `LoadFromUninitializedMemory` | — | — | | (synthesized) | A load from uninitialized memory; like LLVM's `freeze(undef)`. Frontend diagnostics surface uses. |
 | `Poison` | — | — | | (synthesized) | Infectious undefined value; analogue of LLVM `poison`. |
 | `defaultConstruct` | — | — | | `DefaultConstructExpr` and synthesized in IR passes | Produces a default-initialized value of the result type. |
@@ -192,6 +194,24 @@ on the `IRInst`, *not* in the operand list.
 | `matrixSwizzleStore` | — | `dest, source, ...` | | Matrix-element store lowering | Stores selected matrix elements through a pointer. |
 | `updateElement` | — | `oldValue, elementValue` | | (synthesized) | Functional update: returns a new aggregate with one element replaced. |
 
+### Strings and native pointers
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `makeString` | — | `nativeStringValue` | | `String(nativeString)` lowering | Constructs a `String` from a `NativeString`. |
+| `getNativeStr` | — | `stringValue` | | `String.nativeString` lowering | Returns an unowned `NativeString` view of a `String`. |
+| `getNativePtr` | — | `elementType` | | `ComPtr<T>`/`RefPtr<T>` accessor lowering | Returns a native pointer from a `ComPtr<T>` or `RefPtr<T>`. |
+| `getManagedPtrWriteRef` | — | `ptrToManagedPtr` | | (synthesized) | Returns a write reference to a managed-pointer variable (operand must be `Ptr<ComPtr<T>>` or `Ptr<RefPtr<T>>`). |
+| `ManagedPtrAttach` | — | `ptrValue` | | (synthesized) | Attaches a managed-pointer variable to a `NativePtr` without changing its reference count. |
+| `ManagedPtrDetach` | — | `ptrValue` | | (synthesized) | Detaches a managed-pointer variable from its `NativePtr`. |
+
+### Object and CUDA helpers
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `allocObj` | — | — | | (synthesized) | Allocates an object value; used by host-side and managed-pointer lowering. |
+| `CUDA_LDG` | — | (variadic, `min=1`) | | (synthesized for the CUDA backend) | Read-only cached load through CUDA's `__ldg` intrinsic. |
+
 ### Aggregate constructors
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
@@ -233,6 +253,45 @@ on the `IRInst`, *not* in the operand list.
 | `getConditionalValue` | — | `conditionalOperand` | | (synthesized) | Reads the inner value of a `Conditional`. |
 | `extractTaggedUnionTag` | — | `val` | | (synthesized; documented in [generics-and-existentials.md](generics-and-existentials.md)) | Reads the discriminator of a tagged union. |
 | `extractTaggedUnionPayload` | — | `unionVal` | | (synthesized) | Reads the payload of a tagged union. |
+
+### Constexpr arithmetic and casts
+
+Hoistable variants of the regular arithmetic and cast opcodes used
+to lower compile-time integer expressions (`IntVal` subclasses such
+as `PolynomialIntVal`) so that identical compile-time values dedupe.
+Operand and result types mirror their non-`constexpr` counterparts.
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `constexprAdd` | — | `left, right` | H | (synthesized) | Compile-time integer addition. |
+| `constexprSub` | — | `left, right` | H | (synthesized) | Compile-time integer subtraction. |
+| `constexprMul` | — | `left, right` | H | (synthesized) | Compile-time integer multiplication. |
+| `constexprNeg` | — | `value` | H | (synthesized) | Compile-time unary negation. |
+| `constexprDiv` | — | `left, right` | H | (synthesized) | Compile-time integer division. |
+| `constexprIRem` | — | `left, right` | H | (synthesized) | Compile-time integer remainder. |
+| `constexprShl` | — | `left, right` | H | (synthesized) | Compile-time left-shift. |
+| `constexprShr` | — | `left, right` | H | (synthesized) | Compile-time right-shift. |
+| `constexprBitAnd` | — | `left, right` | H | (synthesized) | Compile-time bitwise AND. |
+| `constexprBitOr` | — | `left, right` | H | (synthesized) | Compile-time bitwise OR. |
+| `constexprBitXor` | — | `left, right` | H | (synthesized) | Compile-time bitwise XOR. |
+| `constexprBitNot` | — | `value` | H | (synthesized) | Compile-time bitwise NOT. |
+| `constexprNot` | — | `value` | H | (synthesized) | Compile-time logical NOT. |
+| `constexprEql` | — | `left, right` | H | (synthesized) | Compile-time equality. |
+| `constexprNeq` | — | `left, right` | H | (synthesized) | Compile-time inequality. |
+| `constexprGreater` | — | `left, right` | H | (synthesized) | Compile-time greater-than. |
+| `constexprLess` | — | `left, right` | H | (synthesized) | Compile-time less-than. |
+| `constexprGeq` | — | `left, right` | H | (synthesized) | Compile-time greater-or-equal. |
+| `constexprLeq` | — | `left, right` | H | (synthesized) | Compile-time less-or-equal. |
+| `constexprAnd` | — | `left, right` | H | (synthesized) | Compile-time logical AND. |
+| `constexprOr` | — | `left, right` | H | (synthesized) | Compile-time logical OR. |
+| `constexprSelect` | — | `condition, ifTrue, ifFalse` | H | (synthesized) | Compile-time branch-free selection. |
+| `constexprIntCast` | — | `value` | H | (synthesized) | Compile-time integer-to-integer cast. |
+| `constexprCastIntToFloat` | — | `value` | H | (synthesized) | Compile-time integer-to-float cast. |
+| `constexprCastFloatToInt` | — | `value` | H | (synthesized) | Compile-time float-to-integer cast. |
+| `constexprFloatCast` | — | `value` | H | (synthesized) | Compile-time float-to-float cast. |
+| `constexprCastIntToEnum` | — | `value` | H | (synthesized) | Compile-time integer-to-enum cast. |
+| `constexprCastEnumToInt` | — | `value` | H | (synthesized) | Compile-time enum-to-integer cast. |
+| `constexprEnumCast` | — | `value` | H | (synthesized) | Compile-time enum-to-enum cast. |
 
 ## Notable opcodes
 

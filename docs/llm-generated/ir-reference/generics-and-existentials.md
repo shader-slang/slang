@@ -125,22 +125,20 @@ processing.
 
 ### Witness tables and witness facts
 
-`witness_table` is the parent opcode that owns
-`witness_table_entry` children, one per interface requirement.
-`interface_req_entry` declares a requirement slot on the interface
-type side; `thisTypeWitness` and `TypeEqualityWitness` are
-placeholder witness opcodes used by the type system to certify
-self-conformance and type equality.
+The structural opcodes that back interface dispatch are documented
+in [structure.md](structure.md); only the ones the dispatch path
+consumes directly are summarized here.
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `witness_table` | — | (variadic) | H | `InheritanceDecl` lowering in `slang-lower-to-ir.cpp` | Witness table mapping each requirement of an interface to the concrete satisfier; hoistable so identical conformances dedupe. |
-| `witness_table_entry` | — | `requirementKey, satisfyingVal` | | (synthesized) | One requirement-to-impl mapping inside a `witness_table`. |
-| `interface_req_entry` | `InterfaceRequirementEntry` | `requirementKey, requirementVal` | G | (synthesized, paired with `InterfaceDecl` lowering) | One requirement declaration inside an `InterfaceType`. |
-| `thisTypeWitness` | — | `type` | | (synthesized) | Placeholder witness that `ThisType` implements the enclosing interface; used only inside interface definitions. |
-| `TypeEqualityWitness` | — | `subType, superType` | H | (synthesized) | Placeholder witness certifying two types are equal. |
-| `key` | `StructKey` | — | G | Member declarations in `slang-lower-to-ir.cpp` | Identity for a struct field or interface requirement; carries linkage. |
-| `indexedFieldKey` | — | `baseType, index` | H | (synthesized) | Synthetic key for the *n*-th field of a structural type when no named key exists. |
+- `witness_table`, `witness_table_entry`, and `interface_req_entry`
+  store the requirement-to-implementation mapping that
+  `lookupWitness` walks. See
+  [structure.md — witness tables and witness facts](structure.md).
+- `thisTypeWitness` and `TypeEqualityWitness` are placeholder
+  witnesses used by the type system to certify self-conformance and
+  type equality.
+- `key` (`StructKey`) and `indexedFieldKey` identify the
+  requirement slots that witness tables key on; documented in
+  [structure.md — struct internals](structure.md).
 
 ### Runtime type information
 
@@ -149,6 +147,60 @@ self-conformance and type equality.
 | `rtti_object` | `RTTIObject` | (variadic) | | (synthesized) | Materialized RTTI record for a type; produced by the RTTI-object pass. |
 | `GetSequentialID` | — | `RTTIOperand` | H | (synthesized) | Returns a stable integer ID for an RTTI operand; used by dynamic-dispatch tables. |
 | `GetDynamicResourceHeap` | — | — | H | (synthesized) | Returns the current dynamic-resource-heap value used for descriptor-handle decoding. |
+
+### Type-flow specialization
+
+The type-flow specialization pass replaces dynamic-dispatch through
+interface witnesses with a tag-driven dispatch over a closed
+set of conforming types, witness tables, functions, or generics.
+Sets are hoistable and have canonical ordering; operands are stable
+across passes.
+
+#### Sets and set elements
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `TypeSet` | — | (variadic) | H | (synthesized) | Closed set of conforming types discovered by type-flow analysis. |
+| `FuncSet` | — | (variadic) | H | (synthesized) | Closed set of functions sharing a func-type. |
+| `WitnessTableSet` | — | (variadic) | H | (synthesized) | Closed set of witness tables for a common interface. |
+| `GenericSet` | — | (variadic) | H | (synthesized) | Closed set of generic values for a common interface. |
+| `UnboundedTypeElement` | — | `baseInterfaceType` | H | (synthesized) | Set element standing for an unbounded family of types conforming to an interface. |
+| `UnboundedFuncElement` | — | `funcType` | H | (synthesized) | Set element standing for an unbounded family of functions of a given type. |
+| `UnboundedWitnessTableElement` | — | `baseInterfaceType` | H | (synthesized) | Set element standing for an unbounded family of witness tables of a given interface. |
+| `UnboundedGenericElement` | — | — | H | (synthesized) | Set element standing for an unbounded family of generics of a given interface. |
+| `UninitializedTypeElement` | — | `baseInterfaceType` | H | (synthesized) | Set element standing for an uninitialized type (e.g. from `LoadFromUninitializedMemory`). |
+| `UninitializedWitnessTableElement` | — | `baseInterfaceType` | H | (synthesized) | Set element standing for an uninitialized witness table. |
+| `NoneTypeElement` | — | — | H | (synthesized) | Default "none" type element (used with `OptionalType`). |
+| `NoneWitnessTableElement` | — | — | H | (synthesized) | Default "none" witness-table element (used with `OptionalType`). |
+
+#### Tagged unions and tag operations
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `MakeTaggedUnion` | — | `tag, value` | | (synthesized) | Builds a tagged-union value from a tag and an untagged-union value. |
+| `CastInterfaceToTaggedUnionPtr` | — | `ptr, witnessTableSet, typeSet` | | (synthesized) | Casts an interface-typed pointer to a tagged-union pointer with a known set. |
+| `GetTagFromTaggedUnion` | — | `taggedUnionValue` | | (synthesized) | Extracts the witness-table tag from a tagged-union value. |
+| `GetTypeTagFromTaggedUnion` | — | `taggedUnionValue` | | (synthesized) | Extracts the type tag from a tagged-union value. |
+| `GetValueFromTaggedUnion` | — | `taggedUnionValue` | | (synthesized) | Extracts the untagged-union payload from a tagged-union value. |
+| `GetTagForSuperSet` | — | `tag` | | (synthesized) | Translates a tag to its equivalent in a super-set. |
+| `GetTagForSubSet` | — | `tag` | | (synthesized) | Translates a tag to its equivalent in a sub-set. |
+| `GetTagForMappedSet` | — | `tag, lookupKey` | | (synthesized) | Translates a tag through a key-induced mapping between sets. |
+| `GetTagForSpecializedSet` | — | `tag, specializationArgs...` | | (synthesized) | Translates a tag for a generic set into the corresponding specialized set. |
+| `GetTagFromSequentialID` | — | (variadic) | | (synthesized) | Translates a sequential ID into a local set tag. |
+| `GetSequentialIDFromTag` | — | (variadic) | | (synthesized) | Translates a local set tag into a sequential ID. |
+| `GetElementFromTag` | — | `tag` | | (synthesized) | Resolves a tag back to its concrete set element. |
+| `GetTagOfElementInSet` | — | `element, set` | H | (synthesized) | Returns the tag for a concrete element of a set. |
+
+#### Dispatchers and existential specialization
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `GetDispatcher` | — | `witnessTableSet, lookupKey` | H | (synthesized) | Returns a dispatcher function for one requirement key over a witness-table set. |
+| `GetSpecializedDispatcher` | — | `witnessTableSet, lookupKey, specializationArgs...` | H | (synthesized) | Returns a specialized dispatcher when the key points at a generic. |
+| `SpecializeExistentialsInFunc` | — | `func, bindings...` | H | (synthesized) | Reference to a function with specific existential-parameter bindings; each binding is `VoidLit` for "any" or a type-flow info value. |
+| `SpecializeExistentialsInType` | — | (variadic) | H | (synthesized) | Cache key for specialized `BindExistentialsType` results. |
+| `WeakUse` | — | — | H | (synthesized) | Marker for a weak use that should not pin its operand; used by the type-flow pass. |
+| `FuncTypeOf` | — | — | H | (synthesized) | Compile-time helper that returns the function type of its operand. |
 
 ### AnyValue marshalling
 

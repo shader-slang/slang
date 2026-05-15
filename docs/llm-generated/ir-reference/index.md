@@ -10,15 +10,28 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # IR Reference
 
 This subtree of `docs/llm-generated/` is a per-family reference for the
-Slang Intermediate Representation. Every opcode declared in
+Slang Intermediate Representation. Every concrete opcode declared in
 [../../../source/slang/slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua)
-appears in exactly one family page below, tabulated with its C++ wrapper
+appears in a family page below, tabulated with its C++ wrapper
 struct (from [../../../source/slang/slang-ir-insts.h](../../../source/slang/slang-ir-insts.h)),
 its operand shape, its op-flags (`H` hoistable, `P` parent, `G` global),
 the AST node(s) that lower into it (sourced from
 [../../../source/slang/slang-lower-to-ir.cpp](../../../source/slang/slang-lower-to-ir.cpp)),
 and a one-line summary. Notable opcodes that carry semantics a table row
 cannot convey have short call-outs further down each page.
+
+Most opcodes appear in exactly one family page. A small number of
+opcodes that play two distinct roles (e.g. `struct` / `class` /
+`interface` as both types and parent containers, `param` as both a
+block parameter and a function parameter, `global_var` as both a
+module-scope structural slot and a value-producing op) appear in two
+pages — once as the primary listing and once as a cross-link row
+that points back to the canonical page. Abstract / grouping-only
+Lua entries (`Type`, `Constant`, `TerminatorInst`, `BasicType`,
+`MakeDifferentialPairBase`, `CastStorageToLogicalBase`,
+`LiveRangeMarker`, `SemanticAttr`, `LayoutResourceInfoAttr`,
+`SPIRVAsmOperand`, `Undefined`, `BindingQuery`, ...) appear only in
+hierarchy diagrams, never in opcode tables.
 
 The family pages are intentionally narrow: they describe *shape and
 provenance*, not *behaviour of the passes that consume the IR*. For
@@ -61,15 +74,15 @@ flowchart TD
 | Page | Family | Lua entry root | Approx. opcodes |
 | --- | --- | --- | --- |
 | [types.md](types.md) | Type instructions | `Type` (line ~20) | ~160 |
-| [values.md](values.md) | Constants, arithmetic, conversions, memory, aggregate constructors | `Constant` (line ~838) and top-level value opcodes | ~110 |
+| [values.md](values.md) | Constants, arithmetic, conversions, memory, aggregate constructors, constexpr arithmetic/casts, string and native-pointer helpers | `Constant` (line ~838) and top-level value opcodes; constexpr arithmetic cluster ~line 3142 | ~150 |
 | [structure.md](structure.md) | Module structure: functions, generics, globals, structs, interfaces, witness tables | `GlobalValueWithCode` (line ~787), `module` (line ~827) | ~20 |
-| [control-flow.md](control-flow.md) | Block, parameters, branches, function exits | `TerminatorInst` (line ~1294) + `block` / `Param` at top level | ~20 |
-| [generics-and-existentials.md](generics-and-existentials.md) | `specialize`, witness lookup, existential pack/unpack, RTTI | Top-level (e.g. `specialize` ~line 932, `lookupWitness` ~line 933) | ~30 |
-| [resources-and-atomics.md](resources-and-atomics.md) | Image/buffer/sampler ops, shader IO, atomics, barriers, wave intrinsics, raytracing | `AtomicOperation` (line ~1071) + top-level resource opcodes | ~80 |
-| [differentiation.md](differentiation.md) | Autodiff: differential pairs, forward/backward differentiate, reverse-mode contexts | `MakeDifferentialPairBase` (line ~901) + top-level autodiff opcodes | ~30 |
+| [control-flow.md](control-flow.md) | Block, parameters, branches, function exits, target / quad-execution `Require*` markers | `TerminatorInst` (line ~1294) + `block` / `Param` at top level | ~25 |
+| [generics-and-existentials.md](generics-and-existentials.md) | `specialize`, witness lookup, existential pack/unpack, RTTI, type-flow specialization (sets, tagged unions, dispatchers) | Top-level (e.g. `specialize` ~line 932, `lookupWitness` ~line 933); type-flow cluster ~line 2880 | ~55 |
+| [resources-and-atomics.md](resources-and-atomics.md) | Image/buffer/sampler ops, shader IO, atomics, barriers, fragment-shader interlocks, cooperative matrix/vector, wave intrinsics, raytracing | `AtomicOperation` (line ~1071) + top-level resource opcodes | ~85 |
+| [differentiation.md](differentiation.md) | Autodiff: differential pairs, forward/backward differentiate, reverse-mode contexts, autodiff temporaries, `DiffTypeInfo` | `MakeDifferentialPairBase` (line ~901) + top-level autodiff opcodes | ~35 |
 | [decorations.md](decorations.md) | Decoration family (metadata attached to instructions) | `Decoration` (line ~1594) | ~180 |
-| [metadata.md](metadata.md) | `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` | `Layout` (line ~2619), `Attr` (line ~2652), `Debug*` (line ~2716), `SPIRVAsmOperand` (line ~2756) | ~60 |
-| [misc.md](misc.md) | Pack/expansion, type queries, size/alignment, liveness markers, descriptor heaps, kernel launch | Top-level miscellaneous opcodes | ~50 |
+| [metadata.md](metadata.md) | `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` | `Layout` (line ~2619), `Attr` (line ~2652), `Debug*` (line ~2716), `SPIRVAsmOperand` (line ~2756) | ~55 |
+| [misc.md](misc.md) | System opcodes (`nop`, `Unrecognized`), pack/expansion, type queries, size/alignment, storage casts, liveness markers, descriptor heaps, tensor / runtime helpers, kernel launch | Top-level miscellaneous opcodes | ~55 |
 
 Counts are approximate, rounded to the nearest ten at the
 `source_commit` recorded in this file's front-matter. They count
@@ -132,9 +145,12 @@ entry range and to the `slang-lower-to-ir.cpp` visitors that produce
 opcodes in that family.
 
 Within a family page, the `## Opcodes` table is the canonical index.
-Abstract intermediate Lua entries (such as `BasicType`,
+Abstract / grouping intermediate Lua entries (such as `BasicType`,
 `MakeDifferentialPairBase`, `TerminatorInst`, the abstract `Decoration`
-root) only appear in the `## Family hierarchy` diagrams; they do not
+root, plus the smaller parents `Undefined`, `BindingQuery`,
+`CastStorageToLogicalBase`, `LiveRangeMarker`, `SemanticAttr`,
+`LayoutResourceInfoAttr`, `SPIRVAsmOperand`) only appear in the
+`## Family hierarchy` diagrams and short prose notes; they do not
 appear as table rows. Notable opcodes whose semantics cannot fit in a
 row of the table have a short `## Notable opcodes` call-out further
 down the page.

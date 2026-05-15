@@ -166,22 +166,45 @@ the front-end can build dependency records for the build system.
 
 ## Source-location preservation
 
-Macro-expanded tokens still point at the source location where the
-macro was *invoked*, not where the macro was defined; this is what
-makes diagnostics (see
+Tokens emitted by macro expansion fall into three categories whose
+source locations are chosen differently:
+
+1. **Raw body tokens** — tokens copied verbatim from the macro
+   definition. Their `SourceLoc` is the location of the corresponding
+   token in the macro *definition*, replayed by
+   `MacroInvocation::readToken`
+   ([slang-preprocessor.cpp lines
+   2435-2444](../../../source/slang/slang-preprocessor.cpp)). The
+   `SourceManager` records that the resulting expansion is part of a
+   macro invocation, so diagnostics can walk back to the invocation
+   site even though the spelling location points into the macro body.
+2. **Argument tokens** — tokens taken from the call-site argument
+   list. They retain the call-site `SourceLoc`, since they are
+   physically lexed from the invocation.
+3. **Constructed tokens** — `__LINE__`, `__FILE__`, stringized (`#x`)
+   and pasted (`x##y`) tokens, which are synthesized fresh. These use
+   `m_macroInvocationLoc` so they are attributed to the invocation
+   site ([slang-preprocessor.cpp lines
+   2332-2334](../../../source/slang/slang-preprocessor.cpp)).
+
+This split is what lets diagnostics (see
 [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md))
-meaningful when an error originates from inside a macro. The
-`SourceManager` distinguishes "expansion" locations from "spelling"
-locations through the same compact integer encoding, and exposes
-helpers to reconstruct the inclusion / expansion chain when
-formatting diagnostics.
+point inside the macro body when the macro itself is at fault, while
+still letting users trace the inclusion / expansion chain back to
+the call site. The `SourceManager` distinguishes "expansion"
+locations from "spelling" locations through the same compact integer
+encoding, and exposes helpers to walk that chain when formatting
+diagnostics.
 
 ## Failure modes
 
 - Invalid characters and malformed numeric / string literals raise
   diagnostics through the `DiagnosticSink` passed into the lexer's
   `initialize`. With `kLexerFlag_SuppressDiagnostics` set, the lexer
-  silently drops them — used inside skipped preprocessor blocks.
+  still emits `TokenType::Invalid` tokens for these inputs but
+  suppresses the diagnostics — used inside skipped preprocessor
+  blocks where the tokens will be discarded by the inactive-branch
+  filter.
 - Preprocessor errors (unbalanced `#if`, unknown directive, missing
   include) likewise emit through the sink. When the preprocessor
   cannot recover, it produces an `EndOfFile` token early and the

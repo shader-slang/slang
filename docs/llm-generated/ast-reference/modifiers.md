@@ -185,6 +185,7 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
+| `HLSLGeometryShaderInputPrimitiveTypeModifier` | `Modifier` | (no additional state) | (none) | Common base for the geometry-shader input-primitive markers below. |
 | `HLSLPointModifier` | `HLSLGeometryShaderInputPrimitiveTypeModifier` | (no additional state) | (none) | `point` (GS input). |
 | `HLSLLineModifier` | `HLSLGeometryShaderInputPrimitiveTypeModifier` | (no additional state) | (none) | `line`. |
 | `HLSLTriangleModifier` | `HLSLGeometryShaderInputPrimitiveTypeModifier` | (no additional state) | (none) | `triangle`. |
@@ -195,6 +196,7 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
+| `HLSLMeshShaderOutputModifier` | `Modifier` | (no additional state) | (none) | Common base for the mesh-shader output-array markers below. |
 | `HLSLVerticesModifier` | `HLSLMeshShaderOutputModifier` | (no additional state) | (none) | `vertices` (mesh shader). |
 | `HLSLIndicesModifier` | `HLSLMeshShaderOutputModifier` | (no additional state) | (none) | `indices`. |
 | `HLSLPrimitivesModifier` | `HLSLMeshShaderOutputModifier` | (no additional state) | (none) | `primitives`. |
@@ -204,6 +206,8 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
+| `HLSLLayoutSemantic` | `HLSLSemantic` | register name, component mask | (none) | Base class for HLSL semantics that affect layout (register / packoffset). |
+| `RayPayloadAccessSemantic` | `HLSLSemantic` | stage-name tokens | (none) | Base class for ray-payload read/write access semantics. |
 | `HLSLSimpleSemantic` | `HLSLSemantic` | semantic name | [semantic](../syntax-reference/grammar.md#declarations) | `: NAME` (no parenthesized arguments). |
 | `HLSLRegisterSemantic` | `HLSLLayoutSemantic` | register class, index | [register binding](../syntax-reference/grammar.md#modifiers-and-attributes) | `: register(...)`. |
 | `HLSLPackOffsetSemantic` | `HLSLLayoutSemantic` | offset, element | [pack offset](../syntax-reference/grammar.md#modifiers-and-attributes) | `: packoffset(...)`. |
@@ -216,6 +220,7 @@ Abstract intermediates: `VisibilityModifier`,
 | --- | --- | --- | --- | --- |
 | `GLSLPrecisionModifier` | `Modifier` | (no additional state) | (none) | GLSL precision qualifier. |
 | `GLSLModuleModifier` | `Modifier` | (no additional state) | (none) | Marker for GLSL-module-origin declarations. |
+| `GLSLPreprocessorDirective` | `Modifier` | (no additional state) | (none) | Base class for GLSL preprocessor directives preserved in the AST. |
 | `GLSLVersionDirective` | `GLSLPreprocessorDirective` | version `Token` | (none) | `#version` preprocessor directive carried as AST. |
 | `GLSLExtensionDirective` | `GLSLPreprocessorDirective` | extension name, behavior | (none) | `#extension` directive. |
 | `GLSLLayoutModifierGroupBegin` | `GLSLLayoutModifierGroupMarker` | (no additional state) | (none) | Start marker of a `layout(...)` group. |

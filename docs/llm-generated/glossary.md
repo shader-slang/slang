@@ -150,6 +150,14 @@ explicitly.
   See: [ir-reference/decorations.md](ir-reference/decorations.md),
   [cross-cutting/ir-instructions.md](cross-cutting/ir-instructions.md)
 
+**DiagnosticSink** `[Slang]`
+: The interface that receives diagnostics (errors, warnings, notes)
+  during a compile, declared in
+  [slang-diagnostic-sink.h](../../source/compiler-core/slang-diagnostic-sink.h).
+  Every compiler component takes a sink rather than printing directly.
+
+  See: [cross-cutting/diagnostics.md](cross-cutting/diagnostics.md)
+
 **differential pair** `[Slang]`
 : A two-component value (primal, differential) used by Slang's
   automatic-differentiation machinery. The IR opcode
@@ -161,14 +169,6 @@ explicitly.
   for the full per-opcode list.
 
   See: [ir-reference/differentiation.md](ir-reference/differentiation.md)
-
-**DiagnosticSink** `[Slang]`
-: The interface that receives diagnostics (errors, warnings, notes)
-  during a compile, declared in
-  [slang-diagnostic-sink.h](../../source/compiler-core/slang-diagnostic-sink.h).
-  Every compiler component takes a sink rather than printing directly.
-
-  See: [cross-cutting/diagnostics.md](cross-cutting/diagnostics.md)
 
 **dominator** `[General]`
 : In a CFG with a single entry, a block A *dominates* block B if every

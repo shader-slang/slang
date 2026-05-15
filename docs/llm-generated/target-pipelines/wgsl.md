@@ -13,12 +13,18 @@ This page documents the ordered IR-pass and downstream-binary
 sequence executed when Slang compiles for the WGSL target family.
 The corresponding `CodeGenTarget` values are
 `CodeGenTarget::WGSL`, `CodeGenTarget::WGSLSPIRV`, and
-`CodeGenTarget::WGSLSPIRVAssembly`. All three share the same IR
-pipeline; they differ only in the downstream tool that consumes
-the emitted WGSL text (the bare `WGSL` target hands the text back
-to the caller; the `WGSLSPIRV*` arms hand it to Tint to translate
-to SPIR-V). The shared predicate inside `linkAndOptimizeIR` is
-`isWGPUTarget(targetRequest)`.
+`CodeGenTarget::WGSLSPIRVAssembly`. The three targets share the
+WGSL **source** pipeline because the back-end's source-target
+mapping reduces `WGSLSPIRV` and `WGSLSPIRVAssembly` to source
+target `WGSL` (`source/slang/slang-code-gen.cpp:269-272`); WGSL is
+emitted first, then handed to Tint to translate to SPIR-V for the
+`WGSLSPIRV*` arms. Inside `linkAndOptimizeIR` the shared predicate
+is `isWGPUTarget(targetRequest)`, but several individual switch
+arms list only `CodeGenTarget::WGSL` (for example
+`slang-emit.cpp:1947-1952` and `slang-emit.cpp:2074-2077`); those
+arms still fire for the `WGSLSPIRV*` variants because of the
+source-target reduction, not because the arm's case label mentions
+them.
 
 This page complements
 [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md), which

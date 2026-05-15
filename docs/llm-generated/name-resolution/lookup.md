@@ -416,6 +416,26 @@ iterates this list at
 [slang-lookup.cpp line
 223](../../../source/slang/slang-lookup.cpp).
 
+#### Deduplication: there isn't any at the `LookupResult` level
+
+`AddToLookupResult`
+([slang-lookup.cpp lines
+95-125](../../../source/slang/slang-lookup.cpp)) appends each
+incoming `LookupResultItem` to the result without comparing it
+against previously-collected items. The same `DeclRef` reached
+through two different lookup paths (e.g. via a transparent member
+*and* directly from the enclosing scope, or via two different
+inheritance edges in member lookup) will appear twice in the result.
+Downstream code that needs uniqueness is responsible for filtering:
+[overload-resolution.md](overload-resolution.md) does so via
+`CompareLookupResultItems` during candidate ranking, and
+visibility filtering in `TryCheckOverloadCandidateVisibility`
+(see [visibility.md](visibility.md)) drops duplicates that point at
+identical visible declarations. There is intentionally no
+deduplication inside lookup itself — keeping every breadcrumb path
+visible is what lets later phases produce accurate ambiguity
+diagnostics.
+
 ### Module and namespace
 
 Multiple `namespace Foo {}` declarations in the same module collapse
