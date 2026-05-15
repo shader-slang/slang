@@ -18,8 +18,8 @@ These are handled by two different mechanisms:
 - IR-time synthesis of `RWStructuredBuffer<uint> __slang_coverage`
   in the `slang-ir-coverage-instrument` pass
 - post-emit metadata exposed as `ICoverageTracingMetadata` for
-  counter attribution and `ISyntheticResourceMetadata` for hidden
-  resource binding
+  today's line-compatible counter attribution view and
+  `ISyntheticResourceMetadata` for hidden resource binding
 
 The first is about getting the buffer into the compiled shader. The
 second is about letting the host discover where the buffer lives
@@ -47,7 +47,8 @@ primitive:
   locations. Reflection doesn't carry "slot 7 →
   `physics.slang:22`"; that's not what reflection is about.
   Reflection knows parameter names, types, and layouts. We need a
-  side-channel that records the per-slot semantic intent.
+  side-channel that records the per-slot semantic intent for the
+  current line coverage mode.
   `ICoverageTracingMetadata` (and its on-disk twin
   `.coverage-mapping.json`) is that channel.
 
@@ -60,6 +61,12 @@ coverage — some slots may not map to a real source file and line,
 and that fact is preserved in the metadata and JSON sidecar. The
 LCOV conversion step then applies gcov-style reporting rules by
 filtering those entries out of line-oriented output.
+
+Future branch, function, and source-region coverage should grow this
+attribution side of the design, not the binding side. In particular,
+`ISyntheticResourceMetadata` should remain about hidden resource
+binding, while richer source-based coverage metadata can describe how
+runtime counters map to source regions, functions, and branch outcomes.
 
 ### Buffer synthesis at IR-pass time
 
@@ -148,9 +155,10 @@ Enabling `-trace-coverage` runs three pipeline stages:
      extension is a no-op for them; the buffer flows through emit
      as a standalone `IRGlobalParam`.
    - **Assigns a counter slot to each `IncrementCoverageCounter`
-     op** (per-inst UID — consecutive index in traversal order;
-     multiple ops on the same source line get distinct slots, which
-     keeps the door open for branch/function coverage later).
+     op** for the current exact line mode (per-inst UID —
+     consecutive index in traversal order; multiple ops on the same
+     source line get distinct slots and are aggregated by the LCOV
+     exporter).
    - **Rewrites each op as `AtomicAdd(__slang_coverage[slot], 1,
      Relaxed)`**.
    - **Records `(slot → file, line)` on the artifact's
@@ -217,7 +225,8 @@ artifact in memory, the canonical metadata is right there, and they
 need typed access without going through serialization, schema
 versioning, or file I/O. The artifact's `IMetadata` exposes the two
 query interfaces needed by the host: `ICoverageTracingMetadata`
-returns counter count and per-slot `(file, line)`, while
+returns the current line-compatible counter count and per-slot
+`(file, line)`, while
 `ISyntheticResourceMetadata` returns the chosen hidden-resource
 binding.
 
@@ -359,15 +368,22 @@ end-to-end across all Slang backends. Directions scoped for follow-
 up work, grouped by category. Per-test attribution and branch
 coverage are the highest-leverage near-term picks.
 
+The current `ICoverageTracingMetadata` shape is intentionally a
+line-compatible view. Branch, function, and lower-density region
+coverage are expected to need a richer source-based metadata model
+where runtime counters can map to source ranges, functions, and branch
+outcomes. LCOV should remain a compatibility export (`DA:`,
+`FN/FNDA:`, `BRDA:`), not the only internal coverage model.
+
 ### New LCOV record types
 
 Capabilities the LCOV format already names that the current
 implementation does not yet emit.
 
-- **Branch coverage** (`BRDA:` records). Per-branch-arm counters;
-  the existing per-inst slot model is forward-compatible.
-- **Function coverage** (`FN:` / `FNH:` records). Per-entry-point
-  counter.
+- **Branch coverage** (`BRDA:` records). Per-branch-arm counters,
+  represented through richer source coverage metadata before export.
+- **Function coverage** (`FN:` / `FNH:` records). Per-function-entry
+  counters with function names and source ranges.
 - **Per-test attribution** (`TN:` groupings). Extends
   `slang_coverage_accumulate` with an optional test name. Turns
   coverage from a flat aggregate into a test-quality signal —

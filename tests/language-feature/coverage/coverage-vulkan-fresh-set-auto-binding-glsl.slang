@@ -24,3 +24,4 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: layout(std430, binding = 50) buffer
 //CHECK-DAG: layout(std430, binding = 0, set = 2) buffer
 //CHECK-DAG: layout(std430, binding = 0, set = 3) buffer
+//CHECK-DAG: atomicAdd

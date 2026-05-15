@@ -66,10 +66,11 @@ By default the IR coverage pass auto-allocates a non-conflicting
 location for `__slang_coverage`. For Vulkan / SPIR-V descriptor-set
 targets, it uses the descriptor set after the highest shader-visible
 set at binding 0 so coverage does not extend or fill holes in a
-user-owned descriptor set layout. If the host pipeline layout reserves
-a descriptor set that the shader IR does not reference, pass
-`-trace-coverage-reserved-space <space>` to keep auto-allocation out
-of that space.
+user-owned descriptor set layout. If no shader-visible or
+host-reserved descriptor sets exist, set 0 is the fresh set. If the
+host pipeline layout reserves descriptor sets that the shader IR does
+not reference, pass one `-trace-coverage-reserved-space <space>` per
+reserved set to keep auto-allocation out of those spaces.
 
 Pass `-trace-coverage-binding <index> <space>` to pin the coverage
 buffer at a specific `(register, space)` pair instead:
@@ -105,10 +106,11 @@ slangc shader.slang -target spirv -stage compute -entry main \
 ## Integration workflows
 
 Two equally supported paths, each suited to a different host
-architecture. Both expose the same data: counter count, per-slot
-`(file, line)`, and the coverage buffer's hidden binding. The typed
-API exposes this through `ICoverageTracingMetadata` plus
-`ISyntheticResourceMetadata`; the sidecar serializes the same contract.
+architecture. For today's line coverage mode, both expose the same
+data: counter count, per-slot `(file, line)`, and the coverage
+buffer's hidden binding. The typed API exposes this through
+`ICoverageTracingMetadata` plus `ISyntheticResourceMetadata`; the
+sidecar serializes the same contract.
 A slot may have no real source file/line; that is preserved in the
 metadata and filtered out later when exporting LCOV.
 
@@ -241,19 +243,20 @@ at export time: entries without a real source file or with a
 non-positive line number are skipped instead of being written as
 synthetic `SF:` / `DA:` records.
 
-The metadata interface is extensible: future revisions add
-branch/function coverage and column data through the same API and
-sidecar shape.
+The current metadata interface is the line-compatible view. Future
+branch, function, or source-region coverage may add a richer source
+coverage metadata interface and sidecar schema while keeping this line
+view available for compatibility.
 
 ---
 
 ## CLI reference
 
-| Flag                                      | Effect                                                                                                                                                                                                                                                                         |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `-trace-coverage`                         | Enables the feature. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites counter ops to atomic increments, and emits `<output>.coverage-mapping.json` sidecar when writing to a file.          |
-| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                      |
-| `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                   |
+| Flag                                      | Effect                                                                                                                                                                                                                                                                |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-trace-coverage`                         | Enables the feature. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites counter ops to atomic increments, and emits `<output>.coverage-mapping.json` sidecar when writing to a file. |
+| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                    |
+| `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                 |
 
 ---
 
@@ -301,8 +304,8 @@ declares the slot in its own pipeline layout / root signature.
 | Backend                                   | Default `-trace-coverage`                                                                                                                                                                                                                                                                         | `-trace-coverage-binding=N:0`          | `-trace-coverage-binding=N:M` (M ≠ 0) |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
 | CPU                                       | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
-| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the descriptor set after the highest shader-visible or host-reserved set at binding 0.                                                                                                                                                                             | Supported                              | Compiler-side decoration correct      |
-| D3D12 / HLSL                              | Follow-up. The metadata shape leaves room for D3D register-space binding, but this PR does not define the D3D auto-allocation or reservation policy.                                                                                                                                              | Follow-up                              | Follow-up                             |
+| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the descriptor set after the highest shader-visible or host-reserved set at binding 0.                                                                                                                                                                            | Supported                              | Compiler-side decoration correct      |
+| D3D12 / HLSL                              | Compiler metadata/codegen supported. D3D12 runtime binding policy is follow-up; hosts should query `ISyntheticResourceMetadata` and declare the reported UAV slot in their root signature.                                                                                                        | Supported                              | Compiler-side decoration correct      |
 | CUDA                                      | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
 | Metal (direct)                            | Compiles. End-to-end dispatch is unreliable due to a pre-existing slang-rhi Metal binding quirk ([shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724)) — not a coverage-feature defect.                                                                             | (untested)                             | (untested)                            |
 | GLSL                                      | Supported codegen                                                                                                                                                                                                                                                                                 | (untested)                             | (untested)                            |
@@ -311,10 +314,9 @@ declares the slot in its own pipeline layout / root signature.
 ### Format scope
 
 - **Line coverage only** — emits `DA:` records; no `FN:` / `BRDA:`
-  (function / branch) coverage yet. Per-inst slot assignment is
-  forward-compatible with branch coverage: each branch point would
-  get its own slot, and the LCOV emitter would grow a `BRDA:`
-  writer.
+  (function / branch) coverage yet. Function, branch, and
+  lower-density source-region coverage are expected to use richer
+  source coverage metadata before being exported to LCOV records.
 - **Column position is dropped.** Only `(file, line)` reaches LCOV.
 - **Counter type is `uint32`.** Saturates at ~4 × 10⁹ hits per
   slot. Multiple ops on the same source line accumulate

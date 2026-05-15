@@ -29,23 +29,22 @@ static bool hasNameHint(IRInst* inst, UnownedTerminatedStringSlice expectedName)
     return false;
 }
 
-static SyntheticResourceRecord* findSyntheticResourceRecordById(
-    ArtifactPostEmitMetadata& metadata,
-    uint32_t id)
+static Index findSyntheticResourceRecordIndexById(ArtifactPostEmitMetadata& metadata, uint32_t id)
 {
-    for (auto& record : metadata.m_syntheticResources)
+    for (Index i = 0; i < metadata.m_syntheticResources.getCount(); ++i)
     {
-        if (record.id == id)
-            return &record;
+        if (metadata.m_syntheticResources[i].id == id)
+            return i;
     }
-    return nullptr;
+    return -1;
 }
 
-static SyntheticResourceRecord& getOrAddCoverageSyntheticResourceRecord(
-    ArtifactPostEmitMetadata& metadata)
+static Index getOrAddCoverageSyntheticResourceRecordIndex(ArtifactPostEmitMetadata& metadata)
 {
-    if (auto existing = findSyntheticResourceRecordById(metadata, kCoverageSyntheticResourceID))
-        return *existing;
+    Index existingIndex =
+        findSyntheticResourceRecordIndexById(metadata, kCoverageSyntheticResourceID);
+    if (existingIndex >= 0)
+        return existingIndex;
 
     SyntheticResourceRecord record;
     record.id = kCoverageSyntheticResourceID;
@@ -57,7 +56,7 @@ static SyntheticResourceRecord& getOrAddCoverageSyntheticResourceRecord(
     record.entryPointIndex = -1;
     record.debugName = kCoverageBufferName;
     metadata.m_syntheticResources.add(record);
-    return metadata.m_syntheticResources.getLast();
+    return metadata.m_syntheticResources.getCount() - 1;
 }
 
 // Choose the resource kind under which the coverage buffer is bound
@@ -437,12 +436,22 @@ static IRInst* findCollidingParam(
     int binding)
 {
     auto ranges = collectUsedBindings(module, globalScopeVarLayout, kind);
+    IRInst* fallback = nullptr;
+    bool foundCollision = false;
     for (auto& range : ranges)
     {
         if (bindingRangeContains(range, space, binding))
-            return range.source ? range.source : module->getModuleInst();
+        {
+            foundCollision = true;
+            if (range.source && range.source->sourceLoc.isValid())
+                return range.source;
+            if (!fallback)
+                fallback = range.source;
+        }
     }
-    return nullptr;
+    if (!foundCollision)
+        return nullptr;
+    return fallback ? fallback : module->getModuleInst();
 }
 
 static int pickFreeBindingInSpace(List<UsedBindingRange>& ranges, UInt space)
@@ -564,7 +573,10 @@ static bool pickFreeBindingForCoverage(
     // existing sets. Many hosts build descriptor set layouts directly
     // from parameter blocks or other reflection data, so coverage is
     // appended as a new synthetic-resource set after all shader-visible
-    // sets. The complete location is reported through metadata.
+    // sets. If the shader has no visible sets, set 0 is the fresh set;
+    // hosts with externally reserved set 0 should pass
+    // `-trace-coverage-reserved-space 0` so allocation moves to set 1.
+    // The complete location is reported through metadata.
     if (kind == LayoutResourceKind::DescriptorTableSlot && isKhronosTarget(targetRequest))
     {
         outSpace = pickSpaceAfterHighestUsedSpace(ranges);
@@ -1193,7 +1205,8 @@ void instrumentCoverage(
         }
     }
 
-    auto& syntheticResource = getOrAddCoverageSyntheticResourceRecord(outMetadata);
+    Index syntheticResourceIndex = getOrAddCoverageSyntheticResourceRecordIndex(outMetadata);
+    auto& syntheticResource = outMetadata.m_syntheticResources[syntheticResourceIndex];
     syntheticResource.space = chosenSpace;
     syntheticResource.binding = chosenBinding;
     syntheticResource.uniformOffset = -1;
@@ -1218,10 +1231,12 @@ void finalizeCoverageInstrumentationMetadata(
     if (!enabled)
         return;
 
-    auto record = findSyntheticResourceRecordById(outMetadata, kCoverageSyntheticResourceID);
-    if (!record)
+    Index recordIndex =
+        findSyntheticResourceRecordIndexById(outMetadata, kCoverageSyntheticResourceID);
+    if (recordIndex < 0)
         return;
 
+    auto& record = outMetadata.m_syntheticResources[recordIndex];
     int32_t uniformOffset = -1;
     int32_t uniformStride = 0;
     if (tryGetCoverageUniformBindingInfo(
@@ -1231,8 +1246,8 @@ void finalizeCoverageInstrumentationMetadata(
             uniformOffset,
             uniformStride))
     {
-        record->uniformOffset = uniformOffset;
-        record->uniformStride = uniformStride;
+        record.uniformOffset = uniformOffset;
+        record.uniformStride = uniformStride;
     }
     else if (targetRequest && (isCPUTarget(targetRequest) || isCUDATarget(targetRequest)))
     {
