@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-Slang is a shading-language compiler and runtime implemented primarily in C++17 and built with
+Slang is a shading-language compiler and runtime implemented primarily in C++20 and built with
 CMake.
 
 Key directories:
@@ -61,6 +61,6 @@ Unit tests live under `tools/slang-unit-test` and typically use `SLANG_UNIT_TEST
 - Keep PRs small and based on `master`.
 - PRs require passing workflows, review approval, and a `pr: non-breaking` or
   `pr: breaking change` label.
-- Sign the CLA when prompted.
+- Human contributors should sign the CLA when prompted.
 - For formatting failures, run installed hooks from `./extras/install-git-hooks.sh` or
   request the format bot with `/format`.
