@@ -111,7 +111,7 @@ done
 # Detect macOS and set appropriate binary names
 if [[ "$(uname)" == "Darwin" ]]; then
   # On macOS, check for GNU versions
-  # grep and xargs use g-prefix, diff is installed as /opt/homebrew/bin/diff
+  # grep and xargs use g-prefix, diff is installed in a Homebrew prefix
   missing_tools=()
 
   if ! command -v ggrep &>/dev/null; then
@@ -122,7 +122,11 @@ if [[ "$(uname)" == "Darwin" ]]; then
     missing_tools+=("findutils")
   fi
 
-  if ! command -v /opt/homebrew/bin/diff &>/dev/null; then
+  if command -v /opt/homebrew/bin/diff &>/dev/null; then
+    DIFF_BIN="/opt/homebrew/bin/diff"
+  elif command -v /usr/local/bin/diff &>/dev/null; then
+    DIFF_BIN="/usr/local/bin/diff"
+  else
     missing_tools+=("diffutils")
   fi
 
@@ -135,7 +139,6 @@ if [[ "$(uname)" == "Darwin" ]]; then
 
   GREP_BIN="ggrep"
   XARGS_BIN="gxargs"
-  DIFF_BIN="/opt/homebrew/bin/diff"
 else
   # On other systems, use standard binaries
   GREP_BIN="grep"
