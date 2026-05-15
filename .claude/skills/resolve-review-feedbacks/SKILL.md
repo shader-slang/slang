@@ -44,12 +44,24 @@ Repeat this workflow every 30 minutes until the PR has no unresolved review feed
 
 2. Inspect PR state, checks, mergeability, and review threads.
 3. Fix actionable review feedback and CI failures.
-4. Push changes to the PR branch.
+4. Commit PR modifications as new commits and push them to the PR branch.
 5. Reply to LLM review feedback and resolve only the LLM-owned threads that have been addressed.
 6. Leave human-owned threads unresolved for the human reviewer to resolve manually.
 7. Wait for CI and repeat until clean.
 
 Stop early only if blocked by missing credentials, missing push permission, an ambiguous human decision, or local changes that cannot be safely preserved.
+
+## Commit Policy
+
+When the PR is modified for any reason, preserve the change history by creating a new commit for the modification. Do not use `git commit --amend` for review fixes, CI fixes, conflict-resolution follow-up edits, formatting changes, or any other PR update.
+
+Use concise commit messages that describe the reason for the follow-up change, for example:
+
+```bash
+git add <changed-files>
+git commit -m "Address review feedback"
+git push
+```
 
 ## Review Threads
 
