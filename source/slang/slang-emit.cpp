@@ -142,6 +142,7 @@
 #include "slang-vm-bytecode.h"
 
 #include <assert.h>
+#include <limits>
 Slang::String get_slang_cpp_host_prelude();
 Slang::String get_slang_torch_prelude();
 
@@ -1043,6 +1044,7 @@ Result linkAndOptimizeIR(
         // the synthesis routine.
         int explicitBinding = -1;
         int explicitSpace = -1;
+        List<int> reservedSpaces;
         auto& opts = codeGenContext->getTargetReq()->getOptionSet();
         if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
         {
@@ -1052,12 +1054,43 @@ Result linkAndOptimizeIR(
                 explicitSpace = (int)(*values)[0].intValue2;
             }
         }
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageReservedSpace))
+        {
+            for (auto value : *values)
+            {
+                if (value.kind != CompilerOptionValueKind::Int)
+                {
+                    if (sink)
+                    {
+                        SLANG_DIAGNOSE_UNEXPECTED(
+                            sink,
+                            SourceLoc(),
+                            "TraceCoverageReservedSpace option value must be an integer");
+                    }
+                    return SLANG_FAIL;
+                }
+                if (value.intValue < 0 || value.intValue > std::numeric_limits<int>::max())
+                {
+                    if (sink)
+                    {
+                        sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                            .option = "-trace-coverage-reserved-space",
+                            .parsedValue = value.intValue,
+                        });
+                    }
+                    return SLANG_FAIL;
+                }
+                reservedSpaces.add((int)value.intValue);
+            }
+        }
         SLANG_PASS(
             instrumentCoverage,
             sink,
             codeGenContext->shouldTraceCoverage(),
             explicitBinding,
             explicitSpace,
+            reservedSpaces.getBuffer(),
+            (int)reservedSpaces.getCount(),
             targetRequest,
             outLinkedIR.globalScopeVarLayout,
             *metadata);
@@ -1148,6 +1181,17 @@ Result linkAndOptimizeIR(
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    if (requiredLoweringPassSet.coverageTracing)
+    {
+        SLANG_PASS(
+            finalizeCoverageInstrumentationMetadata,
+            sink,
+            codeGenContext->shouldTraceCoverage(),
+            outLinkedIR.globalScopeVarLayout,
+            targetRequest,
+            *metadata);
+    }
 
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
     SLANG_PASS(lowerLValueCast, targetProgram);
@@ -1256,12 +1300,6 @@ Result linkAndOptimizeIR(
     // This must happen after specialization since DiffTypeInfo is hoistable.
     lowerDiffTypeInfoInsts(irModule);
 
-    // Lower `Result<T,E>` types into ordinary struct types. This must happen
-    // after specialization, since otherwise incompatible copies of the lowered
-    // result structure are generated.
-    if (requiredLoweringPassSet.resultType)
-        SLANG_PASS(lowerResultType, targetProgram, sink);
-
     if (requiredLoweringPassSet.conditionalType)
         SLANG_PASS(lowerConditionalType, sink);
 
@@ -1277,6 +1315,15 @@ Result linkAndOptimizeIR(
 
     if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerOptionalType, sink);
+
+    // Lower `Result<T,E>` types into ordinary struct types. This must happen
+    // after specialization, since otherwise incompatible copies of the lowered
+    // result structure are generated.
+    //
+    // This pass depends on getting accurate results from getAnyValueSize(),
+    // and must therefore run after lowering Optional types.
+    if (requiredLoweringPassSet.resultType)
+        SLANG_PASS(lowerResultType, targetProgram, sink);
 
     if (requiredLoweringPassSet.nonVectorCompositeSelect)
     {

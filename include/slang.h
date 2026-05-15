@@ -1167,7 +1167,13 @@ typedef uint32_t SlangSizeT;
         TraceCoverage = 145, // bool: insert per-statement execution counters
         TraceCoverageBinding =
             146, // intValue0: register index; intValue1: register space — explicit
-                 //   binding for the synthesized __slang_coverage buffer
+                 //   binding for the synthesized __slang_coverage buffer. Consumed
+                 //   only when TraceCoverage is enabled; the slangc CLI spelling also
+                 //   enables TraceCoverage.
+        TraceCoverageReservedSpace =
+            147, // intValue0: descriptor/register space reserved by the host when
+                 //   auto-allocating the synthesized __slang_coverage buffer. This is
+                 //   a repeatable hint consumed only when TraceCoverage is enabled.
 
         CountOf,
     };
@@ -4520,44 +4526,90 @@ struct IMetadata : public ISlangCastable
 
 /** Coverage tracing metadata produced when `-trace-coverage` is active.
 
-Each counter slot in the synthesized coverage buffer maps to a source
+The current implementation reports line-oriented hit-count coverage:
+each counter slot in the synthesized coverage buffer maps to a source
 `(file, line)` pair. The interface lets hosts read that mapping at
 compile time so they can attribute counter values back to source lines
 at runtime without a separate sidecar file. The metadata is retrieved
 by calling `castAs` / `queryInterface` on the artifact-associated
 `IMetadata` object.
 
+Intended use:
+  - use `ICoverageTracingMetadata` for coverage-specific semantics:
+    counter count, slot-to-source attribution, input to manifest
+    serialization, and future coverage-entry semantics
+  - use `ISyntheticResourceMetadata` for the generic hidden binding
+    contract when the host needs to bind compiler-synthesized resources
+    without relying on normal public reflection
+  - `getBufferInfo()` remains as a compatibility descriptor-binding
+    query for coverage-specific callers, but new host integrations
+    should prefer `ISyntheticResourceMetadata` because it also reports
+    CPU/CUDA marshaling locations
+
+Lifetime and ownership:
+  - the metadata object is owned by the compiled artifact / `IMetadata`
+    container it is queried from
+  - pointers returned through `CoverageEntryInfo` remain valid for the
+    lifetime of that metadata object
+  - callers do not own returned strings and must not free them
+
+Future coverage modes:
+  - this interface is intended to grow to cover richer reporting modes
+    such as branch coverage, function coverage, binary
+    covered/uncovered reporting, or warp-aggregated coverage
+  - callers should not assume that future revisions will always model
+    one entry as one source line or one counter value as an exact hit
+    count
+
 Extensible without ABI breakage in two ways:
-  - tail-extending the `CoverageEntryInfo` / `CoverageBufferInfo`
-    structs (gated by their leading `structSize` field), or
+  - tail-extending the `CoverageEntryInfo` struct (gated by its
+    leading `structSize` field), or
   - adding a derived `ICoverageTracingMetadataN` interface with a
     new UUID, queryable through `castAs`.
 The vtable of `ICoverageTracingMetadata` itself is fixed; new
 methods would break ABI for callers compiled against the existing
 header.
 */
-/// Per-counter-slot attribution returned by
+/// Per-coverage-entry attribution returned by
 /// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
 /// `structSize` for ABI-versioned struct growth: future revisions
-/// will add fields (column, function name, branch arm) at the end
-/// without changing the COM interface.
+/// may add fields such as column/span information, function identity,
+/// branch-arm identity, or coverage-mode-specific metadata at the end
+/// without changing the COM interface. The current implementation uses
+/// one entry per line-oriented counter slot. Entries are source-
+/// location based: if generic specialization, cloning, or inlining
+/// duplicates code for the same source line, all executions of that
+/// source location contribute to the same line counter rather than
+/// producing per-specialization counters.
 struct CoverageEntryInfo
 {
     size_t structSize = sizeof(CoverageEntryInfo);
 
-    /// Source file for this counter slot, or `nullptr` if the slot
+    /// Source file for this coverage entry, or `nullptr` if the entry
     /// could not be attributed to a real source file. The returned
     /// pointer is valid for the lifetime of the metadata object.
     const char* file = nullptr;
 
-    /// 1-based source line for this counter slot, or 0 if the slot
-    /// could not be attributed to a real source line.
+    /// 1-based source line for this coverage entry, or 0 if the entry
+    /// could not be attributed to a real source line. The current
+    /// implementation reports line-oriented entries; future revisions
+    /// may attach additional fields describing branch/function/region
+    /// semantics.
     uint32_t line = 0;
 };
 
-/// Coverage-buffer binding info returned by
-/// `ICoverageTracingMetadata::getBufferInfo`. Same `structSize`-
-/// versioning pattern as `CoverageEntryInfo`.
+/// Coverage-buffer descriptor binding info returned by
+/// `ICoverageTracingMetadata::getBufferInfo`. This coverage-specific
+/// view is kept for ABI compatibility. New host integrations should
+/// query `ISyntheticResourceMetadata` when they need the full hidden-
+/// resource binding contract, including CPU/CUDA marshaling fields.
+///
+/// Sentinel conventions:
+///   - `space == -1` means no descriptor space is reported for the
+///     current target
+///   - `binding == -1` means no descriptor binding is reported for the
+///     current target
+/// `0` is a valid value for both fields.
 struct CoverageBufferInfo
 {
     size_t structSize = sizeof(CoverageBufferInfo);
@@ -4581,7 +4633,12 @@ struct ICoverageTracingMetadata : public ISlangCastable
         0x4b9c,
         {0x8e, 0x21, 0x3f, 0x7b, 0x82, 0xa3, 0xd9, 0x51})
 
-    /// Number of counter slots in the synthesized coverage buffer.
+    /// Number of coverage entries in the synthesized coverage buffer.
+    /// In the current implementation this is the number of line-
+    /// oriented source-location counter slots. Generic specializations
+    /// and other cloned instances of the same source line aggregate
+    /// into that source line's slot. Future revisions may extend the
+    /// entry model without changing the interface shape.
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() = 0;
 
     /// Populate `outInfo` with attribution info for counter slot
@@ -4592,14 +4649,171 @@ struct ICoverageTracingMetadata : public ISlangCastable
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getEntryInfo(uint32_t index, CoverageEntryInfo* outInfo) = 0;
 
-    /// Populate `outInfo` with the coverage buffer's binding info.
-    /// The caller must pre-set `outInfo->structSize =
-    /// sizeof(CoverageBufferInfo)`. Returns `SLANG_OK` on success,
-    /// `SLANG_E_INVALID_ARG` for null `outInfo` or mismatched
-    /// `structSize`.
+    /// Populate `outInfo` with the coverage buffer's descriptor
+    /// binding info. The caller should default-initialize `outInfo`
+    /// (for example `CoverageBufferInfo info;`) so `structSize` is
+    /// set to `sizeof(CoverageBufferInfo)`.
+    /// Returns `SLANG_OK` on success, `SLANG_E_INVALID_ARG` for null
+    /// `outInfo` or mismatched `structSize`.
+    ///
+    /// This is the coverage-specific compatibility view of the hidden
+    /// buffer. Hosts that want the generic hidden-resource contract
+    /// should query `ISyntheticResourceMetadata` from the same
+    /// `IMetadata` object.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo* outInfo) = 0;
 };
     #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()
+
+/** Generic metadata for compiler-synthesized bindable resources.
+
+This metadata is intended for features that inject hidden resources
+into the compiled program interface without surfacing them through the
+ordinary public reflection model. Shader coverage is the first
+consumer: its synthesized `__slang_coverage` buffer is reported here
+so hosts can discover how to bind it even though it is not part of
+normal `ProgramLayout` reflection.
+
+The metadata is retrieved by calling `castAs` / `queryInterface` on the
+artifact-associated `IMetadata` object. Like coverage metadata, this
+interface is ABI-stable by design:
+
+  - `SyntheticResourceInfo` may grow by tail extension guarded by its
+    leading `structSize`, or
+  - a future `ISyntheticResourceMetadataN` may be added with a new UUID.
+
+Intended use:
+  - use `ISyntheticResourceMetadata` to discover and bind hidden
+    compiler-synthesized resources
+  - descriptor-backed hosts read `(space, binding)` from
+    `SyntheticResourceInfo`
+  - CPU/CUDA-style marshaling hosts read `uniformOffset` and
+    `uniformStride` from `SyntheticResourceInfo`
+
+Lifetime and ownership:
+  - the metadata object is owned by the compiled artifact / `IMetadata`
+    container it is queried from
+  - pointers returned through `SyntheticResourceInfo` remain valid for
+    the lifetime of that metadata object
+  - callers do not own returned strings and must not free them
+
+Thread safety:
+  - metadata objects are immutable once returned to the host; concurrent
+    read-only queries are allowed as long as callers keep the owning
+    COM object alive
+*/
+enum class SyntheticResourceScope : uint32_t
+{
+    /// One shared resource bound at program/global scope.
+    Global = 0,
+
+    /// A resource scoped to one linked entry point.
+    EntryPoint = 1,
+};
+
+enum class SyntheticResourceAccess : uint32_t
+{
+    Read = 0,
+    Write = 1,
+    ReadWrite = 2,
+};
+
+struct SyntheticResourceInfo
+{
+    size_t structSize = sizeof(SyntheticResourceInfo);
+
+    /// Stable, opaque, non-zero synthetic resource identifier within
+    /// the compiled program. `0` is reserved as the default
+    /// "unassigned" sentinel; `findResourceIndexByID(0, ...)` always
+    /// returns `SLANG_E_NOT_FOUND`. Non-zero ids are assigned from the
+    /// compiler's internal synthetic-resource registry; hosts should
+    /// treat the numeric value as opaque and use it only to correlate
+    /// metadata and runtime binding helpers.
+    uint32_t id = 0;
+
+    /// The Slang binding kind represented by this synthetic
+    /// resource.
+    BindingType bindingType = BindingType::Unknown;
+
+    /// Number of logical resources in the synthetic binding. Most
+    /// current instrumentation resources are scalar (`1`).
+    uint32_t arraySize = 1;
+
+    /// Whether the resource is global/root-scoped or attached to a
+    /// specific entry point. Coverage currently reports a global
+    /// resource; entry-point scoped resources are reserved for future
+    /// synthetic-resource producers.
+    SyntheticResourceScope scope = SyntheticResourceScope::Global;
+
+    /// Intended access pattern for the resource.
+    SyntheticResourceAccess access = SyntheticResourceAccess::Read;
+
+    /// Entry point index when `scope == EntryPoint`, else `-1`.
+    /// No current coverage resource uses entry-point scope.
+    int32_t entryPointIndex = -1;
+
+    /// Sentinel conventions:
+    ///   - `space == -1` means the target does not report a descriptor
+    ///     space for this resource
+    ///   - `binding == -1` means descriptor binding is unavailable for
+    ///     this target
+    ///   - `uniformOffset == -1` means CPU/CUDA-style marshaling
+    ///     location is unavailable for this target
+    ///   - `uniformStride == 0` means CPU/CUDA-style marshaling
+    ///     location is unavailable or no stride applies; when
+    ///     `uniformOffset >= 0`, a non-zero stride may be reported
+    ///     even for scalar resources
+    /// `0` is a valid value for `space`, `binding`, and
+    /// `uniformOffset`.
+    ///
+    /// Descriptor-facing location for backends that bind synthetic
+    /// resources via `(space, binding)`.
+    int32_t space = -1;
+    int32_t binding = -1;
+
+    /// CPU/CUDA-style marshaling location in generated uniform /
+    /// wrapper parameter data, in bytes.
+    int32_t uniformOffset = -1;
+
+    /// Byte stride between adjacent logical elements when
+    /// CPU/CUDA-style marshaling is reported.
+    int32_t uniformStride = 0;
+
+    /// Optional stable debug name for the synthetic resource. The
+    /// returned pointer is valid for the lifetime of the metadata
+    /// object.
+    const char* debugName = nullptr;
+};
+
+struct ISyntheticResourceMetadata : public ISlangCastable
+{
+    SLANG_COM_INTERFACE(
+        0x47a33723,
+        0x181b,
+        0x4d2b,
+        {0xb8, 0x9e, 0x21, 0x54, 0x95, 0xbb, 0x38, 0x8b})
+
+    /// Number of synthetic bindable resources reported by this
+    /// metadata object.
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL getResourceCount() = 0;
+
+    /// Populate `outInfo` with the metadata for synthetic resource
+    /// `index`. The caller should default-initialize `outInfo` (for
+    /// example `SyntheticResourceInfo info;`) so `structSize` is set
+    /// to `sizeof(SyntheticResourceInfo)`.
+    /// Returns `SLANG_OK` on success,
+    /// `SLANG_E_INVALID_ARG` for null `outInfo`, mismatched
+    /// `structSize`, or out-of-range `index`.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getResourceInfo(uint32_t index, SyntheticResourceInfo* outInfo) = 0;
+
+    /// Look up the resource index for a stable synthetic resource
+    /// identifier. Returns `SLANG_OK` on success,
+    /// `SLANG_E_NOT_FOUND` when no resource with that id exists, and
+    /// `SLANG_E_INVALID_ARG` for null `outIndex`.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    findResourceIndexByID(uint32_t id, uint32_t* outIndex) = 0;
+};
+    #define SLANG_UUID_ISyntheticResourceMetadata ISyntheticResourceMetadata::getTypeGuid()
 
 struct CooperativeMatrixType
 {
@@ -5221,15 +5435,17 @@ struct SlangGlobalSessionDesc
  */
 SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t size);
 
-/* Serialize an `ICoverageTracingMetadata` artifact into the canonical
+/* Serialize coverage metadata into the canonical
  * `.coverage-mapping.json` shape. Same bytes that `slangc` writes
  * alongside compiled output when `-trace-coverage` is on, available
  * in-process for hosts compiling via the C++ API.
  *
- * The returned JSON is consumable by:
- * - `slang-coverage-rt` (C library) for accumulation + LCOV emission
- * - `tools/shader-coverage/slang-coverage-to-lcov.py` (Python)
- * - any tool expecting the version-1 manifest format
+ * The returned JSON is consumable by
+ * `tools/shader-coverage/slang-coverage-to-lcov.py` and any tool
+ * expecting the version-1 manifest format. If `metadata` is the
+ * artifact metadata object returned by Slang, it also supports
+ * `ISyntheticResourceMetadata`, and the serializer includes the
+ * coverage buffer's descriptor-facing binding fields when available.
  *
  * @param metadata The coverage metadata, obtained via
  *                 `castAs<ICoverageTracingMetadata>` on the artifact's
