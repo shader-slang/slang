@@ -26,6 +26,8 @@
 #endif
 
 #if defined(_WIN32)
+#include <windows.h>
+
 #include <slang-rhi/agility-sdk.h>
 SLANG_RHI_EXPORT_AGILITY_SDK
 #endif
@@ -33,6 +35,61 @@ SLANG_RHI_EXPORT_AGILITY_SDK
 namespace TestServer
 {
 using namespace Slang;
+
+#if defined(_WIN32)
+static DWORD WINAPI _parentMonitorThreadProc(void* data)
+{
+    HANDLE parentProcess = (HANDLE)data;
+    DWORD waitResult = WaitForSingleObject(parentProcess, INFINITE);
+    CloseHandle(parentProcess);
+
+    if (waitResult == WAIT_OBJECT_0)
+    {
+        TerminateProcess(GetCurrentProcess(), 0);
+    }
+
+    return 0;
+}
+
+static void _startParentMonitor(DWORD parentProcessId)
+{
+    HANDLE parentProcess = OpenProcess(SYNCHRONIZE, FALSE, parentProcessId);
+    if (!parentProcess)
+    {
+        if (GetLastError() == ERROR_INVALID_PARAMETER)
+        {
+            TerminateProcess(GetCurrentProcess(), 0);
+        }
+        return;
+    }
+
+    HANDLE thread = CreateThread(nullptr, 0, _parentMonitorThreadProc, parentProcess, 0, nullptr);
+    if (!thread)
+    {
+        CloseHandle(parentProcess);
+        return;
+    }
+    CloseHandle(thread);
+}
+
+static void _startParentMonitorFromArgs(int argc, const char* const* argv)
+{
+    for (int i = 1; i + 1 < argc; ++i)
+    {
+        if (strcmp(argv[i], "-parent-pid") != 0)
+            continue;
+
+        Int parentProcessId = 0;
+        if (SLANG_SUCCEEDED(
+                StringUtil::parseInt(UnownedStringSlice(argv[i + 1]), parentProcessId)) &&
+            parentProcessId > 0)
+        {
+            _startParentMonitor(DWORD(parentProcessId));
+        }
+        return;
+    }
+}
+#endif
 
 class TestReporter : public ITestReporter
 {
@@ -194,6 +251,10 @@ SlangResult innerMain(
 SlangResult TestServer::init(int argc, const char* const* argv)
 {
     m_exePath = argv[0];
+
+#if defined(_WIN32)
+    _startParentMonitorFromArgs(argc, argv);
+#endif
 
 #if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
     // Suppress the modal abort() dialog in unattended/LLM-driven builds.

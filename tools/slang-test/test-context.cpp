@@ -228,6 +228,8 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
     {
         CommandLine cmdLine;
         cmdLine.setExecutableLocation(ExecutableLocation(exeDirectoryPath, "test-server"));
+        cmdLine.addArg("-parent-pid");
+        cmdLine.addArg(String(Process::getId()));
 
         SLANG_RETURN_ON_FAIL(Process::create(
             cmdLine,
