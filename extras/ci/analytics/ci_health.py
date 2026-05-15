@@ -1334,6 +1334,15 @@ def main():
         in_use = hosted_runner_usage["in_progress"]["total"]
         queued = hosted_runner_usage["queued"]["total"]
         print(f"  Hosted runners in use: {in_use}/{cap}, queued: {queued}")
+        if hosted_runner_usage.get("partial"):
+            fetch_errs = hosted_runner_usage.get("fetch_errors", 0)
+            list_errs = hosted_runner_usage.get("list_errors", [])
+            print(
+                f"  Warning: hosted-runner sample is partial "
+                f"(fetch_errors={fetch_errs}, list_errors={len(list_errs)}); "
+                f"counts above may undercount real usage.",
+                file=sys.stderr,
+            )
     except Exception as e:  # noqa: BLE001 — sampler must never break the health run
         print(f"  Warning: hosted-runner sampler failed: {e}", file=sys.stderr)
         hosted_runner_usage = None
