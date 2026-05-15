@@ -7,8 +7,11 @@ name: CMake Options
 
 on:
   workflow_dispatch:
-  merge_group:
-    types: [checks_requested]
+  # The merge_group trigger was removed because the 10-job matrix consumed
+  # half of the org's 20-runner GitHub-hosted budget per merge-queue attempt,
+  # starving every other workflow (including CI gate jobs) for hours when the
+  # merge queue had multiple entries lined up. Weekly Saturday coverage is
+  # retained; ad-hoc validation is available via workflow_dispatch.
   schedule:
     - cron: "0 8 * * 6" # Saturday 12:00 AM PST (UTC-8)
 
