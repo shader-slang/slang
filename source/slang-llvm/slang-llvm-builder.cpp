@@ -366,6 +366,8 @@ public:
         int line) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
     getDebugForwardDeclareType(CharSlice name, LLVMDebugNode* file, int line) override;
+    SLANG_NO_THROW void SLANG_MCALL
+    replaceDebugForwardDeclareType(LLVMDebugNode* replace, LLVMDebugNode* with) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
     getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunction(
@@ -721,16 +723,16 @@ void LLVMBuilder::finalize()
     // llvmModule->print(rso, nullptr);
     // printf("%s\n", out.c_str());
 
+    // Debug info must be finalized before verifyModule, as otherwise the
+    // unresolved debug nodes can cause verification errors.
+    if (options.debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
+        llvmDebugBuilder->finalize();
+
     llvm::verifyModule(*llvmModule, &llvm::errs());
 
     // O0 is separately handled inside `optimize()`; we need to call it in
     // any case to make sure that `ForceInline` functions get inlined.
     optimize();
-
-    if (options.debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
-    {
-        llvmDebugBuilder->finalize();
-    }
 }
 
 void LLVMBuilder::emitGlobalLLVMIR(const std::string& textIR)
@@ -1811,12 +1813,18 @@ LLVMDebugNode* LLVMBuilder::getDebugForwardDeclareType(
         file = compileUnit->getFile();
     llvm::DIFile* llvmFile = llvm::cast<llvm::DIFile>(file);
 
-    return llvmDebugBuilder->createForwardDecl(
+    return llvmDebugBuilder->createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_structure_type,
         charSliceToLLVM(name),
         llvmFile,
         llvmFile,
         line);
+}
+
+void LLVMBuilder::replaceDebugForwardDeclareType(LLVMDebugNode* replace, LLVMDebugNode* with)
+{
+    llvm::TempMDNode fwdDecl(replace);
+    llvmDebugBuilder->replaceTemporary(std::move(fwdDecl), with);
 }
 
 LLVMDebugNode* LLVMBuilder::getDebugFunctionType(
