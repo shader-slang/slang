@@ -71,6 +71,7 @@ static void _startParentMonitor(DWORD parentProcessId)
     if (!thread)
     {
         CloseHandle(parentProcess);
+        TerminateProcess(GetCurrentProcess(), 0);
         return;
     }
     CloseHandle(thread);
