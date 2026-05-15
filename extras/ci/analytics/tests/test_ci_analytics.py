@@ -1074,14 +1074,62 @@ class TestHostedRunnerUsage(unittest.TestCase):
         with mock.patch.object(
             ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_fetch
         ):
-            jobs = ci_hosted_runner_usage.collect_hosted_jobs(
+            jobs, errors = ci_hosted_runner_usage.collect_hosted_jobs(
                 "shader-slang/slang", [run], "in_progress"
             )
         self.assertEqual(len(jobs), 2)
+        self.assertEqual(errors, 0)
         labels = sorted(j["hosted_label"] for j in jobs)
         self.assertEqual(labels, ["ubuntu-latest", "windows-latest"])
         for j in jobs:
             self.assertEqual(j["workflow_name"], "CI")
+
+    def test_collect_hosted_jobs_counts_fetch_errors(self):
+        """Fetch failures must be surfaced, not silently undercounted."""
+        runs = [{"id": 1, "name": "CI"}, {"id": 2, "name": "CI"}]
+
+        def fake_fetch(repo, run_id):
+            if run_id == 1:
+                return (
+                    [{"status": "in_progress", "labels": ["ubuntu-latest"], "name": "a"}],
+                    None,
+                )
+            return (None, "HTTP 502")
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_fetch
+        ):
+            jobs, errors = ci_hosted_runner_usage.collect_hosted_jobs(
+                "shader-slang/slang", runs, "in_progress"
+            )
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(errors, 1)
+
+    def test_sample_hosted_runner_usage_marks_partial_on_errors(self):
+        run = {"id": 99, "name": "CI"}
+
+        def fake_in_progress(repo):
+            return [run]
+
+        def fake_queued(repo):
+            return []
+
+        def fake_jobs(repo, run_id):
+            return (None, "HTTP 500")
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_jobs", side_effect=fake_queued
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage(
+                "shader-slang/slang", cap=20
+            )
+
+        self.assertTrue(snap.get("partial"))
+        self.assertEqual(snap.get("fetch_errors"), 1)
 
     def test_sample_hosted_runner_usage_shape(self):
         in_progress_run = {"id": 10, "name": "CI"}
@@ -1128,6 +1176,50 @@ class TestHostedRunnerUsage(unittest.TestCase):
         self.assertEqual(snap["in_progress"]["by_label"], [{"label": "ubuntu-latest", "count": 1}])
         self.assertEqual(snap["queued"]["total"], 2)
         self.assertEqual(snap["queued"]["by_workflow"], [{"name": "CMake Options", "count": 2}])
+
+
+class TestHostedLabelPalette(unittest.TestCase):
+    """Regression: variants must yield valid 6-digit `#RRGGBB` colors.
+
+    The original implementation appended an alpha suffix (`"BB"`), then
+    the chart code appended another `"55"` for the background fill,
+    producing invalid 10-digit hex like `#0d6efdBB55`.
+    """
+
+    def _is_six_digit_hex(self, color):
+        return (
+            isinstance(color, str)
+            and len(color) == 7
+            and color.startswith("#")
+            and all(c in "0123456789abcdefABCDEF" for c in color[1:])
+        )
+
+    def test_palette_returns_six_digit_hex_for_all_variants(self):
+        labels = [
+            "ubuntu-latest",
+            "ubuntu-22.04",
+            "ubuntu-24.04",
+            "ubuntu-24.04-arm",
+            "ubuntu-22.04-arm",
+            "windows-latest",
+            "windows-2022",
+            "macos-latest",
+            "macos-13",
+            "self-hosted-fallback",
+        ]
+        palette = ci_health._hosted_label_palette(labels)
+        for lbl, color in palette.items():
+            self.assertTrue(
+                self._is_six_digit_hex(color),
+                msg=f"{lbl!r} → {color!r} is not a 6-digit #RRGGBB",
+            )
+
+    def test_variants_under_same_pool_get_distinct_colors(self):
+        palette = ci_health._hosted_label_palette(
+            ["ubuntu-latest", "ubuntu-22.04", "ubuntu-24.04"]
+        )
+        colors = list(palette.values())
+        self.assertEqual(len(set(colors)), 3)
 
 
 class TestHostedRunnerRender(unittest.TestCase):

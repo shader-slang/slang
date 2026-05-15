@@ -378,7 +378,7 @@ def fetch_merge_queue_status(repo):
 
 def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None, hosted_runner_usage=None):
     """Append a runner status snapshot to the JSONL time-series file."""
-    if not queue_data and not gpu_quota and not hosted_runner_usage:
+    if not queue_data and not gpu_quota and not mq_data and not hosted_runner_usage:
         return
 
     now = datetime.now(timezone.utc)
@@ -656,7 +656,9 @@ def _hosted_label_palette(labels):
     """Assign a stable color per hosted label based on its pool prefix.
 
     Variant labels under the same pool (ubuntu-latest vs. ubuntu-22.04)
-    get shaded variants so they're distinguishable but visibly related.
+    get progressively lighter shades of the same base color so they're
+    distinguishable but visibly related. The returned colors are always
+    6-digit `#RRGGBB` — alpha is applied at use time by the chart code.
     """
     palette = {}
     counts_per_prefix = {}
@@ -668,17 +670,34 @@ def _hosted_label_palette(labels):
         base = HOSTED_LABEL_PALETTE[prefix]
         idx = counts_per_prefix.get(prefix, 0)
         counts_per_prefix[prefix] = idx + 1
-        # First variant gets the base color; subsequent variants get a
-        # lighter alpha-suffix encoded as an HSL-ish offset by appending
-        # an "AA" alpha hint. Chart.js will use the borderColor as-is.
-        palette[lbl] = base if idx == 0 else f"{base}{_alpha_suffix(idx)}"
+        palette[lbl] = base if idx == 0 else _lighten_hex(base, _shade_factor(idx))
     return palette
 
 
-def _alpha_suffix(idx):
-    """Return a 2-hex-digit alpha suffix that decreases with idx."""
-    alphas = ["", "BB", "88", "55", "33"]
-    return alphas[idx] if idx < len(alphas) else "33"
+def _shade_factor(idx):
+    """Return a 0..1 lightening factor that grows with idx (max ~0.8)."""
+    factors = [0.0, 0.30, 0.50, 0.65, 0.78]
+    return factors[idx] if idx < len(factors) else 0.85
+
+
+def _lighten_hex(color, factor):
+    """Lighten a `#RRGGBB` color toward white by `factor` in [0,1].
+
+    Returns a `#RRGGBB` string. Invalid input is returned unchanged.
+    """
+    if not (isinstance(color, str) and len(color) == 7 and color.startswith("#")):
+        return color
+    try:
+        r = int(color[1:3], 16)
+        g = int(color[3:5], 16)
+        b = int(color[5:7], 16)
+    except ValueError:
+        return color
+    factor = max(0.0, min(1.0, factor))
+    r = int(r + (255 - r) * factor)
+    g = int(g + (255 - g) * factor)
+    b = int(b + (255 - b) * factor)
+    return f"#{r:02x}{g:02x}{b:02x}"
 
 
 def build_history_chart(snapshots):
@@ -948,9 +967,9 @@ function buildCharts(hours) {{
             callbacks: {{
               afterBody: function(items) {{
                 const idx = items[0].dataIndex;
-                const total = (hostedRunnerChart.total_series || [])[
-                  (hostedRunnerChart.total_series || []).length - n + idx
-                ];
+                const total = sliceLast(
+                  hostedRunnerChart.total_series || [], n
+                )[idx];
                 if (total == null) return '';
                 return 'Total in use: ' + total + ' / ' + hostedRunnerChart.cap;
               }}

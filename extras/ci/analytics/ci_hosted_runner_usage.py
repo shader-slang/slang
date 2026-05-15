@@ -109,11 +109,19 @@ def collect_hosted_jobs(repo, runs, status_filter):
     """Expand workflow runs to their hosted-runner jobs at `status_filter`.
 
     `status_filter` is e.g. `"in_progress"` or `"queued"`. Returns a
-    list of dicts with keys: workflow_name, job_name, hosted_label.
+    tuple `(results, error_count)`: `results` is a list of dicts with
+    keys workflow_name/job_name/hosted_label; `error_count` is the
+    number of runs whose jobs API call failed and whose hosted-runner
+    usage is therefore *missing* from `results`.
+
+    A non-zero `error_count` means the sample undercounts real usage.
+    Callers should surface this so a quota-exhaustion incident isn't
+    masked by a transient GitHub API hiccup.
     """
     results = []
+    error_count = 0
     if not runs:
-        return results
+        return results, error_count
 
     with ThreadPoolExecutor(max_workers=8) as executor:
         futures = {
@@ -124,6 +132,11 @@ def collect_hosted_jobs(repo, runs, status_filter):
             run = futures[future]
             jobs, err = future.result()
             if err:
+                print(
+                    f"Warning: failed to fetch jobs for run {run.get('id')}: {err}",
+                    file=sys.stderr,
+                )
+                error_count += 1
                 continue
             for job in jobs:
                 if job.get("status") != status_filter:
@@ -136,7 +149,7 @@ def collect_hosted_jobs(repo, runs, status_filter):
                     "job_name": job.get("name", ""),
                     "hosted_label": hosted_label,
                 })
-    return results
+    return results, error_count
 
 
 def summarize(jobs):
@@ -180,14 +193,21 @@ def sample_hosted_runner_usage(repo, cap=DEFAULT_HOSTED_RUNNER_CAP):
     in_progress_runs = fetch_in_progress_runs(repo)
     queued_runs = fetch_queued_jobs(repo)
 
-    in_progress_jobs = collect_hosted_jobs(repo, in_progress_runs, "in_progress")
-    queued_jobs = collect_hosted_jobs(repo, queued_runs, "queued")
+    in_progress_jobs, in_progress_errors = collect_hosted_jobs(
+        repo, in_progress_runs, "in_progress"
+    )
+    queued_jobs, queued_errors = collect_hosted_jobs(repo, queued_runs, "queued")
 
-    return {
+    fetch_errors = in_progress_errors + queued_errors
+    result = {
         "cap": cap,
         "in_progress": summarize(in_progress_jobs),
         "queued": summarize(queued_jobs),
     }
+    if fetch_errors:
+        result["partial"] = True
+        result["fetch_errors"] = fetch_errors
+    return result
 
 
 def parse_args():
