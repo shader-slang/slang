@@ -10,6 +10,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj -xslang -DRWBAB
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DRWBAB
+//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DLOAD_COVERAGE
 
 //TEST:SIMPLE(filecheck=SPV):-target spirv -entry computeMain -stage compute -emit-spirv-directly
 
@@ -40,6 +41,51 @@ void test(uint val)
 
 	uint4 quad = inputBuffer.Load4(uint(tmp * 4));
 	tmp = (quad.x + quad.y + quad.z + quad.w) & 0xF;
+
+#ifdef LOAD_COVERAGE
+    if (val == 0xFFFFFFFF)
+    {
+        uint coverage = 0;
+
+        uint3 triple = inputBuffer.Load3(0);
+        coverage += triple.x + triple.y + triple.z;
+
+        uint2 alignedPair = inputBuffer.Load2Aligned(8, 8);
+        coverage += alignedPair.x + alignedPair.y;
+
+        uint3 alignedTriple = inputBuffer.Load3Aligned(12, 12);
+        coverage += alignedTriple.x + alignedTriple.y + alignedTriple.z;
+
+        uint4 alignedQuad = inputBuffer.Load4Aligned(16, 16);
+        coverage += alignedQuad.x + alignedQuad.y + alignedQuad.z + alignedQuad.w;
+
+        uint2 naturalPair = inputBuffer.Load2Aligned(16);
+        coverage += naturalPair.x + naturalPair.y;
+
+        uint3 naturalTriple = inputBuffer.Load3Aligned(12);
+        coverage += naturalTriple.x + naturalTriple.y + naturalTriple.z;
+
+        uint4 naturalQuad = inputBuffer.Load4Aligned(16);
+        coverage += naturalQuad.x + naturalQuad.y + naturalQuad.z + naturalQuad.w;
+
+        int genericInt = inputBuffer.Load<int>(0);
+        coverage += uint(genericInt);
+
+        float genericFloat = inputBuffer.Load<float>(4);
+        coverage += asuint(genericFloat);
+
+        float4 genericFloatQuad = inputBuffer.Load<float4>(0);
+        coverage += asuint(genericFloatQuad.x);
+
+        float4 alignedFloatQuad = inputBuffer.LoadAligned<float4>(16, 16);
+        coverage += asuint(alignedFloatQuad.x);
+
+        float4 naturalFloatQuad = inputBuffer.LoadAligned<float4>(16);
+        coverage += asuint(naturalFloatQuad.x);
+
+        outputBuffer.Store(0, coverage);
+    }
+#endif
 
 	outputBuffer.Store(val*4, tmp);
 }

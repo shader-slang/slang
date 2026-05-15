@@ -433,6 +433,9 @@ struct ByteAddressBuffer
     ///@param T The type of the value to load from the buffer.
     ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return The value loaded from the buffer.
+    ///@remarks
+    /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
+    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
@@ -5862,7 +5865,7 @@ struct StructuredBuffer : IArray<T>
     {
         [__readNone]
         __intrinsic_op($(kIROp_StructuredBufferLoad))
-        [require(cpp_cuda_glsl_hlsl_spirv_llvm, structuredbuffer)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer)]
         get;
     };
 };
@@ -6270,6 +6273,9 @@ struct $(item.name)
     ///@param T The type of the value to load from the buffer.
     ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return The value loaded from the buffer.
+    ///@remarks
+    /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
+    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
@@ -7105,6 +7111,7 @@ struct $(item.name) : IRWArray<T>
         [__NoSideEffect]
         [nonmutating]
         __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer_rw)]
         ref;
     }
 };
