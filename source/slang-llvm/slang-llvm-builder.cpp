@@ -365,6 +365,8 @@ public:
         LLVMDebugNode* file,
         int line) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
+    getDebugForwardDeclareType(CharSlice name, LLVMDebugNode* file, int line) override;
+    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
     getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunction(
         LLVMDebugNode* funcType,
@@ -1800,6 +1802,20 @@ LLVMDebugNode* LLVMBuilder::getDebugStructType(
         fieldTypes);
 }
 
+LLVMDebugNode* LLVMBuilder::getDebugForwardDeclareType(CharSlice name, LLVMDebugNode* file, int line)
+{
+    if (!file)
+        file = compileUnit->getFile();
+    llvm::DIFile* llvmFile = llvm::cast<llvm::DIFile>(file);
+
+    return llvmDebugBuilder->createForwardDecl(
+        llvm::dwarf::DW_TAG_structure_type,
+        charSliceToLLVM(name),
+        llvmFile,
+        llvmFile,
+        line);
+}
+
 LLVMDebugNode* LLVMBuilder::getDebugFunctionType(
     LLVMDebugNode* returnType,
     Slice<LLVMDebugNode*> paramTypes)
@@ -2349,7 +2365,7 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 
 } // namespace slang_llvm
 
-extern "C" SLANG_DLL_EXPORT SlangResult createLLVMBuilder_V2(
+extern "C" SLANG_DLL_EXPORT SlangResult createLLVMBuilder_V3(
     const SlangUUID& intfGuid,
     Slang::ILLVMBuilder** out,
     Slang::LLVMBuilderOptions options,
