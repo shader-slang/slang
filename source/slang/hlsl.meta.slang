@@ -7071,7 +7071,7 @@ struct $(item.name) : IRWArray<T>
     /// @return The element at the specified index.
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoad))
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, rwstructuredbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer_rw)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location);
 
     /// Load an element from the buffer at the specified location.
@@ -7089,7 +7089,7 @@ struct $(item.name) : IRWArray<T>
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoadStatus))
-    [require(hlsl, rwstructuredbuffer)]
+    [require(hlsl, structuredbuffer_rw)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
     /// Load an element from the buffer at the specified location.
