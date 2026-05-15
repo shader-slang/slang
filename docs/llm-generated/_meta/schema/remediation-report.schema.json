@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shader-slang.github.io/llm-generated/remediation-report.schema.json",
+  "title": "LLM-generated docs remediation report front-matter",
+  "description": "Shape of the YAML front-matter for a remediation report under docs/llm-generated/_meta/remediations/. The body of the report (Summary, optional Escalated findings, Actions table) is not covered by this schema; it is enforced by the lint pass in regenerate.py.",
+  "type": "object",
+  "required": [
+    "remediation_report",
+    "remediator_model",
+    "remediated_at",
+    "target_doc",
+    "review_report",
+    "target_doc_source_commit_before",
+    "target_doc_source_commit_after",
+    "actions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "remediation_report": {
+      "type": "boolean",
+      "const": true,
+      "description": "Sentinel marking the file as a remediation report."
+    },
+    "remediator_model": {
+      "type": "string",
+      "description": "Identifier of the model that produced the remediation. The lower-cased value MUST start with 'claude' or 'anthropic'; the bookkeeping gate refuses other families."
+    },
+    "remediated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "target_doc": {
+      "type": "string",
+      "description": "Manifest key of the remediated document (e.g. pipeline/05-ir-passes.md). Must match the target_doc of the linked review report."
+    },
+    "review_report": {
+      "type": "string",
+      "description": "Workspace-relative path to the review report being acted on (e.g. _meta/reviews/pipeline/05-ir-passes.md.review.md)."
+    },
+    "target_doc_source_commit_before": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,64}$",
+      "description": "The source_commit in the target document's front-matter at the start of remediation (same as the linked review's target_doc_source_commit)."
+    },
+    "target_doc_source_commit_after": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,64}$",
+      "description": "The source_commit in the target document's front-matter after remediation; equal to _before when no edits were made."
+    },
+    "actions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixed", "rejected_bogus", "rejected_out_of_scope", "deferred", "escalated"],
+      "properties": {
+        "fixed": { "type": "integer", "minimum": 0 },
+        "rejected_bogus": { "type": "integer", "minimum": 0 },
+        "rejected_out_of_scope": { "type": "integer", "minimum": 0 },
+        "deferred": { "type": "integer", "minimum": 0 },
+        "escalated": { "type": "integer", "minimum": 0 }
+      },
+      "description": "The five counts must sum to the linked review report's finding_count; the lint pass enforces this."
+    }
+  }
+}

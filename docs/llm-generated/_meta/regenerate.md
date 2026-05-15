@@ -27,11 +27,14 @@ python3 docs/llm-generated/_meta/regenerate.py <subcommand> [args...]
 | Subcommand | Purpose |
 | --- | --- |
 | `list` | Print every doc in the manifest |
-| `list-stale` | Classify each doc as `missing`, `stale`, or `fresh` |
+| `list-stale [--include-review]` | Classify each doc as `missing`, `stale`, or `fresh`; with the flag, annotate each row with its review/remediation status |
 | `digest <doc>` | Compute the current digest of a doc's watched paths |
 | `show <doc>` | Show the manifest entry plus the resolved source files |
 | `mark-fresh <doc> [--commit SHA] [--model NAME]` | Record a fresh entry |
-| `lint [<doc>...]` | Structural linter (front-matter, link resolution, size cap) |
+| `lint [<doc>...]` | Structural linter (front-matter, link resolution, size cap; also lints every review and remediation report) |
+| `review-status [<doc>...] [--show-counts]` | Per-doc review/remediation freshness (see "Review and remediation workflow" below) |
+| `mark-reviewed <doc> [--report PATH]` | Record a review entry from a review report (see below) |
+| `mark-remediated <doc> [--report PATH]` | Record a remediation entry from a remediation report (see below) |
 
 `<doc>` is the manifest key (e.g. `pipeline/05-ir-passes.md`), not the full
 workspace path.
@@ -102,6 +105,188 @@ generated peer docs as context. This typically:
 The cross-link pass is just a regular regeneration of every doc with an
 expanded context, followed by `lint` and `mark-fresh`.
 
+## Review and remediation workflow
+
+Generated docs are subject to a two-stage independent-review process
+intended to catch drift, hallucination, and contract violations:
+
+1. **Review** — performed by an agent from a **different** model family
+   than the one used for generation (the operator's choice; the
+   reference flow uses a GPT model). Produces a structured report under
+   [reviews/](reviews/) (one report per doc).
+2. **Remediation** — performed by an agent from the **same** model family
+   that generated the docs (Anthropic Claude). Acts on every finding in
+   the review report by editing the target doc, recording a rationale to
+   reject the finding, deferring it, or escalating it to a human.
+   Produces a structured report under [remediations/](remediations/).
+
+The driver does not call any agent for either stage. It supplies the
+prompt templates and bookkeeping; the operator runs the agent
+out-of-band, just like for generation.
+
+### Refusal mechanism (soft, three layers)
+
+- **Prompt banner.** The first lines of
+  [prompts/_review.md](prompts/_review.md) tell a Claude-family model to
+  output `REFUSED: Claude model detected; the review step requires a
+  different model family` and stop. The first lines of
+  [prompts/_remediate.md](prompts/_remediate.md) tell a non-Claude model
+  to output `REFUSED: non-Claude model detected; the remediation step
+  requires the same model family that generated the docs` and stop.
+- **Bookkeeping gate.** `mark-reviewed` refuses to record a review whose
+  `reviewer_model` looks like Claude/Anthropic; `mark-remediated`
+  refuses to record a remediation whose `remediator_model` does not.
+- **Runbook.** This file's per-stage instructions name the expected
+  family.
+
+This is intentionally not a hard gate (the tool does not call a model
+API and cannot verify identity directly); the goal is to prevent
+accidental misuse, not to defend against an adversary.
+
+### Step 1 — Review (non-Claude agent)
+
+Pick a doc that needs reviewing. Documents that have never been
+reviewed, and documents whose `watched_paths_digest` has changed since
+the last review, are listed by:
+
+```bash
+python3 docs/llm-generated/_meta/regenerate.py review-status
+```
+
+Each row prints one of `unreviewed`, `review-stale`,
+`reviewed-pending-remediation`, or `remediated`.
+
+For each doc that needs review:
+
+1. Open the review prompt at [prompts/_review.md](prompts/_review.md).
+2. Show the agent: the target document (with its front-matter), the
+   doc's per-page prompt (the path is in the manifest entry; obtain via
+   `regenerate.py show <doc>`), [prompts/_common.md](prompts/_common.md),
+   the resolved watched files at the doc's recorded `source_commit`,
+   and any `depends_on` documents.
+3. Ask the agent to produce a single review report exactly matching the
+   contract in `_review.md`.
+4. Save the report to `_meta/reviews/<doc>.review.md` — preserving the
+   manifest-key directory hierarchy (e.g.
+   `_meta/reviews/pipeline/05-ir-passes.md.review.md`).
+5. Run `regenerate.py lint <doc>`. Fix structural issues by
+   re-prompting the agent — never by hand-editing the report.
+6. Record the review:
+
+   ```bash
+   python3 docs/llm-generated/_meta/regenerate.py mark-reviewed <doc>
+   ```
+
+   `mark-reviewed` reads the default report path
+   (`_meta/reviews/<doc>.review.md`); pass `--report PATH` to override.
+   It refuses to record the entry if `reviewer_model` contains
+   `claude` or `anthropic`.
+
+### Step 2 — Remediation (Claude agent)
+
+Documents needing remediation are listed by the same `review-status`
+output as `reviewed-pending-remediation`.
+
+For each doc:
+
+1. Open the remediation prompt at
+   [prompts/_remediate.md](prompts/_remediate.md).
+2. Show the agent: the target document, the review report from Step 1,
+   the doc's per-page prompt + [prompts/_common.md](prompts/_common.md),
+   and the resolved watched files at the current `HEAD`.
+3. The agent edits the target document where appropriate and produces
+   a remediation report at
+   `_meta/remediations/<doc>.remediation.md` matching the contract in
+   `_remediate.md`.
+4. If the document was edited:
+
+   ```bash
+   python3 docs/llm-generated/_meta/regenerate.py mark-fresh <doc> \
+       --model <model-id>
+   ```
+
+   so the doc's `watched_paths_digest` is refreshed. (If the doc was
+   not edited — every action was a rejection / deferral / escalation —
+   skip `mark-fresh`.)
+5. Lint and record the remediation:
+
+   ```bash
+   python3 docs/llm-generated/_meta/regenerate.py lint <doc>
+   python3 docs/llm-generated/_meta/regenerate.py mark-remediated <doc>
+   ```
+
+   `mark-remediated` reads the default report path; pass `--report
+   PATH` to override. It refuses to record the entry if
+   `remediator_model` does not contain `claude` or `anthropic`.
+
+### Example session
+
+A complete cycle for one doc:
+
+```bash
+# 0. See which docs need review.
+python3 docs/llm-generated/_meta/regenerate.py review-status
+
+# 1. Run the review agent (non-Claude). Save its output to
+#    _meta/reviews/pipeline/06-emit.md.review.md, then:
+python3 docs/llm-generated/_meta/regenerate.py lint pipeline/06-emit.md
+python3 docs/llm-generated/_meta/regenerate.py mark-reviewed pipeline/06-emit.md
+
+# 2. Run the remediation agent (Claude). It may edit
+#    docs/llm-generated/pipeline/06-emit.md. It writes the report to
+#    _meta/remediations/pipeline/06-emit.md.remediation.md, then:
+python3 docs/llm-generated/_meta/regenerate.py mark-fresh pipeline/06-emit.md \
+    --model claude-opus-4.7
+python3 docs/llm-generated/_meta/regenerate.py lint pipeline/06-emit.md
+python3 docs/llm-generated/_meta/regenerate.py mark-remediated pipeline/06-emit.md
+
+# 3. Verify the cycle closed.
+python3 docs/llm-generated/_meta/regenerate.py review-status pipeline/06-emit.md
+# expected: "remediated  pipeline/06-emit.md"
+```
+
+### Ledger and freshness
+
+The two-stage state is recorded in
+[review-state.json](review-state.json) (sibling of `freshness.json`).
+A document is computed as:
+
+- **review-fresh** iff `last_reviewed.target_doc_watched_paths_digest`
+  equals the doc's current front-matter `watched_paths_digest` — i.e.
+  the doc has not been regenerated since the last review.
+- **remediation-fresh** iff review-fresh **and**
+  `last_remediated.review_report_ref` points at the same review report
+  that is currently in `last_reviewed`.
+
+These are not stored; they are derived on the fly by `review-status`
+and by `list-stale --include-review`. When a doc is regenerated and
+`mark-fresh` runs, the next `review-status` will report `review-stale`
+for that doc, prompting the next review cycle.
+
+### Lifecycle
+
+```mermaid
+flowchart LR
+  fresh["fresh, unreviewed"]
+  reviewed["reviewed, pending remediation"]
+  remediated["remediated"]
+  stale["regenerated, review stale"]
+  fresh -->|step 1| reviewed
+  reviewed -->|step 2| remediated
+  remediated -->|"mark-fresh after source change"| stale
+  reviewed -->|"mark-fresh after source change"| stale
+  stale -->|step 1| reviewed
+```
+
+### Out of scope
+
+- A whole-tree integrity review (cross-doc consistency check) — the
+  per-doc reviews already verify each doc's outgoing links via lint.
+- A self-review by the generating model before the external reviewer.
+- Reviewing the reports themselves (recursion).
+- Hard refusal via an HTTP / API gate — the driver does not call a
+  model, so identity cannot be enforced beyond the soft layers above.
+
 ## Linter exit codes and policy
 
 `lint` exits non-zero if any document has a structural **error**:
@@ -110,6 +295,24 @@ expanded context, followed by `lint` and `mark-fresh`.
 - Required front-matter keys missing (`generated`, `model`,
   `generated_at`, `source_commit`, `watched_paths_digest`, `warning`)
 - A markdown link `[text](path)` whose path does not resolve
+
+`lint` also walks every review and remediation report under
+[reviews/](reviews/) and [remediations/](remediations/) and validates:
+
+- The report front-matter against
+  [schema/review-report.schema.json](schema/review-report.schema.json) /
+  [schema/remediation-report.schema.json](schema/remediation-report.schema.json):
+  required keys present, sentinel field `true`, severity / action
+  counts non-negative and consistent with the body.
+- The model fields against the soft refusal rule
+  (`reviewer_model` must not be Claude/Anthropic; `remediator_model`
+  must be).
+- The `## Findings` table (review) and `## Actions` table
+  (remediation): well-formed columns, unique IDs, allowed severity /
+  action values, mandatory cells populated.
+- Cross-consistency: every finding ID in the linked review's
+  `## Findings` table appears exactly once in the remediation's
+  `## Actions` table, with no extras.
 
 `lint` reports **warnings** (currently only "size exceeds cap") without
 failing. A warning is a hint to either tighten the prompt to produce a
@@ -139,10 +342,15 @@ generated doc.
 
 ## What the driver intentionally does NOT do
 
-- It does not call any agent or LLM. Generation is operator-driven.
+- It does not call any agent or LLM. Generation, review, and
+  remediation are all operator-driven.
 - It does not commit or push changes.
-- It does not auto-edit generated documents. If lint fails, the operator
-  re-runs the agent with the lint output included in the prompt context.
+- It does not auto-edit generated documents, review reports, or
+  remediation reports. If lint fails, the operator re-runs the agent
+  with the lint output included in the prompt context.
+- It does not enforce reviewer / remediator identity beyond a soft
+  string check on the `reviewer_model` / `remediator_model` fields in
+  the report front-matter.
 
 ## Continuous integration
 
