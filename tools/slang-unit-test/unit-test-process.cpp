@@ -2,13 +2,18 @@
 
 #include "../../source/core/slang-http.h"
 #include "../../source/core/slang-io.h"
+#include "../../source/core/slang-platform.h"
 #include "../../source/core/slang-process-util.h"
 #include "../../source/core/slang-random-generator.h"
 #include "../../source/core/slang-string-util.h"
 #include "unit-test/slang-unit-test.h"
 
 #if defined(_WIN32)
+#include <wchar.h>
 #include <windows.h>
+// clang-format off
+#include <tlhelp32.h>
+// clang-format on
 #endif
 
 using namespace Slang;
@@ -134,11 +139,40 @@ struct ScopedWinHandle
     }
     ScopedWinHandle(const ScopedWinHandle&) = delete;
     ScopedWinHandle& operator=(const ScopedWinHandle&) = delete;
+    bool isValid() const { return handle && handle != INVALID_HANDLE_VALUE; }
     ~ScopedWinHandle()
     {
-        if (handle)
+        if (isValid())
         {
             CloseHandle(handle);
+        }
+    }
+};
+
+struct ScopedWinEnvironmentVariable
+{
+    const char* name = nullptr;
+    String oldValue;
+    bool hadOldValue = false;
+    bool isSet = false;
+
+    ScopedWinEnvironmentVariable(const char* inName, const String& value)
+        : name(inName)
+    {
+        StringBuilder oldValueBuilder;
+        hadOldValue = SLANG_SUCCEEDED(
+            PlatformUtil::getEnvironmentVariable(UnownedStringSlice(name), oldValueBuilder));
+        oldValue = oldValueBuilder.produceString();
+        isSet = SetEnvironmentVariableA(name, value.getBuffer()) != 0;
+    }
+
+    ScopedWinEnvironmentVariable(const ScopedWinEnvironmentVariable&) = delete;
+    ScopedWinEnvironmentVariable& operator=(const ScopedWinEnvironmentVariable&) = delete;
+    ~ScopedWinEnvironmentVariable()
+    {
+        if (name && isSet)
+        {
+            SetEnvironmentVariableA(name, hadOldValue ? oldValue.getBuffer() : nullptr);
         }
     }
 };
@@ -344,6 +378,120 @@ static SlangResult _parentMonitorTest(UnitTestContext* context)
     SLANG_RETURN_ON_FAIL(_parentMonitorFailureModeTests(context));
     return SLANG_OK;
 }
+
+static SlangResult _findChildTestServerProcessIds(DWORD parentProcessId, List<DWORD>& outProcessIds)
+{
+    ScopedWinHandle snapshot(CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0));
+    if (!snapshot.isValid())
+        return SLANG_FAIL;
+
+    PROCESSENTRY32W entry;
+    ZeroMemory(&entry, sizeof(entry));
+    entry.dwSize = sizeof(entry);
+    if (!Process32FirstW(snapshot.handle, &entry))
+        return SLANG_FAIL;
+
+    do
+    {
+        if (entry.th32ParentProcessID == parentProcessId &&
+            wcscmp(entry.szExeFile, L"test-server.exe") == 0)
+        {
+            outProcessIds.add(entry.th32ProcessID);
+        }
+    } while (Process32NextW(snapshot.handle, &entry));
+
+    return SLANG_OK;
+}
+
+static void _closeWindowsHandles(List<HANDLE>& handles)
+{
+    for (HANDLE handle : handles)
+    {
+        if (handle)
+        {
+            CloseHandle(handle);
+        }
+    }
+    handles.clear();
+}
+
+static SlangResult _testServerParentMonitorIntegrationTest(UnitTestContext* context)
+{
+    String readyEventName = _makeParentMonitorReadyEventName();
+    OSString readyEventOSName = readyEventName.toWString();
+    ScopedWinHandle readyEvent(CreateEventW(nullptr, TRUE, FALSE, readyEventOSName.begin()));
+    if (!readyEvent.isValid())
+        return SLANG_FAIL;
+
+    CommandLine slangTestCmdLine;
+    slangTestCmdLine.setExecutableLocation(
+        ExecutableLocation(context->executableDirectory, "slang-test"));
+    slangTestCmdLine.addArg("-use-test-server");
+    slangTestCmdLine.addArg("-server-count");
+    slangTestCmdLine.addArg("1");
+    slangTestCmdLine.addArg("slang-unit-test-tool/CommandLineProcess");
+
+    PROCESS_INFORMATION slangTestProcessInfo;
+    {
+        ScopedWinEnvironmentVariable readyEventEnv(
+            "SLANG_TEST_PARENT_MONITOR_READY_EVENT",
+            readyEventName);
+        if (!readyEventEnv.isSet)
+            return SLANG_FAIL;
+
+        SLANG_RETURN_ON_FAIL(_createWindowsProcess(slangTestCmdLine, slangTestProcessInfo));
+    }
+
+    ScopedWinHandle slangTestProcess(slangTestProcessInfo.hProcess);
+    ScopedWinHandle slangTestThread(slangTestProcessInfo.hThread);
+    List<HANDLE> testServerHandles;
+    SlangResult result = SLANG_OK;
+
+    if (WaitForSingleObject(readyEvent.handle, 30 * 1000) != WAIT_OBJECT_0)
+    {
+        result = SLANG_FAIL;
+    }
+
+    if (SLANG_SUCCEEDED(result))
+    {
+        List<DWORD> testServerProcessIds;
+        result =
+            _findChildTestServerProcessIds(slangTestProcessInfo.dwProcessId, testServerProcessIds);
+        if (SLANG_SUCCEEDED(result) && testServerProcessIds.getCount() == 0)
+        {
+            result = SLANG_FAIL;
+        }
+
+        for (DWORD processId : testServerProcessIds)
+        {
+            HANDLE process = OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE, FALSE, processId);
+            if (!process)
+            {
+                result = SLANG_FAIL;
+                break;
+            }
+            testServerHandles.add(process);
+        }
+    }
+
+    TerminateProcess(slangTestProcess.handle, 0);
+    WaitForSingleObject(slangTestProcess.handle, INFINITE);
+
+    if (SLANG_SUCCEEDED(result))
+    {
+        for (HANDLE testServerHandle : testServerHandles)
+        {
+            if (WaitForSingleObject(testServerHandle, 5 * 1000) != WAIT_OBJECT_0)
+            {
+                TerminateProcess(testServerHandle, 0);
+                result = SLANG_FAIL;
+            }
+        }
+    }
+
+    _closeWindowsHandles(testServerHandles);
+    return result;
+}
 #endif
 
 static SlangResult _countTest(UnitTestContext* context, Index size, Index crashIndex = -1)
@@ -456,3 +604,10 @@ SLANG_UNIT_TEST(CommandLineProcess)
     SLANG_CHECK(SLANG_SUCCEEDED(_parentMonitorTest(unitTestContext)));
 #endif
 }
+
+#if defined(_WIN32)
+SLANG_UNIT_TEST(TestServerParentMonitorIntegration)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_testServerParentMonitorIntegrationTest(unitTestContext)));
+}
+#endif
