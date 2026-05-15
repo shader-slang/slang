@@ -5,9 +5,9 @@
 Enumeration declaration:
 > *`enum-decl`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'enum'`** [**`'class'`**] [*`enum-identifier`*] <br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'enum'`** [**`'class'`**] [*`enum-identifier`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`tag-type`*]<br>
-> **`'{'`** [*`enum-case-decl`* (**`','`** *`enum-case-decl`*)* ] **`'}'`**
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'{'`** [*`enum-case-decl`* (**`','`** *`enum-case-decl`*)*] **`'}'`**
 
 Enumeration case declaration:
 > *`enum-case-decl`* =<br>
@@ -20,14 +20,15 @@ Enumeration case declaration:
 ### Parameters {#parameters}
 
 - *`modifier-list`* is an optional list of modifiers:
-  - [\[UnscopedEnum\]](../../../core-module-reference/attributes/unscopedenum-08.html) specifies that the
-    enumeration is unscoped.
   - [\[Flags\]](../../../core-module-reference/attributes/flags-0.html) specifies that the
     enumeration defines flags for a bit field.
+  - See also Remark 1 in the Description section below.
 - **`'class'`** is a compatibility feature that allows the same enumeration declarations to be shared between
   C/C++ and Slang.
-- *`enum-identifier`* is the identifier for the declared enumeration type. If omitted, the enumeration
-  is *anonymous*.
+  - See Remark 2 in the Description section below.
+- *`enum-identifier`* is the identifier for the declared enumeration type.
+  - While the syntax currently allows declaring anonymous enumerations, it is recommended that all
+    enumerations be named. See Remark 1 in the Description section below.
 - *`tag-type`* specifies the underlying type of the enumeration. If omitted, the default is `int`.
 - *`enum-const-identifier`* is an identifier for an enumerator, i.e., an enumerated constant.
 - *`expr`* is a [link-time constant](expressions-evaluation-classes.md), specifying the numeric value for the
@@ -42,33 +43,43 @@ enumerators.
 The underlying type of an enumeration must be a [Boolean](types-fundamental.md) or an
 [integer](types-fundamental.md) type. If no underlying type is specified, the default is `int`.
 
-Enumerations can be either *scoped* or *unscoped*. The named constants of a scoped enumeration are accessed
-within the enumeration namespace using the `EnumType.ENUM_CONST` form. If the enumeration is *unscoped*,
-the named constants are defined in the same namespace as the enumeration type. The enumerators of an unscoped
-enumeration can also be accessed using the scoped form.
-
-Named enumerations are scoped by default; anonymous enumerations are always unscoped. The `slangc`
-command-line option `-unscoped-enum` changes the default for named enumerations to unscoped. The
-[\[UnscopedEnum\]](../../../core-module-reference/attributes/unscopedenum-08.html) attribute in the
-modifier list explicitly declares an unscoped enumeration, while the **`'class'`** keyword explicitly
-declares a scoped enumeration. It is an error to apply the \[UnscopedEnum\] attribute to an enum class
-declaration, or to declare an anonymous enum class.
+Enumerations are *scoped*. The named constants of a scoped enumeration are accessed
+within the enumeration namespace using the `EnumType.ENUM_CONST` form.
 
 If an enumerator is not assigned a value, one is provided. By default, the value is the previous enumerator's
 value incremented by 1. If the value for the first enumerator is unspecified, the default is 0. However, if
 [\[Flags\]](../../../core-module-reference/attributes/flags-0.html) is specified for the enumeration, the
-provided value is the previous enumerator's value left-shifted by 1, and the first enumerator is provided with
-a default value of 1.
+provided value is the previous enumerator's value left-shifted by 1, and the default value for the first
+enumerator is 1.
 
 Multiple enumerators may share the same numeric value.
 
 An enumeration may be extended using the [extension](types-extension.md#enum) syntax. An extension can be used
 to add member functions, constructors, interface conformances, and similar features to the enumeration.
 
-> 📝 **Remark:** Scoped enumerations are generally recommended to avoid namespace pollution.
+
+> 📝 **Remark 1:** Slang currently supports *unscoped* enumerations, in which the named constants are defined
+> in the same namespace as the enumeration type. The enumerators of an unscoped enumeration can also be
+> accessed using the scoped form.
+>
+> There are three ways to declare an unscoped enumeration:
+> - The `slangc` command-line option `-unscoped-enum` makes all named enumerations unscoped, except those
+>   that are declared using **`'enum class'`**.
+> - The [\[UnscopedEnum\]](../../../core-module-reference/attributes/unscopedenum-08.html) attribute in the
+>   modifier list explicitly declares an unscoped enumeration.
+> - An anonymous enumeration is unscoped.
+>
+> However, please note that unscoped enumerations are subject to deprecation and removal, and should therefore
+> be avoided in new Slang programs. See GitHub issue
+> [#11175](https://github.com/shader-slang/slang/issues/11175) for details.
+
+> 📝 **Remark 2:** Currently, **`'enum class'`** is always a scoped enumeration whereas **`'enum'`** can be
+> either scoped or unscoped. If unscoped enumerations are removed from Slang, there will be no difference
+> between **`'enum'`** and **`'enum class'`**. New code should prefer **`'enum'`**.
 
 
-## Examples
+
+## Examples {#examples}
 
 ```hlsl
 enum TestEnum
@@ -80,15 +91,7 @@ enum TestEnum
     Max = 2147483647,
 }
 
-[UnscopedEnum]
-enum MyUnscopedEnum
-{
-    SOME_CONSTANT = 123,
-    ANOTHER_CONSTANT = 234,
-}
-
 RWStructuredBuffer<TestEnum> output1;
-RWStructuredBuffer<MyUnscopedEnum> output2;
 
 [numthreads(1,1,1)]
 void main(uint3 threadId : SV_DispatchThreadID)
@@ -98,12 +101,5 @@ void main(uint3 threadId : SV_DispatchThreadID)
     output1[2] = TestEnum.AnotherOne; // 1
     output1[3] = TestEnum.Three;      // 3
     output1[4] = TestEnum.Max;        // 2147483647
-
-    // The enumerators of an unscoped enum can be
-    // used directly...
-    output2[0] = SOME_CONSTANT;       // 123
-
-    // ... or with the enumeration type prefix
-    output2[1] = MyUnscopedEnum.ANOTHER_CONSTANT; // 234
 }
 ```
