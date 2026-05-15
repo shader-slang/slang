@@ -35,6 +35,7 @@ Index getRichDiagnosticsInfoCount();
 % local diagnostics = lua_module.getDiagnostics()
 % for _, diagnostic in ipairs(diagnostics) do
 %     local class_name = lua_module.toPascalCase(diagnostic.name)
+// $(diagnostic.severity): $(diagnostic.name) ($(diagnostic.code))
 struct $(class_name)
 {
 %     -- Direct parameters (non-variadic or shared)
