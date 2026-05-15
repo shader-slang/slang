@@ -5,3 +5,5 @@ defaults:
       path: "llm-generated"
     values:
       layout: "llm-generated"
+include:
+  - _meta
