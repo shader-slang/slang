@@ -2913,6 +2913,18 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
     }
 };
 
+static LoweredElementTypeInfo makeMetalPointerAsUInt64Info(IRType* type)
+{
+    IRBuilder builder(type);
+    builder.setInsertBefore(type);
+    LoweredElementTypeInfo info = {};
+    info.originalType = type;
+    info.loweredType = builder.getUInt64Type();
+    info.convertLoweredToOriginal = kIROp_CastIntToPtr;
+    info.convertOriginalToLowered = kIROp_CastPtrToInt;
+    return info;
+}
+
 struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
 {
     MetalParameterBlockElementTypeLoweringPolicy(
@@ -2952,16 +2964,7 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
             if (auto ptrType = as<IRPtrType>(type))
             {
                 if (as<IRPtrType>(ptrType->getValueType()))
-                {
-                    IRBuilder builder(type);
-                    builder.setInsertBefore(type);
-                    LoweredElementTypeInfo info = {};
-                    info.originalType = type;
-                    info.loweredType = builder.getUInt64Type();
-                    info.convertLoweredToOriginal = kIROp_CastIntToPtr;
-                    info.convertOriginalToLowered = kIROp_CastPtrToInt;
-                    return info;
-                }
+                    return makeMetalPointerAsUInt64Info(type);
             }
         }
         return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
@@ -3000,16 +3003,7 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
                 needsLowering = true;
 
             if (needsLowering)
-            {
-                IRBuilder builder(type);
-                builder.setInsertBefore(type);
-                LoweredElementTypeInfo info = {};
-                info.originalType = type;
-                info.loweredType = builder.getUInt64Type();
-                info.convertLoweredToOriginal = kIROp_CastIntToPtr;
-                info.convertOriginalToLowered = kIROp_CastPtrToInt;
-                return info;
-            }
+                return makeMetalPointerAsUInt64Info(type);
         }
         return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
     }
