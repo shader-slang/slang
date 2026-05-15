@@ -36,6 +36,9 @@ namespace TestServer
 using namespace Slang;
 
 #if defined(_WIN32)
+// This monitor is Windows-only because issue #10109 is specifically about orphaned test-server
+// processes holding DLLs open after slang-test crashes. Unix platforms do not prevent loaded
+// shared libraries from being replaced in the same way.
 static DWORD WINAPI _parentMonitorThreadProc(void* data)
 {
     HANDLE parentProcess = (HANDLE)data;
@@ -44,6 +47,8 @@ static DWORD WINAPI _parentMonitorThreadProc(void* data)
 
     if (waitResult == WAIT_OBJECT_0)
     {
+        // The RPC peer is gone, so graceful shutdown cannot be coordinated. Exit hard to release
+        // DLL file handles promptly; Windows will reclaim the process resources.
         TerminateProcess(GetCurrentProcess(), 0);
     }
 
@@ -52,13 +57,13 @@ static DWORD WINAPI _parentMonitorThreadProc(void* data)
 
 static void _startParentMonitor(DWORD parentProcessId)
 {
+    // Keep this scoped to test-server instead of changing shared process-launch plumbing. The PID
+    // is captured immediately before spawning this process and consumed during init, so the reuse
+    // window is tiny; if we cannot open it at all, avoid leaving an unmonitored orphan.
     HANDLE parentProcess = OpenProcess(SYNCHRONIZE, FALSE, parentProcessId);
     if (!parentProcess)
     {
-        if (GetLastError() == ERROR_INVALID_PARAMETER)
-        {
-            TerminateProcess(GetCurrentProcess(), 0);
-        }
+        TerminateProcess(GetCurrentProcess(), 0);
         return;
     }
 

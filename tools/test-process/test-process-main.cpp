@@ -178,6 +178,22 @@ static SlangResult _httpCrash()
     return SLANG_FAIL;
 }
 
+static SlangResult _sleep(int argc, const char* const* argv)
+{
+    Int timeInMs = 30 * 1000;
+    if (argc > 2)
+    {
+        SLANG_RETURN_ON_FAIL(StringUtil::parseInt(UnownedStringSlice(argv[2]), timeInMs));
+        if (timeInMs < 0 || timeInMs > 60 * 1000)
+        {
+            return SLANG_FAIL;
+        }
+    }
+
+    Process::sleepCurrentThread(timeInMs);
+    return SLANG_OK;
+}
+
 static SlangResult execute(int argc, const char* const* argv)
 {
     if (argc < 2)
@@ -202,6 +218,10 @@ static SlangResult execute(int argc, const char* const* argv)
     else if (toolName == "http-crash")
     {
         return _httpCrash();
+    }
+    else if (toolName == "sleep")
+    {
+        return _sleep(argc, argv);
     }
     return SLANG_E_NOT_AVAILABLE;
 }

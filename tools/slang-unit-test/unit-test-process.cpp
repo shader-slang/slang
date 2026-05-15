@@ -7,6 +7,10 @@
 #include "../../source/core/slang-string-util.h"
 #include "unit-test/slang-unit-test.h"
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 using namespace Slang;
 
 static SlangResult _createProcess(
@@ -118,6 +122,107 @@ static SlangResult _httpCrashTest(UnitTestContext* context)
     return SLANG_OK;
 }
 
+#if defined(_WIN32)
+struct ScopedWinHandle
+{
+    HANDLE handle = nullptr;
+
+    ScopedWinHandle() {}
+    explicit ScopedWinHandle(HANDLE inHandle)
+        : handle(inHandle)
+    {
+    }
+    ~ScopedWinHandle()
+    {
+        if (handle)
+        {
+            CloseHandle(handle);
+        }
+    }
+};
+
+static SlangResult _createWindowsProcess(const CommandLine& cmdLine, PROCESS_INFORMATION& out)
+{
+    STARTUPINFOW startupInfo;
+    ZeroMemory(&startupInfo, sizeof(startupInfo));
+    startupInfo.cb = sizeof(startupInfo);
+
+    String cmdString = cmdLine.toString();
+    OSString cmdStringBuffer = cmdString.toWString();
+
+    OSString pathBuffer;
+    LPCWSTR path = nullptr;
+    if (cmdLine.m_executableLocation.m_type == ExecutableLocation::Type::Path)
+    {
+        pathBuffer = cmdLine.m_executableLocation.m_pathOrName.toWString();
+        path = pathBuffer.begin();
+    }
+
+    ZeroMemory(&out, sizeof(out));
+    BOOL success = CreateProcessW(
+        path,
+        (LPWSTR)cmdStringBuffer.begin(),
+        nullptr,
+        nullptr,
+        FALSE,
+        CREATE_NO_WINDOW,
+        nullptr,
+        nullptr,
+        &startupInfo,
+        &out);
+
+    return success ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _parentMonitorTest(UnitTestContext* context)
+{
+    CommandLine parentCmdLine;
+    parentCmdLine.setExecutableLocation(
+        ExecutableLocation(context->executableDirectory, "test-process"));
+    parentCmdLine.addArg("sleep");
+    parentCmdLine.addArg("30000");
+
+    PROCESS_INFORMATION parentProcessInfo;
+    SLANG_RETURN_ON_FAIL(_createWindowsProcess(parentCmdLine, parentProcessInfo));
+    ScopedWinHandle parentProcess(parentProcessInfo.hProcess);
+    ScopedWinHandle parentThread(parentProcessInfo.hThread);
+
+    CommandLine serverCmdLine;
+    serverCmdLine.setExecutableLocation(
+        ExecutableLocation(context->executableDirectory, "test-server"));
+    serverCmdLine.addArg("-parent-pid");
+    serverCmdLine.addArg(String(uint32_t(parentProcessInfo.dwProcessId)));
+
+    RefPtr<Process> testServerProcess;
+    SlangResult createServerResult = Process::create(
+        serverCmdLine,
+        Process::Flag::AttachDebugger | Process::Flag::DisableStdErrRedirection,
+        testServerProcess);
+    if (SLANG_FAILED(createServerResult))
+    {
+        TerminateProcess(parentProcess.handle, 0);
+        return createServerResult;
+    }
+
+    if (testServerProcess->isTerminated())
+    {
+        TerminateProcess(parentProcess.handle, 0);
+        return SLANG_FAIL;
+    }
+
+    TerminateProcess(parentProcess.handle, 0);
+    WaitForSingleObject(parentProcess.handle, INFINITE);
+
+    if (!testServerProcess->waitForTermination(5 * 1000))
+    {
+        testServerProcess->kill(-1);
+        return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+#endif
+
 static SlangResult _countTest(UnitTestContext* context, Index size, Index crashIndex = -1)
 {
     /* Here we are trying to test what happens if the server produces a large amount of data, and
@@ -224,4 +329,7 @@ SLANG_UNIT_TEST(CommandLineProcess)
     SLANG_CHECK(SLANG_SUCCEEDED(_reflectTest(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_httpReflectTest(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_httpCrashTest(unitTestContext)));
+#if defined(_WIN32)
+    SLANG_CHECK(SLANG_SUCCEEDED(_parentMonitorTest(unitTestContext)));
+#endif
 }
