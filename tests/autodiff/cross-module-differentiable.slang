@@ -51,6 +51,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     outputBuffer[4] = fwd_diff(squaredLength)(dpv).d;
 
     // d/dv_y = 2*2 = 4
+    dpv = diffPair(float3(1.0, 2.0, 3.0), float3(0.0, 0.0, 0.0));
     bwd_diff(squaredLength)(dpv, 1.0);
     outputBuffer[5] = dpv.d.y;
 
