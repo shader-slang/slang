@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ci_visualization import page_template, chart_section, DOWNLOAD_JS
 from ci_hosted_runner_usage import (
     DEFAULT_HOSTED_RUNNER_CAP,
+    HOSTED_LABEL_PREFIXES,
     sample_hosted_runner_usage,
 )
 
@@ -643,7 +644,7 @@ def _build_hosted_runner_chart(snapshots):
     }
 
 
-HOSTED_LABEL_ORDER = ("ubuntu-", "macos-", "windows-")
+HOSTED_LABEL_ORDER = HOSTED_LABEL_PREFIXES
 
 HOSTED_LABEL_PALETTE = {
     "ubuntu-": "#0d6efd",
