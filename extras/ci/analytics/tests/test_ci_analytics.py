@@ -1105,6 +1105,86 @@ class TestHostedRunnerUsage(unittest.TestCase):
         self.assertEqual(len(jobs), 1)
         self.assertEqual(errors, 1)
 
+    def test_sample_counts_queued_jobs_inside_in_progress_runs(self):
+        """A run whose top-level status is `in_progress` can still carry
+        `queued` jobs waiting on a hosted runner. That is exactly the
+        cap-exhaustion leading edge we need to surface — make sure those
+        queued jobs land in the snapshot's `queued` bucket and not in
+        the void.
+        """
+        in_progress_run = {"id": 42, "name": "CI"}
+
+        def fake_in_progress(repo):
+            return [in_progress_run]
+
+        def fake_queued(repo):
+            # No workflow runs have top-level status=queued yet —
+            # the queueing is happening *inside* an in_progress run.
+            return []
+
+        def fake_jobs(repo, run_id):
+            assert run_id == 42
+            return (
+                [
+                    {"status": "in_progress", "labels": ["ubuntu-latest"], "name": "early"},
+                    {"status": "queued", "labels": ["ubuntu-latest"], "name": "stuck-1"},
+                    {"status": "queued", "labels": ["windows-latest"], "name": "stuck-2"},
+                ],
+                None,
+            )
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_jobs", side_effect=fake_queued
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage(
+                "shader-slang/slang", cap=20
+            )
+
+        self.assertEqual(snap["in_progress"]["total"], 1)
+        self.assertEqual(snap["queued"]["total"], 2)
+        queued_labels = {x["label"]: x["count"] for x in snap["queued"]["by_label"]}
+        self.assertEqual(queued_labels, {"ubuntu-latest": 1, "windows-latest": 1})
+
+    def test_sample_dedupes_runs_listed_in_both_endpoints(self):
+        """A run transitioning queued -> in_progress can appear in both
+        list endpoints during sampling. Its jobs must not be counted
+        twice.
+        """
+        run = {"id": 7, "name": "CI"}
+
+        def fake_in_progress(repo):
+            return [run]
+
+        def fake_queued(repo):
+            return [run]
+
+        call_count = {"n": 0}
+
+        def fake_jobs(repo, run_id):
+            call_count["n"] += 1
+            return (
+                [{"status": "in_progress", "labels": ["ubuntu-latest"], "name": "a"}],
+                None,
+            )
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_jobs", side_effect=fake_queued
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage(
+                "shader-slang/slang", cap=20
+            )
+
+        self.assertEqual(call_count["n"], 1)
+        self.assertEqual(snap["in_progress"]["total"], 1)
+
     def test_sample_hosted_runner_usage_marks_partial_on_errors(self):
         run = {"id": 99, "name": "CI"}
 

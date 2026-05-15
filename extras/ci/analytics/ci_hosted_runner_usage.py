@@ -106,18 +106,26 @@ def fetch_queued_jobs(repo):
 
 
 def collect_hosted_jobs(repo, runs, status_filter):
-    """Expand workflow runs to their hosted-runner jobs at `status_filter`.
+    """Expand workflow runs to their hosted-runner jobs.
 
-    `status_filter` is e.g. `"in_progress"` or `"queued"`. Returns a
-    tuple `(results, error_count)`: `results` is a list of dicts with
-    keys workflow_name/job_name/hosted_label; `error_count` is the
-    number of runs whose jobs API call failed and whose hosted-runner
-    usage is therefore *missing* from `results`.
+    `status_filter` is a single status string (e.g. `"in_progress"`) or
+    an iterable of statuses (e.g. `("in_progress", "queued")`). The
+    *job* status is what's matched — not the workflow run's top-level
+    status, since an `in_progress` run can contain `queued` jobs that
+    are stuck waiting for a hosted runner (the textbook cap-exhaustion
+    shape).
 
-    A non-zero `error_count` means the sample undercounts real usage.
-    Callers should surface this so a quota-exhaustion incident isn't
-    masked by a transient GitHub API hiccup.
+    Returns a tuple `(results, error_count)`. Each result dict has
+    keys: workflow_name, job_name, hosted_label, status. `error_count`
+    is the number of runs whose jobs API call failed and whose
+    hosted-runner usage is therefore *missing* from `results`. A
+    non-zero `error_count` means the sample undercounts real usage.
     """
+    if isinstance(status_filter, str):
+        wanted = {status_filter}
+    else:
+        wanted = set(status_filter)
+
     results = []
     error_count = 0
     if not runs:
@@ -139,7 +147,8 @@ def collect_hosted_jobs(repo, runs, status_filter):
                 error_count += 1
                 continue
             for job in jobs:
-                if job.get("status") != status_filter:
+                status = job.get("status")
+                if status not in wanted:
                     continue
                 hosted_label = classify_hosted_label(job.get("labels", []))
                 if not hosted_label:
@@ -148,6 +157,7 @@ def collect_hosted_jobs(repo, runs, status_filter):
                     "workflow_name": run.get("name", ""),
                     "job_name": job.get("name", ""),
                     "hosted_label": hosted_label,
+                    "status": status,
                 })
     return results, error_count
 
@@ -193,12 +203,27 @@ def sample_hosted_runner_usage(repo, cap=DEFAULT_HOSTED_RUNNER_CAP):
     in_progress_runs = fetch_in_progress_runs(repo)
     queued_runs = fetch_queued_jobs(repo)
 
-    in_progress_jobs, in_progress_errors = collect_hosted_jobs(
-        repo, in_progress_runs, "in_progress"
-    )
-    queued_jobs, queued_errors = collect_hosted_jobs(repo, queued_runs, "queued")
+    # A workflow run's top-level status doesn't dictate its jobs' statuses.
+    # An `in_progress` run can carry jobs that are still `queued`, waiting
+    # for a hosted runner — exactly the cap-exhaustion case we need to
+    # detect. So scan jobs from both run sets for both job statuses, then
+    # dedupe by (run_id, job_id) in case a run transitions between the
+    # two list endpoints during sampling.
+    seen = set()
+    deduped_runs = []
+    for run in list(in_progress_runs) + list(queued_runs):
+        rid = run.get("id")
+        if rid in seen:
+            continue
+        seen.add(rid)
+        deduped_runs.append(run)
 
-    fetch_errors = in_progress_errors + queued_errors
+    all_jobs, fetch_errors = collect_hosted_jobs(
+        repo, deduped_runs, ("in_progress", "queued")
+    )
+    in_progress_jobs = [j for j in all_jobs if j["status"] == "in_progress"]
+    queued_jobs = [j for j in all_jobs if j["status"] == "queued"]
+
     result = {
         "cap": cap,
         "in_progress": summarize(in_progress_jobs),
