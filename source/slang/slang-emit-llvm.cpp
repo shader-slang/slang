@@ -2881,7 +2881,7 @@ struct LLVMEmitter
         // Some debug types may have been left as forward declared if they
         // were self-referential (e.g., struct containing a pointer to itself).
         // We have to resolve these last.
-        for (auto[fwdDecl, concrete] : types->forwardDeclaredDebugTypes)
+        for (auto [fwdDecl, concrete] : types->forwardDeclaredDebugTypes)
             builder->replaceDebugForwardDeclareType(fwdDecl, concrete);
     }
 };
