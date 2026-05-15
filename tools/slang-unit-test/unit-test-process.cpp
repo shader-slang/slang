@@ -132,6 +132,8 @@ struct ScopedWinHandle
         : handle(inHandle)
     {
     }
+    ScopedWinHandle(const ScopedWinHandle&) = delete;
+    ScopedWinHandle& operator=(const ScopedWinHandle&) = delete;
     ~ScopedWinHandle()
     {
         if (handle)
@@ -149,6 +151,12 @@ static SlangResult _createWindowsProcess(const CommandLine& cmdLine, PROCESS_INF
 
     String cmdString = cmdLine.toString();
     OSString cmdStringBuffer = cmdString.toWString();
+    List<wchar_t> mutableCmdString;
+    for (const wchar_t* cursor = cmdStringBuffer.begin(); cursor != cmdStringBuffer.end(); ++cursor)
+    {
+        mutableCmdString.add(*cursor);
+    }
+    mutableCmdString.add(0);
 
     OSString pathBuffer;
     LPCWSTR path = nullptr;
@@ -161,7 +169,7 @@ static SlangResult _createWindowsProcess(const CommandLine& cmdLine, PROCESS_INF
     ZeroMemory(&out, sizeof(out));
     BOOL success = CreateProcessW(
         path,
-        (LPWSTR)cmdStringBuffer.begin(),
+        mutableCmdString.getBuffer(),
         nullptr,
         nullptr,
         FALSE,
@@ -201,14 +209,20 @@ static SlangResult _parentMonitorTest(UnitTestContext* context)
     if (SLANG_FAILED(createServerResult))
     {
         TerminateProcess(parentProcess.handle, 0);
+        WaitForSingleObject(parentProcess.handle, INFINITE);
         return createServerResult;
     }
 
     if (testServerProcess->isTerminated())
     {
         TerminateProcess(parentProcess.handle, 0);
+        WaitForSingleObject(parentProcess.handle, INFINITE);
         return SLANG_FAIL;
     }
+
+    // Give test-server time to open the parent handle. The fail-closed path is also acceptable,
+    // but the normal monitor-thread path is what this regression test is meant to exercise.
+    Process::sleepCurrentThread(250);
 
     TerminateProcess(parentProcess.handle, 0);
     WaitForSingleObject(parentProcess.handle, INFINITE);
