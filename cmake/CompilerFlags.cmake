@@ -90,7 +90,7 @@ endfunction()
 function(set_default_compile_options target)
     cmake_parse_arguments(
         ARG
-        "USE_EXTRA_WARNINGS;USE_FEWER_WARNINGS"
+        "USE_EXTRA_WARNINGS;USE_FEWER_WARNINGS;SKIP_ASAN"
         ""
         ""
         ${ARGN}
@@ -151,6 +151,20 @@ function(set_default_compile_options target)
 
     add_supported_cxx_flags(${target} PRIVATE ${warning_flags})
 
+    # Strip the absolute source directory prefix from __FILE__ so that build-machine
+    # paths are not baked into the binary's read-only data section.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(
+            ${target}
+            PRIVATE "-fmacro-prefix-map=${CMAKE_SOURCE_DIR}/="
+        )
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+        target_compile_options(
+            ${target}
+            PRIVATE "/d1trimfile:${CMAKE_SOURCE_DIR}\\"
+        )
+    endif()
+
     if(NOT WIN32)
         # these options are for ELF specific and not for Windows
         add_supported_cxx_linker_flags(
@@ -210,7 +224,7 @@ function(set_default_compile_options target)
             $<$<STREQUAL:${SLANG_LIB_TYPE},STATIC>:STB_IMAGE_STATIC>
     )
 
-    if(SLANG_ENABLE_ASAN)
+    if(SLANG_ENABLE_ASAN AND NOT ARG_SKIP_ASAN)
         # -fno-sanitize-recover=undefined is intentionally omitted so that
         # halt_on_error can be controlled at runtime via UBSAN_OPTIONS.
         # For abort-on-first-UB locally, set UBSAN_OPTIONS=halt_on_error=1.
@@ -254,9 +268,9 @@ function(set_default_compile_options target)
     endif()
 
     if(SLANG_ENABLE_COVERAGE)
-        # Coverage instrumentation for Clang/GCC
-        # Both flags must be used together for source mapping to work
-        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+            # Clang source-based coverage: both flags required together for
+            # source mapping to work
             target_compile_options(
                 ${target}
                 PRIVATE -fprofile-instr-generate -fcoverage-mapping
@@ -266,6 +280,10 @@ function(set_default_compile_options target)
                 BEFORE
                 PUBLIC -fprofile-instr-generate
             )
+        elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+            # GCC gcov-based coverage
+            target_compile_options(${target} PRIVATE --coverage)
+            target_link_options(${target} BEFORE PUBLIC --coverage)
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             # MSVC has no native source-level coverage tool; Windows coverage
             # is collected externally by OpenCppCoverage via PDBs. The only
