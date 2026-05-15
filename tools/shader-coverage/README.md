@@ -39,7 +39,7 @@ coverage pass — no AST decl, so it does not appear in Slang's
 public reflection. Hosts discover the hidden resource binding through
 `slang::ISyntheticResourceMetadata` and use
 `slang::ICoverageTracingMetadata` to learn how many counters to
-allocate and which source line each slot corresponds to.
+allocate and how source coverage entries map to those counters.
 
 The `.coverage-mapping.json` sidecar is **optional** — it's a
 serialization of the same metadata for cross-process / offline
@@ -49,7 +49,7 @@ hosts that compile via the C++ API can ignore the sidecar entirely
 and read the metadata directly from the artifact.
 
 After the host dispatches the shader and reads the counter buffer
-back, the host can either consume the slot→source attribution
+back, the host can either consume the source-entry attribution
 directly or convert the snapshot to LCOV `.info` via
 [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py). LCOV is
 consumable by `genhtml`, Codecov, VS Code Coverage Gutters, etc.
@@ -107,11 +107,11 @@ slangc shader.slang -target spirv -stage compute -entry main \
 
 Two equally supported paths, each suited to a different host
 architecture. For today's line coverage mode, both expose the same
-data: counter count, per-slot `(file, line)`, and the coverage
-buffer's hidden binding. The typed API exposes this through
+data: runtime counter count, source-entry attribution, and the
+coverage buffer's hidden binding. The typed API exposes this through
 `ICoverageTracingMetadata` plus `ISyntheticResourceMetadata`; the
 sidecar serializes the same contract.
-A slot may have no real source file/line; that is preserved in the
+A source entry may have no real source file/line; that is preserved in the
 metadata and filtered out later when exporting LCOV.
 
 ### A. In-process compile (Slang C++ API)
@@ -121,7 +121,7 @@ shader.slang ── compile (C++ API) ──► in-memory artifact + IMetadata
                                                  │
                                        castAs<ICoverageTracingMetadata>
                                        castAs<ISyntheticResourceMetadata>
-                                       → binding, slot→(file, line)
+                                       → binding, source entries
                                                  ▼
                                        host: allocate, bind, dispatch,
                                              readback, consume directly
@@ -144,7 +144,8 @@ auto* coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
 auto* syntheticResources = (slang::ISyntheticResourceMetadata*)metadata->castAs(
     slang::ISyntheticResourceMetadata::getTypeGuid());
 
-uint32_t n = coverage->getCounterCount();
+uint32_t counterCount = coverage->getCounterCount();
+uint32_t entryCount = coverage->getEntryCount();
 SLANG_CHECK(syntheticResources != nullptr);
 
 // The current coverage implementation emits one synthetic resource:
@@ -161,19 +162,27 @@ if (SLANG_SUCCEEDED(syntheticResources->getResourceInfo(coverageResourceIndex, &
     // CPU/CUDA targets: resourceInfo.uniformOffset, resourceInfo.uniformStride.
 }
 
-for (uint32_t i = 0; i < n; ++i) {
+for (uint32_t i = 0; i < entryCount; ++i) {
     slang::CoverageEntryInfo entry;
     if (SLANG_SUCCEEDED(coverage->getEntryInfo(i, &entry))) {
-        // entry.file, entry.line — match against your counter[i] readback
+        // Current line coverage:
+        //   entry.kind == CoverageEntryKind::Line
+        //   entry.counterIndex selects counters[entry.counterIndex]
+        //   entry.file / entry.line attribute that counter to source
     }
 }
 ```
 
-The host allocates a `uint32_t[n]` counter buffer, binds it using the
-hidden binding information reported through
+The host allocates a `uint32_t[counterCount]` counter buffer, binds it
+using the hidden binding information reported through
 `ISyntheticResourceMetadata`, dispatches the shader, reads the
-counters back, and consumes the attribution data however it likes —
-direct telemetry, a custom LCOV writer, a dashboard, etc.
+counters back, and consumes the source entries however it likes —
+direct telemetry, a custom LCOV writer, a dashboard, etc. In the
+current line-coverage mode, entries and counters are one-to-one.
+Future branch/function/source-region modes may expose source entries
+that are not identical to runtime counter slots, so hosts should use
+`entry.counterIndex` rather than assuming the entry index equals the
+counter index.
 
 #### Producing the canonical manifest JSON in-process
 
@@ -211,7 +220,7 @@ shader.slang ── slangc -trace-coverage ──► shader.spv
                           on a different machine, possibly without Slang linked)
                                                        ▼
                                        host: parse sidecar → (set, binding),
-                                             slot→(file, line)
+                                             source entries
                                              allocate, bind, dispatch, readback
                                              emit LCOV via
                                              slang-coverage-to-lcov.py
@@ -233,7 +242,8 @@ slangc shader.slang -target spirv -stage compute -entry main \
 ```
 
 Hosts that aren't linked against Slang still get the data: the
-sidecar contains both the hidden binding and the slot attribution.
+sidecar contains both the hidden binding and the source-entry
+attribution.
 The [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py) Python
 script consumes this format after dispatch when converting readback
 counters to LCOV.
@@ -243,10 +253,12 @@ at export time: entries without a real source file or with a
 non-positive line number are skipped instead of being written as
 synthetic `SF:` / `DA:` records.
 
-The current metadata interface is the line-compatible view. Future
-branch, function, or source-region coverage may add a richer source
-coverage metadata interface and sidecar schema while keeping this line
-view available for compatibility.
+The sidecar schema follows `ICoverageTracingMetadata`: it records the
+runtime counter count and a list of source coverage entries. Current
+line coverage entries use `kind: "line"`, `mode: "count"`, and a
+numeric `counter` index. Future branch, function, or source-region
+coverage can add entries with richer source ranges and semantics while
+keeping the same hidden binding contract.
 
 ---
 
@@ -263,14 +275,15 @@ view available for compatibility.
 ## Counter buffer format
 
 `uint32_t counters[N]` — flat little-endian array, no header. Indexed
-by slot. Saturates at ~4 × 10⁹ hits per slot (see _Current scope_).
+by `CoverageEntryInfo::counterIndex` / manifest `counter`. Saturates
+at ~4 × 10⁹ hits per slot (see _Current scope_).
 
 ---
 
 ## The converter — `slang-coverage-to-lcov.py`
 
 ```
---manifest <file.coverage-mapping.json>  Slot → (file, line) mapping.
+--manifest <file.coverage-mapping.json>  Source entry → counter mapping.
                                  Produced by slangc alongside the
                                  compiled artifact, or hand-built from
                                  ICoverageTracingMetadata.

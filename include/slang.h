@@ -4527,16 +4527,16 @@ struct IMetadata : public ISlangCastable
 /** Coverage tracing metadata produced when `-trace-coverage` is active.
 
 The current implementation reports line-oriented hit-count coverage:
-each counter slot in the synthesized coverage buffer maps to a source
-`(file, line)` pair. The interface lets hosts read that mapping at
-compile time so they can attribute counter values back to source lines
-at runtime without a separate sidecar file. The metadata is retrieved
-by calling `castAs` / `queryInterface` on the artifact-associated
+each counter slot in the synthesized coverage buffer maps to one source
+coverage entry. The interface lets hosts read that mapping at compile
+time so they can attribute counter values back to source locations at
+runtime without a separate sidecar file. The metadata is retrieved by
+calling `castAs` / `queryInterface` on the artifact-associated
 `IMetadata` object.
 
 Intended use:
   - use `ICoverageTracingMetadata` for coverage-specific semantics:
-    counter count, slot-to-source attribution, input to manifest
+    counter count, source-entry attribution, input to manifest
     serialization, and future coverage-entry semantics
   - use `ISyntheticResourceMetadata` for the generic hidden binding
     contract when the host needs to bind compiler-synthesized resources
@@ -4566,21 +4566,44 @@ Extensible without ABI breakage in two ways:
     leading `structSize` field), or
   - adding a derived `ICoverageTracingMetadataN` interface with a
     new UUID, queryable through `castAs`.
-The vtable of `ICoverageTracingMetadata` itself is fixed; new
-methods would break ABI for callers compiled against the existing
-header.
 */
+enum class CoverageEntryKind : uint32_t
+{
+    Unknown = 0,
+    Line = 1,
+    Branch = 2,
+    Function = 3,
+    Region = 4,
+};
+
+enum class CoverageCounterMode : uint32_t
+{
+    Count = 0,
+    Binary = 1,
+    Warp = 2,
+};
+
+enum class CoverageBranchArmKind : uint32_t
+{
+    Unknown = 0,
+    TrueArm = 1,
+    FalseArm = 2,
+    CaseArm = 3,
+    DefaultArm = 4,
+};
+
+static const uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
+
 /// Per-coverage-entry attribution returned by
 /// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
 /// `structSize` for ABI-versioned struct growth: future revisions
 /// may add fields such as column/span information, function identity,
 /// branch-arm identity, or coverage-mode-specific metadata at the end
-/// without changing the COM interface. The current implementation uses
-/// one entry per line-oriented counter slot. Entries are source-
-/// location based: if generic specialization, cloning, or inlining
-/// duplicates code for the same source line, all executions of that
-/// source location contribute to the same line counter rather than
-/// producing per-specialization counters.
+/// without changing the COM interface. Entries are source-location
+/// based: if generic specialization, cloning, or inlining duplicates
+/// code for the same source location, all executions of that source
+/// location contribute to the same source entry rather than producing
+/// per-specialization entries.
 struct CoverageEntryInfo
 {
     size_t structSize = sizeof(CoverageEntryInfo);
@@ -4596,6 +4619,51 @@ struct CoverageEntryInfo
     /// may attach additional fields describing branch/function/region
     /// semantics.
     uint32_t line = 0;
+
+    /// Counter slot used by this entry, or
+    /// `kInvalidCoverageCounterIndex` when the entry has no runtime
+    /// counter. The current line-coverage implementation uses one
+    /// counter per entry.
+    uint32_t counterIndex = kInvalidCoverageCounterIndex;
+
+    /// Semantic kind of this source coverage entry.
+    CoverageEntryKind kind = CoverageEntryKind::Unknown;
+
+    /// Runtime accumulation mode for `counterIndex`.
+    CoverageCounterMode counterMode = CoverageCounterMode::Count;
+
+    /// 1-based inclusive start column for this entry, or 0 when
+    /// unavailable.
+    uint32_t startColumn = 0;
+
+    /// 1-based end line for this entry's half-open end coordinate, or
+    /// 0 when the exact range is unavailable. Future source-region
+    /// coverage can use `(line,startColumn)` to `(endLine,endColumn)`
+    /// for a half-open source range.
+    uint32_t endLine = 0;
+
+    /// 1-based exclusive end column for this entry, or 0 when
+    /// unavailable.
+    uint32_t endColumn = 0;
+
+    /// Function display name for function coverage entries, or
+    /// `nullptr` when not applicable or unavailable.
+    const char* functionName = nullptr;
+
+    /// Stable mangled function name for function coverage entries, or
+    /// `nullptr` when not applicable or unavailable.
+    const char* functionMangledName = nullptr;
+
+    /// Stable branch-site identifier within this metadata object, or 0
+    /// when not applicable.
+    uint32_t branchSiteID = 0;
+
+    /// Stable branch-arm identifier within `branchSiteID`, or 0 when
+    /// not applicable.
+    uint32_t branchArmID = 0;
+
+    /// Branch arm semantic for branch coverage entries.
+    CoverageBranchArmKind branchArmKind = CoverageBranchArmKind::Unknown;
 };
 
 /// Coverage-buffer descriptor binding info returned by
@@ -4633,16 +4701,15 @@ struct ICoverageTracingMetadata : public ISlangCastable
         0x4b9c,
         {0x8e, 0x21, 0x3f, 0x7b, 0x82, 0xa3, 0xd9, 0x51})
 
-    /// Number of coverage entries in the synthesized coverage buffer.
-    /// In the current implementation this is the number of line-
-    /// oriented source-location counter slots. Generic specializations
-    /// and other cloned instances of the same source line aggregate
-    /// into that source line's slot. Future revisions may extend the
-    /// entry model without changing the interface shape.
+    /// Number of runtime counter slots in the synthesized coverage
+    /// buffer. This can differ from `getEntryCount()` once a coverage
+    /// mode has counterless metadata entries or shares one counter
+    /// across several source entries.
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() = 0;
 
-    /// Populate `outInfo` with attribution info for counter slot
-    /// `index`. The caller must pre-set `outInfo->structSize =
+    /// Populate `outInfo` with attribution info for source coverage
+    /// entry `index`. The valid range is `[0, getEntryCount())`. The
+    /// caller must pre-set `outInfo->structSize =
     /// sizeof(CoverageEntryInfo)`. Returns `SLANG_OK` on success,
     /// `SLANG_E_INVALID_ARG` for null `outInfo`, mismatched
     /// `structSize`, or out-of-range `index`.
@@ -4661,6 +4728,13 @@ struct ICoverageTracingMetadata : public ISlangCastable
     /// should query `ISyntheticResourceMetadata` from the same
     /// `IMetadata` object.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo* outInfo) = 0;
+
+    /// Number of source coverage entries available through
+    /// `getEntryInfo`. The current line coverage implementation has
+    /// one entry per counter, but future branch/function/source-region
+    /// coverage may expose entries that do not map one-to-one with
+    /// runtime counter slots.
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() = 0;
 };
     #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()
 
@@ -5441,11 +5515,12 @@ SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t s
  * in-process for hosts compiling via the C++ API.
  *
  * The returned JSON is consumable by
- * `tools/shader-coverage/slang-coverage-to-lcov.py` and any tool
- * expecting the version-1 manifest format. If `metadata` is the
+ * `tools/shader-coverage/slang-coverage-to-lcov.py` and tools
+ * expecting the source-entry manifest format. If `metadata` is the
  * artifact metadata object returned by Slang, it also supports
  * `ISyntheticResourceMetadata`, and the serializer includes the
- * coverage buffer's descriptor-facing binding fields when available.
+ * coverage buffer's descriptor or uniform-marshaling fields when
+ * available.
  *
  * @param metadata The coverage metadata, obtained via
  *                 `castAs<ICoverageTracingMetadata>` on the artifact's

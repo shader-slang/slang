@@ -915,6 +915,69 @@ SLANG_UNIT_TEST(vtableIMetadata)
 }
 
 // ---------------------------------------------------------------------------
+// ICoverageTracingMetadata : ISlangCastable  (own slots 4-7)
+// ---------------------------------------------------------------------------
+struct ICoverageTracingMetadataProbe : ICoverageTracingMetadata
+{
+    int lastSlot = -1;
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const&, void**) SLANG_OVERRIDE
+    {
+        lastSlot = 0;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        lastSlot = 1;
+        return 1;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        lastSlot = 2;
+        return 1;
+    }
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID&) SLANG_OVERRIDE
+    {
+        lastSlot = 3;
+        return nullptr;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE
+    {
+        lastSlot = 4;
+        return 0;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryInfo(uint32_t, CoverageEntryInfo*) SLANG_OVERRIDE
+    {
+        lastSlot = 5;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo*) SLANG_OVERRIDE
+    {
+        lastSlot = 6;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE
+    {
+        lastSlot = 7;
+        return 0;
+    }
+};
+
+SLANG_UNIT_TEST(vtableICoverageTracingMetadata)
+{
+    ICoverageTracingMetadataProbe p;
+    callSlot(&p, 3);
+    SLANG_CHECK(p.lastSlot == 3); // castAs
+    callSlot(&p, 4);
+    SLANG_CHECK(p.lastSlot == 4); // getCounterCount
+    callSlot(&p, 5);
+    SLANG_CHECK(p.lastSlot == 5); // getEntryInfo
+    callSlot(&p, 6);
+    SLANG_CHECK(p.lastSlot == 6); // getBufferInfo
+    callSlot(&p, 7);
+    SLANG_CHECK(p.lastSlot == 7); // getEntryCount
+}
+
+// ---------------------------------------------------------------------------
 // ICompileResult : ISlangCastable  (own slots 4-6)
 // ---------------------------------------------------------------------------
 struct ICompileResultProbe : ICompileResult

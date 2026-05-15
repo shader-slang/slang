@@ -937,7 +937,7 @@ Result linkAndOptimizeIR(
 
     // Create the post-emit metadata object up-front so that IR passes
     // that need to record reportable data (e.g. `instrumentCoverage`'s
-    // slot → source mapping) can write into it directly. `collectMetadata`
+    // source-entry mapping) can write into it directly. `collectMetadata`
     // later fills in binding / exported-function fields.
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
@@ -1035,7 +1035,7 @@ Result linkAndOptimizeIR(
     //
     // Counter ops carry source position on their built-in `sourceLoc`,
     // so this pass is independent of debug-info state. It writes its
-    // slot → source mapping into `metadata`, exposed to hosts via
+    // source-entry mapping into `metadata`, exposed to hosts via
     // ICoverageTracingMetadata.
     if (requiredLoweringPassSet.coverageTracing)
     {

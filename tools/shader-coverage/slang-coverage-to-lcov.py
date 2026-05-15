@@ -9,7 +9,8 @@ Pipeline:
        `RWStructuredBuffer<uint> __slang_coverage`. Counter slots are
        assigned one-per-op in traversal order.
     2. Read the `.coverage-mapping.json` sidecar describing each
-       counter's `(file, line)`, or query the same data through
+       source coverage entry's counter/source mapping, or query the
+       same data through
        `ICoverageTracingMetadata`.
     3. Dispatch the shader, bound to the coverage buffer at the
        reflected binding reported by the metadata / sidecar.
@@ -61,6 +62,36 @@ def load_counters_text(src, count):
     return values[:count]
 
 
+def get_manifest_counter_count(manifest):
+    version = manifest.get("version", 1)
+    if version == 1:
+        total = int(manifest["counters"])
+    elif version == 2:
+        total = int(manifest["counter_count"])
+    else:
+        sys.exit(f"error: unsupported manifest version {version}")
+    if total < 0:
+        sys.exit(f"error: manifest counter count must be non-negative, got {total}")
+    return total
+
+
+def iter_line_entries(manifest):
+    version = manifest.get("version", 1)
+    for entry in manifest["entries"]:
+        if version == 1:
+            yield entry["index"], entry.get("file"), int(entry["line"])
+            continue
+        if version == 2:
+            if entry.get("kind", "line") != "line":
+                continue
+            counter = entry.get("counter")
+            if counter is None:
+                continue
+            yield int(counter), entry.get("file"), int(entry["line"])
+            continue
+        sys.exit(f"error: unsupported manifest version {version}")
+
+
 def main():
     p = argparse.ArgumentParser(
         description="Convert Slang coverage buffer + manifest to LCOV .info."
@@ -90,13 +121,7 @@ def main():
     with open(args.manifest) as f:
         manifest = json.load(f)
 
-    version = manifest.get("version", 1)
-    if version != 1:
-        sys.exit(f"error: unsupported manifest version {version}")
-
-    total = int(manifest["counters"])
-    if total < 0:
-        sys.exit(f"error: manifest 'counters' must be non-negative, got {total}")
+    total = get_manifest_counter_count(manifest)
     if args.counters:
         counters = load_counters_binary(args.counters, total)
     else:
@@ -111,12 +136,9 @@ def main():
     # but filter them out when exporting LCOV.
     hits_by_line = collections.defaultdict(lambda: collections.defaultdict(int))
     skipped_entries = 0
-    for entry in manifest["entries"]:
-        idx = entry["index"]
+    for idx, source, line in iter_line_entries(manifest):
         if idx < 0 or idx >= len(counters):
-            sys.exit(f"error: entry index {idx} out of range [0, {len(counters)})")
-        source = entry.get("file")
-        line = int(entry["line"])
+            sys.exit(f"error: counter index {idx} out of range [0, {len(counters)})")
         if not source or line <= 0:
             skipped_entries += 1
             continue

@@ -827,7 +827,8 @@ static bool resolveHumaneLoc(
     SourceManager* sourceManager,
     IRInst* counterOp,
     String& outFile,
-    uint32_t& outLine)
+    uint32_t& outLine,
+    uint32_t& outColumn)
 {
     if (!sourceManager || !counterOp->sourceLoc.isValid())
         return false;
@@ -836,6 +837,8 @@ static bool resolveHumaneLoc(
         return false;
     outFile = humane.pathInfo.foundPath;
     outLine = (uint32_t)humane.line;
+    if (humane.column > 0)
+        outColumn = (uint32_t)humane.column;
     return true;
 }
 
@@ -868,7 +871,10 @@ struct CoverageInstrumenter
     void lowerCounterOp(IRInst* counterOp, UInt slot)
     {
         CoverageTracingEntry entry;
-        resolveHumaneLoc(sourceManager, counterOp, entry.file, entry.line);
+        entry.counterIndex = (uint32_t)slot;
+        entry.kind = slang::CoverageEntryKind::Line;
+        entry.counterMode = slang::CoverageCounterMode::Count;
+        resolveHumaneLoc(sourceManager, counterOp, entry.file, entry.line, entry.startColumn);
         outMetadata.m_coverageEntries.add(entry);
 
         IRBuilder builder(module);
@@ -904,6 +910,7 @@ struct CoverageInstrumenter
 
     void run(List<IRInst*> const& counterOps)
     {
+        outMetadata.m_coverageCounterCount = (uint32_t)counterOps.getCount();
         outMetadata.m_coverageEntries.reserve(counterOps.getCount());
         // Each counter op gets its own slot: the op's identity IS the
         // UID, and we assign a consecutive index in traversal order.

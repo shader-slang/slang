@@ -131,22 +131,36 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     // else, assignments, writeback) — expect at least several slots.
     uint32_t counterCount = coverage->getCounterCount();
     SLANG_CHECK(counterCount > 0);
+    uint32_t entryCount = coverage->getEntryCount();
+    SLANG_CHECK(entryCount == counterCount);
 
-    // Walk every slot and exercise the per-entry accessor. File
-    // string and line number must both be populated for every slot;
-    // the synthesizer gives every counter op a real source location.
-    for (uint32_t i = 0; i < counterCount; ++i)
+    // Walk every source entry and exercise the per-entry accessor.
+    // File string and line number must both be populated for every
+    // current line-coverage entry; the synthesizer gives every
+    // counter op a real source location.
+    for (uint32_t i = 0; i < entryCount; ++i)
     {
         slang::CoverageEntryInfo entry;
         SLANG_CHECK(coverage->getEntryInfo(i, &entry) == SLANG_OK);
         SLANG_CHECK(entry.file != nullptr);
         SLANG_CHECK(entry.line > 0);
+        SLANG_CHECK(entry.counterIndex == i);
+        SLANG_CHECK(entry.kind == slang::CoverageEntryKind::Line);
+        SLANG_CHECK(entry.counterMode == slang::CoverageCounterMode::Count);
+        SLANG_CHECK(entry.startColumn > 0);
+        SLANG_CHECK(entry.endLine == 0);
+        SLANG_CHECK(entry.endColumn == 0);
+        SLANG_CHECK(entry.functionName == nullptr);
+        SLANG_CHECK(entry.functionMangledName == nullptr);
+        SLANG_CHECK(entry.branchSiteID == 0);
+        SLANG_CHECK(entry.branchArmID == 0);
+        SLANG_CHECK(entry.branchArmKind == slang::CoverageBranchArmKind::Unknown);
     }
 
     // Out-of-range query must return SLANG_E_INVALID_ARG.
     {
         slang::CoverageEntryInfo entry;
-        SLANG_CHECK(coverage->getEntryInfo(counterCount, &entry) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(coverage->getEntryInfo(entryCount, &entry) == SLANG_E_INVALID_ARG);
     }
 
     // Null pointer must return SLANG_E_INVALID_ARG, not crash.
@@ -298,6 +312,8 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     {
         auto noCoverageBundle = createMetadataBundle(SLANG_CPP_SOURCE, "sm_5_0", false);
         auto* noCoverageSyntheticResources = noCoverageBundle.syntheticResources;
+        SLANG_CHECK(noCoverageBundle.coverage->getCounterCount() == 0);
+        SLANG_CHECK(noCoverageBundle.coverage->getEntryCount() == 0);
         SLANG_CHECK(noCoverageSyntheticResources->getResourceCount() == 0);
         uint32_t index = 0;
         SLANG_CHECK(
@@ -330,7 +346,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     // canonical fields are present. Detailed shape is covered by the
     // existing tests on the slangc sidecar; what this assertion locks
     // in is the in-process API path producing a non-empty,
-    // structurally valid manifest with the version-1 contract.
+    // structurally valid manifest with the source-entry contract.
     {
         ComPtr<ISlangBlob> manifest;
         SLANG_CHECK(slang_writeCoverageManifestJson(coverage, manifest.writeRef()) == SLANG_OK);
@@ -339,12 +355,16 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         UnownedStringSlice json(
             (const char*)manifest->getBufferPointer(),
             manifest->getBufferSize());
-        SLANG_CHECK(json.indexOf(toSlice("\"version\": 1")) != -1);
-        SLANG_CHECK(json.indexOf(toSlice("\"counters\"")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"format\": \"slang-coverage\"")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"version\": 2")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"counter_count\"")) != -1);
         SLANG_CHECK(json.indexOf(toSlice("__slang_coverage")) != -1);
         SLANG_CHECK(json.indexOf(toSlice("\"uniform_offset\"")) != -1);
         SLANG_CHECK(json.indexOf(toSlice("\"uniform_stride\"")) != -1);
         SLANG_CHECK(json.indexOf(toSlice("\"entries\"")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"kind\": \"line\"")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"counter\": 0")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"mode\": \"count\"")) != -1);
     }
 
     // Argument validation on the serializer.
