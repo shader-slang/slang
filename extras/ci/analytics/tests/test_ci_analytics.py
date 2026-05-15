@@ -1115,12 +1115,12 @@ class TestHostedRunnerUsage(unittest.TestCase):
         in_progress_run = {"id": 42, "name": "CI"}
 
         def fake_in_progress(repo):
-            return [in_progress_run]
+            return [in_progress_run], None
 
         def fake_queued(repo):
             # No workflow runs have top-level status=queued yet —
             # the queueing is happening *inside* an in_progress run.
-            return []
+            return [], None
 
         def fake_jobs(repo, run_id):
             assert run_id == 42
@@ -1136,7 +1136,7 @@ class TestHostedRunnerUsage(unittest.TestCase):
         with mock.patch.object(
             ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
         ), mock.patch.object(
-            ci_hosted_runner_usage, "fetch_queued_jobs", side_effect=fake_queued
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
         ), mock.patch.object(
             ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
         ):
@@ -1157,10 +1157,10 @@ class TestHostedRunnerUsage(unittest.TestCase):
         run = {"id": 7, "name": "CI"}
 
         def fake_in_progress(repo):
-            return [run]
+            return [run], None
 
         def fake_queued(repo):
-            return [run]
+            return [run], None
 
         call_count = {"n": 0}
 
@@ -1174,7 +1174,7 @@ class TestHostedRunnerUsage(unittest.TestCase):
         with mock.patch.object(
             ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
         ), mock.patch.object(
-            ci_hosted_runner_usage, "fetch_queued_jobs", side_effect=fake_queued
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
         ), mock.patch.object(
             ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
         ):
@@ -1189,10 +1189,10 @@ class TestHostedRunnerUsage(unittest.TestCase):
         run = {"id": 99, "name": "CI"}
 
         def fake_in_progress(repo):
-            return [run]
+            return [run], None
 
         def fake_queued(repo):
-            return []
+            return [], None
 
         def fake_jobs(repo, run_id):
             return (None, "HTTP 500")
@@ -1200,7 +1200,7 @@ class TestHostedRunnerUsage(unittest.TestCase):
         with mock.patch.object(
             ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
         ), mock.patch.object(
-            ci_hosted_runner_usage, "fetch_queued_jobs", side_effect=fake_queued
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
         ), mock.patch.object(
             ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
         ):
@@ -1211,15 +1211,77 @@ class TestHostedRunnerUsage(unittest.TestCase):
         self.assertTrue(snap.get("partial"))
         self.assertEqual(snap.get("fetch_errors"), 1)
 
+    def test_sample_marks_partial_on_listing_endpoint_failure(self):
+        """A 5xx on the runs-listing endpoint must surface as partial,
+        not as a false-healthy zero. Otherwise a transient API error
+        masks the very incident this sampler exists to detect.
+        """
+
+        def fake_in_progress(repo):
+            return [], "HTTP 502 listing in_progress runs"
+
+        def fake_queued(repo):
+            return [], None
+
+        def fake_jobs(repo, run_id):
+            return ([], None)
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage(
+                "shader-slang/slang", cap=20
+            )
+
+        self.assertTrue(snap.get("partial"))
+        self.assertEqual(snap["in_progress"]["total"], 0)
+        self.assertEqual(snap["queued"]["total"], 0)
+        self.assertIn("HTTP 502 listing in_progress runs", snap.get("list_errors", []))
+
+    def test_sample_dedupe_skips_runs_with_missing_id(self):
+        """Don't collapse multiple `id: None` runs into one entry."""
+
+        def fake_in_progress(repo):
+            return [{"name": "broken-1"}, {"name": "broken-2"}], None
+
+        def fake_queued(repo):
+            return [], None
+
+        call_count = {"n": 0}
+
+        def fake_jobs(repo, run_id):
+            call_count["n"] += 1
+            return ([], None)
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage(
+                "shader-slang/slang", cap=20
+            )
+
+        # Both malformed runs must be dropped (not merged into a single
+        # None-id entry and dispatched to fetch_jobs_for_run).
+        self.assertEqual(call_count["n"], 0)
+        self.assertEqual(snap["in_progress"]["total"], 0)
+
     def test_sample_hosted_runner_usage_shape(self):
         in_progress_run = {"id": 10, "name": "CI"}
         queued_run = {"id": 11, "name": "CMake Options"}
 
         def fake_in_progress(repo):
-            return [in_progress_run]
+            return [in_progress_run], None
 
         def fake_queued(repo):
-            return [queued_run]
+            return [queued_run], None
 
         def fake_jobs(repo, run_id):
             if run_id == 10:
@@ -1243,7 +1305,7 @@ class TestHostedRunnerUsage(unittest.TestCase):
         with mock.patch.object(
             ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
         ), mock.patch.object(
-            ci_hosted_runner_usage, "fetch_queued_jobs", side_effect=fake_queued
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
         ), mock.patch.object(
             ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
         ):
@@ -1293,6 +1355,22 @@ class TestHostedLabelPalette(unittest.TestCase):
                 self._is_six_digit_hex(color),
                 msg=f"{lbl!r} → {color!r} is not a 6-digit #RRGGBB",
             )
+
+    def test_palette_handles_unknown_prefix_without_keyerror(self):
+        """If HOSTED_LABEL_PREFIXES gains a new entry not mirrored in
+        HOSTED_LABEL_PALETTE, palette construction must fall back to a
+        neutral color rather than raising KeyError mid-snapshot."""
+        original = ci_hosted_runner_usage.HOSTED_LABEL_PREFIXES
+        with mock.patch.object(
+            ci_health,
+            "HOSTED_LABEL_ORDER",
+            original + ("freebsd-",),
+        ):
+            palette = ci_health._hosted_label_palette(["freebsd-14"])
+        self.assertTrue(
+            self._is_six_digit_hex(palette["freebsd-14"]),
+            msg=f"unknown-prefix label got invalid color {palette['freebsd-14']!r}",
+        )
 
     def test_variants_under_same_pool_get_distinct_colors(self):
         palette = ci_health._hosted_label_palette(

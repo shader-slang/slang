@@ -66,15 +66,15 @@ def classify_hosted_label(labels):
 
 
 def fetch_in_progress_runs(repo):
-    """Fetch all in-progress workflow runs."""
+    """Fetch all in-progress workflow runs. Returns `(runs, error)`."""
     runs, err = gh_api_list(
         f"repos/{repo}/actions/runs?status=in_progress&per_page=100",
         "workflow_runs",
     )
     if err:
         print(f"Warning: failed to fetch in-progress runs: {err}", file=sys.stderr)
-        return []
-    return runs or []
+        return [], err
+    return runs or [], None
 
 
 def fetch_jobs_for_run(repo, run_id):
@@ -88,12 +88,12 @@ def fetch_jobs_for_run(repo, run_id):
     return (jobs if isinstance(jobs, list) else []), None
 
 
-def fetch_queued_jobs(repo):
-    """Fetch queued workflow runs as a stand-in for queued hosted-runner jobs.
+def fetch_queued_runs(repo):
+    """Fetch workflow runs whose top-level status is `queued`.
 
-    GitHub's REST API has no `?status=queued&jobs` shortcut, so we list
-    queued runs and then expand each run to its queued jobs. We classify
-    by hosted-runner label using the job's `labels` field.
+    GitHub's REST API has no `?status=queued&jobs` shortcut, so callers
+    list queued runs here and then expand each run to its queued jobs.
+    Returns `(runs, error)`.
     """
     runs, err = gh_api_list(
         f"repos/{repo}/actions/runs?status=queued&per_page=100",
@@ -101,8 +101,8 @@ def fetch_queued_jobs(repo):
     )
     if err:
         print(f"Warning: failed to fetch queued runs: {err}", file=sys.stderr)
-        return []
-    return runs or []
+        return [], err
+    return runs or [], None
 
 
 def collect_hosted_jobs(repo, runs, status_filter):
@@ -200,20 +200,20 @@ def sample_hosted_runner_usage(repo, cap=DEFAULT_HOSTED_RUNNER_CAP):
             "queued":      { total, by_workflow, by_label },
         }
     """
-    in_progress_runs = fetch_in_progress_runs(repo)
-    queued_runs = fetch_queued_jobs(repo)
+    in_progress_runs, ip_list_err = fetch_in_progress_runs(repo)
+    queued_runs, q_list_err = fetch_queued_runs(repo)
 
     # A workflow run's top-level status doesn't dictate its jobs' statuses.
     # An `in_progress` run can carry jobs that are still `queued`, waiting
     # for a hosted runner — exactly the cap-exhaustion case we need to
     # detect. So scan jobs from both run sets for both job statuses, then
-    # dedupe by (run_id, job_id) in case a run transitions between the
-    # two list endpoints during sampling.
+    # dedupe by run id in case a run transitions between the two list
+    # endpoints during sampling.
     seen = set()
     deduped_runs = []
     for run in list(in_progress_runs) + list(queued_runs):
         rid = run.get("id")
-        if rid in seen:
+        if rid is None or rid in seen:
             continue
         seen.add(rid)
         deduped_runs.append(run)
@@ -229,9 +229,18 @@ def sample_hosted_runner_usage(repo, cap=DEFAULT_HOSTED_RUNNER_CAP):
         "in_progress": summarize(in_progress_jobs),
         "queued": summarize(queued_jobs),
     }
-    if fetch_errors:
+    # Mark partial if either the per-run job fetches or the top-level
+    # run listings failed. A listing failure is more dangerous: it
+    # erases an entire status's contribution rather than one run's,
+    # so a transient 5xx on `?status=queued` must not look healthy.
+    if fetch_errors or ip_list_err or q_list_err:
         result["partial"] = True
+    if fetch_errors:
         result["fetch_errors"] = fetch_errors
+    if ip_list_err or q_list_err:
+        result["list_errors"] = [
+            e for e in (ip_list_err, q_list_err) if e
+        ]
     return result
 
 
