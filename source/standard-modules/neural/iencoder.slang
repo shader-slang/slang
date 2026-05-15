@@ -1,5 +1,4 @@
 implementing neural;
-#include "common-def.slang"
 
 public interface IStaticEncoder<T,
     InArray,

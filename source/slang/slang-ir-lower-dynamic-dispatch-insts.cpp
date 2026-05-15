@@ -639,21 +639,6 @@ struct UntaggedUnionLoweringContext : public InstPassBase
         case kIROp_UnsizedArrayType:
             return true;
 
-        case kIROp_PtrType:
-            {
-                // SPIRV generates incompatible struct types for Function vs
-                // PhysicalStorageBuffer storage classes. Pointers to concrete
-                // structs packed into AnyValue produce type mismatches in the
-                // generated SPIRV. CPU and CUDA handle this correctly.
-                // Interface pointers are allowed: they point to existential
-                // tuples that are already handled by dynamic dispatch lowering.
-                if (!isSPIRV(targetProgram->getTargetReq()->getTarget()))
-                    return false;
-                auto ptrType = cast<IRPtrTypeBase>(type);
-                auto valueType = ptrType->getValueType();
-                return valueType->getOp() != kIROp_InterfaceType;
-            }
-
         case kIROp_StructType:
             {
                 auto structType = cast<IRStructType>(type);
@@ -1069,6 +1054,18 @@ void lowerTagTypes(IRModule* module)
     context.processModule();
 }
 
+// Extract the element type from a pointer-like data type.
+// Handles both IRPtrTypeBase (regular pointers like Ptr<T>) and
+// IRPointerLikeType (ConstantBuffer<T>, ParameterBlock<T>).
+static IRType* getPointerElementType(IRType* ptrDataType)
+{
+    if (auto ptrType = as<IRPtrTypeBase>(ptrDataType))
+        return ptrType->getValueType();
+    if (auto pointerLikeType = as<IRPointerLikeType>(ptrDataType))
+        return pointerLikeType->getElementType();
+    return nullptr;
+}
+
 bool isEffectivelyComPtrType(IRType* type)
 {
     if (!type)
@@ -1238,7 +1235,13 @@ struct TaggedUnionLoweringContext : public InstPassBase
                     {
                         auto baseInterfacePtr = inst->getPtr();
                         auto baseInterfaceType = as<IRInterfaceType>(
-                            as<IRPtrTypeBase>(baseInterfacePtr->getDataType())->getValueType());
+                            getPointerElementType(baseInterfacePtr->getDataType()));
+                        if (!baseInterfaceType)
+                        {
+                            SLANG_UNEXPECTED(
+                                "CastInterfaceToTaggedUnionPtr load: pointer element is not an "
+                                "interface type");
+                        }
 
                         // Rewrite the load to use the original ptr and load
                         // an interface-typed object.
@@ -1269,7 +1272,13 @@ struct TaggedUnionLoweringContext : public InstPassBase
 
                         auto baseInterfacePtr = inst->getPtr();
                         auto baseInterfaceType = as<IRInterfaceType>(
-                            as<IRPtrTypeBase>(baseInterfacePtr->getDataType())->getValueType());
+                            getPointerElementType(baseInterfacePtr->getDataType()));
+                        if (!baseInterfaceType)
+                        {
+                            SLANG_UNEXPECTED(
+                                "CastInterfaceToTaggedUnionPtr store: pointer element is not an "
+                                "interface type");
+                        }
 
                         // Rewrite the store to use the original ptr and store
                         // an interface type'd object.

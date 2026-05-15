@@ -6,6 +6,7 @@
 // enumerating specialization parameters, and validating
 // attempts to specialize shader code.
 
+#include "../core/slang-char-util.h"
 #include "../core/slang-type-text-util.h"
 #include "slang-lookup.h"
 #include "slang-parameter-binding.h"
@@ -853,6 +854,69 @@ static bool _matchVectorBoolType(Type* type)
     return elemType->getBaseType() == BaseType::Bool;
 }
 
+static bool _matchHLSLStreamOutputType(Type* type)
+{
+    return as<HLSLStreamOutputType>(type) != nullptr;
+}
+
+static bool _matchMeshOutputType(Type* type)
+{
+    return as<MeshOutputType>(type) != nullptr;
+}
+
+static bool _isNonGeometryStage(Stage stage)
+{
+    return stage != Stage::Geometry && stage != Stage::Unknown;
+}
+
+static bool _isNonMeshStage(Stage stage)
+{
+    return stage != Stage::Mesh && stage != Stage::Unknown;
+}
+
+// Returns true if `type` is `OutputIndices<T, N>` (`IndicesType`) whose
+// element type `T` is anything other than the three valid mesh-output
+// index shapes: `uint` for point indices, `uint2` for line indices, or
+// `uint3` for triangle indices. Any other element type makes downstream
+// codegen crash: non-integral scalars (e.g. `float`) cause a null
+// `IRIntLit` dereference in GLSL legalization, while wrong-width vectors
+// (e.g. `uint4`) and struct types hit `SLANG_UNREACHABLE` (issue #9435).
+static bool _matchInvalidIndicesElementType(Type* type)
+{
+    auto indicesType = as<IndicesType>(type);
+    if (!indicesType)
+        return false;
+    auto elementType = indicesType->getElementType();
+
+    // If the element type is an error (unresolved name, failed generic, etc.)
+    // a diagnostic has already been emitted — don't pile on a second one.
+    if (!elementType || as<ErrorType>(elementType))
+        return false;
+
+    // Unwrap typedef / type-alias sugar so that e.g.
+    // `typedef uint3 Triangle; OutputIndices<Triangle, N>` is accepted.
+    elementType = elementType->getCanonicalType();
+
+    if (auto basicType = as<BasicExpressionType>(elementType))
+    {
+        // Point indices: scalar `uint`.
+        return basicType->getBaseType() != BaseType::UInt;
+    }
+    if (auto vectorType = as<VectorExpressionType>(elementType))
+    {
+        // Line/triangle indices: `uint2`/`uint3`.
+        auto basicElem = as<BasicExpressionType>(vectorType->getElementType());
+        if (!basicElem || basicElem->getBaseType() != BaseType::UInt)
+            return true;
+        auto count = as<ConstantIntVal>(vectorType->getElementCount());
+        if (!count)
+            return true;
+        auto n = count->getValue();
+        return n != 2 && n != 3;
+    }
+    return true;
+}
+
 static bool _matchMatrixWithOutOfRangeDimensions(Type* type)
 {
     // Row and column counts outside the 1..4 range break downstream codegen
@@ -937,6 +1001,32 @@ static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
     // codegen on the interface-block stages (issue #9450).
     {_matchMatrixWithOutOfRangeDimensions,
      "matrix row and column counts must be between 1 and 4 inclusive",
+     nullptr,
+     _isInterfaceBlockVaryingStage},
+
+    // Geometry-shader stream output wrappers
+    // (`PointStream`/`LineStream`/`TriangleStream<T>`) only make sense on
+    // a `[shader("geometry")]` entry point. Using them on any other stage
+    // segfaults during code generation (issue #9430).
+    {_matchHLSLStreamOutputType,
+     "stream output types are only valid on a geometry shader entry point",
+     nullptr,
+     _isNonGeometryStage},
+
+    // Mesh-shader output wrappers
+    // (`OutputVertices`/`OutputIndices`/`OutputPrimitives<T>`) only make
+    // sense on a `[shader("mesh")]` entry point. The mesh-side counterpart
+    // of #9430 — without this rule the SPIR-V generator produces invalid
+    // or crashing output.
+    {_matchMeshOutputType,
+     "mesh output types are only valid on a mesh shader entry point",
+     nullptr,
+     _isNonMeshStage},
+
+    // `OutputIndices<T, N>` requires `T` to be `uint`/`uint2`/`uint3`.
+    // Other element types crash downstream codegen (issue #9435).
+    {_matchInvalidIndicesElementType,
+     "OutputIndices element type must be uint, uint2, or uint3",
      nullptr,
      _isInterfaceBlockVaryingStage},
 };
@@ -1130,6 +1220,120 @@ bool doStructFieldsHaveSemantic(Type* type)
     return doStructFieldsHaveSemanticImpl(type, seenTypes);
 }
 
+// Returns the base portion of a semantic name with any trailing decimal
+// digits stripped, so that e.g. `SV_Position`, `SV_Position0` and
+// `SV_Position1` all yield `SV_Position`. HLSL semantics are
+// indexed by an optional integer suffix and the index isn't relevant
+// for "is the semantic present" questions.
+static UnownedStringSlice _semanticBaseName(UnownedStringSlice name)
+{
+    auto end = name.end();
+    while (end != name.begin() && CharUtil::isDigit(end[-1]))
+        --end;
+    return UnownedStringSlice(name.begin(), end);
+}
+
+// Returns true if `decl` has a semantic whose base name (any trailing
+// decimal index dropped) matches `baseName`, case-insensitively. `decl`
+// may be null, in which case false is returned.
+static bool _declHasSemantic(Decl* decl, UnownedStringSlice baseName)
+{
+    if (!decl)
+        return false;
+    if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
+    {
+        if (_semanticBaseName(semantic->name.getContent()).caseInsensitiveEquals(baseName))
+            return true;
+    }
+    return false;
+}
+
+// Returns true if any declaration reachable from `type` (transitively
+// through structs, arrays, conditional/wrapper types, modified types
+// and stream/mesh output wrappers) carries a semantic whose base name
+// matches `baseName`.
+//
+// A recursion depth bound is enforced alongside `seenTypes`: generic
+// instantiations can produce a fresh `Type*` at each level and would
+// otherwise recurse unboundedly.
+static bool _typeHasSemanticImpl(
+    ASTBuilder* astBuilder,
+    Type* type,
+    UnownedStringSlice baseName,
+    HashSet<Type*>& seenTypes,
+    UInt recursionDepth = 0)
+{
+    if (recursionDepth >= kMaxTypeNestingDepth)
+        return false;
+    if (!type)
+        return false;
+    type = unwrapConditionalType(type);
+    if (!type)
+        return false;
+    if (seenTypes.contains(type))
+        return false;
+    seenTypes.add(type);
+
+    const auto next = recursionDepth + 1;
+
+    if (auto modType = as<ModifiedType>(type))
+        return _typeHasSemanticImpl(astBuilder, modType->getBase(), baseName, seenTypes, next);
+
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return _typeHasSemanticImpl(
+            astBuilder,
+            arrayType->getElementType(),
+            baseName,
+            seenTypes,
+            next);
+    if (auto streamType = as<HLSLStreamOutputType>(type))
+        return _typeHasSemanticImpl(
+            astBuilder,
+            streamType->getElementType(),
+            baseName,
+            seenTypes,
+            next);
+    if (auto meshOutputType = as<MeshOutputType>(type))
+        return _typeHasSemanticImpl(
+            astBuilder,
+            meshOutputType->getElementType(),
+            baseName,
+            seenTypes,
+            next);
+
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return false;
+    auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
+    if (!structDeclRef)
+        return false;
+
+    for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+    {
+        auto fieldDecl = fieldDeclRef.getDecl();
+        if (_declHasSemantic(fieldDecl, baseName))
+            return true;
+        auto fieldType = getType(astBuilder, fieldDeclRef);
+        if (_typeHasSemanticImpl(astBuilder, fieldType, baseName, seenTypes, next))
+            return true;
+    }
+    return false;
+}
+
+// Convenience wrapper: check whether `decl` (and the type it carries)
+// transitively expose a semantic whose base name matches `baseName`.
+static bool _outputDeclHasSemantic(
+    ASTBuilder* astBuilder,
+    Decl* decl,
+    Type* type,
+    UnownedStringSlice baseName)
+{
+    if (_declHasSemantic(decl, baseName))
+        return true;
+    HashSet<Type*> seenTypes;
+    return _typeHasSemanticImpl(astBuilder, type, baseName, seenTypes);
+}
+
 
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
@@ -1288,6 +1492,37 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         if (!entryPointFuncDecl->findModifier<MaxVertexCountAttribute>())
         {
             sink->diagnose(Diagnostics::GeometryShaderMissingMaxVertexCount{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+    }
+    else if (stage == Stage::Mesh)
+    {
+        // A mesh shader must declare both an output topology and the
+        // pair of mesh outputs (vertices + indices); otherwise the
+        // generated SPIR-V is invalid (issue #9444). The geometry-shader
+        // checks above are the equivalent precedent.
+        if (!entryPointFuncDecl->findModifier<OutputTopologyAttribute>())
+        {
+            sink->diagnose(Diagnostics::MeshShaderMissingOutputTopology{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+        bool hasVerticesOutput = false;
+        bool hasIndicesOutput = false;
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            auto meshOutputType = as<MeshOutputType>(param->getType());
+            if (!meshOutputType)
+                continue;
+            if (as<VerticesType>(meshOutputType))
+                hasVerticesOutput = true;
+            else if (as<IndicesType>(meshOutputType))
+                hasIndicesOutput = true;
+        }
+        if (!hasVerticesOutput || !hasIndicesOutput)
+        {
+            sink->diagnose(Diagnostics::MeshShaderMissingOutputs{
                 .entryPoint = entryPointName,
                 .location = entryPointFuncDecl->loc});
         }
@@ -1560,6 +1795,57 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             ctx.targets = targets.getArrayView();
             ctx.stage = stage;
             validateVaryingType(ctx, param->getType());
+        }
+    }
+
+    // For vertex shaders, warn when an output has been declared but none
+    // of them carry the `SV_Position` semantic. This is almost always a
+    // bug: the rasterizer needs an output position from the last
+    // vertex-processing stage. Cases where the vertex shader is
+    // intentionally producing no position (e.g. it feeds a
+    // tessellation/geometry/mesh stage that supplies SV_Position itself,
+    // or rasterizer-discard / transform feedback is in use) are rare;
+    // users who hit this can add the semantic to a vertex output, or
+    // silence the warning explicitly.
+    //
+    // We deliberately skip the check when the entry point declares no
+    // outputs at all (void return type, no `out`/`inout` parameters).
+    // GLSL-style entry points write `gl_Position` via a global rather
+    // than as a returned member, so we cannot tell whether SV_Position
+    // is missing just by looking at the signature.
+    if (stage == Stage::Vertex)
+    {
+        auto astBuilder = linkage->getASTBuilder();
+        const auto svPosition = UnownedStringSlice::fromLiteral("sv_position");
+
+        auto returnBasicType = as<BasicExpressionType>(returnType);
+        bool returnIsVoid = returnBasicType && returnBasicType->getBaseType() == BaseType::Void;
+        bool hasOutputs = returnType && !returnIsVoid;
+        bool hasSvPosition =
+            _outputDeclHasSemantic(astBuilder, entryPointFuncDecl, returnType, svPosition);
+
+        if (!hasSvPosition)
+        {
+            for (const auto& param : entryPointFuncDecl->getParameters())
+            {
+                // Only outputs (or in/out) of the entry point can carry
+                // SV_Position for the rasterizer.
+                if (!param->hasModifier<OutModifier>() && !param->hasModifier<InOutModifier>())
+                    continue;
+                hasOutputs = true;
+                if (_outputDeclHasSemantic(astBuilder, param, param->getType(), svPosition))
+                {
+                    hasSvPosition = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasOutputs && !hasSvPosition)
+        {
+            sink->diagnose(Diagnostics::VertexShaderMissingSvPosition{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
         }
     }
 
@@ -2776,7 +3062,7 @@ Scope* ComponentType::_getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder)
     // specified via the API or command line.
     //
     // We begin with a dummy scope that has as its parent
-    // the scope that provides the "base" langauge
+    // the scope that provides the "base" language
     // definitions (that scope is necessary because
     // it defines keywords like `true` and `false`).
     //

@@ -289,6 +289,14 @@ void* ArtifactPostEmitMetadata::getInterface(const Guid& guid)
     }
     if (guid == slang::IMetadata::getTypeGuid())
         return static_cast<slang::IMetadata*>(this);
+    if (guid == slang::ICoverageTracingMetadata::getTypeGuid())
+    {
+        return static_cast<slang::ICoverageTracingMetadata*>(this);
+    }
+    if (guid == slang::ISyntheticResourceMetadata::getTypeGuid())
+    {
+        return static_cast<slang::ISyntheticResourceMetadata*>(this);
+    }
     if (guid == slang::ICooperativeTypesMetadata::getTypeGuid())
         return static_cast<slang::ICooperativeTypesMetadata*>(this);
     return nullptr;
@@ -346,6 +354,118 @@ SlangResult ArtifactPostEmitMetadata::isParameterLocationUsed(
 const char* ArtifactPostEmitMetadata::getDebugBuildIdentifier()
 {
     return m_debugBuildIdentifier.getBuffer();
+}
+
+uint32_t ArtifactPostEmitMetadata::getCounterCount()
+{
+    return (uint32_t)m_coverageEntries.getCount();
+}
+
+// ABI versioning: minimum `structSize` we accept for v1 public structs.
+// These constants are frozen at the offset of the LAST field shipped
+// in v1 and **must not be updated when fields are added later**. Newer
+// callers with larger structs pass through; older callers feeding a
+// future v2+ implementation will likewise be accepted, with the impl
+// writing only the v1 fields the caller has space for. When v2 fields
+// are added, write them conditionally based on
+// `outInfo->structSize >= offsetof(struct, newField) + sizeof(newField)`.
+static constexpr size_t kCoverageEntryInfoV1MinSize =
+    offsetof(slang::CoverageEntryInfo, line) + sizeof(uint32_t);
+static constexpr size_t kCoverageBufferInfoV1MinSize =
+    offsetof(slang::CoverageBufferInfo, binding) + sizeof(int32_t);
+static constexpr size_t kSyntheticResourceInfoV1MinSize =
+    offsetof(slang::SyntheticResourceInfo, debugName) + sizeof(const char*);
+
+SlangResult ArtifactPostEmitMetadata::getEntryInfo(
+    uint32_t index,
+    slang::CoverageEntryInfo* outInfo)
+{
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize < kCoverageEntryInfoV1MinSize)
+        return SLANG_E_INVALID_ARG;
+    if (index >= (uint32_t)m_coverageEntries.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto& entry = m_coverageEntries[index];
+    // Surface an empty source-file path as a null pointer so callers
+    // can branch on attributability without separately checking the
+    // length. An empty file string would otherwise look like a
+    // valid (but empty) path to consumers.
+    outInfo->file = entry.file.getLength() ? entry.file.getBuffer() : nullptr;
+    outInfo->line = entry.line;
+    return SLANG_OK;
+}
+
+SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* outInfo)
+{
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize < kCoverageBufferInfoV1MinSize)
+        return SLANG_E_INVALID_ARG;
+
+    outInfo->space = -1;
+    outInfo->binding = -1;
+
+    for (auto& record : m_syntheticResources)
+    {
+        if (record.id == uint32_t(SyntheticResourceKnownID::Coverage))
+        {
+            outInfo->space = record.space;
+            outInfo->binding = record.binding;
+            break;
+        }
+    }
+    return SLANG_OK;
+}
+
+uint32_t ArtifactPostEmitMetadata::getResourceCount()
+{
+    return (uint32_t)m_syntheticResources.getCount();
+}
+
+SlangResult ArtifactPostEmitMetadata::findResourceIndexByID(uint32_t id, uint32_t* outIndex)
+{
+    if (!outIndex)
+        return SLANG_E_INVALID_ARG;
+    if (id == 0)
+        return SLANG_E_NOT_FOUND;
+
+    for (Index i = 0; i < m_syntheticResources.getCount(); ++i)
+    {
+        if (m_syntheticResources[i].id == id)
+        {
+            *outIndex = uint32_t(i);
+            return SLANG_OK;
+        }
+    }
+
+    return SLANG_E_NOT_FOUND;
+}
+
+SlangResult ArtifactPostEmitMetadata::getResourceInfo(
+    uint32_t index,
+    slang::SyntheticResourceInfo* outInfo)
+{
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize < kSyntheticResourceInfoV1MinSize)
+        return SLANG_E_INVALID_ARG;
+    if (index >= (uint32_t)m_syntheticResources.getCount())
+        return SLANG_E_INVALID_ARG;
+
+    auto& record = m_syntheticResources[index];
+    outInfo->id = record.id;
+    outInfo->bindingType = record.bindingType;
+    outInfo->arraySize = record.arraySize;
+    outInfo->scope = record.scope;
+    outInfo->access = record.access;
+    outInfo->entryPointIndex = record.entryPointIndex;
+    outInfo->space = record.space;
+    outInfo->binding = record.binding;
+    outInfo->uniformOffset = record.uniformOffset;
+    outInfo->uniformStride = record.uniformStride;
+    outInfo->debugName = record.debugName.getLength() ? record.debugName.getBuffer() : nullptr;
+    return SLANG_OK;
 }
 
 SlangUInt ArtifactPostEmitMetadata::getCooperativeMatrixTypeCount()

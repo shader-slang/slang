@@ -31,6 +31,7 @@
 #include "slang.h"
 
 #include <assert.h>
+#include <limits>
 
 namespace Slang
 {
@@ -539,6 +540,27 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Reports information about checkpoint contexts used for reverse-mode automatic "
          "differentiation."},
+        {OptionKind::TraceCoverage,
+         "-trace-coverage",
+         nullptr,
+         "Instrument the shader with per-statement execution counters. "
+         "When writing compiled output to a file, slangc also emits "
+         "`<output>.coverage-mapping.json` mapping counter slots to source positions."},
+        {OptionKind::TraceCoverageBinding,
+         "-trace-coverage-binding",
+         "-trace-coverage-binding <index> <space>",
+         "Bind the synthesized `__slang_coverage` buffer at an explicit "
+         "(register index, space) instead of auto-allocating a slot. "
+         "Useful when the host needs the binding fixed at compile time "
+         "before any host metadata reads run. Implies `-trace-coverage`."},
+        {OptionKind::TraceCoverageReservedSpace,
+         "-trace-coverage-reserved-space",
+         "-trace-coverage-reserved-space <space>",
+         "Reserve a descriptor set when auto-allocating the "
+         "synthesized `__slang_coverage` buffer. Use this when the host "
+         "pipeline layout owns descriptor sets that are "
+         "not visible in the compiled shader IR. Repeat for multiple spaces; "
+         "duplicates are idempotent. Applies to Khronos descriptor-set targets."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -1384,6 +1406,10 @@ struct OptionsParser
 
     CommandOptions* m_cmdOptions = nullptr;
     CommandLineContext* m_cmdLineContext = nullptr;
+
+    // Tracks the currently-being-parsed option name (e.g. "-line-directive-mode")
+    // so that diagnostics like UnknownCommandLineValue can mention it.
+    String m_currentOptionName;
 };
 
 int OptionsParser::addTranslationUnit(SlangSourceLanguage language, Stage impliedStage)
@@ -1862,7 +1888,9 @@ SlangResult OptionsParser::_getValue(
         StringBuilder buf;
         StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), buf);
 
-        m_sink->diagnose(Diagnostics::UnknownCommandLineValue{.validValues = buf});
+        m_sink->diagnose(Diagnostics::UnknownCommandLineValue{
+            .option = m_currentOptionName,
+            .validValues = buf});
         return SLANG_FAIL;
     }
 
@@ -1916,7 +1944,8 @@ SlangResult OptionsParser::_getValue(
     StringBuilder buf;
     StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), buf);
 
-    m_sink->diagnose(Diagnostics::UnknownCommandLineValue{.validValues = buf});
+    m_sink->diagnose(
+        Diagnostics::UnknownCommandLineValue{.option = m_currentOptionName, .validValues = buf});
     return SLANG_FAIL;
 }
 
@@ -2366,6 +2395,12 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             return SLANG_FAIL;
         }
 
+        // Use the canonical first-listed name for the option rather than
+        // the raw argument token. For prefix-style options like `-O3` /
+        // `-g2`, `argValue` includes the suffix; the canonical name
+        // (e.g. `-O`, `-g`) is what the user is supposed to recognise.
+        m_currentOptionName = m_cmdOptions->getFirstNameForOption(optionIndex);
+
         const auto optionKind = OptionKind(m_cmdOptions->getOptionAt(optionIndex).userValue);
 
         switch (optionKind)
@@ -2382,6 +2417,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ReportPerfBenchmark:
         case OptionKind::ReportCheckpointIntermediates:
         case OptionKind::ReportDynamicDispatchSites:
+        case OptionKind::TraceCoverage:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
@@ -2453,8 +2489,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     colorValue = SLANG_DIAGNOSTIC_COLOR_AUTO;
                 else
                 {
-                    m_sink->diagnose(
-                        Diagnostics::UnknownCommandLineValue{.validValues = "always, never, auto"});
+                    m_sink->diagnose(Diagnostics::UnknownCommandLineValue{
+                        .option = m_currentOptionName,
+                        .validValues = "always, never, auto"});
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.set(optionKind, (int)colorValue);
@@ -2787,6 +2824,59 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     OptionKind::VulkanBindGlobals,
                     (int)binding,
                     (int)bindingSet);
+                break;
+            }
+        case OptionKind::TraceCoverageBinding:
+            {
+                // -trace-coverage-binding <index> <space>
+                // Reject negative values up front so a typo or sentinel
+                // (`-trace-coverage-binding -1 0`) produces a clear
+                // diagnostic instead of silently degrading to auto-
+                // allocation downstream.
+                Int bindingIndex, bindingSpace;
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindingIndex));
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindingSpace));
+                if (bindingIndex > std::numeric_limits<int>::max())
+                {
+                    m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                        .option = arg.value,
+                        .parsedValue = bindingIndex,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
+                if (bindingSpace > std::numeric_limits<int>::max())
+                {
+                    m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                        .option = arg.value,
+                        .parsedValue = bindingSpace,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
+                linkage->m_optionSet.set(
+                    OptionKind::TraceCoverageBinding,
+                    (int)bindingIndex,
+                    (int)bindingSpace);
+                // Implies -trace-coverage so users don't have to spell both.
+                linkage->m_optionSet.set(OptionKind::TraceCoverage, true);
+                break;
+            }
+        case OptionKind::TraceCoverageReservedSpace:
+            {
+                // -trace-coverage-reserved-space <space>
+                Int bindingSpace;
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindingSpace));
+                if (bindingSpace > std::numeric_limits<int>::max())
+                {
+                    m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                        .option = arg.value,
+                        .parsedValue = bindingSpace,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
+                linkage->m_optionSet.add(OptionKind::TraceCoverageReservedSpace, (int)bindingSpace);
                 break;
             }
         case OptionKind::Profile:
@@ -3680,6 +3770,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
             }
         }
+
+        // (`-trace-coverage` + `-pass-through` rejection moved to
+        // `EndToEndCompileRequest::executeActionsInner` so that C++
+        // API callers using `setPassThrough()` are also covered;
+        // this option-parser path is CLI-only.)
 
         // If the user is requesting code generation via pass-through,
         // then any entry points they specify need to have a stage set,

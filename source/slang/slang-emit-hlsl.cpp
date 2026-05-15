@@ -1074,9 +1074,21 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
-    case kIROp_ControlBarrier:
+    case kIROp_SubpassLoad:
         {
-            m_writer->emit("GroupMemoryBatrierWithGroupSync();\n");
+            auto subpassLoad = as<IRSubpassLoad>(inst);
+            auto outer = getInfo(EmitOp::General);
+            emitOperand(subpassLoad->getSubpassInput(), leftSide(outer, getInfo(EmitOp::Postfix)));
+            if (auto sample = subpassLoad->getSample())
+            {
+                m_writer->emit(".SubpassLoad(");
+                emitOperand(sample, getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
+            else
+            {
+                m_writer->emit(".SubpassLoad()");
+            }
             return true;
         }
     case kIROp_MakeCoopVector:

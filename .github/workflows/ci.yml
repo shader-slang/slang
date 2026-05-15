@@ -274,6 +274,7 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       test-category: full
       full-gpu-tests: true
+      gpu-tier: t4
 
   test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
@@ -287,6 +288,7 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       test-category: full
       full-gpu-tests: true
+      gpu-tier: t4
 
   # MaterialX Integration Tests (Windows only for initial validation)
   test-materialx-windows-release:

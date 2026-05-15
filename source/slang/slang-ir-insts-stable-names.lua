@@ -827,5 +827,7 @@ return {
 	["makeConditionalValue"] = 851,
 	["SpecializeExistentialsInType"] = 852,
 	["assumeAddress"] = 853,
-	["DebugCompilationUnit"] = 854
+	["DebugCompilationUnit"] = 854,
+	["IncrementCoverageCounter"] = 855,
+	["SubpassLoad"] = 856
 }

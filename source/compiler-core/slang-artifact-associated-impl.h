@@ -174,8 +174,43 @@ struct ShaderBindingRange
     }
 };
 
+/// One counter slot → (file, line) mapping entry for coverage tracing.
+/// Populated by `instrumentCoverage` when `-trace-coverage` is active.
+struct CoverageTracingEntry
+{
+    String file;
+    uint32_t line = 0;
+};
+
+struct SyntheticResourceRecord
+{
+    uint32_t id = 0;
+    slang::BindingType bindingType = slang::BindingType::Unknown;
+    uint32_t arraySize = 1;
+    slang::SyntheticResourceScope scope = slang::SyntheticResourceScope::Global;
+    slang::SyntheticResourceAccess access = slang::SyntheticResourceAccess::Read;
+    int32_t entryPointIndex = -1;
+    int32_t space = -1;
+    int32_t binding = -1;
+    int32_t uniformOffset = -1;
+    int32_t uniformStride = 0;
+    String debugName;
+};
+
+// Internal registry for stable synthetic resource ids. Public API
+// exposes ids as opaque non-zero values, but compiler features still
+// need one shared allocation point so independently-added synthetic
+// resources do not collide.
+enum class SyntheticResourceKnownID : uint32_t
+{
+    None = 0,
+    Coverage = 1,
+};
+
 class ArtifactPostEmitMetadata : public ComBaseObject,
                                  public IArtifactPostEmitMetadata,
+                                 public slang::ICoverageTracingMetadata,
+                                 public slang::ISyntheticResourceMetadata,
                                  public slang::ICooperativeTypesMetadata
 {
 public:
@@ -202,6 +237,20 @@ public:
         bool& outUsed) SLANG_OVERRIDE;
 
     SLANG_NO_THROW virtual const char* SLANG_MCALL getDebugBuildIdentifier() SLANG_OVERRIDE;
+
+    // ICoverageTracingMetadata
+    SLANG_NO_THROW virtual uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL
+    getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
+        SLANG_OVERRIDE;
+
+    // ISyntheticResourceMetadata
+    SLANG_NO_THROW virtual uint32_t SLANG_MCALL getResourceCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL
+    getResourceInfo(uint32_t index, slang::SyntheticResourceInfo* outInfo) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL
+    findResourceIndexByID(uint32_t id, uint32_t* outIndex) SLANG_OVERRIDE;
 
     // ICooperativeTypesMetadata
     SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeMatrixTypeCount() SLANG_OVERRIDE;
@@ -238,6 +287,18 @@ public:
     List<slang::CooperativeVectorTypeUsageInfo> m_cooperativeVectorTypes;
     List<slang::CooperativeVectorCombination> m_cooperativeVectorCombinations;
     String m_debugBuildIdentifier;
+
+    // Coverage tracing data, populated by `instrumentCoverage` when
+    // `-trace-coverage` is active. Empty otherwise.
+    List<CoverageTracingEntry> m_coverageEntries;
+
+    // Generic compiler-synthesized bindable resources, including
+    // coverage's hidden buffer. Empty when the compiled target does
+    // not introduce any such resources. Records are finalized before
+    // the metadata object is returned to the host; public getters are
+    // read-only and may return raw `const char*` pointers into the
+    // stored `String`s.
+    List<SyntheticResourceRecord> m_syntheticResources;
 };
 
 } // namespace Slang

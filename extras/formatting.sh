@@ -254,6 +254,7 @@ cmake_formatting() {
   echo "Formatting CMake files..." >&2
 
   readarray -t files < <(list_files '*.cmake' 'CMakeLists.txt' '**/CMakeLists.txt')
+  [ ${#files[@]} -gt 0 ] || return 0
 
   common_args=(
     # turn on warning when this is fixed https://github.com/BlankSpruce/gersemi/issues/39
@@ -291,6 +292,7 @@ cpp_formatting() {
   echo "Formatting cpp files..." >&2
 
   readarray -t files < <(list_files '*.cpp' '*.hpp' '*.c' '*.h' ':!external/**')
+  [ ${#files[@]} -gt 0 ] || return 0
 
   # The progress reporting is a bit sneaky, we use `--verbose` with xargs which
   # prints a line to stderr for each command, and we simply count these...
@@ -341,6 +343,7 @@ yaml_json_formatting() {
   echo "Formatting yaml and json files..." >&2
 
   readarray -t files < <(list_files "*.yaml" "*.yml" "*.json" ':!external/**')
+  [ ${#files[@]} -gt 0 ] || return 0
 
   prettier_formatting
 }
@@ -349,6 +352,7 @@ markdown_formatting() {
   echo "Formatting markdown files..." >&2
 
   readarray -t files < <(list_files "*.md" ':!external/**')
+  [ ${#files[@]} -gt 0 ] || return 0
 
   prettier_formatting
 }
@@ -357,6 +361,7 @@ sh_formatting() {
   echo "Formatting sh files..." >&2
 
   readarray -t files < <(list_files "*.sh")
+  [ ${#files[@]} -gt 0 ] || return 0
 
   common_args=(
     # default 8 is way too wide

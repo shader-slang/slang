@@ -1,5 +1,6 @@
 // slang-api.cpp
 
+#include "../compiler-core/slang-artifact-associated-impl.h"
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-platform.h"
 #include "../core/slang-rtti-info.h"
@@ -1085,6 +1086,125 @@ SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t s
         return nullptr;
 
     return blob.detach();
+}
+
+// JSON-escape one byte into `out`. Handles backslash, double-quote,
+// and the standard control-character escapes; falls back to \u00XX
+// for the remaining U+0000..U+001F range. Source paths can carry tabs
+// or newlines (e.g. from `#line` directives), so the full control
+// range is covered.
+static void _appendCoverageManifestJsonEscaped(Slang::StringBuilder& out, unsigned char uc)
+{
+    switch (uc)
+    {
+    case '\\':
+        out << "\\\\";
+        return;
+    case '"':
+        out << "\\\"";
+        return;
+    case '\b':
+        out << "\\b";
+        return;
+    case '\f':
+        out << "\\f";
+        return;
+    case '\n':
+        out << "\\n";
+        return;
+    case '\r':
+        out << "\\r";
+        return;
+    case '\t':
+        out << "\\t";
+        return;
+    }
+    if (uc < 0x20)
+    {
+        char buf[8];
+        snprintf(buf, sizeof(buf), "\\u%04x", (unsigned)uc);
+        out << buf;
+        return;
+    }
+    out.appendChar((char)uc);
+}
+
+SLANG_EXTERN_C SLANG_API SlangResult
+slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlangBlob** outBlob)
+{
+    if (!metadata || !outBlob)
+        return SLANG_E_INVALID_ARG;
+
+    Slang::StringBuilder out;
+    out << "{\n";
+    out << "  \"version\": 1,\n";
+    uint32_t counterCount = metadata->getCounterCount();
+    out << "  \"counters\": " << (int64_t)counterCount << ",\n";
+    out << "  \"buffer\": {\n";
+    out << "    \"name\": \"__slang_coverage\",\n";
+    out << "    \"element_type\": \"uint32\",\n";
+    out << "    \"element_stride\": 4";
+    if (auto syntheticResources = (slang::ISyntheticResourceMetadata*)metadata->castAs(
+            slang::ISyntheticResourceMetadata::getTypeGuid()))
+    {
+        uint32_t coverageResourceIndex = 0;
+        if (SLANG_SUCCEEDED(syntheticResources->findResourceIndexByID(
+                uint32_t(Slang::SyntheticResourceKnownID::Coverage),
+                &coverageResourceIndex)))
+        {
+            slang::SyntheticResourceInfo resourceInfo;
+            SLANG_RETURN_ON_FAIL(
+                syntheticResources->getResourceInfo(coverageResourceIndex, &resourceInfo));
+            if (resourceInfo.space >= 0)
+                out << ",\n    \"space\": " << (int64_t)resourceInfo.space;
+            if (resourceInfo.binding >= 0)
+                out << ",\n    \"binding\": " << (int64_t)resourceInfo.binding;
+            if (resourceInfo.uniformOffset >= 0)
+                out << ",\n    \"uniform_offset\": " << (int64_t)resourceInfo.uniformOffset;
+            if (resourceInfo.uniformStride > 0)
+                out << ",\n    \"uniform_stride\": " << (int64_t)resourceInfo.uniformStride;
+        }
+    }
+    out << "\n  },\n";
+    out << "  \"entries\": [";
+    for (uint32_t i = 0; i < counterCount; ++i)
+    {
+        slang::CoverageEntryInfo entry;
+        // Every index in [0, counterCount) is a valid argument to
+        // `getEntryInfo` by construction; failure here means an
+        // internal invariant violation. Bail rather than silently
+        // dropping entries — a partial manifest with out-of-order
+        // slot indices would misalign the host's counter array.
+        if (SLANG_FAILED(metadata->getEntryInfo(i, &entry)))
+            return SLANG_FAIL;
+        out << (i == 0 ? "" : ",");
+        out << "\n    {\"index\": " << (int64_t)i << ", \"file\": ";
+        // Mirror the C++ API's nullable contract: `getEntryInfo`
+        // returns `entry.file == nullptr` for unattributable slots,
+        // so the JSON manifest emits `null` (not `""`) for the same
+        // case. A strict consumer that distinguishes "missing source"
+        // from "empty path" sees the same shape from both channels.
+        if (!entry.file)
+        {
+            out << "null";
+        }
+        else
+        {
+            out << "\"";
+            for (const char* p = entry.file; *p; ++p)
+                _appendCoverageManifestJsonEscaped(out, (unsigned char)*p);
+            out << "\"";
+        }
+        out << ", \"line\": " << (int64_t)entry.line << "}";
+    }
+    out << "\n  ]\n";
+    out << "}\n";
+
+    Slang::ComPtr<ISlangBlob> blob = Slang::StringBlob::create(out.toString());
+    if (!blob)
+        return SLANG_E_OUT_OF_MEMORY;
+    *outBlob = blob.detach();
+    return SLANG_OK;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Module Loading !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

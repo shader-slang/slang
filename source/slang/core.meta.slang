@@ -899,6 +899,7 @@ interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat, IFloatingPoint
 {
         /// Get the value of the mathematical constant pi in this type.
     [Differentiable]
+    [__readNone]
     static This getPi();
 }
 
@@ -1288,6 +1289,7 @@ ${
     case BaseType::Double:
 $}
         [Differentiable]
+        [__readNone]
         static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
 
          __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
@@ -1678,7 +1680,7 @@ extension uintptr_t : IRangedValue
 
 /// Represent a 8-bit floating point value with 4 bits of exponent and 3 bits of mantissa.
 [require(spvFloat8EXT)]
-[require(cuda_sm_8_0)]
+[require(cuda_sm_8_9)]
 __intrinsic_type($(kIROp_FloatE4M3Type))
 __magic_type(FloatE4M3Type)
 struct FloatE4M3 : IFloatingPointCoopElement
@@ -1694,7 +1696,7 @@ struct FloatE4M3 : IFloatingPointCoopElement
 
 /// Represent a 8-bit floating point value with 5 bits of exponent and 2 bits of mantissa.
 [require(spvFloat8EXT)]
-[require(cuda_sm_8_0)]
+[require(cuda_sm_8_9)]
 __intrinsic_type($(kIROp_FloatE5M2Type))
 __magic_type(FloatE5M2Type)
 struct FloatE5M2 : IFloatingPointCoopElement

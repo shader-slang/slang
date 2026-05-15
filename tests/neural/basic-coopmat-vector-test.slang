@@ -52,7 +52,7 @@ static const int BatchSize = 32;
 static const int SubgroupSize = 32;
 static const int workgroupCount = BatchSize / SubgroupSize;
 
-typealias ShMemSize = SharedMemorySize< ElementType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, BatchSize / SubgroupSize>;
+typealias ShMemSize = SharedMemorySize<ElementType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, workgroupCount>;
 typealias ShMemSizeLayer1 = ShMemSize.OfLayer1<InputSize, OutputSize>;
 
 typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
@@ -83,8 +83,8 @@ OutputVector MatVecMulAdd<InputVector, OutputVector>(
 // Basic test on MatMul without bias, this test covers both forward and backward pass
 void BasicTestWithoutBias(int tid, int resIndex)
 {
-    typealias InVectorType = WaveTangledVector<ElementType, ShMemSizeLayer1, InputSize, SubgroupSize>;
-    typealias OutVectorType = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, SubgroupSize>;
+    typealias InVectorType = WaveTangledVector<ElementType, ShMemSizeLayer1, InputSize, SubgroupSize, workgroupCount>;
+    typealias OutVectorType = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, SubgroupSize, workgroupCount>;
 
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
@@ -135,8 +135,8 @@ void BasicTestWithoutBias(int tid, int resIndex)
 // Basic test on MatMul with bias, this test covers both forward and backward pass
 void BasicTestWithBias(int tid, int resIndex)
 {
-    typealias InVectorType = WaveTangledVector<ElementType, ShMemSizeLayer1, InputSize, SubgroupSize>;
-    typealias OutVectorType = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, SubgroupSize>;
+    typealias InVectorType = WaveTangledVector<ElementType, ShMemSizeLayer1, InputSize, SubgroupSize, 1>;
+    typealias OutVectorType = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, SubgroupSize, 1>;
 
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
