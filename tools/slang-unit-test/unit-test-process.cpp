@@ -223,6 +223,12 @@ static SlangResult _parentMonitorTest(UnitTestContext* context)
     // Give test-server time to open the parent handle. The fail-closed path is also acceptable,
     // but the normal monitor-thread path is what this regression test is meant to exercise.
     Process::sleepCurrentThread(250);
+    if (testServerProcess->isTerminated())
+    {
+        TerminateProcess(parentProcess.handle, 0);
+        WaitForSingleObject(parentProcess.handle, INFINITE);
+        return SLANG_FAIL;
+    }
 
     TerminateProcess(parentProcess.handle, 0);
     WaitForSingleObject(parentProcess.handle, INFINITE);
