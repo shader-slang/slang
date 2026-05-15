@@ -668,7 +668,7 @@ def _hosted_label_palette(labels):
         if prefix is None:
             palette[lbl] = "#6c757d"
             continue
-        base = HOSTED_LABEL_PALETTE[prefix]
+        base = HOSTED_LABEL_PALETTE.get(prefix, "#6c757d")
         idx = counts_per_prefix.get(prefix, 0)
         counts_per_prefix[prefix] = idx + 1
         palette[lbl] = base if idx == 0 else _lighten_hex(base, _shade_factor(idx))
