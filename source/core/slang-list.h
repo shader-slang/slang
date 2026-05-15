@@ -251,10 +251,25 @@ public:
                 }
                 else*/
                 {
+                    // For trivially-constructible T, _allocate returns raw
+                    // malloc'd memory; use placement-new to construct objects.
+                    // For non-trivially-constructible T, allocateArray already
+                    // default-constructed every element; use assignment so the
+                    // existing objects' destructors are not bypassed.
                     for (Index i = 0; i < idx; i++)
-                        newBuffer[i] = m_buffer[i];
+                    {
+                        if constexpr (std::is_trivially_constructible_v<T>)
+                            new (newBuffer + i) T(m_buffer[i]);
+                        else
+                            newBuffer[i] = m_buffer[i];
+                    }
                     for (Index i = idx; i < m_count; i++)
-                        newBuffer[i + n] = T(static_cast<T&&>(m_buffer[i]));
+                    {
+                        if constexpr (std::is_trivially_constructible_v<T>)
+                            new (newBuffer + i + n) T(static_cast<T&&>(m_buffer[i]));
+                        else
+                            newBuffer[i + n] = static_cast<T&&>(m_buffer[i]);
+                    }
                 }
                 _deallocateBuffer();
             }
@@ -361,13 +376,26 @@ public:
                 std::has_trivial_destructor<T>::value) memcpy(newBuffer, buffer, _count *
                 sizeof(T)); else*/
                 {
+                    // For trivially-constructible T, _allocate returns raw
+                    // malloc'd memory; use placement-new to construct objects.
+                    // For non-trivially-constructible T, allocateArray already
+                    // default-constructed every element; use move-assignment so
+                    // the existing objects' destructors are not bypassed.
                     for (Index i = 0; i < m_count; i++)
-                        newBuffer[i] = static_cast<T&&>(m_buffer[i]);
-
-                    // Default-initialize the remaining elements
-                    for (Index i = m_count; i < size; i++)
                     {
-                        new (newBuffer + i) T();
+                        if constexpr (std::is_trivially_constructible_v<T>)
+                            new (newBuffer + i) T(static_cast<T&&>(m_buffer[i]));
+                        else
+                            newBuffer[i] = static_cast<T&&>(m_buffer[i]);
+                    }
+
+                    // Initialize the remaining elements (trivially-constructible
+                    // T only — non-trivial types were already default-constructed
+                    // by allocateArray).
+                    if constexpr (std::is_trivially_constructible_v<T>)
+                    {
+                        for (Index i = m_count; i < size; i++)
+                            new (newBuffer + i) T();
                     }
                 }
                 _deallocateBuffer();
@@ -400,8 +428,17 @@ public:
         if (m_capacity > m_count && m_count > 0)
         {
             T* newBuffer = _allocate(m_count);
+            // For trivially-constructible T, _allocate returns raw malloc'd
+            // memory; use placement-new to construct objects. For non-trivially-
+            // constructible T, allocateArray already default-constructed every
+            // element; use move-assignment so their destructors are not bypassed.
             for (Index i = 0; i < m_count; i++)
-                newBuffer[i] = static_cast<T&&>(m_buffer[i]);
+            {
+                if constexpr (std::is_trivially_constructible_v<T>)
+                    new (newBuffer + i) T(static_cast<T&&>(m_buffer[i]));
+                else
+                    newBuffer[i] = static_cast<T&&>(m_buffer[i]);
+            }
 
             _deallocateBuffer();
             m_buffer = newBuffer;
