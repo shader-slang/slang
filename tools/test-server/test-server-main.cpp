@@ -90,7 +90,10 @@ static void _startParentMonitorFromArgs(int argc, const char* const* argv)
             parentProcessId > 0 && parentProcessId <= Int(MAXDWORD))
         {
             _startParentMonitor(DWORD(parentProcessId));
+            return;
         }
+
+        TerminateProcess(GetCurrentProcess(), 0);
         return;
     }
 }
