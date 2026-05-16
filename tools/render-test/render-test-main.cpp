@@ -843,6 +843,18 @@ struct AssignValsFromLayoutContext
         ShaderCursor const& dstCursor,
         ShaderInputLayout::AccelerationStructureVal* srcVal)
     {
+        SLANG_UNUSED(srcVal);
+        if (isDescriptorHandleType(dstCursor))
+        {
+            DescriptorHandle handle;
+            auto result = accelerationStructure->getDescriptorHandle(&handle);
+            if (SLANG_SUCCEEDED(result))
+            {
+                SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+                return SLANG_OK;
+            }
+        }
+
         dstCursor.setBinding(accelerationStructure);
         return SLANG_OK;
     }
