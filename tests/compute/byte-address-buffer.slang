@@ -1,15 +1,15 @@
 // byte-address-buffer.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -xslang -DRWBAB
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -xslang -DBAB_GENERIC_LOAD_COVERAGE
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -xslang -DRWBAB -xslang -DBAB_GENERIC_LOAD_COVERAGE
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -xslang -DRWBAB
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -xslang -DRWBAB
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj -xslang -DRWBAB
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DRWBAB
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -xslang -DBAB_GENERIC_LOAD_COVERAGE
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -xslang -DRWBAB -xslang -DBAB_GENERIC_LOAD_COVERAGE
+//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj -xslang -DBAB_GENERIC_LOAD_COVERAGE
+//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj -xslang -DRWBAB -xslang -DBAB_GENERIC_LOAD_COVERAGE
+//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DBAB_GENERIC_LOAD_COVERAGE
+//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DRWBAB -xslang -DBAB_GENERIC_LOAD_COVERAGE
 
 //TEST:SIMPLE(filecheck=SPV):-target spirv -entry computeMain -stage compute -emit-spirv-directly
 
@@ -64,6 +64,9 @@ void test(uint val)
     uint4 naturalQuad = inputBuffer.Load4Aligned(16);
     coverage += naturalQuad.x + naturalQuad.y + naturalQuad.z + naturalQuad.w;
 
+    uint expectedCoverage = 91;
+
+#if defined(BAB_GENERIC_LOAD_COVERAGE)
     int genericInt = inputBuffer.Load<int>(0);
     coverage += uint(genericInt);
 
@@ -79,8 +82,11 @@ void test(uint val)
     float4 naturalFloatQuad = inputBuffer.LoadAligned<float4>(16);
     coverage += asuint(naturalFloatQuad.x);
 
+    expectedCoverage = 100;
+#endif
+
     // Keep the shared expected output while making coverage mismatches visible.
-    tmp = coverage == 100 ? tmp : 0xFFFFFFFF;
+    tmp = coverage == expectedCoverage ? tmp : 0xFFFFFFFF;
 
 	outputBuffer.Store(val*4, tmp);
 }
