@@ -241,6 +241,8 @@ public:
         SLANG_OVERRIDE;
     SLANG_NO_THROW virtual Slice<String> SLANG_MCALL getExportedFunctionMangledNames()
         SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual Slice<UniformParamUsage> SLANG_MCALL getUniformParamUsage()
+        SLANG_OVERRIDE;
 
     // IMetadata
     SLANG_NO_THROW virtual SlangResult isParameterLocationUsed(
@@ -295,6 +297,12 @@ public:
     }
 
     List<ShaderBindingRange> m_usedBindings;
+    // Per uniform bearing parameter byte usage. Each entry carries the
+    // parent CB or parameter block binding identity so queries can be
+    // disambiguated even when multiple CBs share a register space.
+    // Replaces the earlier flat untracked range list, which conflated
+    // siblings in the same space.
+    List<UniformParamUsage> m_uniformParamUsage;
     List<String> m_exportedFunctionMangledNames;
     List<slang::CooperativeMatrixType> m_cooperativeMatrixTypes;
     List<slang::CooperativeMatrixCombination> m_cooperativeMatrixCombinations;

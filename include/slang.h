@@ -4508,8 +4508,19 @@ struct IMetadata : public ISlangCastable
     SLANG_COM_INTERFACE(0x8044a8a3, 0xddc0, 0x4b7f, {0xaf, 0x8e, 0x2, 0x6e, 0x90, 0x5d, 0x73, 0x32})
 
     /*
-    Returns whether a resource parameter at the specified binding location is actually being used
-    in the compiled shader.
+    Whether the compiled shader uses the parameter location.
+    On SLANG_OK, outUsed is the answer. SLANG_E_NOT_AVAILABLE means we can't
+    tell (untracked category, unbounded byte storage, etc.). Treat that as
+    used and bind it.
+
+    For SLANG_PARAMETER_CATEGORY_UNIFORM, registerIndex is the byte offset
+    of the queried field within its space. The answer is true when any
+    tracked read overlaps that byte. When several constant buffers share
+    the same space, this query cannot distinguish between them and may
+    return true for an unused field if a sibling buffer's range covers the
+    same offset. The over reporting is safe (you may bind more than
+    strictly required), never an under report (a real usage is never
+    reported as unused).
     */
     virtual SlangResult isParameterLocationUsed(
         SlangParameterCategory category, // is this a `t` register? `s` register?

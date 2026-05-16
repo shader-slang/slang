@@ -173,7 +173,10 @@ standard output = {
                 },
                 {
                     "name": "c",
-                    "binding": {"kind": "constantBuffer", "index": 3, "used": 1}
+                    "binding": {"kind": "constantBuffer", "index": 3, "used": 1},
+                    "usedByteRanges": [
+                        {"offset": 0, "size": 4}
+                    ]
                 },
                 {
                     "name": "t2",

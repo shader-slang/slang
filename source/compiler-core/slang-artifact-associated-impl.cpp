@@ -325,6 +325,13 @@ Slice<ShaderBindingRange> ArtifactPostEmitMetadata::getUsedBindingRanges()
     return Slice<ShaderBindingRange>(m_usedBindings.getBuffer(), m_usedBindings.getCount());
 }
 
+Slice<UniformParamUsage> ArtifactPostEmitMetadata::getUniformParamUsage()
+{
+    return Slice<UniformParamUsage>(
+        m_uniformParamUsage.getBuffer(),
+        m_uniformParamUsage.getCount());
+}
+
 Slice<String> ArtifactPostEmitMetadata::getExportedFunctionMangledNames()
 {
     return Slice<String>(
@@ -338,6 +345,35 @@ SlangResult ArtifactPostEmitMetadata::isParameterLocationUsed(
     SlangUInt registerIndex,
     bool& outUsed)
 {
+    // Uniform queries are answered from the per param structure which
+    // scopes byte ranges by their parent CB or parameter block. Without
+    // the parent identity in the API signature we still over report
+    // when multiple CBs share a register space (a query matches if any
+    // CB in the space has the byte used). This is safe over reporting
+    // for the API contract: a "yes" might be conservative but a "no"
+    // is always accurate. An untracked entry in the queried space
+    // yields SLANG_E_NOT_AVAILABLE.
+    if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
+    {
+        for (const auto& entry : m_uniformParamUsage)
+        {
+            if (entry.parentSpace != spaceIndex)
+                continue;
+            if (entry.isUntracked)
+                return SLANG_E_NOT_AVAILABLE;
+            for (const auto& r : entry.usedRanges)
+            {
+                if (r.containsBinding(slang::Uniform, spaceIndex, registerIndex))
+                {
+                    outUsed = true;
+                    return SLANG_OK;
+                }
+            }
+        }
+        outUsed = false;
+        return SLANG_OK;
+    }
+
     for (const auto& range : getUsedBindingRanges())
     {
         if (range.containsBinding((slang::ParameterCategory)category, spaceIndex, registerIndex))

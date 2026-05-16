@@ -1,6 +1,7 @@
 
 #include "slang-reflection-json.h"
 
+#include "../compiler-core/slang-artifact-associated-impl.h"
 #include "../core/slang-blob.h"
 #include "slang-ast-support-types.h"
 #include "slang.h"
@@ -1074,114 +1075,6 @@ static void emitReflectionParamJSON(PrettyWriter& writer, slang::VariableLayoutR
 }
 
 
-static void emitUniformFieldUsageJSON(
-    PrettyWriter& writer,
-    slang::TypeLayoutReflection* typeLayout,
-    SlangUInt baseOffset,
-    SlangUInt spaceIndex,
-    SlangCompileRequest* request,
-    int entryPointIndex,
-    String const& namePrefix,
-    bool& outFirst)
-{
-    if (!typeLayout)
-        return;
-
-    auto kind = typeLayout->getKind();
-
-    if (kind == slang::TypeReflection::Kind::ConstantBuffer ||
-        kind == slang::TypeReflection::Kind::ParameterBlock)
-    {
-        if (auto elementVar = typeLayout->getElementVarLayout())
-        {
-            SlangUInt elementOffset = elementVar->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
-            emitUniformFieldUsageJSON(
-                writer,
-                elementVar->getTypeLayout(),
-                baseOffset + elementOffset,
-                spaceIndex,
-                request,
-                entryPointIndex,
-                namePrefix,
-                outFirst);
-        }
-        return;
-    }
-
-    if (kind == slang::TypeReflection::Kind::Array)
-    {
-        auto elementType = typeLayout->getElementTypeLayout();
-        size_t count = typeLayout->getElementCount();
-        size_t stride = typeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
-        if (!elementType || count == 0 || count == SLANG_UNBOUNDED_SIZE || stride == 0)
-            return;
-        for (size_t i = 0; i < count; ++i)
-        {
-            StringBuilder sb;
-            sb << namePrefix << "[" << (uint64_t)i << "]";
-            emitUniformFieldUsageJSON(
-                writer,
-                elementType,
-                baseOffset + i * stride,
-                spaceIndex,
-                request,
-                entryPointIndex,
-                sb.toString(),
-                outFirst);
-        }
-        return;
-    }
-
-    if (kind == slang::TypeReflection::Kind::Struct)
-    {
-        unsigned fieldCount = typeLayout->getFieldCount();
-        for (unsigned ff = 0; ff < fieldCount; ++ff)
-        {
-            auto field = typeLayout->getFieldByIndex(ff);
-            if (!field)
-                continue;
-            const char* fieldName = field->getName();
-            String childName = namePrefix.getLength() && fieldName
-                                   ? namePrefix + "." + fieldName
-                                   : (fieldName ? String(fieldName) : namePrefix);
-            emitUniformFieldUsageJSON(
-                writer,
-                field->getTypeLayout(),
-                baseOffset + field->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM),
-                spaceIndex,
-                request,
-                entryPointIndex,
-                childName,
-                outFirst);
-        }
-        return;
-    }
-
-    size_t leafSize = typeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
-    if (leafSize == 0 || namePrefix.getLength() == 0)
-        return;
-
-    bool used = false;
-    SlangResult queryResult = spIsParameterLocationUsed(
-        request,
-        entryPointIndex,
-        0,
-        SLANG_PARAMETER_CATEGORY_UNIFORM,
-        spaceIndex,
-        baseOffset,
-        used);
-
-    if (!outFirst)
-        writer << ",\n";
-    outFirst = false;
-
-    writer << "{\"name\": \"" << namePrefix.getBuffer()
-           << "\", \"offset\": " << (uint64_t)baseOffset << ", \"size\": " << (uint64_t)leafSize;
-    if (SLANG_SUCCEEDED(queryResult))
-        writer << ", \"used\": " << (used ? 1 : 0);
-    writer << "}";
-}
-
 static void emitEntryPointParamJSON(
     PrettyWriter& writer,
     slang::VariableLayoutReflection* param,
@@ -1205,24 +1098,66 @@ static void emitEntryPointParamJSON(
             kind == slang::TypeReflection::Kind::ParameterBlock ||
             kind == slang::TypeReflection::Kind::Struct)
         {
-            PrettyWriter scratch;
-            bool first = true;
-            emitUniformFieldUsageJSON(
-                scratch,
-                typeLayout,
-                param->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM),
-                param->getBindingSpace(SLANG_PARAMETER_CATEGORY_UNIFORM),
-                request,
-                entryPointIndex,
-                String(),
-                first);
-            if (!first)
+            // Look up the param's primary CB or parameter block binding.
+            // For a CB the binding lives in the ConstantBuffer category;
+            // for a parameter block on Vulkan style targets it lives in
+            // DescriptorTableSlot. We try both so we can match against
+            // the per param usage entry produced by the IR pass.
+            SlangUInt spaceIndex = param->getBindingSpace(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
+            SlangUInt parentBindingIndex =
+                param->getOffset(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
+            if (parentBindingIndex == 0 &&
+                param->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT) != 0)
             {
-                writer << ",\n\"fields\": [\n";
-                writer.indent();
-                writer.writeRaw(scratch.getBuilder().getUnownedSlice());
-                writer.dedent();
-                writer << "\n]";
+                spaceIndex = param->getBindingSpace(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+                parentBindingIndex =
+                    param->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+            }
+
+            // If the metadata is unavailable for any reason (codegen
+            // skipped, request without backing artifact, etc.) we just
+            // omit the usedByteRanges key. That matches how the rest of
+            // this emitter handles missing data.
+            ComPtr<slang::IComponentType> program;
+            ComPtr<slang::IMetadata> metadata;
+            IArtifactPostEmitMetadata* postEmit = nullptr;
+            if (request &&
+                SLANG_SUCCEEDED(request->getProgramWithEntryPoints(program.writeRef())) &&
+                SLANG_SUCCEEDED(
+                    program->getEntryPointMetadata(entryPointIndex, 0, metadata.writeRef())))
+            {
+                postEmit = static_cast<IArtifactPostEmitMetadata*>(
+                    metadata->castAs(IArtifactPostEmitMetadata::getTypeGuid()));
+            }
+            if (postEmit)
+            {
+                for (const auto& entry : postEmit->getUniformParamUsage())
+                {
+                    if (entry.parentSpace != spaceIndex ||
+                        entry.parentBindingIndex != parentBindingIndex)
+                        continue;
+                    if (entry.isUntracked)
+                    {
+                        writer << ",\n\"usedByteRangesUnavailable\": true";
+                    }
+                    else
+                    {
+                        writer << ",\n\"usedByteRanges\": [";
+                        writer.indent();
+                        bool first = true;
+                        for (const auto& r : entry.usedRanges)
+                        {
+                            if (!first)
+                                writer << ",";
+                            first = false;
+                            writer << "\n{\"offset\": " << (uint64_t)r.registerIndex
+                                   << ", \"size\": " << (uint64_t)r.registerCount << "}";
+                        }
+                        writer.dedent();
+                        writer << "\n]";
+                    }
+                    break;
+                }
             }
         }
     }

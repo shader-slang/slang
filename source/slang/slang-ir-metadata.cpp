@@ -2,8 +2,8 @@
 #include "slang-ir-metadata.h"
 
 #include "../compiler-core/slang-artifact-associated-impl.h"
+#include "slang-ir-byte-granularity-usage.h"
 #include "slang-ir-insts.h"
-#include "slang-ir-uniform-usage.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 
@@ -218,31 +218,22 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
         collectMetadataFromInst(param, outMetadata);
     }
 
-    Dictionary<IRGlobalParam*, List<UniformUsageRange>> uniformUsage;
-    collectUniformUsage(irModule, uniformUsage);
-    for (auto& kv : uniformUsage)
+    for (auto& info : collectApproximateByteGranularityUsageInformationForParameterGroups(irModule))
     {
-        auto* param = kv.first;
-        auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
-        if (!layoutDecoration)
-            continue;
-        auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
-        if (!varLayout)
-            continue;
-
-        UInt spaceOffset = 0;
-        if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
-            spaceOffset = spaceAttr->getOffset();
-
-        for (auto& range : kv.second)
+        UniformParamUsage entry;
+        entry.parentSpace = info.parentSpace;
+        entry.parentBindingIndex = info.parentBindingIndex;
+        entry.isUntracked = info.isUntracked;
+        for (auto& r : info.ranges)
         {
-            _insertBinding(
-                outMetadata.m_usedBindings,
-                LayoutResourceKind::Uniform,
-                spaceOffset,
-                range.byteOffset,
-                range.byteSize);
+            ShaderBindingRange sbr;
+            sbr.category = slang::Uniform;
+            sbr.spaceIndex = info.parentSpace;
+            sbr.registerIndex = r.offset;
+            sbr.registerCount = r.size;
+            entry.usedRanges.add(sbr);
         }
+        outMetadata.m_uniformParamUsage.add(_Move(entry));
     }
 }
 

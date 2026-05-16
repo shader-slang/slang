@@ -124,6 +124,25 @@ public:
 
 struct ShaderBindingRange;
 
+struct UniformParamUsage
+{
+    // Parent CB or parameter block binding identity. Together
+    // (parentSpace, parentBindingIndex) uniquely identifies which
+    // uniform bearing parameter the byte ranges below belong to, so
+    // multiple CBs in the same register space stay disambiguated.
+    // Each entry in usedRanges has category=Uniform,
+    // spaceIndex=parentSpace, registerIndex=byte offset within the
+    // parent, and registerCount=byte size.
+    UInt parentSpace;
+    UInt parentBindingIndex;
+    List<ShaderBindingRange> usedRanges;
+    // True when the IR pass deliberately did not analyze this param
+    // (unbounded uniform element type, etc.). usedRanges is empty in
+    // that case and any byte query against this parent should yield
+    // SLANG_E_NOT_AVAILABLE.
+    bool isUntracked;
+};
+
 class IArtifactPostEmitMetadata : public slang::IMetadata
 {
 public:
@@ -141,6 +160,11 @@ public:
 
     /// Get the debug build identifier for a base and debug spirv pair
     SLANG_NO_THROW virtual const char* SLANG_MCALL getDebugBuildIdentifier() = 0;
+
+    /// Per uniform bearing parameter, a scoped list of byte ranges that
+    /// reachable code touched. See UniformParamUsage for the scoping
+    /// contract.
+    SLANG_NO_THROW virtual Slice<UniformParamUsage> SLANG_MCALL getUniformParamUsage() = 0;
 };
 
 } // namespace Slang

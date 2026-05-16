@@ -2028,7 +2028,11 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(
     UInt registerIndex,
     bool& outUsed)
 {
-    if (!ShaderBindingRange::isUsageTracked((slang::ParameterCategory)category))
+    auto cat = (slang::ParameterCategory)category;
+    // Uniform queries are answered from recorded byte ranges (currently
+    // only populated for constant buffer and parameter block contents).
+    // Other categories use the binding tracked predicate.
+    if (cat != slang::Uniform && !ShaderBindingRange::isUsageTracked(cat))
         return SLANG_E_NOT_AVAILABLE;
 
     ComPtr<IArtifact> artifact;
@@ -2039,13 +2043,25 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(
             artifact)))
         return SLANG_E_INVALID_ARG;
 
+    // No artifact or no post emit metadata means codegen did not run for
+    // this entry point and target, or the metadata was stripped. Either
+    // way we cannot answer the query, so report not available rather
+    // than guessing false.
     if (!artifact)
         return SLANG_E_NOT_AVAILABLE;
-
-    // Find a rep
     auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);
     if (!metadata)
         return SLANG_E_NOT_AVAILABLE;
+
+    if (cat == slang::Uniform)
+    {
+        // Only treat a "no match" as authoritative if this artifact has
+        // any per param Uniform usage data at all. Otherwise the caller
+        // can't distinguish "uniform tracking didn't run for this
+        // artifact" from "tracked and unused".
+        if (metadata->getUniformParamUsage().count == 0)
+            return SLANG_E_NOT_AVAILABLE;
+    }
 
     return metadata->isParameterLocationUsed(category, spaceIndex, registerIndex, outUsed);
 }
