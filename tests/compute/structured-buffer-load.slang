@@ -1,7 +1,7 @@
 // structured-buffer-load.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-mtl -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-wgpu -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-mtl -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[1 2 9 9], stride=4):name=readBuffer
 StructuredBuffer<uint> readBuffer;
@@ -22,5 +22,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     result += readWriteBuffer[3];
 
     outputBuffer[0] = result;
+    //CHK:A
     outputBuffer[1] = outputBuffer.Load(0);
+    //CHK-NEXT:A
 }
