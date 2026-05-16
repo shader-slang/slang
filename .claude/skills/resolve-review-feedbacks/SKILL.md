@@ -1,6 +1,6 @@
 ---
 name: resolve-review-feedbacks
-description: Resolve GitHub PR review feedback and CI failures. Use when asked to monitor a PR, reply to and resolve LLM review threads, leave human review threads for human resolution, fix failing checks, rebase merge conflicts, and push updates until the PR is clean.
+description: Resolve GitHub PR review feedback and CI failures. Use when asked to monitor a PR, handle LLM review threads, notify the user about draft/WIP/DNI review-blocking LLM messages, leave human review threads for human resolution, fix failing checks, rebase merge conflicts, and push updates until the PR is clean.
 argument-hint: "<PR URL or number>"
 allowed-tools:
   - Bash
@@ -42,7 +42,7 @@ Repeat this workflow every 30 minutes until the PR has no unresolved review feed
    git fetch --all --prune
    ```
 
-2. Inspect PR state, checks, mergeability, and review threads.
+2. Inspect PR state, checks, mergeability, review-blocking notices, and review threads.
 3. Fix actionable review feedback and CI failures.
 4. Commit PR modifications as new commits and push them to the PR branch.
 5. Reply to LLM review feedback and resolve only the LLM-owned threads that have been addressed.
@@ -50,6 +50,24 @@ Repeat this workflow every 30 minutes until the PR has no unresolved review feed
 7. Wait for CI and repeat until clean.
 
 Stop early only if blocked by missing credentials, missing push permission, an ambiguous human decision, or local changes that cannot be safely preserved.
+
+## Review-Blocking PR State
+
+Before processing normal review feedback, check whether the PR is in a state where LLM reviewers may intentionally skip review:
+
+```bash
+gh pr view "$PR" --json title,isDraft,url
+```
+
+Treat the PR as review-blocked when it is a draft or when the title contains markers such as `WIP`, `DNI`, `DNM`, `do not review`, `do not merge`, or similar wording. Also inspect LLM comments for messages saying that review was skipped, paused, or unavailable because the PR is draft, WIP, DNI, or otherwise not ready for review.
+
+If an LLM left a review-blocking message:
+
+1. Notify the user with the PR URL, the LLM comment URL, and the exact blocking reason.
+2. Do not change the draft state or title unless the user explicitly asks.
+3. Do not treat the message as code feedback, and do not mark the thread resolved on behalf of the user.
+4. Let the user resolve the situation by marking the PR ready for review, changing the title, or otherwise addressing the blocker.
+5. Continue the 30-minute polling loop if the user asked for continuous monitoring.
 
 ## Commit Policy
 
@@ -209,6 +227,7 @@ If the PR branch belongs to a fork or a non-`origin` remote, push to the remote 
 The skill is complete only when all of these are true:
 
 - `gh pr checks "$PR"` shows all required checks passing.
+- The PR is not in a draft/WIP/DNI-style state that LLM reviewers reported as blocking review.
 - There are no unresolved LLM review threads.
 - There are no unresolved human review threads left. Human-owned threads must be resolved by a human reviewer, not by the agent.
 - `gh pr view "$PR" --json mergeStateStatus` does not report a conflict state.
