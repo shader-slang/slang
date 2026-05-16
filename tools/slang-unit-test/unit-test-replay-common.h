@@ -35,6 +35,56 @@ public:
 // finished (including aborts or assertion paths that skipped the dtor).
 #define REPLAY_TEST ScopedReplayContext _scopedReplayContext
 
+// RAII guard for per-test scratch directories. Creates the directory on
+// construction and removes it on destruction, so cleanup runs unconditionally
+// even if an exception leaves the test mid-flight. Used by tests that build a
+// throwaway .slang-replays-* directory to avoid leaking it into later tests in
+// the same process.
+class ScopedReplayDir
+{
+public:
+    explicit ScopedReplayDir(const char* dir)
+        : m_dir(dir)
+    {
+        Slang::Path::createDirectoryRecursive(m_dir);
+    }
+
+    ~ScopedReplayDir()
+    {
+        // Swallow any IO error: cleanup is best-effort and a throw from a
+        // destructor would terminate the test runner.
+        try
+        {
+            Slang::Path::removeNonEmpty(m_dir);
+        }
+        catch (...)
+        {
+        }
+    }
+
+    ScopedReplayDir(const ScopedReplayDir&) = delete;
+    ScopedReplayDir& operator=(const ScopedReplayDir&) = delete;
+
+    const char* path() const { return m_dir; }
+
+private:
+    const char* m_dir;
+};
+
+// Companion to ScopedReplayDir for tests that also reassign the replay
+// directory: restores the default ".slang-replays" on scope exit so the next
+// test in the same process starts from a clean configured directory.
+class ScopedReplayDirectorySetting
+{
+public:
+    ScopedReplayDirectorySetting() = default;
+
+    ~ScopedReplayDirectorySetting() { ctx().setReplayDirectory(".slang-replays"); }
+
+    ScopedReplayDirectorySetting(const ScopedReplayDirectorySetting&) = delete;
+    ScopedReplayDirectorySetting& operator=(const ScopedReplayDirectorySetting&) = delete;
+};
+
 // =============================================================================
 // Helper: Round-trip test template
 // Writes a value, creates a reader, reads it back, and compares

@@ -1,12 +1,9 @@
 // unit-test-replay-roundtrip-sync.cpp
 //
-// Lightweight round-trip / sync-mode tests that depend on no production-code
-// fix. The sync-mode coverage here is deliberately scoped to scalar and string
-// values; the API-call form of sync mode (where ComPtr destructors at scope
-// exit can throw DataMismatchException through a SLANG_NO_THROW boundary)
-// requires Fix C-1 and lives on replay-tests/fix-addref-noexcept.
+// Lightweight round-trip / sync-mode tests. The sync-mode coverage here is
+// scoped to scalar and string values driven directly through ctx().record();
+// sync-mode coverage of the proxy API-call path is not exercised here.
 
-#include "../../source/core/slang-io.h"
 #include "unit-test-replay-common.h"
 
 // =============================================================================
@@ -16,10 +13,14 @@
 // loadReplay() on an obviously bogus path returns failure cleanly.
 SLANG_UNIT_TEST(replayContextLoadReplayNonExistentPath)
 {
-    // Issue #10479 error-path bullet (the "non-existent path" case). The
-    // corrupt-data and truncated-stream cases live in
-    // unit-test-replay-stream-corruption.cpp.
+    // The corrupt-data and truncated-stream variants of the failure-path
+    // contract live in unit-test-replay-stream-corruption.cpp.
     REPLAY_TEST;
+
+    // Snapshot the pre-call state so we can verify the failure path didn't
+    // mutate anything it shouldn't have.
+    size_t streamSizeBefore = ctx().getStream().getSize();
+    Mode modeBefore = ctx().getMode();
 
     // Point at a path that definitely doesn't exist and try to load it.
     SlangResult result = ctx().loadReplay("/nonexistent/path/that/should/not/exist");
@@ -27,9 +28,16 @@ SLANG_UNIT_TEST(replayContextLoadReplayNonExistentPath)
     // Result must be a SlangResult failure code (not an exception).
     SLANG_CHECK(SLANG_FAILED(result));
 
-    // The context must still be in its non-playback state; a failed load
-    // must not leave residual state that fakes a successful playback.
+    // The context must still be in its pre-call state. A regression that
+    // half-applied the load (left m_mode flipped, populated handle tables,
+    // appended bytes to the stream, or merely flipped out of Idle) would
+    // get past a bare !isPlayback() check; comparing mode and stream size
+    // to the pre-call snapshot pins all those down. REPLAY_TEST guarantees
+    // modeBefore == Mode::Idle.
+    SLANG_CHECK(ctx().getMode() == modeBefore);
+    SLANG_CHECK(ctx().isIdle());
     SLANG_CHECK(!ctx().isPlayback());
+    SLANG_CHECK(ctx().getStream().getSize() == streamSizeBefore);
 }
 
 // =============================================================================
@@ -39,7 +47,6 @@ SLANG_UNIT_TEST(replayContextLoadReplayNonExistentPath)
 // Sync mode mismatch on string values raises DataMismatchException.
 SLANG_UNIT_TEST(replayContextSyncModeStringMismatch)
 {
-    // Issue #10479 sync-mode bullet (mismatch-detection arm).
     REPLAY_TEST;
 
     // Record a reference string. The stream now contains a single String
@@ -71,10 +78,9 @@ SLANG_UNIT_TEST(replayContextSyncModeStringMismatch)
 // Sync mode match path over a heterogeneous scalar+string sequence.
 SLANG_UNIT_TEST(replayContextSyncModeMultipleValuesMatch)
 {
-    // Issue #10479 sync-mode bullet (positive case): a faithful re-record
-    // of the exact same values must NOT throw. Pairs with the mismatch
-    // tests above and in unit-test-replay-modes.cpp to cover both arms of
-    // sync-mode comparison.
+    // Positive case for sync mode: a faithful re-record of the exact same
+    // values must NOT throw. Pairs with the mismatch tests above and in
+    // unit-test-replay-modes.cpp to cover both arms of sync-mode comparison.
     REPLAY_TEST;
 
     ctx().setMode(Mode::Record);
@@ -121,10 +127,9 @@ SLANG_UNIT_TEST(replayContextSyncModeMultipleValuesMatch)
 // Null handles round-trip cleanly through record then playback.
 SLANG_UNIT_TEST(replayContextNullHandleRoundTrip)
 {
-    // Issue #10479 edge-cases bullet. A regression that leaves the
-    // caller's variable untouched (e.g., handle skipped because it was
-    // "empty") would silently break any API that accepts nullable
-    // interface arguments.
+    // A regression that leaves the caller's variable untouched (e.g.,
+    // handle skipped because it was "empty") would silently break any API
+    // that accepts nullable interface arguments.
     REPLAY_TEST;
 
     ctx().setMode(Mode::Record);

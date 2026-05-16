@@ -5,10 +5,13 @@
 // the hood share a single ReplayContext mutex) and then validates that
 // every call ran successfully and that the resulting stream contains data.
 //
-// Issue #10479 thread-safety bullet, recording arm. The replay arm of the
-// same bullet (replay a multi-threaded recording) needs Fix D's playback
-// keep-alive and lives on replay-tests/fix-playback-keepalive as
-// replayContextConcurrentRecordingThenPlayback / ConcurrentMixedWorkload.
+// Coverage scope: these tests are smoke checks for gross lock omissions and
+// for the "all threads complete; stream is non-empty" contract. At 4-8
+// threads and 1-25 calls each, a missing per-call lock can still serialize
+// by scheduler luck on a CI runner and pass undetected. The default sizes
+// favor fast CI feedback; real race detection comes from running the
+// process under TSAN, or from cranking the stress test up via -D (see
+// SLANG_UNIT_TEST_REPLAY_THREAD_STRESS_* below).
 
 #include "unit-test-replay-common.h"
 

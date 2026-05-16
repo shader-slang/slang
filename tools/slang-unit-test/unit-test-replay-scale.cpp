@@ -6,8 +6,10 @@
 // that only shows up at scale and would otherwise lurk until a user records
 // a real workload.
 //
-// This branch carries the concurrent-dedup test from this file, which maps
-// to the #10479 thread-safety bullet (dedup arm).
+// The dedup test here covers the lock-held form of the contract: many
+// threads calling recordBlobByHash while each holds ctx().lock() must still
+// collapse to one file. It is not a race-on-the-dedup-map test, since the
+// per-call lock serializes execution (see in-body comment).
 
 #include "../../source/core/slang-io.h"
 #include "unit-test-replay-common.h"
@@ -20,13 +22,21 @@
 // exactly one disk file.
 SLANG_UNIT_TEST(replayContextScaleConcurrentBlobHashingDedup)
 {
-    // A regression (per-thread hash table, lost-update on the dedup map)
-    // would produce 2-8 files instead of 1. Issue #10479 thread-safety
-    // bullet, dedup arm.
+    // A regression that broke dedup for lock-held callers (per-thread hash
+    // table, lost-update on the dedup map under sequential calls) would
+    // produce 2-8 files instead of 1. The per-call ctx().lock() below means
+    // the threads are serialized through recordBlobByHash, so this is a
+    // contract check on the lock-held path rather than a race-on-the-map
+    // test; the value is breadth (multiple threads independently take and
+    // release the recursive mutex) plus on-disk verification of dedup
+    // output.
     REPLAY_TEST;
 
-    // Per-test directory so the file count we assert on isn't mixed with
-    // other tests' output.
+    // RAII: the scratch directory and the replay-directory setting are
+    // restored on scope exit so a throw mid-test can't leak either into
+    // later tests. The dedup file-count assertion below depends on having
+    // a private directory, so this isolation matters in both directions.
+    ScopedReplayDirectorySetting restoreReplayDir;
     ctx().setReplayDirectory(".slang-replays-scale-concurrent");
     ctx().setMode(Mode::Record);
 
@@ -97,8 +107,10 @@ SLANG_UNIT_TEST(replayContextScaleConcurrentBlobHashingDedup)
     (void)Slang::Path::find(filesDir, nullptr, &counter);
     SLANG_CHECK(fileCount == 1);
 
+    // Best-effort: remove the scratch directory before the guard runs so the
+    // file count we assert on doesn't linger past the test. The guard still
+    // restores the default replay-directory setting on scope exit.
     ctx().disable();
     ctx().reset();
     Slang::Path::removeNonEmpty(ctx().getReplayDirectory());
-    ctx().setReplayDirectory(".slang-replays");
 }

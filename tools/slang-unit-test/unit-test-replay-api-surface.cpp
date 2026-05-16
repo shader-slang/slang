@@ -5,7 +5,7 @@
 #include "unit-test-replay-common.h"
 
 // =============================================================================
-// Release-to-zero through the proxy (issue #10479)
+// Release-to-zero through the proxy
 // =============================================================================
 
 // Driving a proxy's refcount to zero through release() must not crash.
@@ -16,9 +16,18 @@ SLANG_UNIT_TEST(replayContextProxyReleaseToZero)
     // done `delete this`. The test cycles refcount up and back a few times
     // (exercising the macro on non-final releases) then drops the final
     // reference. The recorded release-return is appended after releaseImpl()
-    // returns, so the stream must keep growing past the deletion. Any future
-    // change that introduced a `this->...` access after release would crash
-    // here, especially under ASan.
+    // returns, so the stream must keep growing past the deletion. Note also
+    // that _lock (the std::unique_lock that RECORD_CALL takes via
+    // _ctx.lock()) is bound to _ctx (the global ReplayContext) rather than
+    // to `this`, so its destructor running after `delete this` is safe.
+    //
+    // What this test reliably catches: a regression where the macro tail
+    // stops appending the release-return record (stream size assertion
+    // fails). A regression that read freed memory off `this->...` would
+    // need a sanitizer build to surface; in a plain Debug build that read
+    // would likely return stale-but-readable bytes and the test would pass.
+    // The assertion here is therefore "the macro tail continues to run past
+    // `delete this`", with sanitizer builds providing extra coverage.
     REPLAY_TEST;
 
     ctx().setMode(Mode::Record);
@@ -53,7 +62,10 @@ SLANG_UNIT_TEST(replayContextProxyReleaseToZero)
     // Last reference: refcount 1 -> 0 runs `delete this` inside releaseImpl().
     // The macro must continue to run after that point, reading only _ctx
     // (global) and result (stack local). A regression that touched
-    // `this->...` here would crash, especially under ASan.
+    // `this->...` here may crash on read-after-free; in a non-sanitizer
+    // build it could also slip through silently, so the post-call stream
+    // size check below is what catches the more common case where the tail
+    // simply stopped running.
     uint32_t finalCount = proxy->release();
     SLANG_CHECK(finalCount == 0);
 

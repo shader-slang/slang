@@ -1,38 +1,33 @@
 // unit-test-replay-misuse.cpp
 //
-// Defensive tests for replay-context state-machine misuse (this branch
-// carries the loadLatestReplay() failure-path cases that map to the
-// #10479 "error path handling" bullet).
+// Defensive tests for replay-context state-machine misuse: loadLatestReplay()
+// against an empty or missing replay directory must fail cleanly with a
+// SlangResult code rather than throwing or asserting.
 
-#include "../../source/core/slang-io.h"
 #include "unit-test-replay-common.h"
-
-#include <cstring>
 
 // loadLatestReplay() against an empty replay directory must fail cleanly.
 SLANG_UNIT_TEST(replayContextLoadLatestReplayNoFolders)
 {
-    // Issue #10479 error-path bullet: loadReplay / loadLatestReplay against
-    // degenerate inputs. The directory exists but contains no recording
-    // subfolders, so the function must return a SlangResult failure code
-    // rather than throwing or asserting.
+    // The directory exists but contains no recording subfolders, so the
+    // function must return a SlangResult failure code rather than throwing
+    // or asserting.
     REPLAY_TEST;
 
-    // Create an empty directory and point the replay context at it.
-    const char* dir = ".slang-replays-misuse-empty-latest";
-    Slang::Path::createDirectoryRecursive(dir);
+    // RAII: the scratch directory and the replay-directory setting are
+    // both restored on scope exit regardless of how the test ends, so a
+    // later throw from inside loadLatestReplay() can't leak the directory
+    // or the non-default setting into subsequent tests.
+    ScopedReplayDir scratch(".slang-replays-misuse-empty-latest");
+    ScopedReplayDirectorySetting restoreReplayDir;
+
     ctx().reset();
-    ctx().setReplayDirectory(dir);
+    ctx().setReplayDirectory(scratch.path());
 
     // loadLatestReplay() iterates the directory looking for recording
     // subfolders. With none present, it must report failure cleanly.
     SlangResult lr = ctx().loadLatestReplay();
     SLANG_CHECK(SLANG_FAILED(lr));
-
-    // Tear down the test directory and restore the default so subsequent
-    // tests in the same process aren't affected.
-    Slang::Path::removeNonEmpty(dir);
-    ctx().setReplayDirectory(".slang-replays");
 }
 
 // loadLatestReplay() against a non-existent directory must fail cleanly.
@@ -43,6 +38,10 @@ SLANG_UNIT_TEST(replayContextLoadLatestReplayMissingDirectory)
     // path where stat() of the parent directory itself fails.
     REPLAY_TEST;
 
+    // No directory is created on disk here; the guard only restores the
+    // replay-directory setting on scope exit.
+    ScopedReplayDirectorySetting restoreReplayDir;
+
     // Point at a path we know doesn't exist (no creation step).
     ctx().reset();
     ctx().setReplayDirectory(".slang-replays-misuse-does-not-exist-xyz");
@@ -51,7 +50,4 @@ SLANG_UNIT_TEST(replayContextLoadLatestReplayMissingDirectory)
     // rather than throwing on the missing-directory stat error.
     SlangResult lr = ctx().loadLatestReplay();
     SLANG_CHECK(SLANG_FAILED(lr));
-
-    // Restore the default directory.
-    ctx().setReplayDirectory(".slang-replays");
 }
