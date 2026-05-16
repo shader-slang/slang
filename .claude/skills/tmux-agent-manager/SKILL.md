@@ -30,10 +30,13 @@ bash << 'DETECT'
 if command -v tmux &>/dev/null; then
     TMUX_EXEC="tmux"
     SH="bash -c"        # run inline shell commands
-else
-    # tmux not in PATH — assume Windows host, reach it through WSL
+elif wsl tmux -V >/dev/null 2>&1; then
+    # tmux not in PATH but available via WSL — Windows host
     TMUX_EXEC="wsl tmux"
     SH="wsl bash -c"
+else
+    echo "tmux is not available (native or via wsl tmux). Install tmux and retry."
+    exit 1
 fi
 
 # Which git binary produces consistent paths
@@ -135,10 +138,15 @@ Truncate session names to 35 chars with `…`. SUMMARY = last meaningful agent o
 ## Step 4 — Send instruction
 
 1. Parse `$ARGUMENTS`: first token after `send` = session name; rest = message.
-2. Send to the agent pane:
+2. Send to the agent pane using a temp file to safely handle newlines and special characters:
 
 ```bash
-$TMUX_EXEC send-keys -t "SESSION:0.0" "MESSAGE" Enter
+cat > /tmp/agent_send_msg.txt << 'MSG'
+MESSAGE
+MSG
+$TMUX_EXEC load-buffer /tmp/agent_send_msg.txt
+$TMUX_EXEC paste-buffer -t "SESSION:0.0"
+$TMUX_EXEC send-keys -t "SESSION:0.0" "" Enter
 ```
 
 3. Wait 3 seconds, capture pane tail, confirm message appears after `›`.
@@ -158,7 +166,7 @@ user.
 ## Step 6 — Monitor loop
 
 1. Run status workflow (Steps 1–3).
-2. Fire notifications for every `needs_approval` or `stuck` session.
+2. Mark every `needs_approval` or `stuck` session with `⚠ NEEDS ATTENTION` in the status table (notifications are not yet implemented — see Step 5).
 3. Report status table to user.
 4. Schedule next wakeup via ScheduleWakeup:
    - `delaySeconds`: interval from `$ARGUMENTS` (default 60, min 60)
