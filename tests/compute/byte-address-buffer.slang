@@ -1,5 +1,9 @@
 // byte-address-buffer.slang
 
+// BAB_GENERIC_LOAD_COVERAGE is intentionally omitted for the default `-slang`
+// cases because they include the DX11/FXC path, and FXC rejects the generated
+// HLSL `Load<T>` syntax. CPU/Vulkan/D3D12/WGPU still enable it to cover generic
+// typed loads, including the WGSL lowering this test was extended for.
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -xslang -DBAB_GENERIC_LOAD_COVERAGE
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -xslang -DRWBAB -xslang -DBAB_GENERIC_LOAD_COVERAGE
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
