@@ -157,6 +157,12 @@ void ReplayContext::destroySingleton()
     delete toDelete;
 }
 
+int& suppressionCounter()
+{
+    thread_local int counter = 0;
+    return counter;
+}
+
 ReplayContext::ReplayContext()
     : m_stream()
     , m_referenceStream()
@@ -212,6 +218,12 @@ void ReplayContext::ensureInitialized()
 
 void ReplayContext::reset()
 {
+    // Drop playback keep-alive refs BEFORE clearing the handle table. The
+    // releases may trigger ~ProxyBase, which calls back into unregisterProxy;
+    // doing this first lets those calls find their entries and leaves the
+    // dictionaries internally consistent (no dangling raw pointers to objects
+    // that were just destroyed).
+    releasePlaybackKeepAlive();
     closeRecordingMirror(); // Close any active mirror file
     m_stream.reset();
     m_indexStream.reset();
@@ -229,6 +241,9 @@ void ReplayContext::reset()
 
 void ReplayContext::switchToPlayback()
 {
+    // Drop any keep-alive refs from a previous playback before wiping the
+    // handle table. (No-op on the typical Record→Playback transition.)
+    releasePlaybackKeepAlive();
     // Clear all local state
     m_referenceStream.reset();
     m_arena.reset();
@@ -286,6 +301,12 @@ void ReplayContext::setMode(Mode mode)
     else if (mode != Mode::Record && m_mode == Mode::Record)
     {
         closeRecordingMirror();
+    }
+
+    // Leaving Playback (e.g. via disable()) — drop the keep-alive refs.
+    if (m_mode == Mode::Playback && mode != Mode::Playback)
+    {
+        releasePlaybackKeepAlive();
     }
 
     m_mode = mode;
@@ -704,7 +725,29 @@ uint64_t ReplayContext::registerProxyImpl(ISlangUnknown* proxy, ISlangUnknown* i
     m_handleToObject[handle] = proxy;
     m_proxyToImpl[proxy] = implementation;
     m_implToProxy[implementation] = proxy;
+
+    // In playback, keep proxies alive past replayed release() calls so that
+    // post-executeAll handle lookups work. See m_playbackKeepAlive comment.
+    if (m_mode == Mode::Playback)
+    {
+        SuppressRefCountRecording guard;
+        proxy->addRef();
+        m_playbackKeepAlive.add(proxy);
+    }
     return handle;
+}
+
+void ReplayContext::releasePlaybackKeepAlive()
+{
+    if (m_playbackKeepAlive.getCount() == 0)
+        return;
+    SuppressRefCountRecording guard;
+    for (auto* p : m_playbackKeepAlive)
+    {
+        if (p)
+            p->release();
+    }
+    m_playbackKeepAlive.clear();
 }
 
 void ReplayContext::unregisterProxyImpl(ISlangUnknown* proxy)

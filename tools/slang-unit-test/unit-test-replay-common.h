@@ -24,7 +24,18 @@ inline ReplayContext& ctx()
 class ScopedReplayContext
 {
 public:
-    ScopedReplayContext() { ctx().reset(); }
+    ScopedReplayContext()
+    {
+        ctx().reset();
+        // The static HandlerRegistrar populates the handler dictionary once
+        // at process startup, into whichever ReplayContext singleton was
+        // alive then. If a prior test has called destroySingleton(), the
+        // current singleton is freshly constructed and its handler dict is
+        // empty. Re-register so playback that needs handlers actually has
+        // them, regardless of which test ran first.
+        if (ctx().getHandlerCount() == 0)
+            ctx().registerDefaultHandlers();
+    }
 
     ~ScopedReplayContext() { ctx().reset(); }
 };
@@ -66,3 +77,4 @@ static bool roundTripCheck(T value)
     bool atEnd = roundTripValue(value, readValue);
     return atEnd && (readValue == value);
 }
+

@@ -672,6 +672,10 @@ private:
     // Internal registeration using canonical ISlangUnknown* identities
     SLANG_API uint64_t registerProxyImpl(ISlangUnknown* proxy, ISlangUnknown* implementation);
     SLANG_API void unregisterProxyImpl(ISlangUnknown* proxy);
+    /// Drop the extra refs held in m_playbackKeepAlive, with ref-count
+    /// recording suppressed so playback's own teardown doesn't reach into
+    /// the (already-consumed) stream.
+    SLANG_API void releasePlaybackKeepAlive();
     SLANG_API ISlangUnknown* getProxyImpl(ISlangUnknown* implementation);
     SLANG_API ISlangUnknown* getImplementationImpl(ISlangUnknown* proxy);
     SLANG_API uint64_t testOnlyRegisterProxyImpl(ISlangUnknown* obj);
@@ -706,6 +710,14 @@ private:
     // Proxy tracking: maps proxies to implementations and back
     Dictionary<ISlangUnknown*, ISlangUnknown*> m_proxyToImpl;
     Dictionary<ISlangUnknown*, ISlangUnknown*> m_implToProxy;
+
+    // During playback we hold an extra reference on every proxy we register,
+    // so that proxies survive any release() calls replayed from the stream.
+    // This makes post-replay handle lookups (e.g. getProxy(handle)) work,
+    // which is the whole point of playback for debugging/inspection. The refs
+    // are dropped by releasePlaybackKeepAlive() during reset / switchToPlayback /
+    // setMode(Idle).
+    List<ISlangUnknown*> m_playbackKeepAlive;
 
     // Replay directory management
     String m_replayDirectory = ".slang-replays"; ///< Base directory for replays
