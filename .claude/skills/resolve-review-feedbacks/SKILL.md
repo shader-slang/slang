@@ -21,6 +21,16 @@ Use this skill to keep a GitHub PR moving until all CI checks pass, LLM review t
 - The `gh` token can read PR reviews/checks and push to the PR branch.
 - A PR URL or PR number is provided in `$ARGUMENTS`. If it is missing, ask the user for the PR.
 
+Initialize the PR selector once before any use:
+
+```bash
+PR="${ARGUMENTS:-}"
+if [ -z "$PR" ]; then
+  echo "Missing PR argument (URL or number)."
+  exit 1
+fi
+```
+
 Check before making changes:
 
 ```bash
@@ -203,8 +213,11 @@ Resolve by rebasing onto the latest base branch:
 ```bash
 BASE="$(gh pr view "$PR" --json baseRefName --jq .baseRefName)"
 HEAD_BRANCH="$(gh pr view "$PR" --json headRefName --jq .headRefName)"
-git fetch upstream "$BASE"
-git rebase "upstream/$BASE"
+BASE_REPO="$(gh pr view "$PR" --json baseRepository --jq .baseRepository.nameWithOwner)"
+BASE_REMOTE="$(git remote -v | grep -m1 "$BASE_REPO" | awk '{print $1}')"
+BASE_REMOTE="${BASE_REMOTE:-upstream}"
+git fetch "$BASE_REMOTE" "$BASE"
+git rebase "$BASE_REMOTE/$BASE"
 ```
 
 Resolve conflicts in the files, then continue:
