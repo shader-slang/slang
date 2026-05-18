@@ -92,16 +92,17 @@ Parse `$ARGUMENTS` to determine which command to run. If empty or "status", run 
 
 ---
 
-## Step 1 — Enumerate agent panes (one per session)
+## Step 1 — Enumerate candidate agent panes, then filter to confirmed agents
 
 ```bash
 $TMUX_EXEC list-sessions -F "#{session_name}" | sed 's/$/:0.0/'
 ```
 
-This produces one `SESSION:0.0` target per session — the pane where the Claude Code
-agent lives. Use only these targets for state classification, status rows, and sends.
-Enumerating all panes with `list-panes -a` would include non-agent panes and produce
-misleading status rows.
+This produces one `SESSION:0.0` candidate per session. After listing, **filter** to
+only sessions whose pane tail shows Claude/Codex agent markers: a welcome banner,
+a model-info line, or the `›` prompt pattern expected by Step 2. Discard sessions
+that show none of these — they are unrelated tmux sessions and must not be targeted
+for status classification, sends, or implicit target resolution.
 
 ---
 
@@ -158,8 +159,9 @@ wgsl-require-bab-load                needs_approval    ⚠ blocked  Waiting for 
 fix-lambda-capture                   working           ~2 min     Editing source/slang/slang-check-expr.cpp
 ```
 
-Session names are capped at 20 chars at creation time (Step 7a) and never need
-truncation in the table. SUMMARY = last meaningful agent output line.
+Sessions created by Step 7 are capped at 20 chars. Sessions started outside this
+skill may have longer names — truncate display names to 20 chars with `…` as needed
+for table alignment. SUMMARY = last meaningful agent output line.
 
 **YOLO mode warning** — after the table, list every session whose `YOLO_MODE` is `normal`
 as a dedicated warning block:
@@ -199,7 +201,9 @@ When the pane output contains timestamps or progress indicators (e.g. `[12/240]`
 
 Execution order: **4a** (pre-send checks) → **send** → **4b** (confirm delivery) → **4c** (monitor progress).
 
-1. Parse `$ARGUMENTS`: first token after `send` = session name; rest = message.
+1. Parse `$ARGUMENTS` with two explicit forms:
+   - `send <session-name> <message>` — session name provided explicitly (Case A in Step 4a)
+   - `send <message>` — no session token; target resolved implicitly (Case B in Step 4a)
 2. Run **Step 4a — Correlation check** before sending anything.
 3. Send to the agent pane using a temp file to safely handle newlines and special characters:
 
@@ -246,9 +250,9 @@ Capture the session name and last 10 lines of pane 0.0 for each session.
    and tell the user no session called `<name>` exists — **stop, do not send**.
 2. Continue to the mismatch check in 4a-iii.
 
-**Case B — No session name provided** (user described an issue/task without naming a session):
+**Case B — Implicit-target form** (`send <message>` with no session token):
 
-1. If there is exactly one active session → treat it as the target; skip to 4a-iii.
+1. If there is exactly one active **agent** session → treat it as the target; skip to 4a-iii.
 2. If there are multiple active sessions → **ask the user**:
 
    > "There are N active agent sessions: [list names with one-line summaries].
