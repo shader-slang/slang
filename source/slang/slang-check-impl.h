@@ -2121,6 +2121,7 @@ public:
         MethodResultTypeMismatch, // Method return type doesn't match interface requirement
         ParameterDirMismatch,     // Parameter direction mismatch (e.g., `in` vs `out`)
         GenericSignatureMismatch, // Generic signature mismatch (e.g., number of generic parameters)
+        DifferentiabilityMismatch, // Method differentiability doesn't match interface requirement
     };
 
     /// Details about method witness synthesis failure

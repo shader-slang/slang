@@ -3884,6 +3884,13 @@ err(
     span { loc = "param:Decl", message = "parameter '~param' direction '~actualDirection:ParamPassingMode' does not match interface requirement '~expectedDirection:ParamPassingMode'." }
 )
 
+standalone_note(
+    "differentiable-requirement-needs-differentiable-member",
+    -1,
+    "member '~member:Decl' cannot satisfy differentiable interface requirement '~requirement:Decl' because it does not provide the required differentiability",
+    span { loc = "member:Decl" }
+)
+
 warning(
     "non-copyable-type-cannot-conform-to-interface",
     38109,
