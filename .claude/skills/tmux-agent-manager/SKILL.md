@@ -116,7 +116,7 @@ $TMUX_EXEC capture-pane -t "SESSION:W.P" -p | tail -35
 | `working` | Lines contain `• Ran`, `• Read`, `• Writing`, `• Searching`, spinner chars, or active build/test output |
 | `needs_approval` | Lines near bottom contain "Do you want to", "Allow", "(y/n)", "Yes/No", or "approve" |
 | `pending_message` | `›` prompt followed by user message text (received but not yet processed) |
-| `stuck` | Pane content identical across two consecutive polls AND state is not `idle` |
+| `stuck` | Pane content identical across two consecutive polls AND state is not `idle`; **monitor-loop only** — store previous pane snapshot in `PREV_PANE`; compare with current snapshot on each iteration; if unchanged and state ≠ `idle`, classify as `stuck` |
 | `unknown` | None of the above — treat as working |
 
 ---
@@ -161,12 +161,14 @@ When the pane output contains timestamps or progress indicators (e.g. `[12/240]`
 2. Send to the agent pane using a temp file to safely handle newlines and special characters:
 
 ```bash
-cat > /tmp/agent_send_msg.txt << 'MSG'
+TMP_MSG=$(mktemp /tmp/agent_send_msg.XXXXXX.txt)
+cat > "$TMP_MSG" << 'MSG'
 MESSAGE
 MSG
-$TMUX_EXEC load-buffer /tmp/agent_send_msg.txt
+$TMUX_EXEC load-buffer "$TMP_MSG"
 $TMUX_EXEC paste-buffer -t "SESSION:0.0"
 $TMUX_EXEC send-keys -t "SESSION:0.0" "" Enter
+rm -f "$TMP_MSG"
 ```
 
 3. Wait 3 seconds, capture pane tail, confirm message appears after `›`.
@@ -380,13 +382,15 @@ pane content to the user and stop.
 Write to a temp file to safely handle newlines and special characters:
 
 ```bash
-cat > /tmp/agent_prompt_<slug>.txt << 'PROMPT'
+TMP_PROMPT=$(mktemp /tmp/agent_prompt_<slug>.XXXXXX.txt)
+cat > "$TMP_PROMPT" << 'PROMPT'
 <composed prompt text>
 PROMPT
 
-$TMUX_EXEC load-buffer /tmp/agent_prompt_<slug>.txt
+$TMUX_EXEC load-buffer "$TMP_PROMPT"
 $TMUX_EXEC paste-buffer -t "<slug>:0.0"
 $TMUX_EXEC send-keys -t "<slug>:0.0" "" Enter
+rm -f "$TMP_PROMPT"
 ```
 
 After sending, run **Step 4b — Post-send monitoring** targeting `<slug>:0.0` to confirm
