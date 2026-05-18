@@ -181,3 +181,20 @@ The semantics of an assignment expression are to:
 * Store the value of the right-hand side to the l-value of the left-hand side
 * Yield the l-value of the left-hand-side
 
+
+Generic Specialization
+----------------------
+
+TODO: `<...>`
+
+### Disambiguation between Generic Specialization and Less-Than Operator
+
+Generic specialization is context-sensitive. When token `<` is encountered in an expression and the
+left-hand-side operand is:
+
+- known to be generic, then `<` is considered to begin generic specialization.
+- known to be non-generic, then `<` is considered as the less-than operator.
+- undetermined, then parsing as generic arguments is attempted. If parsing succeeds, `<...>` is interpreted as
+  generic specialization. Otherwise, the initial `<` is interpreted as the less-than operator. Parsing is
+  considered successful if `<...>` can be parsed as generic specialization and it is followed by one of `::`,
+  `.`, `(`, `)`, `[`, `]`, `:`, `,`, `?`, `;`, `==`, `!=`, `>`, `>>`, or the end-of-file marker.
