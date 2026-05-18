@@ -33,11 +33,13 @@ SLANG_UNIT_TEST(replayContextScaleConcurrentBlobHashingDedup)
     REPLAY_TEST;
 
     // RAII: the scratch directory and the replay-directory setting are
-    // restored on scope exit so a throw mid-test can't leak either into
-    // later tests. The dedup file-count assertion below depends on having
-    // a private directory, so this isolation matters in both directions.
+    // both restored on scope exit so a throw mid-test can't leak either
+    // into later tests. The dedup file-count assertion below depends on
+    // having a private directory, so this isolation matters in both
+    // directions.
+    ScopedReplayDir scratch(".slang-replays-scale-concurrent");
     ScopedReplayDirectorySetting restoreReplayDir;
-    ctx().setReplayDirectory(".slang-replays-scale-concurrent");
+    ctx().setReplayDirectory(scratch.path());
     ctx().setMode(Mode::Record);
 
     static const uint8_t payload[] = {0x01, 0x02, 0x03, 0x04};
@@ -107,10 +109,6 @@ SLANG_UNIT_TEST(replayContextScaleConcurrentBlobHashingDedup)
     (void)Slang::Path::find(filesDir, nullptr, &counter);
     SLANG_CHECK(fileCount == 1);
 
-    // Best-effort: remove the scratch directory before the guard runs so the
-    // file count we assert on doesn't linger past the test. The guard still
-    // restores the default replay-directory setting on scope exit.
     ctx().disable();
     ctx().reset();
-    Slang::Path::removeNonEmpty(ctx().getReplayDirectory());
 }

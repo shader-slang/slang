@@ -36,7 +36,7 @@ SLANG_UNIT_TEST(replayContextLoadReplayCorruptStream)
     {
         ctx().executeAll();
     }
-    catch (...)
+    catch (const Slang::Exception&)
     {
         caughtException = true;
     }
@@ -49,9 +49,6 @@ SLANG_UNIT_TEST(replayContextLoadReplayCorruptStream)
 // executeAll().
 SLANG_UNIT_TEST(replayContextLoadReplayTruncatedStream)
 {
-    // Distinct from the truncation sweep in unit-test-replay-fuzz.cpp
-    // (which sweeps every prefix length): this pins one representative
-    // case for fast feedback.
     REPLAY_TEST;
 
     // Build a real recording in memory: createGlobalSession2 + findProfile.
@@ -94,7 +91,7 @@ SLANG_UNIT_TEST(replayContextLoadReplayTruncatedStream)
     {
         ctx().executeAll();
     }
-    catch (...)
+    catch (const Slang::Exception&)
     {
         caughtException = true;
     }
