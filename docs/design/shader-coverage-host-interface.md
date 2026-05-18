@@ -84,11 +84,12 @@ These answer:
 - the legacy coverage-specific descriptor binding view
 - how many source coverage entries exist
 
-Line counters are source-location based. If generic specialization,
-inlining, or other IR cloning creates multiple executable copies of
-the same source line, all those copies contribute to that source
-line's counter rather than receiving per-specialization counters.
-For the current line-coverage mode, `getEntryCount()` equals
+Line counters are source-location based, but the current producer emits
+one source entry per inserted counter op. If generic specialization,
+inlining, or other IR cloning creates multiple executable copies that
+map to the same source line, those entries keep distinct counter slots;
+LCOV export aggregates them by `(file, line)` at report-generation
+time. For the current line-coverage mode, `getEntryCount()` equals
 `getCounterCount()`, `CoverageEntryInfo::kind` is `Line`, and
 `CoverageEntryInfo::counterIndex` selects the runtime counter slot.
 Future branch, function, and source-region coverage can add entries

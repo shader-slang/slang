@@ -1239,6 +1239,11 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
         // counter indices would misalign the host's counter array.
         if (SLANG_FAILED(metadata->getEntryInfo(i, &entry)))
             return SLANG_FAIL;
+        if (entry.counterIndex != slang::kInvalidCoverageCounterIndex &&
+            entry.counterIndex >= counterCount)
+        {
+            return SLANG_FAIL;
+        }
         out << (i == 0 ? "" : ",");
         out << "\n    {\"kind\": \"" << _getCoverageEntryKindName(entry.kind) << "\", ";
         out << "\"counter\": ";

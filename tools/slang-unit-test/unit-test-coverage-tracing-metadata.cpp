@@ -421,5 +421,44 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(
             slang_writeCoverageManifestJson(nullptr, dummy.writeRef()) == SLANG_E_INVALID_ARG);
         SLANG_CHECK(slang_writeCoverageManifestJson(coverage, nullptr) == SLANG_E_INVALID_ARG);
+
+        struct OutOfRangeCounterMetadata : slang::ICoverageTracingMetadata
+        {
+            SLANG_NO_THROW SlangResult SLANG_MCALL
+            queryInterface(SlangUUID const&, void** outObject) SLANG_OVERRIDE
+            {
+                if (outObject)
+                    *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID&) SLANG_OVERRIDE
+            {
+                return nullptr;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW SlangResult SLANG_MCALL
+            getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE
+            {
+                if (!outInfo || index != 0)
+                    return SLANG_E_INVALID_ARG;
+                outInfo->file = "bad.slang";
+                outInfo->line = 1;
+                outInfo->counterIndex = 1;
+                outInfo->kind = slang::CoverageEntryKind::Line;
+                outInfo->counterMode = slang::CoverageCounterMode::Count;
+                return SLANG_OK;
+            }
+            SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo*)
+                SLANG_OVERRIDE
+            {
+                return SLANG_OK;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE { return 1; }
+        };
+
+        OutOfRangeCounterMetadata badMetadata;
+        SLANG_CHECK(slang_writeCoverageManifestJson(&badMetadata, dummy.writeRef()) != SLANG_OK);
     }
 }

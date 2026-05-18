@@ -4608,10 +4608,10 @@ static const uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
 /// may add fields such as column/span information, function identity,
 /// branch-arm identity, or coverage-mode-specific metadata at the end
 /// without changing the COM interface. Entries are source-location
-/// based: if generic specialization, cloning, or inlining duplicates
-/// code for the same source location, all executions of that source
-/// location contribute to the same source entry rather than producing
-/// per-specialization entries.
+/// based: the current line-coverage producer emits one source entry
+/// per counter op. If multiple counter ops resolve to the same
+/// `(file, line)`, LCOV export aggregates them at report-generation
+/// time.
 struct CoverageEntryInfo
 {
     size_t structSize = sizeof(CoverageEntryInfo);
@@ -4717,9 +4717,12 @@ struct ICoverageTracingMetadata : public ISlangCastable
 
     /// Populate `outInfo` with attribution info for source coverage
     /// entry `index`. The valid range is `[0, getEntryCount())`. The
-    /// caller must pre-set `outInfo->structSize =
-    /// sizeof(CoverageEntryInfo)`. Returns `SLANG_OK` on success,
-    /// `SLANG_E_INVALID_ARG` for null `outInfo`, mismatched
+    /// caller must pre-set `outInfo->structSize` to the size of the
+    /// `CoverageEntryInfo` definition it was compiled against. The
+    /// implementation accepts any prefix-compatible size at or above
+    /// the v1 minimum (`file` and `line`), and only writes tail fields
+    /// that fit in the caller-provided struct. Returns `SLANG_OK` on
+    /// success, `SLANG_E_INVALID_ARG` for null `outInfo`, too-small
     /// `structSize`, or out-of-range `index`.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getEntryInfo(uint32_t index, CoverageEntryInfo* outInfo) = 0;

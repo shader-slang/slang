@@ -62,21 +62,26 @@ def load_counters_text(src, count):
     return values[:count]
 
 
-def get_manifest_counter_count(manifest):
+def get_manifest_version(manifest):
     version = manifest.get("version", 1)
+    if version not in (1, 2):
+        sys.exit(f"error: unsupported manifest version {version}")
+    return version
+
+
+def get_manifest_counter_count(manifest):
+    version = get_manifest_version(manifest)
     if version == 1:
         total = int(manifest["counters"])
-    elif version == 2:
-        total = int(manifest["counter_count"])
     else:
-        sys.exit(f"error: unsupported manifest version {version}")
+        total = int(manifest["counter_count"])
     if total < 0:
         sys.exit(f"error: manifest counter count must be non-negative, got {total}")
     return total
 
 
 def iter_line_entries(manifest):
-    version = manifest.get("version", 1)
+    version = get_manifest_version(manifest)
     for entry in manifest["entries"]:
         if version == 1:
             yield entry["index"], entry.get("file"), int(entry["line"])
@@ -89,7 +94,6 @@ def iter_line_entries(manifest):
                 continue
             yield int(counter), entry.get("file"), int(entry["line"])
             continue
-        sys.exit(f"error: unsupported manifest version {version}")
 
 
 def main():
