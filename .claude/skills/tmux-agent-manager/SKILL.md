@@ -119,6 +119,26 @@ $TMUX_EXEC capture-pane -t "SESSION:W.P" -p | tail -35
 | `stuck` | Pane content identical across two consecutive polls AND state is not `idle`; **monitor-loop only** — store previous pane snapshot in `PREV_PANE`; compare with current snapshot on each iteration; if unchanged and state ≠ `idle`, classify as `stuck` |
 | `unknown` | None of the above — treat as working |
 
+### YOLO mode detection
+
+For each session, also check whether Claude Code was started with
+`--dangerously-skip-permissions`. Without this flag, every tool call triggers a
+permission prompt and the agent will stall repeatedly.
+
+Scan the last 200 lines of the pane scrollback (which usually includes the startup banner):
+
+```bash
+$TMUX_EXEC capture-pane -t "SESSION:0.0" -p -S -200 \
+  | grep -qE "dangerously-skip-permissions|Bypassing permission" \
+  && echo "yolo" || echo "normal"
+```
+
+Claude Code prints `⚠️  Bypassing permission checks (--dangerously-skip-permissions)` in
+its welcome banner when the flag is active. If that line is absent, classify the session
+as `normal` (not in bypass mode).
+
+Store the result per session as `YOLO_MODE=yolo|normal`.
+
 ---
 
 ## Step 3 — Status report
@@ -133,7 +153,22 @@ wgsl-require-bab-load                needs_approval    ⚠ blocked  Waiting for 
 fix-lambda-capture                   working           ~2 min     Editing source/slang/slang-check-expr.cpp
 ```
 
-Truncate session names to 35 chars with `…`. SUMMARY = last meaningful agent output line.
+Session names are capped at 20 chars at creation time (Step 7a) and never need
+truncation in the table. SUMMARY = last meaningful agent output line.
+
+**YOLO mode warning** — after the table, list every session whose `YOLO_MODE` is `normal`
+as a dedicated warning block:
+
+```
+⚠ The following sessions are NOT running with --dangerously-skip-permissions:
+  • <session-name>
+  • <session-name>
+These agents will pause and request approval for every tool call.
+To restart with bypass mode: tmux kill-session -t <name>, then
+/tmux-agent-manager new <issue> (which always passes --dangerously-skip-permissions).
+```
+
+If all sessions are in YOLO mode, omit the warning block entirely.
 
 **ETA estimation rules** — read the pane tail to classify the current activity, then apply:
 
@@ -157,8 +192,11 @@ When the pane output contains timestamps or progress indicators (e.g. `[12/240]`
 
 ## Step 4 — Send instruction
 
+Execution order: **4a** (pre-send checks) → **send** → **4b** (confirm delivery) → **4c** (monitor progress).
+
 1. Parse `$ARGUMENTS`: first token after `send` = session name; rest = message.
-2. Send to the agent pane using a temp file to safely handle newlines and special characters:
+2. Run **Step 4a — Correlation check** before sending anything.
+3. Send to the agent pane using a temp file to safely handle newlines and special characters:
 
 ```bash
 TMP_MSG=$(mktemp /tmp/agent_send_msg.XXXXXX.txt)
@@ -167,22 +205,164 @@ MESSAGE
 MSG
 $TMUX_EXEC load-buffer "$TMP_MSG"
 $TMUX_EXEC paste-buffer -t "SESSION:0.0"
+# Wait for the paste to land in the terminal before sending Enter.
+# paste-buffer is async — sending Enter immediately risks the keystroke
+# arriving before the pasted text and being swallowed.
+sleep 1
 $TMUX_EXEC send-keys -t "SESSION:0.0" "" Enter
-rm -f "$TMP_MSG"
+# Do NOT rm TMP_MSG here — Step 4b may need it for a retry.
 ```
 
-3. Wait 3 seconds, capture pane tail, confirm message appears after `›`.
-4. Run the **Post-send monitoring** phase (Step 4b) before returning to the user.
+4. Run **Step 4b — Queue verification** to confirm the message was actually submitted.
+5. Run **Step 4c — Post-send monitoring** before returning to the user.
 
 ---
 
-## Step 4b — Post-send monitoring
+## Step 4a — Correlation check
 
-After every `send` (and after Step 7h for new sessions), verify the agent is actually
-making progress and is not silently blocked.
+**Goal:** prevent sending a message intended for one agent to an agent working on a
+different issue, and catch ambiguous targets before any message is delivered.
+
+Run this check immediately after parsing `$ARGUMENTS`, before any `tmux send-keys`.
+
+### 4a-i — Enumerate active sessions
+
+```bash
+$TMUX_EXEC list-sessions -F "#{session_name}"
+```
+
+Capture the session name and last 10 lines of pane 0.0 for each session.
+
+### 4a-ii — Resolve the target session
+
+**Case A — Session name was provided explicitly** (user wrote `send <name> <message>`):
+
+1. Check that `<name>` exactly matches an active session. If not, list the active sessions
+   and tell the user no session called `<name>` exists — **stop, do not send**.
+2. Continue to the mismatch check in 4a-iii.
+
+**Case B — No session name provided** (user described an issue/task without naming a session):
+
+1. If there is exactly one active session → treat it as the target; skip to 4a-iii.
+2. If there are multiple active sessions → **ask the user**:
+
+   > "There are N active agent sessions: [list names with one-line summaries].
+   > Which session should receive this message?"
+
+   Do **not** guess. Wait for the user's answer, then re-enter at Step 4.
+
+### 4a-iii — Mismatch check (for Case A with an explicit session name)
+
+Compare the user's stated intent (issue number, keywords, or description in the message)
+against the target session's apparent task:
+
+- **Session name** — the slug encodes the original issue or task (e.g. `fix-lambda-capture`,
+  `descheap-for-raytracing`). Treat each `-`-separated word as a keyword.
+- **Pane content** — the last 10 lines may show a file name, test name, or error message
+  that reveals the task more precisely than the slug alone.
+
+**Mismatch signals** — flag a mismatch when **any** of the following are true:
+
+| Signal | Example |
+|---|---|
+| User references a GitHub issue number and the session name contains a different issue number | User says "#1234", session slug contains "1567" |
+| User explicitly names a different issue/feature than the session slug describes | User says "lambda fix", session is `descheap-for-raytracing` |
+| User says "the agent working on X" and the target session name contains none of X's keywords | User says "shader compiler crash", session is `fix-lambda-capture` |
+
+**When a mismatch is detected**, stop and ask the user to confirm before sending:
+
+> "⚠ The session `<name>` appears to be working on **<inferred task>**, but your message
+> references **<user's described task>**. Active sessions:
+> [list all sessions with one-line summaries]
+> Did you mean to send to a different session, or should I proceed with `<name>`?"
+
+Wait for explicit confirmation or a corrected session name before proceeding.
+
+**When no mismatch is detected**, proceed directly to sending (Step 4, item 3).
+
+### 4a-iv — Ambiguity heuristic
+
+When the user's message contains strong issue-specific signals (an issue number, a unique
+identifier, a distinctive file or function name) and there is more than one active session
+whose slug partially matches those signals, treat this as ambiguous and ask:
+
+> "Multiple sessions could match your description: [list candidates with summaries].
+> Which one should receive this message?"
+
+Do **not** guess. Always prefer asking over sending to the wrong agent.
+
+---
+
+## Step 4b — Queue verification
+
+**Goal:** confirm that the message was received and submitted to the agent. Recover
+automatically from two common failure modes: Enter not processed (text visible but stuck
+in the input buffer) and paste failed silently (pane looks unchanged).
+
+Run this immediately after the send block in Step 4, before Step 4c.
+
+### Parameters
+
+| Parameter | Default |
+|---|---|
+| `VERIFY_WAIT` | 2 s — wait before first check |
+| `MAX_RETRIES` | 2 — total attempts before giving up |
+
+### Algorithm
+
+```
+attempt = 1
+
+while attempt <= MAX_RETRIES:
+    sleep VERIFY_WAIT
+    tail = capture last 20 lines of SESSION:0.0
+    classify state (idle / working / needs_approval / pending_message / unknown)
+
+    if state == working or state == needs_approval or state == unknown:
+        # Agent received the message and is acting on it (or needs approval).
+        report "✓ Message queued — agent is processing."
+        return  # proceed to Step 4c
+
+    if state == pending_message:
+        # Text is visible after › but Enter was not processed.
+        # This is the "waiting for ENTER" failure mode.
+        $TMUX_EXEC send-keys -t "SESSION:0.0" "" Enter
+        attempt += 1
+        continue
+
+    if state == idle:
+        if attempt == 1:
+            # The pane looks unchanged — paste may have failed silently.
+            # Retry the full send sequence before giving up.
+            $TMUX_EXEC load-buffer "$TMP_MSG"   # (keep TMP_MSG until here)
+            $TMUX_EXEC paste-buffer -t "SESSION:0.0"
+            sleep 1
+            $TMUX_EXEC send-keys -t "SESSION:0.0" "" Enter
+            attempt += 1
+            continue
+        else:
+            # Second idle after retry — give up and report.
+            ALERT: "⚠ Message delivery to SESSION failed after $MAX_RETRIES attempts.
+                    The agent pane appears unchanged. Last 20 pane lines:"
+            show tail
+            return  # do NOT proceed to Step 4c
+
+rm -f "$TMP_MSG"   # clean up after all retries are exhausted or on success
+```
+
+> **`pending_message` state detection**: the pane tail contains text after the last `›`
+> prompt line that is not a model-info or separator line — i.e., the agent has typed input
+> waiting to be submitted with Enter.
+
+---
+
+## Step 4c — Post-send monitoring
 
 **Goal:** catch permission prompts, clarifying questions, and early-idle states before
 the user moves on.
+
+Run this after Step 4b confirms the message was queued. Applies to both regular `send`
+and the initial prompt sent in Step 7h for new sessions.
 
 ### Parameters
 
@@ -204,6 +384,10 @@ loop every CHECK_INTERVAL until elapsed >= MAX_WAIT:
 
     if state == needs_approval:
         ALERT: "⚠ SESSION needs approval — agent is waiting for a permission prompt."
+        if YOLO_MODE[SESSION] == "normal":
+            ALERT (append): "⚠ This agent was NOT started with --dangerously-skip-permissions.
+                             It will block on every tool call requiring approval.
+                             Consider restarting it with bypass mode enabled."
         show the relevant pane lines
         return (stop monitoring)
 
@@ -294,9 +478,13 @@ gh issue view <number> --repo <REPO> --json number,title,body,labels
 - Claude prompt: the user's prompt verbatim + instruction to test and commit
 
 **Slug rule:** lowercase → replace runs of non-alphanumeric chars with `-` → collapse
-consecutive `-` → strip leading/trailing `-` → truncate to 45 chars.
+consecutive `-` → strip leading/trailing `-` → truncate to 20 chars → strip any
+trailing `-` left by the truncation.
 
-Full branch: `<prefix><slug>` (e.g. `fix/getTypeNameHint-crash-on-export`)
+Keep the most meaningful words (usually the first few): a 20-char slug must still be
+recognisable at a glance without needing further truncation in the status table.
+
+Full branch: `<prefix><slug>` (e.g. `fix/getTypeNameHint-cr`)
 Session/worktree name: `<slug>` (no prefix)
 
 ### 7b — Discover paths dynamically
@@ -377,6 +565,23 @@ Wait 8 seconds, then capture the pane tail and look for the `›` prompt or mode
 line. Retry every 5 seconds up to 3 times. If Claude still hasn't started, show the raw
 pane content to the user and stop.
 
+Once the `›` prompt is confirmed, run the YOLO mode check from Step 2 against the new
+session's scrollback:
+
+```bash
+$TMUX_EXEC capture-pane -t "<slug>:0.0" -p -S -200 \
+  | grep -qE "dangerously-skip-permissions|Bypassing permission" \
+  && echo "yolo" || echo "normal"
+```
+
+If the result is `normal`, emit a warning and continue immediately to Step 7h:
+
+```
+⚠ Session '<slug>' is NOT running with --dangerously-skip-permissions.
+  The agent will pause and request approval for every tool call.
+  To fix: kill this session and restart claude with --dangerously-skip-permissions.
+```
+
 ### 7h — Send the task prompt
 
 Write to a temp file to safely handle newlines and special characters:
@@ -389,11 +594,13 @@ PROMPT
 
 $TMUX_EXEC load-buffer "$TMP_PROMPT"
 $TMUX_EXEC paste-buffer -t "<slug>:0.0"
+sleep 1
 $TMUX_EXEC send-keys -t "<slug>:0.0" "" Enter
-rm -f "$TMP_PROMPT"
+# Do NOT rm TMP_PROMPT here — Step 4b may need it for a retry.
 ```
 
-After sending, run **Step 4b — Post-send monitoring** targeting `<slug>:0.0` to confirm
+After sending, run **Step 4b — Queue verification** targeting `<slug>:0.0` to confirm
+the prompt was actually submitted, then run **Step 4c — Post-send monitoring** to confirm
 the agent starts working (not blocked on a permission prompt or asking questions).
 Use `WORKING_GRACE=30` for new sessions since Claude Code takes a moment to start.
 
@@ -408,7 +615,7 @@ Use `WORKING_GRACE=30` for new sessions since Claude Code takes a moment to star
 
 ## Notes
 
-- Session names can be long — truncate to 35 chars in the status table with `…`
+- Session names are capped at 20 chars by the slug rule in Step 7a
 - The Claude Code pane is always window 0, pane 0 unless the user specifies otherwise
 - When a session has multiple windows, check window 0 for the agent; note other windows
   separately if they show interesting activity (build output, test results)
