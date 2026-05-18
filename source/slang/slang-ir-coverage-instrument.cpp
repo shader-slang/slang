@@ -4,6 +4,7 @@
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "compiler-core/slang-source-loc.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-target.h"
@@ -19,6 +20,44 @@ namespace
 // Well-known buffer name. Surfaced via `IRNameHintDecoration` and
 // matches the manifest / sidecar key that hosts read.
 static const char kCoverageBufferName[] = "__slang_coverage";
+static const uint32_t kCoverageSyntheticResourceID = uint32_t(SyntheticResourceKnownID::Coverage);
+
+static bool hasNameHint(IRInst* inst, UnownedTerminatedStringSlice expectedName)
+{
+    if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
+        return nameHint->getName() == expectedName;
+    return false;
+}
+
+static Index findSyntheticResourceRecordIndexById(ArtifactPostEmitMetadata& metadata, uint32_t id)
+{
+    for (Index i = 0; i < metadata.m_syntheticResources.getCount(); ++i)
+    {
+        if (metadata.m_syntheticResources[i].id == id)
+            return i;
+    }
+    return -1;
+}
+
+static Index getOrAddCoverageSyntheticResourceRecordIndex(ArtifactPostEmitMetadata& metadata)
+{
+    Index existingIndex =
+        findSyntheticResourceRecordIndexById(metadata, kCoverageSyntheticResourceID);
+    if (existingIndex >= 0)
+        return existingIndex;
+
+    SyntheticResourceRecord record;
+    record.id = kCoverageSyntheticResourceID;
+    SLANG_RELEASE_ASSERT(record.id != uint32_t(SyntheticResourceKnownID::None));
+    record.bindingType = slang::BindingType::MutableRawBuffer;
+    record.arraySize = 1;
+    record.scope = slang::SyntheticResourceScope::Global;
+    record.access = slang::SyntheticResourceAccess::ReadWrite;
+    record.entryPointIndex = -1;
+    record.debugName = kCoverageBufferName;
+    metadata.m_syntheticResources.add(record);
+    return metadata.m_syntheticResources.getCount() - 1;
+}
 
 // Choose the resource kind under which the coverage buffer is bound
 // for `target`. Each target family speaks a different vocabulary
@@ -53,13 +92,332 @@ static IRGlobalParam* findUserDeclaredCoverageBuffer(IRModule* module)
         auto param = as<IRGlobalParam>(inst);
         if (!param)
             continue;
-        auto nameHint = param->findDecoration<IRNameHintDecoration>();
-        if (!nameHint)
-            continue;
-        if (nameHint->getName() == UnownedTerminatedStringSlice(kCoverageBufferName))
+        if (hasNameHint(param, UnownedTerminatedStringSlice(kCoverageBufferName)))
             return param;
     }
     return nullptr;
+}
+
+static IRStructField* findStructFieldByKey(IRType* type, IRInst* expectedKey)
+{
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (field->getKey() == expectedKey)
+                return field;
+        }
+        return nullptr;
+    }
+
+    if (auto specialize = as<IRSpecialize>(type))
+    {
+        if (auto generic = as<IRGeneric>(specialize->getBase()))
+        {
+            if (auto genericStructType = as<IRStructType>(findInnerMostGenericReturnVal(generic)))
+                return findStructFieldByKey(genericStructType, expectedKey);
+        }
+    }
+
+    return nullptr;
+}
+
+struct UsedBindingRange
+{
+    UInt space = 0;
+    UInt binding = 0;
+    UInt count = 0;
+    bool isUnbounded = false;
+    IRInst* source = nullptr;
+};
+
+static UInt getResourceCount(
+    IRTypeLayout* typeLayout,
+    LayoutResourceKind kind,
+    bool& outIsUnbounded)
+{
+    outIsUnbounded = false;
+    if (!typeLayout)
+        return 0;
+    if (auto sizeAttr = typeLayout->findSizeAttr(kind))
+    {
+        auto size = sizeAttr->getSize();
+        if (size.isInfinite())
+        {
+            outIsUnbounded = true;
+            return 1;
+        }
+        return (UInt)size.getFiniteValueOr(0);
+    }
+    return 0;
+}
+
+static IRInst* selectBindingSource(IRInst* candidate, IRInst* fallback)
+{
+    if (candidate && candidate->sourceLoc.isValid())
+        return candidate;
+    return fallback ? fallback : candidate;
+}
+
+static bool isUnsizedArrayResourceSource(IRInst* source)
+{
+    if (!source)
+        return false;
+
+    // Layout lowering currently records an unsized descriptor array as
+    // an array type layout with a scalar resource count. Preserve the
+    // source variable's IR type so explicit coverage bindings do not
+    // get placed after a Vulkan variable-descriptor-count binding in
+    // the same descriptor set.
+    return as<IRUnsizedArrayType>(source->getDataType()) != nullptr;
+}
+
+static void collectUsedBindingsFromTypeLayout(
+    IRTypeLayout* typeLayout,
+    LayoutResourceKind kind,
+    UInt baseBinding,
+    UInt baseSpace,
+    IRInst* source,
+    List<UsedBindingRange>& outRanges);
+
+static void addUsedBindingRange(
+    List<UsedBindingRange>& outRanges,
+    UInt space,
+    UInt binding,
+    UInt count,
+    bool isUnbounded,
+    IRInst* source)
+{
+    if (count == 0)
+        return;
+
+    UsedBindingRange range;
+    range.space = space;
+    range.binding = binding;
+    range.count = count;
+    range.isUnbounded = isUnbounded;
+    range.source = source;
+    outRanges.add(range);
+}
+
+static void collectUsedBindingsFromVarLayout(
+    IRVarLayout* varLayout,
+    LayoutResourceKind kind,
+    UInt baseBinding,
+    UInt baseSpace,
+    IRInst* source,
+    List<UsedBindingRange>& outRanges)
+{
+    if (!varLayout)
+        return;
+
+    auto typeLayout = varLayout->getTypeLayout();
+
+    UInt localBinding = baseBinding;
+    UInt localSpace = baseSpace;
+    if (auto registerSpaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+        localSpace += registerSpaceAttr->getOffset();
+
+    if (auto offsetAttr = varLayout->findOffsetAttr(kind))
+    {
+        localBinding += offsetAttr->getOffset();
+        localSpace += offsetAttr->getSpace();
+
+        bool isUnbounded = false;
+        UInt count = getResourceCount(typeLayout, kind, isUnbounded);
+        // If a layout carries an explicit resource-kind offset but
+        // its type layout does not expose a finite size, reserve the
+        // base slot rather than pretending the offset is unused.
+        if (count == 0)
+            count = 1;
+        if (isUnsizedArrayResourceSource(source))
+            isUnbounded = true;
+        addUsedBindingRange(outRanges, localSpace, localBinding, count, isUnbounded, source);
+    }
+
+    if (auto groupLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+    {
+        UInt elementSpace = localSpace;
+        if (auto subElementSpaceAttr =
+                varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
+        {
+            elementSpace += subElementSpaceAttr->getOffset();
+        }
+
+        collectUsedBindingsFromVarLayout(
+            groupLayout->getContainerVarLayout(),
+            kind,
+            localBinding,
+            elementSpace,
+            source,
+            outRanges);
+        collectUsedBindingsFromVarLayout(
+            groupLayout->getElementVarLayout(),
+            kind,
+            localBinding,
+            elementSpace,
+            source,
+            outRanges);
+        return;
+    }
+
+    collectUsedBindingsFromTypeLayout(
+        typeLayout,
+        kind,
+        localBinding,
+        localSpace,
+        source,
+        outRanges);
+}
+
+static void collectUsedBindingsFromTypeLayout(
+    IRTypeLayout* typeLayout,
+    LayoutResourceKind kind,
+    UInt baseBinding,
+    UInt baseSpace,
+    IRInst* source,
+    List<UsedBindingRange>& outRanges)
+{
+    if (!typeLayout)
+        return;
+
+    if (auto structTypeLayout = as<IRStructTypeLayout>(typeLayout))
+    {
+        for (auto fieldAttr : structTypeLayout->getFieldLayoutAttrs())
+        {
+            auto fieldSource = selectBindingSource(fieldAttr->getFieldKey(), source);
+            collectUsedBindingsFromVarLayout(
+                fieldAttr->getLayout(),
+                kind,
+                baseBinding,
+                baseSpace,
+                fieldSource,
+                outRanges);
+        }
+        return;
+    }
+
+    if (auto arrayTypeLayout = as<IRArrayTypeLayout>(typeLayout))
+    {
+        collectUsedBindingsFromTypeLayout(
+            arrayTypeLayout->getElementTypeLayout(),
+            kind,
+            baseBinding,
+            baseSpace,
+            source,
+            outRanges);
+    }
+}
+
+static void collectUsedBindingsFromEntryPointParamsLayout(
+    IRFunc* func,
+    IRVarLayout* paramsLayout,
+    LayoutResourceKind kind,
+    List<UsedBindingRange>& outRanges)
+{
+    if (!paramsLayout)
+        return;
+
+    auto typeLayout = paramsLayout->getTypeLayout();
+    auto structTypeLayout = as<IRStructTypeLayout>(typeLayout);
+    if (!structTypeLayout)
+    {
+        collectUsedBindingsFromVarLayout(paramsLayout, kind, 0, 0, func, outRanges);
+        return;
+    }
+
+    UInt baseBinding = 0;
+    UInt baseSpace = 0;
+    if (auto registerSpaceAttr = paramsLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+        baseSpace += registerSpaceAttr->getOffset();
+    if (auto offsetAttr = paramsLayout->findOffsetAttr(kind))
+    {
+        baseBinding += offsetAttr->getOffset();
+        baseSpace += offsetAttr->getSpace();
+    }
+
+    auto param = func->getFirstParam();
+    for (auto fieldAttr : structTypeLayout->getFieldLayoutAttrs())
+    {
+        IRInst* source = param ? (IRInst*)param : (IRInst*)func;
+        collectUsedBindingsFromVarLayout(
+            fieldAttr->getLayout(),
+            kind,
+            baseBinding,
+            baseSpace,
+            source,
+            outRanges);
+
+        if (param)
+            param = param->getNextParam();
+    }
+}
+
+static List<UsedBindingRange> collectUsedBindings(
+    IRModule* module,
+    IRVarLayout* globalScopeVarLayout,
+    LayoutResourceKind kind)
+{
+    List<UsedBindingRange> ranges;
+
+    collectUsedBindingsFromVarLayout(globalScopeVarLayout, kind, 0, 0, nullptr, ranges);
+
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto param = as<IRGlobalParam>(inst);
+        if (!param)
+            continue;
+        auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
+        if (!layoutDecor)
+            continue;
+        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+        if (!varLayout)
+            continue;
+        collectUsedBindingsFromVarLayout(varLayout, kind, 0, 0, param, ranges);
+    }
+
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(inst);
+        if (!func)
+            continue;
+        auto layoutDecor = func->findDecoration<IRLayoutDecoration>();
+        if (!layoutDecor)
+            continue;
+        auto entryPointLayout = as<IREntryPointLayout>(layoutDecor->getLayout());
+        if (!entryPointLayout)
+            continue;
+
+        // Entry-point uniform parameters are not `IRGlobalParam`s yet
+        // when coverage instrumentation runs. Later parameter-collection
+        // passes flatten them into globals using this entry-point layout,
+        // so the auto allocator must reserve their eventual slots here.
+        collectUsedBindingsFromEntryPointParamsLayout(
+            func,
+            entryPointLayout->getParamsLayout(),
+            kind,
+            ranges);
+        collectUsedBindingsFromVarLayout(
+            entryPointLayout->getResultLayout(),
+            kind,
+            0,
+            0,
+            func,
+            ranges);
+    }
+
+    return ranges;
+}
+
+static bool bindingRangeContains(const UsedBindingRange& range, int space, int binding)
+{
+    if (space < 0 || binding < 0)
+        return false;
+    if (range.space != (UInt)space || binding < (int)range.binding)
+        return false;
+    if (range.isUnbounded)
+        return true;
+    return (UInt)(binding - (int)range.binding) < range.count;
 }
 
 // Locate a global parameter whose layout already occupies the given
@@ -70,66 +428,48 @@ static IRGlobalParam* findUserDeclaredCoverageBuffer(IRModule* module)
 // spirv-val both reject the resulting program with cryptic errors,
 // so a Slang-level diagnostic anchored at the colliding declaration
 // is more debuggable.
-static IRGlobalParam* findCollidingParam(
+static IRInst* findCollidingParam(
     IRModule* module,
+    IRVarLayout* globalScopeVarLayout,
     LayoutResourceKind kind,
     int space,
     int binding)
 {
-    for (auto inst : module->getGlobalInsts())
+    auto ranges = collectUsedBindings(module, globalScopeVarLayout, kind);
+    IRInst* fallback = nullptr;
+    bool foundCollision = false;
+    for (auto& range : ranges)
     {
-        auto param = as<IRGlobalParam>(inst);
-        if (!param)
-            continue;
-        auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
-        if (!layoutDecor)
-            continue;
-        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
-        if (!varLayout)
-            continue;
-        UInt paramSpace = 0;
-        if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
-            paramSpace = a->getOffset();
-        if ((int)paramSpace != space)
-            continue;
-        if (auto a = varLayout->findOffsetAttr(kind))
+        if (bindingRangeContains(range, space, binding))
         {
-            if ((int)a->getOffset() == binding)
-                return param;
+            foundCollision = true;
+            if (range.source && range.source->sourceLoc.isValid())
+                return range.source;
+            if (!fallback)
+                fallback = range.source;
         }
     }
-    return nullptr;
+    if (!foundCollision)
+        return nullptr;
+    return fallback ? fallback : module->getModuleInst();
 }
 
-// Pick a binding offset in space 0 that doesn't collide with any
-// existing global param's offset for `kind`. Walks the module once
-// and returns max-occupied + 1, or 0 when nothing else claims a slot
-// of that kind in space 0.
-static int pickFreeBindingForCoverage(IRModule* module, LayoutResourceKind kind)
+static int pickFreeBindingInSpace(List<UsedBindingRange>& ranges, UInt space)
 {
     int maxOccupied = -1;
-    for (auto inst : module->getGlobalInsts())
+    for (auto& range : ranges)
     {
-        auto param = as<IRGlobalParam>(inst);
-        if (!param)
+        if (range.space != space || range.count == 0)
             continue;
-        auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
-        if (!layoutDecor)
-            continue;
-        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
-        if (!varLayout)
-            continue;
-        UInt paramSpace = 0;
-        if (auto a = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
-            paramSpace = a->getOffset();
-        if (paramSpace != 0)
-            continue;
-        if (auto a = varLayout->findOffsetAttr(kind))
-        {
-            int offset = (int)a->getOffset();
-            if (offset > maxOccupied)
-                maxOccupied = offset;
-        }
+        if (range.isUnbounded)
+            return -1;
+        if (range.binding > std::numeric_limits<UInt>::max() - (range.count - 1))
+            return -1;
+        UInt lastBinding = range.binding + range.count - 1;
+        if (lastBinding > (UInt)std::numeric_limits<int>::max())
+            return -1;
+        if ((int)lastBinding > maxOccupied)
+            maxOccupied = (int)lastBinding;
     }
     // Guard against signed overflow on a malformed module that pins a
     // user binding at INT_MAX; `INT_MAX + 1` is undefined behavior in
@@ -139,6 +479,123 @@ static int pickFreeBindingForCoverage(IRModule* module, LayoutResourceKind kind)
     if (maxOccupied == std::numeric_limits<int>::max())
         return -1;
     return maxOccupied + 1;
+}
+
+static int pickSpaceAfterHighestUsedSpace(List<UsedBindingRange>& ranges)
+{
+    UInt maxSpace = 0;
+    bool hasAnyRange = false;
+    for (auto& range : ranges)
+    {
+        hasAnyRange = true;
+        if (range.space > (UInt)std::numeric_limits<int>::max())
+            return -1;
+        if (range.space > maxSpace)
+            maxSpace = range.space;
+    }
+
+    if (!hasAnyRange)
+        return 0;
+    if (maxSpace == (UInt)std::numeric_limits<int>::max())
+        return -1;
+    return int(maxSpace + 1);
+}
+
+static bool shouldHonorReservedCoverageSpaces(TargetRequest* targetRequest)
+{
+    return isKhronosTarget(targetRequest);
+}
+
+static void addReservedCoverageSpaces(
+    List<UsedBindingRange>& ranges,
+    const int* reservedSpaces,
+    int reservedSpaceCount,
+    IRInst* source)
+{
+    if (!reservedSpaces || reservedSpaceCount <= 0)
+        return;
+
+    List<int> uniqueSpaces;
+    for (int i = 0; i < reservedSpaceCount; ++i)
+    {
+        const int space = reservedSpaces[i];
+        if (space < 0)
+            continue;
+        bool alreadyAdded = false;
+        for (auto uniqueSpace : uniqueSpaces)
+        {
+            if (uniqueSpace == space)
+            {
+                alreadyAdded = true;
+                break;
+            }
+        }
+        if (alreadyAdded)
+            continue;
+        uniqueSpaces.add(space);
+
+        // Model a host-reserved descriptor/register space as an
+        // unbounded range starting at binding 0. The allocator then
+        // cannot place coverage into that space even if the current
+        // shader IR does not reference any resource from the host's
+        // pipeline layout.
+        addUsedBindingRange(ranges, (UInt)space, 0, 1, true, source);
+    }
+}
+
+// Pick a `(space, binding)` pair that doesn't collide with any
+// existing layout range for `kind`. Walks program-scope, global, and
+// entry-point layouts, so hidden resources such as `ParameterBlock<T>`
+// members are counted before later target legalization flattens them
+// into concrete descriptor slots.
+static bool pickFreeBindingForCoverage(
+    IRModule* module,
+    TargetRequest* targetRequest,
+    IRVarLayout* globalScopeVarLayout,
+    LayoutResourceKind kind,
+    const int* reservedSpaces,
+    int reservedSpaceCount,
+    int& outSpace,
+    int& outBinding)
+{
+    auto ranges = collectUsedBindings(module, globalScopeVarLayout, kind);
+    if (shouldHonorReservedCoverageSpaces(targetRequest))
+    {
+        addReservedCoverageSpaces(
+            ranges,
+            reservedSpaces,
+            reservedSpaceCount,
+            module->getModuleInst());
+    }
+
+    // For Vulkan/SPIR-V-style descriptor sets, do not extend an
+    // existing set with a new binding, and do not fill holes between
+    // existing sets. Many hosts build descriptor set layouts directly
+    // from parameter blocks or other reflection data, so coverage is
+    // appended as a new synthetic-resource set after all shader-visible
+    // sets. If the shader has no visible sets, set 0 is the fresh set;
+    // hosts with externally reserved set 0 should pass
+    // `-trace-coverage-reserved-space 0` so allocation moves to set 1.
+    // The complete location is reported through metadata.
+    if (kind == LayoutResourceKind::DescriptorTableSlot && isKhronosTarget(targetRequest))
+    {
+        outSpace = pickSpaceAfterHighestUsedSpace(ranges);
+        if (outSpace < 0)
+            return false;
+        outBinding = 0;
+        return true;
+    }
+
+    outSpace = 0;
+    outBinding = pickFreeBindingInSpace(ranges, 0);
+    if (outBinding >= 0)
+        return true;
+
+    outSpace = pickSpaceAfterHighestUsedSpace(ranges);
+    if (outSpace < 0)
+        return false;
+    outBinding = 0;
+    return true;
 }
 
 // Construct the layout for the synthesized coverage buffer at the
@@ -183,8 +640,11 @@ static IRVarLayout* createCoverageBufferVarLayout(
 static IRGlobalParam* synthesizeCoverageBuffer(
     IRModule* module,
     TargetRequest* targetRequest,
+    IRVarLayout* globalScopeVarLayout,
     int explicitBinding,
     int explicitSpace,
+    const int* reservedSpaces,
+    int reservedSpaceCount,
     int& outSpace,
     int& outBinding)
 {
@@ -204,9 +664,15 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     }
     else
     {
-        space = 0;
-        binding = pickFreeBindingForCoverage(module, kind);
-        if (binding < 0)
+        if (!pickFreeBindingForCoverage(
+                module,
+                targetRequest,
+                globalScopeVarLayout,
+                kind,
+                reservedSpaces,
+                reservedSpaceCount,
+                space,
+                binding))
             return nullptr;
     }
 
@@ -224,8 +690,7 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     // space/set dimension (Metal uses `[[buffer(N)]]` only). The IR
     // varLayout above still carries `space = 0` for Metal because the
     // emitter walks the layout's RegisterSpace offset; the public
-    // `CoverageBufferInfo.space` is documented as -1 in those cases
-    // and hosts shouldn't see a bogus 0.
+    // synthetic resource metadata should not expose a bogus 0.
     outSpace = isMetalTarget(targetRequest) ? -1 : space;
     outBinding = binding;
     return param;
@@ -450,6 +915,144 @@ struct CoverageInstrumenter
     }
 };
 
+static bool tryNarrowToInt32(IRIntegerValue value, int32_t& outValue)
+{
+    if (value < std::numeric_limits<int32_t>::min() || value > std::numeric_limits<int32_t>::max())
+    {
+        return false;
+    }
+    outValue = (int32_t)value;
+    return true;
+}
+
+static bool tryFillUniformInfoFromField(
+    TargetRequest* targetRequest,
+    IRStructField* field,
+    int32_t& outUniformOffset,
+    int32_t& outUniformStride)
+{
+    if (!field || !targetRequest)
+        return false;
+
+    IRIntegerValue naturalOffset = 0;
+    if (SLANG_FAILED(getNaturalOffset(targetRequest, field, &naturalOffset)))
+        return false;
+
+    IRSizeAndAlignment fieldSizeAlignment;
+    if (SLANG_FAILED(
+            getNaturalSizeAndAlignment(targetRequest, field->getFieldType(), &fieldSizeAlignment)))
+    {
+        return false;
+    }
+
+    if (fieldSizeAlignment.size == IRSizeAndAlignment::kIndeterminateSize)
+        return false;
+
+    int32_t narrowOffset = -1;
+    int32_t narrowStride = 0;
+    if (!tryNarrowToInt32(naturalOffset, narrowOffset) ||
+        !tryNarrowToInt32(fieldSizeAlignment.getStride(), narrowStride))
+    {
+        return false;
+    }
+
+    outUniformOffset = narrowOffset;
+    outUniformStride = narrowStride;
+    return true;
+}
+
+static IRType* getParameterGroupElementType(IRType* type)
+{
+    if (auto parameterGroupType = as<IRParameterGroupType>(type))
+        return cast<IRType>(parameterGroupType->getOperand(0));
+    return type;
+}
+
+static IRTypeLayout* getParameterGroupElementTypeLayout(IRTypeLayout* typeLayout)
+{
+    if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+        return parameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
+    return typeLayout;
+}
+
+static IRInst* findUniqueCoverageFieldKey(IRVarLayout* globalScopeVarLayout)
+{
+    if (!globalScopeVarLayout)
+        return nullptr;
+
+    auto globalScopeTypeLayout =
+        getParameterGroupElementTypeLayout(globalScopeVarLayout->getTypeLayout());
+    auto globalScopeStructLayout = as<IRStructTypeLayout>(globalScopeTypeLayout);
+    if (!globalScopeStructLayout)
+        return nullptr;
+
+    IRInst* result = nullptr;
+    for (auto fieldAttr : globalScopeStructLayout->getFieldLayoutAttrs())
+    {
+        auto key = fieldAttr->getFieldKey();
+        if (!hasNameHint(key, UnownedTerminatedStringSlice(kCoverageBufferName)))
+            continue;
+        if (result)
+            return nullptr;
+        result = key;
+    }
+    return result;
+}
+
+static IRStructField* findUniqueStructFieldByKeyInGlobalParams(IRModule* module, IRInst* key)
+{
+    if (!key)
+        return nullptr;
+
+    IRStructField* result = nullptr;
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto param = as<IRGlobalParam>(inst);
+        if (!param)
+            continue;
+
+        auto wrapperValueType = getParameterGroupElementType(param->getDataType());
+        auto field = findStructFieldByKey(wrapperValueType, key);
+        if (!field)
+            continue;
+        if (result && result != field)
+            return nullptr;
+        result = field;
+    }
+    return result;
+}
+
+static bool tryGetCoverageUniformBindingInfo(
+    IRModule* module,
+    IRVarLayout* globalScopeVarLayout,
+    TargetRequest* targetRequest,
+    int32_t& outUniformOffset,
+    int32_t& outUniformStride)
+{
+    outUniformOffset = -1;
+    outUniformStride = 0;
+
+    if (!targetRequest || !(isCPUTarget(targetRequest) || isCUDATarget(targetRequest)))
+        return false;
+
+    if (auto fieldKey = findUniqueCoverageFieldKey(globalScopeVarLayout))
+    {
+        if (auto field = findUniqueStructFieldByKeyInGlobalParams(module, fieldKey))
+        {
+            if (tryFillUniformInfoFromField(
+                    targetRequest,
+                    field,
+                    outUniformOffset,
+                    outUniformStride))
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 } // anonymous namespace
 
 void instrumentCoverage(
@@ -458,6 +1061,8 @@ void instrumentCoverage(
     bool enabled,
     int explicitBinding,
     int explicitSpace,
+    const int* reservedSpaces,
+    int reservedSpaceCount,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata)
@@ -497,6 +1102,12 @@ void instrumentCoverage(
         return;
     }
 
+    if (reservedSpaceCount > 0 && !shouldHonorReservedCoverageSpaces(targetRequest))
+    {
+        if (sink)
+            sink->diagnose(Diagnostics::CoverageReservedSpaceIgnored{});
+    }
+
     // Surface a warning if the user has declared a global parameter
     // named `__slang_coverage`. The IR coverage pass synthesizes its
     // own buffer with that name and the user declaration is silently
@@ -512,10 +1123,10 @@ void instrumentCoverage(
     // When the user explicitly pins the coverage buffer with
     // `-trace-coverage-binding`, bail with an actionable diagnostic
     // if the requested slot is already in use. The auto-allocation
-    // path already avoids collisions; the explicit path used to take
-    // the user's value at face value, leaving DXC / spirv-val to
-    // reject the resulting two-params-at-one-slot program with a
-    // cryptic downstream error.
+    // path uses the same layout-derived occupancy query; the
+    // explicit path used to take the user's value at face value,
+    // leaving DXC / spirv-val to reject the resulting
+    // two-params-at-one-slot program with a cryptic downstream error.
     //
     // The collision check itself runs regardless of whether `sink` is
     // available — correctness must not depend on diagnostic plumbing.
@@ -525,7 +1136,12 @@ void instrumentCoverage(
     if (explicitSpace >= 0 && explicitBinding >= 0)
     {
         auto kind = selectCoverageResourceKind(targetRequest);
-        if (auto colliding = findCollidingParam(module, kind, explicitSpace, explicitBinding))
+        if (auto colliding = findCollidingParam(
+                module,
+                globalScopeVarLayout,
+                kind,
+                explicitSpace,
+                explicitBinding))
         {
             if (sink)
                 sink->diagnose(
@@ -541,8 +1157,11 @@ void instrumentCoverage(
     auto buffer = synthesizeCoverageBuffer(
         module,
         targetRequest,
+        globalScopeVarLayout,
         explicitBinding,
         explicitSpace,
+        reservedSpaces,
+        reservedSpaceCount,
         chosenSpace,
         chosenBinding);
 
@@ -560,30 +1179,38 @@ void instrumentCoverage(
         return;
     }
 
-    // Extend the program-scope layout so the buffer participates in
-    // global-uniform packaging on targets that pack (CPU, CUDA). On
-    // graphics targets the scope layout typically has no struct to
-    // extend; the helper is a no-op there and the buffer remains a
-    // standalone `IRGlobalParam`.
-    IRBuilder builder(module);
-    builder.setInsertInto(module->getModuleInst());
-    auto newScopeVarLayout =
-        extendScopeLayoutWithCoverageBuffer(builder, globalScopeVarLayout, buffer);
-    if (newScopeVarLayout != globalScopeVarLayout)
+    // Extend the program-scope layout only for targets that pack
+    // global parameters into a host-visible aggregate. Graphics
+    // targets should keep the coverage buffer as a standalone global
+    // parameter; extending their scope layout can leave stale layout
+    // keys behind when later resource legalization replaces the
+    // synthesized parameter.
+    if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest))
     {
-        globalScopeVarLayout = newScopeVarLayout;
-        // The module inst also carries the scope layout as a layout
-        // decoration; refresh that so subsequent passes that read
-        // from the module rather than the linked-IR struct see the
-        // new layout. Replacing the decoration's payload requires
-        // removing the old and adding the new.
-        if (auto oldDecor = module->getModuleInst()->findDecoration<IRLayoutDecoration>())
-            oldDecor->removeAndDeallocate();
-        builder.addLayoutDecoration(module->getModuleInst(), newScopeVarLayout);
+        IRBuilder builder(module);
+        builder.setInsertInto(module->getModuleInst());
+        auto newScopeVarLayout =
+            extendScopeLayoutWithCoverageBuffer(builder, globalScopeVarLayout, buffer);
+        if (newScopeVarLayout != globalScopeVarLayout)
+        {
+            globalScopeVarLayout = newScopeVarLayout;
+            // The module inst also carries the scope layout as a
+            // layout decoration; refresh that so subsequent passes
+            // that read from the module rather than the linked-IR
+            // struct see the new layout. Replacing the decoration's
+            // payload requires removing the old and adding the new.
+            if (auto oldDecor = module->getModuleInst()->findDecoration<IRLayoutDecoration>())
+                oldDecor->removeAndDeallocate();
+            builder.addLayoutDecoration(module->getModuleInst(), newScopeVarLayout);
+        }
     }
 
-    outMetadata.m_coverageBufferSpace = chosenSpace;
-    outMetadata.m_coverageBufferBinding = chosenBinding;
+    Index syntheticResourceIndex = getOrAddCoverageSyntheticResourceRecordIndex(outMetadata);
+    auto& syntheticResource = outMetadata.m_syntheticResources[syntheticResourceIndex];
+    syntheticResource.space = chosenSpace;
+    syntheticResource.binding = chosenBinding;
+    syntheticResource.uniformOffset = -1;
+    syntheticResource.uniformStride = 0;
 
     CoverageInstrumenter instrumenter(
         module,
@@ -591,6 +1218,42 @@ void instrumentCoverage(
         sink ? sink->getSourceManager() : nullptr,
         outMetadata);
     instrumenter.run(counterOps);
+}
+
+void finalizeCoverageInstrumentationMetadata(
+    IRModule* module,
+    DiagnosticSink* sink,
+    bool enabled,
+    IRVarLayout* globalScopeVarLayout,
+    TargetRequest* targetRequest,
+    ArtifactPostEmitMetadata& outMetadata)
+{
+    if (!enabled)
+        return;
+
+    Index recordIndex =
+        findSyntheticResourceRecordIndexById(outMetadata, kCoverageSyntheticResourceID);
+    if (recordIndex < 0)
+        return;
+
+    auto& record = outMetadata.m_syntheticResources[recordIndex];
+    int32_t uniformOffset = -1;
+    int32_t uniformStride = 0;
+    if (tryGetCoverageUniformBindingInfo(
+            module,
+            globalScopeVarLayout,
+            targetRequest,
+            uniformOffset,
+            uniformStride))
+    {
+        record.uniformOffset = uniformOffset;
+        record.uniformStride = uniformStride;
+    }
+    else if (targetRequest && (isCPUTarget(targetRequest) || isCUDATarget(targetRequest)))
+    {
+        if (sink)
+            sink->diagnose(Diagnostics::CoverageUniformLayoutUnavailable{});
+    }
 }
 
 } // namespace Slang
