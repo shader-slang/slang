@@ -31,6 +31,7 @@
 #include "slang.h"
 
 #include <assert.h>
+#include <limits>
 
 namespace Slang
 {
@@ -551,8 +552,15 @@ void initCommandOptions(CommandOptions& options)
          "Bind the synthesized `__slang_coverage` buffer at an explicit "
          "(register index, space) instead of auto-allocating a slot. "
          "Useful when the host needs the binding fixed at compile time "
-         "(e.g. for a pre-built D3D12 root signature). Implies "
-         "`-trace-coverage`."},
+         "before any host metadata reads run. Implies `-trace-coverage`."},
+        {OptionKind::TraceCoverageReservedSpace,
+         "-trace-coverage-reserved-space",
+         "-trace-coverage-reserved-space <space>",
+         "Reserve a descriptor set when auto-allocating the "
+         "synthesized `__slang_coverage` buffer. Use this when the host "
+         "pipeline layout owns descriptor sets that are "
+         "not visible in the compiled shader IR. Repeat for multiple spaces; "
+         "duplicates are idempotent. Applies to Khronos descriptor-set targets."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -2828,12 +2836,47 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 Int bindingIndex, bindingSpace;
                 SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindingIndex));
                 SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindingSpace));
+                if (bindingIndex > std::numeric_limits<int>::max())
+                {
+                    m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                        .option = arg.value,
+                        .parsedValue = bindingIndex,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
+                if (bindingSpace > std::numeric_limits<int>::max())
+                {
+                    m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                        .option = arg.value,
+                        .parsedValue = bindingSpace,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
                 linkage->m_optionSet.set(
                     OptionKind::TraceCoverageBinding,
                     (int)bindingIndex,
                     (int)bindingSpace);
                 // Implies -trace-coverage so users don't have to spell both.
                 linkage->m_optionSet.set(OptionKind::TraceCoverage, true);
+                break;
+            }
+        case OptionKind::TraceCoverageReservedSpace:
+            {
+                // -trace-coverage-reserved-space <space>
+                Int bindingSpace;
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindingSpace));
+                if (bindingSpace > std::numeric_limits<int>::max())
+                {
+                    m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                        .option = arg.value,
+                        .parsedValue = bindingSpace,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
+                linkage->m_optionSet.add(OptionKind::TraceCoverageReservedSpace, (int)bindingSpace);
                 break;
             }
         case OptionKind::Profile:

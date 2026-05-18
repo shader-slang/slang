@@ -1464,18 +1464,41 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // If we have seen this before, return the memoized instruction
         if (SpvInst** memoized = m_memoizedSpvInsts.tryGetValue(key))
+        {
+            // Different Slang IR instructions can produce the same no-result
+            // SPIR-V instruction, so keep the later IR instruction mapped to
+            // the memoized instruction.
+            if (irInst)
+                m_mapIRInstToSpvInst.addIfNotExists(irInst, *memoized);
             return *memoized;
+        }
 
-        // Otherwise, we can construct our instruction and record the result
+        // Otherwise, construct our instruction and record it in the memoization table.
         InstConstructScope scopeInst(this, opcode, irInst);
         SpvInst* spvInst = scopeInst;
         m_memoizedSpvInsts[key] = spvInst;
 
+        // Replay operands captured by the memoize scope into the live instruction.
         m_operandStack.addRange(ourOperands);
 
         parent->addInst(spvInst);
         return spvInst;
     }
+
+    template<typename... Operands>
+    SpvInst* emitInstMemoizedNoResultID(
+        SpvInstParent* parent,
+        IRInst* irInst,
+        SpvOp opcode,
+        const Operands&... ops)
+    {
+        return emitInstMemoizedNoResultIDCustomOperandFunc(
+            parent,
+            irInst,
+            opcode,
+            [&]() { (emitOperand(ops), ...); });
+    }
+
     //
     // Specific emit funcs
     //
@@ -2642,16 +2665,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto stride = getArrayStrideDecorationValue(irArrayType);
                 if (stride != 0)
                 {
-                    emitInstMemoizedNoResultIDCustomOperandFunc(
+                    emitOpDecorateArrayStride(
                         getSection(SpvLogicalSectionID::Annotations),
                         nullptr,
-                        SpvOpDecorate,
-                        [&]()
-                        {
-                            emitOperand(arrayType);
-                            emitOperand(SpvLiteralInteger::from32(SpvDecorationArrayStride));
-                            emitOperand(SpvLiteralInteger::from32(stride));
-                        });
+                        arrayType,
+                        SpvLiteralInteger::from32(stride));
                 }
                 return arrayType;
             }
@@ -6467,12 +6485,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 requireSPIRVCapability(SpvCapabilityLinkage);
                 auto name =
                     decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
-                emitInst(
+                emitOpDecorateLinkageAttributes(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
-                    SpvOpDecorate,
                     dstID,
-                    SpvDecorationLinkageAttributes,
                     name,
                     SpvLinkageTypeExport);
                 break;
@@ -6482,12 +6498,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 requireSPIRVCapability(SpvCapabilityLinkage);
                 auto name =
                     decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
-                emitInst(
+                emitOpDecorateLinkageAttributes(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
-                    SpvOpDecorate,
                     dstID,
-                    SpvDecorationLinkageAttributes,
                     name,
                     SpvLinkageTypeImport);
                 break;
@@ -10695,6 +10709,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 SLANG_ASSERT(info.has_value());
                 switch (info->class_)
                 {
+                case SPIRVCoreGrammarInfo::OpInfo::Annotation:
+                    return getSection(SpvLogicalSectionID::Annotations);
                 case SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration:
                 case SPIRVCoreGrammarInfo::OpInfo::ConstantCreation:
                     return getSection(SpvLogicalSectionID::ConstantsAndTypes);
@@ -10714,12 +10730,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     case SpvOpExecutionMode:
                     case SpvOpExecutionModeId:
                         return getSection(SpvLogicalSectionID::ExecutionModes);
-                    case SpvOpDecorate:
-                    case SpvOpDecorateId:
-                    case SpvOpDecorateString:
-                    case SpvOpMemberDecorate:
-                    case SpvOpMemberDecorateString:
-                        return getSection(SpvLogicalSectionID::Annotations);
                     case SpvOpTypeNodePayloadArrayAMDX:
                         return getSection(SpvLogicalSectionID::ConstantsAndTypes);
                     default:
@@ -11065,9 +11075,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 const auto opInfo = m_grammarInfo->opInfos.lookup(opcode);
 
                 // TODO: handle resultIdIndex == 1, for constants
-                const bool memoize =
+                const bool memoizeTypeInst =
                     opParent == getSection(SpvLogicalSectionID::ConstantsAndTypes) && opInfo &&
                     opInfo->resultIdIndex == 0;
+                // Only no-result instructions in the annotations section are safe to memoize.
+                // Result-producing annotations like OpDecorationGroup must keep
+                // distinct IDs because later group decorations reference them.
+                const bool memoizeAnnotationInst =
+                    opParent == getSection(SpvLogicalSectionID::Annotations) && opInfo &&
+                    opInfo->resultIdIndex == SPIRVCoreGrammarInfo::OpInfo::kNoResultId;
 
                 // We want the "result instruction" to refer to the top level
                 // block which assumes its value, the others are free to refer
@@ -11076,7 +11092,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 // assigned to result is not necessarily the last instruction
                 const auto assignedInst = isLast ? as<IRInst>(inst) : spvInst;
 
-                if (memoize)
+                if (memoizeTypeInst)
                 {
                     last = emitInstMemoizedCustomOperandFunc(
                         opParent,
@@ -11107,6 +11123,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             cast<IRStringLit>(resOperand->getValue())->getStringSlice();
                         idMap[idName] = last->id;
                     }
+                }
+                else if (memoizeAnnotationInst)
+                {
+                    last = emitInstMemoizedNoResultIDCustomOperandFunc(
+                        opParent,
+                        assignedInst,
+                        opcode,
+                        [&]()
+                        {
+                            for (const auto operand : spvInst->getSPIRVOperands())
+                                emitSpvAsmOperand(operand);
+                        });
                 }
                 else
                 {
@@ -11149,8 +11177,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 else
                                     requiredMask |= SpvImageOperandsMakeTexelAvailableMask;
 
-                                // If user specified any of the required masks, we cannot specified
-                                // anymore.
+                                // If the user specified any of the required masks, do not add them
+                                // again.
                                 if (usedMask & requiredMask)
                                     return;
 

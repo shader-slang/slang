@@ -1,0 +1,179 @@
+name: CMake Options Build (reusable)
+
+# Reusable workflow: builds Slang once per matrix entry (each option set to
+# its non-default value) for a given platform / compiler / config combination.
+# Called from cmake-options.yml.
+#
+# The option list lives in .github/cmake-options-matrix.json (single source of
+# truth shared with cmake-options-build-container.yml).
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      compiler:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+      buildtool:
+        description: >
+          CMake -G value (e.g. "Visual Studio 17 2022"). When set, cmake is
+          invoked directly with -G instead of --preset default. Leave empty
+          to use --preset default (Ninja Multi-Config).
+        required: false
+        type: string
+        default: ""
+      arch:
+        description: >
+          MSVC cross-compilation architecture passed to ilammy/msvc-dev-cmd
+          (e.g. "amd64_arm64" for Windows aarch64 cross-compilation). When
+          set, a second msvc-dev-cmd step runs after common-setup to switch
+          the compiler environment. Leave empty for native compilation.
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  # Read the shared option list once; downstream jobs use fromJSON on the output.
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/cmake-options-matrix.json
+          sparse-checkout-cone-mode: false
+      - id: set-matrix
+        run: |
+          {
+            echo "matrix<<MATRIX_EOF"
+            cat .github/cmake-options-matrix.json
+            echo "MATRIX_EOF"
+          } >> $GITHUB_OUTPUT
+
+  build:
+    needs: setup
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          config: ${{ inputs.config }}
+          build-llvm: false
+
+      - name: Build generators (host architecture, for cross-compilation)
+        if: inputs.os == 'windows' && inputs.arch != ''
+        run: |
+          cmake --workflow --preset generators --fresh
+          mkdir build-platform-generators
+          cmake --install build --config Release --component generators \
+            --prefix build-platform-generators
+
+      - name: Set up MSVC cross-compilation
+        if: inputs.os == 'windows' && inputs.arch != ''
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ inputs.arch }}
+
+      - name: Install system apt packages
+        if: matrix.apt_packages != '' && inputs.os == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_packages }}
+
+      - name: Configure CMake (${{ matrix.option }})
+        if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64')
+        run: |
+          option="${{ matrix.option }}"
+          value="${{ matrix.value }}"
+
+          # Options whose preset default varies by config use value_debug /
+          # value_release instead of a single value field.
+          if [[ -z "$value" && "${{ inputs.config }}" == "debug" && -n "${{ matrix.value_debug }}" ]]; then
+            value="${{ matrix.value_debug }}"
+          elif [[ -z "$value" && "${{ inputs.config }}" != "debug" && -n "${{ matrix.value_release }}" ]]; then
+            value="${{ matrix.value_release }}"
+          fi
+
+          # For options with no explicit value in the matrix, query the current
+          # cmake default and test the opposite so the matrix stays in sync
+          # automatically when defaults change.
+          # Handles both BOOL (ON/OFF) and STRING (TRUE/FALSE) cache types,
+          # the latter being used by auto_option (SLANG_ENABLE_CUDA etc.).
+          if [[ -z "$value" ]]; then
+            defaultVal=$(
+              cmake --preset default --fresh \
+                -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+                -DSLANG_USE_SCCACHE=OFF \
+                -LA 2>/dev/null \
+              | grep -E "^${option}:(BOOL|STRING)=" \
+              | sed 's/.*=//' \
+              | tr '[:upper:]' '[:lower:]'
+            )
+            case "$defaultVal" in
+              on|true)  value=OFF ;;
+              off|false) value=ON ;;
+              *) echo "ERROR: could not detect default for ${option} (got '${defaultVal}')"; exit 1 ;;
+            esac
+            echo "Detected default=${defaultVal}, testing ${option}=${value}"
+            rm -fr build
+          fi
+
+          # When cross-compiling (arch set), generators were pre-built for the
+          # host architecture and installed to build-platform-generators/.
+          generators_path=""
+          if [[ -n "${{ inputs.arch }}" ]]; then
+            generators_path="-DSLANG_GENERATORS_PATH=build-platform-generators/bin"
+          fi
+
+          # SLANG_USE_SCCACHE=OFF prevents the env-var auto-activation path in
+          # CMakeLists.txt from silently enabling sccache and polluting the
+          # shared cache with objects built under non-default CMake options.
+          if [[ -n "${{ inputs.buildtool }}" ]]; then
+            cmake --fresh \
+              -G "${{ inputs.buildtool }}" \
+              -B build \
+              -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+              -DSLANG_USE_SCCACHE=OFF \
+              -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+              $generators_path \
+              "-D${option}=${value}" \
+              ${{ matrix.extra_cmake_flags || '' }}
+          else
+            cmake --preset default --fresh \
+              -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+              -DSLANG_USE_SCCACHE=OFF \
+              -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+              $generators_path \
+              "-D${option}=${value}" \
+              ${{ matrix.extra_cmake_flags || '' }}
+          fi
+
+      - name: Build Slang (${{ matrix.option }})
+        if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64')
+        run: cmake --build build --config "$cmake_config"

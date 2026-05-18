@@ -894,6 +894,7 @@ interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat, IFloatingPoint
 {
         /// Get the value of the mathematical constant pi in this type.
     [Differentiable]
+    [__readNone]
     static This getPi();
 }
 
@@ -1283,6 +1284,7 @@ ${
     case BaseType::Double:
 $}
         [Differentiable]
+        [__readNone]
         static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
 
          __intrinsic_op($(kIROp_Less)) bool lessThan(This other);

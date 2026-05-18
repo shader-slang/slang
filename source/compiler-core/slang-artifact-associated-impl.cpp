@@ -293,6 +293,10 @@ void* ArtifactPostEmitMetadata::getInterface(const Guid& guid)
     {
         return static_cast<slang::ICoverageTracingMetadata*>(this);
     }
+    if (guid == slang::ISyntheticResourceMetadata::getTypeGuid())
+    {
+        return static_cast<slang::ISyntheticResourceMetadata*>(this);
+    }
     if (guid == slang::ICooperativeTypesMetadata::getTypeGuid())
         return static_cast<slang::ICooperativeTypesMetadata*>(this);
     return nullptr;
@@ -357,21 +361,20 @@ uint32_t ArtifactPostEmitMetadata::getCounterCount()
     return (uint32_t)m_coverageEntries.getCount();
 }
 
-// ABI versioning: minimum `structSize` we accept for the v1 shape of
-// `CoverageEntryInfo` / `CoverageBufferInfo`. These constants are
-// frozen at the offsets of the LAST field shipped in v1 (file+line for
-// the entry struct, space+binding for the buffer struct) and **must
-// not be updated when fields are added later** — that's the whole
-// point of `structSize` versioning. Newer callers with larger structs
-// pass through; older callers feeding a future v2+ implementation
-// will likewise be accepted, with the impl writing only the v1 fields
-// the caller has space for. (When v2 fields are added, write them
-// conditionally based on `outInfo->structSize >= offsetof(struct, newField)
-// + sizeof(newField)`.)
+// ABI versioning: minimum `structSize` we accept for v1 public structs.
+// These constants are frozen at the offset of the LAST field shipped
+// in v1 and **must not be updated when fields are added later**. Newer
+// callers with larger structs pass through; older callers feeding a
+// future v2+ implementation will likewise be accepted, with the impl
+// writing only the v1 fields the caller has space for. When v2 fields
+// are added, write them conditionally based on
+// `outInfo->structSize >= offsetof(struct, newField) + sizeof(newField)`.
 static constexpr size_t kCoverageEntryInfoV1MinSize =
     offsetof(slang::CoverageEntryInfo, line) + sizeof(uint32_t);
 static constexpr size_t kCoverageBufferInfoV1MinSize =
     offsetof(slang::CoverageBufferInfo, binding) + sizeof(int32_t);
+static constexpr size_t kSyntheticResourceInfoV1MinSize =
+    offsetof(slang::SyntheticResourceInfo, debugName) + sizeof(const char*);
 
 SlangResult ArtifactPostEmitMetadata::getEntryInfo(
     uint32_t index,
@@ -399,8 +402,69 @@ SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* o
         return SLANG_E_INVALID_ARG;
     if (outInfo->structSize < kCoverageBufferInfoV1MinSize)
         return SLANG_E_INVALID_ARG;
-    outInfo->space = m_coverageBufferSpace;
-    outInfo->binding = m_coverageBufferBinding;
+
+    outInfo->space = -1;
+    outInfo->binding = -1;
+
+    for (auto& record : m_syntheticResources)
+    {
+        if (record.id == uint32_t(SyntheticResourceKnownID::Coverage))
+        {
+            outInfo->space = record.space;
+            outInfo->binding = record.binding;
+            break;
+        }
+    }
+    return SLANG_OK;
+}
+
+uint32_t ArtifactPostEmitMetadata::getResourceCount()
+{
+    return (uint32_t)m_syntheticResources.getCount();
+}
+
+SlangResult ArtifactPostEmitMetadata::findResourceIndexByID(uint32_t id, uint32_t* outIndex)
+{
+    if (!outIndex)
+        return SLANG_E_INVALID_ARG;
+    if (id == 0)
+        return SLANG_E_NOT_FOUND;
+
+    for (Index i = 0; i < m_syntheticResources.getCount(); ++i)
+    {
+        if (m_syntheticResources[i].id == id)
+        {
+            *outIndex = uint32_t(i);
+            return SLANG_OK;
+        }
+    }
+
+    return SLANG_E_NOT_FOUND;
+}
+
+SlangResult ArtifactPostEmitMetadata::getResourceInfo(
+    uint32_t index,
+    slang::SyntheticResourceInfo* outInfo)
+{
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    if (outInfo->structSize < kSyntheticResourceInfoV1MinSize)
+        return SLANG_E_INVALID_ARG;
+    if (index >= (uint32_t)m_syntheticResources.getCount())
+        return SLANG_E_INVALID_ARG;
+
+    auto& record = m_syntheticResources[index];
+    outInfo->id = record.id;
+    outInfo->bindingType = record.bindingType;
+    outInfo->arraySize = record.arraySize;
+    outInfo->scope = record.scope;
+    outInfo->access = record.access;
+    outInfo->entryPointIndex = record.entryPointIndex;
+    outInfo->space = record.space;
+    outInfo->binding = record.binding;
+    outInfo->uniformOffset = record.uniformOffset;
+    outInfo->uniformStride = record.uniformStride;
+    outInfo->debugName = record.debugName.getLength() ? record.debugName.getBuffer() : nullptr;
     return SLANG_OK;
 }
 
