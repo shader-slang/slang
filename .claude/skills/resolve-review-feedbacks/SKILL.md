@@ -230,10 +230,14 @@ git rebase --continue
 Run relevant validation, then push with a lease:
 
 ```bash
-git push --force-with-lease origin "HEAD:$HEAD_BRANCH"
+HEAD_REPO="$(gh pr view "$PR" --json headRepository --jq .headRepository.nameWithOwner)"
+PUSH_REMOTE="$(git remote -v | grep -m1 "$HEAD_REPO" | awk '{print $1}')"
+if [ -z "$PUSH_REMOTE" ]; then
+  echo "Could not determine push remote for $HEAD_REPO"
+  exit 1
+fi
+git push --force-with-lease "$PUSH_REMOTE" "HEAD:$HEAD_BRANCH"
 ```
-
-If the PR branch belongs to a fork or a non-`origin` remote, push to the remote reported by `gh pr view` only after confirming the local remote matches that owner/repository.
 
 ## Completion Criteria
 
