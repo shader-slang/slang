@@ -207,6 +207,8 @@ uint4 WaveGetConvergedMulti();
 
 uint WaveGetNumWaves();  // Number of waves in workgroup (equivalent to GLSL gl_NumSubgroups)
 
+uint WaveGetWaveIndex(); // Wave index in workgroup (GLSL gl_SubgroupID, Metal simdgroup_index_in_threadgroup, WGSL subgroup_id; HLSL compute only)
+
 // Prefix (exclusive scan operations, equivalent to GLSL subgroupExclusive*)
 
 T WavePrefixMin<T>(T expr);   // Exclusive prefix minimum
