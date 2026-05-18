@@ -17049,7 +17049,15 @@ uint WaveGetWaveIndex()
         return __builtinWaveIndex;
     case wgsl:
         __requireTargetExtension("subgroups");
-        return __builtinWaveIndex;
+        __requireTargetExtension("subgroup_id");
+        __stage_switch
+        {
+        case compute:
+            return __builtinWaveIndex;
+        default:
+            static_assert(false, "WaveGetWaveIndex is only supported in compute shaders for WGSL");
+            return 0;
+        }
     case hlsl:
         __stage_switch
         {
