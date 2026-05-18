@@ -83,7 +83,8 @@ bash block that needs them, using the values printed above.
 - `/tmux-agent-manager` or `/tmux-agent-manager status` — snapshot of all sessions
 - `/tmux-agent-manager send <session-name> <message>` — deliver instruction to an agent
 - `/tmux-agent-manager monitor [interval_seconds]` — check all sessions, mark any
-  needing attention in status output, and schedule the next check via ScheduleWakeup (default: 60s)
+  needing attention in status output, and schedule the next check via ScheduleWakeup
+  (default: cache_ttl − 60 s, currently 240 s)
 - `/tmux-agent-manager new <issue_number>` — create worktree + tmux session for a GitHub
   issue and spawn a Claude agent to fix it
 - `/tmux-agent-manager new <free-form prompt>` — same, driven by a task description
@@ -470,7 +471,10 @@ user.
 2. Mark every `needs_approval` or `stuck` session with `⚠ NEEDS ATTENTION` in the status table (notifications are not yet implemented — see Step 5).
 3. Report status table to user.
 4. Schedule next wakeup via ScheduleWakeup:
-   - `delaySeconds`: interval from `$ARGUMENTS` (default 60, min 60)
+   - `delaySeconds`: interval from `$ARGUMENTS`; if not provided, pick `cache_ttl_seconds - 60`
+     (default **240 s** at the current 5-minute cache TTL, giving a 60 s safety margin).
+     Never use a value at or above the cache TTL — doing so forces a cold context re-read on
+     every wakeup. If you know the cache TTL has changed, recalculate accordingly.
    - `prompt`: `/tmux-agent-manager monitor <interval>`
    - `reason`: "periodic tmux agent health check"
 
