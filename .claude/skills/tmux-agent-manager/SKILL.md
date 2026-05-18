@@ -351,7 +351,11 @@ while attempt <= MAX_RETRIES:
             rm -f "$TMP_PAYLOAD"
             return  # do NOT proceed to Step 4c
 
-rm -f "$TMP_PAYLOAD"   # defensive cleanup if loop exits without returning
+rm -f "$TMP_PAYLOAD"
+ALERT: "⚠ Message delivery to SESSION failed after $MAX_RETRIES attempts.
+        The message still appears pending (Enter may not be processing). Last 20 pane lines:"
+show tail
+return  # do NOT proceed to Step 4c
 ```
 
 > **`pending_message` state detection**: the pane tail contains text after the last `›`
