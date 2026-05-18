@@ -5950,7 +5950,8 @@ static Decl* parseEnumDecl(Parser* parser)
     // TODO: diagnose this with a warning some day, and move
     // toward deprecating it.
     //
-    bool isEnumClass = AdvanceIf(parser, "class");
+    Token classToken{};
+    bool isEnumClass = AdvanceIf(parser, "class", &classToken);
     bool isUnscoped = false;
 
     if (!isEnumClass)
@@ -5969,7 +5970,17 @@ static Decl* parseEnumDecl(Parser* parser)
     {
         decl->nameAndLoc.name = generateName(parser);
         decl->nameAndLoc.loc = decl->loc;
-        isUnscoped = true;
+
+        if (!isEnumClass)
+        {
+            isUnscoped = true;
+        }
+        else
+        {
+            // enum class cannot be anonymous
+            parser->sink->diagnose(
+                Diagnostics::AnonymousScopedEnum{.classLocation = classToken.loc});
+        }
     }
     else
     {
@@ -5986,6 +5997,17 @@ static Decl* parseEnumDecl(Parser* parser)
             {
                 addModifier(decl, parser->astBuilder->create<UnscopedEnumAttribute>());
             }
+
+            // If the enum was declared as an enum class, insert a modifier for
+            // conflicting unscoped/scoped enum detection.
+            if (isEnumClass)
+            {
+                auto enumClassModifier = parser->astBuilder->create<EnumClassModifier>();
+                enumClassModifier->loc = classToken.loc;
+                enumClassModifier->keywordName = getName(parser, classToken.getContent());
+                addModifier(decl, enumClassModifier);
+            }
+
             parseOptionalInheritanceClause(parser, decl);
             maybeParseGenericConstraints(parser, genericParent);
             parser->ReadToken(TokenType::LBrace);

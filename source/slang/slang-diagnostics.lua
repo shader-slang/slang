@@ -2843,6 +2843,13 @@ err(
 )
 
 err(
+    "anonymous-scoped-enum",
+    32001,
+    "anonymous scoped enum is not allowed",
+    span { loc = "classLocation", message = "'class' keyword specifies a scoped enumeration" }
+)
+
+err(
     "unexpected-enum-tag-expr",
     32003,
     "unexpected enum tag expression",
