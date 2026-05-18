@@ -126,13 +126,32 @@ $TMUX_EXEC capture-pane -t "SESSION:W.P" -p | tail -35
 Present a compact table, one row per session:
 
 ```
-SESSION                              STATE             SUMMARY
-add-skill-to-resolve-…               idle              Pushed commit 326730bd — waiting for next instruction
-descheap-for-raytracing              working           Running slang-test on descriptor-heap-acceleration-structure.slang
-wgsl-require-bab-load                idle              Build succeeded 8m ago
+SESSION                              STATE             ETA        SUMMARY
+add-skill-to-resolve-…               idle              —          Pushed commit 326730bd — waiting for next instruction
+descheap-for-raytracing              working           ~20 min    Running slang-test on descriptor-heap-acceleration-structure.slang
+wgsl-require-bab-load                needs_approval    ⚠ blocked  Waiting for permission prompt: "Allow bash command?"
+fix-lambda-capture                   working           ~2 min     Editing source/slang/slang-check-expr.cpp
 ```
 
 Truncate session names to 35 chars with `…`. SUMMARY = last meaningful agent output line.
+
+**ETA estimation rules** — read the pane tail to classify the current activity, then apply:
+
+| Activity detected in pane | ETA |
+|---|---|
+| State is `idle` | `—` (already stable) |
+| State is `needs_approval` or `stuck` | `⚠ blocked` (won't progress without input) |
+| State is `pending_message` | `~0 min` (about to start processing) |
+| Running `cmake --build` or `cmake --workflow` | `~5–20 min` |
+| Running `slang-test` (full suite) | `~15–30 min` |
+| Running a single test file | `~1–3 min` |
+| Editing/writing files, running short shell commands | `~1–5 min` |
+| Waiting for CI (GitHub Actions, mentions "workflow run") | `~10–30 min` |
+| Submodule init or large git operation | `~1–2 min` |
+| Activity clearly just started (spinner, first tool call) | `~5–15 min` |
+| Cannot determine from pane content | `?` |
+
+When the pane output contains timestamps or progress indicators (e.g. `[12/240]` in a cmake build), use them to refine the estimate: remaining fraction × typical total time.
 
 ---
 
@@ -340,11 +359,17 @@ Tell the user this step is running; it may take up to a minute the first time.
 $TMUX_EXEC new-session -d -s "<slug>" -c "$PARENT_SHELL/<slug>"
 ```
 
-### 7g — Start Claude Code
+### 7g — Start Claude Code (or Codex)
 
 ```bash
+# Claude Code (default)
 $TMUX_EXEC send-keys -t "<slug>:0.0" "claude --dangerously-skip-permissions" Enter
+
+# Codex alternative
+$TMUX_EXEC send-keys -t "<slug>:0.0" "codex --dangerously-bypass-approvals-and-sandbox" Enter
 ```
+
+Use whichever agent the user requests; default to `claude` if unspecified.
 
 Wait 8 seconds, then capture the pane tail and look for the `›` prompt or model info
 line. Retry every 5 seconds up to 3 times. If Claude still hasn't started, show the raw
