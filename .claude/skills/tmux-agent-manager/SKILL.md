@@ -92,13 +92,16 @@ Parse `$ARGUMENTS` to determine which command to run. If empty or "status", run 
 
 ---
 
-## Step 1 — Enumerate all panes
+## Step 1 — Enumerate agent panes (one per session)
 
 ```bash
-$TMUX_EXEC list-panes -a -F "#{session_name}:#{window_index}.#{pane_index} [#{pane_current_command}]"
+$TMUX_EXEC list-sessions -F "#{session_name}" | sed 's/$/:0.0/'
 ```
 
-The first pane of each session (window 0, pane 0) is where the Claude Code agent lives.
+This produces one `SESSION:0.0` target per session — the pane where the Claude Code
+agent lives. Use only these targets for state classification, status rows, and sends.
+Enumerating all panes with `list-panes -a` would include non-agent panes and produce
+misleading status rows.
 
 ---
 
@@ -408,6 +411,8 @@ loop every CHECK_INTERVAL until elapsed >= MAX_WAIT:
     if state == idle:
         if NOT saw_working AND elapsed < WORKING_GRACE:
             # Too soon to judge — the agent may still be thinking.
+            sleep CHECK_INTERVAL
+            elapsed += CHECK_INTERVAL
             continue
         if NOT saw_working:
             ALERT: "⚠ SESSION returned to idle without any visible tool activity.
