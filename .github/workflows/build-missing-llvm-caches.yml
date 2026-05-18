@@ -110,9 +110,16 @@ jobs:
           sudo apt-get install -y ninja-build
 
           # Install versioned clang toolchain if requested (e.g. clang-18);
-          # GitHub-hosted ubuntu-22.04 images only ship clang-14 by default.
+          # GitHub-hosted ubuntu-22.04 images only ship clang-14 by default,
+          # so add the upstream apt.llvm.org repo for newer versions.
           compiler="${{ matrix.compiler }}"
-          if [[ "$compiler" == clang-* ]]; then
+          if [[ "$compiler" =~ ^clang-([0-9]+)$ ]]; then
+            clang_version="${BASH_REMATCH[1]}"
+            curl -fsSL --retry 3 --retry-delay 5 -o /tmp/llvm-snapshot.gpg.key https://apt.llvm.org/llvm-snapshot.gpg.key
+            sudo apt-key add /tmp/llvm-snapshot.gpg.key
+            rm /tmp/llvm-snapshot.gpg.key
+            sudo add-apt-repository -y "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${clang_version} main"
+            sudo apt-get update
             sudo apt-get install -y "$compiler" "${compiler/clang/clang++}"
           fi
 
