@@ -3,7 +3,8 @@ name: tmux-agent-manager
 description: >-
   Manage multiple Claude Code agent sessions running in tmux. Report a
   status summary of all sessions, deliver instructions to a specific agent
-  via tmux send-keys, and send notifications when any session needs attention.
+  via tmux send-keys, and automatically monitor the agent after each send
+  to detect permission prompts, clarifying questions, or early-idle states.
   Use when the user wants to oversee concurrent Claude agents, check what
   sessions are doing, send a message to an agent, or monitor for sessions
   that need input or are stuck. Works on native Linux, macOS, WSL (inside),
@@ -150,6 +151,80 @@ $TMUX_EXEC send-keys -t "SESSION:0.0" "" Enter
 ```
 
 3. Wait 3 seconds, capture pane tail, confirm message appears after `›`.
+4. Run the **Post-send monitoring** phase (Step 4b) before returning to the user.
+
+---
+
+## Step 4b — Post-send monitoring
+
+After every `send` (and after Step 7h for new sessions), verify the agent is actually
+making progress and is not silently blocked.
+
+**Goal:** catch permission prompts, clarifying questions, and early-idle states before
+the user moves on.
+
+### Parameters
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `CHECK_INTERVAL` | 10 s | Seconds between pane polls |
+| `MAX_WAIT` | 120 s | Stop monitoring after this many seconds |
+| `WORKING_GRACE` | 20 s | Seconds after send before an `idle` return triggers an alert |
+
+### Algorithm
+
+```
+elapsed = 0
+saw_working = false
+
+loop every CHECK_INTERVAL until elapsed >= MAX_WAIT:
+    capture last 35 lines of SESSION:0.0
+    classify state (idle / working / needs_approval / unknown)
+
+    if state == needs_approval:
+        ALERT: "⚠ SESSION needs approval — agent is waiting for a permission prompt."
+        show the relevant pane lines
+        return (stop monitoring)
+
+    if state == working or state == unknown:
+        saw_working = true
+        if elapsed >= MAX_WAIT - CHECK_INTERVAL:
+            report "✓ SESSION is working — monitoring complete."
+            return
+
+    if state == idle:
+        if NOT saw_working AND elapsed < WORKING_GRACE:
+            # Too soon to judge — the agent may still be thinking.
+            continue
+        if NOT saw_working:
+            ALERT: "⚠ SESSION returned to idle without any visible tool activity.
+                    The agent may be asking a clarifying question or encountered an error."
+            show last 35 pane lines
+            return
+        else:
+            # Agent finished quickly — that is fine.
+            report "✓ SESSION completed the task and is now idle."
+            return
+
+    sleep CHECK_INTERVAL
+    elapsed += CHECK_INTERVAL
+
+# Timed out while still working — that is OK.
+report "✓ SESSION is still working after MAX_WAIT s — no attention needed."
+```
+
+### Alert format
+
+When emitting an alert, always include:
+- Session name
+- Detected state
+- The last 35 lines of the pane so the user can see the exact prompt or error
+
+### After an alert
+
+Do **not** automatically send any reply or click "Yes". Present the pane content to the
+user and let them decide how to respond (e.g., use `send` to answer a question or approve
+a permission prompt).
 
 ---
 
@@ -288,6 +363,10 @@ $TMUX_EXEC load-buffer /tmp/agent_prompt_<slug>.txt
 $TMUX_EXEC paste-buffer -t "<slug>:0.0"
 $TMUX_EXEC send-keys -t "<slug>:0.0" "" Enter
 ```
+
+After sending, run **Step 4b — Post-send monitoring** targeting `<slug>:0.0` to confirm
+the agent starts working (not blocked on a permission prompt or asking questions).
+Use `WORKING_GRACE=30` for new sessions since Claude Code takes a moment to start.
 
 ### 7i — Report to user
 
