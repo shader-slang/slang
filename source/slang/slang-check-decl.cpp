@@ -8513,6 +8513,7 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
                         requiredFuncDeclRef,
                         witnessTable,
                         SynthesisPattern::AllInductive);
+                break;
             case BuiltinRequirementKind::And:
             case BuiltinRequirementKind::Or:
             case BuiltinRequirementKind::Not:
