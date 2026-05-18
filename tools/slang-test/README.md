@@ -89,6 +89,8 @@ Tests are identified by a special comment at the start of the test file: `//TEST
 
 To ignore a test, use `//DISABLE_TEST` instead of `//TEST`.
 
+Add `no-synth` to a test command option list to prevent slang-test from creating synthesized render-API or compile-target variants from that command.
+
 Available test types:
 - `SIMPLE`: Runs the slangc compiler with specified options after the command
 - `REFLECTION`: Runs slang-reflection-test with the options specified after the command

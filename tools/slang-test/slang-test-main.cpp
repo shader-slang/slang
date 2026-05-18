@@ -101,6 +101,7 @@ struct TestOptions
         return commandOptions.tryGetValue("diag", prefix);
     }
     bool isNonExhaustiveDiagTest() const { return commandOptions.containsKey("non-exhaustive"); }
+    bool suppressesSynthesizedTests() const { return commandOptions.containsKey("no-synth"); }
 
     Type type = Type::Normal;
 
@@ -4653,6 +4654,11 @@ static void _calcSynthesizedTests(
     // Add the explicit parameter
     for (const auto& srcTest : srcTests)
     {
+        if (srcTest.options.suppressesSynthesizedTests())
+        {
+            continue;
+        }
+
         const auto& requirements = srcTest.requirements;
 
         // Render tests use renderApis...
@@ -4791,6 +4797,7 @@ static void _calcSynthesizedCompileTargetTests(
     for (const auto& srcTest : srcTests)
     {
         if (!srcTest.options.isEnabled || srcTest.options.isSynthesized ||
+            srcTest.options.suppressesSynthesizedTests() ||
             !_isGpuComputeCommand(srcTest.options.command))
             continue;
 

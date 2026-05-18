@@ -1,13 +1,10 @@
 //TEST_CATEGORY(wave, compute)
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -dx12 -profile cs_6_0 -shaderobj -render-feature hardware-device
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-directly
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-via-glsl
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-wgsl -compute -shaderobj -output-using-type
-// Keep LLVM explicit so slang-test does not synthesize an LLVM runtime clone
-// for GPU subgroup builtins.
-//DISABLE_TEST:COMPARE_COMPUTE_EX:-llvm -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK,no-synth):-slang -compute -dx12 -profile cs_6_0 -shaderobj -render-feature hardware-device
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK,no-synth):-vk -compute -shaderobj -emit-spirv-directly
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK,no-synth):-vk -compute -shaderobj -emit-spirv-via-glsl
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK,no-synth):-cuda -compute -shaderobj
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK,no-synth):-metal -compute -shaderobj
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK,no-synth):-wgsl -compute -shaderobj -output-using-type
 
 // Regression test for global-varying builtins that are exposed by generic
 // interface specialization after the early global-varying translation pass.
