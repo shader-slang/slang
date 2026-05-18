@@ -61,7 +61,8 @@ Helper:
 ```bash
 agent_pane_for_session() {
     local session="$1"
-    $ZJ --session "$session" action list-panes --json 2>/dev/null \
+    local pane_id
+    pane_id=$($ZJ --session "$session" action list-panes --json 2>/dev/null \
         | python3 -c '
 import json, sys
 panes = json.load(sys.stdin)
@@ -71,19 +72,34 @@ for p in panes:
     if not p.get("is_plugin") and not p.get("exited"):
         print("terminal_%d" % p["id"]); sys.exit(0)
 sys.exit(1)
-'
+')
+    if [ -z "$pane_id" ]; then
+        echo "agent_pane_for_session: no terminal pane found in session '$session'" >&2
+        return 1
+    fi
+    printf '%s\n' "$pane_id"
 }
 ```
 
 The output is `terminal_<id>` (e.g. `terminal_0`), which all `action` subcommands
-accept via `--pane-id`. If your Zellij version returns a different JSON shape, fall
-back to a one-liner:
+accept via `--pane-id`. **Every caller must check the return status** — an empty `$PID`
+will silently target the wrong pane:
+
+```bash
+PID=$(agent_pane_for_session "<session>") || { echo "cannot resolve agent pane"; exit 1; }
+```
+
+If your Zellij version returns a different JSON shape, fall back to a one-liner that
+also handles the "no pane" case gracefully:
 
 ```bash
 $ZJ --session "$session" action list-panes --json 2>/dev/null \
-    | python3 -c 'import json,sys; ps=json.load(sys.stdin); \
-                  p=next(x for x in ps if not x.get("is_plugin")); \
-                  print("terminal_%d"%p["id"])'
+    | python3 -c 'import json, sys
+ps = json.load(sys.stdin)
+p = next((x for x in ps if not x.get("is_plugin")), None)
+if p is None:
+    sys.exit(1)
+print("terminal_%d" % p["id"])'
 ```
 
 ---
@@ -175,7 +191,10 @@ to refine the estimate: remaining fraction × typical total time.
 ## Step 4 — Send instruction
 
 1. Parse `$ARGUMENTS`: first token after `send` = session name; rest = message.
-2. Resolve the agent pane: `PID=$(agent_pane_for_session "$SESSION")`.
+2. Resolve the agent pane:
+   ```bash
+   PID=$(agent_pane_for_session "$SESSION") || { echo "cannot resolve agent pane for $SESSION"; exit 1; }
+   ```
 3. Deliver the message. For single-line text, `send-keys` is enough; for multi-line
    payloads use `write-chars` (which inserts text verbatim, bracketed-paste style),
    then a separate `send-keys "Enter"` to submit:
@@ -389,7 +408,7 @@ parent terminal.
 Resolve the agent pane, then push the launcher command:
 
 ```bash
-PID=$(agent_pane_for_session "<slug>")
+PID=$(agent_pane_for_session "<slug>") || { echo "cannot resolve agent pane for <slug>"; exit 1; }
 
 # Claude Code (default)
 $ZJ --session "<slug>" action write-chars -p "$PID" -- "claude --dangerously-skip-permissions"
