@@ -69,6 +69,7 @@ type config struct {
 	gcpVMPrefix         string
 	gcpCleanupInterval  time.Duration
 	sessionMaxAge       time.Duration
+	orphanGracePeriod   time.Duration
 }
 
 func (c *config) buildLabels() []scaleset.Label {
@@ -151,6 +152,7 @@ func parseFlags() config {
 	flag.StringVar(&cfg.gcpVMPrefix, "vm-prefix", "", "VM name prefix (default: win-test for windows, linux-test for linux)")
 	flag.DurationVar(&cfg.gcpCleanupInterval, "gcp-cleanup-interval", 2*time.Minute, "Interval for scanning and deleting terminated VMs")
 	flag.DurationVar(&cfg.sessionMaxAge, "session-max-age", 0, "Maximum age before draining and recreating the GitHub scale-set session (0 disables)")
+	flag.DurationVar(&cfg.orphanGracePeriod, "orphan-grace-period", 0, "Time a tracked VM may stay idle (never marked busy) before the cleanup loop evicts it as an orphan (0 uses the package default; negative disables)")
 
 	flag.Parse()
 
@@ -206,6 +208,14 @@ func parseFlags() config {
 			os.Exit(1)
 		}
 		cfg.sessionMaxAge = d
+	}
+	if v := os.Getenv("SCALER_ORPHAN_GRACE_PERIOD"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: invalid SCALER_ORPHAN_GRACE_PERIOD %q: %v\n", v, err)
+			os.Exit(1)
+		}
+		cfg.orphanGracePeriod = d
 	}
 
 	return cfg
@@ -304,14 +314,6 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 		ScaleSetID: ss.ID,
 	})
 
-	// Clean up scale set on exit
-	defer func() {
-		logger.Info("deleting scale set", "id", ss.ID)
-		if err := ssClient.DeleteRunnerScaleSet(context.WithoutCancel(ctx), ss.ID); err != nil {
-			logger.Error("failed to delete scale set", "error", err)
-		}
-	}()
-
 	// Runner name prefix
 	vmPrefix := cfg.gcpVMPrefix
 	if vmPrefix == "" {
@@ -324,13 +326,14 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 
 	// Initialize GCP VM manager
 	vmManager, err := gcpvm.NewManager(ctx, gcpvm.ManagerConfig{
-		Project:          cfg.gcpProject,
-		Zones:            cfg.gcpZones,
-		InstanceTemplate: cfg.gcpInstanceTemplate,
-		GPUType:          cfg.gcpGPUType,
-		Platform:         cfg.gcpPlatform,
-		VMPrefix:         vmPrefix,
-		CleanupInterval:  cfg.gcpCleanupInterval,
+		Project:           cfg.gcpProject,
+		Zones:             cfg.gcpZones,
+		InstanceTemplate:  cfg.gcpInstanceTemplate,
+		GPUType:           cfg.gcpGPUType,
+		Platform:          cfg.gcpPlatform,
+		VMPrefix:          vmPrefix,
+		CleanupInterval:   cfg.gcpCleanupInterval,
+		OrphanGracePeriod: cfg.orphanGracePeriod,
 	})
 	if err != nil {
 		return fmt.Errorf("creating GCP VM manager: %w", err)
@@ -369,6 +372,29 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 		minRunners:     cfg.minRunners,
 		vmPrefix:       vmPrefix,
 	}
+
+	// Clean up scale set on exit, except after a graceful drain. A scaler
+	// that exits via drain mode (SIGUSR1, --session-max-age, or systemctl
+	// reload) is being restarted, not decommissioned — preserving the scale
+	// set lets the next instance reuse the same ID via GetRunnerScaleSet
+	// above, so any in-flight runners keep their JIT registration valid.
+	// Deleting the scale set under a live runner orphans it in a
+	// "Registration not found" retry loop (#11067).
+	//
+	// This defer is declared before defer gcpScaler.shutdown(...) below so
+	// that LIFO ordering runs shutdown first; isDraining() then reflects
+	// the post-shutdown state.
+	defer func() {
+		if gcpScaler.isDraining() {
+			logger.Info("preserving scale set for next scaler instance",
+				"id", ss.ID, "active_vms", vmManager.ActiveCount())
+			return
+		}
+		logger.Info("deleting scale set", "id", ss.ID)
+		if err := ssClient.DeleteRunnerScaleSet(context.WithoutCancel(ctx), ss.ID); err != nil {
+			logger.Error("failed to delete scale set", "error", err)
+		}
+	}()
 
 	// SIGUSR1 enters drain mode: stop accepting new jobs, wait for running
 	// jobs to finish. This enables seamless binary updates:
