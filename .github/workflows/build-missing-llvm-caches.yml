@@ -109,6 +109,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ninja-build
 
+          # Install versioned clang toolchain if requested (e.g. clang-18);
+          # GitHub-hosted ubuntu-22.04 images only ship clang-14 by default.
+          compiler="${{ matrix.compiler }}"
+          if [[ "$compiler" == clang-* ]]; then
+            sudo apt-get install -y "$compiler" "${compiler/clang/clang++}"
+          fi
+
           # Set compiler
           CC=${{ matrix.compiler }}
           CXX=${{ matrix.compiler }}
