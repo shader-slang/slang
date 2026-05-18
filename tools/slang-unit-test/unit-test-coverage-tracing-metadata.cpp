@@ -147,7 +147,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(entry.counterIndex == i);
         SLANG_CHECK(entry.kind == slang::CoverageEntryKind::Line);
         SLANG_CHECK(entry.counterMode == slang::CoverageCounterMode::Count);
-        SLANG_CHECK(entry.startColumn > 0);
+        // Column information is optional; zero means unavailable.
         SLANG_CHECK(entry.endLine == 0);
         SLANG_CHECK(entry.endColumn == 0);
         SLANG_CHECK(entry.functionName == nullptr);

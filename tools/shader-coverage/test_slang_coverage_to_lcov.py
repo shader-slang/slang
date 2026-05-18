@@ -167,6 +167,38 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         )
         self.assertEqual(result.stderr, "")
 
+    def test_rejects_unknown_manifest_version(self):
+        manifest = {
+            "version": 999,
+            "counter_count": 1,
+            "entries": [],
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            td_path = pathlib.Path(td)
+            manifest_path = td_path / "shader.coverage-mapping.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--manifest",
+                    str(manifest_path),
+                    "--counters-text",
+                    "-",
+                    "--test-name",
+                    "shader_coverage",
+                ],
+                input="",
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("error: unsupported manifest version 999", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
