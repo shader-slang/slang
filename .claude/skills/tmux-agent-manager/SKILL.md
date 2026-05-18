@@ -23,10 +23,10 @@ Oversees multiple Claude Code sessions running in tmux.
 ## Environment Detection (run first, before any other step)
 
 Run this once at the start of every skill invocation to set the variables
-used throughout:
+used throughout. Run it as a plain bash block (no subshell wrapper) so the
+variables are available in your reasoning context for all subsequent steps:
 
 ```bash
-bash << 'DETECT'
 # How to reach tmux
 if command -v tmux &>/dev/null; then
     TMUX_EXEC="tmux"
@@ -54,8 +54,10 @@ else
 fi
 
 echo "TMUX_EXEC=$TMUX_EXEC SH=$SH HOST=$HOST GIT=$GIT"
-DETECT
 ```
+
+Re-declare `TMUX_EXEC`, `SH`, `HOST`, and `GIT` at the top of every subsequent
+bash block that needs them, using the values printed above.
 
 **Variable reference used in all steps below:**
 
@@ -199,18 +201,18 @@ Execution order: **4a** (pre-send checks) → **send** → **4b** (confirm deliv
 3. Send to the agent pane using a temp file to safely handle newlines and special characters:
 
 ```bash
-TMP_MSG=$(mktemp /tmp/agent_send_msg.XXXXXX.txt)
-cat > "$TMP_MSG" << 'MSG'
+TMP_PAYLOAD=$(mktemp /tmp/agent_send_msg.XXXXXX.txt)
+cat > "$TMP_PAYLOAD" << 'MSG'
 MESSAGE
 MSG
-$TMUX_EXEC load-buffer "$TMP_MSG"
+$TMUX_EXEC load-buffer "$TMP_PAYLOAD"
 $TMUX_EXEC paste-buffer -t "SESSION:0.0"
 # Wait for the paste to land in the terminal before sending Enter.
 # paste-buffer is async — sending Enter immediately risks the keystroke
 # arriving before the pasted text and being swallowed.
 sleep 1
 $TMUX_EXEC send-keys -t "SESSION:0.0" "" Enter
-# Do NOT rm TMP_MSG here — Step 4b may need it for a retry.
+# Do NOT rm TMP_PAYLOAD here — Step 4b may need it for a retry.
 ```
 
 4. Run **Step 4b — Queue verification** to confirm the message was actually submitted.
@@ -321,6 +323,7 @@ while attempt <= MAX_RETRIES:
     if state == working or state == needs_approval or state == unknown:
         # Agent received the message and is acting on it (or needs approval).
         report "✓ Message queued — agent is processing."
+        rm -f "$TMP_PAYLOAD"
         return  # proceed to Step 4c
 
     if state == pending_message:
@@ -334,7 +337,7 @@ while attempt <= MAX_RETRIES:
         if attempt == 1:
             # The pane looks unchanged — paste may have failed silently.
             # Retry the full send sequence before giving up.
-            $TMUX_EXEC load-buffer "$TMP_MSG"   # (keep TMP_MSG until here)
+            $TMUX_EXEC load-buffer "$TMP_PAYLOAD"
             $TMUX_EXEC paste-buffer -t "SESSION:0.0"
             sleep 1
             $TMUX_EXEC send-keys -t "SESSION:0.0" "" Enter
@@ -345,9 +348,10 @@ while attempt <= MAX_RETRIES:
             ALERT: "⚠ Message delivery to SESSION failed after $MAX_RETRIES attempts.
                     The agent pane appears unchanged. Last 20 pane lines:"
             show tail
+            rm -f "$TMP_PAYLOAD"
             return  # do NOT proceed to Step 4c
 
-rm -f "$TMP_MSG"   # clean up after all retries are exhausted or on success
+rm -f "$TMP_PAYLOAD"   # defensive cleanup if loop exits without returning
 ```
 
 > **`pending_message` state detection**: the pane tail contains text after the last `›`
@@ -587,16 +591,16 @@ If the result is `normal`, emit a warning and continue immediately to Step 7h:
 Write to a temp file to safely handle newlines and special characters:
 
 ```bash
-TMP_PROMPT=$(mktemp /tmp/agent_prompt_<slug>.XXXXXX.txt)
-cat > "$TMP_PROMPT" << 'PROMPT'
+TMP_PAYLOAD=$(mktemp /tmp/agent_prompt_<slug>.XXXXXX.txt)
+cat > "$TMP_PAYLOAD" << 'PROMPT'
 <composed prompt text>
 PROMPT
 
-$TMUX_EXEC load-buffer "$TMP_PROMPT"
+$TMUX_EXEC load-buffer "$TMP_PAYLOAD"
 $TMUX_EXEC paste-buffer -t "<slug>:0.0"
 sleep 1
 $TMUX_EXEC send-keys -t "<slug>:0.0" "" Enter
-# Do NOT rm TMP_PROMPT here — Step 4b may need it for a retry.
+# Do NOT rm TMP_PAYLOAD here — Step 4b may need it for a retry.
 ```
 
 After sending, run **Step 4b — Queue verification** targeting `<slug>:0.0` to confirm
@@ -608,7 +612,7 @@ Use `WORKING_GRACE=30` for new sessions since Claude Code takes a moment to star
 
 - Branch: `<branch>`
 - Worktree: `$PARENT_NATIVE/<slug>`
-- Tmux session: `<slug>` — attach with `tmux attach -t <slug>`
+- Tmux session: `<slug>` — attach with `$TMUX_EXEC attach -t <slug>`
 - Agent is running with the task prompt
 
 ---
