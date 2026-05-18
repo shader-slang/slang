@@ -30,5 +30,5 @@ RWStructuredBuffer<float4> outBuf;
 [numthreads(1, 1, 1)]
 void main(uint tid : SV_DispatchThreadID)
 {
-    outBuf[tid] = params.used.a + float4(params.topUsed.xxxx);
+    outBuf[tid] = params.used.a + float4(params.topUsed.x);
 }
