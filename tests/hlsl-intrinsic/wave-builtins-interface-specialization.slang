@@ -5,6 +5,9 @@
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-wgsl -compute -shaderobj -output-using-type
+// Keep LLVM explicit so slang-test does not synthesize an LLVM runtime clone
+// for GPU subgroup builtins.
+//DISABLE_TEST:COMPARE_COMPUTE_EX:-llvm -compute -shaderobj -output-using-type
 
 // Regression test for global-varying builtins that are exposed by generic
 // interface specialization after the early global-varying translation pass.
