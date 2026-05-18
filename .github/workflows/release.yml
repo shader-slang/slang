@@ -340,6 +340,53 @@ jobs:
             cd ../
           fi
 
+      - name: Verify WASM static package dependencies
+        if: matrix.platform == 'wasm'
+        run: |
+          source emsdk/emsdk_env.sh
+
+          package="${{ steps.package.outputs.SLANG_WASM_LIBS_ARCHIVE }}"
+          if [[ -z "$package" || ! -f "$package" ]]; then
+            echo "WASM static library package was not produced: '$package'" >&2
+            exit 1
+          fi
+
+          tmp_dir="$(mktemp -d)"
+          unzip -q "$package" -d "$tmp_dir/package"
+
+          echo "Packaged WASM static libraries:"
+          find "$tmp_dir/package/lib" -maxdepth 1 -name '*.a' -print | sort
+
+          shopt -s nullglob
+          libraries=("$tmp_dir/package"/lib/*.a)
+          if [[ ${#libraries[@]} -eq 0 ]]; then
+            echo "No static libraries found in '$package'" >&2
+            exit 1
+          fi
+
+          cat > "$tmp_dir/smoke.cpp" <<'EOF'
+          #include <slang.h>
+
+          int main()
+          {
+              slang::IGlobalSession* session = nullptr;
+              SlangGlobalSessionDesc desc = {};
+              SlangResult result = slang_createGlobalSession2(&desc, &session);
+              if (session)
+                  session->release();
+              return SLANG_FAILED(result) ? 1 : 0;
+          }
+          EOF
+
+          em++ -std=c++17 -fwasm-exceptions "$tmp_dir/smoke.cpp" \
+            -I"$tmp_dir/package/include" \
+            -Wl,--whole-archive "${libraries[@]}" -Wl,--no-whole-archive \
+            -sASSERTIONS \
+            -sALLOW_MEMORY_GROWTH \
+            -sERROR_ON_UNDEFINED_SYMBOLS=1 \
+            -Wl,--export=__cpp_exception \
+            -o "$tmp_dir/smoke.js"
+
       - name: File check
         run: |
           find "build/dist-$config" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
