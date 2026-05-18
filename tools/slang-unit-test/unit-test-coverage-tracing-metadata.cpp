@@ -173,6 +173,39 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(coverage->getEntryInfo(0, &entry) == SLANG_E_INVALID_ARG);
     }
 
+    // A caller compiled against the original v1 struct only has
+    // storage through `line`. The implementation must accept that
+    // structSize and must not write tail fields.
+    {
+        slang::CoverageEntryInfo entry;
+        entry.structSize = SLANG_OFFSET_OF(slang::CoverageEntryInfo, line) + sizeof(uint32_t);
+        entry.counterIndex = 0x12345678u;
+        entry.kind = slang::CoverageEntryKind::Function;
+        entry.counterMode = slang::CoverageCounterMode::Warp;
+        entry.startColumn = 77;
+        entry.endLine = 88;
+        entry.endColumn = 99;
+        entry.functionName = "unchanged";
+        entry.functionMangledName = "unchanged_mangled";
+        entry.branchSiteID = 111;
+        entry.branchArmID = 222;
+        entry.branchArmKind = slang::CoverageBranchArmKind::TrueArm;
+        SLANG_CHECK(coverage->getEntryInfo(0, &entry) == SLANG_OK);
+        SLANG_CHECK(entry.file != nullptr);
+        SLANG_CHECK(entry.line > 0);
+        SLANG_CHECK(entry.counterIndex == 0x12345678u);
+        SLANG_CHECK(entry.kind == slang::CoverageEntryKind::Function);
+        SLANG_CHECK(entry.counterMode == slang::CoverageCounterMode::Warp);
+        SLANG_CHECK(entry.startColumn == 77);
+        SLANG_CHECK(entry.endLine == 88);
+        SLANG_CHECK(entry.endColumn == 99);
+        SLANG_CHECK(UnownedStringSlice(entry.functionName) == toSlice("unchanged"));
+        SLANG_CHECK(UnownedStringSlice(entry.functionMangledName) == toSlice("unchanged_mangled"));
+        SLANG_CHECK(entry.branchSiteID == 111);
+        SLANG_CHECK(entry.branchArmID == 222);
+        SLANG_CHECK(entry.branchArmKind == slang::CoverageBranchArmKind::TrueArm);
+    }
+
     // Synthetic resource metadata: coverage should surface one hidden
     // mutable structured buffer resource that hosts can use as a
     // binding helper bridge.
@@ -265,6 +298,21 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(
             spirvSyntheticResources->findResourceIndexByID(info.id, &lookedUpIndex) == SLANG_OK);
         SLANG_CHECK(lookedUpIndex == coverageResourceIndex);
+
+        ComPtr<ISlangBlob> manifest;
+        SLANG_CHECK(
+            slang_writeCoverageManifestJson(spirvBundle.coverage, manifest.writeRef()) == SLANG_OK);
+        SLANG_CHECK(manifest != nullptr);
+        UnownedStringSlice json(
+            (const char*)manifest->getBufferPointer(),
+            manifest->getBufferSize());
+        SLANG_CHECK(json.indexOf(toSlice("\"format\": \"slang-coverage\"")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"version\": 2")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"counter_count\"")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"space\"")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"binding\"")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"uniform_offset\"")) == -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"uniform_stride\"")) == -1);
     }
 
     {

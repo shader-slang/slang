@@ -12,6 +12,47 @@ SCRIPT = pathlib.Path(__file__).with_name("slang-coverage-to-lcov.py")
 
 
 class SlangCoverageToLcovTests(unittest.TestCase):
+    def test_reads_v1_manifest_without_version_field(self):
+        manifest = {
+            "binding": {"space": 0, "binding": 0},
+            "counters": 2,
+            "entries": [
+                {"index": 0, "file": "shader.slang", "line": 12},
+                {"index": 1, "file": "shader.slang", "line": 12},
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            td_path = pathlib.Path(td)
+            manifest_path = td_path / "shader.coverage-mapping.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--manifest",
+                    str(manifest_path),
+                    "--counters-text",
+                    "-",
+                    "--test-name",
+                    "shader_coverage",
+                ],
+                input="5 7\n",
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+        self.assertEqual(
+            result.stdout,
+            "TN:shader_coverage\n"
+            "SF:shader.slang\n"
+            "DA:12,12\n"
+            "end_of_record\n",
+        )
+        self.assertEqual(result.stderr, "")
+
     def test_filters_unattributable_entries_from_lcov(self):
         manifest = {
             "version": 1,

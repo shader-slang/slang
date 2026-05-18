@@ -4566,6 +4566,14 @@ Extensible without ABI breakage in two ways:
     leading `structSize` field), or
   - adding a derived `ICoverageTracingMetadataN` interface with a
     new UUID, queryable through `castAs`.
+
+ABI note:
+  - this interface was extended in place while shader coverage still
+    had no known external implementors, to settle the source-entry
+    metadata model before broad adoption
+  - after this source-entry shape is externally consumed, future
+    vtable growth should use a derived/versioned interface instead
+    of appending methods to `ICoverageTracingMetadata`
 */
 enum class CoverageEntryKind : uint32_t
 {

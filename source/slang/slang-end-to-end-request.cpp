@@ -408,6 +408,10 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
     if (!artifact || path.getLength() == 0)
         return SLANG_OK;
     auto coverage = findAssociatedRepresentation<slang::ICoverageTracingMetadata>(artifact);
+    // Emit the sidecar if either dimension has data. Future coverage
+    // modes may record source entries without runtime counters, or
+    // runtime counter allocation before all source-entry metadata is
+    // populated; the sidecar is the persisted handoff for both.
     if (!coverage || (coverage->getCounterCount() == 0 && coverage->getEntryCount() == 0))
         return SLANG_OK;
     ComPtr<ISlangBlob> jsonBlob;

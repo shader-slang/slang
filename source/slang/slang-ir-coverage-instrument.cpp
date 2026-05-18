@@ -910,15 +910,22 @@ struct CoverageInstrumenter
 
     void run(List<IRInst*> const& counterOps)
     {
-        outMetadata.m_coverageCounterCount = (uint32_t)counterOps.getCount();
-        outMetadata.m_coverageEntries.reserve(counterOps.getCount());
+        const auto counterCount = counterOps.getCount();
+        // Public coverage metadata stores counter indices as uint32_t
+        // because the runtime buffer is indexed by 32-bit elements in
+        // the generated shader code.
+        SLANG_RELEASE_ASSERT(counterCount >= 0);
+        SLANG_RELEASE_ASSERT(
+            uint64_t(counterCount) <= uint64_t(std::numeric_limits<uint32_t>::max()));
+        outMetadata.m_coverageCounterCount = (uint32_t)counterCount;
+        outMetadata.m_coverageEntries.reserve(counterCount);
         // Each counter op gets its own slot: the op's identity IS the
         // UID, and we assign a consecutive index in traversal order.
         // Multiple ops on the same source line get distinct slots; the
         // LCOV converter aggregates per (file, line) at the host side
         // via summation.
-        for (UInt slot = 0; slot < (UInt)counterOps.getCount(); ++slot)
-            lowerCounterOp(counterOps[slot], slot);
+        for (Index slot = 0; slot < counterCount; ++slot)
+            lowerCounterOp(counterOps[slot], UInt(slot));
     }
 };
 
