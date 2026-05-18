@@ -82,8 +82,8 @@ bash block that needs them, using the values printed above.
 
 - `/tmux-agent-manager` or `/tmux-agent-manager status` — snapshot of all sessions
 - `/tmux-agent-manager send <session-name> <message>` — deliver instruction to an agent
-- `/tmux-agent-manager monitor [interval_seconds]` — check all sessions, notify on any
-  needing attention, schedule the next check via ScheduleWakeup (default: 60s)
+- `/tmux-agent-manager monitor [interval_seconds]` — check all sessions, mark any
+  needing attention in status output, and schedule the next check via ScheduleWakeup (default: 60s)
 - `/tmux-agent-manager new <issue_number>` — create worktree + tmux session for a GitHub
   issue and spawn a Claude agent to fix it
 - `/tmux-agent-manager new <free-form prompt>` — same, driven by a task description
@@ -171,7 +171,7 @@ as a dedicated warning block:
   • <session-name>
   • <session-name>
 These agents will pause and request approval for every tool call.
-To restart with bypass mode: tmux kill-session -t <name>, then
+To restart with bypass mode: $TMUX_EXEC kill-session -t <name>, then
 /tmux-agent-manager new <issue> (which always passes --dangerously-skip-permissions).
 ```
 
@@ -208,7 +208,11 @@ Execution order: **4a** (pre-send checks) → **send** → **4b** (confirm deliv
 3. Send to the agent pane using a temp file to safely handle newlines and special characters:
 
 ```bash
-TMP_PAYLOAD=$(mktemp /tmp/agent_send_msg.XXXXXX.txt)
+if [ "$HOST" = "windows" ]; then
+    TMP_PAYLOAD=$(wsl mktemp /tmp/agent_send_msg.XXXXXX.txt)
+else
+    TMP_PAYLOAD=$(mktemp /tmp/agent_send_msg.XXXXXX.txt)
+fi
 cat > "$TMP_PAYLOAD" << 'MSG'
 MESSAGE
 MSG
@@ -604,7 +608,11 @@ If the result is `normal`, emit a warning and continue immediately to Step 7h:
 Write to a temp file to safely handle newlines and special characters:
 
 ```bash
-TMP_PAYLOAD=$(mktemp /tmp/agent_prompt_<slug>.XXXXXX.txt)
+if [ "$HOST" = "windows" ]; then
+    TMP_PAYLOAD=$(wsl mktemp /tmp/agent_prompt_<slug>.XXXXXX.txt)
+else
+    TMP_PAYLOAD=$(mktemp /tmp/agent_prompt_<slug>.XXXXXX.txt)
+fi
 cat > "$TMP_PAYLOAD" << 'PROMPT'
 <composed prompt text>
 PROMPT
