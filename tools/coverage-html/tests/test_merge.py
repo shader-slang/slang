@@ -333,6 +333,26 @@ class CliIntegrationTests(unittest.TestCase):
             f.write(content)
         return path
 
+    def test_rejects_json_input_with_exit_two(self):
+        # The merger stays LCOV-only; JSON inputs are refused so the
+        # max-aggregation pipeline never silently drops region data
+        # the JSON carries but LCOV can't represent.
+        json_path = os.path.join(FIXTURES, "llvm-cov-json-sample.json")
+        res = self._run(json_path, "--quiet")
+        self.assertEqual(res.returncode, 2)
+        self.assertIn("JSON coverage exports", res.stderr)
+        self.assertIn("LCOV variant", res.stderr)
+
+    def test_rejects_gzipped_json_input(self):
+        # `.json.gz` is detected by extension before the gzip auto-
+        # decompress path runs.
+        gz_path = os.path.join(self.tmp, "sample.json.gz")
+        with gzip.open(gz_path, "wt", encoding="utf-8") as f:
+            f.write('{"type":"llvm.coverage.json.export","data":[]}')
+        res = self._run(gz_path, "--quiet")
+        self.assertEqual(res.returncode, 2)
+        self.assertIn("JSON coverage exports", res.stderr)
+
     def test_two_inputs_merge_to_stdout(self):
         a = self._write(
             "a.info",

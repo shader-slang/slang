@@ -18,7 +18,8 @@ using namespace Slang;
 //   - invoke every virtual method in the vtable and check basic
 //     invariants: counter count is non-zero for an instrumented
 //     shader, per-entry `(file, line)` strings/values are populated,
-//     and buffer binding is reported
+//     and hidden buffer binding is available through synthetic
+//     resource metadata
 //
 // This is an ABI-level smoke test: if a future change reorders or
 // changes the signature of any virtual method in
@@ -49,60 +50,82 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
-    slang::TargetDesc targetDesc = {};
-    targetDesc.format = SLANG_CPP_SOURCE;
-    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    struct MetadataBundle
+    {
+        ComPtr<slang::IMetadata> metadata;
+        slang::ICoverageTracingMetadata* coverage = nullptr;
+        slang::ISyntheticResourceMetadata* syntheticResources = nullptr;
+    };
 
-    slang::CompilerOptionEntry covOption = {};
-    covOption.name = slang::CompilerOptionName::TraceCoverage;
-    covOption.value.kind = slang::CompilerOptionValueKind::Int;
-    covOption.value.intValue0 = 1;
+    auto createMetadataBundle =
+        [&](SlangCompileTarget format, const char* profileName, bool coverageEnabled = true)
+    {
+        MetadataBundle bundle;
 
-    slang::SessionDesc sessionDesc = {};
-    sessionDesc.targetCount = 1;
-    sessionDesc.targets = &targetDesc;
-    sessionDesc.compilerOptionEntries = &covOption;
-    sessionDesc.compilerOptionEntryCount = 1;
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = format;
+        targetDesc.profile = globalSession->findProfile(profileName);
 
-    ComPtr<slang::ISession> session;
-    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        slang::CompilerOptionEntry covOption = {};
+        if (coverageEnabled)
+        {
+            covOption.name = slang::CompilerOptionName::TraceCoverage;
+            covOption.value.kind = slang::CompilerOptionValueKind::Int;
+            covOption.value.intValue0 = 1;
+            sessionDesc.compilerOptionEntries = &covOption;
+            sessionDesc.compilerOptionEntryCount = 1;
+        }
 
-    ComPtr<slang::IBlob> diagnostics;
-    auto module = session->loadModuleFromSourceString(
-        "coverageTest",
-        "coverageTest.slang",
-        shaderSource,
-        diagnostics.writeRef());
-    SLANG_CHECK(module != nullptr);
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
-    ComPtr<slang::IEntryPoint> entryPoint;
-    module->findEntryPointByName("computeMain", entryPoint.writeRef());
-    SLANG_CHECK(entryPoint != nullptr);
+        ComPtr<slang::IBlob> diagnostics;
+        auto module = session->loadModuleFromSourceString(
+            "coverageTest",
+            "coverageTest.slang",
+            shaderSource,
+            diagnostics.writeRef());
+        SLANG_CHECK(module != nullptr);
 
-    slang::IComponentType* components[] = {module, entryPoint};
-    ComPtr<slang::IComponentType> program;
-    SLANG_CHECK(
-        session->createCompositeComponentType(components, 2, program.writeRef(), nullptr) ==
-        SLANG_OK);
+        ComPtr<slang::IEntryPoint> entryPoint;
+        module->findEntryPointByName("computeMain", entryPoint.writeRef());
+        SLANG_CHECK(entryPoint != nullptr);
 
-    ComPtr<slang::IComponentType> linked;
-    SLANG_CHECK(program->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+        slang::IComponentType* components[] = {module, entryPoint};
+        ComPtr<slang::IComponentType> program;
+        SLANG_CHECK(
+            session->createCompositeComponentType(components, 2, program.writeRef(), nullptr) ==
+            SLANG_OK);
 
-    // Force codegen so the coverage pass runs. The compiled blob is
-    // not inspected here — metadata is populated as a side effect of
-    // the back-end pipeline.
-    ComPtr<slang::IBlob> codeBlob;
-    SLANG_CHECK(
-        linked->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+        ComPtr<slang::IComponentType> linked;
+        SLANG_CHECK(program->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
 
-    ComPtr<slang::IMetadata> metadata;
-    SLANG_CHECK(
-        linked->getEntryPointMetadata(0, 0, metadata.writeRef(), diagnostics.writeRef()) ==
-        SLANG_OK);
+        ComPtr<slang::IBlob> codeBlob;
+        SLANG_CHECK(
+            linked->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnostics.writeRef()) ==
+            SLANG_OK);
 
-    auto* coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
-        slang::ICoverageTracingMetadata::getTypeGuid());
-    SLANG_CHECK(coverage != nullptr);
+        SLANG_CHECK(
+            linked
+                ->getEntryPointMetadata(0, 0, bundle.metadata.writeRef(), diagnostics.writeRef()) ==
+            SLANG_OK);
+
+        bundle.coverage = (slang::ICoverageTracingMetadata*)bundle.metadata->castAs(
+            slang::ICoverageTracingMetadata::getTypeGuid());
+        SLANG_CHECK(bundle.coverage != nullptr);
+        bundle.syntheticResources = (slang::ISyntheticResourceMetadata*)bundle.metadata->castAs(
+            slang::ISyntheticResourceMetadata::getTypeGuid());
+        SLANG_CHECK(bundle.syntheticResources != nullptr);
+
+        return bundle;
+    };
+
+    auto cpuBundle = createMetadataBundle(SLANG_CPP_SOURCE, "sm_5_0");
+    auto* coverage = cpuBundle.coverage;
+    auto* syntheticResources = cpuBundle.syntheticResources;
 
     // The shader has multiple instrumented statements (for loop, if,
     // else, assignments, writeback) — expect at least several slots.
@@ -136,13 +159,172 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(coverage->getEntryInfo(0, &entry) == SLANG_E_INVALID_ARG);
     }
 
-    // Buffer binding info: for a CPU target, space/binding values may
-    // be -1, but the call must succeed.
+    // Synthetic resource metadata: coverage should surface one hidden
+    // mutable structured buffer resource that hosts can use as a
+    // binding helper bridge.
     {
+        const uint32_t resourceCount = syntheticResources->getResourceCount();
+        SLANG_CHECK(resourceCount == 1);
+
+        const uint32_t coverageResourceIndex = 0;
+        slang::SyntheticResourceInfo info;
+        SLANG_CHECK(syntheticResources->getResourceInfo(coverageResourceIndex, &info) == SLANG_OK);
+        SLANG_CHECK(info.id != 0);
+        SLANG_CHECK(info.bindingType == slang::BindingType::MutableRawBuffer);
+        SLANG_CHECK(info.arraySize == 1);
+        SLANG_CHECK(info.scope == slang::SyntheticResourceScope::Global);
+        SLANG_CHECK(info.access == slang::SyntheticResourceAccess::ReadWrite);
+        SLANG_CHECK(info.entryPointIndex == -1);
+        SLANG_CHECK(info.debugName != nullptr);
+        SLANG_CHECK(UnownedStringSlice(info.debugName) == toSlice("__slang_coverage"));
+
+        // CPU/CUDA-style targets must expose the concrete
+        // marshaling location in the generated global params
+        // payload. Descriptor-facing binding information may
+        // also be available, but it is not the primary
+        // contract for these targets.
+        SLANG_CHECK(info.space >= -1);
+        SLANG_CHECK(info.binding >= -1);
+        SLANG_CHECK(info.uniformOffset >= 0);
+        SLANG_CHECK(info.uniformStride > 0);
+
         slang::CoverageBufferInfo bufferInfo;
         SLANG_CHECK(coverage->getBufferInfo(&bufferInfo) == SLANG_OK);
+        SLANG_CHECK(bufferInfo.space == info.space);
+        SLANG_CHECK(bufferInfo.binding == info.binding);
+
+        uint32_t lookedUpIndex = ~0u;
+        SLANG_CHECK(syntheticResources->findResourceIndexByID(info.id, &lookedUpIndex) == SLANG_OK);
+        SLANG_CHECK(lookedUpIndex == coverageResourceIndex);
+    }
+
+    // CUDA follows the same synthetic-resource marshaling contract as
+    // CPU: the coverage buffer is discoverable through a concrete
+    // uniform payload offset/stride rather than through descriptor
+    // metadata.
+    {
+        auto cudaBundle = createMetadataBundle(SLANG_CUDA_SOURCE, "sm_5_0");
+        auto* cudaSyntheticResources = cudaBundle.syntheticResources;
+
+        SLANG_CHECK(cudaSyntheticResources->getResourceCount() == 1);
+
+        slang::SyntheticResourceInfo info;
+        SLANG_CHECK(cudaSyntheticResources->getResourceInfo(0, &info) == SLANG_OK);
+        SLANG_CHECK(info.id != 0);
+        SLANG_CHECK(info.bindingType == slang::BindingType::MutableRawBuffer);
+        SLANG_CHECK(info.uniformOffset >= 0);
+        SLANG_CHECK(info.uniformStride > 0);
+    }
+
+    // Descriptor-backed targets should expose descriptor-facing binding
+    // information while leaving CPU/CUDA uniform marshaling fields at their
+    // documented sentinel values.
+    {
+        auto spirvBundle = createMetadataBundle(SLANG_SPIRV, "spirv_1_5");
+        auto* spirvSyntheticResources = spirvBundle.syntheticResources;
+
+        const uint32_t resourceCount = spirvSyntheticResources->getResourceCount();
+        SLANG_CHECK(resourceCount == 1);
+
+        const uint32_t coverageResourceIndex = 0;
+        slang::SyntheticResourceInfo info;
+        SLANG_CHECK(
+            spirvSyntheticResources->getResourceInfo(coverageResourceIndex, &info) == SLANG_OK);
+        SLANG_CHECK(info.binding >= 0);
+        SLANG_CHECK(info.space >= 0);
+        SLANG_CHECK(info.bindingType == slang::BindingType::MutableRawBuffer);
+        SLANG_CHECK(info.arraySize == 1);
+        SLANG_CHECK(info.scope == slang::SyntheticResourceScope::Global);
+        SLANG_CHECK(info.access == slang::SyntheticResourceAccess::ReadWrite);
+        SLANG_CHECK(info.entryPointIndex == -1);
+        SLANG_CHECK(info.debugName != nullptr);
+        SLANG_CHECK(UnownedStringSlice(info.debugName) == toSlice("__slang_coverage"));
+        SLANG_CHECK(info.uniformOffset == -1);
+        SLANG_CHECK(info.uniformStride == 0);
+
+        slang::CoverageBufferInfo bufferInfo;
+        SLANG_CHECK(spirvBundle.coverage->getBufferInfo(&bufferInfo) == SLANG_OK);
+        SLANG_CHECK(bufferInfo.space == info.space);
+        SLANG_CHECK(bufferInfo.binding == info.binding);
+
+        uint32_t lookedUpIndex = ~0u;
+        SLANG_CHECK(
+            spirvSyntheticResources->findResourceIndexByID(info.id, &lookedUpIndex) == SLANG_OK);
+        SLANG_CHECK(lookedUpIndex == coverageResourceIndex);
+    }
+
+    {
+        auto hlslBundle = createMetadataBundle(SLANG_HLSL, "cs_5_0");
+        auto* hlslSyntheticResources = hlslBundle.syntheticResources;
+
+        SLANG_CHECK(hlslSyntheticResources->getResourceCount() == 1);
+
+        slang::SyntheticResourceInfo info;
+        SLANG_CHECK(hlslSyntheticResources->getResourceInfo(0, &info) == SLANG_OK);
+        SLANG_CHECK(info.binding >= 0);
+        SLANG_CHECK(info.space >= 0);
+        SLANG_CHECK(info.bindingType == slang::BindingType::MutableRawBuffer);
+        SLANG_CHECK(info.uniformOffset == -1);
+        SLANG_CHECK(info.uniformStride == 0);
+    }
+
+    {
+        auto metalBundle = createMetadataBundle(SLANG_METAL, "metal");
+        auto* metalSyntheticResources = metalBundle.syntheticResources;
+
+        SLANG_CHECK(metalSyntheticResources->getResourceCount() == 1);
+
+        slang::SyntheticResourceInfo info;
+        SLANG_CHECK(metalSyntheticResources->getResourceInfo(0, &info) == SLANG_OK);
+        SLANG_CHECK(info.space == -1);
+        SLANG_CHECK(info.binding >= 0);
+        SLANG_CHECK(info.bindingType == slang::BindingType::MutableRawBuffer);
+        SLANG_CHECK(info.uniformOffset == -1);
+        SLANG_CHECK(info.uniformStride == 0);
+
+        slang::CoverageBufferInfo bufferInfo;
+        SLANG_CHECK(metalBundle.coverage->getBufferInfo(&bufferInfo) == SLANG_OK);
+        SLANG_CHECK(bufferInfo.space == info.space);
+        SLANG_CHECK(bufferInfo.binding == info.binding);
+    }
+
+    {
+        uint32_t index = 0;
+        SLANG_CHECK(syntheticResources->findResourceIndexByID(0, &index) == SLANG_E_NOT_FOUND);
+        SLANG_CHECK(syntheticResources->findResourceIndexByID(1, nullptr) == SLANG_E_INVALID_ARG);
+    }
+    // Coverage disabled: metadata interface remains queryable, but it
+    // should report no synthetic coverage bindings.
+    {
+        auto noCoverageBundle = createMetadataBundle(SLANG_CPP_SOURCE, "sm_5_0", false);
+        auto* noCoverageSyntheticResources = noCoverageBundle.syntheticResources;
+        SLANG_CHECK(noCoverageSyntheticResources->getResourceCount() == 0);
+        uint32_t index = 0;
+        SLANG_CHECK(
+            noCoverageSyntheticResources->findResourceIndexByID(1, &index) == SLANG_E_NOT_FOUND);
+        slang::CoverageBufferInfo bufferInfo;
+        SLANG_CHECK(noCoverageBundle.coverage->getBufferInfo(&bufferInfo) == SLANG_OK);
+        SLANG_CHECK(bufferInfo.space == -1);
+        SLANG_CHECK(bufferInfo.binding == -1);
     }
     SLANG_CHECK(coverage->getBufferInfo(nullptr) == SLANG_E_INVALID_ARG);
+    {
+        slang::CoverageBufferInfo bufferInfo;
+        bufferInfo.structSize = 0;
+        SLANG_CHECK(coverage->getBufferInfo(&bufferInfo) == SLANG_E_INVALID_ARG);
+    }
+    {
+        slang::SyntheticResourceInfo info;
+        SLANG_CHECK(
+            syntheticResources->getResourceInfo(syntheticResources->getResourceCount(), &info) ==
+            SLANG_E_INVALID_ARG);
+    }
+    SLANG_CHECK(syntheticResources->getResourceInfo(0, nullptr) == SLANG_E_INVALID_ARG);
+    {
+        slang::SyntheticResourceInfo info;
+        info.structSize = 0;
+        SLANG_CHECK(syntheticResources->getResourceInfo(0, &info) == SLANG_E_INVALID_ARG);
+    }
 
     // Manifest serializer: produce JSON bytes and sanity-check the
     // canonical fields are present. Detailed shape is covered by the
@@ -160,6 +342,8 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(json.indexOf(toSlice("\"version\": 1")) != -1);
         SLANG_CHECK(json.indexOf(toSlice("\"counters\"")) != -1);
         SLANG_CHECK(json.indexOf(toSlice("__slang_coverage")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"uniform_offset\"")) != -1);
+        SLANG_CHECK(json.indexOf(toSlice("\"uniform_stride\"")) != -1);
         SLANG_CHECK(json.indexOf(toSlice("\"entries\"")) != -1);
     }
 

@@ -1022,8 +1022,20 @@ class CallAttribute : public Attribute
 };
 // `[call]`
 
+// Marks an enum declaration as unscoped. Added by the parser either from the
+// user-written `[UnscopedEnum]` attribute, or implicitly when a non-generic
+// plain `enum` is compiled with `-unscoped-enum`. Generic enums do not carry
+// this attribute even when `-unscoped-enum` is in effect.
 FIDDLE()
 class UnscopedEnumAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+// Marker for enum class declarations, used to detect conflicting explicit
+// unscoped/scoped enum declarations. This modifier has no further semantics.
+FIDDLE()
+class EnumClassModifier : public Modifier
 {
     FIDDLE(...)
 };

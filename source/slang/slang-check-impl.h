@@ -3231,6 +3231,10 @@ public:
 
 
     void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
+    void _checkAliasedOutArguments(
+        InvokeExpr* invoke,
+        FuncType* funcType,
+        FunctionDeclBase* funcDeclBase);
     Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr* expr);
     // Get the type to use when referencing a declaration
     QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);

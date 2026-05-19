@@ -24,6 +24,11 @@ from datetime import datetime, timezone, timedelta
 # Import the page template from ci_visualization
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ci_visualization import page_template, chart_section, DOWNLOAD_JS
+from ci_hosted_runner_usage import (
+    DEFAULT_HOSTED_RUNNER_CAP,
+    HOSTED_LABEL_PREFIXES,
+    sample_hosted_runner_usage,
+)
 
 
 DEFAULT_REPO = "shader-slang/slang"
@@ -372,9 +377,9 @@ def fetch_merge_queue_status(repo):
     return {"recent": recent, "summary": counts}
 
 
-def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None):
+def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None, hosted_runner_usage=None):
     """Append a runner status snapshot to the JSONL time-series file."""
-    if not queue_data and not gpu_quota:
+    if not queue_data and not gpu_quota and not mq_data and not hosted_runner_usage:
         return
 
     now = datetime.now(timezone.utc)
@@ -421,6 +426,9 @@ def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None):
     # Merge queue summary
     if mq_data:
         snapshot["merge_queue"] = mq_data.get("summary", {})
+
+    if hosted_runner_usage:
+        snapshot["hosted_runner_usage"] = hosted_runner_usage
 
     # Append to JSONL file (kept indefinitely, ~55KB/day)
     os.makedirs(output_dir, exist_ok=True)
@@ -576,6 +584,125 @@ def _build_gpu_quota_charts(snapshots):
     return charts
 
 
+def _build_hosted_runner_chart(snapshots):
+    """Build hosted-runner usage chart data, stacked by hosted label.
+
+    Returns None if no snapshot carries hosted_runner_usage data — the
+    field was added later and older snapshots won't have it. Older
+    snapshots are rendered as gaps (None) so the chart starts on the
+    first data point.
+    """
+    has_data = any(s.get("hosted_runner_usage") for s in snapshots)
+    if not has_data:
+        return None
+
+    # Collect every label observed across the window so the stacked
+    # series stay consistent.
+    labels_seen = set()
+    cap = DEFAULT_HOSTED_RUNNER_CAP
+    for s in snapshots:
+        usage = s.get("hosted_runner_usage") or {}
+        if usage.get("cap"):
+            cap = usage["cap"]
+        for row in usage.get("in_progress", {}).get("by_label", []):
+            labels_seen.add(row["label"])
+
+    # Stable ordering: ubuntu first, then macos, then windows, then alpha.
+    def _label_sort_key(lbl):
+        for i, prefix in enumerate(HOSTED_LABEL_ORDER):
+            if lbl.startswith(prefix):
+                return (i, lbl)
+        return (len(HOSTED_LABEL_ORDER), lbl)
+
+    sorted_labels = sorted(labels_seen, key=_label_sort_key)
+
+    label_series = {lbl: [] for lbl in sorted_labels}
+    queued_series = []
+    total_series = []
+    for s in snapshots:
+        usage = s.get("hosted_runner_usage")
+        # Partial samples are known undercounts; plot them as gaps so a
+        # transient Actions API failure doesn't render as a fake dip.
+        if not usage or usage.get("partial"):
+            for lbl in sorted_labels:
+                label_series[lbl].append(None)
+            queued_series.append(None)
+            total_series.append(None)
+            continue
+        by_label = {row["label"]: row["count"] for row in usage.get("in_progress", {}).get("by_label", [])}
+        for lbl in sorted_labels:
+            label_series[lbl].append(by_label.get(lbl, 0))
+        queued_series.append(usage.get("queued", {}).get("total", 0))
+        total_series.append(usage.get("in_progress", {}).get("total", 0))
+
+    palette = _hosted_label_palette(sorted_labels)
+    return {
+        "cap": cap,
+        "labels": sorted_labels,
+        "label_series": label_series,
+        "queued_series": queued_series,
+        "total_series": total_series,
+        "palette": palette,
+    }
+
+
+HOSTED_LABEL_ORDER = HOSTED_LABEL_PREFIXES
+
+HOSTED_LABEL_PALETTE = {
+    "ubuntu-": "#0d6efd",
+    "macos-": "#6f42c1",
+    "windows-": "#28a745",
+}
+
+
+def _hosted_label_palette(labels):
+    """Assign a stable color per hosted label based on its pool prefix.
+
+    Variant labels under the same pool (ubuntu-latest vs. ubuntu-22.04)
+    get progressively lighter shades of the same base color so they're
+    distinguishable but visibly related. The returned colors are always
+    6-digit `#RRGGBB` — alpha is applied at use time by the chart code.
+    """
+    palette = {}
+    counts_per_prefix = {}
+    for lbl in labels:
+        prefix = next((p for p in HOSTED_LABEL_ORDER if lbl.startswith(p)), None)
+        if prefix is None:
+            palette[lbl] = "#6c757d"
+            continue
+        base = HOSTED_LABEL_PALETTE.get(prefix, "#6c757d")
+        idx = counts_per_prefix.get(prefix, 0)
+        counts_per_prefix[prefix] = idx + 1
+        palette[lbl] = base if idx == 0 else _lighten_hex(base, _shade_factor(idx))
+    return palette
+
+
+def _shade_factor(idx):
+    """Return a 0..1 lightening factor that grows with idx (max ~0.8)."""
+    factors = [0.0, 0.30, 0.50, 0.65, 0.78]
+    return factors[idx] if idx < len(factors) else 0.85
+
+
+def _lighten_hex(color, factor):
+    """Lighten a `#RRGGBB` color toward white by `factor` in [0,1].
+
+    Returns a `#RRGGBB` string. Invalid input is returned unchanged.
+    """
+    if not (isinstance(color, str) and len(color) == 7 and color.startswith("#")):
+        return color
+    try:
+        r = int(color[1:3], 16)
+        g = int(color[3:5], 16)
+        b = int(color[5:7], 16)
+    except ValueError:
+        return color
+    factor = max(0.0, min(1.0, factor))
+    r = int(r + (255 - r) * factor)
+    g = int(g + (255 - g) * factor)
+    b = int(b + (255 - b) * factor)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
 def build_history_chart(snapshots):
     """Build Chart.js HTML for 24h runner load history."""
     if not snapshots:
@@ -603,6 +730,10 @@ def build_history_chart(snapshots):
 
     gpu_quota_charts = _build_gpu_quota_charts(snapshots)
 
+    # Hosted-runner usage over time, with the per-org concurrency cap
+    # plotted as a horizontal limit line.
+    hosted_runner_chart = _build_hosted_runner_chart(snapshots)
+
     # Merge queue cumulative success/failure from snapshots
     # Each snapshot records the running 24h totals; we just plot them over time.
     mq_success_data = [s.get("merge_queue", {}).get("success", 0) for s in snapshots]
@@ -627,6 +758,13 @@ def build_history_chart(snapshots):
     if has_mq_snapshots:
         charts_html += chart_section("mqHistory", "Merge Queue Checks (24h rolling)",
             "Rolling 24-hour count of merge queue CI check outcomes, sampled every 15 minutes.")
+    if hosted_runner_chart:
+        charts_html += chart_section(
+            "hostedRunnerHistory",
+            "GitHub-Hosted Runner Usage vs. Cap",
+            "Hosted runners in use (stacked by label) and queued hosted-runner jobs, "
+            "sampled every 15 minutes. Dashed line shows the per-org concurrency cap.",
+        )
 
     return f"""
 <div class="chart-section">
@@ -650,6 +788,8 @@ const allJobsQueued = {json.dumps(queued_data)};
 const allJobsRunning = {json.dumps(running_data)};
 
 const gpuQuotaCharts = {json.dumps(gpu_quota_charts)};
+
+const hostedRunnerChart = {json.dumps(hosted_runner_chart)};
 
 const mqSuccessData = {json.dumps(mq_success_data)};
 const mqFailureData = {json.dumps(mq_failure_data)};
@@ -783,6 +923,66 @@ function buildCharts(hours) {{
     }});
   }}
 
+  // Hosted-runner usage stacked by label, with the cap as a dashed line.
+  const hostedCanvas = document.getElementById('hostedRunnerHistory_canvas');
+  if (hostedCanvas && hostedRunnerChart) {{
+    const hostedDatasets = [];
+    for (const lbl of hostedRunnerChart.labels) {{
+      const color = hostedRunnerChart.palette[lbl] || '#6c757d';
+      hostedDatasets.push({{
+        label: lbl,
+        data: sliceLast(hostedRunnerChart.label_series[lbl] || [], n),
+        borderColor: color,
+        backgroundColor: color + '55',
+        fill: 'stack',
+        stack: 'in_use',
+        tension: 0.3,
+      }});
+    }}
+    hostedDatasets.push({{
+      label: 'Queued',
+      data: sliceLast(hostedRunnerChart.queued_series, n),
+      borderColor: '#ffc107',
+      borderDash: [2, 2],
+      backgroundColor: 'rgba(255,193,7,0.0)',
+      fill: false,
+      tension: 0.3,
+    }});
+    hostedDatasets.push({{
+      label: 'Cap (' + hostedRunnerChart.cap + ')',
+      data: Array(labels.length).fill(hostedRunnerChart.cap),
+      borderColor: '#dc3545',
+      borderDash: [6, 3],
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: false,
+    }});
+    charts.hostedRunner = new Chart(hostedCanvas.getContext('2d'), {{
+      type: 'line',
+      data: {{ labels: displayLabels, datasets: hostedDatasets }},
+      options: {{
+        responsive: true,
+        scales: {{
+          y: {{ min: 0, stacked: true, title: {{ display: true, text: 'Hosted Runners' }} }}
+        }},
+        plugins: {{
+          tooltip: {{
+            callbacks: {{
+              afterBody: function(items) {{
+                const idx = items[0].dataIndex;
+                const total = sliceLast(
+                  hostedRunnerChart.total_series || [], n
+                )[idx];
+                if (total == null) return '';
+                return 'Total in use: ' + total + ' / ' + hostedRunnerChart.cap;
+              }}
+            }}
+          }}
+        }}
+      }}
+    }});
+  }}
+
   // Merge queue checks over time
   const mqCanvas = document.getElementById('mqHistory_canvas');
   if (mqCanvas && hasMqSnapshots) {{
@@ -814,7 +1014,74 @@ buildCharts(24);
 """
 
 
-def generate_health_html(queue_data, failures, output_dir, mq_data=None):
+def render_hosted_runner_usage(hosted_runner_usage):
+    """Render the GitHub-hosted runner quota section."""
+    if not hosted_runner_usage:
+        return "<p>Hosted-runner usage unavailable.</p>"
+
+    cap = hosted_runner_usage.get("cap", DEFAULT_HOSTED_RUNNER_CAP)
+    in_progress = hosted_runner_usage.get("in_progress", {})
+    queued = hosted_runner_usage.get("queued", {})
+    in_use = in_progress.get("total", 0)
+    queued_total = queued.get("total", 0)
+    pct = (in_use / cap * 100) if cap else 0
+    partial = hosted_runner_usage.get("partial", False)
+
+    # Severity thresholds match shader-slang/slang#11142:
+    #   warn  at >=80% of cap
+    #   alarm at  100% of cap with queued > 0
+    # A partial sample is a known undercount; show PARTIAL instead of
+    # OK/HIGH/AT CAP so the dashboard doesn't reassure operators with a
+    # false-healthy banner during an Actions API failure.
+    if partial:
+        banner_fg, banner_bg = "#6c757d", "#e2e3e5"
+        banner_label = "PARTIAL"
+    elif in_use >= cap and queued_total > 0:
+        banner_fg, banner_bg = "#dc3545", "#f8d7da"
+        banner_label = "AT CAP"
+    elif in_use >= 0.8 * cap:
+        banner_fg, banner_bg = "#fd7e14", "#fff3cd"
+        banner_label = "HIGH"
+    else:
+        banner_fg, banner_bg = "#198754", "#d1e7dd"
+        banner_label = "OK"
+
+    html = f"""
+<div style="border-left:4px solid {banner_fg};background:{banner_bg};padding:12px 18px;margin-bottom:14px;border-radius:4px">
+  <span style="background:{banner_fg};color:white;padding:2px 8px;border-radius:3px;font-size:0.8em">{banner_label}</span>
+  <strong style="margin-left:8px">{in_use} / {cap} hosted runners in use ({pct:.0f}%)</strong>
+  &nbsp;&nbsp;<span style="color:#6c757d">queued jobs: {queued_total}</span>
+</div>
+"""
+    if partial:
+        html += (
+            '<p style="color:#6c757d;margin-top:-8px">'
+            "Sample is partial and may undercount usage "
+            "(GitHub Actions API failure during collection)."
+            "</p>\n"
+        )
+
+    def _render_table(rows, name_key, name_header):
+        out = f'<table><tr><th>{name_header}</th><th>Jobs</th></tr>\n'
+        for row in rows:
+            out += f"<tr><td>{_esc(row[name_key])}</td><td>{row['count']}</td></tr>\n"
+        out += "</table>\n"
+        return out
+
+    if in_progress.get("by_workflow"):
+        html += "<h3>In Use by Workflow</h3>\n"
+        html += _render_table(in_progress["by_workflow"], "name", "Workflow")
+    if in_progress.get("by_label"):
+        html += "<h3>In Use by Label</h3>\n"
+        html += _render_table(in_progress["by_label"], "label", "Hosted Label")
+    if queued.get("by_workflow"):
+        html += "<h3>Queued by Workflow</h3>\n"
+        html += _render_table(queued["by_workflow"], "name", "Workflow")
+
+    return html
+
+
+def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_runner_usage=None):
     """Generate health.html from live data."""
     now = datetime.now(timezone.utc)
     fetched_at = now.strftime("%Y-%m-%d %H:%M UTC")
@@ -1009,12 +1276,17 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None):
     snapshots = load_snapshots(output_dir, hours=24)
     history_html = build_history_chart(snapshots)
 
+    hosted_runner_html = render_hosted_runner_usage(hosted_runner_usage)
+
     body = f"""
 <h1>CI System Health</h1>
 <p style="color:#6c757d">Last updated: {fetched_at}</p>
 
 <h2>Queue Status</h2>
 {queue_html}
+
+<h2>GitHub-Hosted Runner Quota</h2>
+{hosted_runner_html}
 
 <h2>Merge Queue</h2>
 {mq_html}
@@ -1055,14 +1327,46 @@ def main():
     else:
         print("  Merge queue data unavailable")
 
+    print("Sampling GitHub-hosted runner usage...")
+    try:
+        hosted_runner_usage = sample_hosted_runner_usage(args.repo)
+        cap = hosted_runner_usage["cap"]
+        in_use = hosted_runner_usage["in_progress"]["total"]
+        queued = hosted_runner_usage["queued"]["total"]
+        print(f"  Hosted runners in use: {in_use}/{cap}, queued: {queued}")
+        if hosted_runner_usage.get("partial"):
+            fetch_errs = hosted_runner_usage.get("fetch_errors", 0)
+            list_errs = hosted_runner_usage.get("list_errors", [])
+            print(
+                f"  Warning: hosted-runner sample is partial "
+                f"(fetch_errors={fetch_errs}, list_errors={len(list_errs)}); "
+                f"counts above may undercount real usage.",
+                file=sys.stderr,
+            )
+    except Exception as e:  # noqa: BLE001 — sampler must never break the health run
+        print(f"  Warning: hosted-runner sampler failed: {e}", file=sys.stderr)
+        hosted_runner_usage = None
+
     print("Recording snapshot...")
-    record_snapshot(queue_data, args.output, gpu_quota=gpu_quota, mq_data=mq_data)
+    record_snapshot(
+        queue_data,
+        args.output,
+        gpu_quota=gpu_quota,
+        mq_data=mq_data,
+        hosted_runner_usage=hosted_runner_usage,
+    )
 
     print("Fetching recent CI failures...")
     failures = fetch_recent_failures(args.repo)
 
     print(f"Generating health.html in {args.output}/...")
-    generate_health_html(queue_data, failures, args.output, mq_data=mq_data)
+    generate_health_html(
+        queue_data,
+        failures,
+        args.output,
+        mq_data=mq_data,
+        hosted_runner_usage=hosted_runner_usage,
+    )
 
     print("Done.")
 
