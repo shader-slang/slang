@@ -12,6 +12,8 @@ void __requireTargetExtension(constexpr String extensionName);
 in uint __builtinWaveLaneIndex : SV_WaveLaneIndex;
 in uint __builtinWaveLaneCount : SV_WaveLaneCount;
 in uint __builtinQuadLaneIndex : SV_QuadLaneIndex;
+in uint __builtinWaveIndex : SV_WaveIndex;
+in uint __builtinGroupIndex : SV_GroupIndex;
 
 //@public:
 /// Represents an interface for buffer data layout.
@@ -17012,6 +17014,61 @@ uint WaveGetNumWaves()
         default:
             static_assert(false, "WaveGetNumWaves is only supported in compute shaders");
             return 0; // unreachable, but needed to satisfy compiler
+        }
+    }
+}
+
+/// Returns the index of the current wave (subgroup) within the workgroup.
+/// Equivalent to GLSL gl_SubgroupID / Metal simdgroup_index_in_threadgroup.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+[NonUniformReturn]
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+uint WaveGetWaveIndex()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_SubgroupID)";
+    case cuda:
+        {
+            uint3 tid = cudaThreadIdx();
+            uint3 blockDim = cudaBlockDim();
+            uint flattenedTid = tid.x + tid.y * blockDim.x + tid.z * blockDim.x * blockDim.y;
+            return flattenedTid / WaveGetLaneCount();
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniform;
+            result:$$uint = OpLoad builtin(SubgroupId:uint)
+        };
+    case metal:
+        return __builtinWaveIndex;
+    case wgsl:
+        __requireTargetExtension("subgroups");
+        __stage_switch
+        {
+        case compute:
+            return __builtinWaveIndex;
+        default:
+            static_assert(false, "WaveGetWaveIndex is only supported in compute shaders for WGSL");
+            return 0;
+        }
+    case hlsl:
+        __stage_switch
+        {
+        case compute:
+            {
+                uint groupIndex = __builtinGroupIndex;
+                uint waveSize = WaveGetLaneCount();
+                return groupIndex / waveSize;
+            }
+        default:
+            static_assert(false, "WaveGetWaveIndex is only supported in compute shaders for HLSL");
+            return 0;
         }
     }
 }
