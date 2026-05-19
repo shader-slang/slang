@@ -276,7 +276,7 @@ keeping the same hidden binding contract.
 
 `uint32_t counters[N]` — flat little-endian array, no header. Indexed
 by `CoverageEntryInfo::counterIndex` / manifest `counter`. Saturates
-at ~4 × 10⁹ hits per slot (see _Current scope_).
+at ~4 × 10⁹ hits per slot (see [Current limitations](#current-limitations)).
 
 ---
 

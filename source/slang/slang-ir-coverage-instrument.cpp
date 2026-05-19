@@ -837,8 +837,7 @@ static bool resolveHumaneLoc(
         return false;
     outFile = humane.pathInfo.foundPath;
     outLine = (uint32_t)humane.line;
-    if (humane.column > 0)
-        outColumn = (uint32_t)humane.column;
+    outColumn = humane.column > 0 ? (uint32_t)humane.column : 0;
     return true;
 }
 

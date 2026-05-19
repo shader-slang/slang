@@ -12,22 +12,13 @@ SCRIPT = pathlib.Path(__file__).with_name("slang-coverage-to-lcov.py")
 
 
 class SlangCoverageToLcovTests(unittest.TestCase):
-    def test_reads_v1_manifest_without_version_field(self):
-        manifest = {
-            "binding": {"space": 0, "binding": 0},
-            "counters": 2,
-            "entries": [
-                {"index": 0, "file": "shader.slang", "line": 12},
-                {"index": 1, "file": "shader.slang", "line": 12},
-            ],
-        }
-
+    def run_converter(self, manifest, counters_text="", check=True):
         with tempfile.TemporaryDirectory() as td:
             td_path = pathlib.Path(td)
             manifest_path = td_path / "shader.coverage-mapping.json"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
-            result = subprocess.run(
+            return subprocess.run(
                 [
                     sys.executable,
                     str(SCRIPT),
@@ -38,11 +29,23 @@ class SlangCoverageToLcovTests(unittest.TestCase):
                     "--test-name",
                     "shader_coverage",
                 ],
-                input="5 7\n",
+                input=counters_text,
                 capture_output=True,
                 text=True,
-                check=True,
+                check=check,
             )
+
+    def test_reads_v1_manifest_without_version_field(self):
+        manifest = {
+            "binding": {"space": 0, "binding": 0},
+            "counters": 2,
+            "entries": [
+                {"index": 0, "file": "shader.slang", "line": 12},
+                {"index": 1, "file": "shader.slang", "line": 12},
+            ],
+        }
+
+        result = self.run_converter(manifest, "5 7\n")
 
         self.assertEqual(
             result.stdout,
@@ -65,27 +68,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             ],
         }
 
-        with tempfile.TemporaryDirectory() as td:
-            td_path = pathlib.Path(td)
-            manifest_path = td_path / "shader.coverage-mapping.json"
-            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--manifest",
-                    str(manifest_path),
-                    "--counters-text",
-                    "-",
-                    "--test-name",
-                    "shader_coverage",
-                ],
-                input="5 7 11\n",
-                capture_output=True,
-                text=True,
-                check=True,
-            )
+        result = self.run_converter(manifest, "5 7 11\n")
 
         self.assertEqual(
             result.stdout,
@@ -136,27 +119,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             ],
         }
 
-        with tempfile.TemporaryDirectory() as td:
-            td_path = pathlib.Path(td)
-            manifest_path = td_path / "shader.coverage-mapping.json"
-            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--manifest",
-                    str(manifest_path),
-                    "--counters-text",
-                    "-",
-                    "--test-name",
-                    "shader_coverage",
-                ],
-                input="5 7 11 13\n",
-                capture_output=True,
-                text=True,
-                check=True,
-            )
+        result = self.run_converter(manifest, "5 7 11 13\n")
 
         self.assertEqual(
             result.stdout,
@@ -174,30 +137,51 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "entries": [],
         }
 
-        with tempfile.TemporaryDirectory() as td:
-            td_path = pathlib.Path(td)
-            manifest_path = td_path / "shader.coverage-mapping.json"
-            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--manifest",
-                    str(manifest_path),
-                    "--counters-text",
-                    "-",
-                    "--test-name",
-                    "shader_coverage",
-                ],
-                input="",
-                capture_output=True,
-                text=True,
-                check=False,
-            )
+        result = self.run_converter(manifest, check=False)
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("error: unsupported manifest version 999", result.stderr)
+
+    def test_reports_malformed_manifest_counter_count(self):
+        manifest = {
+            "version": 2,
+            "counter_count": "not-an-int",
+            "entries": [],
+        }
+
+        result = self.run_converter(manifest, check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("error: manifest is missing a valid counter count", result.stderr)
+
+    def test_reports_missing_manifest_entries(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+        }
+
+        result = self.run_converter(manifest, "0\n", check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("error: manifest is missing 'entries'", result.stderr)
+
+    def test_reports_invalid_v2_line_entry(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "entries": [
+                {
+                    "kind": "line",
+                    "counter": 0,
+                    "file": "shader.slang",
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "0\n", check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("error: invalid v2 line entry in manifest", result.stderr)
 
 
 if __name__ == "__main__":

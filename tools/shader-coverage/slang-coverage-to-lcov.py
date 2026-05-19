@@ -71,10 +71,13 @@ def get_manifest_version(manifest):
 
 def get_manifest_counter_count(manifest):
     version = get_manifest_version(manifest)
-    if version == 1:
-        total = int(manifest["counters"])
-    else:
-        total = int(manifest["counter_count"])
+    try:
+        if version == 1:
+            total = int(manifest["counters"])
+        else:
+            total = int(manifest["counter_count"])
+    except (KeyError, TypeError, ValueError):
+        sys.exit("error: manifest is missing a valid counter count")
     if total < 0:
         sys.exit(f"error: manifest counter count must be non-negative, got {total}")
     return total
@@ -82,17 +85,29 @@ def get_manifest_counter_count(manifest):
 
 def iter_line_entries(manifest):
     version = get_manifest_version(manifest)
-    for entry in manifest["entries"]:
+    try:
+        entries = manifest["entries"]
+    except KeyError:
+        sys.exit("error: manifest is missing 'entries'")
+    if not isinstance(entries, list):
+        sys.exit("error: manifest entries must be an array")
+    for entry in entries:
         if version == 1:
-            yield entry["index"], entry.get("file"), int(entry["line"])
+            try:
+                yield int(entry["index"]), entry.get("file"), int(entry["line"])
+            except (AttributeError, KeyError, TypeError, ValueError):
+                sys.exit("error: invalid v1 entry in manifest")
             continue
         if version == 2:
-            if entry.get("kind", "line") != "line":
-                continue
-            counter = entry.get("counter")
-            if counter is None:
-                continue
-            yield int(counter), entry.get("file"), int(entry["line"])
+            try:
+                if entry.get("kind", "line") != "line":
+                    continue
+                counter = entry.get("counter")
+                if counter is None:
+                    continue
+                yield int(counter), entry.get("file"), int(entry["line"])
+            except (AttributeError, KeyError, TypeError, ValueError):
+                sys.exit("error: invalid v2 line entry in manifest")
             continue
 
 
