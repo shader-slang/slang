@@ -562,9 +562,15 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
                 outInfo->counterMode = slang::CoverageCounterMode::Count;
                 return SLANG_OK;
             }
-            SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo*)
+            SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
                 SLANG_OVERRIDE
             {
+                if (!outInfo)
+                    return SLANG_E_INVALID_ARG;
+                *outInfo = {};
+                outInfo->structSize = sizeof(slang::CoverageBufferInfo);
+                outInfo->space = -1;
+                outInfo->binding = -1;
                 return SLANG_OK;
             }
             SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE { return 1; }
@@ -601,9 +607,15 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
                 outInfo->counterMode = slang::CoverageCounterMode::Count;
                 return SLANG_OK;
             }
-            SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo*)
+            SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
                 SLANG_OVERRIDE
             {
+                if (!outInfo)
+                    return SLANG_E_INVALID_ARG;
+                *outInfo = {};
+                outInfo->structSize = sizeof(slang::CoverageBufferInfo);
+                outInfo->space = -1;
+                outInfo->binding = -1;
                 return SLANG_OK;
             }
             SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE { return 1; }

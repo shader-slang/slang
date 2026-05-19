@@ -69,13 +69,25 @@ def get_manifest_version(manifest):
     return version
 
 
+def parse_manifest_int(value, field_name):
+    if isinstance(value, bool):
+        sys.exit(f"error: manifest {field_name} must be an integer")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if text and text.lstrip("-").isdigit():
+            return int(text)
+    sys.exit(f"error: manifest {field_name} must be an integer")
+
+
 def get_manifest_counter_count(manifest):
     version = get_manifest_version(manifest)
     try:
         if version == 1:
-            total = int(manifest["counters"])
+            total = parse_manifest_int(manifest["counters"], "counter count")
         else:
-            total = int(manifest["counter_count"])
+            total = parse_manifest_int(manifest["counter_count"], "counter count")
     except (KeyError, TypeError, ValueError):
         sys.exit("error: manifest is missing a valid counter count")
     if total < 0:
@@ -94,7 +106,11 @@ def iter_line_entries(manifest):
     for entry in entries:
         if version == 1:
             try:
-                yield int(entry["index"]), entry.get("file"), int(entry["line"])
+                yield (
+                    parse_manifest_int(entry["index"], "v1 entry index"),
+                    entry.get("file"),
+                    parse_manifest_int(entry["line"], "v1 entry line"),
+                )
             except (AttributeError, KeyError, TypeError, ValueError):
                 sys.exit("error: invalid v1 entry in manifest")
             continue
@@ -105,7 +121,11 @@ def iter_line_entries(manifest):
                 counter = entry.get("counter")
                 if counter is None:
                     continue
-                yield int(counter), entry.get("file"), int(entry["line"])
+                yield (
+                    parse_manifest_int(counter, "v2 entry counter"),
+                    entry.get("file"),
+                    parse_manifest_int(entry["line"], "v2 entry line"),
+                )
             except (AttributeError, KeyError, TypeError, ValueError):
                 sys.exit("error: invalid v2 line entry in manifest")
             continue

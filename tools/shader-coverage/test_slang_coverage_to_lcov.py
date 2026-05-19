@@ -152,7 +152,44 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         result = self.run_converter(manifest, check=False)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("error: manifest is missing a valid counter count", result.stderr)
+        self.assertIn(
+            "error: manifest counter count must be an integer", result.stderr
+        )
+
+    def test_reports_non_integral_manifest_counter_count(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 1.9,
+            "entries": [],
+        }
+
+        result = self.run_converter(manifest, check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "error: manifest counter count must be an integer", result.stderr
+        )
+
+    def test_reports_boolean_v2_counter(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "entries": [
+                {
+                    "kind": "line",
+                    "counter": True,
+                    "file": "shader.slang",
+                    "line": 12,
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "0\n", check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "error: manifest v2 entry counter must be an integer", result.stderr
+        )
 
     def test_reports_missing_manifest_entries(self):
         manifest = {

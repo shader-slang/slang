@@ -978,6 +978,63 @@ SLANG_UNIT_TEST(vtableICoverageTracingMetadata)
 }
 
 // ---------------------------------------------------------------------------
+// ISyntheticResourceMetadata : ISlangCastable  (own slots 4-6)
+// ---------------------------------------------------------------------------
+struct ISyntheticResourceMetadataProbe : ISyntheticResourceMetadata
+{
+    int lastSlot = -1;
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const&, void**) SLANG_OVERRIDE
+    {
+        lastSlot = 0;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        lastSlot = 1;
+        return 1;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        lastSlot = 2;
+        return 1;
+    }
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID&) SLANG_OVERRIDE
+    {
+        lastSlot = 3;
+        return nullptr;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL getResourceCount() SLANG_OVERRIDE
+    {
+        lastSlot = 4;
+        return 0;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL getResourceInfo(uint32_t, SyntheticResourceInfo*)
+        SLANG_OVERRIDE
+    {
+        lastSlot = 5;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL findResourceIndexByID(uint32_t, uint32_t*) SLANG_OVERRIDE
+    {
+        lastSlot = 6;
+        return SLANG_OK;
+    }
+};
+
+SLANG_UNIT_TEST(vtableISyntheticResourceMetadata)
+{
+    ISyntheticResourceMetadataProbe p;
+    callSlot(&p, 3);
+    SLANG_CHECK(p.lastSlot == 3); // castAs
+    callSlot(&p, 4);
+    SLANG_CHECK(p.lastSlot == 4); // getResourceCount
+    callSlot(&p, 5);
+    SLANG_CHECK(p.lastSlot == 5); // getResourceInfo
+    callSlot(&p, 6);
+    SLANG_CHECK(p.lastSlot == 6); // findResourceIndexByID
+}
+
+// ---------------------------------------------------------------------------
 // ICompileResult : ISlangCastable  (own slots 4-6)
 // ---------------------------------------------------------------------------
 struct ICompileResultProbe : ICompileResult
