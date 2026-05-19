@@ -7259,19 +7259,10 @@ public property uint gl_NumSubgroups
 
 public property uint gl_SubgroupID
 {
+    [ForceInline]
     [require(glsl_spirv, subgroup_basic)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_SubgroupID)";
-        case spirv:
-            return spirv_asm {
-                        OpCapability GroupNonUniform;
-                        result:$$uint = OpLoad builtin(SubgroupId:uint);
-                    };
-        }
+        return WaveGetWaveIndex();
     }
 }
 
