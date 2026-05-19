@@ -9035,9 +9035,6 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
                     .location = context->parentDecl->loc});
                 return false;
             }
-            auto synthesizedVisibility =
-                getSynthesizedExtensionVisibility(getDeclVisibility(synStructDecl));
-            addVisibilityModifier(synFunc, synthesizedVisibility.memberVisibility);
             break;
         }
     case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
@@ -9166,14 +9163,6 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
             synFunc->operands.add(rematFuncDeclRef);
             synFunc->operands.add(bwdPropFnDeclRef);
 
-            auto synthesizedVisibility =
-                getSynthesizedExtensionVisibility(getDeclVisibility(context->parentDecl));
-            if (auto targetCallableDeclRef = declRefType->getDeclRef().as<CallableDecl>())
-            {
-                synthesizedVisibility = getSynthesizedExtensionVisibility(
-                    getDeclVisibility(targetCallableDeclRef.getDecl()));
-            }
-            addVisibilityModifier(synFunc, synthesizedVisibility.memberVisibility);
             break;
         }
     case BuiltinRequirementKind::BwdCallableRematFunc:
@@ -9192,6 +9181,18 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
     default:
         SLANG_UNEXPECTED("unknown builtin requirement kind for diff func synthesis.");
     }
+
+    DeclVisibility targetVis = getDeclVisibility(context->parentDecl);
+    if (auto extDecl = as<ExtensionDecl>(context->parentDecl))
+    {
+        if (auto drt = as<DeclRefType>(extDecl->targetType))
+            if (auto callable = drt->getDeclRef().as<FunctionDeclBase>())
+                targetVis = getDeclVisibility(callable.getDecl());
+    }
+    addVisibilityModifier(
+        synFunc,
+        getSynthesizedExtensionVisibility(targetVis).memberVisibility);
+
     synFunc->parentDecl = context->parentDecl;
 
     List<Expr*> synArgs;
