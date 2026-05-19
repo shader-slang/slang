@@ -2253,9 +2253,19 @@ struct TypeFlowSpecializationContext
         if (!structType)
             return none();
 
+        // `makeStruct` can be empty for aggregate zero-initialization (e.g. `T x = {};`).
+        // In that case there are no per-field operands to propagate info from.
         UIndex operandIndex = 0;
+        UInt operandCount = makeStruct->getOperandCount();
         for (auto field : structType->getFields())
         {
+            if (operandIndex >= operandCount)
+            {
+                // We expect missing operands only for aggregate zero-init (`T x = {}`),
+                // represented as a zero-operand makeStruct.
+                SLANG_ASSERT(operandCount == 0);
+                break;
+            }
             auto operand = makeStruct->getOperand(operandIndex);
             if (auto operandInfo = tryGetInfo(context, operand))
             {
@@ -6996,8 +7006,16 @@ struct TypeFlowSpecializationContext
         // Reinterpret any of the arguments as necessary.
         bool changed = false;
         UIndex operandIndex = 0;
+        UInt operandCount = inst->getOperandCount();
         for (auto field : structType->getFields())
         {
+            if (operandIndex >= operandCount)
+            {
+                // We expect missing operands only for aggregate zero-init (`T x = {}`),
+                // represented as a zero-operand makeStruct.
+                SLANG_ASSERT(operandCount == 0);
+                break;
+            }
             auto arg = inst->getOperand(operandIndex);
             IRBuilder builder(context);
             builder.setInsertBefore(inst);
