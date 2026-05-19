@@ -110,16 +110,28 @@ static SlangResult _addCUDAPrelude(const String& rootPath, slang::IGlobalSession
     return SLANG_OK;
 }
 
-// Gets the canonical path for exePath, falling back to /proc/self/exe on Linux
-// when exePath is just a bare command name (e.g., when invoked via PATH).
+// Gets the canonical path for exePath, falling back to the operating system's executable path
+// when exePath is just a bare command name. This happens when invoked via PATH on Linux, and also
+// when a Windows .exe is launched directly through WSL interop.
 static SlangResult _getCanonicalOrExecutablePath(const char* exePath, String& outPath)
 {
-    if (SLANG_SUCCEEDED(Path::getCanonical(exePath, outPath)))
+    if (exePath && Path::hasPath(UnownedStringSlice(exePath)) &&
+        SLANG_SUCCEEDED(Path::getCanonical(exePath, outPath)))
     {
+        // argv[0] already contains enough path information to resolve directly.
+        // Examples:
+        // - "./build/Debug/bin/slang-test" on Linux.
+        // - ".\\build\\Debug\\bin\\slang-test.exe" from cmd.exe.
+        // - "D:\\repo\\build\\Debug\\bin\\slang-test.exe".
         return SLANG_OK;
     }
-    // On Linux, when invoked via PATH, argv[0] is just the bare command name
-    // and realpath() fails. Fall back to /proc/self/exe.
+
+    // argv[0] is missing, only a file name, or could not be canonicalized. Ask the OS for the
+    // actual executable path instead.
+    // Examples:
+    // - "slang-test" when invoked via PATH on Linux.
+    // - "slang-test.exe" when launched directly from WSL as ./build/Debug/bin/slang-test.exe.
+    // - A stale symlink or otherwise non-resolvable path-like argv[0].
     outPath = Path::getExecutablePath();
     if (outPath.getLength() == 0)
     {
