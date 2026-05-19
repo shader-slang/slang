@@ -4902,7 +4902,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_SPIRVLoadDescriptorFromHeap:
             {
                 auto loadDesc = as<IRSPIRVLoadDescriptorFromHeap>(inst);
-                if (unwrapAttributedType(inst->getDataType())->getOp() == kIROp_RaytracingAccelerationStructureType)
+                if (unwrapAttributedType(inst->getDataType())->getOp() ==
+                    kIROp_RaytracingAccelerationStructureType)
                 {
                     result = emitAccelerationStructureFromDescriptorHeap(
                         parent,
@@ -7116,8 +7117,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         requireSPIRVAnyCapability({SpvCapabilityRayTracingKHR, SpvCapabilityRayQueryKHR});
         ensureAnyExtensionDeclaration(
-            {UnownedStringSlice("SPV_KHR_ray_tracing"),
-             UnownedStringSlice("SPV_KHR_ray_query")});
+            {UnownedStringSlice("SPV_KHR_ray_tracing"), UnownedStringSlice("SPV_KHR_ray_query")});
 
         IRBuilder builder(m_irModule);
         builder.setInsertInto(m_irModule->getModuleInst());
