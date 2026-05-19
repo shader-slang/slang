@@ -7114,8 +7114,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRInst* heap,
         IRInst* index)
     {
-        ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_tracing"));
-        requireSPIRVCapability(SpvCapabilityRayTracingKHR);
+        requireSPIRVAnyCapability({SpvCapabilityRayTracingKHR, SpvCapabilityRayQueryKHR});
+        ensureAnyExtensionDeclaration(
+            {UnownedStringSlice("SPV_KHR_ray_tracing"),
+             UnownedStringSlice("SPV_KHR_ray_query")});
 
         IRBuilder builder(m_irModule);
         builder.setInsertInto(m_irModule->getModuleInst());
