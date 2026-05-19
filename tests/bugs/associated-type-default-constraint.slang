@@ -1,10 +1,11 @@
-//TEST:SIMPLE: -target hlsl
+//TEST:INTERPRET(filecheck=CHECK):
 
 // Regression test for default generic type arguments that are associated types
 // with their own interface constraints.
 
 interface IData
 {
+    int getValue();
 }
 
 interface IElement
@@ -14,6 +15,10 @@ interface IElement
 
 struct FloatData : IData
 {
+    int getValue()
+    {
+        return 17;
+    }
 }
 
 struct FloatElement : IElement
@@ -31,6 +36,7 @@ FloatData gFunctionValue = getDefaultAssociatedType<FloatElement>();
 
 interface IBaz
 {
+    int getValue();
 }
 
 interface IBar
@@ -45,6 +51,10 @@ interface IFoo
 
 struct ConcreteBaz : IBaz
 {
+    int getValue()
+    {
+        return 23;
+    }
 }
 
 struct ConcreteBar : IBar
@@ -64,3 +74,12 @@ W getChainedDefaultAssociatedType()
 }
 
 ConcreteBaz gChainedFunctionValue = getChainedDefaultAssociatedType<ConcreteFoo>();
+
+void main()
+{
+    printf("%d\n", getDefaultAssociatedType<FloatElement>().getValue());
+    // CHECK: 17
+
+    printf("%d\n", getChainedDefaultAssociatedType<ConcreteFoo>().getValue());
+    // CHECK: 23
+}

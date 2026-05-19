@@ -2971,7 +2971,7 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
             ConversionCost outCost;
             specializedFuncDeclRef = visitor
                                          .trySolveConstraintSystem(
-                                             &system,
+                                             _Move(system),
                                              genericDeclRef,
                                              partiallyAppliedExpr->knownGenericArgs.getArrayView(),
                                              outCost)

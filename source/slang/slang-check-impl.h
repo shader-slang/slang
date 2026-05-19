@@ -760,6 +760,17 @@ struct SharedSemanticsContext : public RefObject
 
     Dictionary<Val*, VariadicPackCardinality> m_packCardinalityCache;
 
+    // Cache the generic parameter and witness slots structurally mentioned by a
+    // value. Generic default solving asks this question repeatedly across
+    // specializations of the same generic, and the answer does not depend on a
+    // particular solver instance; the solver later filters these declarations
+    // through its current relevance/readiness rules.
+    Dictionary<Val*, ShortList<Decl*>> m_genericSolverValDependencyCache;
+
+    // Empty dependency list returned for null values. Functions that return a
+    // `ShortList<Decl*>&` use this object so callers can iterate uniformly.
+    ShortList<Decl*> m_emptyGenericSolverValDependencies;
+
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
@@ -2676,10 +2687,11 @@ public:
         // substituting types.
         bool isEquality = false;
 
-        // True when this ordinary-argument constraint came from a generic parameter bound
-        // such as `<T : IFoo>`. Such constraints validate/default-shape an argument, but they
-        // should not by themselves make a default argument stop being treated as a default.
-        bool isGenericParamBound = false;
+        // True when this ordinary-argument constraint came from a generic parameter
+        // conformance requirement such as `<T : IFoo>`. Such constraints
+        // validate/default-shape an argument, but they should not by themselves
+        // make a default argument stop being treated as a default.
+        bool isGenericParamConformance = false;
 
         // Marks that `val` can depend on other constraints. E.g. `<T, U = T>`
         // `potentiallyDependent` constraints must occur after the constraints
@@ -2688,8 +2700,11 @@ public:
         bool potentiallyDependent = false;
     };
 
-    // A collection of constraints that will need to be satisfied (solved)
-    // in order for checking to succeed.
+    // The shared context used while semantic checking and unification gather
+    // evidence for a generic application. This is not the generic solver's work
+    // list: callers fill it before invoking `trySolveConstraintSystem`, and the
+    // solver reuses it as a temporary inbox when shared unification helpers
+    // discover more ordinary constraints.
     struct ConstraintSystem
     {
         // A source location to use in reporting any issues
@@ -2699,8 +2714,9 @@ public:
         // are trying to solve for.
         GenericDecl* genericDecl = nullptr;
 
-        // Constraints we have accumulated, which constrain
-        // the possible arguments for those parameters.
+        // Constraints accumulated by unification. The generic solver drains
+        // this temporary list into its work-item table, and later unification
+        // steps may append more constraints for the solver to drain again.
         List<Constraint> constraints;
 
         // Additional subtype witnesses available to the currentt constraint solving context.
@@ -2824,15 +2840,16 @@ public:
     Type* TryJoinTypes(ConstraintSystem* constraints, QualType left, QualType right);
 
     // Try to solve a system of generic constraints.
-    // The `system` argument provides the constraints.
-    // The `varSubst` argument provides the list of constraint
-    // variables that were created for the system.
+    // The `system` argument must be moved into the solver because solving
+    // mutates ordinary constraints, appends newly discovered constraints, and
+    // records type-promotion cost while finding the final substitution.
+    // Accepting an rvalue reference keeps this ownership transfer explicit and
+    // avoids copying the accumulated constraint list at the call boundary.
     //
-    // Returns a new declref to the inner decl of `genericDeclRef`,
-    // representing the specialized generic with the values
-    // we solved for along the way.
+    // Returns a new declref to the inner decl of `genericDeclRef`, representing
+    // the specialized generic with the values and witnesses solved along the way.
     DeclRef<Decl> trySolveConstraintSystem(
-        ConstraintSystem* system,
+        ConstraintSystem&& system,
         DeclRef<GenericDecl> genericDeclRef,
         ArrayView<Val*> knownGenericArgs,
         ConversionCost& outBaseCost);
@@ -3073,7 +3090,7 @@ public:
         Index indexInTypePack = 0;
         bool optionalConstraint = false;
         bool equalityConstraint = false;
-        bool genericParamBoundConstraint = false;
+        bool genericParamConformanceConstraint = false;
     };
 
     // Try to find a unification for two values
@@ -3680,34 +3697,33 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
     EndToEndCompileRequest* endToEndReq,
     List<RefPtr<ComponentType>>& outSpecializedEntryPoints);
 
-// Returns `false` if coerce fails.
+// Returns `false` if the constraint cannot be proved.
 // * `constraintDecl` is the constraint we need to satisfy
 // * `genericDeclRef` is the generic decl we are operating on
 // * `maybeContext` is the contect for our current operation. This variable must be filled if
 // `shouldEmitError == true`.
-// * `maybeConstrainedGenericParams` contains set of constrained params relative to `genericDeclRef`
-// and current context.
-//   This param is optional. Coercion `toType` and `fromType` will be added to the set if function
-//   succeeds.
 // * `args` are the current arguments relative to `genericDeclRef`.
-bool addTypeCoercionWitnessToArgs(
+// * `outWitness` receives the solved witness when the constraint is satisfied.
+bool findTypeCoercionWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
     TypeCoercionConstraintDecl* constraintDecl,
     DeclRef<GenericDecl> genericDeclRef,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
-    HashSet<Decl*>* maybeConstrainedGenericParams,
-    ShortList<Val*>& args,
+    ArrayView<Val*> args,
+    TypeCoercionWitness*& outWitness,
     bool shouldEmitError);
 
-bool addHasDiffTypeInfoWitnessToArgs(
+// Returns `false` if differentiation metadata cannot be proved for the
+// substituted constraint type, and otherwise writes the solved witness.
+bool findDiffTypeInfoWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
     HasDiffTypeInfoConstraintDecl* constraintDecl,
     DeclRef<GenericDecl> genericDeclRef,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
-    HashSet<Decl*>* maybeConstrainedGenericParams,
-    ShortList<Val*>& args,
+    ArrayView<Val*> args,
+    Witness*& outWitness,
     bool shouldEmitError);
 
 SourceLoc _getTypeNestingDiagnosticPosForDecl(Decl* decl);

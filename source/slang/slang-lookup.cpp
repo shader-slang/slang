@@ -472,6 +472,16 @@ static void _lookupMembersInSuperTypeFacets(
         {
             if (as<ThisTypeDecl>(parentDeclRef.getDecl()) && getText(name) == "This")
             {
+                if (auto declRefType = as<DeclRefType>(selfType))
+                {
+                    // An interface's own `This` declaration shadows the `This`
+                    // declarations that arrive through base-interface facets.
+                    // Returning an inherited `This.This` candidate here makes
+                    // plain `This` ambiguous in derived interfaces.
+                    if (declRefType->getDeclRef().as<InterfaceDecl>())
+                        continue;
+                }
+
                 // If we are going looking for `This` in a `ThisType`, we just need to return the
                 // declRef itself.
                 AddToLookupResult(ioResult, CreateLookupResultItem(parentDeclRef, inBreadcrumbs));
@@ -509,17 +519,6 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     BreadcrumbInfo* inBreadcrumbs)
 {
     auto semantics = request.semantics;
-    if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
-    {
-        if (name == astBuilder->getSharedASTBuilder()->getThisTypeName())
-        {
-            auto thisTypeDeclRef = astBuilder->getMemberDeclRef(
-                interfaceDeclRef,
-                interfaceDeclRef.getDecl()->getThisTypeDecl());
-            AddToLookupResult(ioResult, CreateLookupResultItem(thisTypeDeclRef, inBreadcrumbs));
-            return;
-        }
-    }
     if (!as<InterfaceDecl>(declRef.getDecl()) &&
         name == astBuilder->getSharedASTBuilder()->getThisTypeName())
     {

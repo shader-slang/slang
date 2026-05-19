@@ -15400,7 +15400,7 @@ DeclRef<ExtensionDecl> SemanticsVisitor::applyExtensionToType(
 
         ConversionCost baseCost;
         auto solvedDeclRef = trySolveConstraintSystem(
-            &constraints,
+            _Move(constraints),
             makeDeclRef(extGenericDecl),
             ArrayView<Val*>(),
             baseCost);
@@ -16785,7 +16785,7 @@ bool areTypesCompatibile(SemanticsVisitor* visitor, Type* fst, Type* snd)
 
             ConversionCost baseCost;
             if (!visitor->trySolveConstraintSystem(
-                    &constraints,
+                    _Move(constraints),
                     makeDeclRef(extGenericDecl),
                     ArrayView<Val*>(),
                     baseCost))

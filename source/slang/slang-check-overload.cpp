@@ -695,14 +695,21 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             knownGenericArgs.add(checkedArgs[ii]);
 
         ConstraintSystem constraints;
+        constraints.loc = context.loc;
+        constraints.genericDecl = genericDeclRef.getDecl();
         ConversionCost solverCost = kConversionCost_None;
         auto solvedDeclRef = trySolveConstraintSystem(
-            &constraints,
+            _Move(constraints),
             genericDeclRef,
             knownGenericArgs.getArrayView().arrayView,
             solverCost);
         if (!solvedDeclRef)
         {
+            candidate.subst = SubstitutionSet(
+                m_astBuilder->getGenericAppDeclRef(genericDeclRef, checkedArgs.getArrayView()));
+            if (!TryCheckOverloadCandidateConstraints(context, candidate))
+                return false;
+
             maybeReportGeneralError();
             return false;
         }
@@ -1171,16 +1178,18 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         }
         else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
         {
-            if (!addTypeCoercionWitnessToArgs(
+            TypeCoercionWitness* typeCoercionWitness = nullptr;
+            if (!findTypeCoercionWitnessForConstraint(
                     getASTBuilder(),
                     this,
                     typeCoercionConstraintDecl,
                     genericDeclRef,
                     &context,
-                    nullptr,
-                    newArgs,
+                    newArgs.getArrayView().arrayView,
+                    typeCoercionWitness,
                     context.mode != OverloadResolveContext::Mode::JustTrying))
                 return false;
+            newArgs.add(typeCoercionWitness);
         }
         else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
         {
@@ -1230,18 +1239,20 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         else if (
             auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
         {
-            if (!addHasDiffTypeInfoWitnessToArgs(
+            Witness* diffTypeInfoWitness = nullptr;
+            if (!findDiffTypeInfoWitnessForConstraint(
                     getASTBuilder(),
                     this,
                     hasDiffTypeInfoConstraintDecl,
                     genericDeclRef,
                     &context,
-                    nullptr,
-                    newArgs,
+                    newArgs.getArrayView().arrayView,
+                    diffTypeInfoWitness,
                     context.mode != OverloadResolveContext::Mode::JustTrying))
             {
                 return false;
             }
+            newArgs.add(diffTypeInfoWitness);
         }
     }
 
@@ -2706,7 +2717,11 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     // TODO(tfoley): We probably need to pass along the explicit arguments here,
     // so that the solver knows to accept those arguments as-is.
     //
-    return trySolveConstraintSystem(&constraints, genericDeclRef, knownGenericArgs, outBaseCost);
+    return trySolveConstraintSystem(
+        _Move(constraints),
+        genericDeclRef,
+        knownGenericArgs,
+        outBaseCost);
 }
 
 LookupResult SemanticsVisitor::lookupConstructorsInType(Type* type, Scope* sourceScope)
