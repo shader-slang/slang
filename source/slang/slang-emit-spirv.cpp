@@ -4902,7 +4902,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_SPIRVLoadDescriptorFromHeap:
             {
                 auto loadDesc = as<IRSPIRVLoadDescriptorFromHeap>(inst);
-                if (inst->getDataType()->getOp() == kIROp_RaytracingAccelerationStructureType)
+                if (unwrapAttributedType(inst->getDataType())->getOp() == kIROp_RaytracingAccelerationStructureType)
                 {
                     result = emitAccelerationStructureFromDescriptorHeap(
                         parent,
@@ -7128,7 +7128,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             SpvOpUntypedAccessChainKHR,
             ensureUntypedPointerType(SpvStorageClassUniformConstant),
             kResultID,
-            getDescriptorHeapBaseType(inst->getDataType()),
+            getDescriptorHeapBaseType(as<IRType>(unwrapAttributedType(inst->getDataType()))),
             heap,
             index);
         auto address = emitOpLoad(parent, nullptr, addressType, valuePtr);
