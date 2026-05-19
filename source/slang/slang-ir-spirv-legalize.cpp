@@ -24,6 +24,7 @@
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
+#include "slang-ir-wrap-cbuffer-element.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 #include "slang-rich-diagnostics.h"
@@ -2601,6 +2602,40 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             t->replaceUsesWith(lowered);
         }
 
+        // Translate ConstantBuffer<T> types used in the descriptor heap path.
+        // When ConstantBuffer<T>.Handle is accessed with spvDescriptorHeapEXT, the
+        // SPIRVLoadDescriptorFromHeap instruction has result type ConstantBuffer<T>.
+        // The SPIRV emit code expects buffer result types to be lowered to pointers,
+        // so replace ConstantBuffer<T> with Ptr<T, Uniform> here. Non-struct element
+        // types are wrapped earlier by wrapCBufferElementsForSPIRV, matching the
+        // treatment for traditionally-bound constant buffers.
+        // Note: ParameterBlock<T> is intentionally excluded because it does not conform
+        // to IOpaqueDescriptor and therefore cannot appear as a DescriptorHandle argument.
+        {
+            List<IRUniformParameterGroupType*> cbufferTypesToProcess;
+            for (auto globalInst : m_module->getGlobalInsts())
+            {
+                if (!as<IRConstantBufferType>(globalInst))
+                    continue;
+                auto t = as<IRUniformParameterGroupType>(globalInst);
+                if (t->hasUses())
+                    cbufferTypesToProcess.add(t);
+            }
+            for (auto t : cbufferTypesToProcess)
+            {
+                IRBuilder builder(m_sharedContext->m_irModule);
+                builder.setInsertBefore(t);
+                auto elementType = t->getElementType();
+                SLANG_ASSERT(as<IRStructType>(elementType));
+                builder.addDecorationIfNotExist(elementType, kIROp_SPIRVBlockDecoration);
+                t->replaceUsesWith(builder.getPtrType(
+                    elementType,
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::Uniform,
+                    t->getDataLayout()));
+            }
+        }
+
         // If older than spirv 1.4, we need more legalization steps due to lack of opcodes.
         if (!m_sharedContext->isSpirv14OrLater())
         {
@@ -2715,6 +2750,21 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 };
+
+class SPIRVWrapCBufferElementPolicy : public WrapCBufferElementPolicy
+{
+public:
+    bool shouldWrapBufferElementInStruct(IRParameterGroupType* cbufferType) override
+    {
+        return !as<IRStructType>(cbufferType->getElementType());
+    }
+};
+
+static void wrapCBufferElementsForSPIRV(IRModule* module)
+{
+    SPIRVWrapCBufferElementPolicy policy = {};
+    wrapCBufferElements(module, &policy);
+}
 
 SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic)
 {
@@ -2981,6 +3031,7 @@ void legalizeIRForSPIRV(
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(entryPoints);
+    wrapCBufferElementsForSPIRV(module);
     legalizeSPIRV(context, module, codeGenContext);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
 
