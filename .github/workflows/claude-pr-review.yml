@@ -189,6 +189,9 @@ jobs:
           show-debug-output: ${{ (vars.SLANG_CLAUDE_DEBUG_ENV == '1' || vars.SLANG_CLAUDE_DEBUG_ENV == 'true') && 'true' || 'false' }}
           # Allow fork PRs. Safe: base-only checkout, COMMENT-only tools, bot approval dismissal.
           allowed-non-write-users: "*"
+          # Allow nv-slang-bot to trigger reviews (e.g. when it pushes commits to a PR).
+          # Reviews are still safe: base-only checkout + COMMENT-only tools regardless of actor.
+          allowed-bots: "nv-slang-bot"
           nv-inference-opus-model: ${{ vars.CLAUDE_NV_OPUS_MODEL }}
           nv-inference-sonnet-model: ${{ vars.CLAUDE_NV_SONNET_MODEL }}
           nv-inference-haiku-model: ${{ vars.CLAUDE_NV_HAIKU_MODEL }}
