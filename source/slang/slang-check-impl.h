@@ -2676,6 +2676,11 @@ public:
         // substituting types.
         bool isEquality = false;
 
+        // True when this ordinary-argument constraint came from a generic parameter bound
+        // such as `<T : IFoo>`. Such constraints validate/default-shape an argument, but they
+        // should not by themselves make a default argument stop being treated as a default.
+        bool isGenericParamBound = false;
+
         // Marks that `val` can depend on other constraints. E.g. `<T, U = T>`
         // `potentiallyDependent` constraints must occur after the constraints
         // that they depend on, otherwise results may be invalid as the prior
@@ -3068,6 +3073,7 @@ public:
         Index indexInTypePack = 0;
         bool optionalConstraint = false;
         bool equalityConstraint = false;
+        bool genericParamBoundConstraint = false;
     };
 
     // Try to find a unification for two values

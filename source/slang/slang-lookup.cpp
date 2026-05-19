@@ -509,6 +509,17 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     BreadcrumbInfo* inBreadcrumbs)
 {
     auto semantics = request.semantics;
+    if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
+    {
+        if (name == astBuilder->getSharedASTBuilder()->getThisTypeName())
+        {
+            auto thisTypeDeclRef = astBuilder->getMemberDeclRef(
+                interfaceDeclRef,
+                interfaceDeclRef.getDecl()->getThisTypeDecl());
+            AddToLookupResult(ioResult, CreateLookupResultItem(thisTypeDeclRef, inBreadcrumbs));
+            return;
+        }
+    }
     if (!as<InterfaceDecl>(declRef.getDecl()) &&
         name == astBuilder->getSharedASTBuilder()->getThisTypeName())
     {

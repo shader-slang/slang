@@ -217,6 +217,51 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
                         return type;
                 }
             }
+            if (auto typeDeclRefType = as<DeclRefType>(type))
+            {
+                // A generic parameter may not have inheritance facets of its
+                // own, but its where-clause bounds are still evidence.  When
+                // `InArray : IArrayAccessor<V>` is compared against
+                // `IArrayAccessor<U>`, unifying the two interface shapes gives
+                // the generic solver the missing ordinary constraint `U = V`.
+                if (auto typeParamDecl =
+                        as<GenericTypeParamDeclBase>(typeDeclRefType->getDeclRef().getDecl()))
+                {
+                    if (auto genericDecl = as<GenericDecl>(typeParamDecl->parentDecl))
+                    {
+                        if (!isRelevantGeneric(*constraints, genericDecl))
+                        {
+                            for (auto member : genericDecl->getDirectMemberDecls())
+                            {
+                                auto boundDecl = as<GenericTypeConstraintDecl>(member);
+                                if (!boundDecl)
+                                    continue;
+
+                                auto boundDeclRef = createDefaultSubstitutionsIfNeeded(
+                                                        m_astBuilder,
+                                                        this,
+                                                        boundDecl->getDefaultDeclRef())
+                                                        .as<GenericTypeConstraintDecl>();
+                                if (!boundDeclRef)
+                                    continue;
+
+                                auto boundSub = getSub(m_astBuilder, boundDeclRef);
+                                auto boundSup = getSup(m_astBuilder, boundDeclRef);
+                                if (!boundSub || !boundSup || !boundSub->equals(type))
+                                    continue;
+
+                                auto unificationResult = TryUnifyTypes(
+                                    *constraints,
+                                    ValUnificationContext(),
+                                    QualType(boundSup),
+                                    interfaceType);
+                                if (unificationResult)
+                                    return type;
+                            }
+                        }
+                    }
+                }
+            }
             if (constraints->subTypeForAdditionalWitnesses)
             {
                 for (auto witnessKV : *constraints->additionalSubtypeWitnesses)
@@ -503,6 +548,7 @@ struct SolvedArg
 {
     Val* val = nullptr;
     SemanticsVisitor::ConstraintPriority priority = SemanticsVisitor::ConstraintPriority::Default;
+    bool hasNonDefaultNonBoundConstraint = false;
     ShortList<QualType, 8> types;
 };
 
@@ -628,707 +674,1520 @@ bool constraintSystemSolverUnpackArgs(
     return true;
 }
 
+Val* tryGetDefaultGenericArgVal(SemanticsVisitor* visitor, Decl* paramDecl)
+{
+    // Type defaults have already been checked as type syntax, so the stored type
+    // is the generic argument value that the solver will replay.
+    if (auto typeParam = as<GenericTypeParamDecl>(paramDecl))
+    {
+        return typeParam->initType.type;
+    }
+    else if (auto valParam = as<GenericValueParamDecl>(paramDecl))
+    {
+        // Value defaults live as expressions until generic solving needs an
+        // `IntVal`; a missing initializer simply means there is no default.
+        if (!valParam->initExpr)
+            return nullptr;
+
+        // Default expressions can refer back into generic state, so use the same
+        // constant-folding circularity guard as the rest of semantic checking.
+        SemanticsVisitor::ConstantFoldingCircularityInfo newCircularityInfo(
+            makeDeclRef(paramDecl),
+            nullptr);
+        return visitor->ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo);
+    }
+    return nullptr;
+}
+
+DeclRefIntVal* getDeclRefIntValUnderCast(IntVal* intVal)
+{
+    // Integer generic arguments can be wrapped in a type cast.  Unification
+    // peels that cast so both sides can expose the same parameter reference.
+    if (const auto castIntVal = as<TypeCastIntVal>(intVal))
+        intVal = as<IntVal>(castIntVal->getBase());
+
+    // Concrete integer values were handled before this helper is called, so the
+    // only useful answer here is a value-parameter reference.
+    return as<DeclRefIntVal>(intVal);
+}
+
+class GenericConstraintSystemSolver
+{
+public:
+    using Constraint = SemanticsVisitor::Constraint;
+    using ConstraintPriority = SemanticsVisitor::ConstraintPriority;
+    using ConstraintSystem = SemanticsVisitor::ConstraintSystem;
+    using ValUnificationContext = SemanticsVisitor::ValUnificationContext;
+
+    struct SolverWorkItem
+    {
+        enum class Kind
+        {
+            OrdinaryConstraint,
+            DefaultArg,
+            Witness,
+        };
+
+        Kind kind = Kind::OrdinaryConstraint;
+        GenericDecl* genericDecl = nullptr;
+        Decl* decl = nullptr;
+        Index constraintIndex = -1;
+        Val* val = nullptr;
+    };
+
+    enum class WorkResult
+    {
+        Done,
+        Solved,
+        Blocked,
+        Failed,
+    };
+
+    GenericConstraintSystemSolver(
+        SemanticsVisitor* visitor,
+        ConstraintSystem* system,
+        DeclRef<GenericDecl> genericDeclRef,
+        ArrayView<Val*> knownGenericArgs,
+        ConversionCost& outBaseCost)
+        : m_visitor(visitor)
+        , m_astBuilder(visitor->getASTBuilder())
+        , m_system(system)
+        , m_genericDeclRef(genericDeclRef)
+        , m_knownGenericArgs(knownGenericArgs)
+        , m_knownGenericArgCount(knownGenericArgs.getCount())
+        , m_outBaseCost(outBaseCost)
+    {
+    }
+
+    DeclRef<Decl> solve()
+    {
+        // The solver is deliberately split into two phases.  First it gathers
+        // every ordinary argument constraint, default argument, and implicit
+        // witness requirement into one list of work items.
+        m_outBaseCost = kConversionCost_None;
+        if (!collectConstraints())
+            return DeclRef<Decl>();
+
+        // The second phase is a single work-list loop.  Each work item either
+        // fills a parameter slot, fills a witness slot, or blocks until another
+        // slot is available.  Any solved slot wakes the blocked items so types,
+        // values, defaults, and witnesses are discovered together.
+        if (!runWorkList())
+            return DeclRef<Decl>();
+
+        // Once the loop is quiet, every required ordinary constraint and every
+        // hidden witness slot must have an answer.  We then serialize those slot
+        // answers back into the generic argument order expected by decl refs.
+        if (!verifyOrdinaryConstraintsSatisfied())
+            return DeclRef<Decl>();
+        if (!rebuildArgsFromCurrentAnswers(false))
+            return DeclRef<Decl>();
+
+        // The final cost mirrors the previous solver: unconstrained generic
+        // parameters are less specific, and witness/type-promotion work
+        // contributes to overload ranking.
+        addUnconstrainedGenericParamCost();
+        m_outBaseCost += m_system->typePromotionCost + m_finalWitnessCost;
+
+        return getSubstDeclRef(m_genericDeclRef.getDecl()->inner);
+    }
+
+private:
+    bool collectConstraints()
+    {
+        // Generic substitutions are nested, so the solver starts by recording the
+        // chain from the outermost generic to the generic being applied.
+        collectGenericDeclChain();
+
+        // Bounds still provide useful shape information for legacy cases such
+        // as `This`-based interface members.  They enter the work list as
+        // ordinary hints, while their real validity is checked by the witness
+        // items collected below.
+        if (!collectGenericParamBoundConstraints())
+            return false;
+
+        // The constraint system already contains inference facts collected by
+        // argument/parameter unification.  Each one becomes a work item that can
+        // fill a type or value parameter slot.
+        collectOrdinaryConstraintsFrom(0);
+
+        // Defaults and where-clauses are collected after ordinary constraints,
+        // but they are not solved in a later phase.  They are simply more work
+        // items in the same loop.
+        collectGenericMemberWorkItems();
+        return true;
+    }
+
+    void collectGenericDeclChain()
+    {
+        for (auto genericDecl = m_genericDeclRef.getDecl(); genericDecl;
+             genericDecl = as<GenericDecl>(genericDecl->parentDecl))
+        {
+            m_genericDecls.add(genericDecl);
+        }
+        m_genericDecls.reverse();
+    }
+
+    bool collectGenericParamBoundConstraints()
+    {
+        for (auto genericDeclRef = m_genericDeclRef; genericDeclRef;
+             genericDeclRef = genericDeclRef.getParent().as<GenericDecl>())
+        {
+            for (auto constraintDeclRef :
+                 getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef))
+            {
+                ValUnificationContext ctx;
+                ctx.optionalConstraint =
+                    constraintDeclRef.getDecl()->hasModifier<OptionalConstraintModifier>();
+                ctx.equalityConstraint = constraintDeclRef.getDecl()->isEqualityConstraint;
+                ctx.genericParamBoundConstraint = true;
+
+                if (!m_visitor->TryUnifyTypes(
+                        *m_system,
+                        ctx,
+                        getSub(m_astBuilder, constraintDeclRef),
+                        getSup(m_astBuilder, constraintDeclRef)))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    void collectOrdinaryConstraintsFrom(Index firstConstraintIndex)
+    {
+        for (Index constraintIndex = firstConstraintIndex;
+             constraintIndex < m_system->constraints.getCount();
+             constraintIndex++)
+        {
+            SolverWorkItem workItem;
+            workItem.kind = SolverWorkItem::Kind::OrdinaryConstraint;
+            workItem.constraintIndex = constraintIndex;
+            addWorkItem(workItem);
+        }
+        m_collectedConstraintCount = m_system->constraints.getCount();
+    }
+
+    void collectGenericMemberWorkItems()
+    {
+        for (auto genericDecl : m_genericDecls)
+            collectGenericMemberWorkItems(genericDecl);
+    }
+
+    void collectGenericMemberWorkItems(GenericDecl* genericDecl)
+    {
+        for (auto member : genericDecl->getDirectMemberDecls())
+        {
+            if (isDefaultableParam(member))
+                addDefaultArgWorkItem(genericDecl, member);
+            else if (isImplicitWitnessConstraint(member))
+                addWitnessWorkItem(genericDecl, member);
+        }
+    }
+
+    bool isDefaultableParam(Decl* member)
+    {
+        if (as<GenericTypePackParamDecl>(member) || as<GenericValuePackParamDecl>(member))
+            return false;
+        return as<GenericTypeParamDecl>(member) || as<GenericValueParamDecl>(member);
+    }
+
+    bool isImplicitWitnessConstraint(Decl* member)
+    {
+        return as<GenericTypeConstraintDecl>(member) || as<TypeCoercionConstraintDecl>(member) ||
+               as<NonEmptyPackConstraintDecl>(member) || as<HasDiffTypeInfoConstraintDecl>(member);
+    }
+
+    void addDefaultArgWorkItem(GenericDecl* genericDecl, Decl* paramDecl)
+    {
+        Val* defaultVal = tryGetDefaultGenericArgVal(m_visitor, paramDecl);
+        if (!defaultVal)
+            return;
+
+        SolverWorkItem workItem;
+        workItem.kind = SolverWorkItem::Kind::DefaultArg;
+        workItem.genericDecl = genericDecl;
+        workItem.decl = paramDecl;
+        workItem.val = defaultVal;
+        m_defaultArgWorkItemIndexByDecl[paramDecl] = m_solverWorkItems.getCount();
+        addWorkItem(workItem);
+    }
+
+    void addWitnessWorkItem(GenericDecl* genericDecl, Decl* constraintDecl)
+    {
+        SolverWorkItem workItem;
+        workItem.kind = SolverWorkItem::Kind::Witness;
+        workItem.genericDecl = genericDecl;
+        workItem.decl = constraintDecl;
+        m_witnessWorkItemIndexByDecl[constraintDecl] = m_solverWorkItems.getCount();
+        addWorkItem(workItem);
+    }
+
+    void addWorkItem(SolverWorkItem const& workItem)
+    {
+        Index itemIndex = m_solverWorkItems.getCount();
+        m_solverWorkItems.add(workItem);
+        m_workItemDone.add(0);
+        m_workItemQueued.add(0);
+        enqueueWorkItem(itemIndex);
+    }
+
+    void enqueueWorkItem(Index itemIndex)
+    {
+        if (m_workItemDone[itemIndex] || m_workItemQueued[itemIndex])
+            return;
+        m_workItemQueued[itemIndex] = 1;
+        m_workList.add(itemIndex);
+    }
+
+    void wakeWorkItems()
+    {
+        for (Index itemIndex = 0; itemIndex < m_solverWorkItems.getCount(); itemIndex++)
+        {
+            m_workItemDone[itemIndex] = 0;
+            enqueueWorkItem(itemIndex);
+        }
+    }
+
+    bool runWorkList()
+    {
+        // The work list is intentionally not split by answer kind.  A default
+        // that needs a witness simply blocks, and the witness constraint is free
+        // to run next.  Conversely, a witness that needs a defaulted type blocks
+        // until that type slot receives an answer.
+        while (m_workListReadIndex < m_workList.getCount())
+        {
+            Index itemIndex = m_workList[m_workListReadIndex++];
+            m_workItemQueued[itemIndex] = 0;
+
+            if (m_workItemDone[itemIndex])
+                continue;
+
+            WorkResult result = tryApplyWorkItem(itemIndex);
+            if (result == WorkResult::Failed)
+                return false;
+            if (result == WorkResult::Blocked)
+                continue;
+
+            m_workItemDone[itemIndex] = 1;
+            if (result == WorkResult::Solved)
+                wakeWorkItems();
+        }
+
+        // If the queue drained while an item remained unsolved, then all
+        // remaining work is waiting on slots that never acquired answers.
+        for (Index itemIndex = 0; itemIndex < m_solverWorkItems.getCount(); itemIndex++)
+        {
+            if (!m_workItemDone[itemIndex])
+                return false;
+        }
+        return true;
+    }
+
+    WorkResult tryApplyWorkItem(Index itemIndex)
+    {
+        auto const& workItem = m_solverWorkItems[itemIndex];
+        switch (workItem.kind)
+        {
+        case SolverWorkItem::Kind::OrdinaryConstraint:
+            return applyOrdinaryConstraint(workItem);
+        case SolverWorkItem::Kind::DefaultArg:
+            return applyDefaultArg(workItem);
+        case SolverWorkItem::Kind::Witness:
+            return applyWitness(workItem);
+        }
+        return WorkResult::Failed;
+    }
+
+    WorkResult applyOrdinaryConstraint(SolverWorkItem const& workItem)
+    {
+        if (workItem.constraintIndex < 0 ||
+            workItem.constraintIndex >= m_system->constraints.getCount())
+            return WorkResult::Failed;
+
+        Constraint c = m_system->constraints[workItem.constraintIndex];
+        if (c.satisfied)
+            return WorkResult::Done;
+        if (c.isGenericParamBound && !c.isEquality)
+            return applyGenericParamBoundConstraint(workItem, c);
+        if (hasBlockersForVal(c.val, c.decl))
+            return WorkResult::Blocked;
+
+        if (!rebuildArgsFromCurrentAnswers(true))
+            return WorkResult::Failed;
+        if (!substitutePotentiallyDependentConstraint(c))
+            return WorkResult::Failed;
+
+        bool succeeded = true;
+        if (auto typeParam = as<GenericTypeParamDeclBase>(c.decl))
+        {
+            succeeded = processTypeParamConstraint(c, typeParam);
+        }
+        else if (auto valPackParam = as<GenericValuePackParamDecl>(c.decl))
+        {
+            succeeded = processValuePackParamConstraint(c, valPackParam);
+        }
+        else if (auto valParam = as<GenericValueParamDecl>(c.decl))
+        {
+            succeeded = processValueParamConstraint(c, valParam);
+        }
+
+        if (!succeeded)
+            return WorkResult::Failed;
+
+        m_system->constraints[workItem.constraintIndex].satisfied = c.satisfied;
+        if (m_collectedConstraintCount < m_system->constraints.getCount())
+            collectOrdinaryConstraintsFrom(m_collectedConstraintCount);
+        return WorkResult::Solved;
+    }
+
+    WorkResult applyGenericParamBoundConstraint(SolverWorkItem const& workItem, Constraint& c)
+    {
+        // A subtype bound is not an answer for the parameter it mentions.  It is
+        // an edge that becomes informative after the subject slot has an answer:
+        // `InputArray : IArrayAccessor<U>` can then compare the known
+        // `InputArray` against that interface shape and may discover `U`.
+        if (isSelfReferenceKnownGenericArg(c.decl))
+        {
+            c.satisfied = true;
+            m_system->constraints[workItem.constraintIndex].satisfied = true;
+            return WorkResult::Done;
+        }
+        if (!hasConcreteSubjectForGenericParamBound(c.decl))
+            return WorkResult::Blocked;
+
+        // The interface side of the bound is allowed to mention parameters that
+        // this same bound is trying to infer.  Rebuilding with placeholders keeps
+        // those references visible to `TryJoinTypes`, which can add the real
+        // ordinary constraints when it recognizes an existing generic witness.
+        if (!rebuildArgsFromCurrentAnswers(true))
+            return WorkResult::Failed;
+        if (!substitutePotentiallyDependentConstraint(c))
+            return WorkResult::Failed;
+
+        Count oldConstraintCount = m_system->constraints.getCount();
+        bool succeeded = true;
+        if (auto typeParam = as<GenericTypeParamDeclBase>(c.decl))
+            succeeded = processTypeParamConstraint(c, typeParam);
+        else if (auto valPackParam = as<GenericValuePackParamDecl>(c.decl))
+            succeeded = processValuePackParamConstraint(c, valPackParam);
+        else if (auto valParam = as<GenericValueParamDecl>(c.decl))
+            succeeded = processValueParamConstraint(c, valParam);
+
+        // Bound-shape failures are left to the witness item, which can produce
+        // the actual proof or fail the specialization.  The ordinary bound item
+        // only exists to contribute any inference that falls out of comparing
+        // generic interface arguments.
+        m_system->constraints[workItem.constraintIndex].satisfied = c.satisfied;
+        if (m_collectedConstraintCount < m_system->constraints.getCount())
+            collectOrdinaryConstraintsFrom(m_collectedConstraintCount);
+        if (!succeeded && oldConstraintCount == m_system->constraints.getCount())
+        {
+            m_system->constraints[workItem.constraintIndex].satisfied = true;
+            return WorkResult::Done;
+        }
+        return WorkResult::Solved;
+    }
+
+    bool isSelfReferenceKnownGenericArg(Decl* paramDecl)
+    {
+        // Default substitutions sometimes pass a parameter back as its own
+        // argument so later code can keep a complete generic-argument list.
+        // That placeholder is useful for shape, but it is not evidence that
+        // the parameter has been inferred.
+        Val* knownArg = nullptr;
+        if (!tryGetKnownGenericArg(paramDecl, knownArg, true))
+            return false;
+        return isSelfReferencePlaceholder(paramDecl, knownArg);
+    }
+
+    bool hasConcreteSubjectForGenericParamBound(Decl* paramDecl)
+    {
+        // Bound inference needs a real subject type, not the declaration-shaped
+        // placeholder used to keep partial substitutions well formed.  A known
+        // explicit argument, an ordinary solved slot, or an already-reduced
+        // default is concrete enough to compare against the bound interface.
+        Val* knownArg = nullptr;
+        if (tryGetKnownGenericArg(paramDecl, knownArg))
+            return true;
+        if (hasConcreteSolvedArg(paramDecl))
+            return true;
+        return m_defaultArgValues.containsKey(paramDecl);
+    }
+
+    WorkResult applyDefaultArg(SolverWorkItem const& workItem)
+    {
+        if (isKnownGenericArg(workItem.decl) || hasNonDefaultNonBoundConstraint(workItem.decl))
+            return WorkResult::Done;
+        if (hasBlockersForVal(workItem.val))
+            return WorkResult::Blocked;
+        if (!rebuildArgsFromCurrentAnswers(true))
+            return WorkResult::Failed;
+
+        auto fullSubst = SubstitutionSet(getSubstDeclRef(m_genericDeclRef.getDecl()->inner));
+        int diff = 0;
+        auto substArg = workItem.val->substituteImpl(m_astBuilder, fullSubst, &diff);
+        if (!substArg)
+            return WorkResult::Failed;
+
+        substArg = substArg->resolve();
+        if (auto substArgType = as<Type>(substArg))
+            substArg = substArgType->getCanonicalType();
+
+        Val* oldArg = nullptr;
+        if (m_defaultArgValues.tryGetValue(workItem.decl, oldArg) && oldArg->equals(substArg))
+            return WorkResult::Done;
+
+        m_defaultArgValues[workItem.decl] = substArg;
+        return WorkResult::Solved;
+    }
+
+    WorkResult applyWitness(SolverWorkItem const& workItem)
+    {
+        if (hasBlockersForWitness(workItem.decl))
+            return WorkResult::Blocked;
+        if (!rebuildArgsFromCurrentAnswers(true))
+            return WorkResult::Failed;
+
+        Val* oldWitnessArg = nullptr;
+        bool hadOldWitnessArg = m_witnessArgValues.tryGetValue(workItem.decl, oldWitnessArg);
+        if (!appendImplicitWitnessArg(workItem.genericDecl, workItem.decl))
+            return WorkResult::Failed;
+
+        Val* newWitnessArg = nullptr;
+        if (!m_witnessArgValues.tryGetValue(workItem.decl, newWitnessArg))
+            return WorkResult::Failed;
+        if (hadOldWitnessArg && oldWitnessArg->equals(newWitnessArg))
+            return WorkResult::Done;
+
+        return WorkResult::Solved;
+    }
+
+    bool substitutePotentiallyDependentConstraint(Constraint& c)
+    {
+        if (!c.potentiallyDependent)
+            return true;
+
+        // Potentially dependent ordinary constraints are replayed through the
+        // current partial substitution.  The work-list blocker check has already
+        // ensured that any parameter or witness mentioned by `c.val` has an
+        // answer, so this substitution can turn projections like `T.A` into
+        // the concrete value that should constrain the target slot.
+        auto genSubst = m_astBuilder->getGenericAppDeclRef(
+            m_genericDeclRef,
+            m_args[c.decl->parentDecl].getArrayView().arrayView);
+        auto newVal = c.val->substitute(m_astBuilder, SubstitutionSet(genSubst));
+        if (newVal)
+            c.val = newVal;
+        return true;
+    }
+
+    bool processTypeParamConstraint(Constraint& c, GenericTypeParamDeclBase* typeParam)
+    {
+        SLANG_ASSERT(typeParam->parameterIndex != -1);
+
+        if (isKnownGenericArg(typeParam))
+        {
+            c.satisfied = true;
+            return true;
+        }
+
+        bool isPack = as<GenericTypePackParamDecl>(typeParam) != nullptr;
+        if (m_solvedArgs[typeParam->parentDecl].getCount() <= typeParam->parameterIndex)
+            m_solvedArgs[typeParam->parentDecl].setCount(typeParam->parameterIndex + 1);
+
+        auto& solvedArg = m_solvedArgs[typeParam->parentDecl][typeParam->parameterIndex];
+        markNonDefaultNonBoundConstraint(solvedArg, c);
+        auto& types = solvedArg.types;
+        if (!isPack)
+            types.setCount(1);
+
+        QualType* ptype = nullptr;
+        if (isPack)
+        {
+            types.setCount(Math::Max(types.getCount(), c.indexInPack + 1));
+            ptype = &types[c.indexInPack];
+        }
+        else
+        {
+            ptype = &types[0];
+        }
+
+        QualType& type = *ptype;
+        auto cType = QualType(as<Type>(c.val), c.isUsedAsLValue);
+        SLANG_RELEASE_ASSERT(cType);
+
+        if (!type)
+        {
+            if (c.isGenericParamBound && !c.isEquality)
+            {
+                c.satisfied = true;
+                return true;
+            }
+            type = cType;
+            solvedArg.priority = c.priority;
+        }
+        else if (!mergeTypeConstraint(type, solvedArg.priority, c, cType))
+        {
+            if (!c.isGenericParamBound)
+                return false;
+        }
+
+        if (c.priority < solvedArg.priority)
+            solvedArg.priority = c.priority;
+
+        c.satisfied = true;
+        return true;
+    }
+
+    bool mergeTypeConstraint(
+        QualType& ioType,
+        ConstraintPriority currentPriority,
+        Constraint const& c,
+        QualType cType)
+    {
+        auto joinType = m_visitor->TryJoinTypes(m_system, ioType, cType);
+        if (!joinType)
+        {
+            if (c.priority < currentPriority)
+                joinType = cType;
+            else if (c.priority > currentPriority)
+                joinType = ioType;
+            else if (c.isEquality)
+                joinType = ioType;
+            else
+                return false;
+        }
+
+        ioType = QualType(joinType, ioType.isLeftValue || cType.isLeftValue);
+        return true;
+    }
+
+    bool processValuePackParamConstraint(Constraint& c, GenericValuePackParamDecl* valPackParam)
+    {
+        SLANG_ASSERT(valPackParam->parameterIndex != -1);
+
+        if (isKnownGenericArg(valPackParam))
+        {
+            c.satisfied = true;
+            return true;
+        }
+
+        if (m_solvedArgs[valPackParam->parentDecl].getCount() <= valPackParam->parameterIndex)
+            m_solvedArgs[valPackParam->parentDecl].setCount(valPackParam->parameterIndex + 1);
+
+        auto& solvedArg = m_solvedArgs[valPackParam->parentDecl][valPackParam->parameterIndex];
+        markNonDefaultNonBoundConstraint(solvedArg, c);
+        Val*& val = solvedArg.val;
+
+        if (auto cValPack = as<ConcreteIntValPack>(c.val))
+        {
+            if (!val)
+                val = cValPack;
+        }
+        else if (auto declRefIntVal = as<DeclRefIntVal>(c.val))
+        {
+            if (!val)
+                val = declRefIntVal;
+        }
+
+        c.satisfied = true;
+        return true;
+    }
+
+    bool processValueParamConstraint(Constraint& c, GenericValueParamDecl* valParam)
+    {
+        SLANG_ASSERT(valParam->parameterIndex != -1);
+
+        if (isKnownGenericArg(valParam))
+        {
+            c.satisfied = true;
+            return true;
+        }
+
+        if (m_solvedArgs[valParam->parentDecl].getCount() <= valParam->parameterIndex)
+            m_solvedArgs[valParam->parentDecl].setCount(valParam->parameterIndex + 1);
+
+        auto& solvedArg = m_solvedArgs[valParam->parentDecl][valParam->parameterIndex];
+        markNonDefaultNonBoundConstraint(solvedArg, c);
+        Val*& val = solvedArg.val;
+        ConstraintPriority& valPriority = solvedArg.priority;
+
+        auto cVal = as<IntVal>(c.val);
+        SLANG_RELEASE_ASSERT(cVal);
+
+        if (!val || (c.priority < valPriority))
+        {
+            val = cVal;
+            valPriority = c.priority;
+        }
+        else if (valPriority == c.priority && !val->equals(cVal))
+        {
+            return false;
+        }
+
+        c.satisfied = true;
+        return true;
+    }
+
+    void markNonDefaultNonBoundConstraint(SolvedArg& solvedArg, Constraint const& c)
+    {
+        if (c.priority != ConstraintPriority::Default && !c.isGenericParamBound)
+            solvedArg.hasNonDefaultNonBoundConstraint = true;
+    }
+
+    bool hasBlockersForWitness(Decl* constraintDecl)
+    {
+        if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
+        {
+            return hasBlockersForVal(genericTypeConstraintDecl->sub.type) ||
+                   hasBlockersForVal(genericTypeConstraintDecl->sup.type);
+        }
+        if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
+        {
+            return hasBlockersForVal(typeCoercionConstraintDecl->fromType.type) ||
+                   hasBlockersForVal(typeCoercionConstraintDecl->toType.type);
+        }
+        if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
+        {
+            if (auto declRefExpr = as<DeclRefExpr>(nonEmptyConstraintDecl->packExpr))
+                return !isParamSlotReady(getDeclRef(m_astBuilder, declRefExpr).getDecl());
+            return true;
+        }
+        if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+        {
+            return hasBlockersForVal(hasDiffTypeInfoConstraintDecl->type.type);
+        }
+        return false;
+    }
+
+    bool hasBlockersForVal(Val* val, Decl* ignoredParamDecl = nullptr)
+    {
+        HashSet<Val*> visitedVals;
+        return collectValBlockers(val, visitedVals, ignoredParamDecl);
+    }
+
+    bool collectValBlockers(Val* val, HashSet<Val*>& ioVisitedVals, Decl* ignoredParamDecl)
+    {
+        if (!val || ioVisitedVals.contains(val))
+            return false;
+        ioVisitedVals.add(val);
+
+        // The dependency protocol is local to expression evaluation: a type or
+        // value parameter reference waits for its parameter slot, and a declared
+        // witness reference waits for the where-clause slot that will supply it.
+        if (auto declRefType = as<DeclRefType>(val))
+        {
+            auto decl = declRefType->getDeclRef().getDecl();
+            if (decl == ignoredParamDecl)
+                return false;
+            if (as<GenericTypeParamDeclBase>(decl) && isRelevantParamSlot(decl) &&
+                !isParamSlotReady(decl))
+                return true;
+        }
+        else if (auto declRefIntVal = as<DeclRefIntVal>(val))
+        {
+            auto decl = declRefIntVal->getDeclRef().getDecl();
+            if (decl == ignoredParamDecl)
+                return false;
+            if (isGenericValueParam(decl) && isRelevantParamSlot(decl) && !isParamSlotReady(decl))
+                return true;
+        }
+        else if (auto declaredWitness = as<DeclaredSubtypeWitness>(val))
+        {
+            if (isWitnessForIgnoredParam(declaredWitness, ignoredParamDecl))
+                return false;
+            if (!isWitnessSlotReady(declaredWitness->getDeclRef().getDecl()))
+                return true;
+        }
+
+        for (auto operand : val->m_operands)
+        {
+            if (operand.kind == ValNodeOperandKind::ValNode &&
+                collectValBlockers(operand.getVal(), ioVisitedVals, ignoredParamDecl))
+                return true;
+        }
+        return false;
+    }
+
+    bool isWitnessForIgnoredParam(DeclaredSubtypeWitness* witness, Decl* ignoredParamDecl)
+    {
+        if (!ignoredParamDecl)
+            return false;
+        if (!witness->getDeclRef().as<GenericTypeConstraintDecl>())
+            return false;
+
+        auto witnessSubDeclRef = isDeclRefTypeOf<Decl>(witness->getSub());
+        return witnessSubDeclRef && witnessSubDeclRef.getDecl() == ignoredParamDecl;
+    }
+
+    bool isParamSlotReady(Decl* paramDecl)
+    {
+        if (!isRelevantParamSlot(paramDecl))
+            return true;
+        Val* knownArg = nullptr;
+        if (tryGetKnownGenericArg(paramDecl, knownArg, true))
+            return true;
+
+        // Pack parameters can always be represented as empty packs while the
+        // solver is forming partial substitutions.  Non-empty-pack constraints
+        // still validate the final cardinality when their witness item runs.
+        if (as<GenericTypePackParamDecl>(paramDecl) || as<GenericValuePackParamDecl>(paramDecl))
+            return true;
+
+        if (hasNonDefaultNonBoundConstraint(paramDecl))
+            return hasConcreteSolvedArg(paramDecl);
+        if (m_defaultArgWorkItemIndexByDecl.containsKey(paramDecl))
+            return m_defaultArgValues.containsKey(paramDecl);
+        return hasConcreteSolvedArg(paramDecl);
+    }
+
+    bool isRelevantParamSlot(Decl* paramDecl)
+    {
+        return m_visitor->isRelevantGeneric(*m_system, paramDecl->parentDecl);
+    }
+
+    bool isWitnessSlotReady(Decl* constraintDecl)
+    {
+        if (!m_witnessWorkItemIndexByDecl.containsKey(constraintDecl))
+            return true;
+        return m_witnessArgValues.containsKey(constraintDecl);
+    }
+
+    bool isKnownGenericArg(Decl* paramDecl)
+    {
+        Val* knownArg = nullptr;
+        return tryGetKnownGenericArg(paramDecl, knownArg);
+    }
+
+    bool tryGetKnownGenericArg(
+        Decl* paramDecl,
+        Val*& outArg,
+        bool allowSelfReferencePlaceholder = false)
+    {
+        // Some callers seed inference with a default substitution such as
+        // `<T, N, T : IFoo>`.  Those self-reference values keep decl-ref shapes
+        // well formed, but they are not explicit user answers; the work list
+        // must still be allowed to replace them with inferred arguments.
+        auto genericDecl = as<GenericDecl>(paramDecl->parentDecl);
+        if (!genericDecl || genericDecl != m_genericDecls[0])
+            return false;
+
+        Index knownArgIndex = getKnownGenericArgIndex(paramDecl);
+        if (knownArgIndex < 0 || knownArgIndex >= m_knownGenericArgCount)
+            return false;
+
+        Val* knownArg = m_knownGenericArgs[knownArgIndex];
+        if (!allowSelfReferencePlaceholder && isSelfReferencePlaceholder(paramDecl, knownArg))
+            return false;
+
+        outArg = knownArg;
+        return true;
+    }
+
+    Index getKnownGenericArgIndex(Decl* argDecl)
+    {
+        // `knownGenericArgs` is the explicit visible-argument prefix supplied by
+        // the call site.  Hidden witnesses still appear in completed generic
+        // applications, but they are solved by witness work items and therefore
+        // do not participate in this lookup.
+        if (auto typeParamDecl = as<GenericTypeParamDeclBase>(argDecl))
+            return typeParamDecl->parameterIndex;
+        if (auto valuePackParamDecl = as<GenericValuePackParamDecl>(argDecl))
+            return valuePackParamDecl->parameterIndex;
+        if (auto valueParamDecl = as<GenericValueParamDecl>(argDecl))
+            return valueParamDecl->parameterIndex;
+        return -1;
+    }
+
+    Index getGenericArgIndex(Decl* argDecl)
+    {
+        auto genericDecl = as<GenericDecl>(argDecl->parentDecl);
+        if (!genericDecl)
+            return -1;
+
+        Index argIndex = 0;
+        for (auto member : genericDecl->getDirectMemberDecls())
+        {
+            if (isDefaultableParam(member) || as<GenericTypePackParamDecl>(member) ||
+                as<GenericValuePackParamDecl>(member) || isImplicitWitnessConstraint(member))
+            {
+                if (member == argDecl)
+                    return argIndex;
+                argIndex++;
+            }
+        }
+        return -1;
+    }
+
+    bool isSelfReferencePlaceholder(Decl* paramDecl, Val* arg)
+    {
+        if (auto declRefType = as<DeclRefType>(arg))
+            return declRefType->getDeclRef().getDecl() == paramDecl;
+        if (auto intVal = as<IntVal>(arg))
+        {
+            if (auto declRefIntVal = getDeclRefIntValUnderCast(intVal))
+                return declRefIntVal->getDeclRef().getDecl() == paramDecl;
+        }
+        return false;
+    }
+
+    bool hasConcreteSolvedArg(Decl* paramDecl)
+    {
+        if (auto typeParam = as<GenericTypeParamDeclBase>(paramDecl))
+        {
+            Val* ignored = nullptr;
+            return tryGetSolvedTypeArg(typeParam, ignored);
+        }
+        if (auto valPackParam = as<GenericValuePackParamDecl>(paramDecl))
+            return valPackParam->parameterIndex < m_solvedArgs[valPackParam->parentDecl].getCount();
+        if (auto valParam = as<GenericValueParamDecl>(paramDecl))
+            return tryGetSolvedValueArg(valParam) != nullptr;
+        return false;
+    }
+
+    bool hasNonDefaultNonBoundConstraint(Decl* paramDecl)
+    {
+        Index parameterIndex = -1;
+        if (auto typeParam = as<GenericTypeParamDeclBase>(paramDecl))
+            parameterIndex = typeParam->parameterIndex;
+        else if (auto valPackParam = as<GenericValuePackParamDecl>(paramDecl))
+            parameterIndex = valPackParam->parameterIndex;
+        else if (auto valParam = as<GenericValueParamDecl>(paramDecl))
+            parameterIndex = valParam->parameterIndex;
+        else
+            return false;
+
+        if (parameterIndex < 0 || parameterIndex >= m_solvedArgs[paramDecl->parentDecl].getCount())
+            return false;
+        return m_solvedArgs[paramDecl->parentDecl][parameterIndex].hasNonDefaultNonBoundConstraint;
+    }
+
+    bool rebuildArgsFromCurrentAnswers(bool allowPlaceholders)
+    {
+        // This function is the single serializer from slot answers to generic
+        // argument arrays.  During solving it may use placeholders so unrelated
+        // slots keep their declaration-order positions; at the end placeholders
+        // are disallowed and every required slot must be concrete.
+        m_args.clear();
+
+        for (auto genericDecl : m_genericDecls)
+        {
+            // Generic applications store the visible type and value arguments
+            // before any hidden witnesses.  The declaration list may contain a
+            // synthesized constraint next to the parameter that introduced it,
+            // so the serializer walks ordinary parameters first and only then
+            // appends the witness answers.
+            for (auto member : genericDecl->getDirectMemberDecls())
+            {
+                if (auto typeParam = as<GenericTypeParamDeclBase>(member))
+                {
+                    Val* knownArg = nullptr;
+                    if (tryGetKnownGenericArg(typeParam, knownArg, true))
+                    {
+                        m_args[genericDecl].add(knownArg);
+                        continue;
+                    }
+                    Val* arg = getTypeParamArg(typeParam, allowPlaceholders);
+                    if (!arg)
+                        return false;
+                    m_args[genericDecl].add(arg);
+                }
+                else if (auto valPackParam = as<GenericValuePackParamDecl>(member))
+                {
+                    Val* knownArg = nullptr;
+                    if (tryGetKnownGenericArg(valPackParam, knownArg, true))
+                    {
+                        m_args[genericDecl].add(knownArg);
+                        continue;
+                    }
+                    m_args[genericDecl].add(getValuePackParamArg(valPackParam));
+                }
+                else if (auto valParam = as<GenericValueParamDecl>(member))
+                {
+                    Val* knownArg = nullptr;
+                    if (tryGetKnownGenericArg(valParam, knownArg, true))
+                    {
+                        m_args[genericDecl].add(knownArg);
+                        continue;
+                    }
+                    Val* arg = getValueParamArg(valParam, allowPlaceholders);
+                    if (!arg)
+                        return false;
+                    m_args[genericDecl].add(arg);
+                }
+            }
+
+            // The second pass preserves the same hidden-argument order that the
+            // generic declaration expects, while keeping those witnesses after
+            // the ordinary argument prefix used by substitution and unification.
+            for (auto member : genericDecl->getDirectMemberDecls())
+            {
+                if (isImplicitWitnessConstraint(member))
+                {
+                    Val* witnessArg = nullptr;
+                    if (m_witnessArgValues.tryGetValue(member, witnessArg))
+                    {
+                        m_args[genericDecl].add(witnessArg);
+                    }
+                    else if (allowPlaceholders)
+                    {
+                        witnessArg = getPlaceholderWitnessArg(member);
+                        if (!witnessArg)
+                            return false;
+                        m_args[genericDecl].add(witnessArg);
+                    }
+                    else if (!allowPlaceholders)
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    Val* getPlaceholderWitnessArg(Decl* constraintDecl)
+    {
+        // Partial substitutions need every hidden witness position to remain
+        // stable, even before the work-list has proved the real witness.  These
+        // placeholders are the same declaration-shaped values used by default
+        // substitutions elsewhere in the checker, so they preserve dependency
+        // edges without claiming the constraint is solved.
+        if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
+        {
+            auto constraintDeclRef =
+                getSubstDeclRef(genericTypeConstraintDecl).as<GenericTypeConstraintDecl>();
+            auto sub = getSub(m_astBuilder, constraintDeclRef);
+            auto sup = getSup(m_astBuilder, constraintDeclRef);
+            if (!sub || !sup)
+                return nullptr;
+            return m_astBuilder->getDeclaredSubtypeWitness(sub, sup, constraintDeclRef);
+        }
+
+        if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
+        {
+            auto constraintDeclRef =
+                getSubstDeclRef(typeCoercionConstraintDecl).as<TypeCoercionConstraintDecl>();
+            auto fromType = getFromType(m_astBuilder, constraintDeclRef);
+            auto toType = getToType(m_astBuilder, constraintDeclRef);
+            if (!fromType || !toType)
+                return nullptr;
+            return m_astBuilder->getBuiltinTypeCoercionWitness(fromType, toType);
+        }
+
+        if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
+        {
+            auto packVal = getNonEmptyPackPlaceholder(nonEmptyConstraintDecl);
+            return packVal ? m_astBuilder->getNonEmptyPackWitness(packVal) : nullptr;
+        }
+
+        if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+        {
+            auto constraintDeclRef =
+                getSubstDeclRef(hasDiffTypeInfoConstraintDecl).as<HasDiffTypeInfoConstraintDecl>();
+            return m_astBuilder->getHasDiffTypeInfoWitness(constraintDeclRef);
+        }
+
+        return nullptr;
+    }
+
+    Val* getNonEmptyPackPlaceholder(NonEmptyPackConstraintDecl* constraintDecl)
+    {
+        // A non-empty-pack witness is parameterized by the pack being tested.
+        // While solving, the pack reference itself is the right placeholder:
+        // later work may prove its cardinality and replace this declaration
+        // witness with the final concrete witness.
+        if (auto declRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
+        {
+            auto packDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
+            if (auto typePackDecl = as<GenericTypePackParamDecl>(packDecl))
+                return DeclRefType::create(m_astBuilder, makeDeclRef(typePackDecl));
+            if (auto valuePackDecl = as<GenericValuePackParamDecl>(packDecl))
+            {
+                return m_astBuilder->getOrCreate<DeclRefIntVal>(
+                    valuePackDecl->getType(),
+                    makeDeclRef(valuePackDecl));
+            }
+        }
+        return nullptr;
+    }
+
+    Val* getTypeParamArg(GenericTypeParamDeclBase* typeParam, bool allowPlaceholders)
+    {
+        if (as<GenericTypePackParamDecl>(typeParam))
+            return getTypePackParamArg(typeParam);
+
+        Val* solvedArg = nullptr;
+        bool hasSolvedArg = tryGetSolvedTypeArg(typeParam, solvedArg);
+        if (hasNonDefaultNonBoundConstraint(typeParam))
+            return hasSolvedArg ? solvedArg : nullptr;
+
+        Val* defaultArg = nullptr;
+        if (m_defaultArgValues.tryGetValue(typeParam, defaultArg))
+            return defaultArg;
+        if (m_defaultArgWorkItemIndexByDecl.containsKey(typeParam))
+        {
+            if (allowPlaceholders)
+                return tryGetDefaultGenericArgVal(m_visitor, typeParam);
+            return nullptr;
+        }
+
+        if (hasSolvedArg)
+            return solvedArg;
+        if (allowPlaceholders)
+            return DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(typeParam));
+        return nullptr;
+    }
+
+    Val* getTypePackParamArg(GenericTypeParamDeclBase* typeParam)
+    {
+        auto& solvedArgs = m_solvedArgs[typeParam->parentDecl];
+        if (typeParam->parameterIndex >= solvedArgs.getCount())
+            return m_astBuilder->getTypePack(ArrayView<Type*>());
+
+        auto& types = solvedArgs[typeParam->parameterIndex].types;
+        for (auto t : types)
+        {
+            if (!t)
+                return nullptr;
+        }
+
+        if (types.getCount() == 1 && isTypePack(types[0]))
+            return types[0].type;
+
+        ShortList<Type*> typeList;
+        for (auto t : types)
+            typeList.add(t.type);
+        return m_astBuilder->getTypePack(typeList.getArrayView().arrayView);
+    }
+
+    bool tryGetSolvedTypeArg(GenericTypeParamDeclBase* typeParam, Val*& outArg)
+    {
+        auto& solvedArgs = m_solvedArgs[typeParam->parentDecl];
+        if (typeParam->parameterIndex >= solvedArgs.getCount())
+            return false;
+
+        auto& types = solvedArgs[typeParam->parameterIndex].types;
+        if (types.getCount() != 1 || !types[0])
+            return false;
+        outArg = types[0].type;
+        return true;
+    }
+
+    Val* getValuePackParamArg(GenericValuePackParamDecl* valPackParam)
+    {
+        auto& solvedArgs = m_solvedArgs[valPackParam->parentDecl];
+        if (valPackParam->parameterIndex >= solvedArgs.getCount())
+            return m_astBuilder->getIntValPack(ArrayView<IntVal*>());
+
+        auto val = solvedArgs[valPackParam->parameterIndex].val;
+        return val ? val : m_astBuilder->getIntValPack(ArrayView<IntVal*>());
+    }
+
+    Val* getValueParamArg(GenericValueParamDecl* valParam, bool allowPlaceholders)
+    {
+        Val* solvedArg = tryGetSolvedValueArg(valParam);
+        if (hasNonDefaultNonBoundConstraint(valParam))
+            return solvedArg;
+
+        Val* defaultArg = nullptr;
+        if (m_defaultArgValues.tryGetValue(valParam, defaultArg))
+            return defaultArg;
+        if (m_defaultArgWorkItemIndexByDecl.containsKey(valParam))
+        {
+            if (allowPlaceholders)
+                return tryGetDefaultGenericArgVal(m_visitor, valParam);
+            return nullptr;
+        }
+
+        if (solvedArg)
+            return solvedArg;
+        if (allowPlaceholders)
+        {
+            auto valParamRef = makeDeclRef(as<VarDeclBase>(valParam));
+            return m_astBuilder->getOrCreate<DeclRefIntVal>(valParam->getType(), valParamRef);
+        }
+        return nullptr;
+    }
+
+    Val* tryGetSolvedValueArg(GenericValueParamDecl* valParam)
+    {
+        auto& solvedArgs = m_solvedArgs[valParam->parentDecl];
+        if (valParam->parameterIndex >= solvedArgs.getCount())
+            return nullptr;
+        return solvedArgs[valParam->parameterIndex].val;
+    }
+
+    DeclRef<Decl> getSubstDeclRef(Decl* constraintDecl)
+    {
+        auto constraintParent = as<GenericDecl>(constraintDecl->parentDecl);
+        DeclRef<Decl> substDeclRef;
+
+        for (auto genericDecl : m_genericDecls)
+        {
+            DeclRef<GenericDecl> genericDeclRef =
+                substDeclRef ? substDeclRef.as<GenericDecl>() : getRootGenericDeclRef(genericDecl);
+
+            substDeclRef = m_astBuilder->getGenericAppDeclRef(
+                genericDeclRef,
+                m_args[genericDecl].getArrayView().arrayView,
+                genericDecl == constraintParent ? constraintDecl : genericDecl->inner);
+
+            if (genericDecl == constraintParent)
+                break;
+        }
+        return substDeclRef;
+    }
+
+    DeclRef<GenericDecl> getRootGenericDeclRef(GenericDecl* genericDecl)
+    {
+        if (as<DirectDeclRef>(m_genericDeclRef.declRefBase))
+            return makeDeclRef(genericDecl);
+        return m_genericDeclRef;
+    }
+
+    bool appendImplicitWitnessArg(GenericDecl* genericDecl, Decl* constraintDecl)
+    {
+        if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
+            return appendGenericTypeConstraintWitness(genericDecl, genericTypeConstraintDecl);
+        if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
+            return appendTypeCoercionWitness(genericDecl, typeCoercionConstraintDecl);
+        if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
+            return appendNonEmptyPackWitness(genericDecl, nonEmptyConstraintDecl);
+        if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+            return appendHasDiffTypeInfoWitness(genericDecl, hasDiffTypeInfoConstraintDecl);
+        return true;
+    }
+
+    bool appendGenericTypeConstraintWitness(
+        GenericDecl* genericDecl,
+        GenericTypeConstraintDecl* constraintDecl)
+    {
+        auto constraintDeclRef = getSubstDeclRef(constraintDecl).as<GenericTypeConstraintDecl>();
+        auto sub = getSub(m_astBuilder, constraintDeclRef);
+        auto sup = getSup(m_astBuilder, constraintDeclRef);
+
+        if (!recordConstrainedGenericParam(constraintDeclRef))
+            return false;
+        if (sub->equals(sup) && isDeclRefTypeOf<InterfaceDecl>(sup))
+            return false;
+
+        auto subTypeWitness = findSubtypeWitnessForConstraint(constraintDecl, sub, sup);
+        return recordSubtypeWitnessArg(genericDecl, constraintDecl, subTypeWitness);
+    }
+
+    bool recordConstrainedGenericParam(DeclRef<GenericTypeConstraintDecl> constraintDeclRef)
+    {
+        if (auto subDeclRefType = as<DeclRefType>(constraintDeclRef.getDecl()->sub.type))
+        {
+            m_constrainedGenericParams.add(subDeclRefType->getDeclRef().getDecl());
+            return true;
+        }
+
+        if (auto subEachType = as<EachType>(constraintDeclRef.getDecl()->sub.type))
+        {
+            if (auto elementDeclRefType = subEachType->getElementDeclRefType())
+            {
+                m_constrainedGenericParams.add(elementDeclRefType->getDeclRef().getDecl());
+                return true;
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    SubtypeWitness* findSubtypeWitnessForConstraint(
+        GenericTypeConstraintDecl* constraintDecl,
+        Type* sub,
+        Type* sup)
+    {
+        // A witness item first asks the ordinary subtype engine for a proof,
+        // because concrete conformances, extension conformances, inherited
+        // interfaces, packs, and cached answers all live there.
+        SubtypeWitness* subTypeWitness = nullptr;
+        if (sub == m_system->subTypeForAdditionalWitnesses)
+        {
+            m_system->additionalSubtypeWitnesses->tryGetValue(sup, subTypeWitness);
+        }
+        else
+        {
+            subTypeWitness = m_visitor->isSubtype(
+                sub,
+                sup,
+                m_system->additionalSubtypeWitnesses ? IsSubTypeOptions::NoCaching
+                                                     : IsSubTypeOptions::None);
+        }
+
+        // Generic solving also sees abstract proofs that the subtype cache is
+        // not allowed to invent.  A forwarded generic parameter can reuse its
+        // own bound witness, and an associated-type projection can reuse the
+        // constraint declared on the associated type that introduced it.
+        if (!subTypeWitness)
+            subTypeWitness = findSubtypeWitnessForGenericParamBound(sub, sup);
+        if (!subTypeWitness)
+            subTypeWitness = findSubtypeWitnessForAssociatedTypeConstraint(sub, sup);
+
+        if (constraintDecl->isEqualityConstraint && !isTypeEqualityWitness(subTypeWitness))
+            subTypeWitness = nullptr;
+        return subTypeWitness;
+    }
+
+    SubtypeWitness* findSubtypeWitnessForGenericParamBound(Type* sub, Type* sup)
+    {
+        // A generic type parameter can be passed as the explicit answer for a
+        // different generic parameter.  When that happens, the proof that the
+        // answer satisfies a required interface may already live on the source
+        // parameter's own declaration, so the witness item can reuse that
+        // declaration rather than waiting for a concrete type.
+        auto subDeclRefType = as<DeclRefType>(sub);
+        if (!subDeclRefType)
+            return nullptr;
+
+        auto typeParamDecl = as<GenericTypeParamDeclBase>(subDeclRefType->getDeclRef().getDecl());
+        if (!typeParamDecl)
+            return nullptr;
+
+        auto genericDecl = as<GenericDecl>(typeParamDecl->parentDecl);
+        if (!genericDecl)
+            return nullptr;
+
+        // Bound declarations are ordinary hidden witness parameters on the
+        // generic that owns the source type parameter.  Default substitutions
+        // give those bounds the same self-reference placeholders used while
+        // checking the generic body, which is exactly the form we see when the
+        // source parameter is forwarded as an argument to another generic.
+        for (auto member : genericDecl->getDirectMemberDecls())
+        {
+            auto boundDecl = as<GenericTypeConstraintDecl>(member);
+            if (!boundDecl)
+                continue;
+
+            auto boundDeclRef = createDefaultSubstitutionsIfNeeded(
+                                    m_astBuilder,
+                                    m_visitor,
+                                    boundDecl->getDefaultDeclRef())
+                                    .as<GenericTypeConstraintDecl>();
+            if (!boundDeclRef)
+                continue;
+
+            auto boundSub = getSub(m_astBuilder, boundDeclRef);
+            auto boundSup = getSup(m_astBuilder, boundDeclRef);
+            if (!boundSub || !boundSup)
+                continue;
+            if (!boundSub->equals(sub) || !boundSup->equals(sup))
+                continue;
+
+            return m_astBuilder->getDeclaredSubtypeWitness(sub, sup, boundDeclRef);
+        }
+
+        return nullptr;
+    }
+
+    SubtypeWitness* findSubtypeWitnessForAssociatedTypeConstraint(Type* sub, Type* sup)
+    {
+        // Associated-type lookups carry the witness used to open the interface:
+        // `T.A` is really `Lookup(T, witness T : IFoo, A)`.  If `A` itself
+        // declares a constraint such as `associatedtype A : IBar`, that
+        // constraint is a solved witness for `T.A : IBar`.
+        auto subDeclRefType = as<DeclRefType>(sub);
+        if (!subDeclRefType)
+            return nullptr;
+
+        auto associatedTypeDeclRef = subDeclRefType->getDeclRef().as<AssocTypeDecl>();
+        if (!associatedTypeDeclRef)
+            return nullptr;
+
+        // The member constraint has to be referenced through the same lookup
+        // path as the associated type.  That preserves the dependency on the
+        // original `T : IFoo` witness and lets later substitution or lowering
+        // follow the proof back through the right interface requirement.
+        for (auto constraintDecl :
+             associatedTypeDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>())
+        {
+            auto constraintDeclRef =
+                m_astBuilder->getMemberDeclRef(associatedTypeDeclRef, constraintDecl)
+                    .as<GenericTypeConstraintDecl>();
+            if (!constraintDeclRef)
+                continue;
+
+            auto constraintSub = getSub(m_astBuilder, constraintDeclRef);
+            auto constraintSup = getSup(m_astBuilder, constraintDeclRef);
+            if (!constraintSub || !constraintSup)
+                continue;
+            if (!constraintSub->equals(sub) || !constraintSup->equals(sup))
+                continue;
+
+            return m_astBuilder->getDeclaredSubtypeWitness(sub, sup, constraintDeclRef);
+        }
+
+        return nullptr;
+    }
+
+    bool recordSubtypeWitnessArg(
+        GenericDecl* genericDecl,
+        GenericTypeConstraintDecl* constraintDecl,
+        SubtypeWitness* subTypeWitness)
+    {
+        SLANG_UNUSED(genericDecl);
+
+        bool witnessIsOptional = m_visitor->isWitnessUncheckedOptional(subTypeWitness);
+        bool constraintIsOptional = constraintDecl->hasModifier<OptionalConstraintModifier>();
+
+        if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
+        {
+            m_witnessArgValues[constraintDecl] = subTypeWitness;
+            m_finalWitnessCost += subTypeWitness->getOverloadResolutionCost();
+            return true;
+        }
+
+        if (!subTypeWitness && constraintIsOptional)
+        {
+            auto noneWitness = m_astBuilder->getOrCreate<NoneWitness>();
+            m_witnessArgValues[constraintDecl] = noneWitness;
+            m_finalWitnessCost += kConversionCost_FailedOptionalConstraint;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool appendTypeCoercionWitness(
+        GenericDecl* genericDecl,
+        TypeCoercionConstraintDecl* constraintDecl)
+    {
+        auto& genericArgs = m_args[genericDecl];
+        Count oldArgCount = genericArgs.getCount();
+        if (!addTypeCoercionWitnessToArgs(
+                m_astBuilder,
+                m_visitor,
+                constraintDecl,
+                m_genericDeclRef,
+                nullptr,
+                &m_constrainedGenericParams,
+                genericArgs,
+                false))
+            return false;
+        if (genericArgs.getCount() <= oldArgCount)
+            return false;
+        m_witnessArgValues[constraintDecl] = genericArgs[genericArgs.getCount() - 1];
+        return true;
+    }
+
+    bool appendNonEmptyPackWitness(
+        GenericDecl* genericDecl,
+        NonEmptyPackConstraintDecl* constraintDecl)
+    {
+        Decl* constrainedPackDecl = nullptr;
+        if (auto declRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
+            constrainedPackDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
+
+        Val* constrainedArg = nullptr;
+        if (auto typePackDecl = as<GenericTypePackParamDecl>(constrainedPackDecl))
+        {
+            if (typePackDecl->parameterIndex < m_args[genericDecl].getCount())
+                constrainedArg = m_args[genericDecl][typePackDecl->parameterIndex];
+        }
+        else if (auto valuePackDecl = as<GenericValuePackParamDecl>(constrainedPackDecl))
+        {
+            if (valuePackDecl->parameterIndex < m_args[genericDecl].getCount())
+                constrainedArg = m_args[genericDecl][valuePackDecl->parameterIndex];
+        }
+
+        if (!constrainedArg || !m_visitor->isKnownNonEmptyPack(constrainedArg))
+            return false;
+
+        m_witnessArgValues[constraintDecl] = m_astBuilder->getNonEmptyPackWitness(constrainedArg);
+        return true;
+    }
+
+    bool appendHasDiffTypeInfoWitness(
+        GenericDecl* genericDecl,
+        HasDiffTypeInfoConstraintDecl* constraintDecl)
+    {
+        auto& genericArgs = m_args[genericDecl];
+        Count oldArgCount = genericArgs.getCount();
+        if (!addHasDiffTypeInfoWitnessToArgs(
+                m_astBuilder,
+                m_visitor,
+                constraintDecl,
+                m_genericDeclRef,
+                nullptr,
+                &m_constrainedGenericParams,
+                genericArgs,
+                false))
+            return false;
+        if (genericArgs.getCount() <= oldArgCount)
+            return false;
+        m_witnessArgValues[constraintDecl] = genericArgs[genericArgs.getCount() - 1];
+        return true;
+    }
+
+    bool verifyOrdinaryConstraintsSatisfied()
+    {
+        for (auto c : m_system->constraints)
+        {
+            if (!c.satisfied)
+                return false;
+        }
+        return true;
+    }
+
+    void addUnconstrainedGenericParamCost()
+    {
+        for (auto genericDecl : m_genericDecls)
+        {
+            for (auto typeParamDecl : genericDecl->getMembersOfType<GenericTypeParamDecl>())
+            {
+                if (!m_constrainedGenericParams.contains(typeParamDecl))
+                    m_outBaseCost += kConversionCost_UnconstraintGenericParam;
+            }
+        }
+    }
+
+private:
+    SemanticsVisitor* m_visitor = nullptr;
+    ASTBuilder* m_astBuilder = nullptr;
+    ConstraintSystem* m_system = nullptr;
+    DeclRef<GenericDecl> m_genericDeclRef;
+    ArrayView<Val*> m_knownGenericArgs;
+    Count m_knownGenericArgCount = 0;
+    ConversionCost& m_outBaseCost;
+
+    List<GenericDecl*> m_genericDecls;
+    Dictionary<Decl*, ShortList<Val*>> m_args;
+    Dictionary<Decl*, ShortList<SolvedArg>> m_solvedArgs;
+    Dictionary<Decl*, Val*> m_defaultArgValues;
+    Dictionary<Decl*, Val*> m_witnessArgValues;
+    HashSet<Decl*> m_constrainedGenericParams;
+
+    ShortList<SolverWorkItem, 16> m_solverWorkItems;
+    Dictionary<Decl*, Index> m_defaultArgWorkItemIndexByDecl;
+    Dictionary<Decl*, Index> m_witnessWorkItemIndexByDecl;
+    ShortList<Index, 16> m_workList;
+    Index m_workListReadIndex = 0;
+    ShortList<int, 16> m_workItemDone;
+    ShortList<int, 16> m_workItemQueued;
+    Count m_collectedConstraintCount = 0;
+    ConversionCost m_finalWitnessCost = kConversionCost_None;
+};
+
 DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     ConstraintSystem* system,
     DeclRef<GenericDecl> genericDeclRef,
     ArrayView<Val*> knownGenericArgs,
     ConversionCost& outBaseCost)
 {
+    // The solver reads generic members while collecting bounds, defaults, and
+    // witnesses, so the declaration must be ready for lookup before we enter it.
     ensureDecl(genericDeclRef.getDecl(), DeclCheckState::ReadyForLookup);
 
-    outBaseCost = kConversionCost_None;
-
-    // For now the "solver" is going to be ridiculously simplistic.
-
-    // The generic itself will have some constraints, and for now we add these
-    // to the system of constrains we will use for solving for the type variables.
-    //
-    // TODO: we need to decide whether constraints are used like this to influence
-    // how we solve for type/value variables, or whether constraints in the parameter
-    // list just work as a validation step *after* we've solved for the types.
-    //
-    // That is, should we allow `<T : Int>` to be written, and cause us to "infer"
-    // that `T` should be the type `Int`? That seems a little silly.
-    //
-    // Eventually, though, we may want to support type identity constraints, especially
-    // on associated types, like `<C where C : IContainer && C.IndexType == Int>`
-    // These seem more reasonable to have influence constraint solving, since it could
-    // conceivably let us specialize a `X<T> : IContainer` to `X<Int>` if we find
-    // that `X<T>.IndexType == T`.
-    auto _genericDeclRef = genericDeclRef;
-    for (; _genericDeclRef; _genericDeclRef = _genericDeclRef.getParent().as<GenericDecl>())
-    {
-        for (auto constraintDeclRef :
-             getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, _genericDeclRef))
-        {
-            ValUnificationContext unificationContext;
-            unificationContext.optionalConstraint =
-                constraintDeclRef.getDecl()->hasModifier<OptionalConstraintModifier>();
-            unificationContext.equalityConstraint =
-                constraintDeclRef.getDecl()->isEqualityConstraint;
-            if (!TryUnifyTypes(
-                    *system,
-                    unificationContext,
-                    getSub(m_astBuilder, constraintDeclRef),
-                    getSup(m_astBuilder, constraintDeclRef)))
-                return DeclRef<Decl>();
-        }
-    }
-
-    List<GenericDecl*> genericDecls;
-    for (auto genericDecl = genericDeclRef.getDecl(); genericDecl;
-         genericDecl = as<GenericDecl>(genericDecl->parentDecl))
-    {
-        genericDecls.add(genericDecl);
-    }
-
-    genericDecls.reverse();
-
-    // Once have built up the initial list of constraints we are trying to satisfy,
-    // we will attempt to solve for each parameter in a way that satisfies all
-    // the constraints that apply to that parameter.
-    //
-    // Note: this is a very limited kind of solver, in that it doesn't have a
-    // way to make use of constraints between two or more parameters.
-    //
-    // As we go, we will build up a list of argument values for a possible
-    // solution for how to assign the parameters in a way that satisfies all
-    // the constraints.
-    //
-    Dictionary<Decl*, ShortList<Val*>> args;
-
-    // If the context is such that some of the arguments are already specified
-    // or known, we need to go ahead and use those arguments direclty (whether
-    // or not they are compatible with the constraints).
-    //
-    Count knownGenericArgCount = knownGenericArgs.getCount();
-
-    // Add default args to the constraints.
-    for (auto _genericDecl : genericDecls)
-    {
-        for (auto member : _genericDecl->getDirectMemberDecls())
-        {
-            if (auto typeParam = as<GenericTypeParamDecl>(member))
-            {
-                SLANG_ASSERT(typeParam->parameterIndex != -1);
-
-                if (typeParam->initType && typeParam->parameterIndex >= knownGenericArgCount)
-                {
-                    Constraint c;
-                    c.decl = member;
-                    c.val = typeParam->initType;
-                    c.priority = ConstraintPriority::Default;
-                    c.isEquality = true;
-                    c.potentiallyDependent = true;
-                    system->constraints.add(c);
-                }
-            }
-            else if (auto valParam = as<GenericValueParamDecl>(member))
-            {
-                SLANG_ASSERT(valParam->parameterIndex != -1);
-
-                if (valParam->initExpr && valParam->parameterIndex >= knownGenericArgCount)
-                {
-                    ConstantFoldingCircularityInfo newCircularityInfo(makeDeclRef(member), nullptr);
-
-                    Constraint c;
-                    c.decl = member;
-                    c.val = ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo);
-                    c.priority = ConstraintPriority::Default;
-                    c.isEquality = true;
-                    c.potentiallyDependent = true;
-                    system->constraints.add(c);
-                }
-            }
-        }
-    }
-
-    // The state of currently solved arguments.
-    Dictionary<Decl*, ShortList<SolvedArg>> solvedArgs;
-
-    // We will then iterate over the constraints trying to solve all generic parameters.
-    // Note that we do not use ranged for here, because processing one constraint may lead to
-    // new constraints being discovered.
-    for (Index constraintIndex = 0; constraintIndex < system->constraints.getCount();
-         constraintIndex++)
-    {
-        // Note: it is important to keep a copy of the constraint here instead of
-        // using a reference, because the constraint list may be modified during the
-        // loop as we discover new constraints.
-        //
-        auto c = system->constraints[constraintIndex];
-
-        // If the constraint is potentially dependent on earlier constraints,
-        // try to substitute it with the currently known args.
-        if (c.potentiallyDependent)
-        {
-            // Return value intentionally ignored: partial args are sufficient
-            // for substituting references to already-solved parameters.
-            // Missing args aren't an issue, they're checked for e.g., in
-            // `maybeSubstituteGenericParam`.
-            constraintSystemSolverUnpackArgs(
-                this,
-                genericDecls,
-                knownGenericArgs,
-                solvedArgs,
-                args);
-
-            auto genSubst = m_astBuilder->getGenericAppDeclRef(
-                genericDeclRef,
-                args[c.decl->parentDecl].getArrayView().arrayView);
-
-            auto newVal = c.val->substitute(m_astBuilder, SubstitutionSet(genSubst));
-            if (newVal)
-                c.val = newVal;
-        }
-
-        if (auto typeParam = as<GenericTypeParamDeclBase>(c.decl))
-        {
-            SLANG_ASSERT(typeParam->parameterIndex != -1);
-            // If the parameter is one where we already know
-            // the argument value to use, we don't bother with
-            // trying to solve for it, and treat any constraints
-            // on such a parameter as implicitly solved-for.
-            //
-            if (typeParam->parameterIndex < knownGenericArgCount)
-            {
-                system->constraints[constraintIndex].satisfied = true;
-                continue;
-            }
-
-            // If the parameter is a type pack, then we may have
-            // constraints that apply to invidual elements of the pack.
-            // We will need to handle the type pack case slightly differently.
-            //
-            bool isPack = as<GenericTypePackParamDecl>(typeParam) != nullptr;
-
-            // We will use a temporary list to hold the resolved types
-            // for this generic parameter.
-            // For normal type parameters, there should be only one type
-            // in the list. For type pack parameters, there can be one type
-            // for each element in the pack.
-            //
-            if (solvedArgs[typeParam->parentDecl].getCount() <= typeParam->parameterIndex)
-            {
-                solvedArgs[typeParam->parentDecl].setCount(typeParam->parameterIndex + 1);
-            }
-
-            auto& types = solvedArgs[typeParam->parentDecl][typeParam->parameterIndex].types;
-            if (!isPack)
-                types.setCount(1);
-
-            ConstraintPriority& typeConstraintPriority =
-                solvedArgs[typeParam->parentDecl][typeParam->parameterIndex].priority;
-
-            QualType* ptype = nullptr;
-            if (isPack)
-            {
-                types.setCount(Math::Max(types.getCount(), c.indexInPack + 1));
-                ptype = &types[c.indexInPack];
-            }
-            else
-                ptype = &types[0];
-            QualType& type = *ptype;
-
-            auto cType = QualType(as<Type>(c.val), c.isUsedAsLValue);
-            SLANG_RELEASE_ASSERT(cType);
-
-            if (!type)
-            {
-                type = cType;
-                typeConstraintPriority = c.priority;
-            }
-            else
-            {
-                // If the type parameter is already constrained to a known type,
-                // we need to make sure our resolved type can satisfy both constraints.
-                // We do so by updating the resolved type to be the "join" of the current
-                // solution and the type in the new constraint. If such join cannot be found,
-                // it means it is not possible to have a compatible solution that meets all
-                // constraints and we should fail.
-                //
-                // Another detail here is that during type joining, we may discover
-                // new constraints from the base types of the types being joined.
-                // We will pass the constraint system to `TryJoinTypes` which can
-                // add new constraints to the system, and we will process the new constraints
-                // in the next iteration.
-                //
-                auto joinType = TryJoinTypes(system, type, cType);
-                if (!joinType)
-                {
-                    // New constraint has higher priority, so it overrides.
-                    if (c.priority < typeConstraintPriority)
-                        joinType = cType;
-                    // New constraint has lower priority, so it doesn't override.
-                    else if (c.priority > typeConstraintPriority)
-                        joinType = type;
-                    // Equality constraint with equal priority; keep earlier type.
-                    else if (c.isEquality)
-                        joinType = type;
-                    else
-                        // failure!
-                        return DeclRef<Decl>();
-                }
-                type = QualType(joinType, type.isLeftValue || cType.isLeftValue);
-            }
-
-            if (c.priority < typeConstraintPriority)
-                typeConstraintPriority = c.priority;
-
-            c.satisfied = true;
-        }
-        else if (auto valPackParam = as<GenericValuePackParamDecl>(c.decl))
-        {
-            SLANG_ASSERT(valPackParam->parameterIndex != -1);
-
-            if (valPackParam->parameterIndex < knownGenericArgCount)
-            {
-                system->constraints[constraintIndex].satisfied = true;
-                continue;
-            }
-
-            if (solvedArgs[valPackParam->parentDecl].getCount() <= valPackParam->parameterIndex)
-                solvedArgs[valPackParam->parentDecl].setCount(valPackParam->parameterIndex + 1);
-            Val*& val = solvedArgs[valPackParam->parentDecl][valPackParam->parameterIndex].val;
-
-            if (auto cValPack = as<ConcreteIntValPack>(c.val))
-            {
-                if (!val)
-                    val = cValPack;
-            }
-            else if (auto declRefIntVal = as<DeclRefIntVal>(c.val))
-            {
-                if (!val)
-                    val = declRefIntVal;
-            }
-            c.satisfied = true;
-        }
-        else if (auto valParam = as<GenericValueParamDecl>(c.decl))
-        {
-            SLANG_ASSERT(valParam->parameterIndex != -1);
-
-            if (valParam->parameterIndex < knownGenericArgCount)
-            {
-                system->constraints[constraintIndex].satisfied = true;
-                continue;
-            }
-
-            if (solvedArgs[valParam->parentDecl].getCount() <= valParam->parameterIndex)
-                solvedArgs[valParam->parentDecl].setCount(valParam->parameterIndex + 1);
-            Val*& val = solvedArgs[valParam->parentDecl][valParam->parameterIndex].val;
-            ConstraintPriority& valPriority =
-                solvedArgs[valParam->parentDecl][valParam->parameterIndex].priority;
-
-            auto cVal = as<IntVal>(c.val);
-            SLANG_RELEASE_ASSERT(cVal);
-
-            if (!val || (c.priority < valPriority))
-            {
-                // Either we didn't have a value or this is a hard constraint
-                // overriding an optional constraint, so we can replace the
-                // value.
-                val = cVal;
-                valPriority = c.priority;
-            }
-            else if (valPriority == c.priority && !val->equals(cVal))
-            {
-                // Two clashing constraints with the same priority, and they
-                // have different values. We have no way to join these and no
-                // way to prefer one over the other (due to ambiguity), so this
-                // is a failure case.
-                return DeclRef<Decl>();
-            }
-
-            c.satisfied = true;
-        }
-        system->constraints[constraintIndex].satisfied = c.satisfied;
-    }
-
-    // After we processed all constraints, `solvedArgs` should have been filled
-    // with the resolved types and values for the generic parameters. We can
-    // now verify if they are complete and consolidate them into final argument
-    // list.
-    if (!constraintSystemSolverUnpackArgs(this, genericDecls, knownGenericArgs, solvedArgs, args))
-        return DeclRef<Decl>();
-
-    // After we've solved for the explicit arguments, we need to
-    // make a second pass and consider the implicit arguments,
-    // based on what we've already determined to be the values
-    // for the explicit arguments.
-
-    // Before we begin, we are going to go ahead and create the
-    // "solved" substitution that we will return if everything works.
-    // This is because we are going to use this substitution,
-    // partially filled in with the results we know so far,
-    // in order to specialize any constraints on the generic.
-    //
-    // E.g., if the generic parameters were `<T : ISidekick>`, and
-    // we've already decided that `T` is `Robin`, then we want to
-    // search for a conformance `Robin : ISidekick`, which involved
-    // apply the substitutions we already know...
-
-    HashSet<Decl*> constrainedGenericParams;
-
-    auto getSubstDeclRef = [&](Decl* constraintDecl) -> DeclRef<Decl>
-    {
-        auto constraintParent = as<GenericDecl>(constraintDecl->parentDecl);
-        DeclRef<Decl> substDeclRef;
-        for (auto _genericDecl : genericDecls)
-        {
-            substDeclRef = m_astBuilder->getGenericAppDeclRef(
-                substDeclRef
-                    ? substDeclRef.as<GenericDecl>()
-                    : (as<DirectDeclRef>(genericDeclRef.declRefBase) ? makeDeclRef(_genericDecl)
-                                                                     : genericDeclRef),
-                args[_genericDecl].getArrayView().arrayView,
-                _genericDecl == constraintParent ? constraintDecl : _genericDecl->inner);
-            if (_genericDecl == constraintParent)
-                break;
-        }
-        return substDeclRef;
-    };
-
-    struct SubstitutableGenericArg
-    {
-        GenericDecl* genericDecl = nullptr;
-        Index argIndex = 0;
-    };
-
-    ShortList<SubstitutableGenericArg, 4> substitutableGenericArgs;
-    for (auto _genericDecl : genericDecls)
-    {
-        Index argIndex = _genericDecl == genericDecls[0] ? knownGenericArgs.getCount() : 0;
-        for (auto member : _genericDecl->getDirectMemberDecls())
-        {
-            if (auto typeParam = as<GenericTypeParamDeclBase>(member))
-            {
-                SLANG_ASSERT(typeParam->parameterIndex != -1);
-                if (typeParam->parameterIndex < knownGenericArgCount)
-                    continue;
-
-                if (!as<GenericTypePackParamDecl>(typeParam) &&
-                    typeParam->parameterIndex < solvedArgs[_genericDecl].getCount() &&
-                    solvedArgs[_genericDecl][typeParam->parameterIndex].priority ==
-                        ConstraintPriority::Default)
-                {
-                    substitutableGenericArgs.add(SubstitutableGenericArg{_genericDecl, argIndex});
-                }
-                argIndex++;
-            }
-            else if (auto valPackParam = as<GenericValuePackParamDecl>(member))
-            {
-                SLANG_ASSERT(valPackParam->parameterIndex != -1);
-                if (valPackParam->parameterIndex < knownGenericArgCount)
-                    continue;
-
-                argIndex++;
-            }
-            else if (auto valParam = as<GenericValueParamDecl>(member))
-            {
-                SLANG_ASSERT(valParam->parameterIndex != -1);
-                if (valParam->parameterIndex < knownGenericArgCount)
-                    continue;
-
-                if (valParam->parameterIndex < solvedArgs[_genericDecl].getCount() &&
-                    solvedArgs[_genericDecl][valParam->parameterIndex].priority ==
-                        ConstraintPriority::Default)
-                {
-                    substitutableGenericArgs.add(SubstitutableGenericArg{_genericDecl, argIndex});
-                }
-                argIndex++;
-            }
-        }
-    }
-
-    Dictionary<Decl*, Count> ordinaryArgCounts;
-    for (auto _genericDecl : genericDecls)
-        ordinaryArgCounts[_genericDecl] = args[_genericDecl].getCount();
-
-    auto substituteDefaultArgs = [&]() -> bool
-    {
-        auto fullSubst = SubstitutionSet(getSubstDeclRef(genericDeclRef.getDecl()->inner));
-        bool changed = false;
-
-        for (auto defaultArg : substitutableGenericArgs)
-        {
-            auto& genericArgs = args[defaultArg.genericDecl];
-            if (defaultArg.argIndex >= genericArgs.getCount())
-                continue;
-
-            auto oldArg = genericArgs[defaultArg.argIndex];
-            int diff = 0;
-            auto substArg = oldArg->substituteImpl(m_astBuilder, fullSubst, &diff);
-            if (auto substArgType = as<Type>(substArg))
-                substArg = substArgType->getCanonicalType();
-            if (!oldArg->equals(substArg))
-            {
-                genericArgs[defaultArg.argIndex] = substArg;
-                changed = true;
-            }
-        }
-
-        return changed;
-    };
-
-    auto appendImplicitWitnessArgs = [&](ConversionCost& ioWitnessCost, bool& ioChanged) -> bool
-    {
-        for (auto _genericDecl : genericDecls)
-            for (auto constraintDecl : _genericDecl->getDirectMemberDecls())
-            {
-                ioChanged |= substituteDefaultArgs();
-
-                if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
-                {
-                    auto constraintDeclRef =
-                        getSubstDeclRef(constraintDecl).as<GenericTypeConstraintDecl>();
-
-                    // Extract the (substituted) sub- and super-type from the constraint.
-                    auto sub = getSub(m_astBuilder, constraintDeclRef);
-                    auto sup = getSup(m_astBuilder, constraintDeclRef);
-
-                    // Mark sub type as constrained.
-                    if (auto subDeclRefType =
-                            as<DeclRefType>(constraintDeclRef.getDecl()->sub.type))
-                        constrainedGenericParams.add(subDeclRefType->getDeclRef().getDecl());
-                    else if (auto subEachType = as<EachType>(constraintDeclRef.getDecl()->sub.type))
-                    {
-                        if (auto elementDeclRefType = subEachType->getElementDeclRefType())
-                        {
-                            constrainedGenericParams.add(
-                                elementDeclRefType->getDeclRef().getDecl());
-                        }
-                        else
-                        {
-                            return false;
-                        }
-                    }
-
-                    if (sub->equals(sup) && isDeclRefTypeOf<InterfaceDecl>(sup))
-                    {
-                        // We are trying to use an interface type itself to conform to the
-                        // type constraint. We can reach this case when the user code does
-                        // not provide an explicit type parameter to specialize a generic
-                        // and the type parameter cannot be inferred from any arguments.
-                        // In this case, we should fail the constraint check.
-                        return false;
-                    }
-
-                    // Search for a witness that shows the constraint is satisfied.
-                    SubtypeWitness* subTypeWitness = nullptr;
-                    if (sub == system->subTypeForAdditionalWitnesses)
-                    {
-                        // If we are trying to find the subtype info for a type whose inheritance
-                        // info is being calculated, use what we have already known about the type.
-                        system->additionalSubtypeWitnesses->tryGetValue(sup, subTypeWitness);
-                    }
-                    else
-                    {
-                        // The general case is to initiate a subtype query.
-                        subTypeWitness = isSubtype(
-                            sub,
-                            sup,
-                            system->additionalSubtypeWitnesses ? IsSubTypeOptions::NoCaching
-                                                               : IsSubTypeOptions::None);
-                    }
-
-                    if (genericTypeConstraintDecl->isEqualityConstraint)
-                    {
-                        // If constraint is an equality constraint, we need to make sure
-                        // the witness is equality witness.
-                        if (!isTypeEqualityWitness(subTypeWitness))
-                            subTypeWitness = nullptr;
-                    }
-
-                    bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
-                    bool constraintIsOptional =
-                        constraintDecl->hasModifier<OptionalConstraintModifier>();
-
-                    if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
-                    {
-                        // We found a witness, so it will become an (implicit) argument.
-                        args[_genericDecl].add(subTypeWitness);
-                        ioWitnessCost += subTypeWitness->getOverloadResolutionCost();
-                        ioChanged |= substituteDefaultArgs();
-                    }
-                    else if (!subTypeWitness && constraintIsOptional)
-                    {
-                        // Optional witness failed to resolve; not an error.
-                        auto noneWitness = m_astBuilder->getOrCreate<NoneWitness>();
-                        args[_genericDecl].add(noneWitness);
-                        ioWitnessCost += kConversionCost_FailedOptionalConstraint;
-                        ioChanged |= substituteDefaultArgs();
-                    }
-                    else
-                    {
-                        // No witness was found, so the inference will now fail.
-                        //
-                        // TODO: Ideally we should print an error message in
-                        // this case, to let the user know why things failed.
-                        return false;
-                    }
-
-                    // TODO: We may need to mark some constrains in our constraint
-                    // system as being solved now, as a result of the witness we found.
-                }
-                else if (
-                    auto typeCoercionConstraintDecl =
-                        as<TypeCoercionConstraintDecl>(constraintDecl))
-                {
-                    if (!addTypeCoercionWitnessToArgs(
-                            getASTBuilder(),
-                            this,
-                            typeCoercionConstraintDecl,
-                            genericDeclRef,
-                            nullptr,
-                            &constrainedGenericParams,
-                            args[_genericDecl],
-                            false))
-                    {
-                        return false;
-                    }
-                    ioChanged |= substituteDefaultArgs();
-                }
-                else if (
-                    auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
-                {
-                    Decl* constrainedPackDecl = nullptr;
-                    if (auto declRefExpr = as<DeclRefExpr>(nonEmptyConstraintDecl->packExpr))
-                    {
-                        constrainedPackDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
-                    }
-
-                    Val* constrainedArg = nullptr;
-                    if (auto typePackDecl = as<GenericTypePackParamDecl>(constrainedPackDecl))
-                    {
-                        if (typePackDecl->parameterIndex < args[_genericDecl].getCount())
-                            constrainedArg = args[_genericDecl][typePackDecl->parameterIndex];
-                    }
-                    else if (
-                        auto valuePackDecl = as<GenericValuePackParamDecl>(constrainedPackDecl))
-                    {
-                        if (valuePackDecl->parameterIndex < args[_genericDecl].getCount())
-                            constrainedArg = args[_genericDecl][valuePackDecl->parameterIndex];
-                    }
-
-                    if (!constrainedArg || !isKnownNonEmptyPack(constrainedArg))
-                        return false;
-
-                    args[_genericDecl].add(m_astBuilder->getNonEmptyPackWitness(constrainedArg));
-                    ioChanged |= substituteDefaultArgs();
-                }
-                else if (
-                    auto hasDiffTypeInfoConstraintDecl =
-                        as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
-                {
-                    if (!addHasDiffTypeInfoWitnessToArgs(
-                            getASTBuilder(),
-                            this,
-                            hasDiffTypeInfoConstraintDecl,
-                            genericDeclRef,
-                            nullptr,
-                            &constrainedGenericParams,
-                            args[_genericDecl],
-                            false))
-                    {
-                        return false;
-                    }
-                    ioChanged |= substituteDefaultArgs();
-                }
-            }
-
-        return true;
-    };
-
-    // Default generic arguments can depend on earlier generic arguments, and those
-    // dependencies can be chained through associated types or associated constants:
-    //
-    //     func<T : IFoo, U : IBar = T.Bar, W : IBaz = U.Baz>()
-    //
-    // For a call like `func<ConcreteFoo>()`, solving initially gives us values like
-    // `U = ConcreteFoo.Bar` and `W = U.Baz`. Reducing `ConcreteFoo.Bar` to its real
-    // associated type can make `U = ConcreteBar`, and only another pass can then reduce
-    // `W = U.Baz` to `ConcreteBar.Baz`.
-    //
-    // The reduction needs implicit witnesses: the substitution logic for `ConcreteFoo.Bar`
-    // discovers the concrete associated type through the `ConcreteFoo : IFoo` witness. Witnesses
-    // are also allowed to depend on earlier defaults, as with the `U : IBar` witness needed to
-    // resolve `U.Baz`.
-    //
-    // We therefore resolve implicit witnesses and default ordinary arguments as a fixed point,
-    // and we run default-argument reduction during the same walk that discovers witnesses. After
-    // a pass appends the `T : IFoo` witness, the next constraint can see `U = ConcreteBar`
-    // instead of `U = T.Bar`; after it appends the `U : IBar` witness, the next constraint can
-    // similarly see `W = ConcreteBaz` instead of `W = U.Baz`.
-    //
-    // Each pass starts from the current ordinary arguments, appends temporary witnesses, and uses
-    // the resulting full substitution to reduce default arguments. If a default changes, those
-    // temporary witnesses are discarded and the next pass recomputes witnesses for the updated
-    // ordinary arguments. When a pass makes no default changes, the witnesses appended in that
-    // pass are for the final ordinary argument list and can be kept.
-    //
-    // Only arguments whose winning solver constraint still has default priority are rewritten.
-    // Required or inferred arguments are deliberate choices made by overload resolution and
-    // argument matching; substituting them here can change identity-sensitive values such as
-    // inferred function/operator types even when their printed type text looks the same.
-    //
-    // The number of default argument slots is a conservative iteration bound. In practice each
-    // pass substitutes through the latest full generic application and either makes progress
-    // along a dependency chain (`T.Bar` -> `ConcreteBar`, then `U.Baz` -> `ConcreteBaz`) or stops.
-    Count maxPassCount = substitutableGenericArgs.getCount() + 1;
-    if (maxPassCount < 1)
-        maxPassCount = 1;
-
-    bool solvedImplicitArgs = false;
-    ConversionCost finalWitnessCost = kConversionCost_None;
-    for (Index pass = 0; pass < maxPassCount; pass++)
-    {
-        for (auto _genericDecl : genericDecls)
-        {
-            args[_genericDecl].setCount(ordinaryArgCounts[_genericDecl]);
-        }
-
-        bool passChanged = substituteDefaultArgs();
-        ConversionCost passWitnessCost = kConversionCost_None;
-        if (!appendImplicitWitnessArgs(passWitnessCost, passChanged))
-            return DeclRef<Decl>();
-
-        passChanged |= substituteDefaultArgs();
-        if (!passChanged)
-        {
-            solvedImplicitArgs = true;
-            finalWitnessCost = passWitnessCost;
-            break;
-        }
-    }
-
-    if (!solvedImplicitArgs)
-        return DeclRef<Decl>();
-
-    // Make sure we haven't constructed any spurious constraints
-    // that we aren't able to satisfy:
-    for (auto c : system->constraints)
-    {
-        if (!c.satisfied)
-        {
-            return DeclRef<Decl>();
-        }
-    }
-
-    // Add a flat cost to all unconstrained generic params.
-    for (auto _genericDecl : genericDecls)
-        for (auto typeParamDecl : _genericDecl->getMembersOfType<GenericTypeParamDecl>())
-        {
-            if (!constrainedGenericParams.contains(typeParamDecl))
-                outBaseCost += kConversionCost_UnconstraintGenericParam;
-        }
-
-    // Add the accumulated type promotion cost from constraint solving.
-    // This includes costs from promoting types to satisfy interface constraints
-    // (e.g., int -> float to satisfy __BuiltinFloatingPointType).
-    outBaseCost += system->typePromotionCost + finalWitnessCost;
-
-    DeclRef<Decl> substGenericDeclRef = getSubstDeclRef(genericDeclRef.getDecl()->inner);
-    return substGenericDeclRef;
+    // All state for the two-phase algorithm lives in the solver object.  The
+    // public entry point stays as a small adapter from semantic checking to the
+    // generic-argument solver.
+    GenericConstraintSystemSolver
+        solver(this, system, genericDeclRef, knownGenericArgs, outBaseCost);
+    return solver.solve();
 }
 
 bool SemanticsVisitor::TryUnifyVals(
@@ -1366,14 +2225,8 @@ bool SemanticsVisitor::TryUnifyVals(
     const auto sndInt = as<IntVal>(snd);
     if (fstInt && sndInt)
     {
-        const auto paramUnderCast = [](IntVal* i)
-        {
-            if (const auto c = as<TypeCastIntVal>(i))
-                i = as<IntVal>(c->getBase());
-            return as<DeclRefIntVal>(i);
-        };
-        auto fstParam = paramUnderCast(fstInt);
-        auto sndParam = paramUnderCast(sndInt);
+        auto fstParam = getDeclRefIntValUnderCast(fstInt);
+        auto sndParam = getDeclRefIntValUnderCast(sndInt);
 
         bool okay = false;
         if (fstParam)
@@ -1476,10 +2329,8 @@ bool SemanticsVisitor::TryUnifyVals(
     else if ((fstNoneWitness && sndSubtypeWitness) || (fstSubtypeWitness && sndNoneWitness))
         return false;
 
-    SLANG_UNIMPLEMENTED_X("value unification case");
-
     // default: fail
-    // return false;
+    return false;
 }
 
 bool SemanticsVisitor::tryUnifyDeclRef(
@@ -1566,6 +2417,7 @@ bool SemanticsVisitor::TryUnifyTypeParam(
     constraint.priority = unificationContext.optionalConstraint ? ConstraintPriority::Optional
                                                                 : ConstraintPriority::Required;
     constraint.isEquality = unificationContext.equalityConstraint;
+    constraint.isGenericParamBound = unificationContext.genericParamBoundConstraint;
     constraints.constraints.add(constraint);
 
     return true;
@@ -1598,6 +2450,7 @@ bool SemanticsVisitor::TryUnifyIntParam(
         val = cast;
     }
     constraint.val = val;
+    constraint.isGenericParamBound = unifyCtx.genericParamBoundConstraint;
 
     constraints.constraints.add(constraint);
 
@@ -1623,6 +2476,7 @@ bool SemanticsVisitor::TryUnifyIntParam(
         constraint.val = val;
         constraint.priority = unifyCtx.optionalConstraint ? ConstraintPriority::Optional
                                                           : ConstraintPriority::Required;
+        constraint.isGenericParamBound = unifyCtx.genericParamBoundConstraint;
         constraints.constraints.add(constraint);
         return true;
     }
@@ -1932,6 +2786,28 @@ struct IndexSpanPair
     }
 };
 
+QualType getMappedQualTypeForConstraint(
+    ASTBuilder* astBuilder,
+    const IndexSpan& span,
+    ShortList<Type*>& typeList,
+    bool isLeftValue,
+    Type* otherType)
+{
+    // When the opposite side is a pack parameter or expansion, the mapped span
+    // stays bundled so recursive unification sees a pack-shaped value.
+    if (isDeclRefTypeOf<GenericTypePackParamDecl>(otherType) || as<ExpandType>(otherType))
+    {
+        auto typesView = makeArrayView(&typeList[span.index], span.count);
+        auto typePack = astBuilder->getTypePack(typesView);
+        return QualType(typePack, isLeftValue);
+    }
+
+    // Non-pack mappings are valid only for a single element; the caller already
+    // asserted the mapping cardinality before asking for a `QualType`.
+    SLANG_ASSERT(span.count == 1);
+    return QualType(typeList[span.index], isLeftValue);
+}
+
 // Helper function to unwrap a type and count expandable types
 static void unwrapTypeAndCountExpandable(
     Type* type,
@@ -2138,36 +3014,15 @@ bool SemanticsVisitor::TryUnifyTypes(
             SLANG_ASSERT(mapping.first.count > 0 && mapping.second.count > 0);
             SLANG_ASSERT(mapping.first.count == 1 || mapping.second.count == 1);
 
-            // Helper function to create QualType from mapping span
-            auto mayPackAndGetQualType = [this](
-                                             const IndexSpan& span,
-                                             ShortList<Type*>& typeList,
-                                             bool isLeftValue,
-                                             Type* otherType) -> QualType
-            {
-                // When the `otherType` is GenericTypePackParamDecl or ExpandType,
-                // we need to create a ConcreteTypePack so that we can handle them
-                // recursively.
-                if (isDeclRefTypeOf<GenericTypePackParamDecl>(otherType) ||
-                    as<ExpandType>(otherType))
-                {
-                    // Multiple types: create ConcreteTypePack
-                    auto typesView = makeArrayView(&typeList[span.index], span.count);
-                    auto typePack = m_astBuilder->getTypePack(typesView);
-                    return QualType(typePack, isLeftValue);
-                }
-
-                SLANG_ASSERT(span.count == 1);
-                return QualType(typeList[span.index], isLeftValue);
-            };
-
             // Get the types directly from the mapping
-            QualType firstArg = mayPackAndGetQualType(
+            QualType firstArg = getMappedQualTypeForConstraint(
+                m_astBuilder,
                 mapping.first,
                 flattenedFirst,
                 fst.isLeftValue,
                 flattenedSecond[mapping.second.index]);
-            QualType secondArg = mayPackAndGetQualType(
+            QualType secondArg = getMappedQualTypeForConstraint(
+                m_astBuilder,
                 mapping.second,
                 flattenedSecond,
                 snd.isLeftValue,
