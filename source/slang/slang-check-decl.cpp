@@ -9162,7 +9162,6 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
             synFunc->operands.add(applyBwdDeclRef);
             synFunc->operands.add(rematFuncDeclRef);
             synFunc->operands.add(bwdPropFnDeclRef);
-
             break;
         }
     case BuiltinRequirementKind::BwdCallableRematFunc:
