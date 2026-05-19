@@ -22,11 +22,11 @@ void rayGenMain(uniform PushConstants pushConstants)
     // CHECK-DAG: %[[AS_TYPE:[A-Za-z0-9_]+]] = OpTypeAccelerationStructureKHR
     // CHECK-DAG: %[[AS_HEAP_ARRAY:[A-Za-z0-9_]+]] = OpTypeRuntimeArray %[[AS_TYPE]]
     // CHECK-DAG: OpDecorate %[[AS_HEAP_ARRAY]] ArrayStride 32
+    // CHECK-DAG: OpCapability RayTracingKHR
     // CHECK: OpUntypedAccessChainKHR %_ptr_UniformConstant %[[AS_HEAP_ARRAY]] %slang_resourceHeap
     // CHECK-NEXT: %[[AS_ADDR:[A-Za-z0-9_]+]] = OpLoad %[[U64]]
     // CHECK-NEXT: OpConvertUToAccelerationStructureKHR %[[AS_TYPE]] %[[AS_ADDR]]
-    // CHECK-DAG: OpCapability RayTracingKHR
-    // CHECK-NOT: OpCapability RayQueryKHR
+    // CHECK: OpTraceRayKHR
     RaytracingAccelerationStructure scene =
         RaytracingAccelerationStructure(pushConstants.accelerationStructure);
 
