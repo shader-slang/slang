@@ -17049,7 +17049,6 @@ uint WaveGetWaveIndex()
         return __builtinWaveIndex;
     case wgsl:
         __requireTargetExtension("subgroups");
-        __requireTargetExtension("subgroup_id");
         __stage_switch
         {
         case compute:
