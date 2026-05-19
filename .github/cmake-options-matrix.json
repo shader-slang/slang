@@ -30,6 +30,10 @@
       "value_debug": "OFF",
       "value_release": "ON"
     },
+    {
+      "option": "SLANG_ENABLE_WEBGPU",
+      "windows_only": "true"
+    },
     { "option": "SLANG_EXCLUDE_DAWN" },
     { "option": "SLANG_EXCLUDE_TINT" },
     { "option": "SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC" },

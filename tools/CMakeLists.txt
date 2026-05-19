@@ -280,6 +280,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             copy-dxcompiler
             copy-dxil
             copy-webgpu_dawn
+            copy-dawn
             copy-slang-tint
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}

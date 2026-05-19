@@ -174,6 +174,16 @@ option(
     ON
 )
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
+if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+    set(SLANG_ENABLE_WEBGPU_DEFAULT ON)
+else()
+    set(SLANG_ENABLE_WEBGPU_DEFAULT OFF)
+endif()
+advanced_option(
+    SLANG_ENABLE_WEBGPU
+    "Enable native WebGPU support through Dawn"
+    ${SLANG_ENABLE_WEBGPU_DEFAULT}
+)
 
 option(
     SLANG_GITHUB_TOKEN
@@ -309,6 +319,18 @@ advanced_option(
     "Optionally exclude webgpu_dawn from the build"
     OFF
 )
+if(SLANG_EXCLUDE_DAWN AND SLANG_ENABLE_WEBGPU)
+    message(
+        STATUS
+        "SLANG_EXCLUDE_DAWN=ON disables SLANG_ENABLE_WEBGPU because WebGPU requires Dawn"
+    )
+    set(SLANG_ENABLE_WEBGPU
+        OFF
+        CACHE BOOL
+        "Enable native WebGPU support through Dawn"
+        FORCE
+    )
+endif()
 
 advanced_option(
     SLANG_EXCLUDE_TINT
@@ -389,7 +411,7 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     )
 endif()
 
-if(NOT SLANG_EXCLUDE_DAWN)
+if(SLANG_ENABLE_WEBGPU AND NOT SLANG_EXCLUDE_DAWN)
     if(NOT DEFINED SLANG_WEBGPU_DAWN_BINARY_URL)
         set(webgpu_dawn_release_tag "webgpu_dawn-0")
         if(
@@ -557,6 +579,36 @@ if(SLANG_WEBGPU_DAWN_BINARY_URL)
         IGNORE_FAILURE
         SLANG_GITHUB_TOKEN ${SLANG_GITHUB_TOKEN}
     )
+endif()
+
+# slang-rhi copies Dawn next to executables. On non-Windows builds, render-test
+# is a module under lib/ and the WGPU loader expects Dawn next to that module.
+if(
+    SLANG_ENABLE_WEBGPU
+    AND TARGET slang-rhi-copy-files
+    AND CMAKE_SYSTEM_NAME MATCHES "Linux|Darwin"
+)
+    set(slang_dawn_shared_library
+        "${CMAKE_SHARED_LIBRARY_PREFIX}dawn${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    )
+    set(slang_dawn_runtime_path
+        "${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/${slang_dawn_shared_library}"
+    )
+    set(slang_dawn_module_path
+        "${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}/${slang_dawn_shared_library}"
+    )
+    add_custom_target(
+        copy-dawn
+        COMMAND
+            ${CMAKE_COMMAND} -E make_directory
+            "${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}"
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_if_different "${slang_dawn_runtime_path}"
+            "${slang_dawn_module_path}"
+        DEPENDS slang-rhi-copy-files
+        VERBATIM
+    )
+    set_target_properties(copy-dawn PROPERTIES FOLDER generated)
 endif()
 
 # slang-tint is only available as a fetched shared library, since it's hosted in the Dawn

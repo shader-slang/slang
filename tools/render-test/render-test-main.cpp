@@ -1885,12 +1885,8 @@ static SlangResult _innerMain(
         else
             desc.slang.targetFlags = 0;
 
-        List<const char*> requiredFeatureList;
-        for (auto& name : options.renderFeatures)
-            requiredFeatureList.add(name.getBuffer());
-
-        desc.requiredFeatures = requiredFeatureList.getBuffer();
-        desc.requiredFeatureCount = (int)requiredFeatureList.getCount();
+        desc.requiredFeatures = options.renderFeatures.getBuffer();
+        desc.requiredFeatureCount = (uint32_t)options.renderFeatures.getCount();
 
 #if defined(_WIN32)
         // When the experimental feature is enabled, things become unstable.
@@ -1980,9 +1976,9 @@ static SlangResult _innerMain(
             deviceWrapper = CachedDeviceWrapper(rhiDevice);
         }
 
-        for (const auto& feature : requiredFeatureList)
+        for (const auto& feature : options.renderFeatures)
         {
-            // If doesn't have required feature... we have to give up
+            // If does not have required feature... we have to give up.
             if (!deviceWrapper->hasFeature(feature))
             {
                 return SLANG_E_NOT_AVAILABLE;
