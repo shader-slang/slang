@@ -93,8 +93,8 @@ time. For the current line-coverage mode, `getEntryCount()` equals
 `getCounterCount()`, `CoverageEntryInfo::kind` is `Line`, and
 `CoverageEntryInfo::counterIndex` selects the runtime counter slot.
 Future branch, function, and source-region coverage can add entries
-that carry function names, branch arm identity, source ranges, or
-alternate counter modes without changing the binding contract.
+that carry function names, branch arm identity, or source ranges without
+changing the binding contract.
 
 Hosts use `ICoverageTracingMetadata` when they need to interpret the
 counter values they read back, or emit LCOV or manifest output.

@@ -373,11 +373,12 @@ with `CoverageEntryInfo::kind == Line`,
 `counterMode == Count`, and `counterIndex` pointing at the runtime
 counter slot. The same object already has room for future branch,
 function, and lower-density region entries: ranges, function names,
-branch site/arm ids, and alternate counter modes live on
-`CoverageEntryInfo`, while `getCounterCount()` continues to describe
-the size of the runtime counter buffer. LCOV remains a compatibility
-export (`DA:`, `FN/FNDA:`, `BRDA:`), not the only internal coverage
-model.
+and branch site/arm ids live on `CoverageEntryInfo`, while
+`getCounterCount()` continues to describe the size of the runtime
+counter buffer. `CoverageCounterMode` currently defines only `Count`;
+additional counter interpretations should be appended when a concrete
+mode is implemented. LCOV remains a compatibility export (`DA:`,
+`FN/FNDA:`, `BRDA:`), not the only internal coverage model.
 
 ### New LCOV record types
 
@@ -414,8 +415,9 @@ profiling ecosystem.
 - **Hot-line profiling.** Sample the same counters over time for
   per-line heatmaps. No external profiler install required;
   cross-vendor.
-- **Per-warp / per-thread attribution.** Divergence coverage on
-  CUDA / SPIR-V; counters become 2D (slot × lane).
+- **Per-lane attribution.** Divergence-oriented reporting would need
+  dedicated metadata and storage semantics when implemented; it is not
+  part of the current source-coverage API.
 - **Native vendor-tool exports.** Nsight, RenderDoc, PIX — so
   graphics engineers see coverage in tools they already use.
 

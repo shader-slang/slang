@@ -4555,8 +4555,8 @@ Lifetime and ownership:
 
 Future coverage modes:
   - this interface is intended to grow to cover richer reporting modes
-    such as branch coverage, function coverage, binary
-    covered/uncovered reporting, or warp-aggregated coverage
+    such as branch coverage, function coverage, and source-region
+    coverage
   - callers should not assume that future revisions will always model
     one entry as one source line or one counter value as an exact hit
     count
@@ -4587,8 +4587,6 @@ enum class CoverageEntryKind : uint32_t
 enum class CoverageCounterMode : uint32_t
 {
     Count = 0,
-    Binary = 1,
-    Warp = 2,
 };
 
 enum class CoverageBranchArmKind : uint32_t
@@ -4637,7 +4635,9 @@ struct CoverageEntryInfo
     /// Semantic kind of this source coverage entry.
     CoverageEntryKind kind = CoverageEntryKind::Unknown;
 
-    /// Runtime accumulation mode for `counterIndex`.
+    /// Runtime accumulation mode for `counterIndex`. The current
+    /// implementation only defines `Count`; future concrete modes can
+    /// be appended when implemented.
     CoverageCounterMode counterMode = CoverageCounterMode::Count;
 
     /// 1-based inclusive start column for this entry, or 0 when

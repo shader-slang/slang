@@ -177,11 +177,12 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     // storage through `line`. The implementation must accept that
     // structSize and must not write tail fields.
     {
+        auto counterModeSentinel = static_cast<slang::CoverageCounterMode>(0x12345678u);
         slang::CoverageEntryInfo entry;
         entry.structSize = SLANG_OFFSET_OF(slang::CoverageEntryInfo, line) + sizeof(uint32_t);
         entry.counterIndex = 0x12345678u;
         entry.kind = slang::CoverageEntryKind::Function;
-        entry.counterMode = slang::CoverageCounterMode::Warp;
+        entry.counterMode = counterModeSentinel;
         entry.startColumn = 77;
         entry.endLine = 88;
         entry.endColumn = 99;
@@ -195,7 +196,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(entry.line > 0);
         SLANG_CHECK(entry.counterIndex == 0x12345678u);
         SLANG_CHECK(entry.kind == slang::CoverageEntryKind::Function);
-        SLANG_CHECK(entry.counterMode == slang::CoverageCounterMode::Warp);
+        SLANG_CHECK(entry.counterMode == counterModeSentinel);
         SLANG_CHECK(entry.startColumn == 77);
         SLANG_CHECK(entry.endLine == 88);
         SLANG_CHECK(entry.endColumn == 99);

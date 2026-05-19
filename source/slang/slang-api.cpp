@@ -1163,12 +1163,10 @@ static const char* _getCoverageCounterModeName(slang::CoverageCounterMode mode)
 {
     switch (mode)
     {
-    case slang::CoverageCounterMode::Binary:
-        return "binary";
-    case slang::CoverageCounterMode::Warp:
-        return "warp";
-    default:
+    case slang::CoverageCounterMode::Count:
         return "count";
+    default:
+        return "unknown";
     }
 }
 
