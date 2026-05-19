@@ -847,12 +847,9 @@ struct AssignValsFromLayoutContext
         if (accelerationStructure && isDescriptorHandleType(dstCursor))
         {
             DescriptorHandle handle;
-            auto result = accelerationStructure->getDescriptorHandle(&handle);
-            if (SLANG_SUCCEEDED(result))
-            {
-                SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
-                return SLANG_OK;
-            }
+            SLANG_RETURN_ON_FAIL(accelerationStructure->getDescriptorHandle(&handle));
+            SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+            return SLANG_OK;
         }
 
         dstCursor.setBinding(accelerationStructure);
