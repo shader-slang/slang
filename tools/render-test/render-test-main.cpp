@@ -844,7 +844,7 @@ struct AssignValsFromLayoutContext
         ShaderInputLayout::AccelerationStructureVal* srcVal)
     {
         SLANG_UNUSED(srcVal);
-        if (isDescriptorHandleType(dstCursor))
+        if (accelerationStructure && isDescriptorHandleType(dstCursor))
         {
             DescriptorHandle handle;
             auto result = accelerationStructure->getDescriptorHandle(&handle);
