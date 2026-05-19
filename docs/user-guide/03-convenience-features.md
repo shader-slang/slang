@@ -662,7 +662,7 @@ void test()
 When targeting SPIR-V, Slang can generate two flavors of code for descriptor handles depending on whether
 the `spvDescriptorHeapEXT` capability is declared or requested on the compilation request.
 
-### Default SPIR-V Behavior
+### Default Slang Behavior
 
 Without requesting `spvDescriptorHeapEXT`, Slang introduces a global array of descriptors and fetches
 from it. The descriptor set ID of the global descriptor array can be configured with the
