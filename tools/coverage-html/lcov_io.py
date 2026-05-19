@@ -129,14 +129,41 @@ class Function:
 
 
 @dataclass
-class AuthFileSummary:
-    """Per-file totals from the `llvm-cov report` text dump.
+class Region:
+    """One LLVM coverage region.
 
-    These are the numbers CI's coverage dashboard quotes — they differ
-    from a verbose `llvm-cov export -format=lcov` output because
-    `llvm-cov report` collapses templated/inlined entries that the
-    LCOV form keeps separate. When supplied via the `--auth-summary`
-    flag, they override LCOV-derived totals on FileRecord.
+    Region coverage is an LLVM-specific metric that counts source
+    spans (typically basic blocks) rather than whole lines or
+    branches. Standard LCOV has no record type for regions; only the
+    `llvm-cov export -format=json` input populates this list.
+
+    `count` is the execution count for the region (0 = not covered).
+    Used today for index/per-file totals; per-line region overlay
+    on the source view is a follow-up that can read these directly.
+    """
+
+    line_start: int
+    line_end: int
+    count: int = 0
+
+
+@dataclass
+class AuthFileSummary:
+    """Per-file authoritative totals.
+
+    Two producers populate this:
+
+    * `parse_llvm_cov_report` (text dump → per-file totals via
+      `--auth-summary`). LCOV-input path. Lines / functions / branches
+      come from the report; regions are present too — the LCOV input
+      itself can't carry them.
+    * `parse_llvm_cov_json` (the `llvm-cov export -format=json`
+      `summary` block per file). JSON-input path. All four metrics
+      come from the same source so the override is total, not partial.
+
+    When attached to a `FileRecord` via `auth_override`, the
+    record's totals/percent properties read from here instead of the
+    record's own dict-derived counters.
     """
 
     line_total: int = 0
@@ -145,6 +172,8 @@ class AuthFileSummary:
     func_missed: int = 0
     branch_total: int = 0
     branch_missed: int = 0
+    region_total: int = 0
+    region_missed: int = 0
 
     @property
     def line_hit(self) -> int:
@@ -157,6 +186,10 @@ class AuthFileSummary:
     @property
     def branch_hit(self) -> int:
         return self.branch_total - self.branch_missed
+
+    @property
+    def region_hit(self) -> int:
+        return self.region_total - self.region_missed
 
 
 @dataclass
@@ -189,17 +222,19 @@ class FileRecord:
     lines: Dict[int, int] = field(default_factory=dict)
     branches: Dict[Tuple[int, int, int], Optional[int]] = field(default_factory=dict)
     functions: Dict[str, Function] = field(default_factory=dict)
+    regions: List[Region] = field(default_factory=list)
     reported_lf: Optional[int] = None
     reported_lh: Optional[int] = None
     reported_brf: Optional[int] = None
     reported_brh: Optional[int] = None
     reported_fnf: Optional[int] = None
     reported_fnh: Optional[int] = None
-    # When set (via --auth-summary), the totals/percent properties
-    # below return values from the authoritative `llvm-cov report`
-    # numbers instead of the LCOV-derived ones. The lines / branches /
-    # functions dicts themselves are NOT overridden — per-line and
-    # per-function rendering keeps using the LCOV detail.
+    # Authoritative per-file totals. Set by --auth-summary on the LCOV
+    # path or by the JSON parser (which always populates it from the
+    # per-file summary block). When set, the totals/percent properties
+    # below return values from here; the dict-shaped lines / branches /
+    # functions / regions data still drives per-line and per-function
+    # rendering.
     auth_override: Optional[AuthFileSummary] = None
 
     # --- line coverage ---
@@ -347,6 +382,34 @@ class FileRecord:
         if total == 0:
             return 0.0
         return 100.0 * self.hit_functions / total
+
+    # --- region coverage (LLVM JSON path only) ---
+    #
+    # Regions don't exist in LCOV. When auth_override is set we trust
+    # its region totals (populated by the JSON parser's per-file
+    # summary, or carried through from `llvm-cov report`'s Regions
+    # column on the LCOV+--auth-summary path). When it's unset, the
+    # `regions` list itself is the source of truth — non-zero `count`
+    # is treated as covered.
+
+    @property
+    def total_regions(self) -> int:
+        if self.auth_override is not None:
+            return self.auth_override.region_total
+        return len(self.regions)
+
+    @property
+    def hit_regions(self) -> int:
+        if self.auth_override is not None:
+            return self.auth_override.region_hit
+        return sum(1 for r in self.regions if r.count > 0)
+
+    @property
+    def percent_regions(self) -> float:
+        total = self.total_regions
+        if total == 0:
+            return 0.0
+        return 100.0 * self.hit_regions / total
 
 
 def function_branch_coverage(record: FileRecord) -> Dict[str, Tuple[int, int]]:
@@ -755,8 +818,8 @@ def write_lcov(
 #   Executed%, Lines, MissedLines, Cover%, Branches, MissedBranches,
 #   Cover%
 # Cover/Executed cells are `-` when the corresponding total is zero.
-# We only consume the integer columns (4, 5, 7, 8, 10, 11) and
-# recompute percentages from total/missed.
+# We consume the six integer total/missed columns and recompute
+# percentages from total/missed.
 
 
 def parse_llvm_cov_report(path: str) -> AuthSummary:
@@ -783,6 +846,8 @@ def parse_llvm_cov_report(path: str) -> AuthSummary:
         if len(parts) != 13:
             continue
         try:
+            regions = int(parts[1])
+            miss_regions = int(parts[2])
             funcs = int(parts[4])
             miss_funcs = int(parts[5])
             lines_ = int(parts[7])
@@ -798,6 +863,8 @@ def parse_llvm_cov_report(path: str) -> AuthSummary:
             func_missed=miss_funcs,
             branch_total=brs,
             branch_missed=miss_brs,
+            region_total=regions,
+            region_missed=miss_regions,
         )
         name = parts[0].strip()
         if name == "TOTAL":
@@ -811,17 +878,23 @@ def _merge_file_summaries(items: List[AuthFileSummary]) -> AuthFileSummary:
     """Combine a list of summaries by max(total) and min(missed).
 
     For a single file across N OSes: merged.total is the largest
-    line/func/branch count any OS reported (union of source locations
-    after #ifdef expansion); merged.missed is the smallest count any
-    OS reported (best coverage). The pair is an upper bound — true
-    merged numbers from a max-aggregated LCOV may be slightly tighter,
-    but they're not derivable from per-OS report text alone.
+    line/func/branch/region count any OS reported (union of source
+    locations after #ifdef expansion); merged.missed is the smallest
+    count any OS reported (best coverage). The pair is an upper bound
+    — true merged numbers from a max-aggregated LCOV may be slightly
+    tighter, but they're not derivable from per-OS report text alone.
+
+    Regions are present only on Linux/macOS (Windows OpenCppCoverage
+    has no region instrumentation), so the gating on `region_total > 0`
+    means a Windows-only entry doesn't fake-zero the merged region
+    count.
     """
     if not items:
         return AuthFileSummary()
     line_items = [i for i in items if i.line_total > 0]
     func_items = [i for i in items if i.func_total > 0]
     br_items = [i for i in items if i.branch_total > 0]
+    region_items = [i for i in items if i.region_total > 0]
     return AuthFileSummary(
         line_total=max((i.line_total for i in items), default=0),
         line_missed=min((i.line_missed for i in line_items), default=0),
@@ -829,6 +902,8 @@ def _merge_file_summaries(items: List[AuthFileSummary]) -> AuthFileSummary:
         func_missed=min((i.func_missed for i in func_items), default=0),
         branch_total=max((i.branch_total for i in items), default=0),
         branch_missed=min((i.branch_missed for i in br_items), default=0),
+        region_total=max((i.region_total for i in items), default=0),
+        region_missed=min((i.region_missed for i in region_items), default=0),
     )
 
 
@@ -845,7 +920,12 @@ def merge_auth_summaries(summaries: List[AuthSummary]) -> AuthSummary:
     totals = [
         s.total
         for s in summaries
-        if s.total.line_total or s.total.func_total or s.total.branch_total
+        if (
+            s.total.line_total
+            or s.total.func_total
+            or s.total.branch_total
+            or s.total.region_total
+        )
     ]
     if totals:
         out.total = _merge_file_summaries(totals)
@@ -856,23 +936,17 @@ def write_llvm_cov_report(summary: AuthSummary, out: IO[str]) -> None:
     """Serialize an AuthSummary back to `llvm-cov report`-shaped text.
 
     Used by the merger to emit a combined per-file summary derived
-    from per-OS report text. The Regions column is not tracked in our
-    data model, so we emit Lines/MissedLines as filler in those slots
-    — the `parse_llvm_cov_report` consumer ignores the Regions
-    columns. Percentages are computed from total/missed and emit `-`
-    when the corresponding total is zero.
+    from per-OS report text. Percentages are computed from total/missed
+    and emit `-` when the corresponding total is zero.
     """
 
     def _pct(hit: int, total: int) -> str:
         return "-" if total <= 0 else f"{100.0 * hit / total:.2f}%"
 
     def _row(name: str, fs: AuthFileSummary) -> str:
-        # Filler Regions/MissedRegions columns mirror Lines/MissedLines.
-        regions = fs.line_total
-        miss_regions = fs.line_missed
         return (
             f"{name:<100}"
-            f" {regions:>10} {miss_regions:>17} {_pct(regions - miss_regions, regions):>9}"
+            f" {fs.region_total:>10} {fs.region_missed:>17} {_pct(fs.region_hit, fs.region_total):>9}"
             f" {fs.func_total:>11} {fs.func_missed:>17} {_pct(fs.func_hit, fs.func_total):>9}"
             f" {fs.line_total:>11} {fs.line_missed:>17} {_pct(fs.line_hit, fs.line_total):>9}"
             f" {fs.branch_total:>11} {fs.branch_missed:>17} {_pct(fs.branch_hit, fs.branch_total):>9}\n"
@@ -882,6 +956,7 @@ def write_llvm_cov_report(summary: AuthSummary, out: IO[str]) -> None:
         summary.total.line_total
         or summary.total.func_total
         or summary.total.branch_total
+        or summary.total.region_total
     )
 
     header = (
