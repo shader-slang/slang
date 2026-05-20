@@ -113,6 +113,34 @@ any allowed `slang-test` directive.
 | `structuredbuffer-readonly-hlsl-emit.slang`       | functional | `#buffer-types`                                                           |
 | `byteaddressbuffertype-hlsl-emit.slang`           | functional | `#buffer-types`                                                           |
 | `texturetype-samplerstate-hlsl-emit.slang`        | functional | `#resource-and-texture-type-families`                                     |
+| `basictype-int8-min-max.slang`                    | boundary   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `basictype-uint8-zero-and-max.slang`              | boundary   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `basictype-uint-wrap-overflow.slang`              | boundary   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `basictype-int-min-max.slang`                     | boundary   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `basictype-float-extremes.slang`                  | boundary   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `basictype-half-arithmetic.slang`                 | boundary   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `basictype-literal-too-large-for-uint64.slang`    | negative   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vectortype-vec2-smallest.slang`                  | boundary   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vectortype-mixed-arithmetic.slang`               | boundary   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vectortype-vec4-full-swizzle.slang`              | boundary   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `matrixtype-2x2-square.slang`                     | boundary   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `matrixtype-4x4-square-stress.slang`              | stress     | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `matrixtype-3x2-rectangular.slang`                | boundary   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `arraytype-single-element.slang`                  | boundary   | `#aggregate-collection-types`                                             |
+| `arraytype-multi-dim-2x3.slang`                   | boundary   | `#aggregate-collection-types`                                             |
+| `arraytype-stress-16-elements.slang`              | stress     | `#aggregate-collection-types`                                             |
+| `ptrtype-alias-roundtrip.slang`                   | boundary   | `#pointer-reference-parameter-passing-types`                              |
+| `nullptrtype-equality.slang`                      | boundary   | `#pointer-reference-parameter-passing-types`                              |
+| `optionaltype-optional-of-float.slang`            | boundary   | `#aggregate-collection-types`                                             |
+| `optionaltype-optional-of-bool.slang`             | boundary   | `#aggregate-collection-types`                                             |
+| `optionaltype-nested-stress.slang`                | stress     | `#aggregate-collection-types`                                             |
+| `functype-zero-param.slang`                       | boundary   | `#functype`                                                               |
+| `functype-eight-param-stress.slang`               | stress     | `#functype`                                                               |
+| `andtype-three-way-conjunction.slang`             | stress     | `#andtype`                                                                |
+| `constantbuffertype-single-scalar.slang`          | boundary   | `#parameter-group-constant-buffer-types`                                  |
+| `parameterblocktype-struct-of-arrays.slang`       | boundary   | `#parameter-group-constant-buffer-types`                                  |
+| `stringtype-empty-literal.slang`                  | boundary   | `#string-dynamic-misc`                                                    |
+| `stringtype-long-literal-stress.slang`            | stress     | `#string-dynamic-misc`                                                    |
 
 ## Doc gaps observed
 

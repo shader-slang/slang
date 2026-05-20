@@ -134,6 +134,38 @@ text and are out of scope.
 | `for-loop-structured-control-flow.slang`          | functional | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
 | `debug-info-opt-in-default-off.slang`             | functional | `#option-set-toggles`                                                     |
 | `primitive-type-emission.slang`                   | functional | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `add-uint32-max-overflow.slang`                   | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `int32-min-literal.slang`                         | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `uint32-max-literal.slang`                        | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `float-negative-zero-constant.slang`              | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `float-divide-by-zero-runtime.slang`              | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `float-inf-plus-inf-runtime.slang`                | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `uint16-storage-buffer-16bit-capability.slang`    | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `int64-storage-buffer-int64-capability.slang`     | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `double-storage-buffer-float64-capability.slang`  | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `half-storage-buffer-float16-capability.slang`    | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `binding-explicit-vk-binding.slang`               | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `binding-zero-descriptor-set-zero.slang`          | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `struct-offset-zero-first-member.slang`           | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `struct-offset-large-third-member.slang`          | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `array-stride-int8-element.slang`                 | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `array-stride-struct-element-large.slang`         | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `numthreads-localsize-1024-x.slang`               | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `numthreads-localsize-asymmetric-xyz.slang`       | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `matrix-4x4-emit.slang`                           | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `vector-swizzle-wxyz-shuffle.slang`               | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `switch-many-cases-ten-plus-default.slang`        | stress     | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `switch-one-case-plus-default.slang`              | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `entry-point-fragment-origin-upper-left.slang`    | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `entry-point-vertex-position.slang`               | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `eliminate-phis-deeply-nested-branches.slang`     | stress     | `#eliminatephis-with-spir-v-specific-options`                             |
+| `nested-loops-three-deep.slang`                   | stress     | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `image-subscript-at-origin-zero-zero.slang`       | boundary   | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `constant-buffer-scalar-uniform.slang`            | boundary   | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `uniform-constant-texture-sampler-pair.slang`     | boundary   | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `atomic-on-workgroup-storage.slang`               | boundary   | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `negative-out-of-bound-static-array-index.slang`  | negative   | `#phase-b-specialization-and-type-legalization`                           |
+| `negative-undefined-identifier.slang`             | negative   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
 
 ## Doc gaps observed
 

@@ -760,7 +760,7 @@ bundles:
       - source/slang/slang-lower-to-ir.cpp
     runner:
       category: agentic-ir
-    size_cap_files: 60
+    size_cap_files: 100
 
   ir-reference/differentiation:
     prompt: prompts/ir-reference-differentiation.md

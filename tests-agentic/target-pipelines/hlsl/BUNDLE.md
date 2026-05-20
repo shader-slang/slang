@@ -114,6 +114,44 @@ specifically about HLSL being non-Khronos.
 | `float-vector-keeps-hlsl-spelling.slang`              | functional | `#phase-d-hlsl-emit-and-downstream-tools`                 |
 | `groupshared-memory-survives.slang`                   | functional | `#phase-d-hlsl-emit-and-downstream-tools`                 |
 | `atomic-operation-survives.slang`                     | functional | `#phase-c-hlsl-legalization-lowering-phi-elimination`     |
+| `register-u-explicit-zero.slang`                      | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `register-u-explicit-high-index.slang`                | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `register-t-explicit-zero.slang`                      | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `register-b-explicit-zero.slang`                      | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `register-conflicting-bindings-diag.slang`            | negative   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `cbuffer-single-scalar.slang`                         | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `cbuffer-array-of-row-major-matrix.slang`             | boundary   | `#wrapstructuredbuffersofmatrices`                        |
+| `cbuffer-many-mixed-fields.slang`                     | stress     | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `uint-literal-max-emits-decimal-u.slang`              | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `uint-literal-zero.slang`                             | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `int-literal-min-emits-decimal.slang`                 | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `int-literal-max-emits-decimal.slang`                 | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `float-positive-infinity-divide.slang`                | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `float-nan-divide.slang`                              | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `float-largest-finite.slang`                          | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `float-smallest-subnormal.slang`                      | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `float-negative-zero-literal.slang`                   | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `numthreads-one-one-one.slang`                        | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `numthreads-max-x-1024.slang`                         | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `numthreads-zero-rejected-diag.slang`                 | negative   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `cbuffer-column-major-matrix.slang`                   | boundary   | `#wrapstructuredbuffersofmatrices`                        |
+| `cbuffer-default-matrix-no-qualifier.slang`           | boundary   | `#wrapstructuredbuffersofmatrices`                        |
+| `row-major-inout-function-param.slang`                | boundary   | `#wrapstructuredbuffersofmatrices`                        |
+| `nvapi-guard-present-without-nv-intrinsic.slang`      | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `nvapi-guard-with-wave-intrinsic.slang`               | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `logical-and-short-circuit-side-effect.slang`         | boundary   | `#phase-c-hlsl-legalization-lowering-phi-elimination`     |
+| `logical-or-short-circuit-side-effect.slang`          | boundary   | `#phase-c-hlsl-legalization-lowering-phi-elimination`     |
+| `constant-buffer-scalar-element.slang`                | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture2d-sample-origin-corner.slang`                | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `vk-binding-ignored-on-hlsl.slang`                    | boundary   | `#hlsl-specific-runtime-predicates`                       |
+| `profile-cs-6-0-emits-prelude.slang`                  | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `profile-cs-6-8-emits-prelude.slang`                  | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `profile-unknown-rejected-diag.slang`                 | negative   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `stress-resource-array-eight-uavs.slang`              | stress     | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `stress-deeply-nested-if-else.slang`                  | stress     | `#eliminatephis-with-default-options`                     |
+| `stress-all-paths-return.slang`                       | stress     | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `stress-structured-buffer-of-double-matrix.slang`     | stress     | `#wrapstructuredbuffersofmatrices`                        |
+| `structured-buffer-of-float-no-wrap.slang`            | boundary   | `#wrapstructuredbuffersofmatrices`                        |
 
 ## Doc gaps observed
 

@@ -112,6 +112,42 @@ rest of the catalog without repeating those.
 | `samplerstate-type.slang`                     | functional | `#resource-and-texture-types`                         |
 | `texture-type.slang`                          | functional | `#resource-and-texture-types`                         |
 | `vector-size-mismatch-negative.slang`         | negative   | `#vec-and-mat`                                        |
+| `scalar-bool-boundary.slang`                  | boundary   | `#basic-scalar-types`                                 |
+| `scalar-int8-smallest.slang`                  | boundary   | `#basic-scalar-types`                                 |
+| `scalar-int64-largest.slang`                  | boundary   | `#basic-scalar-types`                                 |
+| `scalar-uint64-largest.slang`                 | boundary   | `#basic-scalar-types`                                 |
+| `scalar-half-smallest-float.slang`            | boundary   | `#basic-scalar-types`                                 |
+| `scalar-double-largest.slang`                 | boundary   | `#basic-scalar-types`                                 |
+| `vec1-minimum-dimension.slang`                | boundary   | `#vec-and-mat`                                        |
+| `vec2-minimum-multi-element.slang`            | boundary   | `#vec-and-mat`                                        |
+| `vec-int3-explicit-uintcount.slang`           | boundary   | `#vec-and-mat`                                        |
+| `vec-double4-largest-element.slang`           | boundary   | `#vec-and-mat`                                        |
+| `mat1x1-minimum-shape.slang`                  | boundary   | `#vec-and-mat`                                        |
+| `mat-rectangular-2x3.slang`                   | boundary   | `#vec-and-mat`                                        |
+| `vector-size-narrowing-negative.slang`        | negative   | `#vec-and-mat`                                        |
+| `matrix-shape-mismatch-negative.slang`        | negative   | `#vec-and-mat`                                        |
+| `array-size-one.slang`                        | boundary   | `#arrays`                                             |
+| `array-of-array-nesting.slang`                | stress     | `#arrays`                                             |
+| `array-static-const-bound-256.slang`          | stress     | `#arrays`                                             |
+| `array-of-struct-stress.slang`                | stress     | `#arrays`                                             |
+| `array-size-mismatch-negative.slang`          | negative   | `#arrays`                                             |
+| `func-zero-params-void-return.slang`          | boundary   | `#func`                                               |
+| `func-eight-params-stress.slang`              | stress     | `#func`                                               |
+| `func-mixed-vector-params.slang`              | boundary   | `#func`                                               |
+| `func-struct-result.slang`                    | boundary   | `#func`                                               |
+| `struct-empty-boundary.slang`                 | boundary   | `#struct-and-class-containers`                        |
+| `struct-single-field-boundary.slang`          | boundary   | `#struct-and-class-containers`                        |
+| `struct-nested-five-deep.slang`               | stress     | `#struct-and-class-containers`                        |
+| `struct-with-vector-field.slang`              | boundary   | `#struct-and-class-containers`                        |
+| `ptr-from-array-var.slang`                    | boundary   | `#ptr-and-the-access-qualifier-address-space-operands`|
+| `ptr-to-nested-struct-field.slang`            | boundary   | `#ptr-and-the-access-qualifier-address-space-operands`|
+| `rwbuf-struct-element.slang`                  | boundary   | `#resource-and-texture-types`                         |
+| `rwbuf-vector-element.slang`                  | boundary   | `#resource-and-texture-types`                         |
+| `rwbuf-struct-of-vectors-stress.slang`        | stress     | `#resource-and-texture-types`                         |
+| `optional-vector-payload.slang`               | boundary   | `#vectors-matrices-and-composite`                     |
+| `tuple-three-element-stress.slang`            | stress     | `#tuples-packs-and-target-tuples`                     |
+| `witness-table-two-conformances.slang`        | stress     | `#witness-table-types`                                |
+| `generic-on-vector-element.slang`             | stress     | `#spir-v-literals-and-kinds`                          |
 
 ## Doc gaps observed
 

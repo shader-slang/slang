@@ -56,31 +56,69 @@ function bodies of byte-address-buffer accessors).
 
 ## Tests in this bundle
 
-| File                                                  | Intent     | Doc anchor                          |
-| ----------------------------------------------------- | ---------- | ----------------------------------- |
-| `append-buffer-struct.slang`                          | functional | `#append-and-consume-buffers`       |
-| `append-consume-buffer.slang`                         | functional | `#append-and-consume-buffers`       |
-| `atomic-add.slang`                                    | functional | `#atomic-operations`                |
-| `atomic-bitwise.slang`                                | functional | `#atomic-operations`                |
-| `atomic-compare-exchange.slang`                       | functional | `#atomiccompareexchange`            |
-| `atomic-exchange.slang`                               | functional | `#atomic-operations`                |
-| `atomic-groupshared-add.slang`                        | functional | `#atomic-operations`                |
-| `atomic-load-store.slang`                             | functional | `#atomic-operations`                |
-| `atomic-min-max.slang`                                | functional | `#atomic-operations`                |
-| `atomic-uint-add.slang`                               | functional | `#atomic-operations`                |
-| `byte-address-buffer-load.slang`                      | functional | `#buffer-load-and-store`            |
-| `byte-address-buffer-store.slang`                     | functional | `#buffer-load-and-store`            |
-| `byte-address-buffer-type-globalparam.slang`          | functional | `#shader-io`                        |
-| `non-uniform-resource-index-buffer-index.slang`       | functional | `#nonuniformresourceindex`          |
-| `non-uniform-resource-index.slang`                    | functional | `#nonuniformresourceindex`          |
-| `parameter-block-globalparam.slang`                   | functional | `#shader-io`                        |
-| `rwstructured-buffer-getelementptr-nested.slang`      | functional | `#rwstructuredbuffergetelementptr`  |
-| `rwstructured-buffer-load-vector.slang`               | functional | `#buffer-load-and-store`            |
-| `rwstructured-buffer-load.slang`                      | functional | `#buffer-load-and-store`            |
-| `rwstructured-buffer-vector-element.slang`            | functional | `#rwstructuredbuffergetelementptr`  |
-| `structured-buffer-load-struct.slang`                 | functional | `#buffer-load-and-store`            |
-| `structured-buffer-load.slang`                        | functional | `#buffer-load-and-store`            |
-| `structured-buffer-types-globalparam.slang`           | functional | `#shader-io`                        |
+| File                                                                              | Intent     | Doc anchor                          |
+| --------------------------------------------------------------------------------- | ---------- | ----------------------------------- |
+| `append-buffer-int-max-value.slang`                                               | boundary   | `#append-and-consume-buffers`       |
+| `append-buffer-struct.slang`                                                      | functional | `#append-and-consume-buffers`       |
+| `append-buffer-zero-value.slang`                                                  | boundary   | `#append-and-consume-buffers`       |
+| `append-consume-buffer.slang`                                                     | functional | `#append-and-consume-buffers`       |
+| `atomic-add-contention-numthreads-64.slang`                                       | stress     | `#atomic-operations`                |
+| `atomic-add-int-max-literal.slang`                                                | boundary   | `#atomic-operations`                |
+| `atomic-add-int-min-literal.slang`                                                | boundary   | `#atomic-operations`                |
+| `atomic-add-many-calls-sequence.slang`                                            | stress     | `#atomic-operations`                |
+| `atomic-add-many-distinct-locations-stress.slang`                                 | stress     | `#atomic-operations`                |
+| `atomic-add-zero-literal.slang`                                                   | boundary   | `#atomic-operations`                |
+| `atomic-add.slang`                                                                | functional | `#atomic-operations`                |
+| `atomic-and-zero-mask.slang`                                                      | boundary   | `#atomic-operations`                |
+| `atomic-bitwise.slang`                                                            | functional | `#atomic-operations`                |
+| `atomic-compare-exchange-int-min-int-max.slang`                                   | boundary   | `#atomiccompareexchange`            |
+| `atomic-compare-exchange-same-expected-desired.slang`                             | boundary   | `#atomiccompareexchange`            |
+| `atomic-compare-exchange.slang`                                                   | functional | `#atomiccompareexchange`            |
+| `atomic-exchange-zero.slang`                                                      | boundary   | `#atomic-operations`                |
+| `atomic-exchange.slang`                                                           | functional | `#atomic-operations`                |
+| `atomic-groupshared-add-int-max-literal.slang`                                    | boundary   | `#atomic-operations`                |
+| `atomic-groupshared-add.slang`                                                    | functional | `#atomic-operations`                |
+| `atomic-groupshared-contention-numthreads-64.slang`                               | stress     | `#atomic-operations`                |
+| `atomic-load-store-zero.slang`                                                    | boundary   | `#atomic-operations`                |
+| `atomic-load-store.slang`                                                         | functional | `#atomic-operations`                |
+| `atomic-max-int-max-literal.slang`                                                | boundary   | `#atomic-operations`                |
+| `atomic-min-int-min-literal.slang`                                                | boundary   | `#atomic-operations`                |
+| `atomic-min-max.slang`                                                            | functional | `#atomic-operations`                |
+| `atomic-or-all-bits-mask.slang`                                                   | boundary   | `#atomic-operations`                |
+| `atomic-uint-add-uint-max-literal.slang`                                          | boundary   | `#atomic-operations`                |
+| `atomic-uint-add-zero-literal.slang`                                              | boundary   | `#atomic-operations`                |
+| `atomic-uint-add.slang`                                                           | functional | `#atomic-operations`                |
+| `atomic-xor-zero-mask.slang`                                                      | boundary   | `#atomic-operations`                |
+| `byte-address-buffer-load-large-offset.slang`                                     | boundary   | `#buffer-load-and-store`            |
+| `byte-address-buffer-load-offset-zero.slang`                                      | boundary   | `#buffer-load-and-store`            |
+| `byte-address-buffer-load.slang`                                                  | functional | `#buffer-load-and-store`            |
+| `byte-address-buffer-store-int-max-value.slang`                                   | boundary   | `#buffer-load-and-store`            |
+| `byte-address-buffer-store-offset-zero.slang`                                     | boundary   | `#buffer-load-and-store`            |
+| `byte-address-buffer-store.slang`                                                 | functional | `#buffer-load-and-store`            |
+| `byte-address-buffer-type-globalparam.slang`                                      | functional | `#shader-io`                        |
+| `non-uniform-resource-index-buffer-index.slang`                                   | functional | `#nonuniformresourceindex`          |
+| `non-uniform-resource-index-literal-zero.slang`                                   | boundary   | `#nonuniformresourceindex`          |
+| `non-uniform-resource-index-uint-max-literal.slang`                               | boundary   | `#nonuniformresourceindex`          |
+| `non-uniform-resource-index.slang`                                                | functional | `#nonuniformresourceindex`          |
+| `parameter-block-globalparam.slang`                                               | functional | `#shader-io`                        |
+| `rwstructured-buffer-getelementptr-index-zero.slang`                              | boundary   | `#rwstructuredbuffergetelementptr`  |
+| `rwstructured-buffer-getelementptr-int-max-literal.slang`                         | boundary   | `#rwstructuredbuffergetelementptr`  |
+| `rwstructured-buffer-getelementptr-negative-index-literal.slang`                  | boundary   | `#rwstructuredbuffergetelementptr`  |
+| `rwstructured-buffer-getelementptr-nested.slang`                                  | functional | `#rwstructuredbuffergetelementptr`  |
+| `rwstructured-buffer-getelementptr-uint-index.slang`                              | boundary   | `#rwstructuredbuffergetelementptr`  |
+| `rwstructured-buffer-load-index-zero.slang`                                       | boundary   | `#buffer-load-and-store`            |
+| `rwstructured-buffer-load-int-max-literal.slang`                                  | boundary   | `#buffer-load-and-store`            |
+| `rwstructured-buffer-load-many-loads-stress.slang`                                | stress     | `#buffer-load-and-store`            |
+| `rwstructured-buffer-load-negative-index-literal.slang`                           | boundary   | `#buffer-load-and-store`            |
+| `rwstructured-buffer-load-vector.slang`                                           | functional | `#buffer-load-and-store`            |
+| `rwstructured-buffer-load.slang`                                                  | functional | `#buffer-load-and-store`            |
+| `rwstructured-buffer-vector-element.slang`                                        | functional | `#rwstructuredbuffergetelementptr`  |
+| `structured-buffer-load-index-zero.slang`                                         | boundary   | `#buffer-load-and-store`            |
+| `structured-buffer-load-int-max-literal.slang`                                    | boundary   | `#buffer-load-and-store`            |
+| `structured-buffer-load-status-overload-rejected-on-compute-spirv.slang`          | negative   | `#buffer-load-and-store`            |
+| `structured-buffer-load-struct.slang`                                             | functional | `#buffer-load-and-store`            |
+| `structured-buffer-load.slang`                                                    | functional | `#buffer-load-and-store`            |
+| `structured-buffer-types-globalparam.slang`                                       | functional | `#shader-io`                        |
 
 ## Doc gaps observed
 
@@ -143,6 +181,56 @@ function bodies of byte-address-buffer accessors).
   on the helper function; the opcode itself appears only inside
   that helper's body. Same caveat as for the image/sample opcodes
   above.
+- The `buffer-load-and-store` table does not state the runtime
+  behavior of out-of-range buffer indices (one-past-end, negative
+  signed indices, indices larger than the runtime element count).
+  The boundary tests (`*-load-int-max-literal.slang`,
+  `*-load-negative-index-literal.slang`,
+  `*-getelementptr-int-max-literal.slang`,
+  `*-getelementptr-negative-index-literal.slang`) probe these
+  boundaries at the IR-shape level only; runtime semantics
+  (silent ignore / clamp / diagnostic / UB) should be added to the
+  doc.
+- The `atomic-operations` table does not state the runtime
+  semantics of integer wrap, saturation, or overflow when the
+  argument to `atomicAdd` / `atomicSub` / `atomicMin` / `atomicMax`
+  drives the stored value past `INT_MIN` / `INT_MAX` / `UINT_MAX`.
+  The boundary tests (`atomic-add-int-min-literal.slang`,
+  `atomic-add-int-max-literal.slang`,
+  `atomic-uint-add-uint-max-literal.slang`,
+  `atomic-min-int-min-literal.slang`,
+  `atomic-max-int-max-literal.slang`) probe IR-shape preservation;
+  runtime semantics should be stated.
+- The `atomic-operations` table does not state which `T` parameters
+  of `Atomic<T>` are supported. In particular, calling `.and(v)` /
+  `.or(v)` / `.xor(v)` on `Atomic<float>` is rejected with
+  `E30027` ("member not found"), but the table does not enumerate
+  which methods exist for which `T`. The doc should clarify.
+- The `nonuniformresourceindex` note states `nonUniformResourceIndex`
+  is a no-op at the value level but does not address whether the
+  opcode is emitted for compile-time-constant operands (e.g.
+  literal `0u`). The boundary tests
+  (`non-uniform-resource-index-literal-zero.slang`,
+  `non-uniform-resource-index-uint-max-literal.slang`) probe this;
+  the doc should clarify whether folding is permitted.
+- The `shader-io` row mentions `global_param` as the IR form of
+  module-scope shader parameters but does not address resource
+  binding edge cases (`register(u0)`, `register(u<MAX>)`, or
+  conflicting binding declarations). These are not exercised by
+  this bundle.
+- Atomic contention semantics: the doc states `atomicAdd` is the IR
+  form of an atomic add, but does not state how many `atomicAdd`
+  opcodes are emitted from a multi-thread dispatch where many
+  threads add to the same location. Empirically only one opcode is
+  emitted (the parallelism is implicit in the dispatch). The doc
+  should make this explicit.
+- The status-overload diagnostic gating in the doc-gap above only
+  applies to `StructuredBuffer::Load(idx, out status)`. The
+  `RWStructuredBuffer::Load(idx, out status)` overload appears
+  not to exist at all (it does not match any overload; the only
+  diagnostic is a use-of-uninitialized warning on the `status`
+  variable), and so its documented opcode `rwstructuredBufferLoadStatus`
+  has no portable Slang surface in this bundle's coverage.
 
 ## Out of scope (no-GPU runner)
 

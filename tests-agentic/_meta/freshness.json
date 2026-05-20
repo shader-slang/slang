@@ -64,9 +64,9 @@
       "watched_paths_digest": "12add2d77eb534b6741b9633b4251590baf28be0de7f2554aacada789942f5ec"
     },
     "ast-reference/types": {
-      "generated_at": "2026-05-20T14:52:26+00:00",
+      "generated_at": "2026-05-20T20:43:47+00:00",
       "model": "claude-opus-4-7",
-      "source_commit": "331a01d9d0cc721d8fc19a46fec17a4a275ba0e0",
+      "source_commit": "019ec0e5ddac1c14fbad141a3f03d50cf8a5e022",
       "source_doc_digest": "7007cb8ec84defc795a9f755431fcd600ec3df44f2f392d04896c57ec9ce17b9",
       "watched_paths_digest": "05b1016228f8c0bbf2fd6e6ea6d165c4d173a37c116aea0c0eccdb47c10abf97"
     },
@@ -169,9 +169,9 @@
       "watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
     },
     "ir-reference/resources-and-atomics": {
-      "generated_at": "2026-05-20T17:27:31+00:00",
+      "generated_at": "2026-05-20T20:43:46+00:00",
       "model": "claude-opus-4-7",
-      "source_commit": "ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14",
+      "source_commit": "019ec0e5ddac1c14fbad141a3f03d50cf8a5e022",
       "source_doc_digest": "3ac0724b29539a4ec7edd0c37f2e44add27803e6c97e8427e2d67a80b87bb345",
       "watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
     },
@@ -183,9 +183,9 @@
       "watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
     },
     "ir-reference/types": {
-      "generated_at": "2026-05-20T14:24:31+00:00",
+      "generated_at": "2026-05-20T20:43:46+00:00",
       "model": "claude-opus-4-7",
-      "source_commit": "1e0d460c1cb410005c4f775ba11fbc803cc8c16d",
+      "source_commit": "019ec0e5ddac1c14fbad141a3f03d50cf8a5e022",
       "source_doc_digest": "1c525783aca7f77dc841cbd36fd6911b8ec56b1fee8cffc96d4938b604220a84",
       "watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
     },
@@ -323,9 +323,9 @@
       "watched_paths_digest": "9929a933b7e23daa2d56e2d0c08666ee4781a53381b498c723250e39826823db"
     },
     "target-pipelines/hlsl": {
-      "generated_at": "2026-05-20T17:27:32+00:00",
+      "generated_at": "2026-05-20T20:43:47+00:00",
       "model": "claude-opus-4-7",
-      "source_commit": "ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14",
+      "source_commit": "019ec0e5ddac1c14fbad141a3f03d50cf8a5e022",
       "source_doc_digest": "2afce914bae96fe2e024bf6b3685b7339df010398abc456d4a58cb329326fa50",
       "watched_paths_digest": "ee6e5a27774a8a9c7ea3024cc5842f7bc1919255c4c0b9751400d25195f0b7bc"
     },
@@ -344,9 +344,9 @@
       "watched_paths_digest": "346898dc4d064ddc3802d3a68b0195bea085b7a106cf552f607ca57a1f3da4ec"
     },
     "target-pipelines/spirv": {
-      "generated_at": "2026-05-20T17:43:20+00:00",
+      "generated_at": "2026-05-20T20:43:47+00:00",
       "model": "claude-opus-4-7",
-      "source_commit": "330c9a8d807b9f9352e4754f466d1244ae681cff",
+      "source_commit": "019ec0e5ddac1c14fbad141a3f03d50cf8a5e022",
       "source_doc_digest": "b1daf02c9f85dda22a3cac37e70daa316be6cde3c511da1abf8a80d483e1dba1",
       "watched_paths_digest": "bd75ad021965ba68fbd7d335d6359ad1cf49b78a95a9be48be867759452b78f1"
     },
