@@ -116,7 +116,7 @@ static SlangResult _addCUDAPrelude(const String& rootPath, slang::IGlobalSession
 static SlangResult _getCanonicalOrExecutablePath(const char* exePath, String& outPath)
 {
     if (exePath && Path::hasPath(UnownedStringSlice(exePath)) &&
-        SLANG_SUCCEEDED(Path::getCanonical(exePath, outPath)))
+        SLANG_SUCCEEDED(Path::getCanonical(exePath, outPath)) && File::exists(outPath))
     {
         // argv[0] already contains enough path information to resolve directly.
         // Examples:
