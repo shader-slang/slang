@@ -339,7 +339,6 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     // appropriate forms.
     //
     List<Val*> checkedArgs;
-    Index firstDefaultArgIndex = -1;
 
     // Rather than bail out as soon as we hit a problem,
     // we are going to process *all* of the parameters of the
@@ -423,8 +422,6 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                         maybeReportGeneralError();
                         return false;
                     }
-                    if (firstDefaultArgIndex < 0)
-                        firstDefaultArgIndex = checkedArgs.getCount();
                     checkedArgs.add(substType);
                     continue;
                 }
@@ -499,8 +496,6 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                         maybeReportGeneralError();
                         return false;
                     }
-                    if (firstDefaultArgIndex < 0)
-                        firstDefaultArgIndex = checkedArgs.getCount();
                     checkedArgs.add(defaultVal);
                     continue;
                 }
@@ -686,36 +681,6 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
         {
             continue;
         }
-    }
-
-    if (firstDefaultArgIndex >= 0)
-    {
-        ShortList<Val*> knownGenericArgs;
-        for (Index ii = 0; ii < firstDefaultArgIndex; ii++)
-            knownGenericArgs.add(checkedArgs[ii]);
-
-        ConstraintSystem constraints;
-        constraints.loc = context.loc;
-        constraints.genericDecl = genericDeclRef.getDecl();
-        ConversionCost solverCost = kConversionCost_None;
-        auto solvedDeclRef = trySolveConstraintSystem(
-            _Move(constraints),
-            genericDeclRef,
-            knownGenericArgs.getArrayView().arrayView,
-            solverCost);
-        if (!solvedDeclRef)
-        {
-            candidate.subst = SubstitutionSet(
-                m_astBuilder->getGenericAppDeclRef(genericDeclRef, checkedArgs.getArrayView()));
-            if (!TryCheckOverloadCandidateConstraints(context, candidate))
-                return false;
-
-            maybeReportGeneralError();
-            return false;
-        }
-        candidate.conversionCostSum += solverCost;
-        candidate.subst = SubstitutionSet(solvedDeclRef);
-        return success;
     }
 
     auto genSubst = m_astBuilder->getGenericAppDeclRef(genericDeclRef, checkedArgs.getArrayView());
