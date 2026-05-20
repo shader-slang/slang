@@ -19,7 +19,7 @@
 // CHECK610: void __slang_linalg_VectorAccumulate(
 // CHECK610-NOT: byteOffset = offset + i *
 // CHECK610-NOT: i * uint(sizeof(ElTy))
-// CHECK610: dx::linalg::VectorAccumulate(
+// CHECK610: dx::linalg::VectorAccumulate(inputVec, buffer, offset);
 // CHECK610: }
 
 RWByteAddressBuffer outerProductOutput;
