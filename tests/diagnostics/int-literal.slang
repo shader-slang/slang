@@ -41,9 +41,17 @@ int doSomething(int a)
     uint64_t d2 = -9223372036854775808;
 //CHECK:           ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    // Warning, integer literal is too large for signed 64 bit, must be interpreted as unsigned.
+    // No warning: the type ladder for non-decimal integer literals admits
+    // `uint64_t`, so `0xFFFFFFFFFFFFFFFF` is silently typed as `uint64_t`
+    // before being narrowed by the assignment to `int` (#11216).
     int x4 = 0xFFFFFFFFFFFFFFFF;
-//CHECK:     ^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+
+    // No warning: hex literal in the (INT64_MAX, UINT64_MAX] range is `uint64_t`
+    // per the documented type ladder for non-decimal literals (#11216).
+    uint64_t x5 = 0x8000000000000000;
+
+    // No warning: octal/binary literals follow the same non-decimal ladder.
+    uint64_t x6 = 0b1000000000000000000000000000000000000000000000000000000000000000;
 
     return a + int(b);
 }
