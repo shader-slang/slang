@@ -223,6 +223,29 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             result.stderr,
         )
 
+    def test_rejects_non_string_v2_kind(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "entries": [
+                {
+                    "kind": ["line"],
+                    "counter": 0,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 13,
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "5\n", check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "error: manifest v2 entry kind must be a string",
+            result.stderr,
+        )
+
     def test_rejects_unknown_manifest_version(self):
         manifest = {
             "version": 999,

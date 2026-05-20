@@ -30,9 +30,16 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 }
 
 // One counter is assigned to each selectable switch arm: case 0,
-// case 1, case 2, and default.
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(0\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(1\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(2\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(3\)}}
+// case 1, case 2, and default. The ordered checks also lock the
+// fallthrough contract: the case 2 path executes the default body, but
+// must not contain the default arm counter before the default dispatch arm.
+//CHECK: case int(0):
+//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(0\)}}
+//CHECK: case int(1):
+//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(1\)}}
+//CHECK: case int(2):
+//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(2\)}}
+//CHECK-NOT: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(3\)}}
+//CHECK: default:
+//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(3\)}}
 //CHECK-NOT: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(4\)}}

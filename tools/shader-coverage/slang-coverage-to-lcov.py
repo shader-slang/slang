@@ -120,6 +120,8 @@ def iter_manifest_entries(manifest):
         if version == 2:
             try:
                 kind = entry.get("kind", "line")
+                if not isinstance(kind, str):
+                    sys.exit("error: manifest v2 entry kind must be a string")
                 counter = entry.get("counter")
                 yield {
                     "kind": kind,

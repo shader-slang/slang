@@ -509,6 +509,8 @@ struct SharedIRGenContext
 
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
 
+    uint32_t nextCoverageBranchSiteID = 1;
+
     // External (imported) unsafeForceInline functions that need to
     // prelink into the current module after lowering.
     List<IRInst*> externalSymbolsToPrelink;
@@ -631,7 +633,6 @@ struct IRGenContext
     bool traceCoverage = false;
     bool traceFunctionCoverage = false;
     bool traceBranchCoverage = false;
-    uint32_t nextCoverageBranchSiteID = 1;
 
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
@@ -7605,7 +7606,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     // so that it can be used for a label.
     IRBlock* createBlock() { return getBuilder()->createBlock(); }
 
-    uint32_t allocateCoverageBranchSiteID() { return context->nextCoverageBranchSiteID++; }
+    uint32_t allocateCoverageBranchSiteID()
+    {
+        return context->shared->nextCoverageBranchSiteID++;
+    }
 
     void emitBranchCoverageMarker(
         SourceLoc loc,
@@ -15017,6 +15021,11 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
         builder->setInsertInto(module);
 
         context->irBuilder = builder;
+        context->traceCoverage = option.getBoolOption(CompilerOptionName::TraceCoverage);
+        context->traceFunctionCoverage =
+            option.getBoolOption(CompilerOptionName::TraceFunctionCoverage);
+        context->traceBranchCoverage =
+            option.getBoolOption(CompilerOptionName::TraceBranchCoverage);
 
         componentType->acceptVisitor(this, nullptr);
         module->buildMangledNameToGlobalInstMap();

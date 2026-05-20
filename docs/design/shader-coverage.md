@@ -372,10 +372,11 @@ Roadmap
 -------
 
 The current implementation provides line, function-entry, and initial
-branch-arm coverage instrumentation end-to-end across all Slang
-backends. Directions scoped for follow-up work, grouped by category.
-Per-test attribution and source-region coverage are the highest-
-leverage near-term picks.
+branch-arm coverage instrumentation end-to-end across supported Slang
+backends. WGSL is intentionally skipped by the current coverage
+instrumentation path. Directions scoped for follow-up work, grouped by
+category. Per-test attribution and source-region coverage are the
+highest-leverage near-term picks.
 
 `ICoverageTracingMetadata` is intentionally source-entry based rather
 than LCOV-line-only. Today line, function, and branch coverage emit one
