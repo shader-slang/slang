@@ -48,8 +48,8 @@ SLANG_UNIT_TEST(testToolUtilBareArgv0)
     // branch, not the OS fallback. This pins the hasPath + File::exists guard.
     const String selfPath = Path::getExecutablePath();
     String existingResult;
-    SLANG_CHECK(SLANG_SUCCEEDED(
-        TestToolUtil::getExeDirectoryPath(selfPath.getBuffer(), existingResult)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(TestToolUtil::getExeDirectoryPath(selfPath.getBuffer(), existingResult)));
     SLANG_CHECK(existingResult.getLength() > 0);
     SLANG_CHECK(existingResult == Path::getParentDirectory(selfPath));
 }
