@@ -86,20 +86,54 @@ def split_concrete_name(name: str) -> tuple[str, str | None]:
     return name.strip(), None
 
 
+def strip_matrix_suffix(caller_part: str) -> str:
+    """Strip a trailing matrix-value tuple from a job name.
+
+    GH expands `strategy.matrix` job names to `<job_key> (<v1>, <v2>, ...)`.
+    The opening ` (` is the canonical separator. We don't try to parse the
+    tuple — the caller-side matrix axes are reconstructed separately from the
+    GH API's `runner_labels`/job metadata.
+
+    GH truncates job names to ~100 chars in the API response, which can drop
+    the closing `)`. We therefore also strip when the trailing suffix is
+    `(...)` (closed) OR ends with the literal truncation marker `...` after
+    an unclosed `(`.
+
+    Examples:
+      'build (windows, release, cl, x86_64)' -> 'build'
+      'build (windows, cl, x86_64, ..., vu...' -> 'build'  (truncated)
+      'build'                                -> 'build'
+      'name (with spaces) (a, b)'            -> 'name (with spaces)'
+    """
+    idx = caller_part.rfind(" (")
+    if idx == -1:
+        return caller_part
+    suffix = caller_part[idx + 2 :]
+    if caller_part.endswith(")") or suffix.endswith("..."):
+        return caller_part[:idx].strip()
+    return caller_part
+
+
 def resolve_caller_key(
     caller_part: str, workflow_spec: WorkflowSpec
 ) -> tuple[str | None, str]:
     """Map the API-reported caller part of a job name back to a YAML job key.
 
     Returns (job_key, graph_instance_key). graph_instance_key is the canonical
-    matrix tuple for the caller-side matrix, or empty string when none.
+    matrix tuple for the caller-side matrix, or empty string when none. (Real
+    matrix-tuple reconstruction is future work; for now we strip the suffix
+    so the key resolves and leave graph_instance_key empty.)
 
-    Best-effort: exact YAML-key match first. If GH expanded a `name:` template
-    we may not be able to recover the matrix tuple without resolving `${{ ... }}`
-    expressions; the plan acknowledges this and treats it as future work.
+    Resolution order:
+      1. Exact YAML-key match — covers no-matrix jobs.
+      2. Strip a trailing ` (v1, v2, ...)` matrix-suffix and retry — covers
+         GH's default name expansion for `strategy.matrix` jobs.
+      3. Match against a declared `name:` field.
+      4. Stripped/lowercased match for workflows that use spaces in names.
     """
-    if caller_part in workflow_spec.jobs:
-        return caller_part, ""
+    for candidate in (caller_part, strip_matrix_suffix(caller_part)):
+        if candidate in workflow_spec.jobs:
+            return candidate, ""
 
     # Try matching against declared `name:` fields.
     for job_key, spec in workflow_spec.jobs.items():
@@ -142,19 +176,40 @@ def fmt_ts(dt: datetime | None) -> str | None:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _child_ran(child: dict[str, Any]) -> bool:
+    """Did this concrete child actually execute?
+
+    The plan says graph-node timing is over "children that actually ran". GH
+    Actions reports skipped jobs with conclusion='skipped' and bogus timing
+    (started_at == completed_at, or in some cases an out-of-order pair that
+    yields a negative duration when subtracted). Excluding them keeps the
+    aggregates honest.
+    """
+    return child.get("conclusion") not in ("skipped", None)
+
+
 def aggregate_graph_timing(children: list[dict[str, Any]]) -> dict[str, Any]:
-    """MIN/MAX over concrete children + critical-path proxy.
+    """MIN/MAX over concrete children that ran + critical-path proxy.
 
     The full critical path requires the called workflow's internal needs[] DAG;
     for this slice we use MAX(child.duration) as a conservative approximation
     (correct when called jobs have no internal needs[], otherwise a lower
     bound). The internal-DAG walk is a follow-up.
     """
-    started = [parse_ts(c.get("started_at")) for c in children]
-    completed = [parse_ts(c.get("completed_at")) for c in children]
+    ran = [c for c in children if _child_ran(c)]
+    if not ran:
+        return {
+            "started_at": None,
+            "completed_at": None,
+            "duration_seconds": None,
+            "queue_wait_seconds": None,
+        }
+
+    started = [parse_ts(c.get("started_at")) for c in ran]
+    completed = [parse_ts(c.get("completed_at")) for c in ran]
     queue_waits = []
     durations = []
-    for c in children:
+    for c in ran:
         cr = parse_ts(c.get("created_at"))
         st = parse_ts(c.get("started_at"))
         cp = parse_ts(c.get("completed_at"))
@@ -179,8 +234,8 @@ def aggregate_graph_timing(children: list[dict[str, Any]]) -> dict[str, Any]:
 
 def build_rows(
     repo: str, run_id: int, run_attempt: int
-) -> dict[str, list[dict[str, Any]]]:
-    """Return rows keyed by destination table name."""
+) -> tuple[dict[str, list[dict[str, Any]]], int]:
+    """Return (rows-keyed-by-table-name, api_job_count)."""
     out: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
     # workflow_runs (1 row)
@@ -214,10 +269,13 @@ def build_rows(
             f"YAML key: {[j.get('name') for j in unresolved][:5]}{'...' if len(unresolved) > 5 else ''}\n"
         )
 
-    # Graph-node rows.
+    # Graph-node rows — one per top-level YAML job, whether or not any
+    # concrete child ran. Per the plan, every top-level YAML job becomes one
+    # logical graph node; jobs whose children never ran still need a row so
+    # downstream needs[] edges resolve.
     graph_node_row_key_by_caller: dict[str, str] = {}
-    for caller_key, children in children_by_caller.items():
-        spec = workflow_spec.jobs[caller_key]
+    for caller_key, spec in workflow_spec.jobs.items():
+        children = children_by_caller.get(caller_key, [])
         gik = ""  # caller-side strategy.matrix not yet supported; empty string per plan
         rk = graph_node_row_key(spec, run_id, run_attempt, workflow_file, gik)
         graph_node_row_key_by_caller[caller_key] = rk
@@ -231,11 +289,23 @@ def build_rows(
             "success": 4,
             None: 5,
         }
-        # Worst child conclusion in the obvious failure ordering.
-        worst = min(
-            (c.get("conclusion") for c in children),
-            key=lambda c: conclusion_priority.get(c, 99),
-        )
+        # Worst child conclusion in the obvious failure ordering, restricted
+        # to children that ran. Three cases for the graph-node conclusion:
+        #   - any child ran     → worst conclusion among ran children
+        #   - all children skipped → "skipped"
+        #   - no children at all  → NULL (job did not produce any concrete
+        #                            row in this attempt — e.g. its caller
+        #                            was filtered out by `if:`)
+        ran_children = [c for c in children if _child_ran(c)]
+        if ran_children:
+            worst = min(
+                (c.get("conclusion") for c in ran_children),
+                key=lambda c: conclusion_priority.get(c, 99),
+            )
+        elif children:
+            worst = "skipped"
+        else:
+            worst = None
 
         out["jobs"].append(
             {
@@ -347,7 +417,7 @@ def build_rows(
                     }
                 )
 
-    return out
+    return out, len(api_jobs)
 
 
 def _normalize_uses(uses: str | None) -> str | None:
@@ -366,18 +436,31 @@ def _normalize_uses(uses: str | None) -> str | None:
 
 
 def _duration(j: dict[str, Any]) -> float | None:
+    """Wall-clock seconds between started_at and completed_at.
+
+    Returns None when either timestamp is missing or for skipped jobs (GH
+    reports nominal timestamps for skipped jobs that often differ by 1 second
+    in the wrong order, yielding a negative duration). Treating these as NULL
+    matches the BigQuery convention for "this job did not run".
+    """
+    if j.get("conclusion") == "skipped":
+        return None
     st = parse_ts(j.get("started_at"))
     cp = parse_ts(j.get("completed_at"))
     if st and cp:
-        return (cp - st).total_seconds()
+        d = (cp - st).total_seconds()
+        return d if d >= 0 else None
     return None
 
 
 def _queue_wait(j: dict[str, Any]) -> float | None:
+    if j.get("conclusion") == "skipped":
+        return None
     cr = parse_ts(j.get("created_at"))
     st = parse_ts(j.get("started_at"))
     if cr and st:
-        return (st - cr).total_seconds()
+        d = (st - cr).total_seconds()
+        return d if d >= 0 else None
     return None
 
 
@@ -412,10 +495,30 @@ def _resolve_matrix_input(spec: JobSpec, key: str) -> str | None:
 # ---------- Validation ----------
 
 
-def validate(rows: dict[str, list[dict[str, Any]]]) -> list[str]:
+def validate(
+    rows: dict[str, list[dict[str, Any]]],
+    *,
+    api_job_count: int | None = None,
+) -> list[str]:
+    """Structural sanity checks on emitted rows.
+
+    `api_job_count`, when provided, is the number of concrete jobs the GH API
+    returned for this attempt. We use it to catch the silent-empty-output
+    regression where every concrete job goes unresolved → 0 graph rows emit
+    → validation passes despite zero useful data.
+    """
     errors: list[str] = []
     jobs = rows.get("jobs", [])
     graph_row_keys = {r["row_key"] for r in jobs if r["node_kind"] != "concrete_job"}
+    concrete_row_count = sum(1 for r in jobs if r["node_kind"] == "concrete_job")
+
+    if api_job_count is not None and api_job_count > 0 and concrete_row_count == 0:
+        errors.append(
+            f"GH API reported {api_job_count} concrete jobs but the ingester "
+            "emitted zero concrete_job rows — likely a caller-key resolution "
+            "regression. Re-check resolve_caller_key for this workflow's "
+            "matrix expansion pattern."
+        )
 
     for r in jobs:
         if r["node_kind"] == "concrete_job":
@@ -490,10 +593,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
-    rows = build_rows(args.repo, args.run_id, args.run_attempt)
+    rows, api_job_count = build_rows(args.repo, args.run_id, args.run_attempt)
 
     if args.validate:
-        errs = validate(rows)
+        errs = validate(rows, api_job_count=api_job_count)
         if errs:
             for e in errs:
                 sys.stderr.write(f"validation error: {e}\n")
