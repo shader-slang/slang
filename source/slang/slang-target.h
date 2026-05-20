@@ -21,6 +21,8 @@
 namespace Slang
 {
 
+class DiagnosticSink;
+
 enum class CodeGenTarget : SlangCompileTargetIntegral
 {
     Unknown = SLANG_TARGET_UNKNOWN,
@@ -153,6 +155,10 @@ public:
     CapabilitySet getTargetCaps();
 
     void setTargetCaps(CapabilitySet capSet);
+
+    /// Validate that any explicitly requested capabilities are compatible with the code-gen target.
+    /// Emits an error diagnostic for each incompatible capability.
+    void checkCapabilities(DiagnosticSink* sink);
 
     HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions();
 

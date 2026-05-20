@@ -2177,7 +2177,7 @@ err(
     span { loc = "location", message = "'~decl' resolves into a disallowed `~capability` Capability." }
 )
 
-warning(
+err(
     "entry-point-and-profile-are-incompatible",
     36112,
     "entry point incompatible with profile",
@@ -2224,6 +2224,13 @@ err(
     36120,
     "capability cases conflict in target_switch",
     span { loc = "location", message = "the capability for case '~caseName' is '~caseCaps', which conflicts with previous case which requires '~prevCaps'. In target_switch, if two cases are belong to the same target, then one capability set has to be a subset of the other." }
+)
+
+err(
+    "requested-capability-incompatible-with-target",
+    36121,
+    "capability incompatible with compilation target",
+    span { loc = "location", message = "requested capability '~requestedCap' is incompatible with compilation target '~target'." }
 )
 
 

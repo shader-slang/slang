@@ -2517,6 +2517,10 @@ void FrontEndCompileRequest::checkEntryPoints()
 
     auto sink = getSink();
 
+    // Validate that any explicitly requested capabilities are compatible with their targets.
+    for (auto target : linkage->targets)
+        target->checkCapabilities(sink);
+
     // The validation of entry points here will be modal, and controlled
     // by whether the user specified any entry points directly via
     // API or command-line options.
