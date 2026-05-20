@@ -625,11 +625,13 @@ struct IRGenContext
 
     DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
 
-    // Shader-coverage instrumentation. When true, each lowered
-    // statement is preceded by an IncrementCoverageCounter op, which a
-    // later IR pass rewrites into an atomic counter write on a
-    // synthesized buffer.
+    // Shader-coverage instrumentation. Line, function, and branch modes
+    // emit distinct semantic marker ops; a later IR pass rewrites all
+    // markers into atomic counter writes on one synthesized buffer.
     bool traceCoverage = false;
+    bool traceFunctionCoverage = false;
+    bool traceBranchCoverage = false;
+    uint32_t nextCoverageBranchSiteID = 1;
 
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
@@ -7603,6 +7605,24 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     // so that it can be used for a label.
     IRBlock* createBlock() { return getBuilder()->createBlock(); }
 
+    uint32_t allocateCoverageBranchSiteID() { return context->nextCoverageBranchSiteID++; }
+
+    void emitBranchCoverageMarker(
+        SourceLoc loc,
+        uint32_t branchSiteID,
+        uint32_t branchArmID,
+        slang::CoverageBranchArmKind branchArmKind)
+    {
+        if (!context->traceBranchCoverage)
+            return;
+
+        IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, loc);
+        context->irBuilder->emitIncrementBranchCoverageCounter(
+            IRIntegerValue(branchSiteID),
+            IRIntegerValue(branchArmID),
+            IRIntegerValue(uint32_t(branchArmKind)));
+    }
+
     /// Does the given block have a terminator?
     bool isBlockTerminated(IRBlock* block) { return block->getTerminator() != nullptr; }
 
@@ -7751,6 +7771,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
         IRInst* ifInst = nullptr;
+        uint32_t coverageBranchSiteID =
+            context->traceBranchCoverage ? allocateCoverageBranchSiteID() : 0;
 
         if (elseStmt)
         {
@@ -7762,11 +7784,50 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             insertBlock(thenBlock);
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
+            emitBranchCoverageMarker(
+                condExpr->loc,
+                coverageBranchSiteID,
+                1,
+                slang::CoverageBranchArmKind::TrueArm);
             lowerStmt(context, thenStmt);
             emitBranchIfNeeded(afterBlock);
             insertBlock(elseBlock);
+            emitBranchCoverageMarker(
+                condExpr->loc,
+                coverageBranchSiteID,
+                2,
+                slang::CoverageBranchArmKind::FalseArm);
             lowerStmt(context, elseStmt);
             popScopeBlock(prevScopeEndBlock, true);
+
+            insertBlock(afterBlock);
+        }
+        else if (context->traceBranchCoverage)
+        {
+            auto thenBlock = createBlock();
+            auto elseBlock = createBlock();
+            auto afterBlock = createBlock();
+
+            ifInst = builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
+
+            insertBlock(thenBlock);
+
+            IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
+            emitBranchCoverageMarker(
+                condExpr->loc,
+                coverageBranchSiteID,
+                1,
+                slang::CoverageBranchArmKind::TrueArm);
+            lowerStmt(context, thenStmt);
+            popScopeBlock(prevScopeEndBlock, true);
+            emitBranchIfNeeded(afterBlock);
+
+            insertBlock(elseBlock);
+            emitBranchCoverageMarker(
+                condExpr->loc,
+                coverageBranchSiteID,
+                2,
+                slang::CoverageBranchArmKind::FalseArm);
 
             insertBlock(afterBlock);
         }
@@ -7861,6 +7922,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
+        uint32_t coverageBranchSiteID = 0;
+        SourceLoc coverageBranchLoc;
         if (const auto condExpr = stmt->predicateExpression)
         {
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
@@ -7868,12 +7931,36 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             auto irCondition =
                 getSimpleVal(context, lowerRValueExpr(context, stmt->predicateExpression));
 
+            coverageBranchLoc = condExpr->loc;
+            coverageBranchSiteID =
+                context->traceBranchCoverage ? allocateCoverageBranchSiteID() : 0;
+
             // Now we want to `break` if the loop condition is false.
-            builder->emitLoopTest(irCondition, bodyLabel, breakLabel);
+            auto conditionFalseLabel = context->traceBranchCoverage ? createBlock() : breakLabel;
+            builder->emitLoopTest(irCondition, bodyLabel, conditionFalseLabel);
+
+            if (context->traceBranchCoverage)
+            {
+                insertBlock(conditionFalseLabel);
+                emitBranchCoverageMarker(
+                    coverageBranchLoc,
+                    coverageBranchSiteID,
+                    2,
+                    slang::CoverageBranchArmKind::FalseArm);
+                emitBranchIfNeeded(breakLabel);
+            }
         }
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
+        if (coverageBranchSiteID != 0)
+        {
+            emitBranchCoverageMarker(
+                coverageBranchLoc,
+                coverageBranchSiteID,
+                1,
+                slang::CoverageBranchArmKind::TrueArm);
+        }
         IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
         popScopeBlock(prevScopeEndBlock, true);
@@ -7970,18 +8057,44 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
+        uint32_t coverageBranchSiteID = 0;
+        SourceLoc coverageBranchLoc;
         if (auto condExpr = stmt->predicate)
         {
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
             auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
 
+            coverageBranchLoc = condExpr->loc;
+            coverageBranchSiteID =
+                context->traceBranchCoverage ? allocateCoverageBranchSiteID() : 0;
+
             // Now we want to `break` if the loop condition is false.
-            builder->emitLoopTest(irCondition, bodyLabel, breakLabel);
+            auto conditionFalseLabel = context->traceBranchCoverage ? createBlock() : breakLabel;
+            builder->emitLoopTest(irCondition, bodyLabel, conditionFalseLabel);
+
+            if (context->traceBranchCoverage)
+            {
+                insertBlock(conditionFalseLabel);
+                emitBranchCoverageMarker(
+                    coverageBranchLoc,
+                    coverageBranchSiteID,
+                    2,
+                    slang::CoverageBranchArmKind::FalseArm);
+                emitBranchIfNeeded(breakLabel);
+            }
         }
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
+        if (coverageBranchSiteID != 0)
+        {
+            emitBranchCoverageMarker(
+                coverageBranchLoc,
+                coverageBranchSiteID,
+                1,
+                slang::CoverageBranchArmKind::TrueArm);
+        }
         IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
         popScopeBlock(prevScopeEndBlock, true);
@@ -8065,10 +8178,35 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // mergeBlock:
             //   goto breakLabel;
             auto mergeBlock = builder->createBlock();
-            builder->emitIfElse(invCondition, breakLabel, mergeBlock, mergeBlock);
+            if (context->traceBranchCoverage)
+            {
+                auto coverageBranchSiteID = allocateCoverageBranchSiteID();
+                auto conditionFalseBlock = builder->createBlock();
+                builder->emitIfElse(invCondition, conditionFalseBlock, mergeBlock, mergeBlock);
 
-            insertBlock(mergeBlock);
-            builder->emitBranch(loopHead);
+                insertBlock(conditionFalseBlock);
+                emitBranchCoverageMarker(
+                    condExpr->loc,
+                    coverageBranchSiteID,
+                    2,
+                    slang::CoverageBranchArmKind::FalseArm);
+                emitBranchIfNeeded(breakLabel);
+
+                insertBlock(mergeBlock);
+                emitBranchCoverageMarker(
+                    condExpr->loc,
+                    coverageBranchSiteID,
+                    1,
+                    slang::CoverageBranchArmKind::TrueArm);
+                builder->emitBranch(loopHead);
+            }
+            else
+            {
+                builder->emitIfElse(invCondition, breakLabel, mergeBlock, mergeBlock);
+
+                insertBlock(mergeBlock);
+                builder->emitBranch(loopHead);
+            }
         }
 
         // Finally we insert the label that a `break` will jump to
@@ -8451,6 +8589,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // The collected (value, label) pairs for
         // all the `case` statements.
         List<IRInst*> cases;
+
+        // Branch coverage state for this switch. Case/default arms are
+        // counted at switch-dispatch entry, not at case-body entry, so
+        // ordinary fallthrough between case bodies does not double-count
+        // selected arms.
+        uint32_t coverageBranchSiteID = 0;
+        uint32_t nextCoverageBranchArmID = 1;
+        SourceLoc coverageBranchFallbackLoc;
     };
 
     // We need a label to use for a `case` or `default` statement,
@@ -8483,6 +8629,33 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         info->currentCaseLabel = newCaseLabel;
         info->anythingEmittedToCurrentCaseBlock = false;
         return newCaseLabel;
+    }
+
+    IRBlock* createSwitchCoverageDispatchBlock(
+        SwitchStmtInfo* info,
+        IRBlock* bodyLabel,
+        SourceLoc armLoc,
+        slang::CoverageBranchArmKind armKind)
+    {
+        if (info->coverageBranchSiteID == 0)
+            return bodyLabel;
+
+        auto builder = getBuilder();
+        IRBuilderInsertLocScope insertLocScope(builder);
+
+        auto dispatchLabel = createBlock();
+        info->initialBlock->getParent()->addBlock(dispatchLabel);
+        builder->setInsertInto(dispatchLabel);
+
+        SourceLoc markerLoc = armLoc.isValid() ? armLoc : info->coverageBranchFallbackLoc;
+        emitBranchCoverageMarker(
+            markerLoc,
+            info->coverageBranchSiteID,
+            info->nextCoverageBranchArmID++,
+            armKind);
+        builder->emitBranch(bodyLabel);
+
+        return dispatchLabel;
     }
 
     bool hasSwitchCases(Stmt* inStmt)
@@ -8572,20 +8745,30 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             auto caseVal = getSimpleVal(context, caseValInfo);
 
             // Figure out where we are branching to.
-            auto label = getLabelForCase(info);
+            auto bodyLabel = getLabelForCase(info);
+            auto dispatchLabel = createSwitchCoverageDispatchBlock(
+                info,
+                bodyLabel,
+                caseStmt->loc,
+                slang::CoverageBranchArmKind::CaseArm);
 
             // Add this `case` to the list for the enclosing `switch`.
             info->cases.add(caseVal);
-            info->cases.add(label);
+            info->cases.add(dispatchLabel);
         }
         else if (const auto defaultStmt = as<DefaultStmt>(stmt); defaultStmt)
         {
-            auto label = getLabelForCase(info);
+            auto bodyLabel = getLabelForCase(info);
+            auto dispatchLabel = createSwitchCoverageDispatchBlock(
+                info,
+                bodyLabel,
+                defaultStmt->loc,
+                slang::CoverageBranchArmKind::DefaultArm);
 
             // We expect to only find a single `default` stmt.
             SLANG_ASSERT(!info->defaultLabel);
 
-            info->defaultLabel = label;
+            info->defaultLabel = dispatchLabel;
         }
         else if (const auto emptyStmt = as<EmptyStmt>(stmt); emptyStmt)
         {
@@ -8850,6 +9033,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         SwitchStmtInfo info;
         info.initialBlock = initialBlock;
         info.defaultLabel = nullptr;
+        info.coverageBranchSiteID =
+            context->traceBranchCoverage ? allocateCoverageBranchSiteID() : 0;
+        info.coverageBranchFallbackLoc = stmt->condition->loc;
 
         lowerSwitchCases(stmt->body, &info);
 
@@ -8876,9 +9062,19 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             }
         }
 
-        // If there was no `default` statement, then the
-        // default case will just branch directly to the end.
+        // If there was no `default` statement, then the default case
+        // normally branches directly to the end. Under branch coverage,
+        // still route that no-match path through a marker so the switch
+        // branch site has a recorded default outcome.
         auto defaultLabel = info.defaultLabel ? info.defaultLabel : breakLabel;
+        if (!info.defaultLabel && info.coverageBranchSiteID != 0)
+        {
+            defaultLabel = createSwitchCoverageDispatchBlock(
+                &info,
+                breakLabel,
+                stmt->condition->loc,
+                slang::CoverageBranchArmKind::DefaultArm);
+        }
 
         // Now that we've collected the cases, we are
         // prepared to emit the `switch` instruction
@@ -9174,7 +9370,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
     {
         maybeEmitDebugLine(context, &visitor, stmt, stmt->loc);
 
-        // Under `-trace-coverage`, emit a counter op before each executable
+        // Under `-trace-coverage`, emit a line marker before each executable
         // statement (skip Block/Seq/Empty wrappers — no execution to count).
         if (context->traceCoverage && stmt->loc.isValid() && !as<EmptyStmt>(stmt) &&
             !as<BlockStmt>(stmt) && !as<SeqStmt>(stmt))
@@ -13424,6 +13620,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // We lower whatever statement was stored on the declaration
             // as the body of the new IR function.
             //
+            if (subContext->traceFunctionCoverage && decl->loc.isValid())
+            {
+                String functionName;
+                if (auto name = decl->getName())
+                    functionName = name->text;
+                String functionMangledName = getMangledName(context->astBuilder, decl);
+                if (!functionName.getLength())
+                    functionName = functionMangledName;
+
+                IRBuilderSourceLocRAII sourceLocInfo(subContext->irBuilder, decl->loc);
+                subContext->irBuilder->emitIncrementFunctionCoverageCounter(
+                    functionName.getUnownedSlice(),
+                    functionMangledName.getUnownedSlice());
+            }
+
             lowerStmt(subContext, decl->body);
 
             // We need to carefully add a terminator instruction to the end
@@ -14414,8 +14625,11 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     context->irBuilder = builder;
     context->debugInfoLevel = compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel();
-    context->traceCoverage =
-        compileRequest->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage);
+    context->traceCoverage = linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage);
+    context->traceFunctionCoverage =
+        linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceFunctionCoverage);
+    context->traceBranchCoverage =
+        linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
 
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {

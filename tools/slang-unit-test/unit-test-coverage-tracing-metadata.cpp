@@ -115,6 +115,15 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
                 else
                     accum += i * 2u;
             }
+            switch (int(tid.x) & 1)
+            {
+            case 0:
+                accum += 10u;
+                break;
+            default:
+                accum += 20u;
+                break;
+            }
             outputBuffer[0] = accum;
         }
     )";
@@ -129,8 +138,11 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         slang::ISyntheticResourceMetadata* syntheticResources = nullptr;
     };
 
-    auto createMetadataBundle =
-        [&](SlangCompileTarget format, const char* profileName, bool coverageEnabled = true)
+    auto createMetadataBundle = [&](SlangCompileTarget format,
+                                    const char* profileName,
+                                    bool lineCoverageEnabled = true,
+                                    bool functionCoverageEnabled = false,
+                                    bool branchCoverageEnabled = false)
     {
         MetadataBundle bundle;
 
@@ -141,15 +153,24 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         slang::SessionDesc sessionDesc = {};
         sessionDesc.targetCount = 1;
         sessionDesc.targets = &targetDesc;
-        slang::CompilerOptionEntry covOption = {};
-        if (coverageEnabled)
+
+        slang::CompilerOptionEntry coverageOptions[3] = {};
+        uint32_t coverageOptionCount = 0;
+        auto addBoolOption = [&](slang::CompilerOptionName name)
         {
-            covOption.name = slang::CompilerOptionName::TraceCoverage;
-            covOption.value.kind = slang::CompilerOptionValueKind::Int;
-            covOption.value.intValue0 = 1;
-            sessionDesc.compilerOptionEntries = &covOption;
-            sessionDesc.compilerOptionEntryCount = 1;
-        }
+            auto& option = coverageOptions[coverageOptionCount++];
+            option.name = name;
+            option.value.kind = slang::CompilerOptionValueKind::Int;
+            option.value.intValue0 = 1;
+        };
+        if (lineCoverageEnabled)
+            addBoolOption(slang::CompilerOptionName::TraceCoverage);
+        if (functionCoverageEnabled)
+            addBoolOption(slang::CompilerOptionName::TraceFunctionCoverage);
+        if (branchCoverageEnabled)
+            addBoolOption(slang::CompilerOptionName::TraceBranchCoverage);
+        sessionDesc.compilerOptionEntries = coverageOptions;
+        sessionDesc.compilerOptionEntryCount = coverageOptionCount;
 
         ComPtr<slang::ISession> session;
         SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
@@ -525,6 +546,98 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(counter.isValid());
         SLANG_CHECK(container->asInteger(counter) >= 0);
         SLANG_CHECK((uint32_t)container->asInteger(counter) < coverage->getCounterCount());
+    }
+
+    // Function and branch coverage use the same hidden buffer/binding
+    // contract but populate richer source-entry kinds. They are
+    // intentionally opt-in and do not require line coverage to be
+    // enabled, so future region coverage can compose as another
+    // source-entry mode instead of being forced through line probes.
+    {
+        auto semanticBundle = createMetadataBundle(SLANG_CPP_SOURCE, "sm_5_0", false, true, true);
+        auto* semanticCoverage = semanticBundle.coverage;
+        SLANG_CHECK(semanticCoverage->getCounterCount() > 0);
+        SLANG_CHECK(semanticCoverage->getEntryCount() > 0);
+        SLANG_CHECK(semanticBundle.syntheticResources->getResourceCount() == 1);
+
+        bool seenFunction = false;
+        bool seenBranchTrue = false;
+        bool seenBranchFalse = false;
+        bool seenBranchCase = false;
+        bool seenBranchDefault = false;
+        bool seenLine = false;
+        for (uint32_t i = 0; i < semanticCoverage->getEntryCount(); ++i)
+        {
+            slang::CoverageEntryInfo entry;
+            SLANG_CHECK(semanticCoverage->getEntryInfo(i, &entry) == SLANG_OK);
+            SLANG_CHECK(entry.file != nullptr);
+            SLANG_CHECK(entry.line > 0);
+            SLANG_CHECK(entry.counterIndex != slang::kInvalidCoverageCounterIndex);
+            SLANG_CHECK(entry.counterIndex < semanticCoverage->getCounterCount());
+
+            if (entry.kind == slang::CoverageEntryKind::Function)
+            {
+                seenFunction = true;
+                SLANG_CHECK(entry.functionName != nullptr);
+                SLANG_CHECK(entry.functionMangledName != nullptr);
+            }
+            else if (entry.kind == slang::CoverageEntryKind::Branch)
+            {
+                SLANG_CHECK(entry.branchSiteID != 0);
+                SLANG_CHECK(entry.branchArmID != 0);
+                if (entry.branchArmKind == slang::CoverageBranchArmKind::TrueArm)
+                    seenBranchTrue = true;
+                if (entry.branchArmKind == slang::CoverageBranchArmKind::FalseArm)
+                    seenBranchFalse = true;
+                if (entry.branchArmKind == slang::CoverageBranchArmKind::CaseArm)
+                    seenBranchCase = true;
+                if (entry.branchArmKind == slang::CoverageBranchArmKind::DefaultArm)
+                    seenBranchDefault = true;
+            }
+            else if (entry.kind == slang::CoverageEntryKind::Line)
+            {
+                seenLine = true;
+            }
+        }
+        SLANG_CHECK(seenFunction);
+        SLANG_CHECK(seenBranchTrue);
+        SLANG_CHECK(seenBranchFalse);
+        SLANG_CHECK(seenBranchCase);
+        SLANG_CHECK(seenBranchDefault);
+        SLANG_CHECK(!seenLine);
+
+        ComPtr<ISlangBlob> manifest;
+        SLANG_CHECK(
+            slang_writeCoverageManifestJson(semanticCoverage, manifest.writeRef()) == SLANG_OK);
+        ParsedJson parsed;
+        SLANG_CHECK(parseJsonBlob(manifest, parsed) == SLANG_OK);
+        auto container = parsed.container.Ptr();
+        JSONValue entriesValue = findJsonField(container, parsed.root, "entries");
+        SLANG_CHECK(entriesValue.isValid());
+        auto entries = container->getArray(entriesValue);
+        bool seenFunctionJson = false;
+        bool seenBranchJson = false;
+        for (auto entryValue : entries)
+        {
+            JSONValue kindValue = findJsonField(container, entryValue, "kind");
+            SLANG_CHECK(kindValue.isValid());
+            auto kind = container->getString(kindValue);
+            if (kind == toSlice("function"))
+            {
+                seenFunctionJson = true;
+                SLANG_CHECK(findJsonField(container, entryValue, "function").isValid());
+                SLANG_CHECK(findJsonField(container, entryValue, "function_mangled").isValid());
+            }
+            if (kind == toSlice("branch"))
+            {
+                seenBranchJson = true;
+                SLANG_CHECK(findJsonField(container, entryValue, "branch_site").isValid());
+                SLANG_CHECK(findJsonField(container, entryValue, "branch_arm").isValid());
+                SLANG_CHECK(findJsonField(container, entryValue, "branch_arm_kind").isValid());
+            }
+        }
+        SLANG_CHECK(seenFunctionJson);
+        SLANG_CHECK(seenBranchJson);
     }
 
     // Argument validation on the serializer.

@@ -108,6 +108,8 @@ class SlangCoverageToLcovTests(unittest.TestCase):
                     "mode": "count",
                     "file": "shader.slang",
                     "line": 13,
+                    "branch_site": 1,
+                    "branch_arm": 2,
                 },
                 {
                     "kind": "line",
@@ -125,30 +127,23 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             result.stdout,
             "TN:shader_coverage\n"
             "SF:shader.slang\n"
+            "BRDA:13,1,2,11\n"
+            "BRF:1\n"
+            "BRH:1\n"
             "DA:12,12\n"
             "end_of_record\n",
         )
-        # The branch entry and the counterless line entry are not
-        # representable in LCOV's line-oriented model; the converter
-        # reports each skipped category on stderr so a future producer
-        # emitting non-line entries gets visible diagnostics instead
-        # of silent drops.
-        self.assertIn(
-            "note: skipped 1 entries of kind 'branch' not representable in LCOV",
-            result.stderr,
-        )
+        # Counterless source entries stay in the manifest/metadata, but
+        # cannot be represented as LCOV records.
         self.assertIn(
             "note: skipped 1 line entries without a runtime counter not representable in LCOV",
             result.stderr,
         )
 
-    def test_reports_multiple_skipped_kinds(self):
-        # A future producer emitting branch and function entries must
-        # surface a per-kind stderr note for each so empty LCOV output
-        # is never silent.
+    def test_reads_v2_function_and_branch_entries(self):
         manifest = {
             "version": 2,
-            "counter_count": 1,
+            "counter_count": 5,
             "entries": [
                 {
                     "kind": "line",
@@ -158,22 +153,62 @@ class SlangCoverageToLcovTests(unittest.TestCase):
                     "line": 10,
                 },
                 {
-                    "kind": "branch",
-                    "counter": None,
+                    "kind": "function",
+                    "counter": 1,
                     "mode": "count",
                     "file": "shader.slang",
                     "line": 11,
+                    "function": "helper",
+                    "function_mangled": "_S6helper",
                 },
                 {
                     "kind": "branch",
-                    "counter": None,
+                    "counter": 2,
                     "mode": "count",
                     "file": "shader.slang",
                     "line": 12,
+                    "branch_site": 4,
+                    "branch_arm": 1,
                 },
                 {
-                    "kind": "function",
-                    "counter": None,
+                    "kind": "branch",
+                    "counter": 3,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 12,
+                    "branch_site": 4,
+                    "branch_arm": 2,
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "5 3 2 0 99\n")
+
+        self.assertEqual(
+            result.stdout,
+            "TN:shader_coverage\n"
+            "SF:shader.slang\n"
+            "FN:11,helper\n"
+            "FNDA:3,helper\n"
+            "FNF:1\n"
+            "FNH:1\n"
+            "BRDA:12,4,1,2\n"
+            "BRDA:12,4,2,0\n"
+            "BRF:2\n"
+            "BRH:1\n"
+            "DA:10,5\n"
+            "end_of_record\n",
+        )
+        self.assertEqual(result.stderr, "")
+
+    def test_reports_unrepresented_v2_kinds(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "entries": [
+                {
+                    "kind": "region",
+                    "counter": 0,
                     "mode": "count",
                     "file": "shader.slang",
                     "line": 13,
@@ -184,11 +219,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         result = self.run_converter(manifest, "5\n")
 
         self.assertIn(
-            "note: skipped 2 entries of kind 'branch' not representable in LCOV",
-            result.stderr,
-        )
-        self.assertIn(
-            "note: skipped 1 entries of kind 'function' not representable in LCOV",
+            "note: skipped 1 entries of kind 'region' not representable in LCOV",
             result.stderr,
         )
 
@@ -280,7 +311,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         result = self.run_converter(manifest, "0\n", check=False)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("error: invalid v2 line entry in manifest", result.stderr)
+        self.assertIn("error: invalid v2 entry in manifest", result.stderr)
 
 
 if __name__ == "__main__":

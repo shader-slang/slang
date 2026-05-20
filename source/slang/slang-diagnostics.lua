@@ -4692,7 +4692,7 @@ err(
 err(
     "coverage-pass-through-incompatible",
     45104,
-    "`-trace-coverage` cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation"
+    "coverage tracing options cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation"
 )
 
 err(

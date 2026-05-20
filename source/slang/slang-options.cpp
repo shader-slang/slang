@@ -543,9 +543,21 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::TraceCoverage,
          "-trace-coverage",
          nullptr,
-         "Instrument the shader with per-statement execution counters. "
+         "Instrument the shader with per-statement line coverage counters. "
          "When writing compiled output to a file, slangc also emits "
          "`<output>.coverage-mapping.json` mapping source coverage entries to counters."},
+        {OptionKind::TraceFunctionCoverage,
+         "-trace-function-coverage",
+         nullptr,
+         "Instrument the shader with per-function-entry coverage counters. "
+         "Shares the synthesized `__slang_coverage` buffer and coverage metadata path."},
+        {OptionKind::TraceBranchCoverage,
+         "-trace-branch-coverage",
+         nullptr,
+         "Instrument the shader with per-branch-arm coverage counters for "
+         "if/else, loop-condition, switch case/default arms, and switch no-match "
+         "default paths. "
+         "Shares the synthesized `__slang_coverage` buffer and coverage metadata path."},
         {OptionKind::TraceCoverageBinding,
          "-trace-coverage-binding",
          "-trace-coverage-binding <index> <space>",
@@ -2418,6 +2430,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ReportCheckpointIntermediates:
         case OptionKind::ReportDynamicDispatchSites:
         case OptionKind::TraceCoverage:
+        case OptionKind::TraceFunctionCoverage:
+        case OptionKind::TraceBranchCoverage:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
