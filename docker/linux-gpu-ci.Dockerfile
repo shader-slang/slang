@@ -8,8 +8,8 @@
 # - .github/workflows/ci-slang-test-container.yml
 #
 # Build and push:
-#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1 .
-#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
+#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.0 .
+#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.0
 #
 # IMPORTANT: After pushing a new version, update all references in:
 #   - .github/workflows/ci-slang-build-container.yml
@@ -54,6 +54,7 @@ RUN apt-get update && apt-get install -y \
     libxrandr-dev \
     libxinerama-dev \
     libxi-dev \
+    gdb \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Vulkan SDK 1.4.341.1 from tarball (apt packages discontinued after 1.4.313)
