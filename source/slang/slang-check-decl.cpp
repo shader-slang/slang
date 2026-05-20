@@ -11900,6 +11900,106 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
     SemanticsVisitor visitor(withDeclToExcludeFromLookup(decl));
     decl->type = visitor.CheckProperType(decl->type);
     checkVisibility(decl);
+
+    // If this is a generic typealias (e.g., `typealias Baz<T> = Foo<T>`), the body
+    // type may have optional-constraint args resolved to NoneWitness because the
+    // alias's type params are unconstrained at this point.
+    //
+    // Propagate such optional constraints to this generic's own param list so that
+    // instantiation with a concrete type (e.g., `Baz<float>`) can satisfy them.
+    // Also replace the NoneWitness entries in the body type's DeclRef with
+    // DeclaredSubtypeWitnesses referencing the newly added constraints, so that
+    // the IR generic for Baz correctly threads the witness through to Foo.
+    //
+    auto parentGenericDecl = as<GenericDecl>(decl->parentDecl);
+    if (!parentGenericDecl)
+        return;
+
+    auto bodyDeclRefType = as<DeclRefType>(decl->type.type);
+    if (!bodyDeclRefType)
+        return;
+
+    auto genericAppDeclRef =
+        SubstitutionSet(bodyDeclRefType->getDeclRef()).findGenericAppDeclRef();
+    if (!genericAppDeclRef)
+        return;
+
+    // Count the ordinary (non-constraint) params in the body generic so we can
+    // identify which args correspond to constraints.
+    auto bodyGenericDecl = genericAppDeclRef->getGenericDecl();
+    Index ordinaryParamCount = 0;
+    for (auto mm : bodyGenericDecl->getDirectMemberDecls())
+    {
+        if (as<GenericTypeParamDeclBase>(mm) || as<GenericValueParamDecl>(mm) ||
+            as<GenericValuePackParamDecl>(mm))
+            ordinaryParamCount++;
+    }
+
+    // Build a replacement args list, substituting NoneWitness entries with
+    // DeclaredSubtypeWitnesses backed by new optional constraints on parentGenericDecl.
+    List<Val*> newArgs;
+    for (Index i = 0; i < genericAppDeclRef->getArgCount(); i++)
+        newArgs.add(genericAppDeclRef->getArg(i));
+
+    bool modified = false;
+    Index argIdx = ordinaryParamCount;
+
+    auto bodyGenericDeclRef = DeclRef<GenericDecl>(genericAppDeclRef->getGenericDeclRef());
+
+    for (auto mm : bodyGenericDecl->getDirectMemberDecls())
+    {
+        auto constraintDecl = as<GenericTypeConstraintDecl>(mm);
+        if (!constraintDecl)
+            continue;
+
+        if (argIdx < (Index)newArgs.getCount() && as<NoneWitness>(newArgs[argIdx]) &&
+            constraintDecl->hasModifier<OptionalConstraintModifier>())
+        {
+            // Compute the substituted sub/sup types for this constraint by applying
+            // the body type's generic substitution to the constraint's declaration.
+            auto substConstraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        bodyGenericDeclRef,
+                        genericAppDeclRef->getArgs(),
+                        constraintDecl)
+                    .as<GenericTypeConstraintDecl>();
+            auto subType = getSub(m_astBuilder, substConstraintDeclRef);
+            auto supType = getSup(m_astBuilder, substConstraintDeclRef);
+
+            if (subType && supType)
+            {
+                // Add an equivalent optional constraint to the alias's own generic
+                // so that `Baz<float>` can resolve it against float's conformances.
+                auto synConstraint = m_astBuilder->create<GenericTypeConstraintDecl>();
+                synConstraint->parentDecl = parentGenericDecl;
+                synConstraint->sub = TypeExp(subType);
+                synConstraint->sup = TypeExp(supType);
+                addModifier(synConstraint, m_astBuilder->create<OptionalConstraintModifier>());
+                parentGenericDecl->addDirectMemberDecl(synConstraint);
+
+                // Replace the NoneWitness with a DeclaredSubtypeWitness that references
+                // the new constraint.  DeclaredSubtypeWitness::_substituteImplOverride
+                // will exchange this for the real witness when Baz is specialized.
+                auto newWitness = m_astBuilder->getDeclaredSubtypeWitness(
+                    subType,
+                    supType,
+                    m_astBuilder->getDirectDeclRef(synConstraint));
+                newArgs[argIdx] = newWitness;
+                modified = true;
+            }
+        }
+        argIdx++;
+    }
+
+    if (modified)
+    {
+        // Rebuild the body type with the updated constraint witness args.
+        auto newGenericAppDeclRef = m_astBuilder->getGenericAppDeclRef(
+            bodyGenericDeclRef,
+            makeConstArrayView(newArgs.getBuffer(), newArgs.getCount()));
+        decl->type.type = DeclRefType::create(m_astBuilder, newGenericAppDeclRef);
+    }
 }
 
 void SemanticsDeclHeaderVisitor::visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
