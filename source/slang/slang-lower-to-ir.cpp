@@ -7606,10 +7606,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     // so that it can be used for a label.
     IRBlock* createBlock() { return getBuilder()->createBlock(); }
 
-    uint32_t allocateCoverageBranchSiteID()
-    {
-        return context->shared->nextCoverageBranchSiteID++;
-    }
+    uint32_t allocateCoverageBranchSiteID() { return context->shared->nextCoverageBranchSiteID++; }
 
     void emitBranchCoverageMarker(
         SourceLoc loc,
