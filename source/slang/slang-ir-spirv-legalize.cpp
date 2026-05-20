@@ -36,6 +36,8 @@ namespace Slang
 // Legalization of IR for direct SPIRV emit.
 //
 
+static void wrapCBufferElementsForSPIRV(IRModule* module);
+
 struct SPIRVLegalizationContext : public SourceEmitterBase
 {
     SPIRVEmitSharedContext* m_sharedContext;
@@ -2562,8 +2564,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto inst : m_instsToRemove)
             inst->removeAndDeallocate();
 
+        wrapCBufferElementsForSPIRV(m_module);
+
         // Translate types.
-        List<IRHLSLStructuredBufferTypeBase*> instsToProcess;
+        List<IRType*> instsToProcess;
         List<IRInst*> textureFootprintTypes;
 
         for (auto globalInst : m_module->getGlobalInsts())
@@ -2572,6 +2576,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 instsToProcess.add(t);
             }
+            else if (auto constantBufferType = as<IRConstantBufferType>(globalInst))
+            {
+                if (constantBufferType->hasUses())
+                    instsToProcess.add(constantBufferType);
+            }
             else if (globalInst->getOp() == kIROp_TextureFootprintType)
             {
                 textureFootprintTypes.add(globalInst);
@@ -2579,20 +2588,34 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
         for (auto t : instsToProcess)
         {
-            auto lowered = lowerStructuredBufferType(t);
-
-            AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
-            if (as<IRHLSLStructuredBufferType>(t))
-                accessQualifier = AccessQualifier::Immutable;
-
             IRBuilder builder(t);
 
             builder.setInsertBefore(t);
-            t->replaceUsesWith(builder.getPtrType(
-                lowered.structType,
-                accessQualifier,
-                getStorageBufferAddressSpace(),
-                t->getDataLayout()));
+            if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(t))
+            {
+                auto lowered = lowerStructuredBufferType(structuredBufferType);
+
+                AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+                if (as<IRHLSLStructuredBufferType>(t))
+                    accessQualifier = AccessQualifier::Immutable;
+
+                t->replaceUsesWith(builder.getPtrType(
+                    lowered.structType,
+                    accessQualifier,
+                    getStorageBufferAddressSpace(),
+                    structuredBufferType->getDataLayout()));
+            }
+            else if (auto constantBufferType = as<IRUniformParameterGroupType>(t))
+            {
+                auto elementType = constantBufferType->getElementType();
+                SLANG_ASSERT(as<IRStructType>(elementType));
+                builder.addDecorationIfNotExist(elementType, kIROp_SPIRVBlockDecoration);
+                t->replaceUsesWith(builder.getPtrType(
+                    elementType,
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::Uniform,
+                    constantBufferType->getDataLayout()));
+            }
         }
         for (auto t : textureFootprintTypes)
         {
@@ -2600,40 +2623,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(t);
             builder.setInsertBefore(t);
             t->replaceUsesWith(lowered);
-        }
-
-        // Translate ConstantBuffer<T> types used in the descriptor heap path.
-        // When ConstantBuffer<T>.Handle is accessed with spvDescriptorHeapEXT, the
-        // SPIRVLoadDescriptorFromHeap instruction has result type ConstantBuffer<T>.
-        // The SPIRV emit code expects buffer result types to be lowered to pointers,
-        // so replace ConstantBuffer<T> with Ptr<T, Uniform> here. Non-struct element
-        // types are wrapped earlier by wrapCBufferElementsForSPIRV, matching the
-        // treatment for traditionally-bound constant buffers.
-        // Note: ParameterBlock<T> is intentionally excluded because it does not conform
-        // to IOpaqueDescriptor and therefore cannot appear as a DescriptorHandle argument.
-        {
-            List<IRUniformParameterGroupType*> cbufferTypesToProcess;
-            for (auto globalInst : m_module->getGlobalInsts())
-            {
-                if (!as<IRConstantBufferType>(globalInst))
-                    continue;
-                auto t = as<IRUniformParameterGroupType>(globalInst);
-                if (t->hasUses())
-                    cbufferTypesToProcess.add(t);
-            }
-            for (auto t : cbufferTypesToProcess)
-            {
-                IRBuilder builder(m_sharedContext->m_irModule);
-                builder.setInsertBefore(t);
-                auto elementType = t->getElementType();
-                SLANG_ASSERT(as<IRStructType>(elementType));
-                builder.addDecorationIfNotExist(elementType, kIROp_SPIRVBlockDecoration);
-                t->replaceUsesWith(builder.getPtrType(
-                    elementType,
-                    AccessQualifier::ReadWrite,
-                    AddressSpace::Uniform,
-                    t->getDataLayout()));
-            }
         }
 
         // If older than spirv 1.4, we need more legalization steps due to lack of opcodes.
@@ -2756,7 +2745,8 @@ class SPIRVWrapCBufferElementPolicy : public WrapCBufferElementPolicy
 public:
     bool shouldWrapBufferElementInStruct(IRParameterGroupType* cbufferType) override
     {
-        return !as<IRStructType>(cbufferType->getElementType());
+        return as<IRConstantBufferType>(cbufferType) &&
+               !as<IRStructType>(cbufferType->getElementType());
     }
 };
 
@@ -3031,7 +3021,6 @@ void legalizeIRForSPIRV(
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(entryPoints);
-    wrapCBufferElementsForSPIRV(module);
     legalizeSPIRV(context, module, codeGenContext);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
 
