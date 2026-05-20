@@ -270,7 +270,6 @@ def _tier2_concrete_row(
     *,
     run_id: int,
     run_attempt: int,
-    workflow_file: str | None,
     run_created_at: str | None,
 ) -> dict[str, Any]:
     """Build a Tier 2 (record_only) concrete_job row. All graph columns NULL.
@@ -280,6 +279,10 @@ def _tier2_concrete_row(
     works for hosted-runner concurrency and conclusion/duration analytics
     because workflow_name is joinable through (run_id, run_attempt) on
     workflow_runs.
+
+    Per the plan, every graph column is NULL on Tier 2 rows — including
+    caller_workflow_file. Workflow attribution is one JOIN away via
+    workflow_runs.workflow_file. Validation enforces this.
     """
     return {
         "row_key": rk_concrete(api_job["id"]),
@@ -287,7 +290,7 @@ def _tier2_concrete_row(
         "run_id": run_id,
         "run_attempt": run_attempt,
         "name": api_job.get("name"),
-        "caller_workflow_file": workflow_file,
+        "caller_workflow_file": None,
         "caller_job_key": None,
         "called_workflow_file": None,
         "called_job_key": None,
@@ -341,7 +344,6 @@ def build_rows(
                     api_job,
                     run_id=run_id,
                     run_attempt=run_attempt,
-                    workflow_file=workflow_file,
                     run_created_at=run_created_at,
                 )
             )
@@ -628,6 +630,24 @@ def validate(
             "rows; expected 0. Tier 2 must not materialize graph nodes."
         )
 
+    # Per-tier graph-field NULL contract on concrete rows. Tier 2's whole
+    # point is that these fields are unset — leaking a Tier 1-style value
+    # into a Tier 2 row would corrupt the "rows with NULL graph_instance_key
+    # are the lightweight tier" assumption downstream queries can rely on.
+    TIER2_NULL_FIELDS = (
+        "caller_workflow_file",
+        "caller_job_key",
+        "called_workflow_file",
+        "called_job_key",
+        "graph_instance_key",
+        "job_type",
+        "matrix_os",
+        "matrix_arch",
+        "matrix_compiler",
+        "matrix_config",
+        "matrix_gpu_tier",
+    )
+
     for r in jobs:
         if r["node_kind"] == "concrete_job":
             if tier == "record_only":
@@ -635,6 +655,15 @@ def validate(
                     errors.append(
                         f"Tier 2 concrete row {r['job_id']} ({r['name']}) has "
                         f"needs[]={r['needs']}, expected empty list."
+                    )
+                leaked = [
+                    f for f in TIER2_NULL_FIELDS if r.get(f) is not None
+                ]
+                if leaked:
+                    errors.append(
+                        f"Tier 2 concrete row {r['job_id']} ({r['name']}) has "
+                        f"non-NULL graph fields: "
+                        + ", ".join(f"{k}={r[k]!r}" for k in leaked)
                     )
                 continue
             if not r["needs"]:
