@@ -1,5 +1,6 @@
 // slang-api.cpp
 
+#include "../compiler-core/slang-artifact-associated-impl.h"
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-platform.h"
 #include "../core/slang-rtti-info.h"
@@ -1143,17 +1144,27 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
     out << "    \"name\": \"__slang_coverage\",\n";
     out << "    \"element_type\": \"uint32\",\n";
     out << "    \"element_stride\": 4";
-    slang::CoverageBufferInfo bufferInfo;
-    // `bufferInfo.structSize` is set by the default constructor; a
-    // failure here is an internal-invariant violation, not a "fields
-    // unavailable" case. Bail rather than silently producing a
-    // manifest without binding info — hosts that rely on the binding
-    // would parse a partial sidecar without realizing it.
-    SLANG_RETURN_ON_FAIL(metadata->getBufferInfo(&bufferInfo));
-    if (bufferInfo.space >= 0)
-        out << ",\n    \"space\": " << (int64_t)bufferInfo.space;
-    if (bufferInfo.binding >= 0)
-        out << ",\n    \"binding\": " << (int64_t)bufferInfo.binding;
+    if (auto syntheticResources = (slang::ISyntheticResourceMetadata*)metadata->castAs(
+            slang::ISyntheticResourceMetadata::getTypeGuid()))
+    {
+        uint32_t coverageResourceIndex = 0;
+        if (SLANG_SUCCEEDED(syntheticResources->findResourceIndexByID(
+                uint32_t(Slang::SyntheticResourceKnownID::Coverage),
+                &coverageResourceIndex)))
+        {
+            slang::SyntheticResourceInfo resourceInfo;
+            SLANG_RETURN_ON_FAIL(
+                syntheticResources->getResourceInfo(coverageResourceIndex, &resourceInfo));
+            if (resourceInfo.space >= 0)
+                out << ",\n    \"space\": " << (int64_t)resourceInfo.space;
+            if (resourceInfo.binding >= 0)
+                out << ",\n    \"binding\": " << (int64_t)resourceInfo.binding;
+            if (resourceInfo.uniformOffset >= 0)
+                out << ",\n    \"uniform_offset\": " << (int64_t)resourceInfo.uniformOffset;
+            if (resourceInfo.uniformStride > 0)
+                out << ",\n    \"uniform_stride\": " << (int64_t)resourceInfo.uniformStride;
+        }
+    }
     out << "\n  },\n";
     out << "  \"entries\": [";
     for (uint32_t i = 0; i < counterCount; ++i)
