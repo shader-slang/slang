@@ -125,6 +125,46 @@ checked code at runtime); diagnostic claims use
 | `type-mismatch-rejected.slang`                     | negative   | `#failure-modes`                            |
 | `typedef-resolves-to-base-type.slang`              | functional | `#files-and-responsibilities`               |
 | `undefined-identifier-becomes-error.slang`         | negative   | `#failure-modes`                            |
+| `ambiguous-overload-rejected.slang`                | negative   | `#edge-cases-and-failure-modes`             |
+| `argument-must-be-lvalue-rejected.slang`           | negative   | `#files-and-responsibilities`               |
+| `array-negative-size-rejected.slang`               | boundary   | `#files-and-responsibilities`               |
+| `attribute-not-applicable-rejected.slang`          | negative   | `#modifier-validation`                      |
+| `bit-field-non-integral-rejected.slang`            | negative   | `#files-and-responsibilities`               |
+| `bit-field-too-wide-rejected.slang`                | boundary   | `#files-and-responsibilities`               |
+| `break-inside-defer-rejected.slang`                | negative   | `#files-and-responsibilities`               |
+| `class-without-new-rejected.slang`                 | negative   | `#files-and-responsibilities`               |
+| `conflicting-struct-redeclaration-rejected.slang`  | negative   | `#files-and-responsibilities`               |
+| `continue-inside-defer-rejected.slang`             | negative   | `#files-and-responsibilities`               |
+| `cyclic-inheritance-rejected.slang`                | negative   | `#failure-modes`                            |
+| `default-argument-with-zero-args.slang`            | boundary   | `#conversion-costs`                         |
+| `duplicate-modifier-rejected.slang`                | negative   | `#modifier-validation`                      |
+| `expected-string-literal-attr-rejected.slang`      | negative   | `#shader-specific-checks`                   |
+| `function-return-type-mismatch-rejected.slang`     | negative   | `#failure-modes`                            |
+| `generic-value-parameter-type-rejected.slang`      | negative   | `#generic-specialization-and-constraints`   |
+| `global-var-opaque-type-rejected.slang`            | negative   | `#modifier-validation`                      |
+| `invalid-extension-on-interface-rejected.slang`    | negative   | `#generic-specialization-and-constraints`   |
+| `invalid-type-for-constraint-rejected.slang`       | negative   | `#generic-specialization-and-constraints`   |
+| `many-args-positional.slang`                       | boundary   | `#conversion-costs`                         |
+| `member-not-found-on-struct-rejected.slang`        | negative   | `#failure-modes`                            |
+| `missing-override-rejected.slang`                  | negative   | `#generic-specialization-and-constraints`   |
+| `new-on-non-class-rejected.slang`                  | negative   | `#files-and-responsibilities`               |
+| `no-applicable-overload-zero-candidate-rejected.slang` | negative | `#edge-cases-and-failure-modes`            |
+| `numthreads-non-positive-rejected.slang`           | boundary   | `#shader-specific-checks`                   |
+| `overload-prefer-int-over-uint.slang`              | boundary   | `#conversion-costs`                         |
+| `pack-param-must-be-last-rejected.slang`           | negative   | `#generic-specialization-and-constraints`   |
+| `return-inside-defer-rejected.slang`               | negative   | `#files-and-responsibilities`               |
+| `spec-constant-must-be-scalar-rejected.slang`      | negative   | `#modifier-validation`                      |
+| `subscript-on-non-array-rejected.slang`            | negative   | `#files-and-responsibilities`               |
+| `switch-duplicate-cases-rejected.slang`            | negative   | `#files-and-responsibilities`               |
+| `switch-multiple-default-rejected.slang`           | negative   | `#files-and-responsibilities`               |
+| `synthesized-positional-constructor-nested.slang`  | boundary   | `#synthesizing-implicit-code`               |
+| `too-many-arguments-rejected.slang`                | negative   | `#edge-cases-and-failure-modes`             |
+| `too-many-initializers-rejected.slang`             | boundary   | `#synthesizing-implicit-code`               |
+| `try-on-non-call-rejected.slang`                   | negative   | `#files-and-responsibilities`               |
+| `typedef-chain-resolves.slang`                     | boundary   | `#files-and-responsibilities`               |
+| `uncaught-try-in-non-throw-rejected.slang`         | negative   | `#files-and-responsibilities`               |
+| `unsized-member-must-be-last-rejected.slang`       | negative   | `#files-and-responsibilities`               |
+| `variable-used-in-own-definition-rejected.slang`   | negative   | `#failure-modes`                            |
 
 ## Doc gaps observed
 

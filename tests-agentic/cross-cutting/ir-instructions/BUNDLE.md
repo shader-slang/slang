@@ -98,6 +98,40 @@ through any directive that `slang-test` runs on a CPU.
 | `value-string-lit-hash-ir.slang`           | functional | `#value-instructions`                 |
 | `type-vector-ir.slang`                     | functional | `#type-instructions`                  |
 | `type-array-ir.slang`                      | functional | `#type-instructions`                  |
+| `arithmetic-add-uint32-max-overflow.slang` | boundary   | `#value-instructions`                 |
+| `arithmetic-sub-int-min-literal.slang`     | boundary   | `#value-instructions`                 |
+| `arithmetic-mul-by-zero-literal.slang`     | boundary   | `#value-instructions`                 |
+| `arithmetic-div-by-positive-zero-float.slang` | boundary | `#value-instructions`               |
+| `arithmetic-add-float-positive-inf.slang`  | boundary   | `#value-instructions`                 |
+| `arithmetic-add-float-negative-inf.slang`  | boundary   | `#value-instructions`                 |
+| `arithmetic-neg-int.slang`                 | boundary   | `#value-instructions`                 |
+| `comparison-cmpeq-ir.slang`                | boundary   | `#value-instructions`                 |
+| `comparison-cmpne-ir.slang`                | boundary   | `#value-instructions`                 |
+| `comparison-cmplt-ir.slang`                | boundary   | `#value-instructions`                 |
+| `comparison-cmple-ir.slang`                | boundary   | `#value-instructions`                 |
+| `comparison-cmpge-ir.slang`                | boundary   | `#value-instructions`                 |
+| `comparison-nan-greater-than-self.slang`   | boundary   | `#value-instructions`                 |
+| `conversion-bitcast-float-to-uint.slang`   | boundary   | `#value-instructions`                 |
+| `conversion-floatcast-to-int.slang`        | boundary   | `#value-instructions`                 |
+| `conversion-intcast-int-to-uint.slang`     | boundary   | `#value-instructions`                 |
+| `buffer-write-runtime-index.slang`         | boundary   | `#resource-and-shader-io-opcodes`     |
+| `buffer-aliased-write-and-read.slang`      | boundary   | `#resource-and-shader-io-opcodes`     |
+| `atomic-add-stress.slang`                  | stress     | `#resource-and-shader-io-opcodes`     |
+| `control-flow-switch-multi-case.slang`     | boundary   | `#control-flow-instructions`          |
+| `control-flow-empty-body.slang`            | boundary   | `#control-flow-instructions`          |
+| `control-flow-nested-loop.slang`           | stress     | `#control-flow-instructions`          |
+| `type-matrix-float-4x4.slang`              | boundary   | `#type-instructions`                  |
+| `type-vector-length-one.slang`             | boundary   | `#type-instructions`                  |
+| `type-array-length-one.slang`              | boundary   | `#type-instructions`                  |
+| `function-call-high-arity.slang`           | stress     | `#function-and-module-structure`      |
+| `memory-load-struct-from-buffer.slang`     | boundary   | `#memory-instructions`                |
+| `memory-swizzle-single-element.slang`      | boundary   | `#memory-instructions`                |
+| `memory-swizzle-full-reverse.slang`        | boundary   | `#memory-instructions`                |
+| `specialize-two-type-arguments.slang`      | boundary   | `#specialization-and-existentials`    |
+| `structure-empty-struct.slang`             | boundary   | `#type-instructions`                  |
+| `structure-global-constant.slang`          | boundary   | `#function-and-module-structure`      |
+| `negative-arithmetic-add-struct-no-overload.slang` | negative | `#value-instructions`           |
+| `negative-bitcast-size-mismatch.slang`     | negative   | `#value-instructions`                 |
 
 ## Doc gaps observed
 
@@ -133,6 +167,34 @@ through any directive that `slang-test` runs on a CPU.
   back-edge of a `for` loop carries values via block parameters.
   The connection between source-level loops and IR `param`s is
   implicit.
+- The arithmetic family is documented as `add`/`sub`/`mul`/`div` but
+  the unary-negation member of the same family (`neg`) is not named,
+  even though it is the natural 1-operand sibling of the binary
+  operators. Adding `neg` to the value-instructions row would let an
+  agent anchor a boundary test for unary arithmetic directly.
+- The doc's conversion-family entry names `intCast`, `floatCast`, and
+  `bitCast` but does not enumerate the float-to-int and int-to-float
+  numeric conversion opcodes (`castFloatToInt`, `castIntToFloat`)
+  that the front end actually emits for `int(floatExpr)` and
+  `float(intExpr)`. A one-line note on the user surface for each
+  conversion opcode would be a meaningful expansion.
+- The doc's `swizzle` entry does not state the operand shape; the IR
+  actually takes `(base, idx0, idx1, ...)` where the variadic-index
+  arity equals the resulting vector length. Stating this in the
+  memory-instructions row would let agents pin down the lower- vs
+  upper-edge of the swizzle-length axis.
+- The doc cites `globalConstant` only in passing alongside
+  `global_var` / `global_param` but does not name the surface-level
+  construct (`static const`) that produces it. With the surface
+  named, the `globalConstant` opcode could be tested directly.
+- The doc does not document any error or warning text for invalid
+  arithmetic / conversion operands; this restricts the bundle's
+  negative tests to a small surface (struct-arithmetic, bit-cast
+  size mismatch) that survives by general "no overload" /
+  "type mismatch" diagnostics rather than by IR-instruction-specific
+  rules. Naming a few canonical diagnostic codes (e.g. for the
+  bit-width-mismatch rule of `bitCast`) would let agents tie negative
+  tests directly to documented behavior.
 
 ## Out of scope (no-GPU runner)
 

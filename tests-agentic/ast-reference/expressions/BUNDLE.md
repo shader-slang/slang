@@ -50,6 +50,27 @@ non-l-value, undeclared name reference, member-access of a missing
 field, an unconvertible cast, and an InvokeExpr whose argument types
 don't match the only candidate.
 
+A second pass extends the bundle with boundary, stress, and
+additional negative tests instantiated against the mandatory axes in
+`_meta/prompts/_common.md`. For literals: int/uint MIN/MAX edges and
+unsigned-overflow wrap at both `uint` and `uint8` widths; `+0.0`
+vs `-0.0` bit-pattern distinction observed via `1.0/zero` -> ±inf;
+arithmetic overflow to `+inf`/`-inf`; `NaN != NaN` from `0/0`. For
+`InfixExpr`: precedence boundary, deeply nested paren-arithmetic,
+and `% 1` lower edge. For short-circuit logic operators: chains of
+three or more side-effecting RHS calls that must not fire. For
+`MemberExpr`: a five-deep `a.b.c.d.e.v` access, plus a negative
+test on a non-aggregate base. For `InvokeExpr`: 0-arg, 8-arg, and
+arity-mismatch negatives. For `IndexExpr`: index 0, N-1, and a
+three-deep `arr[i][j][k]` chain. For `TypeCastExpr`: uint32→uint8
+narrowing, float→int truncation in both signs, signed→unsigned wrap,
+and an additional struct→bool rejection. For `AssignExpr`: implicit
+narrowing conversion, and assigning to a call result (non-l-value).
+For `SelectExpr`: nested ternary chain and mixed-arm common-type
+emergence. For `InitializerListExpr`: empty `{}`, single-element,
+and an over-count negative. For `LambdaExpr`: zero parameters,
+single capture, and a curried lambda-inside-lambda.
+
 ## Claims enumerated
 
 | Claim ID | Anchor                                                                                                                                                                                                                              | Claim (one line)                                                                                                                       | Tests                                                                                          |
@@ -111,64 +132,111 @@ don't match the only candidate.
 
 ## Tests in this bundle
 
-| File                                              | Intent     | Doc anchor                                                                                                       |
-| ------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
-| `alignof-expr-type.slang`                         | functional | `#nodes`                                                                                                         |
-| `and-type-expr-conjunction.slang`                 | functional | `#type-expression-family-pointertypeexpr-functypeexpr-tupletypeexpr-andtypeexpr-modifiedtypeexpr-thistypeexpr`   |
-| `assign-expr-value-update.slang`                  | functional | `#nodes`                                                                                                         |
-| `assign-to-non-lvalue-rejected.slang`             | negative   | `#nodes`                                                                                                         |
-| `astype-expr-subtype-cast.slang`                  | functional | `#astypeexpr-istypeexpr-casttosupertypeexpr`                                                                     |
-| `bwd-differentiate-expr.slang`                    | functional | `#differentiate-family-expressions`                                                                              |
-| `cast-incompatible-rejected.slang`                | negative   | `#nodes`                                                                                                         |
-| `cast-to-supertype-implicit.slang`                | functional | `#astypeexpr-istypeexpr-casttosupertypeexpr`                                                                     |
-| `compound-assign-plus.slang`                      | functional | `#nodes`                                                                                                         |
-| `countof-expr-type-pack.slang`                    | functional | `#nodes`                                                                                                         |
-| `default-construct-value.slang`                   | functional | `#nodes`                                                                                                         |
-| `explicit-cast-int-to-float.slang`                | functional | `#nodes`                                                                                                         |
-| `explicit-ctor-invoke.slang`                      | functional | `#nodes`                                                                                                         |
-| `fwd-differentiate-expr.slang`                    | functional | `#differentiate-family-expressions`                                                                              |
-| `generic-app-explicit-args.slang`                 | functional | `#nodes`                                                                                                         |
-| `index-expr-multi-dim-array.slang`                | functional | `#nodes`                                                                                                         |
-| `index-expr-subscript.slang`                      | functional | `#nodes`                                                                                                         |
-| `infix-arithmetic-operators.slang`                | functional | `#nodes`                                                                                                         |
-| `infix-comparison-operators.slang`                | functional | `#nodes`                                                                                                         |
-| `initializer-list-aggregate.slang`                | functional | `#nodes`                                                                                                         |
-| `initializer-list-array-elements.slang`           | functional | `#nodes`                                                                                                         |
-| `invoke-call-function.slang`                      | functional | `#invokeexpr-and-the-call-operator-cast-unification`                                                             |
-| `invoke-operator-and-call-unified.slang`          | functional | `#invokeexpr-and-the-call-operator-cast-unification`                                                             |
-| `istype-expr-runtime.slang`                       | functional | `#astypeexpr-istypeexpr-casttosupertypeexpr`                                                                     |
-| `lambda-expr-call.slang`                          | functional | `#lambdaexpr-and-lambdadecl`                                                                                     |
-| `literal-bool-true-false.slang`                   | functional | `#literalexpr-family`                                                                                            |
-| `literal-float-typed.slang`                       | functional | `#literalexpr-family`                                                                                            |
-| `literal-int-suffix-selects-type.slang`           | functional | `#literalexpr-family`                                                                                            |
-| `literal-int-typed.slang`                         | functional | `#literalexpr-family`                                                                                            |
-| `literal-nullptr-typed.slang`                     | functional | `#literalexpr-family`                                                                                            |
-| `literal-string-cpp-emit.slang`                   | functional | `#literalexpr-family`                                                                                            |
-| `logic-and-short-circuit.slang`                   | functional | `#nodes`                                                                                                         |
-| `logic-or-short-circuit.slang`                    | functional | `#nodes`                                                                                                         |
-| `make-optional-some-and-none.slang`               | functional | `#literalexpr-family`                                                                                            |
-| `member-expr-field-access.slang`                  | functional | `#memberexpr-staticmemberexpr-derefmemberexpr`                                                                   |
-| `member-missing-field-rejected.slang`             | negative   | `#memberexpr-staticmemberexpr-derefmemberexpr`                                                                   |
-| `modified-type-expr-const.slang`                  | functional | `#type-expression-family-pointertypeexpr-functypeexpr-tupletypeexpr-andtypeexpr-modifiedtypeexpr-thistypeexpr`   |
-| `no-applicable-overload-rejected.slang`           | negative   | `#overloadedexpr-and-overloadedexpr2`                                                                            |
-| `paren-expr-grouping.slang`                       | functional | `#nodes`                                                                                                         |
-| `partially-applied-generic.slang`                 | functional | `#partiallyappliedgenericexpr`                                                                                   |
-| `postfix-increment.slang`                         | functional | `#nodes`                                                                                                         |
-| `prefix-decrement.slang`                          | functional | `#nodes`                                                                                                         |
-| `prefix-logical-not.slang`                        | functional | `#nodes`                                                                                                         |
-| `prefix-unary-minus.slang`                        | functional | `#nodes`                                                                                                         |
-| `select-evaluates-only-chosen-arm.slang`          | functional | `#nodes`                                                                                                         |
-| `select-expr-ternary.slang`                       | functional | `#nodes`                                                                                                         |
-| `sizeof-expr-type.slang`                          | functional | `#nodes`                                                                                                         |
-| `static-member-call-method.slang`                 | functional | `#memberexpr-staticmemberexpr-derefmemberexpr`                                                                   |
-| `static-member-on-type.slang`                     | functional | `#memberexpr-staticmemberexpr-derefmemberexpr`                                                                   |
-| `swizzle-expr-interpret-value.slang`              | functional | `#nodes`                                                                                                         |
-| `swizzle-expr-vector-multi-target.slang`          | functional | `#nodes`                                                                                                         |
-| `this-expr-in-method.slang`                       | functional | `#nodes`                                                                                                         |
-| `this-type-expr-in-interface.slang`               | functional | `#type-expression-family-pointertypeexpr-functypeexpr-tupletypeexpr-andtypeexpr-modifiedtypeexpr-thistypeexpr`   |
-| `tuple-type-expr-as-return.slang`                 | functional | `#type-expression-family-pointertypeexpr-functypeexpr-tupletypeexpr-andtypeexpr-modifiedtypeexpr-thistypeexpr`   |
-| `undeclared-name-rejected.slang`                  | negative   | `#varexpr-and-declrefexpr`                                                                                       |
-| `var-expr-resolves-name.slang`                    | functional | `#varexpr-and-declrefexpr`                                                                                       |
+| File | Intent | Doc anchor |
+| --- | --- | --- |
+| `alignof-expr-type.slang` | functional | `#nodes` |
+| `and-type-expr-conjunction.slang` | functional | `#type-expression-family-pointertypeexpr-functypeexpr-tupletypeexpr-andtypeexpr-modifiedtypeexpr-thistypeexpr` |
+| `assign-expr-value-update.slang` | functional | `#nodes` |
+| `assign-implicit-narrowing-conversion.slang` | boundary | `#nodes` |
+| `assign-to-call-result-rejected.slang` | negative | `#nodes` |
+| `assign-to-non-lvalue-rejected.slang` | negative | `#nodes` |
+| `astype-expr-subtype-cast.slang` | functional | `#astypeexpr-istypeexpr-casttosupertypeexpr` |
+| `bwd-differentiate-expr.slang` | functional | `#differentiate-family-expressions` |
+| `cast-float-to-int-truncates.slang` | boundary | `#nodes` |
+| `cast-incompatible-rejected.slang` | negative | `#nodes` |
+| `cast-incompatible-struct-to-bool-rejected.slang` | negative | `#nodes` |
+| `cast-negative-int-to-uint-wraps.slang` | boundary | `#nodes` |
+| `cast-to-supertype-implicit.slang` | functional | `#astypeexpr-istypeexpr-casttosupertypeexpr` |
+| `cast-uint32-to-uint8-narrows.slang` | boundary | `#nodes` |
+| `compound-assign-multiply.slang` | boundary | `#nodes` |
+| `compound-assign-plus.slang` | functional | `#nodes` |
+| `countof-expr-type-pack.slang` | functional | `#nodes` |
+| `default-construct-value.slang` | functional | `#nodes` |
+| `explicit-cast-int-to-float.slang` | functional | `#nodes` |
+| `explicit-ctor-invoke.slang` | functional | `#nodes` |
+| `fwd-differentiate-expr.slang` | functional | `#differentiate-family-expressions` |
+| `generic-app-explicit-args.slang` | functional | `#nodes` |
+| `index-expr-index-zero.slang` | boundary | `#nodes` |
+| `index-expr-last-element.slang` | boundary | `#nodes` |
+| `index-expr-multi-dim-array.slang` | functional | `#nodes` |
+| `index-expr-subscript.slang` | functional | `#nodes` |
+| `index-expr-three-dim-chain.slang` | stress | `#nodes` |
+| `infix-arithmetic-operators.slang` | functional | `#nodes` |
+| `infix-comparison-operators.slang` | functional | `#nodes` |
+| `infix-deeply-nested-arithmetic.slang` | stress | `#nodes` |
+| `infix-int-modulo-by-one.slang` | boundary | `#nodes` |
+| `infix-precedence-mul-before-add.slang` | boundary | `#nodes` |
+| `initializer-list-aggregate.slang` | functional | `#nodes` |
+| `initializer-list-array-elements.slang` | functional | `#nodes` |
+| `initializer-list-empty-default-zeros.slang` | boundary | `#nodes` |
+| `initializer-list-single-element.slang` | boundary | `#nodes` |
+| `initializer-list-too-many-elements-rejected.slang` | negative | `#nodes` |
+| `invoke-call-function.slang` | functional | `#invokeexpr-and-the-call-operator-cast-unification` |
+| `invoke-many-args.slang` | stress | `#invokeexpr-and-the-call-operator-cast-unification` |
+| `invoke-operator-and-call-unified.slang` | functional | `#invokeexpr-and-the-call-operator-cast-unification` |
+| `invoke-wrong-arity-rejected.slang` | negative | `#invokeexpr-and-the-call-operator-cast-unification` |
+| `invoke-zero-args.slang` | boundary | `#invokeexpr-and-the-call-operator-cast-unification` |
+| `istype-expr-runtime.slang` | functional | `#astypeexpr-istypeexpr-casttosupertypeexpr` |
+| `istype-no-match-false.slang` | boundary | `#astypeexpr-istypeexpr-casttosupertypeexpr` |
+| `lambda-captures-single-local.slang` | boundary | `#lambdaexpr-and-lambdadecl` |
+| `lambda-expr-call.slang` | functional | `#lambdaexpr-and-lambdadecl` |
+| `lambda-nested-inside-lambda.slang` | stress | `#lambdaexpr-and-lambdadecl` |
+| `lambda-zero-args.slang` | boundary | `#lambdaexpr-and-lambdadecl` |
+| `literal-bool-overload-selection.slang` | boundary | `#literalexpr-family` |
+| `literal-bool-true-false.slang` | functional | `#literalexpr-family` |
+| `literal-float-nan-self-compare.slang` | boundary | `#literalexpr-family` |
+| `literal-float-negative-infinity.slang` | boundary | `#literalexpr-family` |
+| `literal-float-positive-infinity.slang` | boundary | `#literalexpr-family` |
+| `literal-float-positive-vs-negative-zero.slang` | boundary | `#literalexpr-family` |
+| `literal-float-typed.slang` | functional | `#literalexpr-family` |
+| `literal-int-max-value.slang` | boundary | `#literalexpr-family` |
+| `literal-int-min-value.slang` | boundary | `#literalexpr-family` |
+| `literal-int-suffix-selects-type.slang` | functional | `#literalexpr-family` |
+| `literal-int-typed.slang` | functional | `#literalexpr-family` |
+| `literal-int8-min-max.slang` | boundary | `#literalexpr-family` |
+| `literal-nullptr-typed.slang` | functional | `#literalexpr-family` |
+| `literal-string-cpp-emit.slang` | functional | `#literalexpr-family` |
+| `literal-string-empty-cpp-emit.slang` | boundary | `#literalexpr-family` |
+| `literal-uint-max-plus-one-wraps.slang` | stress | `#literalexpr-family` |
+| `literal-uint-max-value.slang` | boundary | `#literalexpr-family` |
+| `literal-uint8-max-plus-one-wraps.slang` | stress | `#literalexpr-family` |
+| `logic-and-rhs-side-effect-skipped-deep.slang` | stress | `#nodes` |
+| `logic-and-short-circuit.slang` | functional | `#nodes` |
+| `logic-or-rhs-side-effect-skipped-deep.slang` | stress | `#nodes` |
+| `logic-or-short-circuit.slang` | functional | `#nodes` |
+| `make-optional-some-and-none.slang` | functional | `#literalexpr-family` |
+| `member-access-on-non-aggregate-rejected.slang` | negative | `#memberexpr-staticmemberexpr-derefmemberexpr` |
+| `member-expr-deeply-chained.slang` | stress | `#memberexpr-staticmemberexpr-derefmemberexpr` |
+| `member-expr-field-access.slang` | functional | `#memberexpr-staticmemberexpr-derefmemberexpr` |
+| `member-missing-field-rejected.slang` | negative | `#memberexpr-staticmemberexpr-derefmemberexpr` |
+| `modified-type-expr-const.slang` | functional | `#type-expression-family-pointertypeexpr-functypeexpr-tupletypeexpr-andtypeexpr-modifiedtypeexpr-thistypeexpr` |
+| `no-applicable-overload-rejected.slang` | negative | `#overloadedexpr-and-overloadedexpr2` |
+| `paren-expr-grouping.slang` | functional | `#nodes` |
+| `partially-applied-generic.slang` | functional | `#partiallyappliedgenericexpr` |
+| `postfix-increment-precedence-vs-deref.slang` | boundary | `#nodes` |
+| `postfix-increment.slang` | functional | `#nodes` |
+| `prefix-decrement-zero-becomes-negative.slang` | boundary | `#nodes` |
+| `prefix-decrement.slang` | functional | `#nodes` |
+| `prefix-double-logical-not.slang` | stress | `#nodes` |
+| `prefix-logical-not.slang` | functional | `#nodes` |
+| `prefix-unary-minus.slang` | functional | `#nodes` |
+| `select-arms-common-type-int-and-float.slang` | boundary | `#nodes` |
+| `select-evaluates-only-chosen-arm.slang` | functional | `#nodes` |
+| `select-expr-ternary.slang` | functional | `#nodes` |
+| `select-nested-ternary.slang` | stress | `#nodes` |
+| `sizeof-expr-type.slang` | functional | `#nodes` |
+| `sizeof-int8-equals-one.slang` | boundary | `#nodes` |
+| `static-member-call-method.slang` | functional | `#memberexpr-staticmemberexpr-derefmemberexpr` |
+| `static-member-on-type.slang` | functional | `#memberexpr-staticmemberexpr-derefmemberexpr` |
+| `swizzle-expr-interpret-value.slang` | functional | `#nodes` |
+| `swizzle-expr-vector-multi-target.slang` | functional | `#nodes` |
+| `swizzle-repeated-component.slang` | stress | `#nodes` |
+| `swizzle-single-component.slang` | boundary | `#nodes` |
+| `this-expr-in-method.slang` | functional | `#nodes` |
+| `this-type-expr-in-interface.slang` | functional | `#type-expression-family-pointertypeexpr-functypeexpr-tupletypeexpr-andtypeexpr-modifiedtypeexpr-thistypeexpr` |
+| `tuple-type-expr-as-return.slang` | functional | `#type-expression-family-pointertypeexpr-functypeexpr-tupletypeexpr-andtypeexpr-modifiedtypeexpr-thistypeexpr` |
+| `undeclared-name-rejected.slang` | negative | `#varexpr-and-declrefexpr` |
+| `var-expr-resolves-name.slang` | functional | `#varexpr-and-declrefexpr` |
 
 ## Doc gaps observed
 
@@ -208,6 +276,22 @@ don't match the only candidate.
   user-spelled form `__dispatch_kernel` but no example of the
   surface arguments (`threadGroupSize` / `dispatchSize`) or the
   contexts where it is accepted. We did not write a test for it.
+- The `IndexExpr` row does not commit to a static-bounds behavior
+  for `arr[N]` where `N >= length(arr)`. The implementation emits
+  `E30029 "array index out of bounds"` at a late IR stage that the
+  `DIAGNOSTIC_TEST` runner does not capture by position; we could
+  not anchor a one-past-end boundary test as a portable negative.
+  A short claim in the IndexExpr section naming the rejection
+  contract and the stage at which it fires would let an agent
+  attach a test for the index-`N` / index-`N+1` upper boundary.
+- The `FloatingPointLiteralExpr` row mentions a "parsed value" but
+  does not specify the in-language surface for IEEE-special values
+  (`+inf`, `-inf`, `NaN`). The boundary tests in this bundle observe
+  the values indirectly (overflow, `0/0`, `1/±0`) because no direct
+  literal spelling is documented. A note pointing at the canonical
+  way to spell those values (or confirming there is no direct
+  spelling) would let us write tighter literal-level boundary
+  tests.
 
 ## Out of scope
 

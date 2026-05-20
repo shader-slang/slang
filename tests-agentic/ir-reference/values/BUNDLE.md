@@ -116,6 +116,66 @@ bundle drills into the rest of the catalog without repeating those.
 | `optional-make-has-value.slang`               | functional | `#result-optional-conditional-helpers`    |
 | `out-param-type.slang`                        | functional | `#conversions`                            |
 | `literal-emit-multi-target.slang`             | functional | `#literal-payload-encoding`               |
+| `add-int32-max-literal.slang`                 | boundary   | `#literal-payload-encoding`               |
+| `add-int32-min-literal.slang`                 | boundary   | `#literal-payload-encoding`               |
+| `add-uint32-max-literal.slang`                | boundary   | `#literal-payload-encoding`               |
+| `cast-uint8-max-plus-one-wraps.slang`         | boundary   | `#literal-payload-encoding`               |
+| `add-int64-max-literal.slang`                 | boundary   | `#literal-payload-encoding`               |
+| `store-int8-min-literal.slang`                | boundary   | `#literal-payload-encoding`               |
+| `store-uint8-max-literal.slang`               | boundary   | `#literal-payload-encoding`               |
+| `store-int16-max-literal.slang`               | boundary   | `#literal-payload-encoding`               |
+| `mul-float-pos-zero-literal.slang`            | boundary   | `#literal-payload-encoding`               |
+| `mul-float-neg-zero-literal.slang`            | boundary   | `#literal-payload-encoding`               |
+| `add-float-max-literal.slang`                 | boundary   | `#literal-payload-encoding`               |
+| `add-float-smallest-normal-literal.slang`     | boundary   | `#literal-payload-encoding`               |
+| `add-double-overflow-folds-to-inf.slang`      | boundary   | `#literal-payload-encoding`               |
+| `int-literal-overflow-any-type-rejected.slang`| negative   | `#literal-payload-encoding`               |
+| `cmpEQ-float-pos-zero-literal.slang`          | boundary   | `#comparison`                             |
+| `cmpEQ-float-neg-zero-literal.slang`          | boundary   | `#comparison`                             |
+| `cmpEQ-self-uniform-float.slang`              | boundary   | `#comparison`                             |
+| `cmpNE-self-uniform-float.slang`              | boundary   | `#comparison`                             |
+| `cmpLE-cmpGE-float-uniform.slang`             | boundary   | `#comparison`                             |
+| `intCast-int-to-uint8-narrowing.slang`        | boundary   | `#conversions`                            |
+| `intCast-int-to-uint64-widening.slang`        | boundary   | `#conversions`                            |
+| `intCast-int-to-uint-same-width.slang`        | boundary   | `#conversions`                            |
+| `floatCast-float-to-half-narrowing.slang`     | boundary   | `#conversions`                            |
+| `floatCast-half-to-double-widening.slang`     | boundary   | `#conversions`                            |
+| `bitCast-uint-to-float-reinterpret.slang`     | boundary   | `#conversions`                            |
+| `swizzle-single-component-from-vec4.slang`    | boundary   | `#swizzle-swizzleset-swizzledstore`       |
+| `swizzle-full-length-xyzw.slang`              | boundary   | `#swizzle-swizzleset-swizzledstore`       |
+| `swizzle-repeat-component-xxxx.slang`         | boundary   | `#swizzle-swizzleset-swizzledstore`       |
+| `swizzle-mixed-xxxy-from-vec2.slang`          | boundary   | `#swizzle-swizzleset-swizzledstore`       |
+| `swizzle-z-on-vec2-rejected.slang`            | negative   | `#swizzle-swizzleset-swizzledstore`       |
+| `swizzle-w-on-vec3-rejected.slang`            | negative   | `#swizzle-swizzleset-swizzledstore`       |
+| `bitfieldExtract-count-zero.slang`            | boundary   | `#arithmetic-and-bitwise`                 |
+| `bitfieldExtract-count-full-width.slang`      | boundary   | `#arithmetic-and-bitwise`                 |
+| `bitfieldExtract-offset-high-edge.slang`      | boundary   | `#arithmetic-and-bitwise`                 |
+| `bitfieldInsert-count-full-width.slang`       | boundary   | `#arithmetic-and-bitwise`                 |
+| `shl-uint-by-zero.slang`                      | boundary   | `#arithmetic-and-bitwise`                 |
+| `shl-uint-by-width-minus-one.slang`           | boundary   | `#arithmetic-and-bitwise`                 |
+| `shl-uint-by-width-overflow.slang`            | boundary   | `#arithmetic-and-bitwise`                 |
+| `shr-int-by-zero.slang`                       | boundary   | `#arithmetic-and-bitwise`                 |
+| `shr-int-by-width-minus-one.slang`            | boundary   | `#arithmetic-and-bitwise`                 |
+| `irem-int-by-one.slang`                       | boundary   | `#arithmetic-and-bitwise`                 |
+| `neg-uniform-int.slang`                       | boundary   | `#arithmetic-and-bitwise`                 |
+| `neg-uniform-float.slang`                     | boundary   | `#arithmetic-and-bitwise`                 |
+| `mul-uint-by-max-literal.slang`               | boundary   | `#arithmetic-and-bitwise`                 |
+| `div-float-by-positive-zero-uniform.slang`    | boundary   | `#arithmetic-and-bitwise`                 |
+| `int-divide-by-zero-literal-rejected.slang`   | negative   | `#arithmetic-and-bitwise`                 |
+| `optional-always-none.slang`                  | boundary   | `#result-optional-conditional-helpers`    |
+| `optional-always-value.slang`                 | boundary   | `#result-optional-conditional-helpers`    |
+| `makeVector-float2-smallest-vector.slang`     | boundary   | `#aggregate-constructors`                 |
+| `makeMatrix-float4x4-largest-documented.slang`| stress     | `#aggregate-constructors`                 |
+| `_probe_diag.slang`                           | stress     | `#aggregate-constructors`                 |
+| `select-true-literal-bool.slang`              | boundary   | `#select`                                 |
+
+## Housekeeping
+
+- `_probe_diag.slang` is a real stress test (two `makeVector` calls
+  feeding a vector `add`); the underscore-prefixed filename is a
+  legacy artifact of the expansion pass and should be renamed to
+  something like `makeVector-pair-feeding-add-stress.slang` on the
+  next regeneration. The lint accepts it as-is.
 
 ## Doc gaps observed
 

@@ -52,6 +52,48 @@ rest of the suite is bootstrapped.
 | `block-comment-removed.slang`        | functional | `#trivia-whitespace-and-comments` |
 | `block-comment-no-nesting.slang`     | functional | `#special-case-lexing-rules`      |
 | `backslash-line-continuation.slang`  | functional | `#special-case-lexing-rules`      |
+| `int-literal-zero.slang`                 | boundary | `#content-tokens`                 |
+| `int-literal-int32-max.slang`            | boundary | `#content-tokens`                 |
+| `int-literal-hex-base.slang`             | boundary | `#content-tokens`                 |
+| `int-literal-octal-base.slang`           | boundary | `#content-tokens`                 |
+| `int-literal-binary-base.slang`          | boundary | `#content-tokens`                 |
+| `int-literal-hex-promotes-to-64bit.slang`| boundary | `#content-tokens`                 |
+| `numeric-suffix-ll-is-int64.slang`       | boundary | `#content-tokens`                 |
+| `numeric-suffix-ull-is-uint64.slang`     | boundary | `#content-tokens`                 |
+| `numeric-suffix-h-is-half.slang`         | boundary | `#content-tokens`                 |
+| `numeric-suffix-lf-is-double.slang`      | boundary | `#content-tokens`                 |
+| `float-literal-hex-form.slang`           | boundary | `#content-tokens`                 |
+| `float-literal-leading-dot.slang`        | boundary | `#content-tokens`                 |
+| `float-literal-exponent-form.slang`      | boundary | `#content-tokens`                 |
+| `string-literal-empty.slang`             | boundary | `#content-tokens`                 |
+| `string-literal-escape-sequences.slang`  | boundary | `#content-tokens`                 |
+| `raw-string-empty-delimiter.slang`       | boundary | `#special-case-lexing-rules`      |
+| `raw-string-multi-char-delimiter.slang`  | boundary | `#special-case-lexing-rules`      |
+| `char-literal-null.slang`                | boundary | `#content-tokens`                 |
+| `char-literal-escape-backslash.slang`    | boundary | `#content-tokens`                 |
+| `block-comment-empty.slang`              | boundary | `#trivia-whitespace-and-comments` |
+| `line-comment-backslash-extends.slang`   | boundary | `#special-case-lexing-rules`      |
+| `block-comment-multi-fake-nest.slang`    | stress   | `#special-case-lexing-rules`      |
+| `negative-integer-literal-too-large.slang` | negative | `#content-tokens`               |
+| `negative-invalid-int-suffix.slang`      | negative | `#content-tokens`                 |
+| `negative-multi-char-literal.slang`      | negative | `#content-tokens`                 |
+
+## Boundary / negative / stress probes (expansion pass)
+
+This pass appends 25 additional tests that probe documented claims at
+their edges. The intents map as follows:
+
+- `boundary` (21): one boundary value per file along the lexer's
+  numeric, string, char, comment, and line-continuation axes.
+- `negative` (3): one `DIAGNOSTIC_TEST` per documented or implied
+  rejection — integer literal too large, invalid integer suffix,
+  multi-character character literal.
+- `stress` (1): a pattern-bloat probe (`/* /* /* /* still one block
+  comment */`) that verifies non-nesting survives repetition.
+
+Every appended file uses the same `doc_ref` (and `doc_section_digest`)
+as the smoke test for the claim it probes; the boundaries are
+additional anchors of those same claims, not new ones.
 
 ## Doc gaps observed
 
@@ -70,6 +112,31 @@ rest of the suite is bootstrapped.
 - Numeric literal suffixes beyond `u` and `f` (`l`, `ul`, `h`, `lf`,
   ...) are mentioned but not exhaustively enumerated. Expansion pass
   candidate once a definitive list is added to the doc.
+- Integer-literal bases (decimal / hex `0x` / octal `0` / binary
+  `0b`) are exercised by the lexer but the doc does not enumerate
+  the accepted prefixes. Boundary tests for each base now exist;
+  the doc would benefit from a one-line note that all four bases
+  are accepted.
+- Floating-point literal forms (trailing dot `1.`, leading dot
+  `.5`, decimal exponent `1e3`, hexadecimal float `0x1.0p4`) are
+  accepted by the lexer but only the generic "FloatingPointLiteral"
+  row in `#content-tokens` is documented. A short grammar note in
+  `#content-tokens` listing the four accepted shapes would close
+  this gap.
+- The interaction of `\<newline>` continuation with line comments
+  (the comment swallows the next physical line because continuations
+  are folded before comment recognition) is implied by the
+  "consumed and folded out" wording in `#special-case-lexing-rules`
+  but not stated explicitly. A worked example in the doc would
+  prevent a confusing-looking but correct behavior from surprising
+  readers.
+- Documented diagnostics (`integer literal is too large to be
+  represented in any integer type`, `invalid suffix on integer
+  literal`, `illegal character literal`) have no explicit error
+  codes / messages listed in `tokens.md`. The negative tests in
+  this pass copy the diagnostic text verbatim from the compiler;
+  promoting them to a "Diagnostics" subsection in the doc would
+  let future authors anchor by claim ID rather than by free text.
 
 ## Out of scope (no-GPU runner)
 

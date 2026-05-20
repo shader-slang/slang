@@ -342,7 +342,7 @@ bundles:
       - source/slang/slang-ir.cpp
     runner:
       category: agentic-cross-cutting
-    size_cap_files: 50
+    size_cap_files: 100
 
   cross-cutting/targets:
     prompt: prompts/cross-cutting-targets.md
@@ -463,7 +463,7 @@ bundles:
       - source/slang/slang-parser.cpp
     runner:
       category: agentic-ast
-    size_cap_files: 80
+    size_cap_files: 150
 
   ast-reference/statements:
     prompt: prompts/ast-reference-statements.md
@@ -681,7 +681,7 @@ bundles:
       - source/slang/slang-lower-to-ir.cpp
     runner:
       category: agentic-ir
-    size_cap_files: 60
+    size_cap_files: 120
 
   ir-reference/control-flow:
     prompt: prompts/ir-reference-control-flow.md
