@@ -765,11 +765,14 @@ struct SharedSemanticsContext : public RefObject
     // specializations of the same generic, and the answer does not depend on a
     // particular solver instance; the solver later filters these declarations
     // through its current relevance/readiness rules.
-    Dictionary<Val*, ShortList<Decl*>> m_genericSolverValDependencyCache;
+    // Cached dependencies live in heap-backed lists so the solver can return
+    // array views instead of references into the dictionary's value storage.
+    Dictionary<Val*, List<Decl*>> m_genericSolverValDependencyCache;
 
-    // Empty dependency list returned for null values. Functions that return a
-    // `ShortList<Decl*>&` use this object so callers can iterate uniformly.
-    ShortList<Decl*> m_emptyGenericSolverValDependencies;
+    // Values that have already been walked and found to mention no generic
+    // solver slots. Keeping this as a set avoids allocating empty lists while
+    // still remembering the common no-dependency case.
+    HashSet<Val*> m_genericSolverValsWithNoDependencies;
 
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"

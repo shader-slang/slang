@@ -1528,7 +1528,7 @@ private:
     // blocker.
     bool hasBlockersForVal(Val* val, Decl* subjectParamDecl = nullptr)
     {
-        auto& dependencies = getValDependencies(val);
+        auto dependencies = getValDependencies(val);
         for (auto dependencyDecl : dependencies)
         {
             if (!isDependencyReady(dependencyDecl, subjectParamDecl))
@@ -1546,7 +1546,7 @@ private:
         if (!changedSlotDecl)
             return false;
 
-        auto& dependencies = getValDependencies(val);
+        auto dependencies = getValDependencies(val);
         for (auto dependencyDecl : dependencies)
         {
             if (dependencyDecl == changedSlotDecl)
@@ -1610,27 +1610,36 @@ private:
         return false;
     }
 
-    // Return the structural generic slots mentioned by a value. The shared cache
-    // stores only syntax-level dependencies, so `T.A` has the same entry before
-    // and after `T` is solved, and the same walk can be reused by later
-    // specializations. `Dictionary` is backed by `unordered_dense::map`, where
-    // insertion can relocate values, so callers must treat the returned
-    // reference as short-lived: inspect it immediately and do not store it or
-    // use it across any call that could populate this cache for another value.
-    ShortList<Decl*>& getValDependencies(Val* val)
+    // Return the structural generic slots mentioned by a value. The shared
+    // cache stores only syntax-level dependencies, so `T.A` has the same entry
+    // before and after `T` is solved, and the same walk can be reused by later
+    // specializations. The cache stores heap-backed `List`s and returns a
+    // by-value view so callers do not borrow the dictionary's value storage.
+    ArrayView<Decl*> getValDependencies(Val* val)
     {
         auto shared = m_visitor->getShared();
         if (!val)
-            return shared->m_emptyGenericSolverValDependencies;
+            return ArrayView<Decl*>();
+
+        if (shared->m_genericSolverValsWithNoDependencies.contains(val))
+            return ArrayView<Decl*>();
 
         if (auto cachedDependencies = shared->m_genericSolverValDependencyCache.tryGetValue(val))
-            return *cachedDependencies;
+            return cachedDependencies->getArrayView();
 
         ShortList<Decl*> dependencies;
         HashSet<Val*> visitedVals;
         collectValDependencies(val, visitedVals, dependencies);
-        shared->m_genericSolverValDependencyCache.add(val, _Move(dependencies));
-        return *shared->m_genericSolverValDependencyCache.tryGetValue(val);
+        if (dependencies.getCount() == 0)
+        {
+            shared->m_genericSolverValsWithNoDependencies.add(val);
+            return ArrayView<Decl*>();
+        }
+
+        List<Decl*> cachedDependencies;
+        cachedDependencies.addRange(dependencies.getArrayView().arrayView);
+        shared->m_genericSolverValDependencyCache.add(val, _Move(cachedDependencies));
+        return shared->m_genericSolverValDependencyCache.tryGetValue(val)->getArrayView();
     }
 
     // Walk a value tree and collect the generic slots it mentions. For example,
