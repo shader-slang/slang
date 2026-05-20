@@ -35,6 +35,7 @@ from _bq_ingest_lib import (
     rk_workflow_run,
     workflow_tier,
 )
+from bq_loader import load_rows_to_bq
 from workflow_parser import JobSpec, WorkflowSpec, fetch_workflow_yaml
 
 
@@ -732,6 +733,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Run structural sanity checks; exit non-zero on any error.",
     )
+    p.add_argument(
+        "--load-to-bq",
+        action="store_true",
+        help=(
+            "After building rows (and validating, if --validate is set), load "
+            "them into per-attempt staging tables and atomically MERGE into "
+            "the live slang_ci dataset. Staging tables are dropped on "
+            "success and failure. No-ops --table emission to stdout."
+        ),
+    )
     return p.parse_args(argv)
 
 
@@ -752,6 +763,18 @@ def main(argv: list[str]) -> int:
             f"{sum(1 for r in rows.get('jobs', []) if r['node_kind'] == 'concrete_job')} concrete), "
             f"{len(rows.get('job_steps', []))} job_steps\n"
         )
+
+    if args.load_to_bq:
+        load_rows_to_bq(
+            rows,
+            src_run_id=args.run_id,
+            src_run_attempt=args.run_attempt,
+        )
+        sys.stderr.write(
+            f"loaded run_id={args.run_id} run_attempt={args.run_attempt} "
+            f"into slang-runners:slang_ci\n"
+        )
+        return 0
 
     emit(rows, args.table)
     return 0

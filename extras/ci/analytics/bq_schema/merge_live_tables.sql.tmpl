@@ -1,0 +1,136 @@
+-- Multi-statement transaction MERGE of per-attempt staging tables into the live
+-- slang_ci dataset. All MERGEs commit atomically, so a CI run is either fully
+-- visible or not at all visible.
+--
+-- This file is a `str.format()` template. Placeholders, all caller-validated
+-- against the regex `^[A-Za-z0-9_]+$`:
+--   {staging_suffix}  — e.g. "src_12345_1__ing_67890_1"
+--
+-- The ingester separately declares part_lo / part_hi as TIMESTAMP DEFAULTs
+-- before BEGIN TRANSACTION (BigQuery requires DECLAREs before BEGIN). Each
+-- table's BETWEEN predicate uses its partition column (workflow_runs uses
+-- created_at; the others use run_created_at).
+
+DECLARE wfr_part_lo TIMESTAMP DEFAULT (
+  SELECT MIN(created_at) FROM `slang-runners.slang_ci_staging.workflow_runs__{staging_suffix}`
+);
+DECLARE wfr_part_hi TIMESTAMP DEFAULT (
+  SELECT MAX(created_at) FROM `slang-runners.slang_ci_staging.workflow_runs__{staging_suffix}`
+);
+DECLARE jobs_part_lo TIMESTAMP DEFAULT (
+  SELECT MIN(run_created_at) FROM `slang-runners.slang_ci_staging.jobs__{staging_suffix}`
+);
+DECLARE jobs_part_hi TIMESTAMP DEFAULT (
+  SELECT MAX(run_created_at) FROM `slang-runners.slang_ci_staging.jobs__{staging_suffix}`
+);
+DECLARE steps_part_lo TIMESTAMP DEFAULT (
+  SELECT MIN(run_created_at) FROM `slang-runners.slang_ci_staging.job_steps__{staging_suffix}`
+);
+DECLARE steps_part_hi TIMESTAMP DEFAULT (
+  SELECT MAX(run_created_at) FROM `slang-runners.slang_ci_staging.job_steps__{staging_suffix}`
+);
+
+BEGIN TRANSACTION;
+
+MERGE `slang-runners.slang_ci.workflow_runs` T
+USING `slang-runners.slang_ci_staging.workflow_runs__{staging_suffix}` S
+ON T.row_key = S.row_key
+   AND T.created_at BETWEEN wfr_part_lo AND wfr_part_hi
+WHEN MATCHED THEN UPDATE SET
+  run_id = S.run_id,
+  run_attempt = S.run_attempt,
+  workflow_file = S.workflow_file,
+  workflow_name = S.workflow_name,
+  event = S.event,
+  head_sha = S.head_sha,
+  head_branch = S.head_branch,
+  triggering_actor = S.triggering_actor,
+  parent_run_id = S.parent_run_id,
+  created_at = S.created_at,
+  started_at = S.started_at,
+  completed_at = S.completed_at,
+  conclusion = S.conclusion
+WHEN NOT MATCHED THEN INSERT (
+  row_key, run_id, run_attempt, workflow_file, workflow_name, event,
+  head_sha, head_branch, triggering_actor, parent_run_id,
+  created_at, started_at, completed_at, conclusion
+) VALUES (
+  S.row_key, S.run_id, S.run_attempt, S.workflow_file, S.workflow_name, S.event,
+  S.head_sha, S.head_branch, S.triggering_actor, S.parent_run_id,
+  S.created_at, S.started_at, S.completed_at, S.conclusion
+);
+
+MERGE `slang-runners.slang_ci.jobs` T
+USING `slang-runners.slang_ci_staging.jobs__{staging_suffix}` S
+ON T.row_key = S.row_key
+   AND T.run_created_at BETWEEN jobs_part_lo AND jobs_part_hi
+WHEN MATCHED THEN UPDATE SET
+  job_id = S.job_id,
+  run_id = S.run_id,
+  run_attempt = S.run_attempt,
+  name = S.name,
+  caller_workflow_file = S.caller_workflow_file,
+  caller_job_key = S.caller_job_key,
+  called_workflow_file = S.called_workflow_file,
+  called_job_key = S.called_job_key,
+  node_kind = S.node_kind,
+  graph_instance_key = S.graph_instance_key,
+  needs = S.needs,
+  conclusion = S.conclusion,
+  started_at = S.started_at,
+  completed_at = S.completed_at,
+  duration_seconds = S.duration_seconds,
+  queue_wait_seconds = S.queue_wait_seconds,
+  runner_name = S.runner_name,
+  runner_labels = S.runner_labels,
+  job_type = S.job_type,
+  matrix_os = S.matrix_os,
+  matrix_arch = S.matrix_arch,
+  matrix_compiler = S.matrix_compiler,
+  matrix_config = S.matrix_config,
+  matrix_gpu_tier = S.matrix_gpu_tier,
+  run_created_at = S.run_created_at
+WHEN NOT MATCHED THEN INSERT (
+  row_key, job_id, run_id, run_attempt, name,
+  caller_workflow_file, caller_job_key, called_workflow_file, called_job_key,
+  node_kind, graph_instance_key, needs, conclusion,
+  started_at, completed_at, duration_seconds, queue_wait_seconds,
+  runner_name, runner_labels, job_type,
+  matrix_os, matrix_arch, matrix_compiler, matrix_config, matrix_gpu_tier,
+  run_created_at
+) VALUES (
+  S.row_key, S.job_id, S.run_id, S.run_attempt, S.name,
+  S.caller_workflow_file, S.caller_job_key, S.called_workflow_file, S.called_job_key,
+  S.node_kind, S.graph_instance_key, S.needs, S.conclusion,
+  S.started_at, S.completed_at, S.duration_seconds, S.queue_wait_seconds,
+  S.runner_name, S.runner_labels, S.job_type,
+  S.matrix_os, S.matrix_arch, S.matrix_compiler, S.matrix_config, S.matrix_gpu_tier,
+  S.run_created_at
+);
+
+MERGE `slang-runners.slang_ci.job_steps` T
+USING `slang-runners.slang_ci_staging.job_steps__{staging_suffix}` S
+ON T.row_key = S.row_key
+   AND T.run_created_at BETWEEN steps_part_lo AND steps_part_hi
+WHEN MATCHED THEN UPDATE SET
+  job_id = S.job_id,
+  run_id = S.run_id,
+  run_attempt = S.run_attempt,
+  run_created_at = S.run_created_at,
+  step_number = S.step_number,
+  step_name = S.step_name,
+  conclusion = S.conclusion,
+  started_at = S.started_at,
+  completed_at = S.completed_at,
+  duration_seconds = S.duration_seconds
+WHEN NOT MATCHED THEN INSERT (
+  row_key, job_id, run_id, run_attempt, run_created_at,
+  step_number, step_name, conclusion,
+  started_at, completed_at, duration_seconds
+) VALUES (
+  S.row_key, S.job_id, S.run_id, S.run_attempt, S.run_created_at,
+  S.step_number, S.step_name, S.conclusion,
+  S.started_at, S.completed_at, S.duration_seconds
+);
+
+COMMIT TRANSACTION;
