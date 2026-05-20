@@ -149,3 +149,7 @@ __pycache__/
 .slang-replays*
 log*.txt
 replay-capture
+
+# Agentic test suite — slang-test artifacts left next to test files
+tests-agentic/**/*.actual
+tests-agentic/**/*.actual.*
