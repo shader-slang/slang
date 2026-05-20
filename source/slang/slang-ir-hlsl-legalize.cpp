@@ -12,10 +12,7 @@
 namespace Slang
 {
 
-static void addDefaultPayloadAccessQualifiersToField(
-    IRBuilder& builder,
-    IRStructKey* fieldKey,
-    IRType* fieldType)
+static void addDefaultPayloadAccessQualifiersToField(IRBuilder& builder, IRStructKey* fieldKey)
 {
     if (fieldKey->findDecoration<IRStageReadAccessDecoration>() ||
         fieldKey->findDecoration<IRStageWriteAccessDecoration>())
@@ -46,7 +43,7 @@ static void addDefaultPayloadAccessQualifiersToStruct(IRBuilder& builder, IRStru
 {
     for (auto field : structType->getFields())
     {
-        addDefaultPayloadAccessQualifiersToField(builder, field->getKey(), field->getFieldType());
+        addDefaultPayloadAccessQualifiersToField(builder, field->getKey());
     }
 }
 
@@ -120,10 +117,7 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
                     builder.addNameHintDecoration(elementBufferKey, UnownedStringSlice("data"));
                     if (isForcedRayPayloadStruct)
                     {
-                        addDefaultPayloadAccessQualifiersToField(
-                            builder,
-                            elementBufferKey,
-                            forceStructBaseType);
+                        addDefaultPayloadAccessQualifiersToField(builder, elementBufferKey);
                     }
                     auto _dataField = builder.createStructField(
                         structType,
