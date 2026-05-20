@@ -545,7 +545,7 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Instrument the shader with per-statement execution counters. "
          "When writing compiled output to a file, slangc also emits "
-         "`<output>.coverage-mapping.json` mapping counter slots to source positions."},
+         "`<output>.coverage-mapping.json` mapping source coverage entries to counters."},
         {OptionKind::TraceCoverageBinding,
          "-trace-coverage-binding",
          "-trace-coverage-binding <index> <space>",

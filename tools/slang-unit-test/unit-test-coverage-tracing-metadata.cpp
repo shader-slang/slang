@@ -1,10 +1,82 @@
 // unit-test-coverage-tracing-metadata.cpp
 
+#include "../../source/compiler-core/slang-json-lexer.h"
+#include "../../source/compiler-core/slang-json-parser.h"
+#include "../../source/compiler-core/slang-json-value.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
+
+namespace
+{
+
+struct ParsedJson
+{
+    SourceManager sourceManager;
+    DiagnosticSink sink;
+    RefPtr<JSONContainer> container;
+    JSONValue root;
+
+    ParsedJson()
+        : sink(&sourceManager, nullptr)
+    {
+        sourceManager.initialize(nullptr, nullptr);
+        container = new JSONContainer(&sourceManager);
+    }
+};
+
+static SlangResult parseJsonBlob(ISlangBlob* blob, ParsedJson& outJson)
+{
+    String contents(
+        UnownedStringSlice((const char*)blob->getBufferPointer(), blob->getBufferSize()));
+    SourceFile* sourceFile =
+        outJson.sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+    SourceView* sourceView =
+        outJson.sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+    JSONLexer lexer;
+    lexer.init(sourceView, &outJson.sink);
+
+    JSONBuilder builder(outJson.container, JSONBuilder::Flag::ConvertLexemes);
+    JSONParser parser;
+    SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &builder, &outJson.sink));
+    outJson.root = builder.getRootValue();
+    return SLANG_OK;
+}
+
+static JSONValue findJsonField(JSONContainer* container, const JSONValue& object, const char* key)
+{
+    JSONKey jsonKey = container->findKey(UnownedStringSlice(key));
+    if (jsonKey == 0)
+        return JSONValue::makeInvalid();
+    return container->findObjectValue(object, jsonKey);
+}
+
+static void checkJsonStringField(
+    JSONContainer* container,
+    const JSONValue& object,
+    const char* key,
+    const char* expected)
+{
+    JSONValue value = findJsonField(container, object, key);
+    SLANG_CHECK(value.isValid());
+    SLANG_CHECK(container->getString(value) == UnownedStringSlice(expected));
+}
+
+static void checkJsonIntField(
+    JSONContainer* container,
+    const JSONValue& object,
+    const char* key,
+    int64_t expected)
+{
+    JSONValue value = findJsonField(container, object, key);
+    SLANG_CHECK(value.isValid());
+    SLANG_CHECK(container->asInteger(value) == expected);
+}
+
+} // namespace
 
 // Exercises the public `slang::ICoverageTracingMetadata` COM interface
 // end-to-end:
@@ -123,6 +195,40 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         return bundle;
     };
 
+    auto checkLineCoverageEntries = [](slang::ICoverageTracingMetadata* coverage)
+    {
+        // The current producer emits line entries with concrete runtime
+        // counters. Keep the checks source-entry based so future modes can
+        // diverge from positional entry-to-counter identity without breaking
+        // this ABI smoke test.
+        const uint32_t counterCount = coverage->getCounterCount();
+        SLANG_CHECK(counterCount > 0);
+        const uint32_t entryCount = coverage->getEntryCount();
+        SLANG_CHECK(entryCount > 0);
+
+        bool seenAnyStartColumn = false;
+        for (uint32_t i = 0; i < entryCount; ++i)
+        {
+            slang::CoverageEntryInfo entry;
+            SLANG_CHECK(coverage->getEntryInfo(i, &entry) == SLANG_OK);
+            SLANG_CHECK(entry.file != nullptr);
+            SLANG_CHECK(entry.line > 0);
+            SLANG_CHECK(entry.counterIndex != slang::kInvalidCoverageCounterIndex);
+            SLANG_CHECK(entry.counterIndex < counterCount);
+            SLANG_CHECK(entry.kind == slang::CoverageEntryKind::Line);
+            SLANG_CHECK(entry.counterMode == slang::CoverageCounterMode::Count);
+            seenAnyStartColumn = seenAnyStartColumn || entry.startColumn > 0;
+            SLANG_CHECK(entry.endLine == 0);
+            SLANG_CHECK(entry.endColumn == 0);
+            SLANG_CHECK(entry.functionName == nullptr);
+            SLANG_CHECK(entry.functionMangledName == nullptr);
+            SLANG_CHECK(entry.branchSiteID == 0);
+            SLANG_CHECK(entry.branchArmID == 0);
+            SLANG_CHECK(entry.branchArmKind == slang::CoverageBranchArmKind::Unknown);
+        }
+        SLANG_CHECK(seenAnyStartColumn);
+    };
+
     auto cpuBundle = createMetadataBundle(SLANG_CPP_SOURCE, "sm_5_0");
     auto* coverage = cpuBundle.coverage;
     auto* syntheticResources = cpuBundle.syntheticResources;
@@ -131,22 +237,14 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     // else, assignments, writeback) — expect at least several slots.
     uint32_t counterCount = coverage->getCounterCount();
     SLANG_CHECK(counterCount > 0);
-
-    // Walk every slot and exercise the per-entry accessor. File
-    // string and line number must both be populated for every slot;
-    // the synthesizer gives every counter op a real source location.
-    for (uint32_t i = 0; i < counterCount; ++i)
-    {
-        slang::CoverageEntryInfo entry;
-        SLANG_CHECK(coverage->getEntryInfo(i, &entry) == SLANG_OK);
-        SLANG_CHECK(entry.file != nullptr);
-        SLANG_CHECK(entry.line > 0);
-    }
+    uint32_t entryCount = coverage->getEntryCount();
+    SLANG_CHECK(entryCount > 0);
+    checkLineCoverageEntries(coverage);
 
     // Out-of-range query must return SLANG_E_INVALID_ARG.
     {
         slang::CoverageEntryInfo entry;
-        SLANG_CHECK(coverage->getEntryInfo(counterCount, &entry) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(coverage->getEntryInfo(entryCount, &entry) == SLANG_E_INVALID_ARG);
     }
 
     // Null pointer must return SLANG_E_INVALID_ARG, not crash.
@@ -157,6 +255,40 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         slang::CoverageEntryInfo entry;
         entry.structSize = 0;
         SLANG_CHECK(coverage->getEntryInfo(0, &entry) == SLANG_E_INVALID_ARG);
+    }
+
+    // A caller compiled against the original v1 struct only has
+    // storage through `line`. The implementation must accept that
+    // structSize and must not write tail fields.
+    {
+        auto counterModeSentinel = static_cast<slang::CoverageCounterMode>(0x12345678u);
+        slang::CoverageEntryInfo entry;
+        entry.structSize = SLANG_OFFSET_OF(slang::CoverageEntryInfo, line) + sizeof(uint32_t);
+        entry.counterIndex = 0x12345678u;
+        entry.kind = slang::CoverageEntryKind::Function;
+        entry.counterMode = counterModeSentinel;
+        entry.startColumn = 77;
+        entry.endLine = 88;
+        entry.endColumn = 99;
+        entry.functionName = "unchanged";
+        entry.functionMangledName = "unchanged_mangled";
+        entry.branchSiteID = 111;
+        entry.branchArmID = 222;
+        entry.branchArmKind = slang::CoverageBranchArmKind::TrueArm;
+        SLANG_CHECK(coverage->getEntryInfo(0, &entry) == SLANG_OK);
+        SLANG_CHECK(entry.file != nullptr);
+        SLANG_CHECK(entry.line > 0);
+        SLANG_CHECK(entry.counterIndex == 0x12345678u);
+        SLANG_CHECK(entry.kind == slang::CoverageEntryKind::Function);
+        SLANG_CHECK(entry.counterMode == counterModeSentinel);
+        SLANG_CHECK(entry.startColumn == 77);
+        SLANG_CHECK(entry.endLine == 88);
+        SLANG_CHECK(entry.endColumn == 99);
+        SLANG_CHECK(UnownedStringSlice(entry.functionName) == toSlice("unchanged"));
+        SLANG_CHECK(UnownedStringSlice(entry.functionMangledName) == toSlice("unchanged_mangled"));
+        SLANG_CHECK(entry.branchSiteID == 111);
+        SLANG_CHECK(entry.branchArmID == 222);
+        SLANG_CHECK(entry.branchArmKind == slang::CoverageBranchArmKind::TrueArm);
     }
 
     // Synthetic resource metadata: coverage should surface one hidden
@@ -204,6 +336,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     // metadata.
     {
         auto cudaBundle = createMetadataBundle(SLANG_CUDA_SOURCE, "sm_5_0");
+        checkLineCoverageEntries(cudaBundle.coverage);
         auto* cudaSyntheticResources = cudaBundle.syntheticResources;
 
         SLANG_CHECK(cudaSyntheticResources->getResourceCount() == 1);
@@ -221,6 +354,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     // documented sentinel values.
     {
         auto spirvBundle = createMetadataBundle(SLANG_SPIRV, "spirv_1_5");
+        checkLineCoverageEntries(spirvBundle.coverage);
         auto* spirvSyntheticResources = spirvBundle.syntheticResources;
 
         const uint32_t resourceCount = spirvSyntheticResources->getResourceCount();
@@ -251,10 +385,36 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(
             spirvSyntheticResources->findResourceIndexByID(info.id, &lookedUpIndex) == SLANG_OK);
         SLANG_CHECK(lookedUpIndex == coverageResourceIndex);
+
+        ComPtr<ISlangBlob> manifest;
+        SLANG_CHECK(
+            slang_writeCoverageManifestJson(spirvBundle.coverage, manifest.writeRef()) == SLANG_OK);
+        SLANG_CHECK(manifest != nullptr);
+        ParsedJson parsed;
+        SLANG_CHECK(parseJsonBlob(manifest, parsed) == SLANG_OK);
+        auto container = parsed.container.Ptr();
+        checkJsonStringField(container, parsed.root, "format", "slang-coverage");
+        checkJsonIntField(container, parsed.root, "version", 2);
+        checkJsonIntField(
+            container,
+            parsed.root,
+            "counter_count",
+            spirvBundle.coverage->getCounterCount());
+
+        JSONValue buffer = findJsonField(container, parsed.root, "buffer");
+        SLANG_CHECK(buffer.isValid());
+        checkJsonStringField(container, buffer, "name", "__slang_coverage");
+        checkJsonStringField(container, buffer, "element_type", "uint32");
+        checkJsonIntField(container, buffer, "element_stride", 4);
+        SLANG_CHECK(findJsonField(container, buffer, "space").isValid());
+        SLANG_CHECK(findJsonField(container, buffer, "binding").isValid());
+        SLANG_CHECK(!findJsonField(container, buffer, "uniform_offset").isValid());
+        SLANG_CHECK(!findJsonField(container, buffer, "uniform_stride").isValid());
     }
 
     {
         auto hlslBundle = createMetadataBundle(SLANG_HLSL, "cs_5_0");
+        checkLineCoverageEntries(hlslBundle.coverage);
         auto* hlslSyntheticResources = hlslBundle.syntheticResources;
 
         SLANG_CHECK(hlslSyntheticResources->getResourceCount() == 1);
@@ -270,6 +430,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
 
     {
         auto metalBundle = createMetadataBundle(SLANG_METAL, "metal");
+        checkLineCoverageEntries(metalBundle.coverage);
         auto* metalSyntheticResources = metalBundle.syntheticResources;
 
         SLANG_CHECK(metalSyntheticResources->getResourceCount() == 1);
@@ -298,6 +459,8 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     {
         auto noCoverageBundle = createMetadataBundle(SLANG_CPP_SOURCE, "sm_5_0", false);
         auto* noCoverageSyntheticResources = noCoverageBundle.syntheticResources;
+        SLANG_CHECK(noCoverageBundle.coverage->getCounterCount() == 0);
+        SLANG_CHECK(noCoverageBundle.coverage->getEntryCount() == 0);
         SLANG_CHECK(noCoverageSyntheticResources->getResourceCount() == 0);
         uint32_t index = 0;
         SLANG_CHECK(
@@ -330,21 +493,38 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
     // canonical fields are present. Detailed shape is covered by the
     // existing tests on the slangc sidecar; what this assertion locks
     // in is the in-process API path producing a non-empty,
-    // structurally valid manifest with the version-1 contract.
+    // structurally valid manifest with the source-entry contract.
     {
         ComPtr<ISlangBlob> manifest;
         SLANG_CHECK(slang_writeCoverageManifestJson(coverage, manifest.writeRef()) == SLANG_OK);
         SLANG_CHECK(manifest != nullptr);
         SLANG_CHECK(manifest->getBufferSize() > 0);
-        UnownedStringSlice json(
-            (const char*)manifest->getBufferPointer(),
-            manifest->getBufferSize());
-        SLANG_CHECK(json.indexOf(toSlice("\"version\": 1")) != -1);
-        SLANG_CHECK(json.indexOf(toSlice("\"counters\"")) != -1);
-        SLANG_CHECK(json.indexOf(toSlice("__slang_coverage")) != -1);
-        SLANG_CHECK(json.indexOf(toSlice("\"uniform_offset\"")) != -1);
-        SLANG_CHECK(json.indexOf(toSlice("\"uniform_stride\"")) != -1);
-        SLANG_CHECK(json.indexOf(toSlice("\"entries\"")) != -1);
+        ParsedJson parsed;
+        SLANG_CHECK(parseJsonBlob(manifest, parsed) == SLANG_OK);
+        auto container = parsed.container.Ptr();
+        checkJsonStringField(container, parsed.root, "format", "slang-coverage");
+        checkJsonIntField(container, parsed.root, "version", 2);
+        checkJsonIntField(container, parsed.root, "counter_count", coverage->getCounterCount());
+
+        JSONValue buffer = findJsonField(container, parsed.root, "buffer");
+        SLANG_CHECK(buffer.isValid());
+        checkJsonStringField(container, buffer, "name", "__slang_coverage");
+        checkJsonStringField(container, buffer, "element_type", "uint32");
+        checkJsonIntField(container, buffer, "element_stride", 4);
+        SLANG_CHECK(findJsonField(container, buffer, "uniform_offset").isValid());
+        SLANG_CHECK(findJsonField(container, buffer, "uniform_stride").isValid());
+
+        JSONValue entriesValue = findJsonField(container, parsed.root, "entries");
+        SLANG_CHECK(entriesValue.isValid());
+        auto entries = container->getArray(entriesValue);
+        SLANG_CHECK(entries.getCount() > 0);
+        JSONValue firstEntry = entries[0];
+        checkJsonStringField(container, firstEntry, "kind", "line");
+        checkJsonStringField(container, firstEntry, "mode", "count");
+        JSONValue counter = findJsonField(container, firstEntry, "counter");
+        SLANG_CHECK(counter.isValid());
+        SLANG_CHECK(container->asInteger(counter) >= 0);
+        SLANG_CHECK((uint32_t)container->asInteger(counter) < coverage->getCounterCount());
     }
 
     // Argument validation on the serializer.
@@ -353,5 +533,108 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(
             slang_writeCoverageManifestJson(nullptr, dummy.writeRef()) == SLANG_E_INVALID_ARG);
         SLANG_CHECK(slang_writeCoverageManifestJson(coverage, nullptr) == SLANG_E_INVALID_ARG);
+
+        struct OutOfRangeCounterMetadata : slang::ICoverageTracingMetadata
+        {
+            SLANG_NO_THROW SlangResult SLANG_MCALL
+            queryInterface(SlangUUID const&, void** outObject) SLANG_OVERRIDE
+            {
+                if (outObject)
+                    *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID&) SLANG_OVERRIDE
+            {
+                return nullptr;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW SlangResult SLANG_MCALL
+            getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE
+            {
+                if (!outInfo || index != 0)
+                    return SLANG_E_INVALID_ARG;
+                outInfo->file = "bad.slang";
+                outInfo->line = 1;
+                outInfo->counterIndex = 1;
+                outInfo->kind = slang::CoverageEntryKind::Line;
+                outInfo->counterMode = slang::CoverageCounterMode::Count;
+                return SLANG_OK;
+            }
+            SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
+                SLANG_OVERRIDE
+            {
+                if (!outInfo)
+                    return SLANG_E_INVALID_ARG;
+                *outInfo = {};
+                outInfo->structSize = sizeof(slang::CoverageBufferInfo);
+                outInfo->space = -1;
+                outInfo->binding = -1;
+                return SLANG_OK;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE { return 1; }
+        };
+
+        OutOfRangeCounterMetadata badMetadata;
+        SLANG_CHECK(slang_writeCoverageManifestJson(&badMetadata, dummy.writeRef()) != SLANG_OK);
+
+        struct NullCounterMetadata : slang::ICoverageTracingMetadata
+        {
+            SLANG_NO_THROW SlangResult SLANG_MCALL
+            queryInterface(SlangUUID const&, void** outObject) SLANG_OVERRIDE
+            {
+                if (outObject)
+                    *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID&) SLANG_OVERRIDE
+            {
+                return nullptr;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW SlangResult SLANG_MCALL
+            getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE
+            {
+                if (!outInfo || index != 0)
+                    return SLANG_E_INVALID_ARG;
+                outInfo->file = "counterless.slang";
+                outInfo->line = 1;
+                outInfo->counterIndex = slang::kInvalidCoverageCounterIndex;
+                outInfo->kind = slang::CoverageEntryKind::Region;
+                outInfo->counterMode = slang::CoverageCounterMode::Count;
+                return SLANG_OK;
+            }
+            SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
+                SLANG_OVERRIDE
+            {
+                if (!outInfo)
+                    return SLANG_E_INVALID_ARG;
+                *outInfo = {};
+                outInfo->structSize = sizeof(slang::CoverageBufferInfo);
+                outInfo->space = -1;
+                outInfo->binding = -1;
+                return SLANG_OK;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE { return 1; }
+        };
+
+        NullCounterMetadata nullCounterMetadata;
+        ComPtr<ISlangBlob> nullCounterManifest;
+        SLANG_CHECK(
+            slang_writeCoverageManifestJson(&nullCounterMetadata, nullCounterManifest.writeRef()) ==
+            SLANG_OK);
+        ParsedJson parsed;
+        SLANG_CHECK(parseJsonBlob(nullCounterManifest, parsed) == SLANG_OK);
+        auto container = parsed.container.Ptr();
+        JSONValue entriesValue = findJsonField(container, parsed.root, "entries");
+        SLANG_CHECK(entriesValue.isValid());
+        auto entries = container->getArray(entriesValue);
+        SLANG_CHECK(entries.getCount() == 1);
+        JSONValue counter = findJsonField(container, entries[0], "counter");
+        SLANG_CHECK(counter.isValid());
+        SLANG_CHECK(counter.type == JSONValue::Type::Null);
     }
 }
