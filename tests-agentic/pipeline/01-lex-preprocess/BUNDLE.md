@@ -77,6 +77,31 @@ here.
 | `missing-include-diagnostic.slang`                            | negative   | `#failure-modes`                      |
 | `unknown-directive-diagnostic.slang`                          | negative   | `#failure-modes`                      |
 | `unbalanced-if-diagnostic.slang`                              | negative   | `#failure-modes`                      |
+| `if-expression-zero-is-false.slang`                           | boundary   | `#preprocessor-directives`            |
+| `if-expression-uint32-max-is-true.slang`                      | boundary   | `#preprocessor-directives`            |
+| `if-expression-int32-max-is-true.slang`                       | boundary   | `#preprocessor-directives`            |
+| `if-expression-signed-overflow-wraps.slang`                   | boundary   | `#preprocessor-directives`            |
+| `if-undefined-macro-is-zero.slang`                            | boundary   | `#preprocessor-directives`            |
+| `if-nested-five-deep.slang`                                   | stress     | `#preprocessor-directives`            |
+| `elif-chain-five-arms.slang`                                  | stress     | `#preprocessor-directives`            |
+| `function-macro-zero-args.slang`                              | boundary   | `#macro-expansion`                    |
+| `function-macro-eight-args.slang`                             | stress     | `#macro-expansion`                    |
+| `function-macro-empty-argument.slang`                         | boundary   | `#macro-expansion`                    |
+| `stringize-empty-argument.slang`                              | boundary   | `#source-location-preservation`       |
+| `token-paste-with-empty-rhs.slang`                            | boundary   | `#source-location-preservation`       |
+| `line-macro-after-line-directive.slang`                       | boundary   | `#source-location-preservation`       |
+| `include-nested-5deep.slang`                                  | stress     | `#include-resolution`                 |
+| `include-self-cycle-diagnostic.slang`                         | negative   | `#failure-modes`                      |
+| `header-guard-pattern.slang`                                  | boundary   | `#preprocessor-directives`            |
+| `backslash-line-continuation-in-string.slang`                 | boundary   | `#lexer-flags-and-special-case-rules` |
+| `error-directive-empty-message.slang`                         | boundary   | `#preprocessor-directives`            |
+| `error-directive-long-message.slang`                          | boundary   | `#preprocessor-directives`            |
+| `error-directive-macro-name-in-message.slang`                 | boundary   | `#preprocessor-directives`            |
+| `warning-directive-empty-message.slang`                       | boundary   | `#preprocessor-directives`            |
+| `pragma-unknown-emits-warning.slang`                          | boundary   | `#preprocessor-directives`            |
+| `pragma-unknown-with-args.slang`                              | boundary   | `#preprocessor-directives`            |
+| `pragma-once-prevents-redefinition.slang`                     | boundary   | `#preprocessor-directives`            |
+| `macro-wrong-argument-count-diagnostic.slang`                 | negative   | `#macro-expansion`                    |
 
 ## Doc gaps observed
 
@@ -119,6 +144,78 @@ here.
   the user might expect a lexer error). The doc itself hands off
   to `02-parse-ast.md` for the lookup story, so no test is
   anchored here.
+- The `## Failure modes` section enumerates only "unbalanced
+  `#if`, unknown directive, missing include" but the compiler
+  also emits a dedicated **cyclic-include** diagnostic
+  (`cyclic-include`, code 15302) — observed by
+  `include-self-cycle-diagnostic.slang`. Suggestion: add the
+  cyclic-include failure mode to the failure-modes list.
+- The doc says the `#if` arithmetic evaluator handles "standard
+  C/HLSL" expressions but does not commit to **integer overflow
+  semantics** inside `#if`. The boundary tests
+  (`if-expression-signed-overflow-wraps.slang`,
+  `if-expression-uint32-max-is-true.slang`) probe the observed
+  behavior (signed wrap, `0xFFFFFFFF` treated as non-zero) but
+  the doc could promise these explicitly.
+- The doc treats `#error`, `#warning`, `#pragma`, and `#line` as
+  members of "the standard C/HLSL set" without further detail.
+  In particular the behavior that `#error` **does not expand
+  macros in its message** (verified by
+  `error-directive-macro-name-in-message.slang`) is not
+  documented; nor is the unknown-pragma policy ("warning, ignore,
+  continue" — verified by `pragma-unknown-emits-warning.slang`).
+  Suggestion: add a short sub-section enumerating each directive
+  and its message-expansion / failure-mode contract.
+- Recursive macro expansion ("a macro that references its own
+  name in its body") is not explicitly addressed in the doc.
+  The doc describes "fresh environment that maps parameter
+  names to pseudo-macros" but does not commit to a
+  recursion-detection rule. Boundary test deferred until the
+  doc commits a claim.
+- The doc's `## Source-location preservation` lists `__LINE__`,
+  `__FILE__`, `#x`, `x##y` as "constructed tokens" but does not
+  discuss the `#line` directive's interaction with `__LINE__`
+  (verified by `line-macro-after-line-directive.slang`).
+  Suggestion: add a sentence noting that `#line N` shifts the
+  logical counter used by constructed `__LINE__` tokens.
+
+## Boundary / stress coverage added in expansion
+
+The expansion pass added boundary, stress, and negative probes
+against the axes called out in `_common.md` (Pressure the
+compiler):
+
+- **`#if` expression**: 0 (lower edge), `0xFFFFFFFF` (uint32
+  MAX), `2147483647` (int32 MAX), signed arithmetic overflow
+  (`INT_MAX + 1` wraps), undefined identifier treated as 0,
+  five-deep nesting, five-arm `#elif` chain.
+- **Macro expansion**: zero-parameter macro, eight-parameter
+  macro (many-args stress), empty argument substitution,
+  wrong-argument-count diagnostic (negative).
+- **Stringize / paste**: empty argument to `#x` yields `""`,
+  `##` with empty right-hand operand collapses to the left
+  operand.
+- **`#include`**: five-deep chain, self-include cycle (negative
+  — cyclic include diagnostic), header-guard pattern via
+  `#ifndef` / `#define`.
+- **Predefined macros**: `__LINE__` after `#line N` reports a
+  shifted value (far-line boundary). `__FILE__` boundary is
+  covered by the existing functional test.
+- **Line continuation**: backslash-newline inside a string
+  literal (in addition to the existing in-macro test).
+- **`#error` / `#warning`**: empty-message edge, long-message
+  edge, macro-name-in-message (verbatim, not expanded).
+- **`#pragma`**: unknown pragma is a warning (not an error);
+  unknown pragma with arguments still warns; `#pragma once` in
+  a doubly-included header prevents duplicate declarations.
+
+Skipped boundary axes:
+
+- **Recursive macro definition** (negative) — the doc does not
+  commit to detection semantics; recorded as a doc gap above.
+- **Line continuation in `#include` path** — Slang does not
+  document line-continuation behavior inside an include path
+  specifically; no observable claim to anchor to.
 
 ## Out of scope (no-GPU runner)
 

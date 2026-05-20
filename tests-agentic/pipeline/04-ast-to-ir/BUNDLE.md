@@ -113,6 +113,26 @@ lowers to which IR construct").
 | `block-param-replaces-phi.slang`                              | functional | `#mapping-ast-constructs-to-ir`       |
 | `rwbuffer-write-lowers-to-getelementptr-store.slang`          | functional | `#mapping-ast-constructs-to-ir`       |
 | `return-void-uses-void-constant.slang`                        | functional | `#mapping-ast-constructs-to-ir`       |
+| `funcdecl-empty-body-lowers-to-return-val-void.slang`                     | boundary   | `#mapping-ast-constructs-to-ir` |
+| `funcdecl-many-params-eight-block-params.slang`                           | boundary   | `#mapping-ast-constructs-to-ir` |
+| `funcdecl-default-arg-materialized-at-call-site.slang`                    | boundary   | `#mapping-ast-constructs-to-ir` |
+| `funcdecl-returns-struct-lowers-to-return-val-struct.slang`               | boundary   | `#mapping-ast-constructs-to-ir` |
+| `blockstmt-single-stmt-block-collapses.slang`                             | boundary   | `#mapping-ast-constructs-to-ir` |
+| `blockstmt-nested-five-deep-multiple-blocks.slang`                        | stress     | `#mapping-ast-constructs-to-ir` |
+| `structdecl-many-fields-eight-fields.slang`                               | boundary   | `#mapping-ast-constructs-to-ir` |
+| `interfacedecl-empty-no-req-entry.slang`                                  | boundary   | `#mapping-ast-constructs-to-ir` |
+| `interfacedecl-three-methods-three-req-entries.slang`                     | boundary   | `#mapping-ast-constructs-to-ir` |
+| `generic-multi-typearg-call-specialize-two-types.slang`                   | boundary   | `#generics-and-existentials`    |
+| `generic-multi-value-args-call-specialize-four-values.slang`              | boundary   | `#generics-and-existentials`    |
+| `generic-recursive-depth-five-call-chain-specialize.slang`                | stress     | `#generics-and-existentials`    |
+| `literalexpr-uint-max-runtime-add-one-not-folded.slang`                   | boundary   | `#mapping-ast-constructs-to-ir` |
+| `literalexpr-uint-max-literal-add-one-constant-folds.slang`               | boundary   | `#mapping-ast-constructs-to-ir` |
+| `static-const-lowers-to-global-constant.slang`                            | boundary   | `#mapping-ast-constructs-to-ir` |
+| `cbuffer-empty-lowers-to-empty-struct.slang`                              | boundary   | `#module-level-outputs`         |
+| `cbuffer-single-scalar-lowers-to-one-field-struct.slang`                  | boundary   | `#module-level-outputs`         |
+| `cbuffer-mixed-types-lowers-to-struct-with-mixed-fields.slang`            | boundary   | `#module-level-outputs`         |
+| `entry-point-multiple-each-gets-entry-point-decoration.slang`             | boundary   | `#module-level-outputs`         |
+| `entry-missing-name-fires-no-function-found.slang`                        | negative   | `#module-level-outputs`         |
 
 ## Doc gaps observed
 

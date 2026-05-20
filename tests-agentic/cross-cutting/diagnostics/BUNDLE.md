@@ -77,6 +77,38 @@ no multi-backend matrix is needed.
 | `source-location-file-line-format.slang`        | negative   | `#source-locations-and-message-rendering`   |
 | `source-span-multi-character.slang`             | negative   | `#source-locations-and-message-rendering`   |
 | `type-name-interpolation-in-message.slang`      | negative   | `#anatomy-of-a-rich-diagnostic`             |
+| `warnings-as-errors-promotes-warning.slang`     | boundary   | `#diagnosticsink`                           |
+| `pragma-warning-pop-empty-warns.slang`          | boundary   | `#error-codes-and-the-name-field`           |
+| `pragma-warning-push-not-popped-warns.slang`    | boundary   | `#error-codes-and-the-name-field`           |
+| `pragma-warning-unknown-specifier-warns.slang`  | boundary   | `#error-codes-and-the-name-field`           |
+| `pragma-warning-disable-multiple-codes.slang`   | boundary   | `#error-codes-and-the-name-field`           |
+| `diagnostic-on-first-line.slang`                | boundary   | `#source-locations-and-message-rendering`   |
+| `diagnostic-on-final-source-line.slang`         | boundary   | `#source-locations-and-message-rendering`   |
+| `deeply-nested-error-still-rendered.slang`      | stress     | `#source-locations-and-message-rendering`   |
+| `many-undefined-identifiers-stress.slang`       | stress     | `#diagnosticsink`                           |
+| `error-chain-with-companion-note.slang`         | boundary   | `#anatomy-of-a-legacy-diagnostic`           |
+| `error-code-break-outside-loop.slang`           | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-continue-outside-loop.slang`        | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-divide-by-zero.slang`               | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-invalid-array-size.slang`           | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-assign-non-lvalue.slang`            | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-subscript-non-array.slang`          | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-call-operator-not-found.slang`      | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-no-member-of-type.slang`            | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-redeclaration-conflicts.slang`      | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-type-mismatch.slang`                | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-expected-a-type.slang`              | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-user-defined-error.slang`           | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-user-defined-warning.slang`         | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-unknown-preprocessor-directive.slang` | negative | `#error-codes-and-the-name-field`           |
+| `error-code-directive-without-if.slang`         | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-end-of-file-in-conditional.slang`   | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-divide-by-zero-in-preprocessor.slang` | negative | `#error-codes-and-the-name-field`           |
+| `error-code-unexpected-eof.slang`               | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-cyclic-include.slang`               | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-include-failed.slang`               | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-return-needs-expression.slang`      | negative   | `#error-codes-and-the-name-field`           |
+| `error-code-invalid-type-void.slang`            | negative   | `#error-codes-and-the-name-field`           |
 
 ## Doc gaps observed
 
@@ -110,6 +142,27 @@ no multi-backend matrix is needed.
   rest of the translation unit" vs "the pragma applies to the
   current `__include` only"). This is a real user-visible behavior
   worth a documented claim, but absent one we do not test it.
+- The doc mentions that the Severity filter "can suppress,
+  downgrade, or upgrade diagnostics by id" but does not name the
+  user-facing surfaces for `upgrade` and `downgrade` (the
+  `-warnings-as-errors <id>` and `-warnings-disable <id>` command
+  line flags). The boundary test
+  `warnings-as-errors-promotes-warning.slang` exercises the
+  `-warnings-as-errors` surface; the doc could call out both
+  command-line flags explicitly.
+- The doc describes the `#pragma warning` overrides but does not
+  enumerate the legal specifier set (`push`, `pop`, `disable`,
+  `error`, `default`, `suppress`). The `pragma-warning-unknown-
+  specifier-warns.slang` boundary test pins one rejected
+  specifier; the doc could list the accepted set explicitly to
+  pair with the rejection diagnostic.
+- The doc claims macro-expanded locations are "rendered with their
+  expansion stack" but does not describe what an
+  end-of-file-during-conditional diagnostic chain looks like
+  (primary + companion `see 'if' directive` note). The boundary
+  test `error-code-end-of-file-in-conditional.slang` exercises
+  this chain; the doc could add a small example of the multi-
+  record rendering.
 
 ## Out of scope (no-GPU runner)
 

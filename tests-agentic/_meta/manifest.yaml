@@ -120,7 +120,7 @@ bundles:
       - source/slang/slang-preprocessor.cpp
     runner:
       category: agentic-pipeline
-    size_cap_files: 40
+    size_cap_files: 75
 
   pipeline/02-parse-ast:
     prompt: prompts/pipeline-02-parse-ast.md

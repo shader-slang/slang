@@ -92,6 +92,28 @@ C++ for positive coverage and GLSL / WGSL for negative coverage).
 | `preludes-included-by-c-and-cuda.slang`         | functional | `#preludes`                                 |
 | `resource-binding-shape-per-target.slang`       | functional | `#backends`                                 |
 | `cbuffer-shape-per-target.slang`                | functional | `#backends`                                 |
+| `float-literal-zero-emit-per-target.slang`      | boundary   | `#shared-c-like-base`                       |
+| `float-positive-infinity-emit-per-target.slang` | boundary   | `#shared-c-like-base`                       |
+| `float-nan-emit-per-target.slang`               | boundary   | `#shared-c-like-base`                       |
+| `int-literal-min-emit-per-target.slang`         | boundary   | `#shared-c-like-base`                       |
+| `uint-literal-max-emit-per-target.slang`        | boundary   | `#shared-c-like-base`                       |
+| `empty-kernel-body-per-target.slang`            | boundary   | `#backends`                                 |
+| `single-buffer-kernel-no-vk-binding.slang`      | boundary   | `#backends`                                 |
+| `matrix-default-layout-emit-per-target.slang`   | boundary   | `#shared-c-like-base`                       |
+| `matrix-row-major-emit-per-target.slang`        | boundary   | `#shared-c-like-base`                       |
+| `spirv-emits-opsource-not-line-directive.slang` | negative   | `#source-writer-abstraction`                |
+| `wgsl-omits-line-directive.slang`               | negative   | `#source-writer-abstraction`                |
+| `multi-entry-point-foo-vs-bar-emit.slang`       | boundary   | `#emit-dispatcher`                          |
+| `spirv-omits-slang-prelude-include.slang`       | negative   | `#preludes`                                 |
+| `metal-omits-slang-prelude-include.slang`       | negative   | `#preludes`                                 |
+| `many-buffer-bindings-stress.slang`             | stress     | `#backends`                                 |
+| `precedence-deeply-nested-arith-stress.slang`   | stress     | `#operator-precedence-and-parenthesization` |
+| `hlsl-numthreads-survives-multi-resource.slang` | stress     | `#hlsl`                                     |
+| `cuda-global-params-shim-shape.slang`           | boundary   | `#cuda`                                     |
+| `cpp-host-shim-thread-and-group-entry.slang`    | boundary   | `#c`                                        |
+| `large-numthreads-emit-per-target.slang`        | boundary   | `#backends`                                 |
+| `single-thread-numthreads-emit-per-target.slang` | boundary  | `#backends`                                 |
+| `struct-multi-field-emit-per-target.slang`      | boundary   | `#shared-c-like-base`                       |
 
 ## Doc gaps observed
 
