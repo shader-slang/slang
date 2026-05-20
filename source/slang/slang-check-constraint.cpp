@@ -1054,20 +1054,25 @@ private:
         m_workList.add(itemIndex);
     }
 
-    // Reconsider every other work item after one item publishes progress. The
-    // work list is usually small, and this rule keeps the algorithm easy to
-    // reason about: no solved default, inferred type, or hidden witness can be
-    // missed because its dependency was represented indirectly in a substituted
-    // decl-ref. Items that are still settled will simply return `Done` when they
-    // run again.
+    // Reconsider the items that can observe the slot that just changed. Blocked
+    // items are always pending, so they get another turn after any progress.
+    // Items that already reached a terminal result only need to run again when
+    // their stored default, witness requirement, or conformance shape mentions
+    // the changed slot; this keeps the unified loop from degenerating into
+    // repeated full-list scans for ordinary generic applications.
     void wakeWorkItemsAfterProgress(Index solvedItemIndex)
     {
+        Decl* solvedDecl = m_solverWorkItems[solvedItemIndex].decl;
         for (Index itemIndex = 0; itemIndex < m_solverWorkItems.getCount(); itemIndex++)
         {
             if (itemIndex == solvedItemIndex)
                 continue;
 
-            m_solverWorkItems[itemIndex].done = false;
+            auto& workItem = m_solverWorkItems[itemIndex];
+            if (workItem.done && !workItemDependsOnSlot(workItem, solvedDecl))
+                continue;
+
+            workItem.done = false;
             enqueueWorkItem(itemIndex);
         }
     }
@@ -1529,6 +1534,79 @@ private:
             if (!isDependencyReady(dependencyDecl, subjectParamDecl))
                 return true;
         }
+        return false;
+    }
+
+    // Decide whether a value syntactically mentions a slot that has just
+    // changed. This uses the same cached structural dependency list as blocker
+    // detection, but it asks a simpler question: should an already-solved item
+    // be invalidated so it can substitute the value again?
+    bool valDependsOnSlot(Val* val, Decl* changedSlotDecl)
+    {
+        if (!changedSlotDecl)
+            return false;
+
+        auto& dependencies = getValDependencies(val);
+        for (auto dependencyDecl : dependencies)
+        {
+            if (dependencyDecl == changedSlotDecl)
+                return true;
+        }
+        return false;
+    }
+
+    // Determine whether a previously completed work item must be retried after
+    // one slot changed. Defaults depend on their default value, witnesses depend
+    // on the types or packs named by their requirement, and conformance-shape
+    // constraints also depend on their subject becoming available.
+    bool workItemDependsOnSlot(SolverWorkItem const& workItem, Decl* changedSlotDecl)
+    {
+        switch (workItem.kind)
+        {
+        case SolverWorkItem::Kind::OrdinaryConstraint:
+            if (workItem.constraint.isGenericParamConformance &&
+                workItem.constraint.decl == changedSlotDecl)
+            {
+                return true;
+            }
+            return valDependsOnSlot(workItem.constraint.val, changedSlotDecl);
+
+        case SolverWorkItem::Kind::DefaultArg:
+            return valDependsOnSlot(workItem.val, changedSlotDecl);
+
+        case SolverWorkItem::Kind::Witness:
+            return witnessDependsOnSlot(workItem.decl, changedSlotDecl);
+        }
+        return false;
+    }
+
+    // Hidden witness requirements name their dependencies through different
+    // declaration shapes. This helper keeps that shape-specific knowledge in
+    // one place so the work-list loop can continue to reason only in terms of
+    // slots that changed.
+    bool witnessDependsOnSlot(Decl* constraintDecl, Decl* changedSlotDecl)
+    {
+        if (!changedSlotDecl)
+            return false;
+
+        if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
+        {
+            return valDependsOnSlot(genericTypeConstraintDecl->sub.type, changedSlotDecl) ||
+                   valDependsOnSlot(genericTypeConstraintDecl->sup.type, changedSlotDecl);
+        }
+        if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
+        {
+            return valDependsOnSlot(typeCoercionConstraintDecl->fromType.type, changedSlotDecl) ||
+                   valDependsOnSlot(typeCoercionConstraintDecl->toType.type, changedSlotDecl);
+        }
+        if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
+        {
+            if (auto declRefExpr = as<DeclRefExpr>(nonEmptyConstraintDecl->packExpr))
+                return getDeclRef(m_astBuilder, declRefExpr).getDecl() == changedSlotDecl;
+            return false;
+        }
+        if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+            return valDependsOnSlot(hasDiffTypeInfoConstraintDecl->type.type, changedSlotDecl);
         return false;
     }
 
