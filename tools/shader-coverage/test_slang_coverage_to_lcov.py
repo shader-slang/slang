@@ -128,7 +128,69 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "DA:12,12\n"
             "end_of_record\n",
         )
-        self.assertEqual(result.stderr, "")
+        # The branch entry and the counterless line entry are not
+        # representable in LCOV's line-oriented model; the converter
+        # reports each skipped category on stderr so a future producer
+        # emitting non-line entries gets visible diagnostics instead
+        # of silent drops.
+        self.assertIn(
+            "note: skipped 1 entries of kind 'branch' not representable in LCOV",
+            result.stderr,
+        )
+        self.assertIn(
+            "note: skipped 1 line entries without a runtime counter not representable in LCOV",
+            result.stderr,
+        )
+
+    def test_reports_multiple_skipped_kinds(self):
+        # A future producer emitting branch and function entries must
+        # surface a per-kind stderr note for each so empty LCOV output
+        # is never silent.
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "entries": [
+                {
+                    "kind": "line",
+                    "counter": 0,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 10,
+                },
+                {
+                    "kind": "branch",
+                    "counter": None,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 11,
+                },
+                {
+                    "kind": "branch",
+                    "counter": None,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 12,
+                },
+                {
+                    "kind": "function",
+                    "counter": None,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 13,
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "5\n")
+
+        self.assertIn(
+            "note: skipped 2 entries of kind 'branch' not representable in LCOV",
+            result.stderr,
+        )
+        self.assertIn(
+            "note: skipped 1 entries of kind 'function' not representable in LCOV",
+            result.stderr,
+        )
 
     def test_rejects_unknown_manifest_version(self):
         manifest = {

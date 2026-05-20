@@ -95,7 +95,7 @@ def get_manifest_counter_count(manifest):
     return total
 
 
-def iter_line_entries(manifest):
+def iter_line_entries(manifest, skipped_by_kind=None):
     version = get_manifest_version(manifest)
     try:
         entries = manifest["entries"]
@@ -116,10 +116,24 @@ def iter_line_entries(manifest):
             continue
         if version == 2:
             try:
-                if entry.get("kind", "line") != "line":
+                # Non-line kinds and counterless line entries are not
+                # representable in LCOV's line-oriented model and are
+                # intentionally skipped here. Record the skip category
+                # so `main` can surface a stderr summary for
+                # debuggability — future producers emitting branch /
+                # function / region entries should otherwise see empty
+                # LCOV with no diagnostic.
+                kind = entry.get("kind", "line")
+                if kind != "line":
+                    if skipped_by_kind is not None:
+                        skipped_by_kind[kind] = skipped_by_kind.get(kind, 0) + 1
                     continue
                 counter = entry.get("counter")
                 if counter is None:
+                    if skipped_by_kind is not None:
+                        skipped_by_kind["line-counterless"] = (
+                            skipped_by_kind.get("line-counterless", 0) + 1
+                        )
                     continue
                 yield (
                     parse_manifest_int(counter, "v2 entry counter"),
@@ -175,7 +189,8 @@ def main():
     # but filter them out when exporting LCOV.
     hits_by_line = collections.defaultdict(lambda: collections.defaultdict(int))
     skipped_entries = 0
-    for idx, source, line in iter_line_entries(manifest):
+    skipped_by_kind = {}
+    for idx, source, line in iter_line_entries(manifest, skipped_by_kind):
         if idx < 0 or idx >= len(counters):
             sys.exit(f"error: counter index {idx} out of range [0, {len(counters)})")
         if not source or line <= 0:
@@ -196,6 +211,16 @@ def main():
         print(
             f"note: skipped {skipped_entries} coverage entr"
             f"{'y' if skipped_entries == 1 else 'ies'} without attributable source location",
+            file=sys.stderr,
+        )
+    for kind in sorted(skipped_by_kind):
+        count = skipped_by_kind[kind]
+        if kind == "line-counterless":
+            label = "line entries without a runtime counter"
+        else:
+            label = f"entries of kind {kind!r}"
+        print(
+            f"note: skipped {count} {label} not representable in LCOV",
             file=sys.stderr,
         )
 

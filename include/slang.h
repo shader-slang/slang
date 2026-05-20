@@ -4598,7 +4598,7 @@ enum class CoverageBranchArmKind : uint32_t
     DefaultArm = 4,
 };
 
-static const uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
+inline constexpr uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
 
 /// Per-coverage-entry attribution returned by
 /// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
