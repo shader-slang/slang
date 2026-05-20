@@ -154,6 +154,34 @@ echo "slangc Compiler Coverage (excludes generated/non-compiler code):"
 echo "================================================================"
 $LLVM_COV report "$LIBSLANG" -instr-profile="$COVERAGE_DIR"/slang-test.profdata "${SLANGC_IGNORE_ARGS[@]}"
 
+# Generate GFX coverage report (if libgfx exists).
+# libgfx is a shared library instrumented via slang_add_target, so we can
+# measure it directly.
+LIBGFX="$BUILD_DIR/$CONFIG/lib/libgfx.$LIB_EXT"
+if [[ -f "$LIBGFX" ]]; then
+  echo
+  echo "GFX Library Coverage Summary:"
+  echo "============================="
+  $LLVM_COV report "$LIBGFX" -instr-profile="$COVERAGE_DIR"/slang-test.profdata 2>/dev/null ||
+    echo "(no coverage data for libgfx)"
+fi
+
+# Generate RHI coverage report.
+# slang-rhi is a static library linked into slang-test, so we report against
+# the slang-test binary and scope by positional source path. Using a positional
+# source argument (not -ignore-filename-regex with negative lookahead) keeps
+# this compatible with llvm-cov's POSIX ERE on Linux.
+SLANG_TEST_BIN="$BUILD_DIR/$CONFIG/bin/slang-test"
+if [[ -f "$SLANG_TEST_BIN" ]]; then
+  echo
+  echo "RHI Coverage Summary (via slang-test binary):"
+  echo "=============================================="
+  $LLVM_COV report "$SLANG_TEST_BIN" \
+    -instr-profile="$COVERAGE_DIR"/slang-test.profdata \
+    "$REPO_ROOT/external/slang-rhi/" 2>/dev/null ||
+    echo "(no coverage data for slang-rhi)"
+fi
+
 # Generate HTML reports (optional)
 if [[ "$COVERAGE_HTML" = "1" ]]; then
   HTML_DIR="${COVERAGE_HTML_DIR:-$REPO_ROOT/coverage-html}"
