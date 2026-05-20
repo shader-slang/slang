@@ -26,6 +26,7 @@ import json
 import os
 import random
 import re
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -36,6 +37,12 @@ from typing import Any, Iterable
 # Caller-validated suffix shape — anything else risks SQL injection via the
 # `str.format()`-templated MERGE script.
 _SAFE_TOKEN = re.compile(r"^[A-Za-z0-9_]+$")
+
+# The plan's BigQuery project. The MERGE template hardcodes the same name,
+# so making this a parameter would create a footgun (loads in one project,
+# MERGE against another). One constant is the simplest honest expression
+# of "we have exactly one prod project."
+PROJECT = "slang-runners"
 
 
 def staging_suffix(
@@ -72,14 +79,18 @@ def derive_ingester_identity() -> tuple[str, str]:
 
     Inside GitHub Actions, GITHUB_RUN_ID and GITHUB_RUN_ATTEMPT are set; both
     are integers but we keep them as strings since they flow into the staging
-    suffix. For manual CLI invocations, fall back to a `manual<unix_ms>`
-    identity and attempt=1, so simultaneous local runs cannot collide.
+    suffix. For manual CLI invocations, fall back to a hybrid identity
+    `manual<unix_ms>p<pid>r<random_hex>` and attempt=1. The random suffix is
+    what makes two invocations within the same millisecond — same `time()`,
+    same `pid` after a quick fork-exec — still get distinct staging tables.
     """
     run_id = os.environ.get("GITHUB_RUN_ID")
     run_attempt = os.environ.get("GITHUB_RUN_ATTEMPT")
     if run_id and run_attempt:
         return run_id, run_attempt
-    return f"manual{int(time.time() * 1000)}", "1"
+    ms = int(time.time() * 1000)
+    rand_suffix = secrets.token_hex(4)  # 8 hex chars; 32 bits of randomness
+    return f"manual{ms}p{os.getpid()}r{rand_suffix}", "1"
 
 
 # ---------- bq CLI wrappers ----------
@@ -106,33 +117,30 @@ def _bq_run(args: list[str]) -> subprocess.CompletedProcess:
     return proc
 
 
-_schema_cache: dict[tuple[str, str], list[dict[str, Any]]] = {}
+_schema_cache: dict[str, list[dict[str, Any]]] = {}
 
 
-def _live_schema_path(
-    table: str, *, project: str, schema_dir: Path
-) -> Path:
+def _live_schema_path(table: str, *, schema_dir: Path) -> Path:
     """Return a path to a JSON file containing the live table's schema, fit
-    for `bq load --schema=<path>`. Cached per (project, table) within the
-    process so repeated loads in one ingest only hit `bq show` once.
+    for `bq load --schema=<path>`. Cached per table within the process so
+    repeated loads in one ingest only hit `bq show` once.
     """
-    key = (project, table)
-    if key not in _schema_cache:
+    if table not in _schema_cache:
         proc = subprocess.run(
             [
                 "bq",
                 "show",
                 "--format=prettyjson",
                 "--schema",
-                f"{project}:slang_ci.{table}",
+                f"{PROJECT}:slang_ci.{table}",
             ],
             check=True,
             capture_output=True,
             text=True,
         )
-        _schema_cache[key] = json.loads(proc.stdout)
+        _schema_cache[table] = json.loads(proc.stdout)
     schema_path = schema_dir / f"{table}.schema.json"
-    schema_path.write_text(json.dumps(_schema_cache[key]))
+    schema_path.write_text(json.dumps(_schema_cache[table]))
     return schema_path
 
 
@@ -142,7 +150,6 @@ def load_ndjson_to_staging(
     ndjson_path: Path,
     suffix: str,
     schema_dir: Path,
-    project: str = "slang-runners",
 ) -> str:
     """`bq load` an NDJSON file into a new per-attempt staging table.
 
@@ -155,8 +162,8 @@ def load_ndjson_to_staging(
     """
     if not _SAFE_TOKEN.match(table):
         raise ValueError(f"bad table name {table!r}")
-    staging_id = f"{project}:slang_ci_staging.{table}__{suffix}"
-    schema_path = _live_schema_path(table, project=project, schema_dir=schema_dir)
+    staging_id = f"{PROJECT}:slang_ci_staging.{table}__{suffix}"
+    schema_path = _live_schema_path(table, schema_dir=schema_dir)
     # --replace lets retries clobber a leftover staging table from a previous
     # crash; the suffix already encodes attempt identity so this is correct.
     _bq_run(
@@ -172,14 +179,16 @@ def load_ndjson_to_staging(
     return staging_id
 
 
-def drop_staging_tables(suffix: str, *, tables: Iterable[str], project: str = "slang-runners") -> None:
+def drop_staging_tables(suffix: str, *, tables: Iterable[str]) -> None:
     """Drop the per-attempt staging tables, swallowing per-table errors so the
-    cleanup pass always tries every table. Called from a finally: clause.
+    cleanup pass always tries every table. Called from a finally: clause, so
+    it must tolerate the "table never existed because its load failed" case.
+    `bq rm -f` already exits 0 when the table is missing.
     """
     for table in tables:
         if not _SAFE_TOKEN.match(table):
             continue
-        staging_id = f"{project}:slang_ci_staging.{table}__{suffix}"
+        staging_id = f"{PROJECT}:slang_ci_staging.{table}__{suffix}"
         try:
             _bq_run(["rm", "-f", "-t", staging_id])
         except subprocess.CalledProcessError as e:
@@ -209,7 +218,6 @@ def _is_transaction_conflict(stderr: str) -> bool:
 def run_merge_with_retry(
     *,
     sql: str,
-    project: str = "slang-runners",
     max_attempts: int = 7,
 ) -> None:
     """Run the multi-statement MERGE transaction with conflict retry.
@@ -230,7 +238,7 @@ def run_merge_with_retry(
                 "query",
                 "--use_legacy_sql=false",
                 "--project_id",
-                project,
+                PROJECT,
                 "--format=none",
             ],
             input=sql,
@@ -267,7 +275,6 @@ def load_rows_to_bq(
     *,
     src_run_id: int,
     src_run_attempt: int,
-    project: str = "slang-runners",
     merge_template_path: Path | None = None,
 ) -> None:
     """End-to-end: write per-table NDJSON, load into per-attempt staging,
@@ -297,25 +304,29 @@ def load_rows_to_bq(
 
     with tempfile.TemporaryDirectory(prefix="bq-stage-") as tmp:
         tmp_dir = Path(tmp)
-        for table in _PHASE1_TABLES:
-            table_rows = rows.get(table, [])
-            ndjson_path = tmp_dir / f"{table}.ndjson"
-            with ndjson_path.open("w") as f:
-                for r in table_rows:
-                    f.write(json.dumps(r))
-                    f.write("\n")
-            load_ndjson_to_staging(
-                table=table,
-                ndjson_path=ndjson_path,
-                suffix=suffix,
-                schema_dir=tmp_dir,
-                project=project,
-            )
-
+        # try/finally wraps both the staging-load phase and the MERGE phase
+        # so a failure partway through the loads still triggers cleanup.
+        # bq load --replace creates the staging tables as a side effect, so
+        # any table we attempted to load may already exist when we land here.
         try:
-            run_merge_with_retry(sql=sql, project=project)
+            for table in _PHASE1_TABLES:
+                table_rows = rows.get(table, [])
+                ndjson_path = tmp_dir / f"{table}.ndjson"
+                with ndjson_path.open("w") as f:
+                    for r in table_rows:
+                        f.write(json.dumps(r))
+                        f.write("\n")
+                load_ndjson_to_staging(
+                    table=table,
+                    ndjson_path=ndjson_path,
+                    suffix=suffix,
+                    schema_dir=tmp_dir,
+                )
+            run_merge_with_retry(sql=sql)
         finally:
             # Always clean up staging tables — they're disposable and the
             # staging dataset has a 1-day default expiration as a safety net,
-            # but explicit drop keeps things tidy.
-            drop_staging_tables(suffix, tables=_PHASE1_TABLES, project=project)
+            # but explicit drop keeps things tidy. drop_staging_tables
+            # tolerates "table not found" so it's safe to call even when a
+            # load failed before creating a given table.
+            drop_staging_tables(suffix, tables=_PHASE1_TABLES)
