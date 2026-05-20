@@ -10,13 +10,15 @@
 
 // CHECK610-DAG: dx::linalg::OuterProduct<
 // CHECK610-DAG: acc.InterlockedAccumulate(matBuf, matOff);
-// CHECK610-DAG: dx::linalg::VectorAccumulate(inputVec, buffer, offset);
 // CHECK610-DAG: __slang_linalg_OuterProductAccumulate<
 // CHECK610-DAG: __slang_linalg_VectorAccumulate<
 // CHECK610-NOT: OuterProduct<MatDT, dx::linalg::MatrixScope::Thread>
 // CHECK610-NOT: ComponentTypeTraits<ElTy>
 // CHECK610-NOT: buffer.template Load<ElTy>
 // CHECK610-NOT: buffer.template Store<ElTy>
+// CHECK610-NOT: byteOffset = offset + i *
+// CHECK610: void __slang_linalg_VectorAccumulate(
+// CHECK610: dx::linalg::VectorAccumulate(
 
 RWByteAddressBuffer outerProductOutput;
 RWByteAddressBuffer reduceSumOutput;
