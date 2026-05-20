@@ -247,6 +247,8 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
     // Determine if this is a GLSL-based target. For GLSL targets, SPIRV version and
     // extension atoms are intentionally converted to their GLSL-SPIRV equivalents
     // rather than being treated as incompatible, so we skip those.
+    // NOTE: This mirrors the isGLSLTarget logic in getTargetCaps() — keep them in sync
+    // if new GLSL-based targets are added.
     bool isGLSLTarget = false;
     switch (getTarget())
     {
@@ -293,8 +295,11 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
         if (toAdd.isEmpty())
             continue;
 
-        // For GLSL targets, SPIRV-targeted capabilities are auto-converted; not an error.
-        if (isGLSLTarget && asAtom(toAdd.getCompileTarget()) == CapabilityAtom::spirv)
+        // For GLSL targets, SPIRV-targeted capabilities are auto-converted to their
+        // glsl_spirv_* equivalents by getTargetCaps(); not an error.
+        // Use containsKey rather than getCompileTarget() to avoid relying on dictionary
+        // iteration order when a capability spans multiple target families.
+        if (isGLSLTarget && toAdd.getCapabilityTargetSets().containsKey(CapabilityAtom::spirv))
             continue;
 
         if (!cookedCaps.isIncompatibleWith(toAdd))

@@ -1,10 +1,25 @@
+// Requesting a SPIRV capability on an HLSL target should error.
 //TEST:SIMPLE(filecheck=CHECK_ERR): -target hlsl -entry main -stage compute -capability spirv_1_5
-//TEST:SIMPLE(filecheck=CHECK_OK): -target spirv -entry main -stage compute -capability spirv_1_5
-//TEST:SIMPLE(filecheck=CHECK_OK): -target spirv -entry main -stage compute -capability spirv_1_5 -ignore-capabilities
-
-// Requesting a SPIRV capability with an HLSL target should be an error.
 // CHECK_ERR: error[E36121]
+
+// The same SPIRV capability on a SPIRV target is fine.
+//TEST:SIMPLE(filecheck=CHECK_OK): -target spirv -entry main -stage compute -capability spirv_1_5
 // CHECK_OK-NOT: E36121
+
+// -ignore-capabilities suppresses E36121.
+//TEST:SIMPLE(filecheck=CHECK_IGNORE): -target hlsl -entry main -stage compute -capability spirv_1_5 -ignore-capabilities
+// CHECK_IGNORE-NOT: E36121
+
+// GLSL target with a SPIRV capability: auto-converted to glsl_spirv_*, no error.
+//TEST:SIMPLE(filecheck=CHECK_GLSL_OK): -target glsl -entry main -stage compute -capability spirv_1_5
+// CHECK_GLSL_OK-NOT: E36121
+
+// Requesting a GLSL feature capability on a CPP target should error.
+//TEST:SIMPLE(filecheck=CHECK_ERR_CPP): -target cpp -entry main -stage compute -capability image_loadstore
+// CHECK_ERR_CPP: error[E36121]
+
+// Note: cross-target version aliases like sm_6_0 intentionally include SPIRV paths
+// (sm_6_0 maps to spirv_1_3 for SPIRV targets), so they do NOT trigger E36121.
 
 [numthreads(1, 1, 1)]
 void main() {}
