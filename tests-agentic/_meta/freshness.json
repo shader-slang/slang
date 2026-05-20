@@ -133,6 +133,20 @@
       "source_doc_digest": "d5381c8e732782fb3c7c867a0de12b1ae29edbcede8a5cb37f8db47276e38b43",
       "watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
     },
+    "ir-reference/metadata": {
+      "generated_at": "2026-05-20T17:57:05+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "2aa9f69f5e2e75f6e2f4231a451a1a022818e18b",
+      "source_doc_digest": "3216251c72624b474409742713e67c3562882361cc1f104f8f3fda2ef68cc6c0",
+      "watched_paths_digest": "4efe93afbd22f4572d6d334ca82947cebf8058c7572291261103fd18aa04f6bd"
+    },
+    "ir-reference/misc": {
+      "generated_at": "2026-05-20T17:57:05+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "2aa9f69f5e2e75f6e2f4231a451a1a022818e18b",
+      "source_doc_digest": "d3e825874b20af6a9aee9ec05258024460a36074969159f4b86b451f74857f87",
+      "watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
+    },
     "ir-reference/resources-and-atomics": {
       "generated_at": "2026-05-20T17:27:31+00:00",
       "model": "claude-opus-4-7",
@@ -160,6 +174,13 @@
       "source_commit": "331a01d9d0cc721d8fc19a46fec17a4a275ba0e0",
       "source_doc_digest": "0bd66a543db2abee42ed03fc4534c5483860e577fe816355ee527d444cedd80b",
       "watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
+    },
+    "name-resolution/index": {
+      "generated_at": "2026-05-20T17:57:05+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "2aa9f69f5e2e75f6e2f4231a451a1a022818e18b",
+      "source_doc_digest": "b0430d4ce5c1b754210dd984ba0aa37efa52cb522661212bd1c593e713d61d77",
+      "watched_paths_digest": "668c0693482182a9e432e769a62c17c6a73f88b00454fecfd038698b2462cd72"
     },
     "name-resolution/lookup": {
       "generated_at": "2026-05-20T14:24:32+00:00",
@@ -287,12 +308,26 @@
       "source_doc_digest": "2afce914bae96fe2e024bf6b3685b7339df010398abc456d4a58cb329326fa50",
       "watched_paths_digest": "ee6e5a27774a8a9c7ea3024cc5842f7bc1919255c4c0b9751400d25195f0b7bc"
     },
+    "target-pipelines/metal": {
+      "generated_at": "2026-05-20T17:57:05+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "2aa9f69f5e2e75f6e2f4231a451a1a022818e18b",
+      "source_doc_digest": "4a7697c3667a9f1364743d589b96dbb7f0bbed4738f28a74cfefbb3153e47d62",
+      "watched_paths_digest": "346898dc4d064ddc3802d3a68b0195bea085b7a106cf552f607ca57a1f3da4ec"
+    },
     "target-pipelines/spirv": {
       "generated_at": "2026-05-20T17:43:20+00:00",
       "model": "claude-opus-4-7",
       "source_commit": "330c9a8d807b9f9352e4754f466d1244ae681cff",
       "source_doc_digest": "b1daf02c9f85dda22a3cac37e70daa316be6cde3c511da1abf8a80d483e1dba1",
       "watched_paths_digest": "bd75ad021965ba68fbd7d335d6359ad1cf49b78a95a9be48be867759452b78f1"
+    },
+    "target-pipelines/wgsl": {
+      "generated_at": "2026-05-20T17:57:05+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "2aa9f69f5e2e75f6e2f4231a451a1a022818e18b",
+      "source_doc_digest": "d16c48a1b04e16432afea2867f729fb871e9db503b94181cca95f2b816a5f61d",
+      "watched_paths_digest": "3a231855d2500716d08acc7404223e6d69655007cc529e406477b87c9bf1a697"
     }
   },
   "schema_version": 1
