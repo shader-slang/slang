@@ -7,6 +7,7 @@
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-spirv-legalize.h"
 #include "slang-ir-spirv-snippet.h"
@@ -1358,6 +1359,46 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         ResultIDToken resultId,
         const OperandEmitFunc& f)
     {
+        return emitInstMemoizedCustomOperandFuncWithExtraKeyData(
+            parent,
+            irInst,
+            opcode,
+            resultId,
+            f,
+            List<SpvWord>());
+    }
+
+    template<typename... Operands>
+    SpvInst* emitInstMemoizedWithExtraKeyData(
+        SpvInstParent* parent,
+        IRInst* irInst,
+        SpvOp opcode,
+        // We take the resultId here explicitly here to make sure we don't try
+        // and memoize its value.
+        ResultIDToken resultId,
+        List<SpvWord>&& extraKeyData,
+        const Operands&... ops)
+    {
+        return emitInstMemoizedCustomOperandFuncWithExtraKeyData(
+            parent,
+            irInst,
+            opcode,
+            resultId,
+            [&]() { (emitOperand(ops), ...); },
+            std::move(extraKeyData));
+    }
+
+    template<typename OperandEmitFunc>
+    SpvInst* emitInstMemoizedCustomOperandFuncWithExtraKeyData(
+        SpvInstParent* parent,
+        IRInst* irInst,
+        SpvOp opcode,
+        // We take the resultId here explicitly here to make sure we don't try
+        // and memoize its value.
+        ResultIDToken resultId,
+        const OperandEmitFunc& f,
+        List<SpvWord>&& extraKeyData)
+    {
         List<SpvWord> ourOperands;
         {
             auto scopePeek = OperandMemoizeScope(this);
@@ -1367,13 +1408,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             ourOperands = std::move(m_operandStack);
         }
 
-        // Hash the whole global stack and opcode
-        SpvTypeInstKey key;
-        key.words.add(opcode);
-        key.words.addRange(ourOperands);
+        // Hash the opcode, encoded operands, and any caller-provided key data.
+        SpvInstKey key;
+        key.instWords.add(opcode);
+        key.instWords.addRange(ourOperands);
+        key.extraKeyData = std::move(extraKeyData);
 
         // If we have seen this before, return the memoized instruction
-        if (SpvInst** memoized = m_spvTypeInsts.tryGetValue(key))
+        if (SpvInst** memoized = m_memoizedSpvInsts.tryGetValue(key))
         {
             // There could be another different slang IR inst that translates to
             // the same spir-v inst.
@@ -1389,7 +1431,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // Otherwise, we can construct our instruction and record the result
         InstConstructScope scopeInst(this, opcode, irInst);
         SpvInst* spvInst = scopeInst;
-        m_spvTypeInsts[key] = spvInst;
+        m_memoizedSpvInsts[key] = spvInst;
 
         // Emit our operands, this time with the resultId too
         emitOperand(resultId);
@@ -1415,25 +1457,48 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             ourOperands = std::move(m_operandStack);
         }
 
-        // Hash the whole global stack and opcode
-        SpvTypeInstKey key;
-        key.words.add(opcode);
-        key.words.addRange(ourOperands);
+        // Hash the opcode and encoded operands.
+        SpvInstKey key;
+        key.instWords.add(opcode);
+        key.instWords.addRange(ourOperands);
 
         // If we have seen this before, return the memoized instruction
-        if (SpvInst** memoized = m_spvTypeInsts.tryGetValue(key))
+        if (SpvInst** memoized = m_memoizedSpvInsts.tryGetValue(key))
+        {
+            // Different Slang IR instructions can produce the same no-result
+            // SPIR-V instruction, so keep the later IR instruction mapped to
+            // the memoized instruction.
+            if (irInst)
+                m_mapIRInstToSpvInst.addIfNotExists(irInst, *memoized);
             return *memoized;
+        }
 
-        // Otherwise, we can construct our instruction and record the result
+        // Otherwise, construct our instruction and record it in the memoization table.
         InstConstructScope scopeInst(this, opcode, irInst);
         SpvInst* spvInst = scopeInst;
-        m_spvTypeInsts[key] = spvInst;
+        m_memoizedSpvInsts[key] = spvInst;
 
+        // Replay operands captured by the memoize scope into the live instruction.
         m_operandStack.addRange(ourOperands);
 
         parent->addInst(spvInst);
         return spvInst;
     }
+
+    template<typename... Operands>
+    SpvInst* emitInstMemoizedNoResultID(
+        SpvInstParent* parent,
+        IRInst* irInst,
+        SpvOp opcode,
+        const Operands&... ops)
+    {
+        return emitInstMemoizedNoResultIDCustomOperandFunc(
+            parent,
+            irInst,
+            opcode,
+            [&]() { (emitOperand(ops), ...); });
+    }
+
     //
     // Specific emit funcs
     //
@@ -1817,20 +1882,196 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return m_extensionInsts.containsKey(name);
     }
 
-    struct SpvTypeInstKey
+    struct SpvInstKey
     {
-        List<SpvWord> words;
-        bool operator==(const SpvTypeInstKey& other) const { return words == other.words; }
+        List<SpvWord> instWords;
+        List<SpvWord> extraKeyData;
+        bool operator==(const SpvInstKey& other) const
+        {
+            return instWords == other.instWords && extraKeyData == other.extraKeyData;
+        }
         const static bool kHasUniformHash = true;
         auto getHashCode() const
         {
-            return Slang::getHashCode(
-                reinterpret_cast<const char*>(words.getBuffer()),
-                words.getCount() * sizeof(SpvWord));
+            const auto instWordsHash = Slang::getHashCode(
+                reinterpret_cast<const char*>(instWords.getBuffer()),
+                instWords.getCount() * sizeof(SpvWord));
+            const auto extraKeyDataHash = Slang::getHashCode(
+                reinterpret_cast<const char*>(extraKeyData.getBuffer()),
+                extraKeyData.getCount() * sizeof(SpvWord));
+            return combineHash(instWordsHash, extraKeyDataHash);
         }
     };
 
-    Dictionary<SpvTypeInstKey, SpvInst*> m_spvTypeInsts;
+    Dictionary<SpvInstKey, SpvInst*> m_memoizedSpvInsts;
+
+    // `IRSizeAndAlignmentDecoration` currently serves two purposes: it caches
+    // the result of layout queries on a type, and it is also the closest signal
+    // we have for which concrete layout should drive SPIR-V layout emission.
+    // That conflicts when multiple layout rules have been queried for the same
+    // type; for example, debug-info emission can ask for Natural layout on a type
+    // originally laid out as Std430. Prefer the non-Natural rule here so layout
+    // emission and layout-sensitive memoization use the same heuristic.
+    // TODO: Attach an explicit "primary layout" marker during
+    // `lowerBufferElementTypeToStorageType`. See #10964.
+    bool tryGetPreferredSizeAndAlignmentLayoutRuleName(
+        IRType* type,
+        IRTypeLayoutRuleName* outLayoutRuleName)
+    {
+        if (!type)
+            return false;
+
+        IRTypeLayoutRuleName result = IRTypeLayoutRuleName::Natural;
+        bool foundLayout = false;
+        for (auto decor : type->getDecorations())
+        {
+            if (auto sizeDecor = as<IRSizeAndAlignmentDecoration>(decor))
+            {
+                foundLayout = true;
+                auto name = sizeDecor->getLayoutName();
+                if (name != IRTypeLayoutRuleName::Natural)
+                {
+                    *outLayoutRuleName = name;
+                    return true;
+                }
+                result = name;
+            }
+        }
+
+        if (!foundLayout)
+            return false;
+
+        *outLayoutRuleName = result;
+        return true;
+    }
+
+    IRTypeLayoutRules* getPointerArrayStrideLayoutRule(IRPtrTypeBase* ptrType, IRType* valueType)
+    {
+        if (ptrType->getDataLayout())
+            return getTypeLayoutRuleForBuffer(m_targetProgram, ptrType);
+
+        IRTypeLayoutRuleName layoutRuleName;
+        if (tryGetPreferredSizeAndAlignmentLayoutRuleName(valueType, &layoutRuleName) &&
+            layoutRuleName != IRTypeLayoutRuleName::Natural)
+            return IRTypeLayoutRules::get(layoutRuleName);
+
+        return getTypeLayoutRuleForBuffer(m_targetProgram, ptrType);
+    }
+
+    IRIntegerValue getArrayElementStrideValue(IRArrayTypeBase* arrayType, IRTypeLayoutRules* rule)
+    {
+        auto elementType = arrayType->getElementType();
+        if (isIROpaqueType(elementType) || !shouldEmitArrayStride(elementType))
+            return 0;
+
+        if (auto strideInst = arrayType->getArrayStride())
+            return getIntVal(strideInst);
+
+        IRSizeAndAlignment elementSizeAndAlignment;
+        getSizeAndAlignment(m_targetRequest, rule, elementType, &elementSizeAndAlignment);
+
+        if (elementSizeAndAlignment.size == IRSizeAndAlignment::kIndeterminateSize)
+            return IRSizeAndAlignment::kIndeterminateSize;
+
+        elementSizeAndAlignment = rule->alignCompositeElement(elementSizeAndAlignment);
+        return elementSizeAndAlignment.getStride();
+    }
+
+    IRIntegerValue getPointerArrayStrideValue(IRPtrTypeBase* ptrType, SpvStorageClass storageClass)
+    {
+        if (!ptrType)
+            return 0;
+
+        if (storageClass != SpvStorageClassPhysicalStorageBuffer &&
+            storageClass != SpvStorageClassStorageBuffer)
+            return 0;
+
+        auto valueType = ptrType->getValueType();
+        auto rule = getPointerArrayStrideLayoutRule(ptrType, valueType);
+
+        if (auto arrayType = as<IRUnsizedArrayType>(valueType))
+            return getArrayElementStrideValue(arrayType, rule);
+
+        IRSizeAndAlignment sizeAndAlignment;
+        getSizeAndAlignment(m_targetRequest, rule, valueType, &sizeAndAlignment);
+
+        if (sizeAndAlignment.size == IRSizeAndAlignment::kIndeterminateSize)
+            return IRSizeAndAlignment::kIndeterminateSize;
+
+        return rule->alignCompositeElement(sizeAndAlignment).getStride();
+    }
+
+    IRIntegerValue getArrayStrideValue(IRInst* inst)
+    {
+        if (auto arrayType = as<IRArrayTypeBase>(inst))
+        {
+            auto elementType = arrayType->getElementType();
+            if (isIROpaqueType(elementType) || !shouldEmitArrayStride(elementType))
+                return 0;
+
+            if (auto strideInst = arrayType->getArrayStride())
+                return getIntVal(strideInst);
+
+            if (arrayType->getOp() == kIROp_UnsizedArrayType)
+            {
+                IRTypeLayoutRuleName layoutRuleName = IRTypeLayoutRuleName::Natural;
+                tryGetPreferredSizeAndAlignmentLayoutRuleName(elementType, &layoutRuleName);
+                return getArrayElementStrideValue(
+                    arrayType,
+                    IRTypeLayoutRules::get(layoutRuleName));
+            }
+
+            return 0;
+        }
+
+        if (auto ptrType = as<IRPtrTypeBase>(inst))
+        {
+            return getPointerArrayStrideValue(ptrType, getSpvStorageClass(ptrType));
+        }
+
+        return 0;
+    }
+
+    // Returns 0 when no ArrayStride decoration should be emitted.
+    SpvWord getArrayStrideDecorationValue(IRInst* inst)
+    {
+        auto stride = getArrayStrideValue(inst);
+
+        if (stride == IRSizeAndAlignment::kIndeterminateSize)
+        {
+            // Any unsized data type (e.g. struct or array) will have size of
+            // kIndeterminateSize, in such case the stride is invalid, so we have to
+            // provide a non-zero value to pass the spirv validator.
+            return 0xFFFF;
+        }
+
+        // TODO: Diagnose strides outside the 32-bit SPIR-V ArrayStride literal range.
+
+        return SpvWord(uint32_t(stride));
+    }
+
+    void addArrayStrideExtraKeyData(List<SpvWord>& extraKeyData, IRIntegerValue stride)
+    {
+        uint64_t strideValue = uint64_t(stride);
+        extraKeyData.add(SpvWord(strideValue & 0xffffffff));
+        extraKeyData.add(SpvWord((strideValue >> 32) & 0xffffffff));
+    }
+
+    List<SpvWord> getPointerTypeExtraKeyData(IRInst* inst, SpvStorageClass storageClass)
+    {
+        List<SpvWord> extraKeyData;
+        addArrayStrideExtraKeyData(
+            extraKeyData,
+            getPointerArrayStrideValue(as<IRPtrTypeBase>(inst), storageClass));
+        return extraKeyData;
+    }
+
+    List<SpvWord> getArrayTypeExtraKeyData(IRInst* inst)
+    {
+        List<SpvWord> extraKeyData;
+        addArrayStrideExtraKeyData(extraKeyData, getArrayStrideValue(inst));
+        return extraKeyData;
+    }
 
     bool shouldEmitSPIRVReflectionInfo()
     {
@@ -2174,7 +2415,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else if (storageClass == SpvStorageClassNodePayloadAMDX)
                 {
                     auto spvValueType = ensureInst(valueType);
-                    auto spvNodePayloadType = emitOpTypeNodePayloadArray(inst, spvValueType);
+                    // The IR instruction maps to the pointer type below. This wrapper is only
+                    // the pointee type required by SPIR-V, so do not register it for the IR inst.
+                    auto spvNodePayloadType = emitOpTypeNodePayloadArray(nullptr, spvValueType);
                     valueTypeId = getID(spvNodePayloadType);
                 }
                 else
@@ -2198,33 +2441,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     if (m_decoratedSpvInsts.add(getID(resultSpvType)))
                     {
-                        IRSizeAndAlignment sizeAndAlignment;
-                        uint32_t stride;
-
-                        if (auto layout = valueType->findDecoration<IRSizeAndAlignmentDecoration>())
-                        {
-                            auto rule = IRTypeLayoutRules::get(layout->getLayoutName());
-                            getSizeAndAlignment(
-                                m_targetRequest,
-                                rule,
-                                valueType,
-                                &sizeAndAlignment);
-                        }
-                        else
-                        {
-                            getNaturalSizeAndAlignment(
-                                m_targetRequest,
-                                valueType,
-                                &sizeAndAlignment);
-                        }
-                        uint64_t valueSize = sizeAndAlignment.size;
-
-                        // Any unsized data type (e.g. struct or array) will have size of
-                        // kIndeterminateSize, in such case the stride is invalid, so we have to
-                        // provide a non-zero value to pass the spirv validator.
-                        stride = (valueSize >= (uint64_t)sizeAndAlignment.kIndeterminateSize)
-                                     ? 0xFFFF
-                                     : (uint32_t)sizeAndAlignment.getStride();
+                        auto stride = getArrayStrideDecorationValue(ptrType);
                         if (stride != 0)
                         {
                             emitOpDecorateArrayStride(
@@ -2445,43 +2662,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         ? emitOpTypeArray(inst, elementType, irArrayType->getElementCount())
                         : emitOpTypeRuntimeArray(inst, elementType);
                 // Arrays of opaque types should not emit a stride
-                if (!isIROpaqueType(elementType) &&
-                    shouldEmitArrayStride(irArrayType->getElementType()))
+                auto stride = getArrayStrideDecorationValue(irArrayType);
+                if (stride != 0)
                 {
-                    auto stride = 0;
-                    // If the array type has no stride, it indicates that this array type is only
-                    // used in Private or Function storage class (aka. thread-local or function
-                    // scope variable), in that case SPIRV doesn't allow to decorate the array
-                    // stride.
-                    //
-                    // The only exception is if the array type is unsized, because unsized array
-                    // also has no stride operand, however unsized array can not be used in Private
-                    // or Function, so we are safe to just decorate the stride for unsized array by
-                    // calculating the natural stride.
-                    if (auto strideInst = irArrayType->getArrayStride())
-                    {
-                        stride = (int)getIntVal(strideInst);
-                    }
-                    else if (inst->getOp() == kIROp_UnsizedArrayType)
-                    {
-                        IRSizeAndAlignment sizeAndAlignment;
-                        getNaturalSizeAndAlignment(m_targetRequest, elementType, &sizeAndAlignment);
-                        stride = (int)sizeAndAlignment.getStride();
-                    }
-
-                    if (stride != 0)
-                    {
-                        emitInstMemoizedNoResultIDCustomOperandFunc(
-                            getSection(SpvLogicalSectionID::Annotations),
-                            nullptr,
-                            SpvOpDecorate,
-                            [&]()
-                            {
-                                emitOperand(arrayType);
-                                emitOperand(SpvLiteralInteger::from32(SpvDecorationArrayStride));
-                                emitOperand(SpvLiteralInteger::from32(stride));
-                            });
-                    }
+                    emitOpDecorateArrayStride(
+                        getSection(SpvLogicalSectionID::Annotations),
+                        nullptr,
+                        arrayType,
+                        SpvLiteralInteger::from32(stride));
                 }
                 return arrayType;
             }
@@ -5096,6 +5284,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_ImageLoad:
             result = emitImageLoad(parent, as<IRImageLoad>(inst));
             break;
+        case kIROp_SubpassLoad:
+            result = emitSubpassLoad(parent, as<IRSubpassLoad>(inst));
+            break;
         case kIROp_ImageStore:
             result = emitImageStore(parent, as<IRImageStore>(inst));
             break;
@@ -5384,6 +5575,37 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         SpvImageOperandsMakeTexelVisibleMask | SpvImageOperandsNonPrivateTexelMask);
 
                     emitOperand(memoryScope);
+                }
+            });
+    }
+
+    SpvInst* emitSubpassLoad(SpvInstParent* parent, IRSubpassLoad* inst)
+    {
+        requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto zeroVec = builder.emitMakeVectorFromScalar(
+            builder.getVectorType(
+                builder.getIntType(),
+                builder.getIntValue(builder.getIntType(), 2)),
+            builder.getIntValue(builder.getIntType(), 0));
+
+        return emitInstCustomOperandFunc(
+            parent,
+            inst,
+            SpvOpImageRead,
+            [&]()
+            {
+                emitOperand(inst->getDataType());
+                emitOperand(kResultID);
+                emitOperand(inst->getSubpassInput());
+                emitOperand(zeroVec);
+
+                if (auto sample = inst->getSample())
+                {
+                    emitOperand(SpvImageOperandsSampleMask);
+                    emitOperand(sample);
                 }
             });
     }
@@ -6263,12 +6485,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 requireSPIRVCapability(SpvCapabilityLinkage);
                 auto name =
                     decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
-                emitInst(
+                emitOpDecorateLinkageAttributes(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
-                    SpvOpDecorate,
                     dstID,
-                    SpvDecorationLinkageAttributes,
                     name,
                     SpvLinkageTypeExport);
                 break;
@@ -6278,12 +6498,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 requireSPIRVCapability(SpvCapabilityLinkage);
                 auto name =
                     decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
-                emitInst(
+                emitOpDecorateLinkageAttributes(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
-                    SpvOpDecorate,
                     dstID,
-                    SpvDecorationLinkageAttributes,
                     name,
                     SpvLinkageTypeImport);
                 break;
@@ -6387,30 +6605,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
          * assigned the same Offset.
          *
          *****/
-        // TODO: `IRSizeAndAlignmentDecoration` currently serves two purposes: it caches the
-        // result of layout queries on a type (any query simply attaches the decoration), and it is
-        // used here to decide which layout rule should be applied when emitting the struct.  That
-        // conflicts when multiple layout rules have been queried for the same struct -- in
-        // particular, debug-info emission asks for Natural layout on types that were originally
-        // laid out as Std430, which leaves both decorations on the struct and a plain
-        // `findDecoration` call would return whichever was attached first.  We prefer the
-        // non-Natural rule here as a heuristic, but the real fix is to either stop reusing the
-        // caching decoration as a layout-selection signal or to attach an explicit "primary
-        // layout" marker during `lowerBufferElementTypeToStorageType`.  See #10964.
         IRTypeLayoutRuleName layoutRuleName = IRTypeLayoutRuleName::Natural;
-        for (auto decor : structType->getDecorations())
-        {
-            if (auto sizeDecor = as<IRSizeAndAlignmentDecoration>(decor))
-            {
-                auto name = sizeDecor->getLayoutName();
-                if (name != IRTypeLayoutRuleName::Natural)
-                {
-                    layoutRuleName = name;
-                    break;
-                }
-                layoutRuleName = name;
-            }
-        }
+        tryGetPreferredSizeAndAlignmentLayoutRuleName(structType, &layoutRuleName);
         int32_t id = 0;
         bool isPhysicalType = isPhysicalCompositeType(structType);
         for (auto field : structType->getFields())
@@ -10513,6 +10709,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 SLANG_ASSERT(info.has_value());
                 switch (info->class_)
                 {
+                case SPIRVCoreGrammarInfo::OpInfo::Annotation:
+                    return getSection(SpvLogicalSectionID::Annotations);
                 case SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration:
                 case SPIRVCoreGrammarInfo::OpInfo::ConstantCreation:
                     return getSection(SpvLogicalSectionID::ConstantsAndTypes);
@@ -10532,12 +10730,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     case SpvOpExecutionMode:
                     case SpvOpExecutionModeId:
                         return getSection(SpvLogicalSectionID::ExecutionModes);
-                    case SpvOpDecorate:
-                    case SpvOpDecorateId:
-                    case SpvOpDecorateString:
-                    case SpvOpMemberDecorate:
-                    case SpvOpMemberDecorateString:
-                        return getSection(SpvLogicalSectionID::Annotations);
                     case SpvOpTypeNodePayloadArrayAMDX:
                         return getSection(SpvLogicalSectionID::ConstantsAndTypes);
                     default:
@@ -10883,9 +11075,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 const auto opInfo = m_grammarInfo->opInfos.lookup(opcode);
 
                 // TODO: handle resultIdIndex == 1, for constants
-                const bool memoize =
+                const bool memoizeTypeInst =
                     opParent == getSection(SpvLogicalSectionID::ConstantsAndTypes) && opInfo &&
                     opInfo->resultIdIndex == 0;
+                // Only no-result instructions in the annotations section are safe to memoize.
+                // Result-producing annotations like OpDecorationGroup must keep
+                // distinct IDs because later group decorations reference them.
+                const bool memoizeAnnotationInst =
+                    opParent == getSection(SpvLogicalSectionID::Annotations) && opInfo &&
+                    opInfo->resultIdIndex == SPIRVCoreGrammarInfo::OpInfo::kNoResultId;
 
                 // We want the "result instruction" to refer to the top level
                 // block which assumes its value, the others are free to refer
@@ -10894,7 +11092,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 // assigned to result is not necessarily the last instruction
                 const auto assignedInst = isLast ? as<IRInst>(inst) : spvInst;
 
-                if (memoize)
+                if (memoizeTypeInst)
                 {
                     last = emitInstMemoizedCustomOperandFunc(
                         opParent,
@@ -10925,6 +11123,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             cast<IRStringLit>(resOperand->getValue())->getStringSlice();
                         idMap[idName] = last->id;
                     }
+                }
+                else if (memoizeAnnotationInst)
+                {
+                    last = emitInstMemoizedNoResultIDCustomOperandFunc(
+                        opParent,
+                        assignedInst,
+                        opcode,
+                        [&]()
+                        {
+                            for (const auto operand : spvInst->getSPIRVOperands())
+                                emitSpvAsmOperand(operand);
+                        });
                 }
                 else
                 {
@@ -10967,8 +11177,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 else
                                     requiredMask |= SpvImageOperandsMakeTexelAvailableMask;
 
-                                // If user specified any of the required masks, we cannot specified
-                                // anymore.
+                                // If the user specified any of the required masks, do not add them
+                                // again.
                                 if (usedMask & requiredMask)
                                     return;
 

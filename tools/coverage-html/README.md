@@ -1,39 +1,60 @@
 # slang-coverage-html + slang-coverage-merge
 
-Two cooperating Python 3 tools for static-HTML coverage reports
-from LCOV `.info` files:
+Two cooperating Python 3 tools for static-HTML coverage reports:
 
-- **`slang-coverage-html`** — render one LCOV to a directory of
-  static HTML. Zero-install on any platform — no `pip`, no Perl
-  (`genhtml`), no .NET runtime (ReportGenerator).
+- **`slang-coverage-html`** — render one coverage input to a
+  directory of static HTML. Accepts standard LCOV (`.info` /
+  `.lcov`, optionally `.gz`) or `llvm-cov export -format=json`
+  (`.json`, optionally `.gz`). Format is picked by extension.
+  Zero-install on any platform — no `pip`, no Perl (`genhtml`),
+  no .NET runtime (ReportGenerator).
 - **`slang-coverage-merge`** — combine multiple LCOV inputs (e.g.
   one per CI host) into a single merged LCOV using max-aggregation.
-  Pipe the result through the renderer for a unified report.
+  LCOV-only; for JSON input, render each per-OS file to its own
+  HTML and skip the merger. Pipe the merged LCOV through the
+  renderer for a unified report.
 
-Both are **deliberately project-neutral**: they consume any standard
-LCOV file. Project-specific filtering (e.g. exclude rules for a
-particular code base) belongs in a thin wrapper around them — see
-`tools/coverage/` for the Slang wrapper that injects slangc-only
-filters and Slang's GitHub Actions runner path roots.
+Both are **deliberately project-neutral**: they consume standard
+LCOV or `llvm-cov` JSON exports. Project-specific filtering
+(e.g. exclude rules for a particular code base) belongs in a thin
+wrapper around them — see `tools/coverage/` for the Slang wrapper
+that injects slangc-only filters and Slang's GitHub Actions
+runner path roots.
 
-> **Branch coverage from `llvm-cov export -format=lcov` runs
-> below `llvm-cov report`.** The export emits more BRDA records
-> than the report counts (the report tool collapses some
-> templated/inlined entries that the LCOV form keeps separate),
-> so LCOV-derived branch numbers come in lower. The fix is the
-> `--auth-summary` flag: pass an `llvm-cov report` text dump and
-> per-file totals are taken from the report instead of derived
-> from the LCOV. With it, branch / function / line numbers match
-> the report exactly. Without it, branches are still useful but
-> not directly comparable to a `llvm-cov report` number.
+## Picking an input format
+
+| Producer | Recommended input | Why |
+| -------- | ----------------- | --- |
+| `llvm-cov` on Linux/macOS C++ | `llvm-cov export -format=json` | Native regions, lossless branches/functions, totals match `llvm-cov report` by construction |
+| Shader coverage (`shader-coverage-to-lcov.py`) | LCOV `.info` | Producer emits LCOV natively |
+| Windows OpenCppCoverage → Cobertura → LCOV | LCOV `.info` | No JSON variant available upstream |
+
+> **Why not just always feed LCOV?** `llvm-cov export -format=lcov`
+> is lossy on the LLVM path: regions are missing entirely, BRDA
+> over-emits relative to `llvm-cov report`'s branch count, and
+> FNDA undercounts inlined functions. The historical workaround
+> was the `--auth-summary` flag, which patches per-file totals
+> from an `llvm-cov report` text dump alongside the LCOV. The JSON
+> path sidesteps that entirely — same `.profdata`, full fidelity,
+> single file, no patch step. Use the JSON path whenever the
+> producer is `llvm-cov`; the LCOV path remains the right input
+> for shader coverage and for Windows where Cobertura is the
+> upstream format. `--auth-summary` is rejected on JSON input
+> because the JSON `summary` block is already authoritative.
 
 ## Quick start
 
-### Render one LCOV
+### Render one coverage file
 
 ```bash
+# LCOV input (shader coverage, Windows path).
 python3 tools/coverage-html/slang-coverage-html.py coverage.lcov
 # → writes ./coverage-html/index.html
+
+# `llvm-cov export -format=json` input (Linux/macOS C++ path).
+# Native regions; matches `llvm-cov report` by construction.
+python3 tools/coverage-html/slang-coverage-html.py coverage.json
+
 open coverage-html/index.html       # macOS
 xdg-open coverage-html/index.html   # Linux
 start coverage-html\index.html      # Windows
@@ -64,8 +85,9 @@ supported today:
 
 1. **Shader coverage** — `examples/shader-coverage-demo` produces
    `coverage.lcov`; this renderer turns it into HTML.
-2. **Compiler C++ coverage on Linux/macOS** — `llvm-cov export
--format=lcov` → this renderer.
+2. **Compiler C++ coverage on Linux/macOS** — `llvm-cov export`
+   (JSON, the default) → this renderer. (`-format=lcov` is also
+   supported but lossy; prefer JSON.)
 3. **Compiler C++ coverage on Windows** — `OpenCppCoverage` →
    Cobertura → (converter) → LCOV → this renderer.
 
@@ -75,7 +97,12 @@ don't promise support for every LCOV extension in the wild.
 ## Options — `slang-coverage-html`
 
 ```
-slang-coverage-html <input.lcov> [options]
+slang-coverage-html <input> [options]
+
+<input>                LCOV (.info, .lcov, .info.gz, .lcov.gz) or
+                       llvm-cov JSON export (.json, .json.gz).
+                       Format picked by extension; anything not
+                       ending in .json[.gz] is treated as LCOV.
 
 --output-dir PATH      Output directory (default: ./coverage-html/)
 --title TEXT           Page title (default: "Coverage report")
@@ -87,13 +114,19 @@ slang-coverage-html <input.lcov> [options]
 --filter-exclude-regex REGEX  Exclude Python regex (repeatable).
 --auth-summary FILE    Override LCOV-derived per-file totals with the
                        authoritative numbers from an `llvm-cov report`
-                       text dump (e.g. CI's source of truth).
+                       text dump (e.g. CI's source of truth). LCOV
+                       input only — rejected with an error when the
+                       input is JSON, since the JSON `summary` block
+                       is already authoritative for those numbers.
 --quiet                Suppress progress output
 ```
 
-Function and branch columns render automatically when the input LCOV
-carries `FN:` / `FNDA:` / `BRDA:` records. No flag needed to enable
-them — they disappear again when the LCOV has none.
+Function, branch, and region columns render automatically when the
+input carries the data — `FN:` / `FNDA:` / `BRDA:` records on the
+LCOV path, or non-zero `summary.{functions,branches,regions}` on
+the JSON path. No flag needed to enable any of them; they disappear
+again when the input has none. Region totals are LLVM-only and
+appear on the JSON path or on `--auth-summary`-enriched LCOV.
 
 ## Options — `slang-coverage-merge`
 
@@ -166,9 +199,15 @@ arguments to the generic tool.
 
 ## Methodology vs `llvm-cov report`
 
-Our percentages are computed from raw LCOV records, with one
-deliberate adjustment so the numbers line up with CI's published
-per-platform metrics:
+> The notes below describe the **LCOV input path**. On the **JSON
+> input path**, all four metrics (lines / functions / branches /
+> regions) come straight from the per-file `summary` block in the
+> JSON export, so they match `llvm-cov report` by construction —
+> no methodology gap, no `--auth-summary` needed.
+
+On the LCOV path, our percentages are computed from raw LCOV
+records, with one deliberate adjustment so the numbers line up
+with CI's published per-platform metrics:
 
 - **Functions** are deduped by `(file, first_line)`. Each LCOV `FN:`
   record carries a mangled name, and the `llvm-cov export` step
@@ -244,6 +283,7 @@ later runs:
 | **2**  | Branch coverage (`BRDA:`) summary (header + index column); function coverage (`FN:`/`FNDA:`) summary (header + index column)                                                                                                                                                                    | **Shipped**                   |
 | **2b** | Inline per-line branch column between hit count and source. Collapsed `(hit/total)` summary with tier-colored span (`branchAll` green, `branchPart` amber, `branchNone` red) and per-branch tooltip (`title="br0: N; br1: N; br2: -"`). Gutter widens only on files that carry any BRDA records | **Shipped**                   |
 | **2c** | Per-file Functions table moved into the index as an expandable row (chevron + hidden `<tr class="fileFunctions">` revealed by a tiny inline JS toggle). Per-file pages drop the Functions table; their header still shows the Functions summary metric                                          | **Shipped**                   |
+| **2d** | `llvm-cov export -format=json` accepted as input alongside LCOV; Region Coverage column auto-shows whenever input data carries it. JSON path drops the `--auth-summary` patching step — totals match `llvm-cov report` natively                                                                 | **Shipped**                   |
 | 3      | Per-test `TN:` drill-down; per-test tabs on file pages                                                                                                                                                                                                                                          | Aggregated (max-across) today |
 
 Phase 2b preserves phase-1 byte-identical rendering when a file has
@@ -287,22 +327,29 @@ across every platform our customers run.
 python3 -m unittest discover -s tools/coverage-html/tests -v
 ```
 
-108 unit + integration tests across `tests/test_lcov_io.py`,
-`tests/test_renderer.py`, and `tests/test_merge.py` cover: LCOV
-parsing (incl. TN: max-aggregation, corrupt-input detection,
-unknown-record tolerance, BRDA with `-` tokens, FN/FNDA join-by-
-name), `llvm-cov report` text parsing + auth-summary override,
-source resolution (path variants, caching, miss → placeholder),
-filter globs + regexes (composition rules), tier thresholds,
-function/branch percent calcs, per-line branch-cell rendering
-(empty / all-taken / partial / none / not-evaluated), CLI round-
-trip, empty-input rendering, idempotency modulo timestamp,
-foreign-dir overwrite guard, phase-1-regression check against the
-real-data phase-2 fixture, plus merge-tool path normalization
-(forward-slash, longest-prefix-wins), max-aggregation (lines,
-branches, functions, auth summaries), absent-vs-zero handling,
-gzipped-input auto-decompression, file-output mode, and end-to-end
-"merge → render" smoke.
+Unit + integration tests across `tests/test_lcov_io.py`,
+`tests/test_llvm_cov_json.py`, `tests/test_renderer.py`, and
+`tests/test_merge.py` cover: LCOV parsing (incl. TN: max-aggregation,
+corrupt-input detection, unknown-record tolerance, BRDA with `-`
+tokens, FN/FNDA join-by-name), `llvm-cov report` text parsing +
+auth-summary override (now with regions), `llvm-cov export
+-format=json` parsing (per-file summary → totals, segment-driven
+line hits, native branch/function/region population, gzipped input
+auto-decompress, malformed/wrong-type guards), source resolution
+(path variants, caching, miss → placeholder), filter globs +
+regexes (composition rules), tier thresholds, function/branch/
+region percent calcs, per-line branch-cell rendering (empty /
+all-taken / partial / none / not-evaluated), Regions column
+conditional rendering (present on JSON input, absent on bare LCOV
+to keep phase-1 byte-identical), `--auth-summary` mutex with JSON
+input, CLI round-trip, empty-input rendering, idempotency modulo
+timestamp, foreign-dir overwrite guard, phase-1-regression check
+against the real-data phase-2 fixture, plus merge-tool path
+normalization (forward-slash, longest-prefix-wins), max-aggregation
+(lines, branches, functions, regions, auth summaries), absent-vs-
+zero handling (incl. Windows-no-regions case), gzipped-input
+auto-decompression, file-output mode, JSON-input refusal in the
+merger, and end-to-end "merge → render" smoke.
 
 The Slang wrapper at `tools/coverage/` carries an additional 13
 tests (`tools/coverage/tests/test_slang_filters.py`) for the
@@ -345,12 +392,15 @@ tools/coverage-html/
 ├── lcov_io.py                     # shared parser / writer / data model
 │                                  #   + SourceResolver, function-coverage
 │                                  #   helpers, llvm-cov report parser /
-│                                  #   AuthSummary merger / writer
+│                                  #   AuthSummary merger / writer, Region
+├── llvm_cov_json.py               # `llvm-cov export -format=json` parser
+│                                  #   producing the same FileRecord shape
 ├── style.css                      # inlined into every page at render time
 ├── script.js                      # toggle / chrome-measure JS, same
 ├── README.md                      # this file
 └── tests/
     ├── test_lcov_io.py            # parser + data model + helpers
+    ├── test_llvm_cov_json.py      # JSON parser tests
     ├── test_renderer.py           # HTML rendering + CLI integration
     ├── test_merge.py              # merger unit + integration tests
     └── fixtures/
@@ -361,6 +411,7 @@ tools/coverage-html/
         ├── slangc-llvm-cov-sample.info  # real-data BRDA + FN/FNDA fixture
         ├── branches-and-functions.info  # small hand-crafted phase-2 fixture
         ├── llvm-cov-report-sample.txt   # auth-summary parser fixture
+        ├── llvm-cov-json-sample.json    # llvm-cov JSON parser fixture
         ├── empty.info
         ├── corrupt-bad-da.info
         ├── mixed-paths.info

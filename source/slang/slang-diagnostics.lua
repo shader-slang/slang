@@ -1043,6 +1043,13 @@ err(
     span { loc = "location", message = "cannot use a stage name in '__target_switch', use '__stage_switch' for stage-specific code." }
 )
 
+warning(
+    "spirv-layout-sensitive-type-in-asm",
+    29116,
+    "layout-sensitive SPIR-V type declaration in spirv_asm",
+    span { loc = "location", message = "layout-sensitive SPIR-V type declaration '~opcode' in spirv_asm may not preserve Slang data-layout information; form layout-sensitive pointers/values with Slang types or expressions and pass them into spirv_asm instead" }
+)
+
 
 -- Load semantic checking diagnostics (part 1)
 -- (inlined from slang-diagnostics-semantic-checking-1.lua)
@@ -1202,6 +1209,13 @@ standalone_note(
     30049,
     "attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification",
     span { loc = "expr:Expr" }
+)
+
+warning(
+    "potentially-aliased-out-parameter",
+    30051,
+    "potentially aliased argument to 'out'/'inout'/'ref' parameter",
+    span { loc = "firstArg:Expr", message = "argument for '~direction1' parameter '~param1:Name' may alias argument for '~direction2' parameter '~param2:Name'; passing the same value to both may produce unexpected results" }
 )
 
 err(
@@ -1955,7 +1969,7 @@ err(
     "forward-reference-in-generic-constraint",
     30117,
     "forward reference in generic constraint",
-    span { loc = "expr:Expr", message = "generic constraint for parameter '~param:Type' references type parameter '~referenced:Decl' before it is declared" }
+    span { loc = "expr:Expr", message = "generic constraint for parameter '~param:Type' references parameter '~referenced:Decl' before it is declared" }
 )
 
 err(
@@ -1963,6 +1977,20 @@ err(
     30118,
     "cannot mix differentiable value types with differentiable pointer outputs",
     span { loc = "location", message = "function has both IDifferentiable value types and IDifferentiablePtrType outputs, which is not currently supported. Please split the function so that differentiable value parameters and pointer differentiable outputs are in separate functions." }
+)
+
+warning(
+    "cannot-synthesize-dadd-dzero-for-custom-differential",
+    30123,
+    "cannot synthesize complete differential method",
+    span { loc = "typeDecl:Decl", message = "cannot synthesize a complete '~methodName:Name' for type '~typeDecl' because its 'Differential' type contains fields that are not differentiable. Provide a user-defined '~methodName:Name' implementation." }
+)
+
+err(
+    "forward-reference-in-generic-default-initializer",
+    30122,
+    "forward reference in generic default initializer",
+    span { loc = "expr:Expr", message = "generic default initializer for parameter '~param:Decl' references parameter '~referenced:Decl' before it is declared" }
 )
 
 
@@ -2782,6 +2810,13 @@ err(
     span { loc = "decl:Decl", message = "static const variable '~decl' must have an initializer" }
 )
 
+err(
+    "static-const-global-non-constant-init",
+    31226,
+    "static const global initializer must be a compile-time constant",
+    span { loc = "decl:Decl", message = "initializer of static const global '~decl' does not evaluate to a compile-time constant" }
+)
+
 -- 3123x - Modifiers and Deprecation (part 2)
 
 err(
@@ -2808,10 +2843,27 @@ err(
 )
 
 err(
+    "anonymous-scoped-enum",
+    32001,
+    "anonymous scoped enum is not allowed",
+    span { loc = "classLocation", message = "'class' keyword specifies a scoped enumeration" }
+)
+
+err(
     "unexpected-enum-tag-expr",
     32003,
     "unexpected enum tag expression",
     span { loc = "expr:Expr", message = "unexpected form for 'enum' tag value expression" }
+)
+
+warning(
+    "enum-case-implicit-tag-value-overflow",
+    32006,
+    "implicit enum case value overflows underlying tag type",
+    span {
+        loc = "decl:Decl",
+        message = "implicit value for enum case '~decl' overflows tag type '~tagType:Type' and wraps around",
+    }
 )
 
 -- 303xx: interfaces and associated types
@@ -3175,6 +3227,13 @@ warning(
     30521,
     "initializing an interface variable with defaults is deprecated and may cause unexpected behavior",
     span { loc = "expr:Expr", message = "initializing an interface variable with defaults is deprecated and may cause unexpected behavior. Please provide a compatible initializer or leave the variable uninitialized" }
+)
+
+err(
+    "interface-default-initializer-error",
+    30524,
+    "cannot initialize an interface variable with defaults",
+    span { loc = "expr:Expr", message = "initializing an interface variable with defaults is not supported. Please provide a compatible initializer or leave the variable uninitialized" }
 )
 
 --
@@ -4099,7 +4158,7 @@ err(
     "cannot-use-resource-type-in-structured-buffer",
     38204,
     "resource type in StructuredBuffer",
-    span { loc = "location", message = "StructuredBuffer element type '~type:IRInst' cannot contain resource or opaque handle types" }
+    span { loc = "location", message = "StructuredBuffer element type '~type:IRInst' must not be a resource type or contain an opaque handle type" }
 )
 
 err(
@@ -4565,6 +4624,13 @@ warning(
     span { loc = "location", message = "left shift amount exceeds the number of bits and the result will be always zero, (`~lhsType:IRInst' << `~shiftAmount:Int`)." }
 )
 
+warning(
+    "operator-shift-on-narrow-type",
+    41034,
+    "left shift on narrow integer type",
+    span { loc = "location", message = "left shift on narrow integer type '~lhsType:IRInst'; unlike C/C++, Slang does not promote narrow integers before shifting. If a wider result is needed, cast the left operand to a wider type first (e.g., uint(x) << n)." }
+)
+
 err(
     "unsupported-use-of-l-value-for-auto-diff",
     41901,
@@ -4627,6 +4693,25 @@ err(
     "coverage-pass-through-incompatible",
     45104,
     "`-trace-coverage` cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation"
+)
+
+err(
+    "coverage-uniform-layout-unavailable",
+    45105,
+    "could not resolve the CPU/CUDA uniform layout for `__slang_coverage`"
+)
+
+err(
+    "coverage-binding-option-out-of-range",
+    45106,
+    "coverage binding option value is out of range",
+    span { loc = "location", message = "option '~option' expects a value in range 0..2147483647, but got '~parsedValue:Int'." }
+)
+
+warning(
+    "coverage-reserved-space-ignored",
+    45107,
+    "`-trace-coverage-reserved-space` does not apply to this target; ignoring reserved spaces"
 )
 
 -- 41xxx - Semantic checking (continued)
@@ -4993,7 +5078,7 @@ fatal(
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 
--- Metal and WGSL (56101-56105)
+-- Metal or WGSL (56101-56109)
 
 err(
     "resource-types-in-constant-buffer-in-parameter-block-not-allowed-on-metal",
@@ -5035,6 +5120,27 @@ err(
     56106,
     "texture format '~format' does not support '~accessMode' access for storage textures in WGSL",
     span { loc = "location" }  -- No span message: source location is not available at emit time
+)
+
+warning(
+    "multisampled-subpass-input-not-supported-on-metal",
+    56107,
+    "Metal does not support per-sample SubpassLoad; the sample index will be ignored",
+    span { loc = "location", message = "Metal framebuffer fetch does not support per-sample reads. The sample index is ignored and the resolved value is returned." }
+)
+
+err(
+    "subpass-input-used-outside-entry-point",
+    56108,
+    "SubpassInput used outside of the fragment entry point function",
+    span { loc = "location", message = "on Metal, SubpassInput can only be used from the fragment entry point or from functions that are inlined into it. If this reference is inside a helper function, ensure it is not marked [noinline]." }
+)
+
+err(
+    "subpass-input-in-parameter-block-not-allowed-on-metal",
+    56109,
+    "SubpassInput in ParameterBlock not supported on Metal",
+    span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
 )
 
 -- SPIRV (57001-57004)
@@ -5254,6 +5360,13 @@ fatal(
 )
 
 
+err(
+    "class-type-not-supported",
+    39031,
+    "class types are not supported in type layout",
+    span { loc = "location", message = "class type '~name' is not supported; use 'struct' instead" }
+)
+
 -- Load semantic checking diagnostics (part 17) - Standalone notes for cross-referencing
 -- (inlined from slang-diagnostics-semantic-checking-17.lua)
 
@@ -5416,4 +5529,3 @@ if #validation_errors > 0 then
 end
 
 return processed_diagnostics
-

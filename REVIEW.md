@@ -18,14 +18,14 @@ Agents will read these files directly — do NOT embed the full diff in agent pr
 
 Classify changed files to decide which reviewers to dispatch:
 
-| Reviewer | Dispatch when changed files match | Skip when |
-|----------|----------------------------------|-----------|
-| `code-quality-reviewer` | **Always** — every PR gets this | Never skip |
-| `ir-correctness-reviewer` | `source/slang/slang-ir-*.cpp`, `slang-lower-*.cpp`, `slang-check-*.cpp`, `*.meta.slang`, `slang-ir-insts.lua` | Only tests/docs/build changes |
-| `security-code-reviewer` | `source/**/*.cpp`, `source/**/*.h` (any C++ source) | Only tests/docs/build changes |
-| `test-coverage-reviewer` | **Always** — every PR gets this | Never skip |
-| `cross-backend-reviewer` | `source/slang/slang-emit-*.cpp`, `prelude/**`, `*.meta.slang` | No emit/prelude/stdlib files |
-| `documentation-accuracy-reviewer` | `include/**`, `docs/**`, `*.meta.slang`, or PR touches public API | Only internal refactors with no API/doc surface |
+| Reviewer                          | Dispatch when changed files match                                                                             | Skip when                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `code-quality-reviewer`           | **Always** — every PR gets this                                                                               | Never skip                                      |
+| `ir-correctness-reviewer`         | `source/slang/slang-ir-*.cpp`, `slang-lower-*.cpp`, `slang-check-*.cpp`, `*.meta.slang`, `slang-ir-insts.lua` | Only tests/docs/build changes                   |
+| `security-code-reviewer`          | `source/**/*.cpp`, `source/**/*.h` (any C++ source)                                                           | Only tests/docs/build changes                   |
+| `test-coverage-reviewer`          | **Always** — every PR gets this                                                                               | Never skip                                      |
+| `cross-backend-reviewer`          | `source/slang/slang-emit-*.cpp`, `prelude/**`, `*.meta.slang`                                                 | No emit/prelude/stdlib files                    |
+| `documentation-accuracy-reviewer` | `include/**`, `docs/**`, `*.meta.slang`, or PR touches public API                                             | Only internal refactors with no API/doc surface |
 
 **Minimum**: `code-quality-reviewer` + `test-coverage-reviewer` always run.
 **Typical**: 4-6 reviewers for source changes. 2 for test-only or doc-only PRs.
@@ -37,6 +37,7 @@ Agent(subagent_type="<reviewer>", run_in_background=true, ...)
 ```
 
 Each agent's prompt MUST include:
+
 - The PR number, repo name, title, and linked issue (if any)
 - "Read `tmp/pr-diff.patch` for the full diff and `tmp/pr-files.txt` for the changed file list"
 - "Read CLAUDE.md for project context"
@@ -48,21 +49,40 @@ Each agent's prompt MUST include:
 
 Wait for all 6 background agents to complete. You will be automatically notified as each one finishes.
 
-Once ALL 6 have returned findings, combine them and filter:
-- Drop false positives and low-value findings
-- Drop formatting/style issues (CI enforces via `./extras/formatting.sh`)
-- Merge duplicates across teammates
-- Keep only findings with confidence >= 80
+Once ALL 6 have returned findings, build the editorial table below, **fill every column for every Keep row**, and post only Keep rows.
+
+| Source agent | file:line | Severity | Confidence | Evidence / verification quote | User-visible impact | Keep / Drop |
+
+Rules (applied in order, before any posting):
+
+1. **Evidence quote is mandatory for every Keep row.** Paste a verbatim snippet from the diff or surrounding source that _supports the title's claim of a plausible bug mechanism on the quoted lines_. The quote does not have to prove the full causal chain end-to-end; it must make the title plausible on the quoted code. If the quote cannot support the title as written, rewrite the title to match the quote, or mark Drop. No Keep row may ship with an empty Evidence quote. **If Rule 4 applies** (the finding depends on unverified language/runtime semantics), include the verification quote from source/test/doc in the same column, prefixed with `Verification:` so both quotes are distinguishable.
+
+2. **Severity rules (applied strictly):**
+   - 🔴 **Bug** — requires a concrete failing input, UB, crash, data loss, or public API-contract break. State the input and the wrong behavior. "Could be wrong" or "might break" is not a bug.
+   - 🟡 **Gap** — requires one of: (a) missing test for a changed behavior, naming the new behavior; (b) public API contradiction (docstring vs impl, interface vs default), naming the contradicting lines; (c) **silent behavior change in an IR pass, emitter, peephole, or layout/legalization rule, even without a concrete failing test** — quote the diff line that changes the behavior and name the visible difference (e.g. `sizeof(T, DefaultDataLayout)` returning Natural-rule size before, LLVM-rule size after). Vague "inconsistency" without a named behavior → Drop.
+   - 🔵 **Question** — post ONLY if the PR cannot be judged without author intent AND you name the exact binary decision the author must make. "Is this intentional?" without a decision → convert to a Gap with a concrete expected-vs-actual mismatch, or Drop.
+
+3. **Confidence floor (applied after severity):** Drop Bug/Gap with confidence < 85. Drop Question with confidence < 90. Confidence is _your model confidence that the severity rule above is satisfied_, not how likely the author agrees. **Multi-subagent override:** if two or more subagents independently flag the same file:line cluster (±5 lines) with compatible severity, and at least one subagent reports confidence ≥ 75, keep the finding even if other subagents report lower confidence — convergence is signal.
+
+4. **Verification gate:** Drop any finding that depends on unverified language/runtime semantics (Slang exceptions, interface conformance, CUDA capability gates, target prelude availability) unless you quoted the source/test/doc that verifies it. No verification quote → Drop.
+
+5. **Dedup + bundling:** Merge duplicates across teammates. Group closely related consistency nits (missing `static`/`override`/`public`, docstring polish) into one comment; do not post low-impact maintainability items as separate inline threads.
+
+6. **CI-enforced drops:** Drop formatting/style issues (`./extras/formatting.sh`) and anything already caught by existing CI.
+
+A finding that fails any rule above is marked Drop in the table. Do not post Drop rows. Do not post findings that were not in the table.
 
 ## Step 4: Analyze changes for the review
 
 Before writing, prepare two things:
 
 **A) Group changes by feature/module** (for PRs touching 3+ files):
+
 - Example: "SER capability handling" = `slang-emit-spirv.cpp` + `slang-capability.cpp` + `tests/spirv/ser-*.slang`
 - This goes into the "Changes Overview" section
 
 **B) For each finding, prepare a detailed explanation**:
+
 - What the code did BEFORE this PR (or what it does now that's wrong)
 - What the IMPACT is (concrete scenario, example inputs/outputs, which users hit this)
 - What the FIX should be (specific, actionable)
@@ -151,6 +171,7 @@ The review body is the SUMMARY. The detailed analysis goes in inline comments. U
 Omit the Findings section if there are 0 findings. Changes Overview is ALWAYS included.
 
 ### Severity badges:
+
 - 🔴 **Bug** — correctness issue, crash, UB, or security vulnerability
 - 🟡 **Gap** — missing backend/test/doc coverage, inconsistency
 - 🔵 **Question** — intent unclear, needs author clarification
