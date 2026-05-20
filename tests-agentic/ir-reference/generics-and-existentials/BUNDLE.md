@@ -87,6 +87,27 @@ shapes.
 | `interface-req-this-type.slang` | functional | `#interfacereqentry` |
 | `interface-lists-req-entries.slang` | functional | `#interfacereqentry` |
 | `global-generic-param.slang` | functional | `#generic-application` |
+| `specialize-two-type-params.slang` | boundary | `#specialize` |
+| `specialize-four-type-params.slang` | boundary | `#specialize` |
+| `specialize-value-param.slang` | boundary | `#specialize` |
+| `specialize-no-constraint.slang` | boundary | `#specialize` |
+| `specialize-multi-constraint.slang` | boundary | `#specialize` |
+| `global-generic-param-with-constraint.slang` | boundary | `#generic-application` |
+| `empty-interface-witness-table.slang` | boundary | `#witness-tables-and-witness-facts` |
+| `empty-interface-no-req-entries.slang` | boundary | `#interfacereqentry` |
+| `witness-table-three-method-rows.slang` | boundary | `#witnesstable-and-witnesstableentry` |
+| `interface-three-req-entries.slang` | boundary | `#interfacereqentry` |
+| `lookup-witness-multi-method-dispatch.slang` | boundary | `#lookupwitness-lookupwitnessmethod` |
+| `make-existential-vector-payload.slang` | boundary | `#makeexistential` |
+| `make-existential-struct-payload.slang` | boundary | `#makeexistential` |
+| `recursive-generic-depth-two.slang` | boundary | `#generic-application` |
+| `stress-eight-type-params.slang` | stress | `#specialize` |
+| `stress-recursive-generic-depth-five.slang` | stress | `#generic-application` |
+| `stress-many-specialize-call-sites.slang` | stress | `#specialize` |
+| `stress-specialize-with-existential-payload.slang` | stress | `#specialize` |
+| `negative-constraint-not-satisfied.slang` | negative | `#specialize` |
+| `negative-zero-type-args-no-inference.slang` | negative | `#specialize` |
+| `negative-undefined-type-arg.slang` | negative | `#specialize` |
 
 ## Out of scope (no-GPU runner)
 
@@ -167,3 +188,32 @@ this bundle.
   is what carries the (interface, implementing-type) pair —
   this is observable at LOWER-TO-IR and is a stable hook for
   FileCheck.
+- The `### Generic application` row for `global_generic_param`
+  does not say whether a constrained module-scope generic
+  (`type_param T : IFoo;`) is supported. Empirically the
+  LOWER-TO-IR stage produces a second `let %3 :
+  witness_table_t(%IFoo) = global_generic_param` line, but a
+  later compiler pass crashes (segfault) before SPIR-V emission
+  completes. The doc should either bless the form (and document
+  the dual `global_generic_param` shape) or call it out as
+  unsupported. A separate `negative-` test was not added because
+  the failure mode is a process crash rather than a diagnostic.
+- The `### specialize` row's operand list `base, arg, ...` does
+  not distinguish type arguments from compile-time integer
+  value arguments. Empirically integer literals appear as
+  `N : Int` operands inside `specialize(...)`. A one-line note
+  in the row would clarify that the operand list is
+  type-or-value, not type-only.
+- The `### specialize` notable-opcode prose says the opcode is
+  hoistable but does not give a per-arity ceiling. Empirically
+  the dump accepts arities up to at least 8 type parameters
+  without truncation or change-of-spelling. A "no compiler-side
+  arity cap" sentence would prevent test authors from probing
+  for one.
+- The doc does not describe what `### makeExistential` does
+  when the concrete-type payload is itself an aggregate
+  (struct, vector, array). Empirically the result-type slot
+  remains `%I` regardless of payload shape and the value
+  operand is the aggregate's IR value. A "payload shape is
+  opaque to the opcode" note would clarify the result-type
+  invariant.

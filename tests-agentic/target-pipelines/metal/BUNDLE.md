@@ -154,6 +154,33 @@ scope on the no-GPU runner.
 | `texture-binding-positional-zero.slang`                    | functional | `#phase-d-metal-emit-and-downstream-tools`                |
 | `numthreads-not-an-emitted-attribute.slang`                | negative   | `#phase-d-metal-emit-and-downstream-tools`                |
 | `downstream-stops-at-text-no-metallib.slang`               | negative   | `#downstream-apple-metal-compiler`                        |
+| `uint-max-plus-one-wraps-to-zero.slang`                    | boundary   | `#phase-d-metal-emit-and-downstream-tools`                |
+| `int-max-literal-emits-verbatim.slang`                     | boundary   | `#phase-d-metal-emit-and-downstream-tools`                |
+| `int-min-literal-emits-negative.slang`                     | boundary   | `#phase-d-metal-emit-and-downstream-tools`                |
+| `float-positive-infinity-divide.slang`                     | boundary   | `#phase-d-metal-emit-and-downstream-tools`                |
+| `half-precision-boundary-survives.slang`                   | boundary   | `#phase-d-metal-emit-and-downstream-tools`                |
+| `bitcast-uint-to-float.slang`                              | boundary   | `#phase-c-metal-legalization-lowering-phi-elimination`    |
+| `asuint-float-bitcast-direction.slang`                     | boundary   | `#phase-c-metal-legalization-lowering-phi-elimination`    |
+| `buffer-binding-index-fifteen.slang`                       | stress     | `#phase-d-metal-emit-and-downstream-tools`                |
+| `buffer-binding-eight-buffer-pressure.slang`               | stress     | `#phase-d-metal-emit-and-downstream-tools`                |
+| `texture-and-sampler-paired-at-zero.slang`                 | boundary   | `#phase-d-metal-emit-and-downstream-tools`                |
+| `sampler-binding-index-one.slang`                          | boundary   | `#phase-d-metal-emit-and-downstream-tools`                |
+| `vk-binding-ignored-positional-wins.slang`                 | boundary   | `#phase-d-metal-emit-and-downstream-tools`                |
+| `groupshared-scalar-threadgroup-pointer.slang`             | boundary   | `#specializeaddressspaceformetal`                         |
+| `groupshared-struct-array-threadgroup.slang`               | boundary   | `#specializeaddressspaceformetal`                         |
+| `groupshared-float4-vector-threadgroup.slang`              | boundary   | `#specializeaddressspaceformetal`                         |
+| `multiple-groupshared-vars-threadgroup-each.slang`         | boundary   | `#specializeaddressspaceformetal`                         |
+| `groupshared-array-256-stress.slang`                       | stress     | `#specializeaddressspaceformetal`                         |
+| `numthreads-one-one-one-still-emits-kernel.slang`          | boundary   | `#phase-d-metal-emit-and-downstream-tools`                |
+| `numthreads-1024-one-one-emits-kernel.slang`               | boundary   | `#phase-d-metal-emit-and-downstream-tools`                |
+| `numthreads-zero-x-rejected.slang`                         | negative   | `#phase-d-metal-emit-and-downstream-tools`                |
+| `cbuffer-row-major-matrix-storage.slang`                   | boundary   | `#wrapcbufferelementsformetal`                            |
+| `cbuffer-column-major-matrix-storage.slang`                | boundary   | `#wrapcbufferelementsformetal`                            |
+| `multiple-cbuffers-positional-buffer-indices.slang`        | boundary   | `#wrapcbufferelementsformetal`                            |
+| `large-local-array-256-stress.slang`                       | stress     | `#phase-d-metal-emit-and-downstream-tools`                |
+| `deeply-nested-control-flow-stress.slang`                  | stress     | `#eliminatephis-with-default-options`                     |
+| `enum-with-int-max-collapses-to-literal.slang`             | boundary   | `#phase-a-link-and-entry-point-prep`                      |
+| `append-structured-buffer-rejected-on-metal.slang`         | negative   | `#phase-b-specialization-and-type-legalization`           |
 
 ## Doc gaps observed
 

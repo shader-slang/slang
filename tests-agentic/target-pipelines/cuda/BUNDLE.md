@@ -101,9 +101,54 @@ Phase A/B/C/D tables that can be observed in
 | `line-directive-survives.slang`                 | functional | `#phase-d-cuda-emit-and-downstream-tools`                   |
 | `no-register-binding-on-cuda.slang`             | functional | `#cuda-specific-runtime-predicates`                         |
 | `device-function-decoration.slang`              | functional | `#phase-d-cuda-emit-and-downstream-tools`                   |
+| `add-uint32-max-wrap.slang`                     | boundary   | `#phase-d-cuda-emit-and-downstream-tools`                   |
+| `int-min-emit.slang`                            | boundary   | `#phase-d-cuda-emit-and-downstream-tools`                   |
+| `int-max-emit.slang`                            | boundary   | `#phase-d-cuda-emit-and-downstream-tools`                   |
+| `float-positive-zero-emit.slang`                | boundary   | `#phase-d-cuda-emit-and-downstream-tools`                   |
+| `float-nan-emit.slang`                          | boundary   | `#phase-d-cuda-emit-and-downstream-tools`                   |
+| `float-infinity-emit.slang`                     | boundary   | `#phase-d-cuda-emit-and-downstream-tools`                   |
+| `half-largest-finite-emit.slang`                | boundary   | `#phase-d-cuda-emit-and-downstream-tools`                   |
+| `ldg-on-static-index-zero.slang`                | boundary   | `#lowerimmutablebufferloadforcuda`                          |
+| `ldg-on-runtime-bounded-index.slang`            | boundary   | `#lowerimmutablebufferloadforcuda`                          |
+| `ldg-on-struct-per-field-runtime-bound.slang`   | boundary   | `#lowerimmutablebufferloadforcuda`                          |
+| `atomic-add-uint-max-wrap.slang`                | boundary   | `#phase-c-cuda-legalization-lowering-phi-elimination`       |
+| `atomic-add-int-max.slang`                      | boundary   | `#phase-c-cuda-legalization-lowering-phi-elimination`       |
+| `atomic-add-contention-64-threads.slang`        | stress     | `#phase-c-cuda-legalization-lowering-phi-elimination`       |
+| `numthreads-one-one-one.slang`                  | boundary   | `#phase-d-cuda-emit-and-downstream-tools`                   |
+| `numthreads-1024-one-one.slang`                 | boundary   | `#phase-d-cuda-emit-and-downstream-tools`                   |
+| `numthreads-zero-rejected-diag.slang`           | negative   | `#phase-d-cuda-emit-and-downstream-tools`                   |
+| `groupshared-scalar-to-device-shared.slang`     | boundary   | `#phase-d-cuda-emit-and-downstream-tools`                   |
+| `groupshared-struct-to-device-shared.slang`     | boundary   | `#phase-d-cuda-emit-and-downstream-tools`                   |
+| `texture-sample-at-zero-zero.slang`             | boundary   | `#phase-b-specialization-and-type-legalization`             |
+| `texture-sample-at-one-one.slang`               | boundary   | `#phase-b-specialization-and-type-legalization`             |
+| `texture-sample-at-nan-nan.slang`               | boundary   | `#phase-b-specialization-and-type-legalization`             |
+| `inout-pointer-at-int-max.slang`                | boundary   | `#undoparametercopy-and-transformparamstoconstref`          |
+| `array-return-rewrite-n-one.slang`              | boundary   | `#phase-c-cuda-legalization-lowering-phi-elimination`       |
+| `array-return-rewrite-n-sixteen.slang`          | boundary   | `#phase-c-cuda-legalization-lowering-phi-elimination`       |
+| `stress-eight-buffer-params.slang`              | stress     | `#phase-a-link-and-entry-point-prep`                        |
+| `stress-deeply-nested-control-flow.slang`       | stress     | `#eliminatephis-with-default-options`                       |
+| `stress-recursive-function-rejected.slang`      | negative   | `#phase-b-specialization-and-type-legalization`             |
 
 ## Doc gaps observed
 
+- The doc does not pin the specific CUDA-prelude macros and helper
+  symbols (`SLANG_INFINITY`, `__half(...)`, `make_float2`, `tex2DLod`,
+  `FixedArray<T, N>`) that the emitter relies on for numeric and
+  texture boundaries. The boundary tests anchor each through its
+  parent claim section, but a single doc table listing
+  "prelude-symbol → emit-shape" would let boundary tests reference
+  the symbols directly.
+- The doc does not state how out-of-range signed-integer literals
+  (e.g. `int8_t(128)`) are handled by the CUDA pipeline: observed
+  behavior is silent two's-complement wrap with no diagnostic, but
+  the source doc does not anchor this. No negative test was added
+  for this boundary; the documented contract is missing.
+- The doc does not specify the upper-bound for `[numthreads(N,1,1)]`
+  on CUDA emit. Observed: N=1024 (CUDA hardware max-per-dim)
+  compiles cleanly; N=0 is rejected at check time (diagnostic
+  `E31102`). The boundary tests anchor the positive ends to the
+  Phase D emit-wrapping claim, but the upper-bound number is not
+  documented.
 - The doc's Phase D table mentions `CUDASourceEmitter` but does not
   name `#include "slang-cuda-prelude.h"` or
   `extern "C" __global__ void` as the canonical CUDA emit-prelude

@@ -77,6 +77,35 @@ with `-target wgsl -entry main -stage compute` against the
 | `texture2d-binding.slang`                             | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
 | `uint3-becomes-vec3-u32.slang`                        | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
 | `vector-logical-and-becomes-select.slang`             | functional | `#legalizelogicalandor`                                          |
+| `append-structured-buffer-rejected.slang`             | negative   | `#phase-b-specialization-and-type-legalization`                  |
+| `array-index-out-of-bounds-rejected.slang`            | negative   | `#phase-b-specialization-and-type-legalization`                  |
+| `atomic-int-add.slang`                                | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `atomic-uint-add-max-value.slang`                     | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `binding-15-group-3-high.slang`                       | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `binding-zero-group-zero.slang`                       | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `byte-address-buffer-load-offset-zero.slang`          | boundary   | `#legalizebyteaddressbufferops-with-wgsl-options`                |
+| `constant-buffer-matrix-std140-wrapper.slang`         | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `float-nan-via-helper.slang`                          | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `float-positive-and-negative-zero.slang`              | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `float-vector-with-infinity.slang`                    | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `groupshared-array-256-elements.slang`                | boundary   | `#specializeaddressspaceforwgsl`                                 |
+| `integer-literal-int-max.slang`                       | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `integer-literal-int-min.slang`                       | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `integer-literal-uint-max.slang`                      | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `integer-literal-uint-zero.slang`                     | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `interlocked-add-rejected.slang`                      | negative   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `large-array-1024-elements.slang`                     | stress     | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `matrix-storage-rectangular-3x4.slang`                | boundary   | `#phase-c-wgsl-legalization-lowering-phi-elimination`            |
+| `matrix-storage-square-2x2.slang`                     | boundary   | `#phase-c-wgsl-legalization-lowering-phi-elimination`            |
+| `multi-combined-texture-sampler-pairs.slang`          | boundary   | `#phase-b-specialization-and-type-legalization`                  |
+| `multi-resources-many-bindings-stress.slang`          | stress     | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `nested-branches-five-deep-phi.slang`                 | stress     | `#eliminatephis-with-default-options`                            |
+| `numthreads-256-1-1-webgpu-max.slang`                 | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `numthreads-3d-product-256.slang`                     | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `numthreads-one-one-one-minimum.slang`                | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `numthreads-zero-rejected.slang`                      | negative   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `storage-uniform-explicit-address-space.slang`        | boundary   | `#specializeaddressspaceforwgsl`                                 |
+| `vec3-padding-trailing-field.slang`                   | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
 
 ## Doc gaps observed
 
