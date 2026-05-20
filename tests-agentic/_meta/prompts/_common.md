@@ -266,6 +266,11 @@ masks per-target regressions; a multi-target test catches them.
   the "Suggested annotations" output — even a single token mismatch
   (`entry point` vs `entrypoint`) will fail the test and waste an
   iteration round.
+- The `//CHECK:` annotation must appear on the source line
+  **immediately following** the offending source line — not several
+  lines downstream. The matcher is position-based; placement matters.
+- Type-mismatch diagnostics span a range (`^^^^`, multi-caret), not
+  a single caret. Copy the exact width from "Suggested annotations".
 - The runner's "Suggested annotations" output (when a test fails) is
   the **source of truth** for exact line + column positions. Hand-
   counting carets is unreliable; copy from suggested annotations.
