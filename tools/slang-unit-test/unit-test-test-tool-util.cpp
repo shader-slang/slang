@@ -31,9 +31,14 @@ SLANG_UNIT_TEST(testToolUtilBareArgv0)
     SLANG_CHECK(SLANG_SUCCEEDED(TestToolUtil::getExeDirectoryPath("", emptyResult)));
     SLANG_CHECK(emptyResult == Path::getParentDirectory(Path::getExecutablePath()));
 
-    // Path-like but unresolvable — hasPath() == true, getCanonical fails, must fall through.
+#if !SLANG_WINDOWS_FAMILY
+    // Path-like but unresolvable on POSIX — hasPath() == true, realpath() fails for a
+    // non-existent path, so the function must fall through to Path::getExecutablePath().
+    // On Windows _wfullpath() does not validate existence, so this branch cannot be
+    // triggered with a simple missing path there.
     String missingResult;
     SLANG_CHECK(SLANG_SUCCEEDED(
         TestToolUtil::getExeDirectoryPath("/nonexistent/dir/slang-test", missingResult)));
     SLANG_CHECK(missingResult == Path::getParentDirectory(Path::getExecutablePath()));
+#endif
 }
