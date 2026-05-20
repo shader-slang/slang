@@ -12,6 +12,35 @@ import subprocess
 from typing import Any
 
 
+# Tier 1 (`parse_graph`) workflows: full YAML fetch + graph-node materialization
+# + (eventually) build_stats artifacts. Matched by display `name:` field, not
+# filename — that's what GitHub's `on: workflow_run:` clause uses.
+#
+# Everything else that reaches the ingester is Tier 2 (`record_only`): concrete
+# jobs only, NULL graph columns. The `ci-telemetry.yml` `on: workflow_run:`
+# filter is the union of both tiers; the dispatch happens here.
+#
+# MaterialX Integration Tests is intentionally NOT in Tier 1: it's
+# workflow_call:-only, so it never fires its own workflow_run event. Its jobs
+# arrive transitively via CI's caller_node rows.
+PARSE_GRAPH_WORKFLOWS: frozenset[str] = frozenset({
+    "CI",
+    "CMake Options",
+    "Falcor Tests",
+    "Falcor Compiler Perf-Test",
+    "RTX Remix Shaders (Nightly)",
+    "Sascha Willems Vulkan Shaders (Nightly)",
+    "VK-GL-CTS Nightly",
+})
+
+
+def workflow_tier(workflow_name: str | None) -> str:
+    """Return 'parse_graph' or 'record_only' for a workflow's display name."""
+    if workflow_name in PARSE_GRAPH_WORKFLOWS:
+        return "parse_graph"
+    return "record_only"
+
+
 def gh_api(path: str) -> dict[str, Any]:
     """Single GH API call returning parsed JSON."""
     proc = subprocess.run(

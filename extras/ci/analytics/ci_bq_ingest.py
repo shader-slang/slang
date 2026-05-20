@@ -33,6 +33,7 @@ from _bq_ingest_lib import (
     rk_direct_node,
     rk_step,
     rk_workflow_run,
+    workflow_tier,
 )
 from workflow_parser import JobSpec, WorkflowSpec, fetch_workflow_yaml
 
@@ -233,10 +234,93 @@ def aggregate_graph_timing(children: list[dict[str, Any]]) -> dict[str, Any]:
 # ---------- Main ingest ----------
 
 
+def _emit_steps_for_job(
+    out: dict[str, list[dict[str, Any]]],
+    api_job: dict[str, Any],
+    *,
+    run_id: int,
+    run_attempt: int,
+    run_created_at: str | None,
+) -> None:
+    """Append job_steps rows for one API job. Shared by both tiers."""
+    job_id = api_job["id"]
+    for step in api_job.get("steps") or []:
+        step_number = step.get("number")
+        if step_number is None:
+            continue
+        out["job_steps"].append(
+            {
+                "row_key": rk_step(job_id, step_number),
+                "job_id": job_id,
+                "run_id": run_id,
+                "run_attempt": run_attempt,
+                "run_created_at": run_created_at,
+                "step_number": step_number,
+                "step_name": step.get("name"),
+                "conclusion": step.get("conclusion"),
+                "started_at": step.get("started_at"),
+                "completed_at": step.get("completed_at"),
+                "duration_seconds": _duration(step),
+            }
+        )
+
+
+def _tier2_concrete_row(
+    api_job: dict[str, Any],
+    *,
+    run_id: int,
+    run_attempt: int,
+    workflow_file: str | None,
+    run_created_at: str | None,
+) -> dict[str, Any]:
+    """Build a Tier 2 (record_only) concrete_job row. All graph columns NULL.
+
+    Tier 2 workflows don't get their YAML parsed, so we have no caller-side
+    keys, no needs[] edges, and no matrix axes. Querying these rows still
+    works for hosted-runner concurrency and conclusion/duration analytics
+    because workflow_name is joinable through (run_id, run_attempt) on
+    workflow_runs.
+    """
+    return {
+        "row_key": rk_concrete(api_job["id"]),
+        "job_id": api_job["id"],
+        "run_id": run_id,
+        "run_attempt": run_attempt,
+        "name": api_job.get("name"),
+        "caller_workflow_file": workflow_file,
+        "caller_job_key": None,
+        "called_workflow_file": None,
+        "called_job_key": None,
+        "node_kind": "concrete_job",
+        "graph_instance_key": None,
+        "needs": [],
+        "conclusion": api_job.get("conclusion"),
+        "started_at": api_job.get("started_at"),
+        "completed_at": api_job.get("completed_at"),
+        "duration_seconds": _duration(api_job),
+        "queue_wait_seconds": _queue_wait(api_job),
+        "runner_name": api_job.get("runner_name"),
+        "runner_labels": api_job.get("labels") or [],
+        "job_type": None,
+        "matrix_os": None,
+        "matrix_arch": None,
+        "matrix_compiler": None,
+        "matrix_config": None,
+        "matrix_gpu_tier": None,
+        "run_created_at": run_created_at,
+    }
+
+
 def build_rows(
     repo: str, run_id: int, run_attempt: int
-) -> tuple[dict[str, list[dict[str, Any]]], int]:
-    """Return (rows-keyed-by-table-name, api_job_count)."""
+) -> tuple[dict[str, list[dict[str, Any]]], int, str]:
+    """Return (rows-keyed-by-table-name, api_job_count, tier).
+
+    Dispatches on the workflow's display name: Tier 1 (parse_graph) fetches
+    YAML and materializes graph nodes; Tier 2 (record_only) emits concrete
+    rows only with NULL graph columns. See PARSE_GRAPH_WORKFLOWS in
+    _bq_ingest_lib.py for the Tier 1 list.
+    """
     out: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
     # workflow_runs (1 row)
@@ -245,12 +329,35 @@ def build_rows(
     head_sha = wfr_row["head_sha"]
     workflow_file = wfr_row["workflow_file"]
     run_created_at = wfr_row["created_at"]
-
-    # YAML at head_sha (data only).
-    workflow_spec = fetch_workflow_yaml(repo, workflow_file, head_sha)
+    tier = workflow_tier(wfr_row.get("workflow_name"))
 
     # All concrete jobs in the attempt.
     api_jobs = fetch_concrete_jobs(repo, run_id, run_attempt)
+
+    if tier == "record_only":
+        for api_job in api_jobs:
+            out["jobs"].append(
+                _tier2_concrete_row(
+                    api_job,
+                    run_id=run_id,
+                    run_attempt=run_attempt,
+                    workflow_file=workflow_file,
+                    run_created_at=run_created_at,
+                )
+            )
+            _emit_steps_for_job(
+                out,
+                api_job,
+                run_id=run_id,
+                run_attempt=run_attempt,
+                run_created_at=run_created_at,
+            )
+        return out, len(api_jobs), tier
+
+    # Tier 1 path: full graph materialization below.
+
+    # YAML at head_sha (data only).
+    workflow_spec = fetch_workflow_yaml(repo, workflow_file, head_sha)
 
     # Group concrete jobs by caller-side YAML key. Each group becomes one
     # graph-node row (caller_node or direct_node).
@@ -398,27 +505,15 @@ def build_rows(
                 }
             )
 
-            for step in api_job.get("steps") or []:
-                step_number = step.get("number")
-                if step_number is None:
-                    continue
-                out["job_steps"].append(
-                    {
-                        "row_key": rk_step(job_id, step_number),
-                        "job_id": job_id,
-                        "run_id": run_id,
-                        "run_attempt": run_attempt,
-                        "run_created_at": run_created_at,
-                        "step_number": step_number,
-                        "step_name": step.get("name"),
-                        "conclusion": step.get("conclusion"),
-                        "started_at": step.get("started_at"),
-                        "completed_at": step.get("completed_at"),
-                        "duration_seconds": _duration(step),
-                    }
-                )
+            _emit_steps_for_job(
+                out,
+                api_job,
+                run_id=run_id,
+                run_attempt=run_attempt,
+                run_created_at=run_created_at,
+            )
 
-    return out, len(api_jobs)
+    return out, len(api_jobs), tier
 
 
 def _normalize_uses(uses: str | None) -> str | None:
@@ -500,6 +595,7 @@ def validate(
     rows: dict[str, list[dict[str, Any]]],
     *,
     api_job_count: int | None = None,
+    tier: str = "parse_graph",
 ) -> list[str]:
     """Structural sanity checks on emitted rows.
 
@@ -507,6 +603,11 @@ def validate(
     returned for this attempt. We use it to catch the silent-empty-output
     regression where every concrete job goes unresolved → 0 graph rows emit
     → validation passes despite zero useful data.
+
+    `tier` selects the rule set: 'parse_graph' (Tier 1) requires every
+    concrete row to have exactly one needs[] entry pointing at its graph
+    node, while 'record_only' (Tier 2) expects no graph rows at all and
+    empty needs[] on concrete rows.
     """
     errors: list[str] = []
     jobs = rows.get("jobs", [])
@@ -521,8 +622,21 @@ def validate(
             "matrix expansion pattern."
         )
 
+    if tier == "record_only" and graph_row_keys:
+        errors.append(
+            f"Tier 2 (record_only) ingest emitted {len(graph_row_keys)} graph "
+            "rows; expected 0. Tier 2 must not materialize graph nodes."
+        )
+
     for r in jobs:
         if r["node_kind"] == "concrete_job":
+            if tier == "record_only":
+                if r["needs"]:
+                    errors.append(
+                        f"Tier 2 concrete row {r['job_id']} ({r['name']}) has "
+                        f"needs[]={r['needs']}, expected empty list."
+                    )
+                continue
             if not r["needs"]:
                 errors.append(
                     f"concrete row {r['job_id']} ({r['name']}) has empty needs[]"
@@ -594,16 +708,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
-    rows, api_job_count = build_rows(args.repo, args.run_id, args.run_attempt)
+    rows, api_job_count, tier = build_rows(args.repo, args.run_id, args.run_attempt)
 
     if args.validate:
-        errs = validate(rows, api_job_count=api_job_count)
+        errs = validate(rows, api_job_count=api_job_count, tier=tier)
         if errs:
             for e in errs:
                 sys.stderr.write(f"validation error: {e}\n")
             return 1
         sys.stderr.write(
-            f"validation OK: {len(rows.get('workflow_runs', []))} workflow_runs, "
+            f"validation OK [{tier}]: {len(rows.get('workflow_runs', []))} workflow_runs, "
             f"{len(rows.get('jobs', []))} jobs ("
             f"{sum(1 for r in rows.get('jobs', []) if r['node_kind'] != 'concrete_job')} graph, "
             f"{sum(1 for r in rows.get('jobs', []) if r['node_kind'] == 'concrete_job')} concrete), "
