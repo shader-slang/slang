@@ -2610,11 +2610,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto elementType = constantBufferType->getElementType();
                 SLANG_ASSERT(as<IRStructType>(elementType));
                 builder.addDecorationIfNotExist(elementType, kIROp_SPIRVBlockDecoration);
+                auto dataLayout = constantBufferType->getDataLayout();
+                if (!dataLayout)
+                    dataLayout = builder.getDefaultBufferLayoutType();
                 t->replaceUsesWith(builder.getPtrType(
                     elementType,
                     AccessQualifier::Immutable,
                     AddressSpace::Uniform,
-                    constantBufferType->getDataLayout()));
+                    dataLayout));
             }
         }
         for (auto t : textureFootprintTypes)
