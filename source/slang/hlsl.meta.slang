@@ -176,23 +176,12 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load a 32-bit unsigned integer or value with type of `T` from the buffer at the specified location.
-    ///@param T The type of the value to load from the buffer.
+    /// Load a 32-bit unsigned integer from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return The value loaded from the buffer.
-    ///
-    ///@remarks
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
+    ///@return The 32-bit unsigned integer loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint Load(int location)
     {
         __target_switch
@@ -203,6 +192,18 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load a 32-bit unsigned integer from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return The 32-bit unsigned integer loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
@@ -214,24 +215,12 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load two 32-bit unsigned integers from the buffer at the specified location
-    /// with additional alignment.
-    ///@param location The input address in bytes.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
+    /// Load two 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return Two 32-bit unsigned integers loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint2 Load2(uint location)
     {
         __target_switch
@@ -242,19 +231,40 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load2`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load2";
+        case hlsl:
+            return Load2(location);
         default:
             return __byteAddressBufferLoad<uint2>(this, location, alignment);
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
@@ -266,14 +276,12 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load two 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of stride of `uint2`, which is 8.
-    ///@param location The input address in bytes, which must be a multiple of alignment of 8. Invalid
-    /// value of location will cause undefined behavior.
-    ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 8.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint2 Load2Aligned(uint location)
     {
         __target_switch
@@ -286,21 +294,10 @@ struct ByteAddressBuffer
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint3 Load3(uint location)
     {
         __target_switch
@@ -311,19 +308,40 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load3`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load3";
+        case hlsl:
+            return Load3(location);
         default:
             return __byteAddressBufferLoad<uint3>(this, location, alignment);
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
@@ -335,13 +353,12 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load three 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of stride of `uint3`, which is 12.
-    ///@param location The input address in bytes which must be a multiple of alignment of 12.
-    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint3 Load3Aligned(uint location)
     {
         __target_switch
@@ -353,21 +370,11 @@ struct ByteAddressBuffer
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes which must be a multiple of alignment of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint4 Load4(uint location)
     {
         __target_switch
@@ -378,19 +385,40 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load4`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load4";
+        case hlsl:
+            return Load4(location);
         default:
             return __byteAddressBufferLoad<uint4>(this, location, alignment);
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
@@ -402,13 +430,12 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load four 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint4`, which is 16.
-    ///@param location The input address in bytes which must be a multiple of alignment of 16.
-    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 16.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint4 Load4Aligned(uint location)
     {
         __target_switch
@@ -419,27 +446,46 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load a value with type `T` from the buffer at the specified location.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@return The value loaded from the buffer.
+    ///@remarks
+    /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
+    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
     [__readNone]
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
     }
 
+    /// Load a value with type `T` from the buffer at the specified location with a known alignment.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@return The value loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
+    /// On other targets, `alignment` is forwarded to the lowered load instruction.
     [__readNone]
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     T LoadAligned<T>(uint location, uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
 
-    /// Load an element with type `T` from the buffer at the specified location with alignment of `T`.
-    ///@param location The input address in bytes which must be a multiply of size of `T`.
-    ///@return T value with type `T` loaded from the buffer.
+    /// Load a value with type `T` from the buffer at the specified location with natural alignment.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of the natural stride of `T`.
+    ///@return The value loaded from the buffer.
     ///@remarks
-    ///Currently, this function only supports when `T` is scalar, vector or matrix type.
+    /// Currently, this function only supports when `T` is scalar, vector or matrix type.
     [__readNone]
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     T LoadAligned<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
@@ -5804,28 +5850,33 @@ struct StructuredBuffer : IArray<T>
         stride = rs.y;
     }
 
-    /// Load a element from the buffer at the specified location.
+    /// Load an element from the buffer at the specified location.
+    /// @param TIndex Type of the index.
+    /// @param location The index of buffer.
+    /// @return The element at the specified index.
+    __intrinsic_op($(kIROp_StructuredBufferLoad))
+    [__readNone]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer)]
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
+
+    /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param location The index of buffer.
     /// @param[out] status The status of the operation.
     /// @return The element at the specified index.
     ///
     /// @remarks
+    /// This function is only supported when targeting HLSL.
     /// You can't access the output parameter `status` directly; instead,
     /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
     /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
     /// Gather, or Load operation accessed mapped tiles in a tiled resource.
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    __intrinsic_op($(kIROp_StructuredBufferLoad))
-    [__readNone]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer)]
-    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
-
     __intrinsic_op($(kIROp_StructuredBufferLoadStatus))
     [require(hlsl, structuredbuffer)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
-    /// Load a element from the buffer at the specified location.
+    /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param index The index of buffer.
     /// @return The element at the specified index.
@@ -5834,7 +5885,7 @@ struct StructuredBuffer : IArray<T>
     {
         [__readNone]
         __intrinsic_op($(kIROp_StructuredBufferLoad))
-        [require(cpp_cuda_glsl_hlsl_spirv_llvm, structuredbuffer)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer)]
         get;
     };
 };
@@ -5983,23 +6034,12 @@ struct $(item.name)
         }
     }
 
-    /// Load a 32-bit unsigned integer or value with type of `T` from the buffer at the specified location.
-    ///@param T The type of the value to load from the buffer.
+    /// Load a 32-bit unsigned integer from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return The value loaded from the buffer.
-    ///
-    ///@remarks
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
+    ///@return The 32-bit unsigned integer loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint Load(int location)
     {
         __target_switch
@@ -6010,9 +6050,21 @@ struct $(item.name)
         }
     }
 
+    /// Load a 32-bit unsigned integer from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return The 32-bit unsigned integer loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl)]
+    [require(hlsl, byteaddressbuffer_rw)]
     uint Load(int location, out uint status)
     {
         __target_switch
@@ -6021,24 +6073,12 @@ struct $(item.name)
         }
     }
 
-    /// Load two 32-bit unsigned integers from the buffer at the specified location
-    /// with additional alignment.
-    ///@param location The input address in bytes.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
+    /// Load two 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return Two 32-bit unsigned integers loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint2 Load2(uint location)
     {
         __target_switch
@@ -6049,26 +6089,34 @@ struct $(item.name)
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load2`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load2";
+        case hlsl:
+            return Load2(location);
         default:
             return __byteAddressBufferLoad<uint2>(this, location, alignment);
         }
     }
 
-    /// Load two 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint2`, which is 8.
-    ///@param location The input address in bytes, which must be a multiple of alignment of 8.
-    ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 8.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint2 Load2Aligned(uint location)
     {
         __target_switch
@@ -6079,9 +6127,21 @@ struct $(item.name)
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl)]
+    [require(hlsl, byteaddressbuffer_rw)]
     uint2 Load2(uint location, out uint status)
     {
         __target_switch
@@ -6092,21 +6152,10 @@ struct $(item.name)
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint3 Load3(uint location)
     {
         __target_switch
@@ -6117,26 +6166,34 @@ struct $(item.name)
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load3`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load3";
+        case hlsl:
+            return Load3(location);
         default:
             return __byteAddressBufferLoad<uint3>(this, location, alignment);
         }
     }
 
-    /// Load three 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint3`, which is 12.
-    ///@param location The input address in bytes which must be a multiple of alignment of 12.
-    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint3 Load3Aligned(uint location)
     {
         __target_switch
@@ -6147,9 +6204,21 @@ struct $(item.name)
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl)]
+    [require(hlsl, byteaddressbuffer_rw)]
     uint3 Load3(uint location, out uint status)
     {
         __target_switch
@@ -6159,21 +6228,11 @@ struct $(item.name)
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes which must be a multiple of alignment of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint4 Load4(uint location)
     {
         __target_switch
@@ -6184,26 +6243,34 @@ struct $(item.name)
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load4`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load4";
+        case hlsl:
+            return Load4(location);
         default:
             return __byteAddressBufferLoad<uint4>(this, location, alignment);
         }
     }
 
-    /// Load four 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint4`, which is 16.
-    ///@param location The input address in bytes which must be a multiple of alignment of 16.
-    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 16.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint4 Load4Aligned(uint location)
     {
         __target_switch
@@ -6214,9 +6281,21 @@ struct $(item.name)
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl)]
+    [require(hlsl, byteaddressbuffer_rw)]
     uint4 Load4(uint location, out uint status)
     {
         __target_switch
@@ -6225,30 +6304,46 @@ struct $(item.name)
         }
     }
 
+    /// Load a value with type `T` from the buffer at the specified location.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@return The value loaded from the buffer.
+    ///@remarks
+    /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
+    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
     }
 
+    /// Load a value with type `T` from the buffer at the specified location with a known alignment.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@return The value loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
+    /// On other targets, `alignment` is forwarded to the lowered load instruction.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     T LoadAligned<T>(uint location, uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
 
-    /// Load an element with type `T` from the buffer at the specified location with alignment of `T`.
-    ///@param location The input address in bytes which must be a multiple of size of `T`.
-    ///@return T value with type `T` loaded from the buffer.
+    /// Load a value with type `T` from the buffer at the specified location with natural alignment.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of the natural stride of `T`.
+    ///@return The value loaded from the buffer.
     ///@remarks
-    ///Currently, this function only supports when `T` is scalar, vector, or matrix type.
+    /// Currently, this function only supports when `T` is scalar, vector, or matrix type.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     T LoadAligned<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
@@ -7014,28 +7109,34 @@ struct $(item.name) : IRWArray<T>
     [require(hlsl)]
     uint IncrementCounter();
 
-    /// Load a element from the buffer at the specified location.
+    /// Load an element from the buffer at the specified location.
+    /// @param TIndex Type of the index.
+    /// @param location The index of buffer.
+    /// @return The element at the specified index.
+    [__NoSideEffect]
+    __intrinsic_op($(kIROp_RWStructuredBufferLoad))
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer_rw)]
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
+
+    /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param location The index of buffer.
     /// @param[out] status The status of the operation.
     /// @return The element at the specified index.
     ///
     /// @remarks
+    /// This function is only supported when targeting HLSL.
     /// You can't access the output parameter `status` directly; instead,
     /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
     /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
     /// Gather, or Load operation accessed mapped tiles in a tiled resource.
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
-    [__NoSideEffect]
-    __intrinsic_op($(kIROp_RWStructuredBufferLoad))
-    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
-
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoadStatus))
+    [require(hlsl, structuredbuffer_rw)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
-    /// Load a element from the buffer at the specified location.
+    /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param index The index of buffer.
     /// @return The element at the specified index.
@@ -7048,6 +7149,7 @@ struct $(item.name) : IRWArray<T>
         [__NoSideEffect]
         [nonmutating]
         __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer_rw)]
         ref;
     }
 };
