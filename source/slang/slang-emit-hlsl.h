@@ -148,6 +148,7 @@ protected:
     void _emitHLSLDecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val);
     void _emitHLSLDecorationSingleFloat(const char* name, IRFunc* entryPoint, IRFloatLit* val);
 
+    bool _shouldEmitPayloadAccessQualifiers();
     void _emitStageAccessSemantic(IRStageAccessDecoration* decoration, const char* name);
 
     // HLSL prelude strings for built-in helper functions injected at the top of emitted output.

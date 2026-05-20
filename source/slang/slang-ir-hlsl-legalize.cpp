@@ -12,6 +12,54 @@
 namespace Slang
 {
 
+static void addDefaultPayloadAccessQualifiersToField(
+    IRBuilder& builder,
+    IRStructKey* fieldKey,
+    IRType* fieldType)
+{
+    // Nested ray-payload structs carry their own payload annotations.
+    if (fieldType->findDecoration<IRRayPayloadDecoration>())
+        return;
+
+    if (fieldKey->findDecoration<IRStageReadAccessDecoration>() ||
+        fieldKey->findDecoration<IRStageWriteAccessDecoration>())
+    {
+        return;
+    }
+
+    IRInst* stageNames[] = {
+        builder.getStringValue(UnownedStringSlice("caller")),
+        builder.getStringValue(UnownedStringSlice("anyhit")),
+        builder.getStringValue(UnownedStringSlice("closesthit")),
+        builder.getStringValue(UnownedStringSlice("miss")),
+    };
+
+    builder.addDecoration(
+        fieldKey,
+        kIROp_StageReadAccessDecoration,
+        stageNames,
+        SLANG_COUNT_OF(stageNames));
+    builder.addDecoration(
+        fieldKey,
+        kIROp_StageWriteAccessDecoration,
+        stageNames,
+        SLANG_COUNT_OF(stageNames));
+}
+
+static void addDefaultPayloadAccessQualifiersToStruct(IRBuilder& builder, IRStructType* structType)
+{
+    for (auto field : structType->getFields())
+    {
+        addDefaultPayloadAccessQualifiersToField(builder, field->getKey(), field->getFieldType());
+    }
+}
+
+static void addRayPayloadDecorationIfNeeded(IRBuilder& builder, IRType* type)
+{
+    if (!type->findDecoration<IRRayPayloadDecoration>())
+        builder.addRayPayloadDecoration(type);
+}
+
 void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* inst)
 {
     for (auto child : inst->getChildren())
@@ -42,7 +90,12 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
                     {
                         call->setArg(i, arg->getOperand(0));
                         if (isForcedRayPayloadStruct)
-                            builder.addRayPayloadDecoration(forceStructBaseType);
+                        {
+                            addRayPayloadDecorationIfNeeded(builder, forceStructBaseType);
+                            addDefaultPayloadAccessQualifiersToStruct(
+                                builder,
+                                cast<IRStructType>(forceStructBaseType));
+                        }
                         continue;
                     }
 
@@ -65,10 +118,17 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
                     StringBuilder structName;
                     builder.addNameHintDecoration(structType, UnownedStringSlice(typeNameHint));
                     if (isForcedRayPayloadStruct)
-                        builder.addRayPayloadDecoration(structType);
+                        addRayPayloadDecorationIfNeeded(builder, structType);
 
                     auto elementBufferKey = builder.createStructKey();
                     builder.addNameHintDecoration(elementBufferKey, UnownedStringSlice("data"));
+                    if (isForcedRayPayloadStruct)
+                    {
+                        addDefaultPayloadAccessQualifiersToField(
+                            builder,
+                            elementBufferKey,
+                            forceStructBaseType);
+                    }
                     auto _dataField = builder.createStructField(
                         structType,
                         elementBufferKey,
