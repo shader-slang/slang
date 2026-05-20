@@ -11973,12 +11973,15 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
                 auto subType = getSub(m_astBuilder, substConstraintDeclRef);
                 auto supType = getSup(m_astBuilder, substConstraintDeclRef);
 
+                // getSub/getSup should always succeed on a fully-checked optional constraint.
+                SLANG_ASSERT(subType && supType);
                 if (subType && supType)
                 {
                     // Add an equivalent optional constraint to the alias's own generic
                     // so that `Baz<float>` can resolve it against float's conformances.
                     auto synConstraintDecl = m_astBuilder->create<GenericTypeConstraintDecl>();
                     synConstraintDecl->nameAndLoc = constraintDecl->getNameAndLoc();
+                    synConstraintDecl->loc = constraintDecl->loc;
                     synConstraintDecl->parentDecl = parentGenericDecl;
                     synConstraintDecl->isEqualityConstraint = constraintDecl->isEqualityConstraint;
                     synConstraintDecl->sub = TypeExp(subType);
