@@ -1743,7 +1743,7 @@ alias sm_6_0_version = _sm_6_0
 /// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_0 = sm_6_0_version
-             |  GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_shuffle + GL_KHR_shader_subgroup_arithmetic + GL_KHR_shader_subgroup_quad + GL_KHR_shader_subgroup_vote
+             |  GL_KHR_shader_subgroup_basic + GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_shuffle + GL_KHR_shader_subgroup_arithmetic + GL_KHR_shader_subgroup_quad + GL_KHR_shader_subgroup_vote
              // previous
              | sm_5_1
              ;
