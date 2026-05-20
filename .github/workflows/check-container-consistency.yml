@@ -25,8 +25,11 @@ jobs:
           echo ""
 
           # Extract all container images from workflow files
+          # Exclude ci-slang-test-cuda-versions.yml which intentionally uses
+          # different image tags for multi-CUDA-version testing.
           images=$(grep -h "image: ghcr.io/shader-slang/slang-linux-gpu-ci" \
             .github/workflows/*-container.yml 2>/dev/null \
+            | grep -v "cuda" \
             | sed 's/.*image: //' \
             | sed 's/^[[:space:]]*//' \
             | sort -u)

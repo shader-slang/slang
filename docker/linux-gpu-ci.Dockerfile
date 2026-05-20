@@ -1,19 +1,25 @@
 # Linux GPU CI Container Image
 #
-# Base image with CUDA 13.0.1 for GPU testing on self-hosted runners
-# Requires driver 580.65.06 or newer
+# Base image with CUDA for GPU testing on self-hosted runners.
+# Default CUDA version is 13.0.1 (requires driver 580.65.06 or newer).
 #
 # Used by:
 # - .github/workflows/ci-slang-build-container.yml
 # - .github/workflows/ci-slang-test-container.yml
+# - .github/workflows/ci-slang-test-cuda-versions.yml (CUDA 12.5 variant)
 #
-# Build and push:
-#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1 .
-#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
+# Build and push (default CUDA 13.0.1):
+#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.0 .
+#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.0
+#
+# Build and push (CUDA 12.5):
+#   docker build --build-arg CUDA_VERSION=12.5.1 -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.0-cuda12.5 .
+#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.0-cuda12.5
 #
 # IMPORTANT: After pushing a new version, update all references in:
 #   - .github/workflows/ci-slang-build-container.yml
 #   - .github/workflows/ci-slang-test-container.yml
+#   - .github/workflows/ci-slang-test-cuda-versions.yml
 #   - .github/workflows/ci-slangpy-tests-container.yml
 #
 # Find all references:
@@ -21,7 +27,8 @@
 #
 # The check-container-consistency.yml workflow will verify all references match.
 
-FROM nvidia/cuda:13.0.1-devel-ubuntu22.04
+ARG CUDA_VERSION=13.0.1
+FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu22.04
 
 # Install essential tools required for GitHub Actions
 # - curl: for downloading dependencies
@@ -104,5 +111,5 @@ RUN echo "=== Installed Tools ===" && \
 
 # Set labels for identification
 LABEL org.opencontainers.image.source=https://github.com/shader-slang/slang
-LABEL org.opencontainers.image.description="Slang Linux GPU CI container with CUDA 13.0.1"
+LABEL org.opencontainers.image.description="Slang Linux GPU CI container"
 LABEL org.opencontainers.image.licenses=MIT

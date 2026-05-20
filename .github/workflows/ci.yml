@@ -152,6 +152,14 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "build"]'
 
+  # CUDA 12.5 compatibility tests (Linux, containerized, non-blocking)
+  test-cuda-12-5-linux-release:
+    needs: [filter, build-linux-release-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test-cuda-versions.yml
+    with:
+      config: release
+
   # Linux tests (self-hosted GPU runner, containerized)
   test-linux-debug-gcc-x86_64:
     needs: [filter, build-linux-debug-gcc-x86_64]
