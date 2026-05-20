@@ -170,7 +170,9 @@ the claim against every feasible backend, not just one:**
 This is how the suite gains backend coverage. A single-target test
 masks per-target regressions; a multi-target test catches them.
 
-### Lessons captured from the pilot bundle (syntax-reference/tokens)
+### Lessons captured from earlier bundles
+
+#### From the pilot (syntax-reference/tokens)
 
 - `slangi` printf does **not** support `%s`. For string-typed claims,
   use `//TEST:SIMPLE(filecheck=CHECK):-target cpp` and FileCheck the
@@ -181,6 +183,58 @@ masks per-target regressions; a multi-target test catches them.
 - `static const int x = N;` at file scope, then read in `main`, is the
   cleanest pattern for asserting compile-time-known values without
   buffer plumbing.
+
+#### FileCheck pattern gotchas
+
+- **`[[...]]` is a FileCheck regex-variable reference**, not literal
+  text. Metal `[[kernel]]`, HLSL `[[vk::binding(...)]]`, and Vulkan
+  semantic annotations in emitted code cannot be checked with a
+  literal `[[kernel]]` pattern — FileCheck reports
+  `undefined variable: kernel`. Use a bare substring (e.g. `kernel`)
+  or escape the brackets.
+- **DCE strips locally-unused code before SPIR-V emit** (and most
+  other backends). To observe a computed value in emitted text, the
+  value must escape — write it to an `RWStructuredBuffer` parameter,
+  return it from an entry point, or use it in a side-effecting
+  printf/atomic. A pure-internal computation is removed before the
+  CHECK can see it.
+- **Identifier mangling varies per target.** A Slang local `a` may
+  appear as `a_0` in HLSL, `globalParams_0.a_0` in CUDA via param-
+  block lowering, or `__ldg(&...->a_0)` in CUDA via read-only buffer
+  lowering. Use FileCheck wildcards like `a_{{[0-9]+}}` rather than
+  literal `a_0`.
+
+#### `-dump-ir` directive (when observing IR instructions)
+
+- Combine `-dump-ir` with **`-target <text-target>`** AND **`-o /dev/null`**.
+  Without `-target` the compile stops early; without `-o /dev/null` the
+  target text mixes with IR on stdout and FileCheck fails. With both,
+  IR goes to stdout and target text is discarded.
+- **Constant folding** collapses literal-arithmetic before IR can be
+  observed. To observe `add(%a, %b)` in IR, pass operands as `uniform`
+  function parameters (or read them from a buffer) rather than as
+  literal integers.
+- **Trivial locals are eliminated** during initial lowering. The `var`
+  opcode survives in IR when the local is a struct accessed by field
+  address, but a plain `int x = a;` is collapsed.
+
+#### `DIAGNOSTIC_TEST` directive (for negative / "is rejected" claims)
+
+- The `non-exhaustive` flag is an **argument** to the directive's
+  argument list, not a directive prefix:
+  `//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):` — not
+  `//DIAGNOSTIC_TEST(non-exhaustive):SIMPLE(diag=CHECK):`.
+- The runner **rejects** `non-exhaustive` when all diagnostics in the
+  test happen to be matched. Omit the flag in that case.
+- The runner's "Suggested annotations" output (when a test fails) is
+  the **source of truth** for exact line + column positions. Hand-
+  counting carets is unreliable; copy from suggested annotations.
+- **Caret `^` placement** in `//CHECK:` requires the caret column to
+  be `>= 10` (the `//CHECK:` prefix consumes columns 1–9). For tokens
+  in columns 1–9, use the block-comment form: `/*CHECK: ... */`.
+- **Some diagnostics attach to unexpected lines** (e.g. missing-return
+  attaches to the function signature line, not the return statement).
+  Look at the actual compiler output before placing annotations.
 
 ## Slang command line — quick reminders
 
