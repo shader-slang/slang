@@ -108,7 +108,6 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
 
                     builder.setInsertBefore(call->getCallee());
                     auto structType = builder.createStructType();
-                    StringBuilder structName;
                     builder.addNameHintDecoration(structType, UnownedStringSlice(typeNameHint));
                     if (isForcedRayPayloadStruct)
                         addRayPayloadDecorationIfNeeded(builder, structType);
