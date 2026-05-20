@@ -475,6 +475,8 @@ IRInst* DifferentiableTypeConformanceContext::buildDifferentiablePairWitness(
 
         auto addMethod = builder->createFunc();
         auto zeroMethod = builder->createFunc();
+        builder->addForceInlineDecoration(addMethod);
+        builder->addForceInlineDecoration(zeroMethod);
 
         table = builder->createWitnessTable(
             sharedContext->differentiableInterfaceType,
