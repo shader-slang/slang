@@ -10,15 +10,15 @@ Overview
 Shader coverage has two separate jobs:
 
 1. insert execution counters into generated shader code
-2. let the host discover the counter buffer and map counter slots back
-   to source locations
+2. let the host discover the counter buffer and map source coverage
+   entries back to runtime counter slots
 
 These are handled by two different mechanisms:
 
 - IR-time synthesis of `RWStructuredBuffer<uint> __slang_coverage`
   in the `slang-ir-coverage-instrument` pass
 - post-emit metadata exposed as `ICoverageTracingMetadata` for
-  today's line-compatible counter attribution view and
+  today's source-entry attribution view and
   `ISyntheticResourceMetadata` for hidden resource binding
 
 The first is about getting the buffer into the compiled shader. The
@@ -44,11 +44,11 @@ primitive:
   / root-signature / descriptor-set machinery.
 
 - **Attribution** — turning counter values back into source
-  locations. Reflection doesn't carry "slot 7 →
-  `physics.slang:22`"; that's not what reflection is about.
+  locations. Reflection doesn't carry "entry 7 uses counter slot 7
+  for `physics.slang:22`"; that's not what reflection is about.
   Reflection knows parameter names, types, and layouts. We need a
-  side-channel that records the per-slot semantic intent for the
-  current line coverage mode.
+  side-channel that records the source-entry semantic intent for the
+  current coverage mode.
   `ICoverageTracingMetadata` (and its on-disk twin
   `.coverage-mapping.json`) is that channel.
 
@@ -57,7 +57,7 @@ The two channels carry complementary data — binding info answers
 the binding it cannot allocate or bind the buffer; without the
 attribution it cannot interpret the counter values it reads back.
 The metadata is also intentionally a little richer than LCOV line
-coverage — some slots may not map to a real source file and line,
+coverage — some entries may not map to a real source file and line,
 and that fact is preserved in the metadata and JSON sidecar. The
 LCOV conversion step then applies gcov-style reporting rules by
 filtering those entries out of line-oriented output.
@@ -161,9 +161,9 @@ Enabling `-trace-coverage` runs three pipeline stages:
      exporter).
    - **Rewrites each op as `AtomicAdd(__slang_coverage[slot], 1,
      Relaxed)`**.
-   - **Records `(slot → file, line)` on the artifact's
+   - **Records source entries on the artifact's
      `ICoverageTracingMetadata` and the synthesized buffer binding on
-     `ISyntheticResourceMetadata`.** A slot is unattributable when its
+     `ISyntheticResourceMetadata`.** A source entry is unattributable when its
      `IncrementCoverageCounter` op carried an invalid `sourceLoc`, or
      one whose humane-loc has no positive line — typically because the
      underlying statement came from code synthesis (autodiff reverse-
@@ -225,8 +225,7 @@ artifact in memory, the canonical metadata is right there, and they
 need typed access without going through serialization, schema
 versioning, or file I/O. The artifact's `IMetadata` exposes the two
 query interfaces needed by the host: `ICoverageTracingMetadata`
-returns the current line-compatible counter count and per-slot
-`(file, line)`, while
+returns the runtime counter count plus source coverage entries, while
 `ISyntheticResourceMetadata` returns the chosen hidden-resource
 binding.
 
@@ -328,12 +327,12 @@ creation applications, compute applications.
 
 The host queries metadata directly from the compiled artifact, reads
 the hidden resource binding from `ISyntheticResourceMetadata` and
-per-slot `(file, line)` attribution from `ICoverageTracingMetadata`,
+source-entry attribution from `ICoverageTracingMetadata`,
 and declares the slot in its own pipeline-layout / root-signature code.
 No file I/O is involved; the
 `.coverage-mapping.json` sidecar is not produced or read.
 
-The host is free to consume the per-slot attribution in whatever
+The host is free to consume the source-entry attribution in whatever
 shape suits it — write its own LCOV, feed an internal dashboard,
 log directly to telemetry, etc.
 
@@ -368,11 +367,17 @@ end-to-end across all Slang backends. Directions scoped for follow-
 up work, grouped by category. Per-test attribution and branch
 coverage are the highest-leverage near-term picks.
 
-The current `ICoverageTracingMetadata` shape is intentionally a
-line-compatible view. Branch, function, and lower-density region
-coverage are expected to need a richer source-based metadata model
-where runtime counters can map to source ranges, functions, and branch
-outcomes. LCOV should remain a compatibility export (`DA:`,
+`ICoverageTracingMetadata` is intentionally source-entry based rather
+than LCOV-line-only. Today line coverage emits one entry per counter,
+with `CoverageEntryInfo::kind == Line`,
+`counterMode == Count`, and `counterIndex` pointing at the runtime
+counter slot. The same object already has room for future branch,
+function, and lower-density region entries: ranges, function names,
+and branch site/arm ids live on `CoverageEntryInfo`, while
+`getCounterCount()` continues to describe the size of the runtime
+counter buffer. `CoverageCounterMode` currently defines only `Count`;
+additional counter interpretations should be appended when a concrete
+mode is implemented. LCOV remains a compatibility export (`DA:`,
 `FN/FNDA:`, `BRDA:`), not the only internal coverage model.
 
 ### New LCOV record types
@@ -410,8 +415,9 @@ profiling ecosystem.
 - **Hot-line profiling.** Sample the same counters over time for
   per-line heatmaps. No external profiler install required;
   cross-vendor.
-- **Per-warp / per-thread attribution.** Divergence coverage on
-  CUDA / SPIR-V; counters become 2D (slot × lane).
+- **Per-lane attribution.** Divergence-oriented reporting would need
+  dedicated metadata and storage semantics when implemented; it is not
+  part of the current source-coverage API.
 - **Native vendor-tool exports.** Nsight, RenderDoc, PIX — so
   graphics engineers see coverage in tools they already use.
 

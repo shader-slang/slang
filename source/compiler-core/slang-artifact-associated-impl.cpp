@@ -358,6 +358,11 @@ const char* ArtifactPostEmitMetadata::getDebugBuildIdentifier()
 
 uint32_t ArtifactPostEmitMetadata::getCounterCount()
 {
+    return m_coverageCounterCount;
+}
+
+uint32_t ArtifactPostEmitMetadata::getEntryCount()
+{
     return (uint32_t)m_coverageEntries.getCount();
 }
 
@@ -376,6 +381,14 @@ static constexpr size_t kCoverageBufferInfoV1MinSize =
 static constexpr size_t kSyntheticResourceInfoV1MinSize =
     offsetof(slang::SyntheticResourceInfo, debugName) + sizeof(const char*);
 
+#define SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, fieldName, value)              \
+    do                                                                                    \
+    {                                                                                     \
+        if ((outInfo)->structSize >=                                                      \
+            offsetof(slang::CoverageEntryInfo, fieldName) + sizeof((outInfo)->fieldName)) \
+            (outInfo)->fieldName = (value);                                               \
+    } while (0)
+
 SlangResult ArtifactPostEmitMetadata::getEntryInfo(
     uint32_t index,
     slang::CoverageEntryInfo* outInfo)
@@ -393,8 +406,27 @@ SlangResult ArtifactPostEmitMetadata::getEntryInfo(
     // valid (but empty) path to consumers.
     outInfo->file = entry.file.getLength() ? entry.file.getBuffer() : nullptr;
     outInfo->line = entry.line;
+    SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, counterIndex, entry.counterIndex);
+    SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, kind, entry.kind);
+    SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, counterMode, entry.counterMode);
+    SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, startColumn, entry.startColumn);
+    SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, endLine, entry.endLine);
+    SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, endColumn, entry.endColumn);
+    SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(
+        outInfo,
+        functionName,
+        entry.functionName.getLength() ? entry.functionName.getBuffer() : nullptr);
+    SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(
+        outInfo,
+        functionMangledName,
+        entry.functionMangledName.getLength() ? entry.functionMangledName.getBuffer() : nullptr);
+    SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, branchSiteID, entry.branchSiteID);
+    SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, branchArmID, entry.branchArmID);
+    SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, branchArmKind, entry.branchArmKind);
     return SLANG_OK;
 }
+
+#undef SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD
 
 SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* outInfo)
 {
