@@ -2788,14 +2788,12 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
             findThisTypeWitness(SubstitutionSet(declRef), as<InterfaceDecl>(decl->parentDecl));
         if (_isInterfaceThisTypeWitness(witness))
         {
-            // While checking an interface body, a const requirement can be
-            // read through the interface's abstract self type. An array bound
-            // that depends on an associated integer requirement is one example.
-            // That reference is still part of the interface contract; it is not
-            // a solved value from a concrete conformance's witness table. Keep
-            // it dependent here so that an `IntVal` does not capture the
-            // interface's local self witness and later escape into another
-            // generic scope.
+            // A const requirement read from the interface's own abstract
+            // `This` is still part of the interface contract, not a concrete
+            // witness-table answer. Ordinary declaration checking keeps that
+            // value out of lowered declaration types; conformance checking can
+            // resolve the same requirement through a concrete witness table
+            // when an implementation is compared against the contract.
             return nullptr;
         }
 

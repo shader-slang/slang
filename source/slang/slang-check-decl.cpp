@@ -5098,6 +5098,129 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // declarations they contain should be fully checked.
 }
 
+static Expr* _getArrayTypeExprBase(Expr* typeExpr)
+{
+    // Parameter and result declarations keep the source type expression that
+    // produced the checked `Type`. We peel wrappers that do not correspond to
+    // a real type constructor so an array syntax node can be lined up with the
+    // `ArrayExpressionType` being compared.
+    for (;;)
+    {
+        if (auto sharedTypeExpr = as<SharedTypeExpr>(typeExpr))
+        {
+            typeExpr = sharedTypeExpr->base.exp;
+        }
+        else if (auto modifiedTypeExpr = as<ModifiedTypeExpr>(typeExpr))
+        {
+            typeExpr = modifiedTypeExpr->base.exp;
+        }
+        else
+        {
+            return typeExpr;
+        }
+    }
+}
+
+static IntVal* _canonicalizeArrayElementCount(ASTBuilder* astBuilder, IntVal* elementCount)
+{
+    // Array types canonicalize their element count to `int`, so a value witness
+    // such as a `uint` static-const requirement must be normalized before it is
+    // compared with the count stored on an implementation's array type.
+    if (!elementCount)
+        return nullptr;
+
+    auto intType = astBuilder->getIntType();
+    if (elementCount->getType() == intType)
+        return elementCount;
+
+    if (auto constantElementCount = as<ConstantIntVal>(elementCount))
+        return astBuilder->getIntVal(intType, constantElementCount->getValue());
+
+    return astBuilder->getTypeCastIntVal(intType, elementCount);
+}
+
+static IntVal* _tryGetArrayElementCountFromRequirementWitness(
+    ASTBuilder* astBuilder,
+    WitnessTable* witnessTable,
+    Expr* elementCountExpr)
+{
+    // In an interface declaration, an array bound may name a const requirement:
+    // `interface I { static const uint N; void f(float x[N]); }`. The checked
+    // declaration type must remain abstract, but a conformance witness table
+    // records the implementation's answer for `N`, so signature matching can
+    // recover the concrete array count from that table.
+    if (!witnessTable)
+        return nullptr;
+
+    auto declRefExpr = as<DeclRefExpr>(elementCountExpr);
+    if (!declRefExpr)
+        return nullptr;
+
+    auto elementCountDeclRef = declRefExpr->declRef.as<VarDeclBase>();
+    if (!elementCountDeclRef)
+        return nullptr;
+
+    auto elementCountDecl = elementCountDeclRef.getDecl();
+    if (!isInterfaceRequirement(elementCountDecl))
+        return nullptr;
+
+    RequirementWitness requirementWitness;
+    if (!witnessTable->getRequirementDictionary().tryGetValue(elementCountDecl, requirementWitness))
+    {
+        return nullptr;
+    }
+
+    if (requirementWitness.getFlavor() != RequirementWitness::Flavor::val)
+        return nullptr;
+
+    auto witnessedElementCount = as<IntVal>(requirementWitness.getVal());
+    return _canonicalizeArrayElementCount(astBuilder, witnessedElementCount);
+}
+
+static bool _doesTypeMatchRequirementWithWitnessedArrayBounds(
+    ASTBuilder* astBuilder,
+    Type* requiredType,
+    Type* satisfyingType,
+    Expr* requiredTypeExpr,
+    WitnessTable* witnessTable)
+{
+    // Most signatures match by their canonical types alone. The extra path
+    // below handles only the case where the requirement side kept an abstract
+    // interface-owned array bound out of its declaration type, while the
+    // implementation side has already folded the bound to the generic value
+    // parameter or constant that satisfies the requirement.
+    if (requiredType->equals(satisfyingType))
+        return true;
+
+    auto requiredArrayType = as<ArrayExpressionType>(requiredType);
+    auto satisfyingArrayType = as<ArrayExpressionType>(satisfyingType);
+    if (!requiredArrayType || !satisfyingArrayType)
+        return false;
+
+    auto requiredArrayTypeExpr = as<IndexExpr>(_getArrayTypeExprBase(requiredTypeExpr));
+    if (!requiredArrayTypeExpr || requiredArrayTypeExpr->indexExprs.getCount() != 1)
+        return false;
+
+    auto requiredElementCount = requiredArrayType->getElementCount();
+    auto satisfyingElementCount = satisfyingArrayType->getElementCount();
+    if (!requiredElementCount->equals(satisfyingElementCount))
+    {
+        auto witnessedElementCount = _tryGetArrayElementCountFromRequirementWitness(
+            astBuilder,
+            witnessTable,
+            requiredArrayTypeExpr->indexExprs[0]);
+        if (!witnessedElementCount || !witnessedElementCount->equals(satisfyingElementCount))
+            return false;
+    }
+
+    return _doesTypeMatchRequirementWithWitnessedArrayBounds(
+        astBuilder,
+        requiredArrayType->getElementType(),
+        satisfyingArrayType->getElementType(),
+        requiredArrayTypeExpr->baseExpression,
+        witnessTable);
+}
+
 bool SemanticsVisitor::doesSignatureMatchRequirement(
     DeclRef<CallableDecl> satisfyingMemberDeclRef,
     DeclRef<CallableDecl> requiredMemberDeclRef,
@@ -5189,18 +5312,35 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             auto requiredParamType = getType(m_astBuilder, requiredParam);
             auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
 
-            if (!requiredParamType->equals(satisfyingParamType))
+            if (!_doesTypeMatchRequirementWithWitnessedArrayBounds(
+                    m_astBuilder,
+                    requiredParamType,
+                    satisfyingParamType,
+                    requiredParam.getDecl()->type.exp,
+                    witnessTable))
+            {
                 return false;
+            }
         }
 
         auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
         auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
-        if (!requiredResultType->equals(satisfyingResultType))
+        if (!_doesTypeMatchRequirementWithWitnessedArrayBounds(
+                m_astBuilder,
+                requiredResultType,
+                satisfyingResultType,
+                requiredMemberDeclRef.getDecl()->returnType.exp,
+                witnessTable))
             return false;
 
         auto requiredErrorType = getErrorCodeType(m_astBuilder, requiredMemberDeclRef);
         auto satisfyingErrorType = getErrorCodeType(m_astBuilder, satisfyingMemberDeclRef);
-        if (!requiredErrorType->equals(satisfyingErrorType))
+        if (!_doesTypeMatchRequirementWithWitnessedArrayBounds(
+                m_astBuilder,
+                requiredErrorType,
+                satisfyingErrorType,
+                requiredMemberDeclRef.getDecl()->errorType.exp,
+                witnessTable))
             return false;
     }
 
