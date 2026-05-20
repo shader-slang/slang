@@ -1,5 +1,33 @@
 {
   "bundles": {
+    "ast-reference/base": {
+      "generated_at": "2026-05-20T12:42:37+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "ef4af96c0996402dfe65ab0fdd347e4ae7e1a742",
+      "source_doc_digest": "e0ba3f54791ca461a6115045b9af60f5aa9444b387f4f5ba5c42a9669750c1ae",
+      "watched_paths_digest": "599ef31fb3dc8f15cb8601e47192d5216426cc7cfe8e201e324f7beef84eb695"
+    },
+    "cross-cutting/diagnostics": {
+      "generated_at": "2026-05-20T12:42:37+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "ef4af96c0996402dfe65ab0fdd347e4ae7e1a742",
+      "source_doc_digest": "35cfb9612e0af198f089e0c87a82055a4f43737c2865d74d83133722d9f18bda",
+      "watched_paths_digest": "a79bc9266564f8d663b4a60ade42dd146b58decdeb8ab1715ae4cd41e01a9a09"
+    },
+    "pipeline/01-lex-preprocess": {
+      "generated_at": "2026-05-20T12:42:37+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "ef4af96c0996402dfe65ab0fdd347e4ae7e1a742",
+      "source_doc_digest": "53eade2c502f9bd2f30352a014642950f055df72b7f060a240ff34569eafbeea",
+      "watched_paths_digest": "9219ab7235ed9a6e491e941233bae687c32aefd89c797c71c233bfcbbb57b829"
+    },
+    "syntax-reference/keywords-and-builtins": {
+      "generated_at": "2026-05-20T12:42:37+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "ef4af96c0996402dfe65ab0fdd347e4ae7e1a742",
+      "source_doc_digest": "149c069099bcdbf65d61cb7c0a8efad6ebfce473dad9ffb85251ba6cb96f4820",
+      "watched_paths_digest": "46d545d00112e20974ad7c66196cd74864348c29baa96c46b13ae4a26b395634"
+    },
     "syntax-reference/tokens": {
       "generated_at": "2026-05-20T11:32:17+00:00",
       "model": "claude-opus-4-7",

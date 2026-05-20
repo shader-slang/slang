@@ -128,18 +128,59 @@ The bundle is run by `slang-test`. The agentic suite runs on CI runners
 that have **no GPU**, so only directives that work without one are
 allowed:
 
-| Directive                                                                | When to use                                                                            |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| `//TEST:SIMPLE(filecheck=CHECK):`                                        | Compile and FileCheck the textual output (HLSL/GLSL/MSL/WGSL/CUDA/SPIR-V-asm/IR-dump). |
-| `//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):`                                  | Verify a diagnostic is emitted with the expected text/severity/code.                   |
-| `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type` | CPU compute kernel; verify the buffer values.                                          |
-| `//TEST:INTERPRET(filecheck=CHECK):`                                     | Run under `slangi` (byte-code interpreter).                                            |
-| `//TEST:SIMPLE...-dump-ir...`                                            | Inspect IR via FileCheck patterns.                                                     |
+| Directive                                                                | When to use                                                          |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `//TEST:SIMPLE(filecheck=CHECK):-target hlsl`                            | Compile to HLSL text and FileCheck the emitted code.                 |
+| `//TEST:SIMPLE(filecheck=CHECK):-target glsl`                            | Compile to GLSL text and FileCheck the emitted code.                 |
+| `//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm`                       | Compile to SPIR-V assembly text and FileCheck the emitted code.      |
+| `//TEST:SIMPLE(filecheck=CHECK):-target metal`                           | Compile to Metal text and FileCheck the emitted code.                |
+| `//TEST:SIMPLE(filecheck=CHECK):-target wgsl`                            | Compile to WGSL text and FileCheck the emitted code.                 |
+| `//TEST:SIMPLE(filecheck=CHECK):-target cuda`                            | Compile to CUDA C++ text and FileCheck the emitted code.             |
+| `//TEST:SIMPLE(filecheck=CHECK):-target cpp`                             | Compile to CPU C++ text and FileCheck the emitted code.              |
+| `//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):`                                  | Verify a diagnostic is emitted with the expected text/severity/code. |
+| `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type` | CPU compute kernel; verify the buffer values.                        |
+| `//TEST:INTERPRET(filecheck=CHECK):`                                     | Run under `slangi` (byte-code interpreter).                          |
+| `//TEST:SIMPLE...-dump-ir...`                                            | Inspect IR via FileCheck patterns.                                   |
 
 Do **not** use any directive that requires a real GPU (Vulkan, D3D12,
 Metal, WGSL runtime, OptiX, etc.). If a behavior can only be exercised
 on a GPU, document it as a doc-gap-like note in `BUNDLE.md` under
 `## Out of scope (no-GPU runner)` and skip it.
+
+### Exercise as many backends as the claim allows
+
+A single test file may carry **multiple `//TEST` directives**, one per
+line at the top of the file. `slang-test` runs each directive
+independently and any failure fails the file. **The default is to test
+the claim against every feasible backend, not just one:**
+
+- For a claim that is **target-independent** (lexer / parser /
+  early-semantic-check), one or two directives is enough — adding more
+  is repetition of identical pre-backend behavior. Use `INTERPRET` as
+  the primary.
+- For a claim that is **target-dependent** (IR passes, legalization,
+  emit behaviors, capability gates), add a `//TEST` directive for
+  _every_ feasible text-emit target where the claim is observable:
+  HLSL, GLSL, SPIR-V (asm), Metal, WGSL, CUDA, CPP. If different
+  targets produce different emitted text, use distinct `CHECK`
+  patterns per directive (see existing tests under `tests/` for
+  examples; slang-test selects the pattern block matching the
+  directive).
+
+This is how the suite gains backend coverage. A single-target test
+masks per-target regressions; a multi-target test catches them.
+
+### Lessons captured from the pilot bundle (syntax-reference/tokens)
+
+- `slangi` printf does **not** support `%s`. For string-typed claims,
+  use `//TEST:SIMPLE(filecheck=CHECK):-target cpp` and FileCheck the
+  emitted C++ source for the string literal.
+- Slang prefers **constructor-style casts** (`int('A')`) over C-style
+  casts (`(int)'A'`) for char-to-int. The C-style form returns 0 in
+  the interpreter.
+- `static const int x = N;` at file scope, then read in `main`, is the
+  cleanest pattern for asserting compile-time-known values without
+  buffer plumbing.
 
 ## Slang command line — quick reminders
 
