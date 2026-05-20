@@ -3908,6 +3908,161 @@ static Expr* convertHigherOrderExprToLookup(
     }
 }
 
+// Peel implicit casts and parentheses from an expression.
+static Expr* _peelCastsAndParens(Expr* expr)
+{
+    for (;;)
+    {
+        if (!expr)
+            return nullptr;
+        // Peel any single-argument TypeCastExpr: this covers
+        // ImplicitCastExpr, OutImplicitCastExpr, InOutImplicitCastExpr,
+        // and LValueImplicitCastExpr which wrap the original argument
+        // during overload resolution for out/inout coercion.
+        if (auto castExpr = as<TypeCastExpr>(expr))
+        {
+            if (castExpr->arguments.getCount() == 1)
+            {
+                expr = castExpr->arguments[0];
+                continue;
+            }
+        }
+        if (auto parenExpr = as<ParenExpr>(expr))
+        {
+            expr = parenExpr->base;
+            continue;
+        }
+        return expr;
+    }
+}
+
+// Check whether two expressions refer to the same storage location by
+// comparing their structure in lockstep. Handles bare variable
+// references, member accesses (s.x == s.x, but not s.x == s.y), and
+// subscripts with matching constant indices (arr[0] == arr[0], but not
+// arr[0] == arr[1]). Returns false for anything it can't prove equal.
+static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
+{
+    a = _peelCastsAndParens(a);
+    b = _peelCastsAndParens(b);
+    if (!a || !b)
+        return false;
+
+    // Same declaration reference.
+    if (auto aDeclRef = as<DeclRefExpr>(a))
+    {
+        auto bDeclRef = as<DeclRefExpr>(b);
+        return bDeclRef && aDeclRef->declRef.getDecl() == bDeclRef->declRef.getDecl();
+    }
+
+    // Same member of the same base: s.x vs s.x.
+    if (auto aMember = as<MemberExpr>(a))
+    {
+        auto bMember = as<MemberExpr>(b);
+        if (!bMember)
+            return false;
+        if (aMember->declRef.getDecl() != bMember->declRef.getDecl())
+            return false;
+        return _exprsDefinitelyAlias(aMember->baseExpression, bMember->baseExpression);
+    }
+
+    // Same element of the same base: arr[0] vs arr[0].
+    if (auto aIndex = as<IndexExpr>(a))
+    {
+        auto bIndex = as<IndexExpr>(b);
+        if (!bIndex)
+            return false;
+        if (aIndex->indexExprs.getCount() != 1 || bIndex->indexExprs.getCount() != 1)
+            return false;
+        // Only compare constant integer indices; dynamic indices are
+        // conservatively treated as non-aliasing (may be different).
+        auto aLit = as<IntegerLiteralExpr>(aIndex->indexExprs[0]);
+        auto bLit = as<IntegerLiteralExpr>(bIndex->indexExprs[0]);
+        if (!aLit || !bLit || aLit->value != bLit->value)
+            return false;
+        return _exprsDefinitelyAlias(aIndex->baseExpression, bIndex->baseExpression);
+    }
+
+    return false;
+}
+
+static bool _isOutInOutOrRefParam(FuncType* funcType, Index paramIndex)
+{
+    auto paramType = funcType->getParamTypeWithModeWrapper(paramIndex);
+    return as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType);
+}
+
+static const char* _getDirectionString(FuncType* funcType, Index paramIndex)
+{
+    auto paramType = funcType->getParamTypeWithModeWrapper(paramIndex);
+    if (as<OutParamType>(paramType))
+        return "out";
+    if (as<BorrowInOutParamType>(paramType))
+        return "inout";
+    if (as<RefParamType>(paramType))
+        return "ref";
+    return "in";
+}
+
+void SemanticsVisitor::_checkAliasedOutArguments(
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    FunctionDeclBase* funcDeclBase)
+{
+    // Operator expressions (compound assignments like `a += a`, prefix/postfix
+    // `++a`, etc.) desugar into function calls with `inout` parameters but have
+    // well-defined semantics even when the operand appears on both sides.
+    // Skip the aliasing check for those.
+    if (as<OperatorExpr>(invoke))
+        return;
+
+    Index argCount = invoke->arguments.getCount();
+    Index paramCount = funcType->getParamCount();
+    Index checkCount = Math::Min(argCount, paramCount);
+
+    // For each pair of arguments, check if they refer to the same storage
+    // and at least one parameter is out/inout/ref. We compare expressions
+    // structurally: bare variables (a == a), member accesses (s.x == s.x
+    // but not s.x == s.y), and constant-index subscripts (arr[0] == arr[0]
+    // but not arr[0] == arr[1]).
+    for (Index i = 0; i < checkCount; ++i)
+    {
+        bool iIsOut = _isOutInOutOrRefParam(funcType, i);
+
+        for (Index j = i + 1; j < checkCount; ++j)
+        {
+            // At least one of the two must be out/inout/ref.
+            bool jIsOut = _isOutInOutOrRefParam(funcType, j);
+            if (!iIsOut && !jIsOut)
+                continue;
+
+            if (!_exprsDefinitelyAlias(invoke->arguments[i], invoke->arguments[j]))
+                continue;
+
+            // Both arguments refer to the same variable and at least
+            // one is out/inout/ref. Put the out/inout/ref parameter
+            // first in the diagnostic for clarity.
+            Index first = iIsOut ? i : j;
+            Index second = iIsOut ? j : i;
+
+            Name* paramNameFirst = nullptr;
+            Name* paramNameSecond = nullptr;
+            if (funcDeclBase && funcDeclBase->getParameters().getCount() > first)
+                paramNameFirst = funcDeclBase->getParameters()[first]->getName();
+            if (funcDeclBase && funcDeclBase->getParameters().getCount() > second)
+                paramNameSecond = funcDeclBase->getParameters()[second]->getName();
+
+            getSink()->diagnose(Diagnostics::PotentiallyAliasedOutParameter{
+                .direction1 = _getDirectionString(funcType, first),
+                .param1 = paramNameFirst,
+                .direction2 = _getDirectionString(funcType, second),
+                .param2 = paramNameSecond,
+                .firstArg = invoke->arguments[first]});
+            break; // One warning per outer index i is enough.
+        }
+    }
+}
+
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
     auto rs = ResolveInvoke(expr);
@@ -4139,6 +4294,12 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                     }
                 }
             }
+
+            // Check for potentially aliased out/inout/ref arguments.
+            // If two arguments refer to the same root variable and at
+            // least one of them is out/inout/ref, the behavior is
+            // undefined (issue #10699).
+            _checkAliasedOutArguments(invoke, funcType, funcDeclBase);
 
             if (!IsErrorExpr(invoke))
             {

@@ -982,14 +982,6 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(translateEntryPointInParamToBorrow, sink);
 
-    if (requiredLoweringPassSet.globalVaryingVar)
-        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
-
-    if (requiredLoweringPassSet.resolveVaryingInputRef)
-        SLANG_PASS(resolveVaryingInputRef);
-
-    SLANG_PASS(fixEntryPointCallsites);
-
     // Replace any global constants with their values.
     //
     SLANG_PASS(replaceGlobalConstants);
@@ -1952,6 +1944,18 @@ Result linkAndOptimizeIR(
         SLANG_PASS(resolveTextureFormat);
         break;
     }
+
+    // Specialization can expose references to global varying builtins that were
+    // previously hidden behind generic/interface dispatch. Translate all global
+    // varying inputs/outputs now, after specialization, but before target
+    // entry-point legalization.
+    if (requiredLoweringPassSet.globalVaryingVar)
+        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
+
+    if (requiredLoweringPassSet.resolveVaryingInputRef)
+        SLANG_PASS(resolveVaryingInputRef);
+
+    SLANG_PASS(fixEntryPointCallsites);
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.

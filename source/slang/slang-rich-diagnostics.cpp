@@ -57,6 +57,15 @@ UnownedStringSlice nameToPrintableString(Name* name)
     return name ? name->text.getUnownedSlice() : UnownedStringSlice{"<unknown name>"};
 }
 
+String declToPrintableString(Decl* decl)
+{
+    if (!decl)
+        return "<unknown decl>";
+    StringBuilder sb;
+    printDiagnosticArg(sb, decl);
+    return sb.produceString();
+}
+
 String typeToPrintableString(Type* type)
 {
     return type ? type->toString() : "<unknown type>";
@@ -263,7 +272,7 @@ String declVisibilityToPrintableString(DeclVisibility visibility)
 %           elseif ptype == "qualtype" then
           qualTypeToPrintableString($(base_expr))
 %           elseif ptype == "decl" then
-          nameToPrintableString($(base_expr)->getName())
+          declToPrintableString($(base_expr))
 %           elseif ptype == "modifier" then
           modifierToPrintableString($(base_expr))
 %           elseif ptype == "irinst" then

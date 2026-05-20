@@ -1,3 +1,5 @@
+// Used as example in docs/user-guide/03-convenience-features.md ("Lambda Expressions - Coercion to functype")
+
 //TEST:INTERPRET(filecheck=CHECK):
 
 func test(f: functype(int, int)->float) -> float
