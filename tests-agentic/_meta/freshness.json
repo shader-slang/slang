@@ -1,5 +1,12 @@
 {
   "bundles": {
+    "architecture/dependency-graph": {
+      "generated_at": "2026-05-20T18:03:22+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "30ae111120515b7406aa6f427a4eaaa28a0903d8",
+      "source_doc_digest": "3cb2e36ed79632f04be823e3e1bb14782a2979342d9ee050543f7702c34d098a",
+      "watched_paths_digest": "30983b1eac237a20bb36b39636936cb7cb3bc5b003a6f2f819545a3ac80fb871"
+    },
     "architecture/module-map": {
       "generated_at": "2026-05-20T17:43:21+00:00",
       "model": "claude-opus-4-7",
@@ -34,6 +41,13 @@
       "source_commit": "3250005059a2746ebc504a9d3f71ed112f1f2b94",
       "source_doc_digest": "b98fffd8c6cc8711efedeacdd86661dc131dc617e39a464934db0b59040faf44",
       "watched_paths_digest": "095ac036e831eb7631a84f942f39c0461e59910aefb1c4c6522c17f442f3bf95"
+    },
+    "ast-reference/index": {
+      "generated_at": "2026-05-20T18:03:22+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "30ae111120515b7406aa6f427a4eaaa28a0903d8",
+      "source_doc_digest": "74458dc9e2353d3c6bf43e66bf8d2b66ca18568f491325d3d0f32c657a8cf089",
+      "watched_paths_digest": "fcff49f791602541714393b9894002eb276fdcaee6ae6a3a261e8e4c97b0e9f1"
     },
     "ast-reference/modifiers": {
       "generated_at": "2026-05-20T17:01:27+00:00",
@@ -132,6 +146,13 @@
       "source_commit": "ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14",
       "source_doc_digest": "d5381c8e732782fb3c7c867a0de12b1ae29edbcede8a5cb37f8db47276e38b43",
       "watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
+    },
+    "ir-reference/index": {
+      "generated_at": "2026-05-20T18:03:22+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "30ae111120515b7406aa6f427a4eaaa28a0903d8",
+      "source_doc_digest": "c7bb18980b66f41a697cbfaf3565d541d61e59bd49630c18d2eab6e5dba4d8f1",
+      "watched_paths_digest": "06d9ac3c0f70e6ea59684d52fb680ade68d2455e3c924214a39cc4442e3fad70"
     },
     "ir-reference/metadata": {
       "generated_at": "2026-05-20T17:57:05+00:00",
@@ -307,6 +328,13 @@
       "source_commit": "ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14",
       "source_doc_digest": "2afce914bae96fe2e024bf6b3685b7339df010398abc456d4a58cb329326fa50",
       "watched_paths_digest": "ee6e5a27774a8a9c7ea3024cc5842f7bc1919255c4c0b9751400d25195f0b7bc"
+    },
+    "target-pipelines/index": {
+      "generated_at": "2026-05-20T18:03:22+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "30ae111120515b7406aa6f427a4eaaa28a0903d8",
+      "source_doc_digest": "9ce9a410a0bad8427f3bd6458dd60bf8d59797430a9668ce295ca0b62a01feea",
+      "watched_paths_digest": "f48c602efa824ba1c41f8f80a982d156007c51018b730902f0853d28ce4f3da0"
     },
     "target-pipelines/metal": {
       "generated_at": "2026-05-20T17:57:05+00:00",
