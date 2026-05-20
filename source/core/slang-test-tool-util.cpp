@@ -130,7 +130,8 @@ static SlangResult _getCanonicalOrExecutablePath(const char* exePath, String& ou
     // actual executable path instead.
     // Examples:
     // - "slang-test" when invoked via PATH on Linux.
-    // - "slang-test.exe" when launched directly from WSL as ./build/Debug/bin/slang-test.exe.
+    // - "slang-test.exe" when WSL interop strips path information from argv[0]
+    //   (e.g., the user invoked it from WSL with the bin dir on PATH).
     // - A stale symlink or otherwise non-resolvable path-like argv[0].
     outPath = Path::getExecutablePath();
     if (outPath.getLength() == 0)
