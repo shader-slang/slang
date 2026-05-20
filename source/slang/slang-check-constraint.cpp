@@ -217,52 +217,6 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
                         return type;
                 }
             }
-            if (auto typeDeclRefType = as<DeclRefType>(type))
-            {
-                // A generic parameter may not have inheritance facets of its
-                // own, but its where-clause conformances are still evidence.
-                // When `InArray : IArrayAccessor<V>` is compared against
-                // `IArrayAccessor<U>`, unifying the two interface shapes gives
-                // the generic solver the missing ordinary constraint `U = V`.
-                if (auto typeParamDecl =
-                        as<GenericTypeParamDeclBase>(typeDeclRefType->getDeclRef().getDecl()))
-                {
-                    if (auto genericDecl = as<GenericDecl>(typeParamDecl->parentDecl))
-                    {
-                        if (isRelevantGeneric(*constraints, genericDecl))
-                        {
-                            for (auto member : genericDecl->getDirectMemberDecls())
-                            {
-                                auto conformanceDecl = as<GenericTypeConstraintDecl>(member);
-                                if (!conformanceDecl)
-                                    continue;
-
-                                auto conformanceDeclRef = createDefaultSubstitutionsIfNeeded(
-                                                              m_astBuilder,
-                                                              this,
-                                                              conformanceDecl->getDefaultDeclRef())
-                                                              .as<GenericTypeConstraintDecl>();
-                                if (!conformanceDeclRef)
-                                    continue;
-
-                                auto conformanceSub = getSub(m_astBuilder, conformanceDeclRef);
-                                auto conformanceSup = getSup(m_astBuilder, conformanceDeclRef);
-                                if (!conformanceSub || !conformanceSup ||
-                                    !conformanceSub->equals(type))
-                                    continue;
-
-                                auto unificationResult = TryUnifyTypes(
-                                    *constraints,
-                                    ValUnificationContext(),
-                                    QualType(conformanceSup),
-                                    interfaceType);
-                                if (unificationResult)
-                                    return type;
-                            }
-                        }
-                    }
-                }
-            }
             if (constraints->subTypeForAdditionalWitnesses)
             {
                 for (auto witnessKV : *constraints->additionalSubtypeWitnesses)
