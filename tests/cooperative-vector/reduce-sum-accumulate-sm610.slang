@@ -1,5 +1,6 @@
 // SM6.10 behavioral test for cooperative-vector reduce-sum accumulate.
-// Disabled until GPU CI runners support cs_6_10 / DXC SM6.10.
+// TODO: enable when GPU CI runners gain cs_6_10 / DXC SM6.10 support
+//       (requires DXC >= v1.9.2602 and dx::linalg::VectorAccumulate in dx/linalg.h).
 // Multi-threaded: 8 lanes each accumulate [1,1,1,1] into the same byte offset.
 // Atomic reduce-sum yields output[i]=8; a non-atomic load/add/store loop would
 // produce a smaller value due to lost updates under thread contention.
