@@ -110,7 +110,14 @@ _REQUIRED_TEST_META_KEYS = (
     "warning",
 )
 
-_ALLOWED_INTENTS = ("functional", "expansion", "regression", "negative")
+_ALLOWED_INTENTS = (
+    "functional",  # canonical smoke test, one per claim
+    "boundary",  # boundary-value probe (min/max/overflow/underflow/zero/inf/NaN/empty/MAX+1 etc.)
+    "stress",  # pattern-bloat / corner-case probe (deep nesting, many-arg packs, etc.)
+    "negative",  # documented diagnostic / "is rejected" probe
+    "expansion",  # added during a Phase E expansion pass
+    "regression",  # anchored to a fixed compiler issue
+)
 
 
 def _rel_to_repo(path: Path) -> str:

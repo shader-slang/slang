@@ -170,6 +170,93 @@ the claim against every feasible backend, not just one:**
 This is how the suite gains backend coverage. A single-target test
 masks per-target regressions; a multi-target test catches them.
 
+### Pressure the compiler — boundary coverage is mandatory
+
+**One smoke test per claim is the floor, not the ceiling.** For
+every documented claim, instantiate the relevant boundary axes
+below. Boundary tests carry `//META: intent=boundary`; stress
+patterns carry `//META: intent=stress`. The lint rejects bundles
+where the source doc touches a mandatory axis without at least one
+matching test.
+
+#### Mandatory axes
+
+If the source doc claim mentions or implies any of these, the
+bundle MUST include boundary tests for them:
+
+**Integer types** (`int`, `uint`, `int8/16/32/64`, `uint8/16/32/64`):
+
+- `0` (lower edge)
+- documented `MIN` (e.g. `int(-2147483648)`, `int8(-128)`)
+- documented `MAX` (e.g. `uint(0xFFFFFFFF)`, `int(2147483647)`)
+- `MAX + 1` (overflow) — assert wrap for unsigned; assert documented
+  behavior (UB / saturate / wrap) for signed
+- literal too-large-for-type (negative test: documented error fires)
+
+**Float types** (`float`, `double`, `half`):
+
+- `0.0` and `-0.0` (distinct bit patterns)
+- smallest positive normal
+- smallest positive denormal / subnormal (if doc admits)
+- largest finite
+- `+inf`, `-inf`
+- `NaN`
+- a value that exposes documented rounding behavior
+
+**Buffer / array / pointer access** (`RWStructuredBuffer`,
+`ByteAddressBuffer`, `ConstantBuffer`, `ParameterBlock`,
+`Texture*`, fixed-size array, runtime array, pointer types):
+
+- index `0` (lower edge)
+- index `N-1` where `N` is the buffer/array bound
+- index `N` (one-past-end) — assert documented behavior (silent
+  ignore / clamp / diagnostic / UB)
+- index `-1` (negative — where signed; covers underflow)
+- runtime-bounded vs static-bounded access
+- zero-length buffer (where allowed)
+- aliasing two refs to the same storage (write through one, read
+  through another)
+
+**Diagnostics** (any documented error / warning):
+
+- one negative test per documented diagnostic code, citing the
+  exact code (`E####`) and message text **verbatim** from
+  "Suggested annotations".
+- if the documented input has multiple shapes (expression-level
+  vs declaration-level vs statement-level), test each shape.
+
+#### Encouraged axes
+
+These are not lint-enforced, but skip them only with a
+`## Out of scope` rationale:
+
+- **Vector / matrix**: 1-element / smallest documented dim, max
+  documented dim, mixed-type construction, swizzle of length 1
+  vs full.
+- **Arrays**: empty (if allowed), `[1]`, max documented size.
+- **Generics / variadics**: 0 type args, 1 arg, "many" args
+  (>= 8), recursive instantiation depth `>= 3`, pack of length
+  0 / 1 / N.
+- **Control flow**: empty body, deeply nested (>= 5 levels),
+  fall-through, dead code after return, unreachable, all-paths-
+  diverge.
+
+#### Pattern guidance
+
+- **One boundary value per file.** `slang-test` reports failures
+  per file; isolating each boundary makes the failure signal
+  precise. Don't pack 5 boundaries into one `COMPARE_COMPUTE` test.
+- **File naming reflects the boundary**:
+  `add-uint32-max-overflow.slang`, `buffer-write-index-zero.slang`,
+  `float-divide-by-positive-zero.slang`. Avoid generic names like
+  `boundary-1.slang`.
+- **`purpose` field names the exact boundary**: "Verifies
+  `uint(MAX) + uint(1)` wraps to `0` per documented unsigned wrap
+  semantics." Don't repurpose smoke-test purpose strings.
+- Boundary tests anchor to the same doc claim as their parent
+  smoke test (same `doc_ref`). They are not separate claims —
+  they are additional probes of the same claim.
+
 ### Lessons captured from earlier bundles
 
 #### `slangi` / INTERPRET quirks
