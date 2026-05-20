@@ -191,6 +191,15 @@ masks per-target regressions; a multi-target test catches them.
   Use the `IFunc`-constrained helper idiom from
   `tests/language-feature/lambda/lambda-in-let.slang` if you need to
   exercise lambdas on `slangi`.
+- **`throw` / `catch` are NOT correctly evaluated under INTERPRET**
+  — the catch handler appears to fire even on the success path. Use
+  `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type`
+  for exception semantics.
+- **`slangi` cannot host `cbuffer` or non-const `static` module
+  globals.** The interpreter rejects with
+  `unsupported global inst for vm bytecode emit`. For module-scope
+  values, use `static const` only; for `ConstantBuffer<T>` claims,
+  switch to `//TEST:SIMPLE(filecheck=CHECK):-target hlsl`.
 
 #### FileCheck pattern gotchas
 
@@ -220,6 +229,12 @@ masks per-target regressions; a multi-target test catches them.
   via `vk::binding(7)` and `vk::binding(3)` may still emit as
   `[[buffer(0)]]` and `[[buffer(1)]]` on Metal. Don't assert
   binding-driven indices on Metal.
+- **`CHECK` directives on the same source line must appear in
+  textual order** of the patterns they match. When multiple emit
+  markers appear on one line (e.g. Metal
+  `[[kernel]] ... [[thread_position_in_grid]] ... [[buffer(N)]]`),
+  use `// CHECK-SAME:` for additional matches following the initial
+  `// CHECK:`.
 
 #### `-dump-ir` directive (when observing IR instructions)
 
@@ -243,6 +258,14 @@ masks per-target regressions; a multi-target test catches them.
   `//DIAGNOSTIC_TEST(non-exhaustive):SIMPLE(diag=CHECK):`.
 - The runner **rejects** `non-exhaustive` when all diagnostics in the
   test happen to be matched. Omit the flag in that case.
+- The runner sometimes emits **two diagnostics for a single
+  user-visible error** — a short form and a span form (e.g. the
+  span form repeats the same message with full type substitutions
+  like `vector<int,3>`). Use `non-exhaustive` and match just the
+  short form. Always copy the diagnostic text **verbatim** from
+  the "Suggested annotations" output — even a single token mismatch
+  (`entry point` vs `entrypoint`) will fail the test and waste an
+  iteration round.
 - The runner's "Suggested annotations" output (when a test fails) is
   the **source of truth** for exact line + column positions. Hand-
   counting carets is unreliable; copy from suggested annotations.
