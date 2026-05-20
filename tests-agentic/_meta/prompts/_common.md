@@ -172,7 +172,7 @@ masks per-target regressions; a multi-target test catches them.
 
 ### Lessons captured from earlier bundles
 
-#### From the pilot (syntax-reference/tokens)
+#### `slangi` / INTERPRET quirks
 
 - `slangi` printf does **not** support `%s`. For string-typed claims,
   use `//TEST:SIMPLE(filecheck=CHECK):-target cpp` and FileCheck the
@@ -183,6 +183,14 @@ masks per-target regressions; a multi-target test catches them.
 - `static const int x = N;` at file scope, then read in `main`, is the
   cleanest pattern for asserting compile-time-known values without
   buffer plumbing.
+- **`slangi` cannot instantiate `class`** — `class C { __init... } new C(...)`
+  crashes the interpreter. For class-reference-type / ref-accessor
+  observations, use `-target hlsl` (or other text-emit) instead.
+- **Lambda direct-invocation fails under INTERPRET.**
+  `let f = (int x) => ...; f(7)` does not execute on the interpreter.
+  Use the `IFunc`-constrained helper idiom from
+  `tests/language-feature/lambda/lambda-in-let.slang` if you need to
+  exercise lambdas on `slangi`.
 
 #### FileCheck pattern gotchas
 
@@ -203,6 +211,15 @@ masks per-target regressions; a multi-target test catches them.
   block lowering, or `__ldg(&...->a_0)` in CUDA via read-only buffer
   lowering. Use FileCheck wildcards like `a_{{[0-9]+}}` rather than
   literal `a_0`.
+- **CUDA factors `__ldg(&uniform)` reads into temporaries**,
+  splitting compound expressions on uniform operands. To observe a
+  binary expression on CUDA, derive operands from thread/dispatch
+  IDs (or locals holding them) rather than from `uniform` globals.
+- **Metal `[[buffer(N)]]` indices are positional**, not driven by
+  `vk::binding(...)` or HLSL `register(uN)`. Two struct fields bound
+  via `vk::binding(7)` and `vk::binding(3)` may still emit as
+  `[[buffer(0)]]` and `[[buffer(1)]]` on Metal. Don't assert
+  binding-driven indices on Metal.
 
 #### `-dump-ir` directive (when observing IR instructions)
 
