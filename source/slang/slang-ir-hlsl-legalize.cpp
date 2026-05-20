@@ -208,4 +208,48 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
     }
 }
 
+void legalizeRayPayloadAccessQualifiersForHLSL(IRModule* module)
+{
+    IRBuilder builder(module);
+
+    // Default stage list matches the implicit pre-SM 6.7 semantics where every
+    // stage could read and write every payload field.
+    IRInst* defaultStageOperands[] = {
+        builder.getStringValue(UnownedStringSlice::fromLiteral("caller")),
+        builder.getStringValue(UnownedStringSlice::fromLiteral("anyhit")),
+        builder.getStringValue(UnownedStringSlice::fromLiteral("closesthit")),
+        builder.getStringValue(UnownedStringSlice::fromLiteral("miss")),
+    };
+    const Int kDefaultStageCount = SLANG_COUNT_OF(defaultStageOperands);
+
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto structType = as<IRStructType>(globalInst);
+        if (!structType)
+            continue;
+        if (!structType->findDecoration<IRRayPayloadDecoration>())
+            continue;
+
+        for (auto field : structType->getFields())
+        {
+            auto fieldKey = field->getKey();
+            if (fieldKey->findDecoration<IRStageReadAccessDecoration>())
+                continue;
+            if (fieldKey->findDecoration<IRStageWriteAccessDecoration>())
+                continue;
+
+            builder.addDecoration(
+                fieldKey,
+                kIROp_StageReadAccessDecoration,
+                defaultStageOperands,
+                kDefaultStageCount);
+            builder.addDecoration(
+                fieldKey,
+                kIROp_StageWriteAccessDecoration,
+                defaultStageOperands,
+                kDefaultStageCount);
+        }
+    }
+}
+
 } // namespace Slang

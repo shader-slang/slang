@@ -1645,6 +1645,22 @@ Result linkAndOptimizeIR(
             SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
         }
 
+        // For DXIL/HLSL at SM 6.7+: DXC requires every field of a `[raypayload]`
+        // struct to carry payload access qualifiers. Slang emits `[raypayload]`
+        // for any struct with `IRRayPayloadDecoration` (#10267), including ones
+        // tagged implicitly by `legalizeNonStructParameterToStructForHLSL` above,
+        // so we must run after that pass. Attach default qualifiers to fields
+        // that lack them.
+        if (isD3DTarget(targetRequest))
+        {
+            auto profile = targetProgram->getOptionSet().getProfile();
+            if (profile.getFamily() == ProfileFamily::DX &&
+                profile.getVersion() >= ProfileVersion::DX_6_7)
+            {
+                SLANG_PASS(legalizeRayPayloadAccessQualifiersForHLSL);
+            }
+        }
+
         if (requiredLoweringPassSet.existentialTypeLayout)
         {
             SLANG_PASS(legalizeExistentialTypeLayout, targetProgram, sink);
