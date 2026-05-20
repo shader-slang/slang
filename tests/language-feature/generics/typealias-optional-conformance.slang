@@ -20,6 +20,9 @@ struct Bar<T> where optional T : IFoo
 
 typealias Baz<T> = Bar<T>;
 
+// Two-level alias: transitive propagation of the optional constraint.
+typealias Qux<T> = Baz<T>;
+
 struct MyFoo : IFoo
 {
     int getValue() { return 42; }
@@ -31,10 +34,14 @@ void main()
     int a = Bar<MyFoo>().test();
     // Through typealias: must also satisfy the optional constraint.
     int b = Baz<MyFoo>().test();
+    // Two-level alias: transitive constraint propagation.
+    int c = Qux<MyFoo>().test();
     // Without conformance: constraint is not satisfied.
-    int c = Bar<int>().test();
-    int d = Baz<int>().test();
-    printf("%d %d %d %d\n", a, b, c, d);
+    int d = Bar<int>().test();
+    int e = Baz<int>().test();
+    int f = Qux<int>().test();
+    printf("%d %d %d %d %d %d\n", a, b, c, d, e, f);
 }
 
-// CHECK: 1 1 0 0
+// CHECK: 1 1 1 0 0 0
+

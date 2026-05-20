@@ -11952,7 +11952,7 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
         if (!constraintDecl)
             continue;
 
-        if (argIdx < (Index)newArgs.getCount() && as<NoneWitness>(newArgs[argIdx]) &&
+        if (argIdx < newArgs.getCount() && as<NoneWitness>(newArgs[argIdx]) &&
             constraintDecl->hasModifier<OptionalConstraintModifier>())
         {
             // Compute the substituted sub/sup types for this constraint by applying
@@ -11971,12 +11971,14 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
             {
                 // Add an equivalent optional constraint to the alias's own generic
                 // so that `Baz<float>` can resolve it against float's conformances.
-                auto synConstraint = m_astBuilder->create<GenericTypeConstraintDecl>();
-                synConstraint->parentDecl = parentGenericDecl;
-                synConstraint->sub = TypeExp(subType);
-                synConstraint->sup = TypeExp(supType);
-                addModifier(synConstraint, m_astBuilder->create<OptionalConstraintModifier>());
-                parentGenericDecl->addDirectMemberDecl(synConstraint);
+                auto synConstraintDecl = m_astBuilder->create<GenericTypeConstraintDecl>();
+                synConstraintDecl->nameAndLoc = constraintDecl->getNameAndLoc();
+                synConstraintDecl->parentDecl = parentGenericDecl;
+                synConstraintDecl->isEqualityConstraint = constraintDecl->isEqualityConstraint;
+                synConstraintDecl->sub = TypeExp(subType);
+                synConstraintDecl->sup = TypeExp(supType);
+                addModifier(synConstraintDecl, m_astBuilder->create<OptionalConstraintModifier>());
+                parentGenericDecl->addDirectMemberDecl(synConstraintDecl);
 
                 // Replace the NoneWitness with a DeclaredSubtypeWitness that references
                 // the new constraint.  DeclaredSubtypeWitness::_substituteImplOverride
@@ -11984,7 +11986,7 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
                 auto newWitness = m_astBuilder->getDeclaredSubtypeWitness(
                     subType,
                     supType,
-                    m_astBuilder->getDirectDeclRef(synConstraint));
+                    m_astBuilder->getDirectDeclRef(synConstraintDecl));
                 newArgs[argIdx] = newWitness;
                 modified = true;
             }
