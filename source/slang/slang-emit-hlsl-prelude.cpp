@@ -109,7 +109,7 @@ void __slang_linalg_OuterProductAccumulate(
 template<typename ElTy, uint N, typename BufTy>
 void __slang_linalg_VectorAccumulate(vector<ElTy, N> inputVec, BufTy buffer, uint offset)
 {
-    dx::linalg::InterlockedAccumulate(buffer, inputVec, offset);
+    dx::linalg::VectorAccumulate(inputVec, buffer, offset);
 }
 )";
 

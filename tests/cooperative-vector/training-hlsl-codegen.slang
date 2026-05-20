@@ -10,7 +10,7 @@
 
 // CHECK610-DAG: dx::linalg::OuterProduct<
 // CHECK610-DAG: acc.InterlockedAccumulate(matBuf, matOff);
-// CHECK610-DAG: dx::linalg::InterlockedAccumulate(buffer, inputVec, offset);
+// CHECK610-DAG: dx::linalg::VectorAccumulate(inputVec, buffer, offset);
 // CHECK610-DAG: __slang_linalg_OuterProductAccumulate<
 // CHECK610-DAG: __slang_linalg_VectorAccumulate<
 // CHECK610-NOT: OuterProduct<MatDT, dx::linalg::MatrixScope::Thread>
