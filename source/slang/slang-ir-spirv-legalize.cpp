@@ -455,6 +455,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto uniformParamGroupType = as<IRUniformParameterGroupType>(innerType);
                 innerType = uniformParamGroupType->getElementType();
                 dataLayout = uniformParamGroupType->getDataLayout();
+                if (!dataLayout)
+                    dataLayout = builder.getDefaultBufferLayoutType();
                 if (addressSpace == AddressSpace::ThreadLocal)
                     addressSpace = AddressSpace::Uniform;
                 // Constant buffer is already treated like a pointer type, and
