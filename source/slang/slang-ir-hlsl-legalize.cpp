@@ -17,10 +17,6 @@ static void addDefaultPayloadAccessQualifiersToField(
     IRStructKey* fieldKey,
     IRType* fieldType)
 {
-    // Nested ray-payload structs carry their own payload annotations.
-    if (fieldType->findDecoration<IRRayPayloadDecoration>())
-        return;
-
     if (fieldKey->findDecoration<IRStageReadAccessDecoration>() ||
         fieldKey->findDecoration<IRStageWriteAccessDecoration>())
     {

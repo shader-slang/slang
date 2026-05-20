@@ -2183,6 +2183,7 @@ bool HLSLSourceEmitter::_shouldEmitPayloadAccessQualifiers()
     if (m_effectiveProfile.getFamily() != ProfileFamily::DX)
         return false;
 
+    // PAQs are required on [raypayload] struct members starting with SM 6.7.
     return m_effectiveProfile.getVersion() >= ProfileVersion::DX_6_7;
 }
 
