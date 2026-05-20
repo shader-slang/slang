@@ -14,6 +14,20 @@
       "source_doc_digest": "e0ba3f54791ca461a6115045b9af60f5aa9444b387f4f5ba5c42a9669750c1ae",
       "watched_paths_digest": "599ef31fb3dc8f15cb8601e47192d5216426cc7cfe8e201e324f7beef84eb695"
     },
+    "ast-reference/declarations": {
+      "generated_at": "2026-05-20T13:44:16+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "3250005059a2746ebc504a9d3f71ed112f1f2b94",
+      "source_doc_digest": "8ee031cac40aa40c1d361b29c159ef5a472b28baec129349366fe4ffd78eac99",
+      "watched_paths_digest": "328973beec1effabd095eb1784b812673fccfa641b71d28f1e7c83a9228ca518"
+    },
+    "ast-reference/expressions": {
+      "generated_at": "2026-05-20T13:44:16+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "3250005059a2746ebc504a9d3f71ed112f1f2b94",
+      "source_doc_digest": "b98fffd8c6cc8711efedeacdd86661dc131dc617e39a464934db0b59040faf44",
+      "watched_paths_digest": "095ac036e831eb7631a84f942f39c0461e59910aefb1c4c6522c17f442f3bf95"
+    },
     "cross-cutting/diagnostics": {
       "generated_at": "2026-05-20T12:42:37+00:00",
       "model": "claude-opus-4-7",
@@ -27,6 +41,13 @@
       "source_commit": "74db89b9f77cdced9c4d0c47f377b38fffb9180b",
       "source_doc_digest": "a0fb638618164f0a2ef326bfc1eda1d1f8d37d916fbe5842e1ae309d082169f9",
       "watched_paths_digest": "a7b1c184243cc33ab7365f1e766ae76123f4e9039f529babd0a030cb03949933"
+    },
+    "name-resolution/scopes": {
+      "generated_at": "2026-05-20T13:44:15+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "3250005059a2746ebc504a9d3f71ed112f1f2b94",
+      "source_doc_digest": "b163eb95da44a7485f2a712a76e0f23eac29f3fa131adb146f13413b1dc7f67d",
+      "watched_paths_digest": "0e24c839aae758e71e82ec905ea23d5fa0a613909e9d55418f42457a1e2bd89a"
     },
     "pipeline/01-lex-preprocess": {
       "generated_at": "2026-05-20T12:42:37+00:00",
@@ -48,6 +69,20 @@
       "source_commit": "74db89b9f77cdced9c4d0c47f377b38fffb9180b",
       "source_doc_digest": "7cb7a8661d1aff4316b63053539fe2827ef6a707dcb4338674753b06c8afbfa9",
       "watched_paths_digest": "47917e9e7bbd0d4c7cec93d02043b25787343696017d2490659c825a87e68dbe"
+    },
+    "pipeline/04-ast-to-ir": {
+      "generated_at": "2026-05-20T13:44:15+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "3250005059a2746ebc504a9d3f71ed112f1f2b94",
+      "source_doc_digest": "2786b3ac65f55d3fefdde03d0c432f013d0d8c9686304746f06a7f61fab79197",
+      "watched_paths_digest": "3dbc65f6df020239a91b769be66fa5d3b9d250fac6a4422fc500ef569caf3235"
+    },
+    "pipeline/06-emit": {
+      "generated_at": "2026-05-20T13:44:15+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "3250005059a2746ebc504a9d3f71ed112f1f2b94",
+      "source_doc_digest": "a2de47410ee74b8edd850e32a2ffdc06270316e9feb047f181ef4397564602e9",
+      "watched_paths_digest": "58e2222aab32a056bd6816440b7e7723f8b7eacefa98bb9064bbf1d76287a24d"
     },
     "pipeline/overview": {
       "generated_at": "2026-05-20T13:03:34+00:00",
