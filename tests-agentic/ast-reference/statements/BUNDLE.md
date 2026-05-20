@@ -1,7 +1,7 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T17:00:00Z
+generated_at: 2026-05-21T00:00:00Z
 source_commit: 1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 watched_paths_digest: 12add2d77eb534b6741b9633b4251590baf28be0de7f2554aacada789942f5ec
 source_doc: docs/llm-generated/ast-reference/statements.md
@@ -110,6 +110,28 @@ are unobservable through any allowed `slang-test` directive.
 | `compiletimefor-unrolls.slang` | functional | `#compiletimeforstmt` |
 | `stageswitch-static-dispatch.slang` | functional | `#targetswitchstmt-stageswitchstmt-targetcasestmt` |
 | `targetswitch-static-dispatch.slang` | functional | `#targetswitchstmt-stageswitchstmt-targetcasestmt` |
+| `blockstmt-empty.slang` | boundary | `#blockstmt-and-seqstmt` |
+| `blockstmt-single-statement.slang` | boundary | `#blockstmt-and-seqstmt` |
+| `blockstmt-deeply-nested-stress.slang` | stress | `#blockstmt-and-seqstmt` |
+| `ifstmt-elseif-chain-stress.slang` | stress | `#ifstmt` |
+| `ifstmt-predicate-evaluated-once.slang` | boundary | `#ifstmt` |
+| `forstmt-zero-iterations.slang` | boundary | `#loop-family` |
+| `forstmt-one-iteration.slang` | boundary | `#loop-family` |
+| `forstmt-many-iterations-stress.slang` | stress | `#loop-family` |
+| `forstmt-init-only-with-break.slang` | boundary | `#loop-family` |
+| `whilestmt-true-with-break.slang` | boundary | `#loop-family` |
+| `switchstmt-default-only.slang` | boundary | `#switchstmt-casestmt-defaultstmt` |
+| `switchstmt-no-default.slang` | boundary | `#switchstmt-casestmt-defaultstmt` |
+| `breakstmt-from-switch.slang` | boundary | `#switchstmt-casestmt-defaultstmt` |
+| `continuestmt-outside-loop-rejected.slang` | negative | `#nodes` |
+| `returnstmt-void-bare.slang` | boundary | `#nodes` |
+| `returnstmt-inside-loop.slang` | boundary | `#nodes` |
+| `deferstmt-multiple-lifo-order.slang` | boundary | `#deferstmt` |
+| `deferstmt-at-function-entry.slang` | boundary | `#deferstmt` |
+| `throwstmt-enum-value-preserved.slang` | boundary | `#throwstmt-and-catchstmt` |
+| `catchstmt-nested-try.slang` | boundary | `#throwstmt-and-catchstmt` |
+| `compiletimefor-zero-range.slang` | boundary | `#compiletimeforstmt` |
+| `compiletimefor-large-range-stress.slang` | stress | `#compiletimeforstmt` |
 
 ## Doc gaps observed
 

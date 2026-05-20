@@ -94,6 +94,30 @@ test confirms that `let` immutability is enforced by the checker.
 | `builtin-hlsl-structured-buffer.slang`     | functional | `#core-module-supplied-vocabulary`  |
 | `reserved-sv-prefix-hlsl.slang`            | functional | `#reserved-identifier-prefixes`     |
 | `reserved-gl-prefix-glsl.slang`            | functional | `#reserved-identifier-prefixes`     |
+| `boundary-sizeof-double.slang`              | boundary   | `#expression-keywords`              |
+| `boundary-sizeof-bool-byte.slang`           | boundary   | `#expression-keywords`              |
+| `boundary-alignof-int.slang`                | boundary   | `#expression-keywords`              |
+| `boundary-countof-variadic-pack.slang`      | boundary   | `#expression-keywords`              |
+| `boundary-nullptr-pointer-literal.slang`    | boundary   | `#expression-keywords`              |
+| `boundary-optional-float-none.slang`        | boundary   | `#expression-keywords`              |
+| `boundary-int8-min.slang`                   | boundary   | `#core-module-supplied-vocabulary`  |
+| `boundary-uint8-max.slang`                  | boundary   | `#core-module-supplied-vocabulary`  |
+| `boundary-int64-max.slang`                  | boundary   | `#core-module-supplied-vocabulary`  |
+| `boundary-half-overload.slang`              | boundary   | `#core-module-supplied-vocabulary`  |
+| `boundary-float4-swizzle-reverse.slang`     | boundary   | `#core-module-supplied-vocabulary`  |
+| `boundary-float4x4-mul-vector.slang`        | boundary   | `#core-module-supplied-vocabulary`  |
+| `boundary-rwstructuredbuffer-index-zero-hlsl.slang` | boundary | `#core-module-supplied-vocabulary` |
+| `boundary-register-u0-binding-hlsl.slang`   | boundary   | `#core-module-supplied-vocabulary`  |
+| `boundary-enum-int-min-max.slang`           | boundary   | `#decl-keywords`                    |
+| `boundary-typedef-c-style.slang`            | boundary   | `#decl-keywords`                    |
+| `boundary-using-namespace.slang`            | boundary   | `#decl-keywords`                    |
+| `boundary-defer-statement-order.slang`      | boundary   | `#statement-keywords`               |
+| `negative-rwstructuredbuffer-missing-args.slang` | negative | `#core-module-supplied-vocabulary` |
+| `negative-int-as-identifier-in-expr.slang`  | negative   | `#core-module-supplied-vocabulary`  |
+| `negative-let-through-inout-argument.slang` | negative   | `#decl-keywords`                    |
+| `stress-deeply-nested-namespace-scope.slang` | stress    | `#decl-keywords`                    |
+| `stress-twelve-numeric-overloads.slang`     | stress     | `#core-module-supplied-vocabulary`  |
+| `stress-typealias-eight-deep-chain.slang`   | stress     | `#decl-keywords`                    |
 
 ## Doc gaps observed
 
@@ -130,6 +154,27 @@ test confirms that `let` immutability is enforced by the checker.
   `.slang` module to resolve in `slangi`'s search path. The
   no-GPU runner cannot reliably stage modules outside the test
   directory, so this claim was not exercised here.
+- `countof(arr)` on a plain fixed-size local array under `slangi`
+  returned `4` (the size of `int` in bytes) rather than the array
+  element count, regardless of the declared size. The variadic-pack
+  form (`countof(D)` for `let each D : int`) returns the documented
+  element count, so the `boundary-countof-variadic-pack.slang` probe
+  uses the pack form. Worth a note in the doc that the array form is
+  only constant-folded in some contexts, or that the canonical
+  `countof` shape is the pack form.
+- The keyword-vs-identifier rules are not spelled out: `let`, `var`,
+  and even `int` can be reused as identifier names in
+  declarator position (e.g. `int let = 5;` is accepted), but `int`
+  cannot appear at the head of an expression-typed declaration
+  (`int x = int + 1;` is rejected with `E30060`). A short paragraph
+  on which contexts re-classify an identifier as a value vs a type
+  would let us write more precise boundary tests.
+- `SV_`-prefixed and `gl_`-prefixed names are documented as
+  "reserved", but in practice a user-named local `int SV_userVar`
+  inside a function compiles and produces the printed value. The
+  prefix policy is therefore advisory rather than enforced; a note
+  to that effect in the doc would justify removing speculative
+  user-prefix boundary tests.
 
 ## Out of scope (no-GPU runner)
 

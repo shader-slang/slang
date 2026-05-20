@@ -80,6 +80,37 @@ module-identity (typedef resolves, `Optional<T>` compiles).
 | `hlsl-resource-rwstructuredbuffer-lowers-per-target.slang` | functional | `#core-module`                   |
 | `hlsl-resource-texture2d-lowers-per-target.slang`          | functional | `#core-module`                   |
 | `standard-module-neural-not-implicit.slang`                | negative   | `#standard-modules`              |
+| `dot-zero-vector.slang`                                    | boundary   | `#core-module`                   |
+| `dot-inf-vector.slang`                                     | boundary   | `#core-module`                   |
+| `dot-nan-vector.slang`                                     | boundary   | `#core-module`                   |
+| `length-zero-vector.slang`                                 | boundary   | `#core-module`                   |
+| `length-nan-vector.slang`                                  | boundary   | `#core-module`                   |
+| `normalize-zero-vector.slang`                              | boundary   | `#core-module`                   |
+| `mul-matrix-vector-2x2.slang`                              | boundary   | `#core-module`                   |
+| `mul-matrix-vector-4x4.slang`                              | boundary   | `#core-module`                   |
+| `mul-zero-matrix-vector.slang`                             | boundary   | `#core-module`                   |
+| `core-typedef-int32-max.slang`                             | boundary   | `#what-the-core-module-provides` |
+| `core-typedef-uint32-max.slang`                            | boundary   | `#what-the-core-module-provides` |
+| `core-typedef-float32-inf.slang`                           | boundary   | `#what-the-core-module-provides` |
+| `core-typedef-float32-nan.slang`                           | boundary   | `#what-the-core-module-provides` |
+| `conv-int32-max-to-float32.slang`                          | boundary   | `#what-the-core-module-provides` |
+| `conv-half-roundtrip.slang`                                | boundary   | `#what-the-core-module-provides` |
+| `printf-int-max.slang`                                     | boundary   | `#core-module`                   |
+| `printf-int-min.slang`                                     | boundary   | `#core-module`                   |
+| `printf-float-inf.slang`                                   | boundary   | `#core-module`                   |
+| `printf-float-nan.slang`                                   | boundary   | `#core-module`                   |
+| `printf-no-args.slang`                                     | boundary   | `#core-module`                   |
+| `printf-many-args.slang`                                   | stress     | `#core-module`                   |
+| `texture-sample-uv-center.slang`                           | boundary   | `#core-module`                   |
+| `texture-sample-uv-corner.slang`                           | boundary   | `#core-module`                   |
+| `glsl-mat4-allow-glsl.slang`                               | boundary   | `#glsl-module`                   |
+| `glsl-min-max-clamp-aliases.slang`                         | boundary   | `#glsl-module`                   |
+| `import-nonexistent-module.slang`                          | negative   | `#standard-modules`              |
+| `glsl-vec3-without-allow-glsl.slang`                       | negative   | `#glsl-module`                   |
+| `import-diff-by-name-fails.slang`                          | negative   | `#standard-modules`              |
+| `dot-many-uses-stress.slang`                               | stress     | `#core-module`                   |
+| `mul-many-uses-stress.slang`                               | stress     | `#core-module`                   |
+| `optional-deep-nesting-stress.slang`                       | stress     | `#what-the-core-module-provides` |
 
 ## Doc gaps observed
 
@@ -111,6 +142,27 @@ module-identity (typedef resolves, `Optional<T>` compiles).
   (e.g. HLSL `-profile sm_6_2`, SPIR-V `Float16` capability) are
   not documented; we therefore skip a `float16_t` lowering test
   rather than guess at the right flag set.
+- The doc lists `dot`, `length`, `mul` (and by inference
+  `normalize`) as HLSL-meta-module intrinsics but does not name the
+  documented behaviour of these intrinsics at numeric edges
+  (zero-vector, infinity, NaN) — boundary tests therefore assert
+  only front-end acceptance and emit preservation, not specific
+  per-target runtime values.
+- The doc does not state the per-target spelling of `printf`
+  format conversions (`%d`, `%f` at MIN/MAX/inf/NaN) or whether
+  `slangi` shares the host's libc formatting; boundary printf
+  tests cite the doc's general "HLSL meta-module exposes ...
+  intrinsics" wording and assert string-match on the interpreter
+  output observed today.
+- The doc identifies the GLSL module as "target-conditional" but
+  does not enumerate the GLSL-flavoured arithmetic helpers
+  (`min`, `max`, `clamp`, etc.) that the module re-exports — our
+  `glsl-min-max-clamp-aliases` test had to discover their
+  availability empirically.
+- The doc does not state that the diff meta-module is non-
+  importable by `import diff;` from user code — our negative
+  `import-diff-by-name-fails` test had to discover the
+  loader-search-path behaviour empirically.
 
 ## Out of scope (no-GPU runner)
 

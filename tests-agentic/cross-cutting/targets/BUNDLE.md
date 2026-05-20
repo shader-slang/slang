@@ -64,6 +64,27 @@ cross-target behavior.
 | `spirv-asm-and-binary-target-variants.slang`               | functional | `#targets`                       |
 | `target-switch-selects-active-branch.slang`                | functional | `#how-target-choice-affects-ir`  |
 | `target-table-all-text-emit.slang`                         | functional | `#targets`                       |
+| `profile-edge-lowest-sm-4-0.slang`                         | boundary   | `#profiles`                      |
+| `profile-edge-highest-sm-6-9.slang`                        | boundary   | `#profiles`                      |
+| `profile-edge-spirv-1-0.slang`                             | boundary   | `#profiles`                      |
+| `profile-edge-spirv-1-6.slang`                             | boundary   | `#profiles`                      |
+| `profile-edge-glsl-460.slang`                              | boundary   | `#profiles`                      |
+| `profile-unknown-name-rejected.slang`                      | negative   | `#profiles`                      |
+| `profile-stage-conflict-with-explicit-stage-rejected.slang`| negative   | `#profiles`                      |
+| `target-switch-single-arm.slang`                           | boundary   | `#how-target-choice-affects-ir`  |
+| `target-switch-only-default-arm.slang`                     | boundary   | `#how-target-choice-affects-ir`  |
+| `target-switch-all-fallthrough.slang`                      | boundary   | `#how-target-choice-affects-ir`  |
+| `target-switch-empty-body.slang`                           | boundary   | `#how-target-choice-affects-ir`  |
+| `target-switch-missing-arm-falls-to-default.slang`         | boundary   | `#how-target-choice-affects-ir`  |
+| `target-switch-missing-arm-rejected.slang`                 | negative   | `#how-target-choice-affects-ir`  |
+| `target-switch-nested-stress.slang`                        | stress     | `#how-target-choice-affects-ir`  |
+| `capability-stage-and-target-conjunction-cuda.slang`       | boundary   | `#vocabulary`                    |
+| `capability-conflict-two-target-atoms-rejected.slang`      | negative   | `#capability-system`             |
+| `raytracing-intrinsic-on-vertex-stage-rejected.slang`      | negative   | `#capability-system`             |
+| `sm-6-3-feature-on-sm-6-0-rejected-restrictive.slang`      | negative   | `#runtime-representation`        |
+| `wave-active-sum-on-cpp-rejected.slang`                    | negative   | `#capability-system`             |
+| `unknown-target-name-rejected.slang`                       | negative   | `#targets`                       |
+| `all-seven-text-targets-dense-stress.slang`                | stress     | `#targets`                       |
 
 ## Doc gaps observed
 
@@ -81,6 +102,23 @@ cross-target behavior.
 - The DXIL binary target is not exercised here; the doc lists it but
   binary emission requires a downstream-compiler binary that the
   agentic runner does not assume.
+- `__target_switch` is named in the IR section but not documented
+  user-side: its arm-count edges (0 arms, 1 arm, all-fallthrough,
+  `default:` fallback) had to be discovered empirically. A short
+  user-side spec would let tests anchor to a precise claim instead
+  of the specialization pass's name.
+- `## Profiles` mentions Family + Version + Stage but does not state
+  what happens when a sub-version request (e.g. `glsl_150`) is below
+  the back-end's floor; the back-end silently clamps to `#version 450`.
+  Documented clamping rules would make profile-edge tests
+  unambiguous.
+- The `-restrictive-capability-check` flag is exercised by tests but
+  not named in `## Capability system`; only the "Computing the join"
+  bullet under Runtime representation hints at its role.
+- Per-target stage rejection (e.g. fragment-on-cuda) is not robust:
+  one observed shape produced a SIGSEGV rather than a clean
+  diagnostic. The doc should state which stage × target pairs are
+  rejected at check time vs. accepted vs. unsupported.
 
 ## Out of scope (no-GPU runner)
 

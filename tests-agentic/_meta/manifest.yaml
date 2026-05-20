@@ -479,7 +479,7 @@ bundles:
       - source/slang/slang-parser.cpp
     runner:
       category: agentic-ast
-    size_cap_files: 40
+    size_cap_files: 80
 
   ast-reference/types:
     prompt: prompts/ast-reference-types.md

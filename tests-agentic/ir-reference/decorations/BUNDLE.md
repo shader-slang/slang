@@ -128,6 +128,32 @@ right**, sampling its breadth across categories.
 | `two-inlining-hints-coexist.slang` | functional | `#inlining-and-optimization` |
 | `method-decoration.slang` | functional | `#other` |
 | `constructor-decoration.slang` | functional | `#other` |
+| `num-threads-min.slang` | boundary | `#entry-point-and-stage` |
+| `num-threads-large-x.slang` | boundary | `#entry-point-and-stage` |
+| `num-threads-x-only.slang` | boundary | `#entry-point-and-stage` |
+| `wave-size-min.slang` | boundary | `#entry-point-and-stage` |
+| `wave-size-max.slang` | boundary | `#entry-point-and-stage` |
+| `glsl-location-zero.slang` | boundary | `#layout-and-binding` |
+| `glsl-location-large.slang` | boundary | `#layout-and-binding` |
+| `packoffset-decoration.slang` | boundary | `#layout-and-binding` |
+| `semantic-explicit-index.slang` | boundary | `#interpolation-and-shader-io` |
+| `interpolation-mode-linear.slang` | boundary | `#interpolation-and-shader-io` |
+| `interpolation-mode-sample.slang` | boundary | `#interpolation-and-shader-io` |
+| `interpolation-mode-nointerpolation.slang` | boundary | `#interpolation-and-shader-io` |
+| `loop-control-loop-mode.slang` | boundary | `#loop-and-branch-hints` |
+| `force-unroll-on-loop.slang` | boundary | `#loop-and-branch-hints` |
+| `loop-max-iters.slang` | boundary | `#loop-and-branch-hints` |
+| `entry-point-vertex-profile.slang` | boundary | `#entrypoint-entrypointdecoration` |
+| `export-witness-table-prefix.slang` | boundary | `#linkage-and-lifetime` |
+| `read-none-decoration.slang` | boundary | `#inlining-and-optimization` |
+| `numthreads-zero-error.slang` | negative | `#entry-point-and-stage` |
+| `numthreads-negative-error.slang` | negative | `#entry-point-and-stage` |
+| `numthreads-arg-count-error.slang` | negative | `#entry-point-and-stage` |
+| `force-unroll-on-function-error.slang` | negative | `#loop-and-branch-hints` |
+| `function-with-many-decorations.slang` | stress | `#inlining-and-optimization` |
+| `struct-with-many-field-decorations.slang` | stress | `#interpolation-and-shader-io` |
+| `entry-point-with-many-attributes.slang` | stress | `#entry-point-and-stage` |
+| `branch-and-flatten-cascade.slang` | stress | `#loop-and-branch-hints` |
 
 ## Out of scope (no-GPU runner)
 
