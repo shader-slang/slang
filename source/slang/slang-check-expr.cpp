@@ -2671,61 +2671,6 @@ bool SemanticsVisitor::_checkForCircularityInConstantFolding(
     return false;
 }
 
-// Identify the abstract self witness declared by an interface. In an interface
-// body, a reference such as `This.Requirement` is still part of the contract,
-// so the witness for `This : TheInterface` must not be treated as a concrete
-// conformance witness.
-static bool _isInterfaceThisTypeWitness(SubtypeWitness* witness)
-{
-    // A declared `This : I` witness is the interface's abstract self witness.
-    // It is not a solved answer that can be embedded in a value, because each
-    // lowered generic wrapper gets its own local representation of `This`.
-    auto declaredWitness = as<DeclaredSubtypeWitness>(witness);
-    if (!declaredWitness)
-        return false;
-
-    if (!as<ThisTypeConstraintDecl>(declaredWitness->getDeclRef()))
-        return false;
-
-    if (as<ThisType>(declaredWitness->getSub()))
-        return true;
-
-    if (auto declRefType = as<DeclRefType>(declaredWitness->getSub()))
-        return declRefType->getDeclRef().as<ThisTypeDecl>();
-
-    return false;
-}
-
-// Recognize an integer requirement read through an interface's own abstract
-// self type. For example, an array bound can mention an associated integer
-// requirement of `This`; that expression remains dependent until a concrete
-// implementation supplies the witness.
-static bool _isInterfaceThisRequirementExpr(Expr* expr)
-{
-    // Constant-expression checking normally diagnoses a missing integer value.
-    // For an interface requirement reached through the interface's own `This`,
-    // the missing value is intentional: the signature is still abstract and the
-    // concrete witness will only exist when a conforming type is checked.
-    auto declRefExpr = as<DeclRefExpr>(expr);
-    if (!declRefExpr)
-        return false;
-
-    auto varDeclRef = declRefExpr->declRef.as<VarDeclBase>();
-    if (!varDeclRef)
-        return false;
-
-    auto decl = varDeclRef.getDecl();
-    if (!isInterfaceRequirement(decl))
-        return false;
-
-    auto interfaceDecl = as<InterfaceDecl>(decl->parentDecl);
-    if (!interfaceDecl)
-        return false;
-
-    auto witness = findThisTypeWitness(SubstitutionSet(varDeclRef), interfaceDecl);
-    return _isInterfaceThisTypeWitness(witness);
-}
-
 IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     DeclRef<VarDeclBase> const& declRef,
     ConstantFoldingKind kind,
@@ -2786,16 +2731,6 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     {
         auto witness =
             findThisTypeWitness(SubstitutionSet(declRef), as<InterfaceDecl>(decl->parentDecl));
-        if (_isInterfaceThisTypeWitness(witness))
-        {
-            // A const requirement read from the interface's own abstract
-            // `This` is still part of the interface contract, not a concrete
-            // witness-table answer. Ordinary declaration checking keeps that
-            // value out of lowered declaration types; conformance checking can
-            // resolve the same requirement through a concrete witness table
-            // when an implementation is compared against the contract.
-            return nullptr;
-        }
 
         auto val = WitnessLookupIntVal::tryFold(
             m_astBuilder,
@@ -3294,7 +3229,7 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
         return nullptr;
 
     auto result = tryFoldIntegerConstantExpression(expr, kind, circularityInfo);
-    if (!result && sink && !_isInterfaceThisRequirementExpr(expr))
+    if (!result && sink)
     {
         sink->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{.location = expr->loc});
     }
