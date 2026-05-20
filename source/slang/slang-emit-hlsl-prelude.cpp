@@ -109,13 +109,7 @@ void __slang_linalg_OuterProductAccumulate(
 template<typename ElTy, uint N, typename BufTy>
 void __slang_linalg_VectorAccumulate(vector<ElTy, N> inputVec, BufTy buffer, uint offset)
 {
-    // No dx::linalg wrapper for cooperative-vector reduce-sum yet; approximate with per-lane load/add/store
-    for (uint i = 0; i < N; ++i)
-    {
-        uint byteOffset = offset + i * uint(sizeof(ElTy));
-        ElTy cur = buffer.template Load<ElTy>(byteOffset);
-        buffer.template Store<ElTy>(byteOffset, cur + inputVec[i]);
-    }
+    dx::linalg::InterlockedAccumulate(buffer, inputVec, offset);
 }
 )";
 
