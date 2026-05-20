@@ -11991,6 +11991,12 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
                         m_astBuilder->create<OptionalConstraintModifier>());
                     parentGenericDecl->addDirectMemberDecl(synConstraintDecl);
 
+                    // Pre-check the constraint now, while sub.type/sup.type are known-good.
+                    // Without this, getDefaultSubstitutionArgs would drive it through
+                    // visitGenericTypeConstraintDecl in an uncontrolled context, which could
+                    // trigger AndType flattening on the sup type.
+                    ensureDecl(synConstraintDecl, DeclCheckState::SignatureChecked);
+
                     // Invalidate cached default substitution args since we just added a member.
                     m_astBuilder->m_cachedGenericDefaultArgs.remove(parentGenericDecl);
                     parentGenericDecl->_cachedArgsForDefaultSubstitution.clear();
@@ -12008,9 +12014,11 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
             }
         }
 
-        // Any non-ordinary-param member occupies exactly one constraint arg slot.
-        if (as<GenericTypeConstraintDecl>(mm) || as<TypeCoercionConstraintDecl>(mm) ||
-            as<NonEmptyPackConstraintDecl>(mm) || as<HasDiffTypeInfoConstraintDecl>(mm))
+        // Any member that is not an ordinary (type/value/pack) param occupies exactly one
+        // constraint arg slot.  Using the negated ordinary-param check mirrors the skip
+        // condition above and automatically handles any future constraint member types.
+        if (!as<GenericTypeParamDeclBase>(mm) && !as<GenericValueParamDecl>(mm) &&
+            !as<GenericValuePackParamDecl>(mm))
         {
             argIdx++;
         }
