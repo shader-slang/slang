@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/shader-slang/slang/tests-agentic/_meta/schema/remediation-report.schema.json",
+  "title": "tests-agentic remediation report",
+  "description": "Schema for a remediation report under tests-agentic/_meta/remediations/<bundle>.remediation.md. Produced by a Claude agent acting on every finding in the linked review report.",
+  "type": "object",
+  "required": [
+    "remediation_report",
+    "remediator_model",
+    "remediated_at",
+    "target_bundle",
+    "review_report",
+    "target_bundle_source_commit_before",
+    "target_bundle_source_commit_after",
+    "actions"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "remediation_report": { "type": "boolean", "const": true },
+    "remediator_model": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "(?i)(claude|anthropic)",
+      "description": "Must self-identify as a Claude/Anthropic model. Soft-enforced by lint."
+    },
+    "remediated_at": { "type": "string", "format": "date-time" },
+    "target_bundle": { "type": "string", "minLength": 1 },
+    "review_report": {
+      "type": "string",
+      "description": "Workspace-relative path to the review report this remediation responds to.",
+      "pattern": "^tests-agentic/_meta/reviews/.+\\.review\\.md$"
+    },
+    "target_bundle_source_commit_before": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,64}$"
+    },
+    "target_bundle_source_commit_after": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,64}$"
+    },
+    "actions": {
+      "type": "object",
+      "required": [
+        "fixed",
+        "rejected_bogus",
+        "rejected_out_of_scope",
+        "deferred",
+        "escalated"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "fixed": { "type": "integer", "minimum": 0 },
+        "rejected_bogus": { "type": "integer", "minimum": 0 },
+        "rejected_out_of_scope": { "type": "integer", "minimum": 0 },
+        "deferred": { "type": "integer", "minimum": 0 },
+        "escalated": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

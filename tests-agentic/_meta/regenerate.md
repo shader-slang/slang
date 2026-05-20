@@ -1,0 +1,183 @@
+# Regeneration Workflow — tests-agentic
+
+This document describes how to (re)generate, review, and remediate
+test bundles under `tests-agentic/`. The pipeline is deliberately
+**operator-driven**: the driver script (`regenerate.py`) tracks state,
+but bundle generation is an out-of-band agent invocation that the
+operator performs.
+
+The shape mirrors the documentation regeneration workflow at
+[`../../docs/llm-generated/_meta/regenerate.md`](../../docs/llm-generated/_meta/regenerate.md);
+the two systems are siblings.
+
+## Prerequisites
+
+- Python 3.9+ (no third-party packages required; PyYAML is used if
+  available but not mandatory).
+- A working `git` and a clean checkout.
+- An AI agent that can read files in the workspace and write text
+  files. Generation, review, and remediation are model-agnostic at the
+  driver level; soft refusal layers (see below) enforce which model
+  family runs which stage.
+- For Phase B2 and later: a `slang-test` build (Release) so bundles
+  can be exercised.
+
+## The driver
+
+All commands run from the repository root.
+
+```bash
+python3 tests-agentic/_meta/regenerate.py <subcommand> [args...]
+```
+
+| Subcommand                                          | Purpose                                                                                             |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `list`                                              | Print every bundle in the manifest                                                                  |
+| `list-stale`                                        | Classify each bundle as `missing`, `stale`, or `fresh`                                              |
+| `digest <bundle>`                                   | Compute current watched-paths and source-doc digests                                                |
+| `show <bundle>`                                     | Manifest entry + resolved source files + source doc                                                 |
+| `mark-fresh <bundle> [--commit SHA] [--model NAME]` | Record a fresh entry                                                                                |
+| `lint [<bundle>...]`                                | Structural linter (BUNDLE.md front-matter, every `.slang` has a `//META` block, `doc_ref` resolves) |
+| `expansion-candidates [--from <report.json>]`       | (Phase E) rank bundles by under-coverage; outputs bundle keys + scores only                         |
+| `review-status / mark-reviewed / mark-remediated`   | (Phase D) two-stage review/remediation. Stubs currently.                                            |
+
+`<bundle>` is the manifest key (e.g. `pipeline/03-semantic-check`),
+which equals the bundle directory under `tests-agentic/`.
+
+## Phase A — Foundation (the current phase)
+
+The scaffold is in place: `_meta/regenerate.py`, `_meta/manifest.yaml`,
+schemas under `_meta/schema/`, base prompts under `_meta/prompts/`, and
+one representative per-section prompt
+(`prompts/pipeline-03-semantic-check.md`). No bundles exist yet.
+
+To verify the scaffold:
+
+```bash
+python3 tests-agentic/_meta/regenerate.py list           # 51 bundle keys
+python3 tests-agentic/_meta/regenerate.py list-stale     # all "missing"
+python3 tests-agentic/_meta/regenerate.py lint           # 0 errors, 0 warnings
+python3 tests-agentic/_meta/regenerate.py show pipeline/01-lex-preprocess
+```
+
+## Phase B1 — Bootstrap generation
+
+For each bundle, in dependency order (consult `depends_on` in the
+manifest; bundles that list dependencies should be generated _after_
+their dependencies so the agent can read those bundles' BUNDLE.md
+files as additional context):
+
+1. Open the per-section prompt at
+   `tests-agentic/_meta/prompts/<key>.md`. If it does not yet exist,
+   author one using
+   [`prompts/pipeline-03-semantic-check.md`](prompts/pipeline-03-semantic-check.md)
+   as a template (target / required structure / doc sources /
+   quality checklist).
+2. Show the agent:
+   - `_meta/prompts/_common.md`,
+   - the per-section prompt,
+   - the bundle's `source_doc` (the docs/llm-generated/ file),
+   - any allowed secondary docs the per-section prompt names,
+   - any already-generated `depends_on` bundles' BUNDLE.md.
+3. Ask the agent to emit `BUNDLE.md` plus N `.slang` files at
+   `tests-agentic/<key>/`.
+4. Run `regenerate.py lint <key>`. Fix structural issues by
+   re-prompting — **never** by hand-editing.
+5. Build `slang-test` (Release). Spot-check that each new `.slang`
+   compiles under its declared target. The lint pass does not invoke
+   `slangc`; this is a human sanity check.
+6. `regenerate.py mark-fresh <key> --model <model-id>`.
+
+## Phase B2 — Slang-test wiring
+
+A separate PR. Confirm or extend `slang-test` to walk
+`tests-agentic/` under `agentic-*` categories, and add
+`.github/workflows/agentic-tests-nightly.yml` modeled on
+`coverage-nightly.yml`. The nightly is advisory: it does not gate
+PR merges.
+
+## Phase C — Cross-link pass
+
+After every bundle has been generated at least once, re-run each
+bundle with peer bundles' BUNDLE.md as additional context. This pass
+typically aligns terminology and removes redundancy between bundles
+whose claims overlap (e.g. parser-level claims appearing in both
+`pipeline/02-parse-ast` and `ast-reference/declarations`).
+
+## Phase D — Review / remediation
+
+Two-stage review identical in shape to the documentation flow:
+
+1. **Review** — by a non-Claude model. Produces a structured report
+   under `_meta/reviews/<key>.review.md`. Refusal banner enforced by
+   the prompt and by `mark-reviewed` (when the wiring lands).
+2. **Remediation** — by a Claude model. Edits the bundle to fix
+   findings; records actions in `_meta/remediations/<key>.remediation.md`.
+
+The schemas at `_meta/schema/{review-report,remediation-report}.schema.json`
+define the report contracts.
+
+The `mark-reviewed` / `mark-remediated` driver commands and the
+`review-status` classifier are stubbed in Phase A; they print a
+not-yet-implemented notice. The wiring lands when the first review
+cycle is run.
+
+## Phase E — Expansion loop
+
+Wired into the nightly job after Phase B2 stabilizes.
+
+Inputs to the loop: per-night coverage report (JSON) listing per-file
+line-coverage percentages.
+
+The driver computes per-bundle scores by averaging the coverage of
+the bundle's `coverage_targets`. Bundles with the lowest scores are
+re-prompted with `prompts/_expand.md`. The expansion prompt
+deliberately does not pass source-line information to the agent — it
+asks the agent to re-read the source doc, find under-tested claims,
+and add tests for them.
+
+If documented behavior cannot reach uncovered code, the agent records
+that as a doc-gap finding in the bundle's `BUNDLE.md` under
+`## Doc gaps observed`. The loop does not paper over gaps by writing
+source-targeted tests.
+
+To trigger an expansion locally:
+
+```bash
+python3 tests-agentic/_meta/regenerate.py expansion-candidates \
+    --from path/to/coverage-report.json
+```
+
+Output is bundle-key + score; no source-line detail leaks.
+
+## Hand-edit policy
+
+- `.slang` files in `tests-agentic/<key>/`: **no hand-edits**.
+- `BUNDLE.md`: **no hand-edits**.
+- `_meta/manifest.yaml`, `_meta/schema/*`, `_meta/prompts/*`: hand-edited
+  (these are the source of truth for regeneration).
+- `_meta/freshness.json`, `_meta/review-state.json`: driver-edited.
+
+If you find a test that's wrong, the right move is one of:
+
+1. Improve the bundle's per-section prompt and re-run generation.
+2. Improve the source documentation (a docs/llm-generated change is
+   a separate PR against the docs PR / docs branch).
+3. Improve the manifest (add a watched path, raise the size cap).
+
+Then `regenerate.py mark-fresh <bundle>`.
+
+## CI integration (Phase B2 and later)
+
+The intended attachment points:
+
+- **Nightly run.** `agentic-tests-nightly.yml`, scheduled
+  ~`0 4 * * *` (after `coverage-nightly`), runs `slang-test` against
+  the `agentic-*` categories. Advisory only; never blocks PRs.
+- **Lint on PR.** A check workflow that runs
+  `regenerate.py lint` and `regenerate.py list-stale` on any PR
+  touching `tests-agentic/` or `docs/llm-generated/`. Soft warning;
+  not a gate.
+
+The driver has no third-party Python dependencies, so wiring this into
+CI is just a `python3` invocation.

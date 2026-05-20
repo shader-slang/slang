@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/shader-slang/slang/tests-agentic/_meta/schema/review-report.schema.json",
+  "title": "tests-agentic review report",
+  "description": "Schema for a review report under tests-agentic/_meta/reviews/<bundle>.review.md. Produced by a non-Claude agent reviewing an agentic test bundle against its source_doc.",
+  "type": "object",
+  "required": [
+    "review_report",
+    "reviewer_model",
+    "reviewed_at",
+    "target_bundle",
+    "target_bundle_source_commit",
+    "target_bundle_watched_paths_digest",
+    "target_bundle_source_doc_digest",
+    "source_commit",
+    "checklist",
+    "finding_count",
+    "severity_breakdown"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "review_report": { "type": "boolean", "const": true },
+    "reviewer_model": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "pattern": "(?i)(claude|anthropic)" },
+      "description": "Must self-identify as a non-Claude / non-Anthropic model. Soft-enforced by lint."
+    },
+    "reviewed_at": { "type": "string", "format": "date-time" },
+    "target_bundle": { "type": "string", "minLength": 1 },
+    "target_bundle_source_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,64}$"
+    },
+    "target_bundle_watched_paths_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "target_bundle_source_doc_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_commit": { "type": "string", "pattern": "^[0-9a-f]{7,64}$" },
+    "checklist": {
+      "type": "object",
+      "required": [
+        "doc_anchored",
+        "claims_verified",
+        "test_compiles",
+        "no_source_targeting",
+        "intent_classification",
+        "front_matter_validity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "doc_anchored": {
+          "enum": ["pass", "partial", "fail"],
+          "description": "Every test has a resolvable doc_ref."
+        },
+        "claims_verified": {
+          "enum": ["pass", "partial", "fail"],
+          "description": "Each test's purpose paraphrases the cited doc section."
+        },
+        "test_compiles": {
+          "enum": ["pass", "partial", "fail"],
+          "description": "Every test compiles under slangc with the declared target."
+        },
+        "no_source_targeting": {
+          "enum": ["pass", "partial", "fail"],
+          "description": "No test was written to hit a specific source line (i.e., the bundle was not patched with source-line-targeted tests)."
+        },
+        "intent_classification": {
+          "enum": ["pass", "partial", "fail"],
+          "description": "Every test's intent field matches its content (functional vs expansion vs regression vs negative)."
+        },
+        "front_matter_validity": {
+          "enum": ["pass", "partial", "fail"],
+          "description": "BUNDLE.md and every test //META block validate against the schemas."
+        }
+      }
+    },
+    "finding_count": { "type": "integer", "minimum": 0 },
+    "severity_breakdown": {
+      "type": "object",
+      "required": ["critical", "major", "minor", "nit"],
+      "additionalProperties": false,
+      "properties": {
+        "critical": { "type": "integer", "minimum": 0 },
+        "major": { "type": "integer", "minimum": 0 },
+        "minor": { "type": "integer", "minimum": 0 },
+        "nit": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
