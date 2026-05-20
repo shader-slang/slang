@@ -131,7 +131,7 @@ jobs:
         # compared. Persists the merged LCOV + auth-summary so a future diff
         # job can compare two runs without re-merging from scratch.
         run: |
-          set -uo pipefail
+          set -euo pipefail
 
           ART=coverage-artifacts
           MERGER=tools/coverage-html/slang-coverage-merge.py
@@ -139,12 +139,16 @@ jobs:
           SLANG_MERGE=tools/coverage/slang-merge.py
           SLANG_RENDER=tools/coverage/slang-render.py
 
-          # Strip-prefix list covers all three GitHub-hosted runner roots so
-          # SF: paths collapse to repo-relative form (mirrors slang_filters.py).
-          STRIP=(
-            --strip-prefix /__w/slang/slang/
-            --strip-prefix /Users/runner/work/slang/slang/
-            --strip-prefix D:/a/slang/slang/
+          # Single source of truth: pull the runner-root prefixes from
+          # tools/coverage/slang_filters.py so the list used for the
+          # full-library merge below cannot drift from the one
+          # $SLANG_MERGE auto-injects for the slangc merge.
+          STRIP=()
+          while IFS= read -r prefix; do
+            STRIP+=( --strip-prefix "$prefix" )
+          done < <(
+            PYTHONPATH=tools/coverage python3 -c \
+              'from slang_filters import SLANG_CI_STRIP_PREFIXES; print("\n".join(SLANG_CI_STRIP_PREFIXES))'
           )
 
           # Locate the per-OS gzipped LCOV artifacts. The compiler-suffixed
@@ -168,7 +172,7 @@ jobs:
           [ -f "$ART/coverage-linux-x86_64/coverage-report.txt"        ] && AUTH_FULL+=( --auth-summary "$ART/coverage-linux-x86_64/coverage-report.txt" )
           [ -f "$ART/coverage-macos-aarch64/coverage-report.txt"       ] && AUTH_FULL+=( --auth-summary "$ART/coverage-macos-aarch64/coverage-report.txt" )
           [ -f "$ART/coverage-linux-x86_64/coverage-report-slangc.txt" ] && AUTH_SLANGC+=( --auth-summary "$ART/coverage-linux-x86_64/coverage-report-slangc.txt" )
-          [ -f "$ART/coverage-macos-aarch64/coverage-report-slangc.txt"] && AUTH_SLANGC+=( --auth-summary "$ART/coverage-macos-aarch64/coverage-report-slangc.txt" )
+          [ -f "$ART/coverage-macos-aarch64/coverage-report-slangc.txt" ] && AUTH_SLANGC+=( --auth-summary "$ART/coverage-macos-aarch64/coverage-report-slangc.txt" )
 
           if [ ${#INPUTS[@]} -eq 0 ]; then
             echo "::warning::No per-OS LCOV artifacts found; skipping new-renderer reports."
