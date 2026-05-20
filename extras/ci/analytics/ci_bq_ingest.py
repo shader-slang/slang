@@ -124,27 +124,28 @@ def resolve_caller_key(
     matrix-tuple reconstruction is future work; for now we strip the suffix
     so the key resolves and leave graph_instance_key empty.)
 
-    Resolution order:
+    Resolution order, tried first with the raw caller_part and again with a
+    matrix-suffix-stripped variant (so a job with both `strategy.matrix` and a
+    custom top-level `name:` still resolves):
       1. Exact YAML-key match — covers no-matrix jobs.
-      2. Strip a trailing ` (v1, v2, ...)` matrix-suffix and retry — covers
-         GH's default name expansion for `strategy.matrix` jobs.
-      3. Match against a declared `name:` field.
-      4. Stripped/lowercased match for workflows that use spaces in names.
+      2. Match against a declared `name:` field.
+      3. Stripped/lowercased match for workflows that use spaces in names.
     """
-    for candidate in (caller_part, strip_matrix_suffix(caller_part)):
+    candidates = [caller_part]
+    stripped = strip_matrix_suffix(caller_part)
+    if stripped != caller_part:
+        candidates.append(stripped)
+
+    for candidate in candidates:
         if candidate in workflow_spec.jobs:
             return candidate, ""
-
-    # Try matching against declared `name:` fields.
-    for job_key, spec in workflow_spec.jobs.items():
-        if spec.name and spec.name == caller_part:
-            return job_key, ""
-
-    # Fallback: stripped match (some workflows use spaces in names).
-    normalized = caller_part.replace(" ", "-").lower()
-    for job_key in workflow_spec.jobs:
-        if job_key.lower() == normalized:
-            return job_key, ""
+        for job_key, spec in workflow_spec.jobs.items():
+            if spec.name and spec.name == candidate:
+                return job_key, ""
+        normalized = candidate.replace(" ", "-").lower()
+        for job_key in workflow_spec.jobs:
+            if job_key.lower() == normalized:
+                return job_key, ""
 
     return None, ""
 
