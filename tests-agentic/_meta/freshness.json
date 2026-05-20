@@ -1,1 +1,12 @@
-{ "schema_version": 1, "bundles": {} }
+{
+  "bundles": {
+    "syntax-reference/tokens": {
+      "generated_at": "2026-05-20T11:32:17+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "1099f9d83f3d63135650f759de64b32a4eee48aa",
+      "source_doc_digest": "d75869f84bce1dbc6ad2449ddfdb74dada8405ec359b9dae628844b6d3389b6e",
+      "watched_paths_digest": "09f4cba6ed86dd22ab9eb213b2fb1a4aa730fccbd2dd249fb56c3b7502622005"
+    }
+  },
+  "schema_version": 1
+}
