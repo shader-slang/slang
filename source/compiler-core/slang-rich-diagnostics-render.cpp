@@ -1,5 +1,6 @@
 #include "slang-rich-diagnostics-render.h"
 
+#include "../core/slang-char-encode.h"
 #include "../core/slang-dictionary.h"
 #include "../core/slang-list.h"
 #include "../core/slang-string-util.h"
@@ -321,9 +322,29 @@ private:
                     line.content = UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
                 }
             }
-            if (m_lexer && span.length <= 0 && line.content.getLength() > 0 && span.col > 0 &&
-                span.col - 1 < line.content.getLength())
-                span.length = m_lexer(line.content.tail(span.col - 1)).getLength();
+            if (line.content.getLength() > 0 && span.col > 0)
+            {
+                // span.col is a 1-based code-point index; convert to a byte offset for tail()
+                auto byteOffset = UTF8Util::codePointIndexToByteOffset(line.content, span.col - 1);
+                if (m_lexer && span.length <= 0 && byteOffset < line.content.getLength())
+                {
+                    // Ask the lexer for the token starting here, then express its
+                    // size in code points so it stays consistent with span.col.
+                    auto token = m_lexer(line.content.tail(byteOffset));
+                    span.length = (Int64)UTF8Util::calcCodePointCount(token);
+                }
+                else if (span.length > 0 && byteOffset < line.content.getLength())
+                {
+                    // LayoutSpan::length was set from span.range.getOffset(span.range.end)
+                    // in makeLayoutSpan, which is a byte distance. Convert to code points.
+                    // SourceRange endpoints are always code-point-aligned for valid source,
+                    // so the byte slice will not end mid-sequence in practice.
+                    auto tail = line.content.tail(byteOffset);
+                    auto cappedLen = std::min(tail.getLength(), (Index)span.length);
+                    span.length = (Int64)UTF8Util::calcCodePointCount(
+                        UnownedStringSlice(tail.begin(), tail.begin() + cappedLen));
+                }
+            }
             line.spans.add({span.col, span.length, span.label, span.isPrimary});
         }
 
@@ -791,14 +812,20 @@ String renderDiagnosticMachineReadable(
                     view->getSourceFile()->getLineAtIndex(actualLine - 1));
                 UnownedStringSlice lineContent =
                     UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
-                if (lineContent.getLength() > 0 && beginLoc.column > 0 &&
-                    beginLoc.column - 1 < lineContent.getLength())
+                if (lineContent.getLength() > 0 && beginLoc.column > 0)
                 {
-                    Int64 tokenLen = sll(lineContent.tail(beginLoc.column - 1)).getLength();
-                    if (tokenLen > 0)
+                    // beginLoc.column is a 1-based code-point index; convert to byte offset
+                    auto byteOffset =
+                        UTF8Util::codePointIndexToByteOffset(lineContent, beginLoc.column - 1);
+                    if (byteOffset < lineContent.getLength())
                     {
-                        endLoc.line = beginLoc.line;
-                        endLoc.column = beginLoc.column + tokenLen;
+                        auto token = sll(lineContent.tail(byteOffset));
+                        Int64 tokenLen = (Int64)UTF8Util::calcCodePointCount(token);
+                        if (tokenLen > 0)
+                        {
+                            endLoc.line = beginLoc.line;
+                            endLoc.column = beginLoc.column + tokenLen;
+                        }
                     }
                 }
             }
