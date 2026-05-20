@@ -2612,7 +2612,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 builder.addDecorationIfNotExist(elementType, kIROp_SPIRVBlockDecoration);
                 t->replaceUsesWith(builder.getPtrType(
                     elementType,
-                    AccessQualifier::ReadWrite,
+                    AccessQualifier::Immutable,
                     AddressSpace::Uniform,
                     constantBufferType->getDataLayout()));
             }
