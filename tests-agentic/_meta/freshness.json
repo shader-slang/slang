@@ -1,5 +1,12 @@
 {
   "bundles": {
+    "architecture/overview": {
+      "generated_at": "2026-05-20T13:03:34+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "74db89b9f77cdced9c4d0c47f377b38fffb9180b",
+      "source_doc_digest": "3895e3132d3762339ddfb3fedad04d48dc40bec19e81e36ba65ac96233bbe55f",
+      "watched_paths_digest": "b5bae7d719ddfca09ffeb7d96497c5c488f8241c98977291cb22b1aef784eac1"
+    },
     "ast-reference/base": {
       "generated_at": "2026-05-20T12:42:37+00:00",
       "model": "claude-opus-4-7",
@@ -14,12 +21,40 @@
       "source_doc_digest": "35cfb9612e0af198f089e0c87a82055a4f43737c2865d74d83133722d9f18bda",
       "watched_paths_digest": "a79bc9266564f8d663b4a60ade42dd146b58decdeb8ab1715ae4cd41e01a9a09"
     },
+    "cross-cutting/ir-instructions": {
+      "generated_at": "2026-05-20T13:03:34+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "74db89b9f77cdced9c4d0c47f377b38fffb9180b",
+      "source_doc_digest": "a0fb638618164f0a2ef326bfc1eda1d1f8d37d916fbe5842e1ae309d082169f9",
+      "watched_paths_digest": "a7b1c184243cc33ab7365f1e766ae76123f4e9039f529babd0a030cb03949933"
+    },
     "pipeline/01-lex-preprocess": {
       "generated_at": "2026-05-20T12:42:37+00:00",
       "model": "claude-opus-4-7",
       "source_commit": "ef4af96c0996402dfe65ab0fdd347e4ae7e1a742",
       "source_doc_digest": "53eade2c502f9bd2f30352a014642950f055df72b7f060a240ff34569eafbeea",
       "watched_paths_digest": "9219ab7235ed9a6e491e941233bae687c32aefd89c797c71c233bfcbbb57b829"
+    },
+    "pipeline/02-parse-ast": {
+      "generated_at": "2026-05-20T13:03:34+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "74db89b9f77cdced9c4d0c47f377b38fffb9180b",
+      "source_doc_digest": "977f6e495e28bc2ba271733427de33d6aa497d32ec2fd71b39151f0476b5887b",
+      "watched_paths_digest": "4b0540420709071d4ae8e6fb49464229e1ed4854c95ebaf2ab3f36c22ad3b022"
+    },
+    "pipeline/03-semantic-check": {
+      "generated_at": "2026-05-20T13:03:34+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "74db89b9f77cdced9c4d0c47f377b38fffb9180b",
+      "source_doc_digest": "7cb7a8661d1aff4316b63053539fe2827ef6a707dcb4338674753b06c8afbfa9",
+      "watched_paths_digest": "47917e9e7bbd0d4c7cec93d02043b25787343696017d2490659c825a87e68dbe"
+    },
+    "pipeline/overview": {
+      "generated_at": "2026-05-20T13:03:34+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "74db89b9f77cdced9c4d0c47f377b38fffb9180b",
+      "source_doc_digest": "2e3bb175b1486e8d48ac5bf18b268c81bf3df2a8052f3710c5bcd10f29b748e8",
+      "watched_paths_digest": "91822d0ba2727d055b7f1218dcd8a2ac05ac7c9441d7fe565ec6c3cc599ea206"
     },
     "syntax-reference/keywords-and-builtins": {
       "generated_at": "2026-05-20T12:42:37+00:00",

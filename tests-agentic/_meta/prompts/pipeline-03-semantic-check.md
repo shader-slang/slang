@@ -91,6 +91,30 @@ claims that the doc does not make.
 - `source/slang/slang-diagnostics.lua` (for diagnostic codes and
   message text)
 
+## DIAGNOSTIC_TEST lessons (gotchas observed during this bundle)
+
+- Caret columns are matched **exactly**. The `^` (or `^^^...`) on
+  every `//CHECK:` / `/*CHECK:` line must align to the actual
+  column range of the offending token in the rendered diagnostic.
+  When unsure, run the test once and copy the runner's "Suggested
+  annotations you can copy" block — it is authoritative.
+- A `^` at source-column 1–9 is impossible to express with `//CHECK:`
+  (the `//CHECK:` prefix consumes those columns). Use the
+  `/*CHECK: ... */` block-comment form, where the carets sit on
+  fresh lines under the source line they pin.
+- `non-exhaustive` is **an argument inside the `(diag=CHECK, ...)`
+  parens**, not a top-level prefix:
+  `//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):`.
+- Exhaustive mode rejects a test that has `non-exhaustive` but
+  annotates every emitted diagnostic ("Unnecessary 'non-exhaustive'").
+  Use `non-exhaustive` only when there are companion diagnostics
+  you intentionally do not want to pin (e.g. "candidate: …" notes
+  attached to an overload-resolution failure).
+- Some diagnostics attach to a different line than the user-visible
+  offending one — e.g. `missing-return` (W41010) attaches to the
+  function's signature line, not the closing brace. Place the
+  `/*CHECK:` block immediately after that line.
+
 ## Quality checklist (in addition to `_common.md`'s)
 
 - [ ] Every test's `doc_ref` resolves to an existing anchor in
