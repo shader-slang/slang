@@ -2180,11 +2180,10 @@ void HLSLSourceEmitter::_emitStageAccessSemantic(
 
 bool HLSLSourceEmitter::_shouldEmitPayloadAccessQualifiers()
 {
-    auto profile = getTargetProgram()->getOptionSet().getProfile();
-    if (profile.getFamily() != ProfileFamily::DX)
+    if (m_effectiveProfile.getFamily() != ProfileFamily::DX)
         return false;
 
-    return profile.getVersion() >= ProfileVersion::DX_6_7;
+    return m_effectiveProfile.getVersion() >= ProfileVersion::DX_6_7;
 }
 
 void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
