@@ -89,46 +89,11 @@ witness-side sharing a key, generic body yielding a func).
 
 ## Doc gaps observed
 
-- The doc's `### generic` notable-opcode discussion states "Each
-  `generic` has a single block, and that block ends with a `yield`
-  (not a `return_val`) whose operand is the result of the type-
-  level computation." The actual LOWER-TO-IR dump shows
-  `return_val(%func)` rather than a `yield`-spelled terminator —
-  the `yield` opcode is the underlying instruction but the dump
-  prints it as `return_val` at this stage. A clarifying note on
-  the dump-vs-internal spelling would prevent test-author
-  confusion. (See `generic-body-yields-func.slang`.)
-- The `### key / StructKey` discussion describes the role of the
-  key as "globally linkable IR value" but does not specify the
-  shape of the `[export(...)]` linkage decoration (the per-field
-  key uses the field-export pattern `_SVR...`, distinct from the
-  `key__...` prefix used for interface requirements). A worked
-  example showing both forms side-by-side would prevent over-
-  specific FileCheck patterns.
-- The `### func` notable-opcode discussion notes "the function
-  signature is on the `func` itself via its type" but does not
-  call out that the printed form is `func %name : Func(retT,
-  paramT...)` — the `Func(...)` constructor wraps the return type
-  followed by parameter types in source order. A one-line note
-  would anchor consumer tests.
-- The `Module` table row lists `module` as the top-level
-  container but does not name a `-dump-ir`-observable anchor for
-  the `module` opcode itself (the dump preamble is large and not
-  stable across versions). A note that `module` is implicitly
-  observed via the existence of its top-level children, rather
-  than as a named line in the dump, would clarify the
-  testing-vs-internal observability boundary.
-- The `Functions and generics` table row for `param` says
-  "Documented in detail in control-flow.md", but the function-
-  signature role (entry-block params holding the declared
-  function parameters) is *not* documented in `control-flow.md`
-  (which anchors `param` in its block-parameter / phi-replacement
-  role only). A brief note in `structure.md` that the entry block
-  of a `func` carries the function's parameters as `param`
-  children — in declaration order — would close the gap.
-- The `Global state` row for `global_var` says "Module-scope
-  mutable variable" but does not call out the dump shape: a
-  one-block body that returns the initializer value
-  (`return_val(<init>)`). A short example would prevent
-  test-authors from expecting a bare module-scope `let` with the
-  initializer inlined.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#generic](../../../docs/llm-generated/ir-reference/structure.md#generic) | undocumented-behavior | The doc's `### generic` notable-opcode discussion states "Each `generic` has a single block, and that block ends with a `yield` (not a `return_val`) whose operand is the result of the type- level computation." The actual LOWER-TO-IR dump shows `return_val(%func)` rather than a `yield`-spelled terminator — the `yield` opcode is the underlying instruction but the dump prints it as `return_val` at this stage. A clarifying note on the dump-vs-internal spelling would prevent test-author confusion. (See `generic-body-yields-func.slang`.) |  |
+| [#key-structkey](../../../docs/llm-generated/ir-reference/structure.md#key-structkey) | missing-example | The `### key / StructKey` discussion describes the role of the key as "globally linkable IR value" but does not specify the shape of the `[export(...)]` linkage decoration (the per-field key uses the field-export pattern `_SVR...`, distinct from the `key__...` prefix used for interface requirements). | A worked example showing both forms side-by-side would prevent over- specific FileCheck patterns. |
+| [#func](../../../docs/llm-generated/ir-reference/structure.md#func) | undocumented-behavior | The `### func` notable-opcode discussion notes "the function signature is on the `func` itself via its type" but does not call out that the printed form is `func %name : Func(retT, paramT...)` — the `Func(...)` constructor wraps the return type followed by parameter types in source order. | A one-line note would anchor consumer tests. |
+| [#module](../../../docs/llm-generated/ir-reference/structure.md#module) | undocumented-behavior | The `Module` table row lists `module` as the top-level container but does not name a `-dump-ir`-observable anchor for the `module` opcode itself (the dump preamble is large and not stable across versions). | A note that `module` is implicitly observed via the existence of its top-level children, rather than as a named line in the dump, would clarify the testing-vs-internal observability boundary. |
+| [#documented-in-detail-in-control-flowmd](../../../docs/llm-generated/ir-reference/structure.md#documented-in-detail-in-control-flowmd) | undocumented-behavior | The `Functions and generics` table row for `param` says "Documented in detail in control-flow.md", but the function- signature role (entry-block params holding the declared function parameters) is *not* documented in `control-flow.md` (which anchors `param` in its block-parameter / phi-replacement role only). A brief note in `structure.md` that the entry block of a `func` carries the function's parameters as `param` children — in declaration order — would close the gap. |  |
+| [#module-scope-mutable-variable](../../../docs/llm-generated/ir-reference/structure.md#module-scope-mutable-variable) | undocumented-behavior | The `Global state` row for `global_var` says "Module-scope mutable variable" but does not call out the dump shape: a one-block body that returns the initializer value (`return_val(<init>)`). | A short example would prevent test-authors from expecting a bare module-scope `let` with the initializer inlined. |

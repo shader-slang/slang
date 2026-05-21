@@ -127,147 +127,27 @@ function bodies of byte-address-buffer accessors).
 
 ## Doc gaps observed
 
-- The `atomic-operations` table lists `atomicSub` as a distinct
-  opcode, but `Atomic<T>` does not expose a `sub(v)` method on its
-  natural surface — `a.add(-v)` lowers to `atomicAdd(%p, -%v)`,
-  not `atomicSub`. The doc should either name the AST surface that
-  produces `atomicSub` (perhaps an IR pass that folds `add(-v)`
-  into `sub`) or note that `atomicSub` is synthesized.
-- The doc's HLSL-intrinsic-mapped atomic rows (`InterlockedAdd` →
-  `atomicAdd`, `InterlockedCompareExchange` → `atomicCompareExchange`,
-  etc.) imply the opcodes are produced at LOWER-TO-IR, but in the
-  observed dump the `Interlocked*` intrinsics remain as
-  `call %InterlockedAdd(...)` etc.; only an IR pass later rewrites
-  them to atomic opcodes. The portable surface that does produce
-  the opcodes directly is the `Atomic<T>` core-module type — the
-  doc should mention this surface alongside the HLSL intrinsics.
-- The `buffer-load-and-store` table lists `rwstructuredBufferStore`
-  with AST origin "`rwBuf[i] = val` lowering in
-  `slang-lower-to-ir.cpp`", but the observed lowering of
-  `rwBuf[i] = val` is `rwstructuredBufferGetElementPtr` followed by
-  `store`, not `rwstructuredBufferStore`. The doc should either
-  name a different surface that produces `rwstructuredBufferStore`
-  or mark it "(synthesized by an IR pass)".
-- The `buffer-load-and-store` table lists
-  `structuredBufferLoadStatus` / `rwstructuredBufferLoadStatus`
-  produced by the `Load(idx, out status)` overload, but in the
-  `compute` stage on `spirv` the overload is gated behind a
-  capability flag and emits `E36107`. The doc should either name
-  the required capability or note the overload's gating.
-- The `barriers-and-synchronization` row says
-  `GroupMemoryBarrierWithGroupSync` is the opcode produced by the
-  same-named intrinsic, but at LOWER-TO-IR the intrinsic surfaces
-  as `call %GroupMemoryBarrierWithGroupSync()` — the opcode form
-  must appear later in the pipeline. Same observation applies to
-  `ControlBarrier` and `BeginFragmentShaderInterlock` /
-  `EndFragmentShaderInterlock`.
-- The `wave-intrinsics` table similarly lists
-  `waveGetActiveMask` / `waveMaskBallot` / `waveMaskMatch` as the
-  opcodes produced by their same-named intrinsics, but at
-  LOWER-TO-IR they surface as `call %WaveGetActiveMask(...)`. The
-  doc should clarify the stage at which the call form is rewritten
-  to the opcode form.
-- The `texture-and-image` and `sampling-and-combined-samplers`
-  tables list `imageLoad` / `imageStore` / `imageSubscript` /
-  `sample` / `sampleGrad` as the opcodes produced by
-  `Texture*::Load`, `Texture*::Sample`, `rwtex[uv]`, and
-  `rwtex[uv] = v` respectively. At LOWER-TO-IR the user `main` body
-  hosts a `call specialize(%Load, ...)` / `%Sample` /
-  `%operatorx5Bx5Dx5Fget` / `%operatorx5Bx5Dx5Fset`; the named
-  opcodes live inside those library functions' `GenericAsm` bodies
-  and are not observable from `main`. The doc should either name
-  the IR pass that inlines and replaces the call with the opcode,
-  or describe the observation method (look inside the library
-  helper body, not main).
-- The `resource-queries-and-modifiers` table lists
-  `StructuredBufferGetDimensions` with AST origin
-  `StructuredBuffer::GetDimensions` method, but the natural
-  surface lowers to a `call %StructuredBufferx5FGetDimensions(...)`
-  on the helper function; the opcode itself appears only inside
-  that helper's body. Same caveat as for the image/sample opcodes
-  above.
-- The `buffer-load-and-store` table does not state the runtime
-  behavior of out-of-range buffer indices (one-past-end, negative
-  signed indices, indices larger than the runtime element count).
-  The boundary tests (`*-load-int-max-literal.slang`,
-  `*-load-negative-index-literal.slang`,
-  `*-getelementptr-int-max-literal.slang`,
-  `*-getelementptr-negative-index-literal.slang`) probe these
-  boundaries at the IR-shape level only; runtime semantics
-  (silent ignore / clamp / diagnostic / UB) should be added to the
-  doc.
-- The `atomic-operations` table does not state the runtime
-  semantics of integer wrap, saturation, or overflow when the
-  argument to `atomicAdd` / `atomicSub` / `atomicMin` / `atomicMax`
-  drives the stored value past `INT_MIN` / `INT_MAX` / `UINT_MAX`.
-  The boundary tests (`atomic-add-int-min-literal.slang`,
-  `atomic-add-int-max-literal.slang`,
-  `atomic-uint-add-uint-max-literal.slang`,
-  `atomic-min-int-min-literal.slang`,
-  `atomic-max-int-max-literal.slang`) probe IR-shape preservation;
-  runtime semantics should be stated.
-- The `atomic-operations` table does not state which `T` parameters
-  of `Atomic<T>` are supported. In particular, calling `.and(v)` /
-  `.or(v)` / `.xor(v)` on `Atomic<float>` is rejected with
-  `E30027` ("member not found"), but the table does not enumerate
-  which methods exist for which `T`. The doc should clarify.
-- The `nonuniformresourceindex` note states `nonUniformResourceIndex`
-  is a no-op at the value level but does not address whether the
-  opcode is emitted for compile-time-constant operands (e.g.
-  literal `0u`). The boundary tests
-  (`non-uniform-resource-index-literal-zero.slang`,
-  `non-uniform-resource-index-uint-max-literal.slang`) probe this;
-  the doc should clarify whether folding is permitted.
-- The `shader-io` row mentions `global_param` as the IR form of
-  module-scope shader parameters but does not address resource
-  binding edge cases (`register(u0)`, `register(u<MAX>)`, or
-  conflicting binding declarations). These are not exercised by
-  this bundle.
-- Atomic contention semantics: the doc states `atomicAdd` is the IR
-  form of an atomic add, but does not state how many `atomicAdd`
-  opcodes are emitted from a multi-thread dispatch where many
-  threads add to the same location. Empirically only one opcode is
-  emitted (the parallelism is implicit in the dispatch). The doc
-  should make this explicit.
-- The status-overload diagnostic gating in the doc-gap above only
-  applies to `StructuredBuffer::Load(idx, out status)`. The
-  `RWStructuredBuffer::Load(idx, out status)` overload appears
-  not to exist at all (it does not match any overload; the only
-  diagnostic is a use-of-uninitialized warning on the `status`
-  variable), and so its documented opcode `rwstructuredBufferLoadStatus`
-  has no portable Slang surface in this bundle's coverage.
-- The `texture-and-image` and `sampling-and-combined-samplers`
-  tables enumerate eight `TextureShape*` carriers (1D / 2D / 3D /
-  Cube, each with optional array, plus 2DMS) and an RW flag on
-  `RWTexture*`. The mapping between those Slang surface types and
-  the IR `TextureShape*Type` tokens (`TextureShape1DType`,
-  `TextureShape2DType`, `TextureShape3DType`, `TextureShapeCubeDType`,
-  plus the trailing array / isMS / isRW operand slots on
-  `TextureType(...)`) is not stated in the doc. Tests in this
-  expansion (`texture*-globalparam.slang`) pin the mapping in IR.
-- The doc's `sampling-and-combined-samplers` table lists `sample`
-  and `sampleGrad` but does not enumerate `Gather`, `SampleCmp`,
-  `SampleCmpLevelZero`, `SampleBias`, or `SampleLevel`. All five
-  are documented surfaces on `Texture*` in the core module and
-  all of them lower through the same `call specialize(%helper,
-  ..., TextureShape*Type, ...)` pre-inline shape in `main`. The
-  doc should either name additional opcodes that correspond to
-  them or note that they share the `sample` / `sampleGrad`
-  opcodes after inlining.
-- Texture `Load`/`Sample`/`Gather`/`SampleCmp` calls all pass the
-  texture shape, array flag, MS flag, and access flag as
-  specialization arguments to the helper at LOWER-TO-IR, but the
-  isMS slot in the `call specialize(...)` arg list for a
-  `Texture2DMS<T>::Load` is `0`, not `1` — the multi-sample-ness
-  is encoded in the texture's `global_param` type, not re-supplied
-  at the call site. The doc should state which capability slots
-  are "texture-resident" (only on the type) vs "call-resident"
-  (also passed to the helper specialization).
-- The doc lists `SamplerComparisonState` only implicitly as a
-  variant of `SamplerState`; no row enumerates its distinct IR
-  resource type. The `samplercomparisonstate-globalparam.slang`
-  test pins it as a distinct top-level `global_param` carrier
-  alongside `SamplerState`.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#atomic-operations](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#atomic-operations) | undocumented-behavior | The `atomic-operations` table lists `atomicSub` as a distinct opcode, but `Atomic<T>` does not expose a `sub(v)` method on its natural surface — `a.add(-v)` lowers to `atomicAdd(%p, -%v)`, not `atomicSub`. | The doc should either name the AST surface that produces `atomicSub` (perhaps an IR pass that folds `add(-v)` into `sub`) or note that `atomicSub` is synthesized. |
+| [#interlockedadd](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#interlockedadd) | undocumented-behavior | The doc's HLSL-intrinsic-mapped atomic rows (`InterlockedAdd` → `atomicAdd`, `InterlockedCompareExchange` → `atomicCompareExchange`, etc.) imply the opcodes are produced at LOWER-TO-IR, but in the observed dump the `Interlocked*` intrinsics remain as `call %InterlockedAdd(...)` etc.; only an IR pass later rewrites them to atomic opcodes. The portable surface that does produce the opcodes directly is the `Atomic<T>` core-module type — the doc should mention this surface alongside the HLSL intrinsics. |  |
+| [#rwbufi-val-lowering-in-slang-lower-to-ircpp](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#rwbufi-val-lowering-in-slang-lower-to-ircpp) | drift-from-source | The `buffer-load-and-store` table lists `rwstructuredBufferStore` with AST origin "`rwBuf[i] = val` lowering in `slang-lower-to-ir.cpp`", but the observed lowering of `rwBuf[i] = val` is `rwstructuredBufferGetElementPtr` followed by `store`, not `rwstructuredBufferStore`. | The doc should either name a different surface that produces `rwstructuredBufferStore` or mark it "(synthesized by an IR pass)". |
+| [#buffer-load-and-store](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#buffer-load-and-store) | undocumented-behavior | The `buffer-load-and-store` table lists `structuredBufferLoadStatus` / `rwstructuredBufferLoadStatus` produced by the `Load(idx, out status)` overload, but in the `compute` stage on `spirv` the overload is gated behind a capability flag and emits `E36107`. | The doc should either name the required capability or note the overload's gating. |
+| [#barriers-and-synchronization](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#barriers-and-synchronization) | undocumented-behavior | The `barriers-and-synchronization` row says `GroupMemoryBarrierWithGroupSync` is the opcode produced by the same-named intrinsic, but at LOWER-TO-IR the intrinsic surfaces as `call %GroupMemoryBarrierWithGroupSync()` — the opcode form must appear later in the pipeline. Same observation applies to `ControlBarrier` and `BeginFragmentShaderInterlock` / `EndFragmentShaderInterlock`. |  |
+| [#wave-intrinsics](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#wave-intrinsics) | undocumented-behavior | The `wave-intrinsics` table similarly lists `waveGetActiveMask` / `waveMaskBallot` / `waveMaskMatch` as the opcodes produced by their same-named intrinsics, but at LOWER-TO-IR they surface as `call %WaveGetActiveMask(...)`. | The doc should clarify the stage at which the call form is rewritten to the opcode form. |
+| [#texture-and-image](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#texture-and-image) | undocumented-behavior | The `texture-and-image` and `sampling-and-combined-samplers` tables list `imageLoad` / `imageStore` / `imageSubscript` / `sample` / `sampleGrad` as the opcodes produced by `Texture*::Load`, `Texture*::Sample`, `rwtex[uv]`, and `rwtex[uv] = v` respectively. At LOWER-TO-IR the user `main` body hosts a `call specialize(%Load, ...)` / `%Sample` / `%operatorx5Bx5Dx5Fget` / `%operatorx5Bx5Dx5Fset`; the named opcodes live inside those library functions' `GenericAsm` bodies and are not observable from `main`. | The doc should either name the IR pass that inlines and replaces the call with the opcode, or describe the observation method (look inside the library helper body, not main). |
+| [#resource-queries-and-modifiers](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#resource-queries-and-modifiers) | undocumented-behavior | The `resource-queries-and-modifiers` table lists `StructuredBufferGetDimensions` with AST origin `StructuredBuffer::GetDimensions` method, but the natural surface lowers to a `call %StructuredBufferx5FGetDimensions(...)` on the helper function; the opcode itself appears only inside that helper's body. Same caveat as for the image/sample opcodes above. |  |
+| [#buffer-load-and-store](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#buffer-load-and-store) | undocumented-behavior | The `buffer-load-and-store` table does not state the runtime behavior of out-of-range buffer indices (one-past-end, negative signed indices, indices larger than the runtime element count). The boundary tests (`*-load-int-max-literal.slang`, `*-load-negative-index-literal.slang`, `*-getelementptr-int-max-literal.slang`, `*-getelementptr-negative-index-literal.slang`) probe these boundaries at the IR-shape level only; runtime semantics (silent ignore / clamp / diagnostic / UB) should be added to the doc. |  |
+| [#atomic-operations](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#atomic-operations) | undocumented-behavior | The `atomic-operations` table does not state the runtime semantics of integer wrap, saturation, or overflow when the argument to `atomicAdd` / `atomicSub` / `atomicMin` / `atomicMax` drives the stored value past `INT_MIN` / `INT_MAX` / `UINT_MAX`. The boundary tests (`atomic-add-int-min-literal.slang`, `atomic-add-int-max-literal.slang`, `atomic-uint-add-uint-max-literal.slang`, `atomic-min-int-min-literal.slang`, `atomic-max-int-max-literal.slang`) probe IR-shape preservation; runtime semantics should be stated. |  |
+| [#member-not-found](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#member-not-found) | undocumented-behavior | The `atomic-operations` table does not state which `T` parameters of `Atomic<T>` are supported. In particular, calling `.and(v)` / `.or(v)` / `.xor(v)` on `Atomic<float>` is rejected with `E30027` ("member not found"), but the table does not enumerate which methods exist for which `T`. | The doc should clarify. |
+| [#nonuniformresourceindex](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#nonuniformresourceindex) | undocumented-behavior | The `nonuniformresourceindex` note states `nonUniformResourceIndex` is a no-op at the value level but does not address whether the opcode is emitted for compile-time-constant operands (e.g. literal `0u`). The boundary tests (`non-uniform-resource-index-literal-zero.slang`, `non-uniform-resource-index-uint-max-literal.slang`) probe this; the doc should clarify whether folding is permitted. |  |
+| [#shader-io](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#shader-io) | undocumented-behavior | The `shader-io` row mentions `global_param` as the IR form of module-scope shader parameters but does not address resource binding edge cases (`register(u0)`, `register(u<MAX>)`, or conflicting binding declarations). These are not exercised by this bundle. |  |
+| [#atomicadd](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#atomicadd) | undocumented-behavior | Atomic contention semantics: the doc states `atomicAdd` is the IR form of an atomic add, but does not state how many `atomicAdd` opcodes are emitted from a multi-thread dispatch where many threads add to the same location. Empirically only one opcode is emitted (the parallelism is implicit in the dispatch). | The doc should make this explicit. |
+| (unspecified) | undocumented-behavior | The status-overload diagnostic gating in the doc-gap above only applies to `StructuredBuffer::Load(idx, out status)`. The `RWStructuredBuffer::Load(idx, out status)` overload appears not to exist at all (it does not match any overload; the only diagnostic is a use-of-uninitialized warning on the `status` variable), and so its documented opcode `rwstructuredBufferLoadStatus` has no portable Slang surface in this bundle's coverage. |  |
+| [#texture-and-image](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#texture-and-image) | undocumented-behavior | The `texture-and-image` and `sampling-and-combined-samplers` tables enumerate eight `TextureShape*` carriers (1D / 2D / 3D / Cube, each with optional array, plus 2DMS) and an RW flag on `RWTexture*`. The mapping between those Slang surface types and the IR `TextureShape*Type` tokens (`TextureShape1DType`, `TextureShape2DType`, `TextureShape3DType`, `TextureShapeCubeDType`, plus the trailing array / isMS / isRW operand slots on `TextureType(...)`) is not stated in the doc. Tests in this expansion (`texture*-globalparam.slang`) pin the mapping in IR. |  |
+| [#sampling-and-combined-samplers](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#sampling-and-combined-samplers) | undocumented-behavior | The doc's `sampling-and-combined-samplers` table lists `sample` and `sampleGrad` but does not enumerate `Gather`, `SampleCmp`, `SampleCmpLevelZero`, `SampleBias`, or `SampleLevel`. All five are documented surfaces on `Texture*` in the core module and all of them lower through the same `call specialize(%helper, ..., TextureShape*Type, ...)` pre-inline shape in `main`. | The doc should either name additional opcodes that correspond to them or note that they share the `sample` / `sampleGrad` opcodes after inlining. |
+| [#texture-resident](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#texture-resident) | undocumented-behavior | Texture `Load`/`Sample`/`Gather`/`SampleCmp` calls all pass the texture shape, array flag, MS flag, and access flag as specialization arguments to the helper at LOWER-TO-IR, but the isMS slot in the `call specialize(...)` arg list for a `Texture2DMS<T>::Load` is `0`, not `1` — the multi-sample-ness is encoded in the texture's `global_param` type, not re-supplied at the call site. | The doc should state which capability slots are "texture-resident" (only on the type) vs "call-resident" (also passed to the helper specialization). |
+| [#samplercomparisonstate](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#samplercomparisonstate) | undocumented-behavior | The doc lists `SamplerComparisonState` only implicitly as a variant of `SamplerState`; no row enumerates its distinct IR resource type. The `samplercomparisonstate-globalparam.slang` test pins it as a distinct top-level `global_param` carrier alongside `SamplerState`. |  |
 
 ## Out of scope (no-GPU runner)
 

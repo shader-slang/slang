@@ -189,72 +189,19 @@ specifically about HLSL being non-Khronos.
 
 ## Doc gaps observed
 
-- The doc's Phase D table mentions the `HLSLSourceEmitter` and the
-  emit step but does not name `#pragma pack_matrix(column_major)`
-  as the canonical HLSL prelude marker, or describe the
-  `#ifdef SLANG_HLSL_ENABLE_NVAPI` guarded `nvHLSLExtns.h` include.
-  A one-line statement of these two emit-prelude facts would
-  let a test anchor them precisely; this bundle anchors them
-  to the general `#phase-d-hlsl-emit-and-downstream-tools`
-  section.
-- The doc's `## wrapStructuredBuffersOfMatrices` section
-  describes wrapping the matrix element of a `StructuredBuffer`
-  but does not state the emit-time naming convention
-  (`_S<N>` for the wrapper struct, `_MatrixStorage_<spelling>natural_<N>`
-  for the storage form picked up via `cbuffer` with `row_major`).
-  Documenting these names would let a test pin the exact
-  spelling rather than a regex; this bundle uses regex
-  wildcards.
-- The doc does not state that `legalizeUniformBufferLoad` is
-  observable through any specific HLSL emit pattern. We have
-  no test for it because the doc does not anchor a checkable
-  marker.
-- The doc's `## legalizeLogicalAndOr` notes that DXC
-  short-circuits `&&` / `||` on scalars only, and that the IR
-  pass rewrites short-circuit ops over vectors. The doc does
-  not specify what the emitted text looks like in the rewritten
-  form (e.g. element-wise `select` calls vs. preserved `&&` on
-  vectors that the underlying HLSL accepts). We do not test
-  this claim because the emit-side observation is not
-  pinned by the doc.
-- The doc's `## floatNonUniformResourceIndex` mentions the
-  `NonUniformResourceIndex(...)` HLSL intrinsic but does not
-  give a Slang-language way to surface it on a compute-stage
-  entry point. The natural surface is a graphics-pipeline
-  bindless workflow that the no-GPU compute bundle cannot
-  exercise; no test in this bundle.
-- The doc's Phase A table lists `addDenormalModeDecorations`
-  as always-on, but does not state any user-observable HLSL
-  emit marker for denormal mode. No test.
-- The doc lists `applyVariableScopeCorrection` as running for
-  HLSL but does not name an observable emit pattern (HLSL
-  scoping is implicit in the surrounding `if`/`while`
-  blocks). No test.
-- The doc's Phase C diagram mentions `unexportNonEmbeddableIR`
-  as gated on `EmbedDownstreamIR`. The `-embed-downstream-ir`
-  switch is a command-line surface; the doc does not anchor a
-  text-emit marker.
-- The doc's `## Source` table cites line numbers
-  (`linkAndOptimizeIR` at line ~893, `emitEntryPointsSourceFromIR`
-  at line ~2418, the `HLSLSourceEmitter` constructor at line
-  ~2507). These are navigation aids and not user-observable;
-  no test.
-- The doc states "HLSL has no iterative passes in
-  `linkAndOptimizeIR`" but the consequence ("no extra
-  simplification loop in the pass log") is not observable
-  through `slangc -target hlsl` text. No test.
-- The doc's Phase D table mentions `HLSLSourceEmitter` walks the
-  IR and writes HLSL text, but does not enumerate which texture
-  variants survive (`Texture1D`, `Texture2DArray`,
-  `TextureCubeArray`, `Texture2DMS<T,N>`, `RWTexture1D`,
-  `RWTexture2D`, `RWTexture3D`, `SamplerComparisonState`) nor
-  the canonical method spellings (`Sample`, `SampleLevel`,
-  `SampleGrad`, `Load`, `GatherRed`/`GatherGreen`/`GatherBlue`/`GatherAlpha`,
-  `SampleCmp`, `SampleCmpLevelZero`). A one-line statement that
-  each Slang texture/sampler variant emits as the same HLSL
-  native type name with the matching `register(t|u|s)` class
-  would let tests anchor more precisely than the general
-  `#phase-d-hlsl-emit-and-downstream-tools` section.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#pragma](../../../docs/llm-generated/target-pipelines/hlsl.md#pragma) | undocumented-behavior | The doc's Phase D table mentions the `HLSLSourceEmitter` and the emit step but does not name `#pragma pack_matrix(column_major)` as the canonical HLSL prelude marker, or describe the `#ifdef SLANG_HLSL_ENABLE_NVAPI` guarded `nvHLSLExtns.h` include. | A one-line statement of these two emit-prelude facts would let a test anchor them precisely; this bundle anchors them to the general `#phase-d-hlsl-emit-and-downstream-tools` section. |
+| [#wrapstructuredbuffersofmatrices](../../../docs/llm-generated/target-pipelines/hlsl.md#wrapstructuredbuffersofmatrices) | undocumented-behavior | The doc's `## wrapStructuredBuffersOfMatrices` section describes wrapping the matrix element of a `StructuredBuffer` but does not state the emit-time naming convention (`_S<N>` for the wrapper struct, `_MatrixStorage_<spelling>natural_<N>` for the storage form picked up via `cbuffer` with `row_major`). Documenting these names would let a test pin the exact spelling rather than a regex; this bundle uses regex wildcards. |  |
+| [#legalizeuniformbufferload](../../../docs/llm-generated/target-pipelines/hlsl.md#legalizeuniformbufferload) | undocumented-behavior | The doc does not state that `legalizeUniformBufferLoad` is observable through any specific HLSL emit pattern. We have no test for it because the doc does not anchor a checkable marker. |  |
+| [#legalizelogicalandor](../../../docs/llm-generated/target-pipelines/hlsl.md#legalizelogicalandor) | undocumented-behavior | The doc's `## legalizeLogicalAndOr` notes that DXC short-circuits `&&` / `\|\|` on scalars only, and that the IR pass rewrites short-circuit ops over vectors. The doc does not specify what the emitted text looks like in the rewritten form (e.g. element-wise `select` calls vs. preserved `&&` on vectors that the underlying HLSL accepts). We do not test this claim because the emit-side observation is not pinned by the doc. |  |
+| [#floatnonuniformresourceindex](../../../docs/llm-generated/target-pipelines/hlsl.md#floatnonuniformresourceindex) | undocumented-behavior | The doc's `## floatNonUniformResourceIndex` mentions the `NonUniformResourceIndex(...)` HLSL intrinsic but does not give a Slang-language way to surface it on a compute-stage entry point. The natural surface is a graphics-pipeline bindless workflow that the no-GPU compute bundle cannot exercise; no test in this bundle. |  |
+| [#adddenormalmodedecorations](../../../docs/llm-generated/target-pipelines/hlsl.md#adddenormalmodedecorations) | undocumented-behavior | The doc's Phase A table lists `addDenormalModeDecorations` as always-on, but does not state any user-observable HLSL emit marker for denormal mode. No test. |  |
+| [#applyvariablescopecorrection](../../../docs/llm-generated/target-pipelines/hlsl.md#applyvariablescopecorrection) | undocumented-behavior | The doc lists `applyVariableScopeCorrection` as running for HLSL but does not name an observable emit pattern (HLSL scoping is implicit in the surrounding `if`/`while` blocks). No test. |  |
+| [#unexportnonembeddableir](../../../docs/llm-generated/target-pipelines/hlsl.md#unexportnonembeddableir) | undocumented-behavior | The doc's Phase C diagram mentions `unexportNonEmbeddableIR` as gated on `EmbedDownstreamIR`. The `-embed-downstream-ir` switch is a command-line surface; the doc does not anchor a text-emit marker. |  |
+| [#source](../../../docs/llm-generated/target-pipelines/hlsl.md#source) | undocumented-behavior | The doc's `## Source` table cites line numbers (`linkAndOptimizeIR` at line ~893, `emitEntryPointsSourceFromIR` at line ~2418, the `HLSLSourceEmitter` constructor at line ~2507). These are navigation aids and not user-observable; no test. |  |
+| [#hlsl-has-no-iterative-passes-in-linkandoptimizeir](../../../docs/llm-generated/target-pipelines/hlsl.md#hlsl-has-no-iterative-passes-in-linkandoptimizeir) | undocumented-behavior | The doc states "HLSL has no iterative passes in `linkAndOptimizeIR`" but the consequence ("no extra simplification loop in the pass log") is not observable through `slangc -target hlsl` text. No test. |  |
+| [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools) | undocumented-behavior | The doc's Phase D table mentions `HLSLSourceEmitter` walks the IR and writes HLSL text, but does not enumerate which texture variants survive (`Texture1D`, `Texture2DArray`, `TextureCubeArray`, `Texture2DMS<T,N>`, `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `SamplerComparisonState`) nor the canonical method spellings (`Sample`, `SampleLevel`, `SampleGrad`, `Load`, `GatherRed`/`GatherGreen`/`GatherBlue`/`GatherAlpha`, `SampleCmp`, `SampleCmpLevelZero`). | A one-line statement that each Slang texture/sampler variant emits as the same HLSL native type name with the matching `register(t\|u\|s)` class would let tests anchor more precisely than the general `#phase-d-hlsl-emit-and-downstream-tools` section. |
 
 ## Out of scope (no-GPU runner)
 

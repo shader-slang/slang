@@ -95,48 +95,15 @@ C++ for positive coverage and GLSL / WGSL for negative coverage).
 
 ## Doc gaps observed
 
-- The doc lists `slang-emit.cpp` line numbers ("line 893", "line 2418
-  at `source_commit`") for `linkAndOptimizeIR` and
-  `emitEntryPointsSourceFromIR`. These are navigation aids, not
-  user-facing claims; no test anchors them.
-- The doc's preludes table groups HLSL with the prelude-having
-  targets, but the HLSL emit only includes `nvHLSLExtns.h`
-  conditionally (`#ifdef SLANG_HLSL_ENABLE_NVAPI`). A one-line note
-  in the doc that HLSL's prelude inclusion is conditional (unlike
-  CUDA / C++) would clarify what a test should check; the test in
-  this bundle pins the `SLANG_HLSL_ENABLE_NVAPI` macro rather than
-  an unconditional `#include`.
-- The doc's `## Operator precedence and parenthesization` section
-  says the helper inserts "minimal" parentheses but does not give
-  any example of an expression that requires parens vs. one that
-  does not. Two tests in this bundle cover the two cases; an
-  example pair in the doc would let an agent test these more
-  precisely.
-- The doc's `## Source-writer abstraction` section mentions
-  `LineDirectiveMode` configures the directive style (C / GLSL /
-  none) but does not state which mode is the default per target.
-  The test in this bundle pins only the existence of `#line`
-  directives on HLSL/GLSL/Metal/CUDA/C++; SPIR-V and WGSL do not
-  emit `#line` directives by default but the doc does not say so
-  explicitly.
-- The doc's `## Backends` table for Metal says "Emits Metal Shading
-  Language" but does not state that Metal assigns `buffer(N)`
-  indices positionally from the entry-point parameter list (i.e.
-  Metal does not honour `register(uN)` or `vk::binding(N)` for
-  buffer index). A one-line clarification in the doc would let the
-  test pin Metal's `buffer(N)` to a specific index; the test in
-  this bundle accepts any integer.
-- The doc's `## Backends` table lists CUDA as emitting CUDA source,
-  but does not state that CUDA uses a `GlobalParams` struct +
-  `SLANG_globalParams` shim to surface module-scope `uniform`
-  declarations. The test in this bundle confirms the
-  `SLANG_globalParams`/`__constant__ GlobalParams_0` shape, which
-  the doc does not currently describe.
-- The doc's `## Preludes` table column for "C++ host" points at
-  `slang-cpp-host-prelude.h`, but the doc does not state when this
-  prelude is selected vs. `slang-cpp-prelude.h`. We test only the
-  shader-side prelude (`slang-cpp-prelude.h`) because that is the
-  one chosen by `-target cpp` for a compute entry point.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#line-893](../../../docs/llm-generated/pipeline/06-emit.md#line-893) | undocumented-behavior | The doc lists `slang-emit.cpp` line numbers ("line 893", "line 2418 at `source_commit`") for `linkAndOptimizeIR` and `emitEntryPointsSourceFromIR`. These are navigation aids, not user-facing claims; no test anchors them. |  |
+| [#ifdef](../../../docs/llm-generated/pipeline/06-emit.md#ifdef) | undocumented-behavior | The doc's preludes table groups HLSL with the prelude-having targets, but the HLSL emit only includes `nvHLSLExtns.h` conditionally (`#ifdef SLANG_HLSL_ENABLE_NVAPI`). | A one-line note in the doc that HLSL's prelude inclusion is conditional (unlike CUDA / C++) would clarify what a test should check; the test in this bundle pins the `SLANG_HLSL_ENABLE_NVAPI` macro rather than an unconditional `#include`. |
+| [#operator-precedence-and-parenthesization](../../../docs/llm-generated/pipeline/06-emit.md#operator-precedence-and-parenthesization) | undocumented-behavior | The doc's `## Operator precedence and parenthesization` section says the helper inserts "minimal" parentheses but does not give any example of an expression that requires parens vs. one that does not. Two tests in this bundle cover the two cases; an example pair in the doc would let an agent test these more precisely. |  |
+| [#line](../../../docs/llm-generated/pipeline/06-emit.md#line) | undocumented-behavior | The doc's `## Source-writer abstraction` section mentions `LineDirectiveMode` configures the directive style (C / GLSL / none) but does not state which mode is the default per target. The test in this bundle pins only the existence of `#line` directives on HLSL/GLSL/Metal/CUDA/C++; SPIR-V and WGSL do not emit `#line` directives by default but the doc does not say so explicitly. |  |
+| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | undocumented-behavior | The doc's `## Backends` table for Metal says "Emits Metal Shading Language" but does not state that Metal assigns `buffer(N)` indices positionally from the entry-point parameter list (i.e. Metal does not honour `register(uN)` or `vk::binding(N)` for buffer index). | A one-line clarification in the doc would let the test pin Metal's `buffer(N)` to a specific index; the test in this bundle accepts any integer. |
+| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | undocumented-behavior | The doc's `## Backends` table lists CUDA as emitting CUDA source, but does not state that CUDA uses a `GlobalParams` struct + `SLANG_globalParams` shim to surface module-scope `uniform` declarations. The test in this bundle confirms the `SLANG_globalParams`/`__constant__ GlobalParams_0` shape, which the doc does not currently describe. |  |
+| [#preludes](../../../docs/llm-generated/pipeline/06-emit.md#preludes) | undocumented-behavior | The doc's `## Preludes` table column for "C++ host" points at `slang-cpp-host-prelude.h`, but the doc does not state when this prelude is selected vs. `slang-cpp-prelude.h`. We test only the shader-side prelude (`slang-cpp-prelude.h`) because that is the one chosen by `-target cpp` for a compute entry point. |  |
 
 ## Out of scope (no-GPU runner)
 

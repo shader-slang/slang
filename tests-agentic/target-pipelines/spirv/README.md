@@ -198,133 +198,30 @@ text and are out of scope.
 
 ## Doc gaps observed
 
-- The doc enumerates the Phase D word-emission steps
-  (`emitDebug`, `emitParams`, `emitEPs`, `emitFront`,
-  `emitPhys`) but does not name the canonical SPIR-V text
-  prelude markers (`; SPIR-V`, `; Version: 1.X`,
-  `OpCapability Shader`, `OpMemoryModel Logical GLSL450`,
-  `SPV_KHR_storage_buffer_storage_class`,
-  `OpSource Slang 1`). A one-line statement of these
-  prelude facts would let a test anchor them precisely;
-  the bundle anchors them to the general
-  `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`
-  section.
-- The doc does not name the storage-class assignments
-  (`StorageBuffer` for `StructuredBuffer`, `Uniform` for
-  `cbuffer`, `Workgroup` for `groupshared`,
-  `UniformConstant` for textures/samplers, `Input` for
-  varying inputs). These are core to the SPIR-V emit but
-  are inferred via cross-referencing `legalizeEntryPointsForGLSL`
-  and the per-target storage-class table. A doc table
-  enumerating storage classes per Slang resource type
-  would be useful.
-- The doc names `legalizeConstantBufferLoadForGLSL` and
-  `lowerBufferElementTypeToStorageType` but does not state
-  that the emitted SPIR-V uses the `*_std140`-suffixed
-  wrapper-struct convention (visible in
-  `OpName %SLANG_ParameterGroup_<name>_std140 ...`). A
-  one-line statement of this would let a test pin the
-  exact spelling rather than a regex; the bundle uses
-  regex wildcards.
-- The doc's `## Source` table cites line numbers (`linkAndOptimizeIR`
-  at line ~893, `emitSPIRVForEntryPointsDirectly` at line ~3122,
-  etc.). These are navigation aids and not user-observable;
-  no test.
-- The doc states `simplifyIRForSpirvLegalization` settles in
-  2-3 outer iterations in practice but has no documented
-  observable consequence; no test.
-- The doc lists `addUserTypeHintDecorations` as gated on
-  `VulkanEmitReflection`. The doc does not name an emit
-  marker; this is a reflection-only feature, not a SPIR-V
-  text observable. No test.
-- The doc's `## Forward-declared pointer fixup` describes the
-  loop but does not give a user-source pattern that triggers
-  it. Slang's `checkForRecursiveTypes` rejects recursive
-  structs, so the loop is unreachable from compute-stage
-  user code. No test.
-- The doc says `OpEntryPoint` operands include all variables
-  the entry point references but does not say the entry-point
-  string operand is always `"main"` regardless of the Slang
-  entry-point function name. We pin this via experiment in
-  the test `entry-point-name-symbol-vs-string.slang`; a doc
-  statement would be cleaner.
-- The doc says `validateAtomicOperations` is called inside
-  `legalizeIRForSPIRV` but does not state which SPIR-V opcode
-  `InterlockedAdd` lowers to. We pin `OpAtomicIAdd` from
-  emit-experiment.
-- The doc says `legalizeLogicalAndOr` runs for SPIR-V (Khronos
-  arm) but does not state the SPIR-V opcode the vector `&&`
-  produces. We pin `OpLogicalAnd` from emit-experiment.
-- The doc names `legalizeEntryPointsForGLSL` but does not list
-  the HLSL-SV-to-SPIR-V builtin mapping table
-  (`SV_DispatchThreadID -> gl_GlobalInvocationID`,
-  `SV_GroupThreadID -> gl_LocalInvocationID`,
-  `SV_GroupID -> gl_WorkGroupID`,
-  `SV_VertexID -> gl_VertexIndex`,
-  `SV_InstanceID -> gl_InstanceIndex`, etc.). The new builtin
-  tests pin these mappings from emit-experiment; a doc table
-  would make them anchorable to a specific row.
-- The doc names `validateAtomicOperations` but lists only `IAdd`
-  as the example. We pin `OpAtomicCompareExchange`,
-  `OpAtomicUMin`, and `OpAtomicOr` from emit-experiment as
-  additional accepted opcodes.
-- The doc names `legalizeImageSubscript` and `OpTypeSampledImage`
-  but does not enumerate the SPIR-V image-dim values for the
-  Slang texture-type family (`Texture2D`/`Texture3D`/`TextureCube`/
-  `Texture2DArray`). The dim and Arrayed bit are user-observable
-  in spirv-asm and would benefit from explicit doc rows.
-- The doc does not state the full 7-operand `OpTypeImage` encoding
-  emitted by Slang (`%sampled-type Dim Depth Arrayed MS Sampled
-  Format`). In particular: the Depth operand is `2` ("no
-  indication" / Unknown) rather than the SPIR-V-spec default of
-  `0`, and the Format operand is `Unknown` for `Texture*<floatN>`
-  but `Rgba32ui` for `RWTexture*<uintN>` (set by
-  `resolveTextureFormat`). The new image-type tests pin these
-  bit positions from emit-experiment.
-- The doc enumerates `legalizeImageSubscript` for storage-image
-  writes/reads but does not name the SPIR-V capability ladder for
-  the texture-type family: `Sampled1D` / `Image1D` (1D dim split
-  by sampled-vs-storage), `SampledBuffer` / `ImageBuffer` (Buffer
-  dim split), and `StorageImageReadWithoutFormat` /
-  `StorageImageWriteWithoutFormat` (RW texture with unresolved
-  format). The new capability tests pin these.
-- The doc does not separate the sampled-image dispatch family
-  (`OpImageSampleImplicitLod` / `OpImageSampleExplicitLod` with
-  `Lod` / `Grad` operands / `OpImageSampleDrefExplicitLod` for the
-  comparison form) from the texel-fetch family (`OpImageFetch`
-  with `Lod` for sampled images, `Sample` for MS images,
-  `OpImageRead` for storage images). All these opcodes are
-  user-observable in spirv-asm; the new SampleLevel /
-  SampleGrad / SampleImplicitLod / Load / SampleCmpLevelZero
-  tests pin them from emit-experiment.
-- The doc does not name the SPIR-V size-query opcode pair
-  `OpImageQuerySizeLod` (sampled images) vs `OpImageQuerySize`
-  (storage images, no Lod) and `OpImageQueryLevels` for the mip
-  count, nor that the `ImageQuery` capability is emitted only
-  when a size/level query is present. The new GetDimensions
-  tests pin this distinction.
-- The doc references SPIR-V version selection (`isSpirv16OrLater`,
-  `shouldEmitDiscardAsDemote`) but does not name the
-  `-profile spirv_1_6` command-line knob that flips the
-  predicate. The two discard tests pin behavior on both sides;
-  a doc note linking the CLI flag to the predicate would make
-  this anchorable.
-- The doc mentions Khronos-target capability emission per type
-  width but does not enumerate the integer-width capability
-  ladder (`Int8` / `Int16` / `Int64`) or where the corresponding
-  `UniformAndStorageBuffer*BitAccess` extensions trigger.
-- The doc mentions `GLSL.std.450` only obliquely (the via-GLSL
-  legacy path). The SPIR-V direct-emit path also relies on
-  `OpExtInstImport "GLSL.std.450"` for transcendentals; this
-  belongs in the doc's "common to all SPIR-V emit" list.
-- The doc does not name `OpSpecConstant` or the
-  `[SpecializationConstant]` -> `SpecId` mapping. Specialization
-  constants are core to Vulkan but the doc treats them as out of
-  scope; a one-line "spec-constants emit as OpSpecConstant" note
-  would let the bundle anchor that claim.
-- The doc names `OpLoopMerge` for structured control flow but
-  does not state that `[unroll]` adds the `Unroll` annotation
-  (and `[loop]` adds `DontUnroll`). Pinned by emit-experiment.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools) | undocumented-behavior | The doc enumerates the Phase D word-emission steps (`emitDebug`, `emitParams`, `emitEPs`, `emitFront`, `emitPhys`) but does not name the canonical SPIR-V text prelude markers (`; SPIR-V`, `; Version: 1.X`, `OpCapability Shader`, `OpMemoryModel Logical GLSL450`, `SPV_KHR_storage_buffer_storage_class`, `OpSource Slang 1`). | A one-line statement of these prelude facts would let a test anchor them precisely; the bundle anchors them to the general `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools` section. |
+| [#storagebuffer](../../../docs/llm-generated/target-pipelines/spirv.md#storagebuffer) | undocumented-behavior | The doc does not name the storage-class assignments (`StorageBuffer` for `StructuredBuffer`, `Uniform` for `cbuffer`, `Workgroup` for `groupshared`, `UniformConstant` for textures/samplers, `Input` for varying inputs). These are core to the SPIR-V emit but are inferred via cross-referencing `legalizeEntryPointsForGLSL` and the per-target storage-class table. A doc table enumerating storage classes per Slang resource type would be useful. |  |
+| [#legalizeconstantbufferloadforglsl](../../../docs/llm-generated/target-pipelines/spirv.md#legalizeconstantbufferloadforglsl) | undocumented-behavior | The doc names `legalizeConstantBufferLoadForGLSL` and `lowerBufferElementTypeToStorageType` but does not state that the emitted SPIR-V uses the `*_std140`-suffixed wrapper-struct convention (visible in `OpName %SLANG_ParameterGroup_<name>_std140 ...`). | A one-line statement of this would let a test pin the exact spelling rather than a regex; the bundle uses regex wildcards. |
+| [#source](../../../docs/llm-generated/target-pipelines/spirv.md#source) | undocumented-behavior | The doc's `## Source` table cites line numbers (`linkAndOptimizeIR` at line ~893, `emitSPIRVForEntryPointsDirectly` at line ~3122, etc.). These are navigation aids and not user-observable; no test. |  |
+| [#simplifyirforspirvlegalization](../../../docs/llm-generated/target-pipelines/spirv.md#simplifyirforspirvlegalization) | undocumented-behavior | The doc states `simplifyIRForSpirvLegalization` settles in 2-3 outer iterations in practice but has no documented observable consequence; no test. |  |
+| [#addusertypehintdecorations](../../../docs/llm-generated/target-pipelines/spirv.md#addusertypehintdecorations) | undocumented-behavior | The doc lists `addUserTypeHintDecorations` as gated on `VulkanEmitReflection`. The doc does not name an emit marker; this is a reflection-only feature, not a SPIR-V text observable. No test. |  |
+| [#forward-declared-pointer-fixup](../../../docs/llm-generated/target-pipelines/spirv.md#forward-declared-pointer-fixup) | undocumented-behavior | The doc's `## Forward-declared pointer fixup` describes the loop but does not give a user-source pattern that triggers it. Slang's `checkForRecursiveTypes` rejects recursive structs, so the loop is unreachable from compute-stage user code. No test. |  |
+| [#main](../../../docs/llm-generated/target-pipelines/spirv.md#main) | undocumented-behavior | The doc says `OpEntryPoint` operands include all variables the entry point references but does not say the entry-point string operand is always `"main"` regardless of the Slang entry-point function name. We pin this via experiment in the test `entry-point-name-symbol-vs-string.slang`; a doc statement would be cleaner. |  |
+| [#validateatomicoperations](../../../docs/llm-generated/target-pipelines/spirv.md#validateatomicoperations) | undocumented-behavior | The doc says `validateAtomicOperations` is called inside `legalizeIRForSPIRV` but does not state which SPIR-V opcode `InterlockedAdd` lowers to. We pin `OpAtomicIAdd` from emit-experiment. |  |
+| [#legalizelogicalandor](../../../docs/llm-generated/target-pipelines/spirv.md#legalizelogicalandor) | undocumented-behavior | The doc says `legalizeLogicalAndOr` runs for SPIR-V (Khronos arm) but does not state the SPIR-V opcode the vector `&&` produces. We pin `OpLogicalAnd` from emit-experiment. |  |
+| [#legalizeentrypointsforglsl](../../../docs/llm-generated/target-pipelines/spirv.md#legalizeentrypointsforglsl) | undocumented-behavior | The doc names `legalizeEntryPointsForGLSL` but does not list the HLSL-SV-to-SPIR-V builtin mapping table (`SV_DispatchThreadID -> gl_GlobalInvocationID`, `SV_GroupThreadID -> gl_LocalInvocationID`, `SV_GroupID -> gl_WorkGroupID`, `SV_VertexID -> gl_VertexIndex`, `SV_InstanceID -> gl_InstanceIndex`, etc.). The new builtin tests pin these mappings from emit-experiment; a doc table would make them anchorable to a specific row. |  |
+| [#validateatomicoperations](../../../docs/llm-generated/target-pipelines/spirv.md#validateatomicoperations) | undocumented-behavior | The doc names `validateAtomicOperations` but lists only `IAdd` as the example. We pin `OpAtomicCompareExchange`, `OpAtomicUMin`, and `OpAtomicOr` from emit-experiment as additional accepted opcodes. |  |
+| [#legalizeimagesubscript](../../../docs/llm-generated/target-pipelines/spirv.md#legalizeimagesubscript) | undocumented-behavior | The doc names `legalizeImageSubscript` and `OpTypeSampledImage` but does not enumerate the SPIR-V image-dim values for the Slang texture-type family (`Texture2D`/`Texture3D`/`TextureCube`/ `Texture2DArray`). The dim and Arrayed bit are user-observable in spirv-asm and would benefit from explicit doc rows. |  |
+| [#no-indication](../../../docs/llm-generated/target-pipelines/spirv.md#no-indication) | undocumented-behavior | The doc does not state the full 7-operand `OpTypeImage` encoding emitted by Slang (`%sampled-type Dim Depth Arrayed MS Sampled Format`). In particular: the Depth operand is `2` ("no indication" / Unknown) rather than the SPIR-V-spec default of `0`, and the Format operand is `Unknown` for `Texture*<floatN>` but `Rgba32ui` for `RWTexture*<uintN>` (set by `resolveTextureFormat`). The new image-type tests pin these bit positions from emit-experiment. |  |
+| [#legalizeimagesubscript](../../../docs/llm-generated/target-pipelines/spirv.md#legalizeimagesubscript) | undocumented-behavior | The doc enumerates `legalizeImageSubscript` for storage-image writes/reads but does not name the SPIR-V capability ladder for the texture-type family: `Sampled1D` / `Image1D` (1D dim split by sampled-vs-storage), `SampledBuffer` / `ImageBuffer` (Buffer dim split), and `StorageImageReadWithoutFormat` / `StorageImageWriteWithoutFormat` (RW texture with unresolved format). The new capability tests pin these. |  |
+| [#opimagesampleimplicitlod](../../../docs/llm-generated/target-pipelines/spirv.md#opimagesampleimplicitlod) | undocumented-behavior | The doc does not separate the sampled-image dispatch family (`OpImageSampleImplicitLod` / `OpImageSampleExplicitLod` with `Lod` / `Grad` operands / `OpImageSampleDrefExplicitLod` for the comparison form) from the texel-fetch family (`OpImageFetch` with `Lod` for sampled images, `Sample` for MS images, `OpImageRead` for storage images). All these opcodes are user-observable in spirv-asm; the new SampleLevel / SampleGrad / SampleImplicitLod / Load / SampleCmpLevelZero tests pin them from emit-experiment. |  |
+| [#opimagequerysizelod](../../../docs/llm-generated/target-pipelines/spirv.md#opimagequerysizelod) | undocumented-behavior | The doc does not name the SPIR-V size-query opcode pair `OpImageQuerySizeLod` (sampled images) vs `OpImageQuerySize` (storage images, no Lod) and `OpImageQueryLevels` for the mip count, nor that the `ImageQuery` capability is emitted only when a size/level query is present. The new GetDimensions tests pin this distinction. |  |
+| [#isspirv16orlater](../../../docs/llm-generated/target-pipelines/spirv.md#isspirv16orlater) | undocumented-behavior | The doc references SPIR-V version selection (`isSpirv16OrLater`, `shouldEmitDiscardAsDemote`) but does not name the `-profile spirv_1_6` command-line knob that flips the predicate. The two discard tests pin behavior on both sides; a doc note linking the CLI flag to the predicate would make this anchorable. |  |
+| [#int8](../../../docs/llm-generated/target-pipelines/spirv.md#int8) | undocumented-behavior | The doc mentions Khronos-target capability emission per type width but does not enumerate the integer-width capability ladder (`Int8` / `Int16` / `Int64`) or where the corresponding `UniformAndStorageBuffer*BitAccess` extensions trigger. |  |
+| [#glslstd450](../../../docs/llm-generated/target-pipelines/spirv.md#glslstd450) | undocumented-behavior | The doc mentions `GLSL.std.450` only obliquely (the via-GLSL legacy path). The SPIR-V direct-emit path also relies on `OpExtInstImport "GLSL.std.450"` for transcendentals; this belongs in the doc's "common to all SPIR-V emit" list. |  |
+| [#spec-constants-emit-as-opspecconstant](../../../docs/llm-generated/target-pipelines/spirv.md#spec-constants-emit-as-opspecconstant) | undocumented-behavior | The doc does not name `OpSpecConstant` or the `[SpecializationConstant]` -> `SpecId` mapping. Specialization constants are core to Vulkan but the doc treats them as out of scope; a one-line "spec-constants emit as OpSpecConstant" note would let the bundle anchor that claim. |  |
+| [#oploopmerge](../../../docs/llm-generated/target-pipelines/spirv.md#oploopmerge) | undocumented-behavior | The doc names `OpLoopMerge` for structured control flow but does not state that `[unroll]` adds the `Unroll` annotation (and `[loop]` adds `DontUnroll`). Pinned by emit-experiment. |  |
 
 ## Out of scope (no-GPU runner)
 

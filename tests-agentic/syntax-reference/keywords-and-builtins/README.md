@@ -86,60 +86,16 @@ test confirms that `let` immutability is enforced by the checker.
 
 ## Doc gaps observed
 
-- The `#complex-modifiers-take-arguments` table lists `layout`,
-  `volatile`, `coherent`, `restrict`, etc. as taking arguments, but
-  does not give a complete syntactic shape (what the argument list
-  looks like, which contexts accept the modifier). No test in this
-  bundle anchors there because the user-facing syntax is not described
-  precisely enough to derive a verifiable claim. Filing as a doc gap
-  would help.
-- `#expression-keywords` lists `try`, `no_diff`, `__fwd_diff`,
-  `fwd_diff`, `__bwd_diff`, `bwd_diff`, `new`, and the shape/pack
-  utility expressions (`__first`, `__last`, `__trimFirst`, ...) but
-  does not document a minimum standalone use that would let us
-  exercise them through `slangi`. Most need accompanying imports or
-  generic-resolution machinery that would not fit in a single test
-  file. Recorded as candidates for expansion once the doc spells out
-  a self-contained example for each.
-- `#decl-keywords` says `struct`, `class`, and `enum` are not
-  registered through `g_parseSyntaxEntries[]`. The text mentions
-  `parseClassDecl` for `class` but no user-facing claim describes how
-  `class` differs from `struct` for the user. Without a documented
-  behavioral difference, no test for `class` was added beyond the
-  general decl-keyword family covered by `decl-enum-value.slang` and
-  `decl-init-constructor.slang`.
-- `row_major` / `column_major` are listed as simple modifiers but
-  their effect on HLSL emit is hidden by Slang's natural-layout
-  rewriting, so the post-emit text does not contain the
-  `row_major` token in a self-contained `cbuffer` test. Without a
-  documented user-observable claim distinct from the emit text, no
-  test was added.
-- `import` is listed as a decl keyword but importing a real module
-  (`diff`) from the agentic suite would require the matching
-  `.slang` module to resolve in `slangi`'s search path. The
-  no-GPU runner cannot reliably stage modules outside the test
-  directory, so this claim was not exercised here.
-- `countof(arr)` on a plain fixed-size local array under `slangi`
-  returned `4` (the size of `int` in bytes) rather than the array
-  element count, regardless of the declared size. The variadic-pack
-  form (`countof(D)` for `let each D : int`) returns the documented
-  element count, so the `boundary-countof-variadic-pack.slang` probe
-  uses the pack form. Worth a note in the doc that the array form is
-  only constant-folded in some contexts, or that the canonical
-  `countof` shape is the pack form.
-- The keyword-vs-identifier rules are not spelled out: `let`, `var`,
-  and even `int` can be reused as identifier names in
-  declarator position (e.g. `int let = 5;` is accepted), but `int`
-  cannot appear at the head of an expression-typed declaration
-  (`int x = int + 1;` is rejected with `E30060`). A short paragraph
-  on which contexts re-classify an identifier as a value vs a type
-  would let us write more precise boundary tests.
-- `SV_`-prefixed and `gl_`-prefixed names are documented as
-  "reserved", but in practice a user-named local `int SV_userVar`
-  inside a function compiles and produces the printed value. The
-  prefix policy is therefore advisory rather than enforced; a note
-  to that effect in the doc would justify removing speculative
-  user-prefix boundary tests.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#complex-modifiers-take-arguments](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#complex-modifiers-take-arguments) | undocumented-behavior | The `#complex-modifiers-take-arguments` table lists `layout`, `volatile`, `coherent`, `restrict`, etc. as taking arguments, but does not give a complete syntactic shape (what the argument list looks like, which contexts accept the modifier). No test in this bundle anchors there because the user-facing syntax is not described precisely enough to derive a verifiable claim. Filing as a doc gap would help. |  |
+| [#expression-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#expression-keywords) | undocumented-behavior | `#expression-keywords` lists `try`, `no_diff`, `__fwd_diff`, `fwd_diff`, `__bwd_diff`, `bwd_diff`, `new`, and the shape/pack utility expressions (`__first`, `__last`, `__trimFirst`, ...) but does not document a minimum standalone use that would let us exercise them through `slangi`. Most need accompanying imports or generic-resolution machinery that would not fit in a single test file. Recorded as candidates for expansion once the doc spells out a self-contained example for each. |  |
+| [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords) | undocumented-behavior | `#decl-keywords` says `struct`, `class`, and `enum` are not registered through `g_parseSyntaxEntries[]`. The text mentions `parseClassDecl` for `class` but no user-facing claim describes how `class` differs from `struct` for the user. | Without a documented behavioral difference, no test for `class` was added beyond the general decl-keyword family covered by `decl-enum-value.slang` and `decl-init-constructor.slang`. |
+| [#rowmajor](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#rowmajor) | undocumented-behavior | `row_major` / `column_major` are listed as simple modifiers but their effect on HLSL emit is hidden by Slang's natural-layout rewriting, so the post-emit text does not contain the `row_major` token in a self-contained `cbuffer` test. | Without a documented user-observable claim distinct from the emit text, no test was added. |
+| [#import](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#import) | undocumented-behavior | `import` is listed as a decl keyword but importing a real module (`diff`) from the agentic suite would require the matching `.slang` module to resolve in `slangi`'s search path. The no-GPU runner cannot reliably stage modules outside the test directory, so this claim was not exercised here. |  |
+| [#countofarr](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#countofarr) | undocumented-behavior | `countof(arr)` on a plain fixed-size local array under `slangi` returned `4` (the size of `int` in bytes) rather than the array element count, regardless of the declared size. The variadic-pack form (`countof(D)` for `let each D : int`) returns the documented element count, so the `boundary-countof-variadic-pack.slang` probe uses the pack form. Worth a note in the doc that the array form is only constant-folded in some contexts, or that the canonical `countof` shape is the pack form. |  |
+| [#let](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#let) | undocumented-behavior | The keyword-vs-identifier rules are not spelled out: `let`, `var`, and even `int` can be reused as identifier names in declarator position (e.g. `int let = 5;` is accepted), but `int` cannot appear at the head of an expression-typed declaration (`int x = int + 1;` is rejected with `E30060`). | A short paragraph on which contexts re-classify an identifier as a value vs a type would let us write more precise boundary tests. |
+| [#reserved](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#reserved) | undocumented-behavior | `SV_`-prefixed and `gl_`-prefixed names are documented as "reserved", but in practice a user-named local `int SV_userVar` inside a function compiles and produces the printed value. The prefix policy is therefore advisory rather than enforced; a note to that effect in the doc would justify removing speculative user-prefix boundary tests. |  |
 
 ## Out of scope (no-GPU runner)
 

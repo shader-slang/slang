@@ -62,30 +62,11 @@ single file with the agentic runner and is captured under
 
 ## Doc gaps observed
 
-- The "Per-keyword semantics" section claims `private` is visible
-  "inside the declaring container — that is, the same aggregate
-  type (`struct`, `class`, `interface`, ...) **or the same
-  namespace**." In practice the compiler rejects a `private` decl
-  declared directly inside a `namespace` block with
-  `invalid-use-of-private-visibility` (because
-  `isGlobalDecl(decl)` returns true for namespace-scope decls in
-  `slang-check-modifier.cpp` around line 1971). The doc should
-  clarify that `private` works for aggregate-type members only,
-  or describe the namespace-scope path that triggers the
-  diagnostic.
-- The "Edge cases and failure modes" section lists
-  `invalid-use-of-private-visibility` as firing for "a top-level
-  decl … marked `private`," but the same diagnostic also fires
-  for interface requirements (see
-  `private-interface-requirement-rejected.slang`). A second
-  bullet enumerating the interface-requirement case would make
-  the failure-mode list complete.
-- "Defaults by language version" describes the legacy-language
-  default of `public` for unannotated decls, but does not surface
-  a single-file way to observe that default. Today the default is
-  only observable across `import` boundaries between modules of
-  different language versions, which the single-file agentic
-  runner cannot express.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#per-keyword-semantics](../../../docs/llm-generated/name-resolution/visibility.md#per-keyword-semantics) | undocumented-behavior | The "Per-keyword semantics" section claims `private` is visible "inside the declaring container — that is, the same aggregate type (`struct`, `class`, `interface`, ...) **or the same namespace**." In practice the compiler rejects a `private` decl declared directly inside a `namespace` block with `invalid-use-of-private-visibility` (because `isGlobalDecl(decl)` returns true for namespace-scope decls in `slang-check-modifier.cpp` around line 1971). | The doc should clarify that `private` works for aggregate-type members only, or describe the namespace-scope path that triggers the diagnostic. |
+| [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/visibility.md#edge-cases-and-failure-modes) | undocumented-behavior | The "Edge cases and failure modes" section lists `invalid-use-of-private-visibility` as firing for "a top-level decl … marked `private`," but the same diagnostic also fires for interface requirements (see `private-interface-requirement-rejected.slang`). A second bullet enumerating the interface-requirement case would make the failure-mode list complete. |  |
+| [#defaults-by-language-version](../../../docs/llm-generated/name-resolution/visibility.md#defaults-by-language-version) | undocumented-behavior | "Defaults by language version" describes the legacy-language default of `public` for unannotated decls, but does not surface a single-file way to observe that default. Today the default is only observable across `import` boundaries between modules of different language versions, which the single-file agentic runner cannot express. |  |
 
 ## Out of scope (single-file runner)
 

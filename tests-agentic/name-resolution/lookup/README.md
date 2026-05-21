@@ -91,59 +91,15 @@ not duplicated here:
 
 ## Doc gaps observed
 
-- The `## Concepts` section lists `LookupMask` and its bits in
-  detail (type / Function / Value / Attribute / SyntaxDecl /
-  Semantic / Default), but Slang's surface language does not let a
-  user share names between a struct and a function (the "conflicting
-  declaration" diagnostic at slang-diagnostics.lua code 30200
-  fires); the documented mask-separation behavior is internal to
-  the parser/checker. A user-observable claim about mask filtering
-  would be helpful — e.g. naming an input shape where two same-name
-  decls of different mask kinds **do** survive past redeclaration
-  checks and the mask actually picks between them.
-- The `## Concepts` section enumerates `LookupOptions` flags
-  (`IgnoreBaseInterfaces`, `Completion`, `NoDeref`, etc.) but only
-  `IgnoreInheritance` and `NoDeref` have indirect user surfaces
-  (extension-on-same-type stays in scope; `ExtensionDecl` forces
-  NoDeref for `This`). `Completion` and `ConsiderAllLocalNamesInScope`
-  are language-server- and parser-only and not exercisable through
-  `slang-test`. A doc-gap note could clarify which options have
-  any user-observable consequence.
-- The `## Algorithm > Transparent members` section says the
-  recursion is short-circuited "when the request's `mask` includes
-  `Attribute`" to avoid infinite recursion on attribute targets,
-  but there is no user-observable way to issue an attribute-mask
-  lookup from a `.slang` source. The negative case for this
-  short-circuit (i.e. "an attribute-targeted lookup does NOT see
-  through transparent members") cannot be anchored from a user
-  source file. A claim about the attribute decl recursion that
-  shows on the surface (e.g. through a synthesized attribute
-  decl example) would unblock a test.
-- The `## Algorithm > Transparent members` section names the
-  `IgnoreTransparentMembers` option as used by "looking up an
-  unscoped-enum's underlying type to break a similar cycle"; the
-  doc does not name a user-surface that toggles this option. A
-  positive test for this option would have to anchor to an
-  unstated claim, so it is deferred.
-- The `## Algorithm > Member lookup` section names `EachType` /
-  `FirstPackElementType` / `LastPackElementType` / `PackBranchType`
-  canonicalization in the type-shape dispatch, but these arise
-  only inside variadic-pack contexts (no exposed surface in
-  user `.slang` outside specific generic-pack idioms). A test
-  could be added if the doc highlighted a specific user pattern
-  that takes that path.
-- The `## Edge cases and failure modes` section names
-  `ExtensionExternVarModifier` and `ExternModifier` in extensions
-  as filtered at the start of `DeclPassesLookupMask`. Both
-  modifiers are core-module-only; user code cannot apply them to
-  an extension to produce the rejection. A claim that some
-  user-writable form maps to those modifiers would unblock a
-  negative test.
-- The `## Edge cases and failure modes` section says `AndType`
-  reaching the type dispatch is an internal-error
-  (`SLANG_UNEXPECTED`). That is a compiler-developer claim
-  ("constraint-flattening must run before lookup"), not a user-
-  observable claim, so no test anchors here.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#concepts](../../../docs/llm-generated/name-resolution/lookup.md#concepts) | undocumented-behavior | The `## Concepts` section lists `LookupMask` and its bits in detail (type / Function / Value / Attribute / SyntaxDecl / Semantic / Default), but Slang's surface language does not let a user share names between a struct and a function (the "conflicting declaration" diagnostic at slang-diagnostics.lua code 30200 fires); the documented mask-separation behavior is internal to the parser/checker. A user-observable claim about mask filtering would be helpful — e.g. naming an input shape where two same-name decls of different mask kinds **do** survive past redeclaration checks and the mask actually picks between them. |  |
+| [#concepts](../../../docs/llm-generated/name-resolution/lookup.md#concepts) | undocumented-behavior | The `## Concepts` section enumerates `LookupOptions` flags (`IgnoreBaseInterfaces`, `Completion`, `NoDeref`, etc.) but only `IgnoreInheritance` and `NoDeref` have indirect user surfaces (extension-on-same-type stays in scope; `ExtensionDecl` forces NoDeref for `This`). `Completion` and `ConsiderAllLocalNamesInScope` are language-server- and parser-only and not exercisable through `slang-test`. A doc-gap note could clarify which options have any user-observable consequence. |  |
+| [#algorithm-transparent-members](../../../docs/llm-generated/name-resolution/lookup.md#algorithm-transparent-members) | undocumented-behavior | The `## Algorithm > Transparent members` section says the recursion is short-circuited "when the request's `mask` includes `Attribute`" to avoid infinite recursion on attribute targets, but there is no user-observable way to issue an attribute-mask lookup from a `.slang` source. The negative case for this short-circuit (i.e. "an attribute-targeted lookup does NOT see through transparent members") cannot be anchored from a user source file. A claim about the attribute decl recursion that shows on the surface (e.g. through a synthesized attribute decl example) would unblock a test. |  |
+| [#algorithm-transparent-members](../../../docs/llm-generated/name-resolution/lookup.md#algorithm-transparent-members) | undocumented-behavior | The `## Algorithm > Transparent members` section names the `IgnoreTransparentMembers` option as used by "looking up an unscoped-enum's underlying type to break a similar cycle"; the doc does not name a user-surface that toggles this option. A positive test for this option would have to anchor to an unstated claim, so it is deferred. |  |
+| [#algorithm-member-lookup](../../../docs/llm-generated/name-resolution/lookup.md#algorithm-member-lookup) | undocumented-behavior | The `## Algorithm > Member lookup` section names `EachType` / `FirstPackElementType` / `LastPackElementType` / `PackBranchType` canonicalization in the type-shape dispatch, but these arise only inside variadic-pack contexts (no exposed surface in user `.slang` outside specific generic-pack idioms). A test could be added if the doc highlighted a specific user pattern that takes that path. |  |
+| [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/lookup.md#edge-cases-and-failure-modes) | undocumented-behavior | The `## Edge cases and failure modes` section names `ExtensionExternVarModifier` and `ExternModifier` in extensions as filtered at the start of `DeclPassesLookupMask`. Both modifiers are core-module-only; user code cannot apply them to an extension to produce the rejection. A claim that some user-writable form maps to those modifiers would unblock a negative test. |  |
+| [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/lookup.md#edge-cases-and-failure-modes) | undocumented-behavior | The `## Edge cases and failure modes` section says `AndType` reaching the type dispatch is an internal-error (`SLANG_UNEXPECTED`). That is a compiler-developer claim ("constraint-flattening must run before lookup"), not a user- observable claim, so no test anchors here. |  |
 
 ## Out of scope (no-GPU runner)
 

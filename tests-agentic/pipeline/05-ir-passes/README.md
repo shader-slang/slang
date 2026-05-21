@@ -190,97 +190,22 @@ no-GPU runner and is recorded under `## Out of scope`.
 
 ## Doc gaps observed
 
-- The "Specialization and generics" category lists
-  `slang-ir-typeflow-specialize.cpp` and `slang-ir-typeflow-set.cpp`
-  as "Type-flow set construction" / "Specialization based on type
-  flow" but does not name a user-observable footprint of either
-  pass — neither pass shows up in a `### BEFORE/AFTER` dump
-  uniquely, and neither has a distinguishable emit-text consequence
-  that a `.slang` test could anchor on. A short example of what
-  type-flow-based specialization changes (e.g. dynamic-dispatch
-  call resolved via type-flow, observable as a removed
-  `lookup_witness` in the dump) would unlock tests here.
-- The "Type and value legalization" category lists
-  `slang-ir-any-value-marshalling.cpp` and
-  `slang-ir-any-value-inference.cpp` as "Pack / unpack values into
-  `AnyValue`" / "Determines `AnyValue` size for existentials".
-  Both passes run only when `AnyValue` types appear in IR; the
-  doc does not name a Slang-source-level construct that surfaces
-  these in the emit. A pointer to a user-visible `AnyValue`
-  spelling (or the surface of dynamic-dispatch through interfaces
-  that triggers it) would unlock a per-pass test.
-- The "Loop transformations" category lists
-  `slang-ir-uniformity.cpp` ("Uniformity / divergence analysis")
-  as a pass but does not name a user-observable consequence. We
-  could not anchor a test on uniformity output without
-  fabricating one. A short example of what changes — e.g. "a
-  varying conditional triggers a `convergent` requirement in the
-  SPIR-V emit" — would be testable.
-- The "Loop transformations" category also lists
-  `slang-ir-synthesize-active-mask.cpp` with no user-visible
-  footprint enumerated. Same gap as uniformity.
-- The "Target-specific lowering" category lists
-  `slang-ir-lower-cuda-builtin-types.cpp` (CUDA only) but does
-  not enumerate which Slang built-in types are transformed nor
-  what the CUDA emit text looks like before vs after. A short
-  example (e.g. "Slang `RaytracingAccelerationStructure` becomes
-  CUDA `OptixTraversableHandle`") would let us anchor a CUDA
-  builtin-type lowering test.
-- The "Specialization and generics" category includes
-  `slang-ir-specialize-resources.cpp` but does not name the
-  observable post-condition. We anchored a smoke test on
-  "resource argument inlines cleanly", but a stronger doc
-  statement (e.g. "the resource is no longer passed as a
-  parameter; it is referenced directly at the call site") would
-  enable a sharper test.
-- The "Differentiation (autodiff)" category lists nine passes
-  (`slang-ir-autodiff*.cpp`) but does not enumerate user-observable
-  consequences per pass. Only `check-differentiability` has an
-  observable surface here (a diagnostic). The other autodiff
-  passes (`fwd`, `rev`, `transpose`, `unzip`, `cfg-norm`,
-  `loop-analysis`, `pairs`, `primal-hoist`, `region`) would need
-  per-pass "what the user sees" rows to be testable from a `.slang`
-  file. A pointer to the `[Differentiable]` user surface alongside
-  each row would unlock per-pass tests.
-- The "Inlining and call-graph" category lists `call-graph`,
-  `reachability`, `propagate-func-properties`, `marshal-native-call`,
-  `defer-buffer-load` — none of which name a user-observable
-  consequence. They are analysis or marshalling helpers that this
-  bundle could not anchor cleanly. A "footprint in emit text" row
-  per pass would enable tests.
-- The "Layout and binding" category includes `user-type-hint`,
-  `metadata`, `explicit-global-init` — the doc states the pass
-  exists and what it does internally but not how to spot its
-  output. `explicit-global-context` was the only one we could
-  anchor cleanly (CUDA / C++ pointer threading).
-- The "Loop transformations" category lists six passes
-  (`loop-unroll`, `loop-inversion`, `fuse-satcoop`, `restructure`,
-  `restructure-scoping`, `synthesize-active-mask`, `uniformity`).
-  Only `loop-unroll` is observably testable; the rest would need
-  per-pass "what to look for in the dump or emit" prose.
-- The "Instrumentation" section names `coverage-instrument` /
-  `finalize-coverage-metadata` as gated on `-trace-coverage-binding`
-  and `-trace-coverage-reserved-space` — those flags' surface is
-  not exercised here (recorded under `## Out of scope`). A
-  default-on instrumentation pass without flag dependence would
-  be testable; the doc could add such an example.
-- The "Linking and validation" category lists `slang-ir-validate.cpp`
-  as "structural sanity checks". The doc names no user-observable
-  symptom of validation failing; we could not produce a clean
-  negative test for the validator itself. A short example of a
-  malformed IR construct that validation rejects would help.
-- The doc cites the `linkAndOptimizeIR` orchestration but says
-  "the pipeline is **not** a fixed list" — the only observable
-  ordering claim we could anchor was "DCE runs multiple times" (a
-  weak claim that the orchestrator interleaves cleanup). Any
-  pass-ordering invariant that the doc affirms (e.g. "specialize
-  always runs before inline" or "validate runs first and last")
-  would unlock ordering-based tests, but no such invariant is
-  currently stated.
-- "Target-specific lowering" has `slang-ir-translate.cpp` listed
-  as "Generic translation step used by some targets" — too vague
-  to anchor a test. Naming the specific surface (e.g. "Translate
-  routes `printf` to OptiX-shaped trace calls") would help.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#beforeafter](../../../docs/llm-generated/pipeline/05-ir-passes.md#beforeafter) | undocumented-behavior | The "Specialization and generics" category lists `slang-ir-typeflow-specialize.cpp` and `slang-ir-typeflow-set.cpp` as "Type-flow set construction" / "Specialization based on type flow" but does not name a user-observable footprint of either pass — neither pass shows up in a `### BEFORE/AFTER` dump uniquely, and neither has a distinguishable emit-text consequence that a `.slang` test could anchor on. | A short example of what type-flow-based specialization changes (e.g. dynamic-dispatch call resolved via type-flow, observable as a removed `lookup_witness` in the dump) would unlock tests here. |
+| [#type-and-value-legalization](../../../docs/llm-generated/pipeline/05-ir-passes.md#type-and-value-legalization) | undocumented-behavior | The "Type and value legalization" category lists `slang-ir-any-value-marshalling.cpp` and `slang-ir-any-value-inference.cpp` as "Pack / unpack values into `AnyValue`" / "Determines `AnyValue` size for existentials". Both passes run only when `AnyValue` types appear in IR; the doc does not name a Slang-source-level construct that surfaces these in the emit. A pointer to a user-visible `AnyValue` spelling (or the surface of dynamic-dispatch through interfaces that triggers it) would unlock a per-pass test. |  |
+| [#loop-transformations](../../../docs/llm-generated/pipeline/05-ir-passes.md#loop-transformations) | undocumented-behavior | The "Loop transformations" category lists `slang-ir-uniformity.cpp` ("Uniformity / divergence analysis") as a pass but does not name a user-observable consequence. We could not anchor a test on uniformity output without fabricating one. | A short example of what changes — e.g. "a varying conditional triggers a `convergent` requirement in the SPIR-V emit" — would be testable. |
+| [#loop-transformations](../../../docs/llm-generated/pipeline/05-ir-passes.md#loop-transformations) | undocumented-behavior | The "Loop transformations" category also lists `slang-ir-synthesize-active-mask.cpp` with no user-visible footprint enumerated. Same gap as uniformity. |  |
+| [#target-specific-lowering](../../../docs/llm-generated/pipeline/05-ir-passes.md#target-specific-lowering) | undocumented-behavior | The "Target-specific lowering" category lists `slang-ir-lower-cuda-builtin-types.cpp` (CUDA only) but does not enumerate which Slang built-in types are transformed nor what the CUDA emit text looks like before vs after. | A short example (e.g. "Slang `RaytracingAccelerationStructure` becomes CUDA `OptixTraversableHandle`") would let us anchor a CUDA builtin-type lowering test. |
+| [#specialization-and-generics](../../../docs/llm-generated/pipeline/05-ir-passes.md#specialization-and-generics) | undocumented-behavior | The "Specialization and generics" category includes `slang-ir-specialize-resources.cpp` but does not name the observable post-condition. We anchored a smoke test on "resource argument inlines cleanly", but a stronger doc statement (e.g. "the resource is no longer passed as a parameter; it is referenced directly at the call site") would enable a sharper test. |  |
+| [#differentiation-autodiff](../../../docs/llm-generated/pipeline/05-ir-passes.md#differentiation-autodiff) | undocumented-behavior | The "Differentiation (autodiff)" category lists nine passes (`slang-ir-autodiff*.cpp`) but does not enumerate user-observable consequences per pass. Only `check-differentiability` has an observable surface here (a diagnostic). The other autodiff passes (`fwd`, `rev`, `transpose`, `unzip`, `cfg-norm`, `loop-analysis`, `pairs`, `primal-hoist`, `region`) would need per-pass "what the user sees" rows to be testable from a `.slang` file. A pointer to the `[Differentiable]` user surface alongside each row would unlock per-pass tests. |  |
+| [#inlining-and-call-graph](../../../docs/llm-generated/pipeline/05-ir-passes.md#inlining-and-call-graph) | undocumented-behavior | The "Inlining and call-graph" category lists `call-graph`, `reachability`, `propagate-func-properties`, `marshal-native-call`, `defer-buffer-load` — none of which name a user-observable consequence. They are analysis or marshalling helpers that this bundle could not anchor cleanly. A "footprint in emit text" row per pass would enable tests. |  |
+| [#layout-and-binding](../../../docs/llm-generated/pipeline/05-ir-passes.md#layout-and-binding) | undocumented-behavior | The "Layout and binding" category includes `user-type-hint`, `metadata`, `explicit-global-init` — the doc states the pass exists and what it does internally but not how to spot its output. `explicit-global-context` was the only one we could anchor cleanly (CUDA / C++ pointer threading). |  |
+| [#loop-transformations](../../../docs/llm-generated/pipeline/05-ir-passes.md#loop-transformations) | undocumented-behavior | The "Loop transformations" category lists six passes (`loop-unroll`, `loop-inversion`, `fuse-satcoop`, `restructure`, `restructure-scoping`, `synthesize-active-mask`, `uniformity`). Only `loop-unroll` is observably testable; the rest would need per-pass "what to look for in the dump or emit" prose. |  |
+| [#out-of-scope](../../../docs/llm-generated/pipeline/05-ir-passes.md#out-of-scope) | undocumented-behavior | The "Instrumentation" section names `coverage-instrument` / `finalize-coverage-metadata` as gated on `-trace-coverage-binding` and `-trace-coverage-reserved-space` — those flags' surface is not exercised here (recorded under `## Out of scope`). A default-on instrumentation pass without flag dependence would be testable; the doc could add such an example. |  |
+| [#linking-and-validation](../../../docs/llm-generated/pipeline/05-ir-passes.md#linking-and-validation) | undocumented-behavior | The "Linking and validation" category lists `slang-ir-validate.cpp` as "structural sanity checks". The doc names no user-observable symptom of validation failing; we could not produce a clean negative test for the validator itself. | A short example of a malformed IR construct that validation rejects would help. |
+| [#the-pipeline-is-not-a-fixed-list](../../../docs/llm-generated/pipeline/05-ir-passes.md#the-pipeline-is-not-a-fixed-list) | undocumented-behavior | The doc cites the `linkAndOptimizeIR` orchestration but says "the pipeline is **not** a fixed list" — the only observable ordering claim we could anchor was "DCE runs multiple times" (a weak claim that the orchestrator interleaves cleanup). Any pass-ordering invariant that the doc affirms (e.g. "specialize always runs before inline" or "validate runs first and last") would unlock ordering-based tests, but no such invariant is currently stated. |  |
+| [#target-specific-lowering](../../../docs/llm-generated/pipeline/05-ir-passes.md#target-specific-lowering) | undocumented-behavior | "Target-specific lowering" has `slang-ir-translate.cpp` listed as "Generic translation step used by some targets" — too vague to anchor a test. | Naming the specific surface (e.g. "Translate routes `printf` to OptiX-shaped trace calls") would help. |
 
 ## Out of scope (no-GPU runner)
 

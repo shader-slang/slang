@@ -70,37 +70,17 @@ cross-target behavior.
 
 ## Doc gaps observed
 
-- `## Targets` enumerates DXIL/MSL-binary/WebGPU-binary as binary
-  output formats but does not state which combinations of `-target`
-  + `-profile` produce them via slangc CLI vs. via the runtime API.
-- `## Profiles` does not enumerate the available profile names; tests
-  had to discover spellings from `tests/` and `source/slang/slang-profile-defs.h`.
-- `## Capability system` describes conjunction-of-disjunctions
-  semantics with the `raytracing` example, but does not enumerate
-  which capability atoms are stage-only vs. target-only vs. both.
-- No documented user-facing capability-introspection (e.g. a
-  `__capability_query` builtin) — observed via diagnostic emission
-  only.
-- The DXIL binary target is not exercised here; the doc lists it but
-  binary emission requires a downstream-compiler binary that the
-  agentic runner does not assume.
-- `__target_switch` is named in the IR section but not documented
-  user-side: its arm-count edges (0 arms, 1 arm, all-fallthrough,
-  `default:` fallback) had to be discovered empirically. A short
-  user-side spec would let tests anchor to a precise claim instead
-  of the specialization pass's name.
-- `## Profiles` mentions Family + Version + Stage but does not state
-  what happens when a sub-version request (e.g. `glsl_150`) is below
-  the back-end's floor; the back-end silently clamps to `#version 450`.
-  Documented clamping rules would make profile-edge tests
-  unambiguous.
-- The `-restrictive-capability-check` flag is exercised by tests but
-  not named in `## Capability system`; only the "Computing the join"
-  bullet under Runtime representation hints at its role.
-- Per-target stage rejection (e.g. fragment-on-cuda) is not robust:
-  one observed shape produced a SIGSEGV rather than a clean
-  diagnostic. The doc should state which stage × target pairs are
-  rejected at check time vs. accepted vs. unsupported.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#targets](../../../docs/llm-generated/cross-cutting/targets.md#targets) | undocumented-behavior | `## Targets` enumerates DXIL/MSL-binary/WebGPU-binary as binary output formats but does not state which combinations of `-target` + `-profile` produce them via slangc CLI vs. via the runtime API. |  |
+| [#profiles](../../../docs/llm-generated/cross-cutting/targets.md#profiles) | undocumented-behavior | `## Profiles` does not enumerate the available profile names; tests had to discover spellings from `tests/` and `source/slang/slang-profile-defs.h`. |  |
+| [#capability-system](../../../docs/llm-generated/cross-cutting/targets.md#capability-system) | undocumented-behavior | `## Capability system` describes conjunction-of-disjunctions semantics with the `raytracing` example, but does not enumerate which capability atoms are stage-only vs. target-only vs. both. |  |
+| [#capabilityquery](../../../docs/llm-generated/cross-cutting/targets.md#capabilityquery) | undocumented-behavior | No documented user-facing capability-introspection (e.g. a `__capability_query` builtin) — observed via diagnostic emission only. |  |
+| (unspecified) | undocumented-behavior | The DXIL binary target is not exercised here; the doc lists it but binary emission requires a downstream-compiler binary that the agentic runner does not assume. |  |
+| [#targetswitch](../../../docs/llm-generated/cross-cutting/targets.md#targetswitch) | undocumented-behavior | `__target_switch` is named in the IR section but not documented user-side: its arm-count edges (0 arms, 1 arm, all-fallthrough, `default:` fallback) had to be discovered empirically. | A short user-side spec would let tests anchor to a precise claim instead of the specialization pass's name. |
+| [#version](../../../docs/llm-generated/cross-cutting/targets.md#version) | ambiguous-claim | `## Profiles` mentions Family + Version + Stage but does not state what happens when a sub-version request (e.g. `glsl_150`) is below the back-end's floor; the back-end silently clamps to `#version 450`. Documented clamping rules would make profile-edge tests unambiguous. |  |
+| [#capability-system](../../../docs/llm-generated/cross-cutting/targets.md#capability-system) | undocumented-behavior | The `-restrictive-capability-check` flag is exercised by tests but not named in `## Capability system`; only the "Computing the join" bullet under Runtime representation hints at its role. |  |
+| (unspecified) | undocumented-behavior | Per-target stage rejection (e.g. fragment-on-cuda) is not robust: one observed shape produced a SIGSEGV rather than a clean diagnostic. | The doc should state which stage × target pairs are rejected at check time vs. accepted vs. unsupported. |
 
 ## Out of scope (no-GPU runner)
 

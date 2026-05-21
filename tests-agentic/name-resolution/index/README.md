@@ -92,21 +92,8 @@ emit without a GPU.
 
 ## Doc gaps observed
 
-- The index doc names `TryCheckOverloadCandidateVisibility` as the
-  reason phases interleave (visibility is re-checked inside
-  overload resolution), but does not give a user-observable
-  consequence distinct from "the visibility diagnostic still
-  fires". A direct test of this would have nothing to observe
-  beyond what `visibility/` and `overload-resolution/` already
-  cover; the index doc could either drop the parenthetical or
-  add a sentence describing what a developer sees differently.
-- The `#pages` and `#related-glossary-terms` sections are pure
-  pointer tables; they are explicitly out of scope per the
-  per-section prompt. No gap, just noted for future readers.
-- The mermaid `#flow-diagram` shows `breadcrumbs` as part of the
-  final output but the body text does not state where the
-  breadcrumb chain is first attached. The index doc could
-  clarify whether breadcrumbs are produced inside lookup, during
-  the visibility/overload phases, or assembled at the very end --
-  the answer would scope a future "where-do-breadcrumbs-come-from"
-  test.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#the-visibility-diagnostic-still-fires](../../../docs/llm-generated/name-resolution/index.md#the-visibility-diagnostic-still-fires) | undocumented-behavior | The index doc names `TryCheckOverloadCandidateVisibility` as the reason phases interleave (visibility is re-checked inside overload resolution), but does not give a user-observable consequence distinct from "the visibility diagnostic still fires". A direct test of this would have nothing to observe beyond what `visibility/` and `overload-resolution/` already cover; the index doc could either drop the parenthetical or add a sentence describing what a developer sees differently. |  |
+| [#pages](../../../docs/llm-generated/name-resolution/index.md#pages) | undocumented-behavior | The `#pages` and `#related-glossary-terms` sections are pure pointer tables; they are explicitly out of scope per the per-section prompt. No gap, just noted for future readers. |  |
+| [#flow-diagram](../../../docs/llm-generated/name-resolution/index.md#flow-diagram) | undocumented-behavior | The mermaid `#flow-diagram` shows `breadcrumbs` as part of the final output but the body text does not state where the breadcrumb chain is first attached. The index doc could clarify whether breadcrumbs are produced inside lookup, during the visibility/overload phases, or assembled at the very end -- the answer would scope a future "where-do-breadcrumbs-come-from" test. |  |

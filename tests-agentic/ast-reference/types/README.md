@@ -191,54 +191,16 @@ any allowed `slang-test` directive.
 
 ## Doc gaps observed
 
-- The doc names `NamedExpressionType` as "a typedef'd / typealias'd
-  type that preserves the original name for diagnostics". In
-  practice, both `typedef T Y;` and `typealias Y = T;` produce a
-  type-mismatch diagnostic that renders the **underlying** type's
-  name, not the alias name. Either the doc's claim about
-  diagnostic-preservation should be removed, or the diagnostic
-  renderer needs to look through `NamedExpressionType` differently.
-  No test in this bundle exercises that claim; recording as a gap.
-- The doc says `ConditionalType` is "compile-time conditional type"
-  but does not name a user-spelling production. The grammar pointer
-  is empty `(none)`; without a surface form this is not testable
-  through `slangc`. A doc-level pointer to the conditional-type
-  spelling (or a note saying it is checker-synthesized) would
-  resolve this.
-- `AtomicType` is "atomic wrapper type" in the doc with grammar
-  `(none)`. `Atomic<T>` is a surface spelling but its observable
-  behavior depends on the target (groupshared / structured-buffer)
-  and is not portable on the no-GPU runner. A doc-level pointer to
-  the minimal portable observation would let an agent anchor a
-  test.
-- The doc lists `EnumTypeType` as "the type of an `enum` type
-  itself (its kind)". The user-facing claim is unclear: an enum
-  used as a type is observable (covered by
-  `ast-reference/declarations/enumdecl-tagged-union.slang`), but
-  the "type of the enum type" itself is a kind-level claim that
-  has no obvious surface. Recording as a gap.
-- The doc lists `BottomType` as "bottom type representing 'no
-  value'; used in the type lattice". The note says it is "used as
-  the result type of expressions that do not return (e.g. throw)".
-  `throw` is unobservable under INTERPRET (per `_common.md`
-  lessons); a portable-on-no-GPU surface would be needed to test
-  this.
-- The doc lists 9 operands for `TextureType` but does not enumerate
-  them. The observable surface (one test that observes the
-  presence of `Texture2D<T>` on the HLSL backend) covers only the
-  first operand. A doc-level table of the 9 operands and which
-  surface spellings select each combination would let agents
-  anchor finer-grained tests.
-- The doc lists a "Fp8" family (`FloatE4M3Type`, `FloatE5M2Type`)
-  and a `BFloat16Type` but no portable surface for these is
-  documented. The user-spelling appears target-gated; a doc-level
-  pointer to the minimal targetable spelling would let an agent
-  anchor a test.
-- `DifferentialPairType` and `DifferentialPtrPairType` are
-  "differential pair (primal, differential) used by autodiff".
-  Observable only through `[Differentiable]` machinery; the
-  autodiff feature lives in a separate bundle. A doc pointer to
-  that bundle would clarify boundary ownership.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#a-typedefd-typealiasd-type-that-preserves-the-original-name-for-diagnostics](../../../docs/llm-generated/ast-reference/types.md#a-typedefd-typealiasd-type-that-preserves-the-original-name-for-diagnostics) | undocumented-behavior | The doc names `NamedExpressionType` as "a typedef'd / typealias'd type that preserves the original name for diagnostics". In practice, both `typedef T Y;` and `typealias Y = T;` produce a type-mismatch diagnostic that renders the **underlying** type's name, not the alias name. | Either the doc's claim about diagnostic-preservation should be removed, or the diagnostic renderer needs to look through `NamedExpressionType` differently. No test in this bundle exercises that claim; recording as a gap. |
+| [#compile-time-conditional-type](../../../docs/llm-generated/ast-reference/types.md#compile-time-conditional-type) | undocumented-behavior | The doc says `ConditionalType` is "compile-time conditional type" but does not name a user-spelling production. The grammar pointer is empty `(none)`; without a surface form this is not testable through `slangc`. A doc-level pointer to the conditional-type spelling (or a note saying it is checker-synthesized) would resolve this. |  |
+| [#atomic-wrapper-type](../../../docs/llm-generated/ast-reference/types.md#atomic-wrapper-type) | undocumented-behavior | `AtomicType` is "atomic wrapper type" in the doc with grammar `(none)`. `Atomic<T>` is a surface spelling but its observable behavior depends on the target (groupshared / structured-buffer) and is not portable on the no-GPU runner. A doc-level pointer to the minimal portable observation would let an agent anchor a test. |  |
+| [#the-type-of-an-enum-type-itself-its-kind](../../../docs/llm-generated/ast-reference/types.md#the-type-of-an-enum-type-itself-its-kind) | undocumented-behavior | The doc lists `EnumTypeType` as "the type of an `enum` type itself (its kind)". The user-facing claim is unclear: an enum used as a type is observable (covered by `ast-reference/declarations/enumdecl-tagged-union.slang`), but the "type of the enum type" itself is a kind-level claim that has no obvious surface. Recording as a gap. |  |
+| [#bottom-type-representing-no-value-used-in-the-type-lattice](../../../docs/llm-generated/ast-reference/types.md#bottom-type-representing-no-value-used-in-the-type-lattice) | undocumented-behavior | The doc lists `BottomType` as "bottom type representing 'no value'; used in the type lattice". The note says it is "used as the result type of expressions that do not return (e.g. throw)". `throw` is unobservable under INTERPRET (per `_common.md` lessons); a portable-on-no-GPU surface would be needed to test this. |  |
+| [#texturetype](../../../docs/llm-generated/ast-reference/types.md#texturetype) | undocumented-behavior | The doc lists 9 operands for `TextureType` but does not enumerate them. The observable surface (one test that observes the presence of `Texture2D<T>` on the HLSL backend) covers only the first operand. A doc-level table of the 9 operands and which surface spellings select each combination would let agents anchor finer-grained tests. |  |
+| [#fp8](../../../docs/llm-generated/ast-reference/types.md#fp8) | missing-surface | The doc lists a "Fp8" family (`FloatE4M3Type`, `FloatE5M2Type`) and a `BFloat16Type` but no portable surface for these is documented. The user-spelling appears target-gated; a doc-level pointer to the minimal targetable spelling would let an agent anchor a test. |  |
+| [#differential-pair-primal-differential-used-by-autodiff](../../../docs/llm-generated/ast-reference/types.md#differential-pair-primal-differential-used-by-autodiff) | undocumented-behavior | `DifferentialPairType` and `DifferentialPtrPairType` are "differential pair (primal, differential) used by autodiff". Observable only through `[Differentiable]` machinery; the autodiff feature lives in a separate bundle. A doc pointer to that bundle would clarify boundary ownership. |  |
 
 ## Out of scope
 

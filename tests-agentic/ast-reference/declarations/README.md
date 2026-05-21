@@ -96,48 +96,15 @@ allowed `slang-test` directive.
 
 ## Doc gaps observed
 
-- The doc lists `FuncAliasDecl` as "function alias / re-export of an
-  existing callable" with a grammar link to `[func alias]`. In
-  practice `FuncAliasDecl` is synthesized by the checker for forms
-  like forward-mode differentiation rather than spelled in user
-  code; the surface syntax `func aliasedName = original;` is not
-  accepted by `slangc`. Either the doc's grammar pointer should be
-  removed, or the doc should clarify that `FuncAliasDecl` is
-  checker-synthesized.
-- The doc enumerates `SynthesizedStructDecl`, `SynthesizedFuncDecl`,
-  `InterfaceDefaultImplDecl`, `ThisTypeDecl`, `ThisTypeConstraintDecl`,
-  and `UnresolvedDecl` as concrete classes, but each is internal —
-  there is no user spelling and no externally observable behavior
-  distinct from the surrounding decl. A one-line note "synthesized
-  by the checker, no user spelling" would let an agent skip them
-  without doubt.
-- The doc mentions `ModernParamDecl` ("modern-syntax parameter;
-  immutable unless `out`/`inout`") but does not specify which
-  parameter spelling produces `ModernParamDecl` vs. `ParamDecl`. The
-  parameter-direction test here covers the direction half of the
-  claim; the `ModernParamDecl`-vs-`ParamDecl` distinction would need
-  a doc-level pointer to the modern parameter grammar.
-- The doc says `EnumDecl::tagType` carries the underlying integer
-  type but does not state a user-facing claim about how the tag type
-  affects, e.g., `int(c)` conversion. The tag-value test here uses
-  the default tag type and so does not exercise the alternative.
-- The doc mentions `EnumDecl` exhaustive matching is part of the
-  AggTypeDecl machinery; the doc does not state whether a
-  `switch` without `default` over an enum is diagnosed. (In our
-  experimentation `switch` lowering in the interpreter is the
-  blocker; a stmt-tests page would be a better home.) The doc
-  could spell this out so a future agent can either anchor a
-  diagnostic test here or defer to `ast-reference/statements`.
-- `RequireCapabilityDecl`'s observable behavior on a Slang
-  unknown-capability name (the C-39 test) emits a "capability does
-  not exist" error; the source-doc text only says "expressed as a
-  decl so it can be exported". A one-line claim about the
-  diagnostic would make the negative test directly anchorable.
-- The doc lists `GLSLInterfaceBlockDecl` as "GLSL-style interface
-  block (uniform/buffer/in/out)". The user-observable surface is
-  GLSL-only; this bundle does not exercise it because the
-  interpreter cannot model GLSL interface blocks. A pointer from
-  the doc to a GLSL emit-side test would resolve this.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#function-alias-re-export-of-an-existing-callable](../../../docs/llm-generated/ast-reference/declarations.md#function-alias-re-export-of-an-existing-callable) | undocumented-behavior | The doc lists `FuncAliasDecl` as "function alias / re-export of an existing callable" with a grammar link to `[func alias]`. In practice `FuncAliasDecl` is synthesized by the checker for forms like forward-mode differentiation rather than spelled in user code; the surface syntax `func aliasedName = original;` is not accepted by `slangc`. | Either the doc's grammar pointer should be removed, or the doc should clarify that `FuncAliasDecl` is checker-synthesized. |
+| [#synthesized-by-the-checker-no-user-spelling](../../../docs/llm-generated/ast-reference/declarations.md#synthesized-by-the-checker-no-user-spelling) | undocumented-behavior | The doc enumerates `SynthesizedStructDecl`, `SynthesizedFuncDecl`, `InterfaceDefaultImplDecl`, `ThisTypeDecl`, `ThisTypeConstraintDecl`, and `UnresolvedDecl` as concrete classes, but each is internal — there is no user spelling and no externally observable behavior distinct from the surrounding decl. | A one-line note "synthesized by the checker, no user spelling" would let an agent skip them without doubt. |
+| [#modern-syntax-parameter-immutable-unless-outinout](../../../docs/llm-generated/ast-reference/declarations.md#modern-syntax-parameter-immutable-unless-outinout) | undocumented-behavior | The doc mentions `ModernParamDecl` ("modern-syntax parameter; immutable unless `out`/`inout`") but does not specify which parameter spelling produces `ModernParamDecl` vs. `ParamDecl`. The parameter-direction test here covers the direction half of the claim; the `ModernParamDecl`-vs-`ParamDecl` distinction would need a doc-level pointer to the modern parameter grammar. |  |
+| [#enumdecltagtype](../../../docs/llm-generated/ast-reference/declarations.md#enumdecltagtype) | undocumented-behavior | The doc says `EnumDecl::tagType` carries the underlying integer type but does not state a user-facing claim about how the tag type affects, e.g., `int(c)` conversion. The tag-value test here uses the default tag type and so does not exercise the alternative. |  |
+| [#enumdecl](../../../docs/llm-generated/ast-reference/declarations.md#enumdecl) | undocumented-behavior | The doc mentions `EnumDecl` exhaustive matching is part of the AggTypeDecl machinery; the doc does not state whether a `switch` without `default` over an enum is diagnosed. (In our experimentation `switch` lowering in the interpreter is the blocker; a stmt-tests page would be a better home.) The doc could spell this out so a future agent can either anchor a diagnostic test here or defer to `ast-reference/statements`. |  |
+| [#capability-does-not-exist](../../../docs/llm-generated/ast-reference/declarations.md#capability-does-not-exist) | undocumented-behavior | `RequireCapabilityDecl`'s observable behavior on a Slang unknown-capability name (the C-39 test) emits a "capability does not exist" error; the source-doc text only says "expressed as a decl so it can be exported". | A one-line claim about the diagnostic would make the negative test directly anchorable. |
+| [#glsl-style-interface-block-uniformbufferinout](../../../docs/llm-generated/ast-reference/declarations.md#glsl-style-interface-block-uniformbufferinout) | undocumented-behavior | The doc lists `GLSLInterfaceBlockDecl` as "GLSL-style interface block (uniform/buffer/in/out)". The user-observable surface is GLSL-only; this bundle does not exercise it because the interpreter cannot model GLSL interface blocks. A pointer from the doc to a GLSL emit-side test would resolve this. |  |
 
 ## Out of scope
 

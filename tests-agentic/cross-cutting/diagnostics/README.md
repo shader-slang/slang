@@ -89,57 +89,16 @@ no multi-backend matrix is needed.
 
 ## Doc gaps observed
 
-- The doc enumerates `Severity::Fatal` and `Severity::Internal` and
-  states their rendered names (`fatal error`, `internal error`) but
-  does not describe any user-reachable program that reliably
-  triggers either severity. Both are typically driven by environment
-  conditions (missing include file for fatal, ICE for internal) that
-  are non-trivial to script as a regression. Suggest the doc either
-  link to a representative example or add a short "how to trigger"
-  note next to each severity.
-- The doc mentions `overrideDiagnostic` and the `flag` group as
-  suppression surfaces but does not say what the user-facing
-  spelling of either is (e.g. `#pragma warning(disable: <name>)` vs
-  `<flag>`). The integer-id form is implicitly common, but the
-  string-name and flag-group forms are under-documented. Suggest the
-  doc add one explicit example of each suppression form.
-- The JSON-emitting writer described under
-  `#source-locations-and-message-rendering` is mentioned but has no
-  user-facing claim that is observable via `slangc` defaults. To
-  test it we would need a doc claim about the command-line knob that
-  selects the JSON writer; that is not currently in the doc.
-- The `name` field of a diagnostic is referenced as a unique
-  identifier but the doc does not state whether the name appears in
-  any rendered output. Empirically, slangc renders `error[E30201]`
-  but not the name; we cannot test the name's externally observable
-  consequence until the doc states one.
-- The doc describes per-source warning-state tracking
-  (`SourceWarningStateTrackerBase`) for pragma overrides but does
-  not state a claim about scope (e.g. "the pragma applies to the
-  rest of the translation unit" vs "the pragma applies to the
-  current `__include` only"). This is a real user-visible behavior
-  worth a documented claim, but absent one we do not test it.
-- The doc mentions that the Severity filter "can suppress,
-  downgrade, or upgrade diagnostics by id" but does not name the
-  user-facing surfaces for `upgrade` and `downgrade` (the
-  `-warnings-as-errors <id>` and `-warnings-disable <id>` command
-  line flags). The boundary test
-  `warnings-as-errors-promotes-warning.slang` exercises the
-  `-warnings-as-errors` surface; the doc could call out both
-  command-line flags explicitly.
-- The doc describes the `#pragma warning` overrides but does not
-  enumerate the legal specifier set (`push`, `pop`, `disable`,
-  `error`, `default`, `suppress`). The `pragma-warning-unknown-
-  specifier-warns.slang` boundary test pins one rejected
-  specifier; the doc could list the accepted set explicitly to
-  pair with the rejection diagnostic.
-- The doc claims macro-expanded locations are "rendered with their
-  expansion stack" but does not describe what an
-  end-of-file-during-conditional diagnostic chain looks like
-  (primary + companion `see 'if' directive` note). The boundary
-  test `error-code-end-of-file-in-conditional.slang` exercises
-  this chain; the doc could add a small example of the multi-
-  record rendering.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#how-to-trigger](../../../docs/llm-generated/cross-cutting/diagnostics.md#how-to-trigger) | undocumented-behavior | The doc enumerates `Severity::Fatal` and `Severity::Internal` and states their rendered names (`fatal error`, `internal error`) but does not describe any user-reachable program that reliably triggers either severity. Both are typically driven by environment conditions (missing include file for fatal, ICE for internal) that are non-trivial to script as a regression. Suggest the doc either link to a representative example or add a short "how to trigger" note next to each severity. |  |
+| [#pragma](../../../docs/llm-generated/cross-cutting/diagnostics.md#pragma) | undocumented-behavior | The doc mentions `overrideDiagnostic` and the `flag` group as suppression surfaces but does not say what the user-facing spelling of either is (e.g. `#pragma warning(disable: <name>)` vs `<flag>`). The integer-id form is implicitly common, but the string-name and flag-group forms are under-documented. Suggest the doc add one explicit example of each suppression form. |  |
+| [#source-locations-and-message-rendering](../../../docs/llm-generated/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | undocumented-behavior | The JSON-emitting writer described under `#source-locations-and-message-rendering` is mentioned but has no user-facing claim that is observable via `slangc` defaults. To test it we would need a doc claim about the command-line knob that selects the JSON writer; that is not currently in the doc. |  |
+| [#name](../../../docs/llm-generated/cross-cutting/diagnostics.md#name) | undocumented-behavior | The `name` field of a diagnostic is referenced as a unique identifier but the doc does not state whether the name appears in any rendered output. Empirically, slangc renders `error[E30201]` but not the name; we cannot test the name's externally observable consequence until the doc states one. |  |
+| [#the-pragma-applies-to-the-rest-of-the-translation-unit](../../../docs/llm-generated/cross-cutting/diagnostics.md#the-pragma-applies-to-the-rest-of-the-translation-unit) | undocumented-behavior | The doc describes per-source warning-state tracking (`SourceWarningStateTrackerBase`) for pragma overrides but does not state a claim about scope (e.g. "the pragma applies to the rest of the translation unit" vs "the pragma applies to the current `__include` only"). This is a real user-visible behavior worth a documented claim, but absent one we do not test it. |  |
+| [#can-suppress-downgrade-or-upgrade-diagnostics-by-id](../../../docs/llm-generated/cross-cutting/diagnostics.md#can-suppress-downgrade-or-upgrade-diagnostics-by-id) | undocumented-behavior | The doc mentions that the Severity filter "can suppress, downgrade, or upgrade diagnostics by id" but does not name the user-facing surfaces for `upgrade` and `downgrade` (the `-warnings-as-errors <id>` and `-warnings-disable <id>` command line flags). The boundary test `warnings-as-errors-promotes-warning.slang` exercises the `-warnings-as-errors` surface; the doc could call out both command-line flags explicitly. |  |
+| [#pragma](../../../docs/llm-generated/cross-cutting/diagnostics.md#pragma) | undocumented-behavior | The doc describes the `#pragma warning` overrides but does not enumerate the legal specifier set (`push`, `pop`, `disable`, `error`, `default`, `suppress`). The `pragma-warning-unknown- specifier-warns.slang` boundary test pins one rejected specifier; the doc could list the accepted set explicitly to pair with the rejection diagnostic. |  |
+| [#rendered-with-their-expansion-stack](../../../docs/llm-generated/cross-cutting/diagnostics.md#rendered-with-their-expansion-stack) | undocumented-behavior | The doc claims macro-expanded locations are "rendered with their expansion stack" but does not describe what an end-of-file-during-conditional diagnostic chain looks like (primary + companion `see 'if' directive` note). The boundary test `error-code-end-of-file-in-conditional.slang` exercises this chain; the doc could add a small example of the multi- record rendering. |  |
 
 ## Out of scope (no-GPU runner)
 

@@ -73,35 +73,14 @@ grammar names, and in what shape they parse.
 
 ## Doc gaps observed
 
-- The `### `<` disambiguation` section lists the "generic-followers"
-  punctuation set (`::`, `.`, `(`, `)`, `[`, `]`, `:`, `,`, `?`,
-  `;`, `==`, `!=`, `>`, `>>`) but does not give a positive example
-  for each follower individually. A claim-per-follower expansion
-  would need either an enumerative example or a follower-specific
-  sub-anchor in the doc.
-- The doc lists `LambdaExpr ::= '(' ParamList? ')' '=>' Expr` and
-  the single-parameter form `IDENT '=>' Expr`, but `_common.md`
-  notes that "Lambda direct-invocation fails under INTERPRET",
-  which precludes the simplest positive test. A separate
-  IFunc-constrained idiom would be needed and is better anchored
-  to the lambda feature doc, not this grammar bundle.
-- The `## Modifiers` section lists ~50 modifier keywords as one
-  alternative in `ModifierKeyword` without per-modifier syntactic
-  notes; only the production "a modifier list precedes a decl" is a
-  grammar claim. Individual modifier semantics belong to
-  `ast-reference/modifiers.md` or the semantic-check bundle.
-- The doc mentions `try` is an expression keyword but states there
-  is no `try { } catch { }` statement, only `do ... catch`. We
-  cover `DoCatchStmt` only indirectly via the statement list; a
-  dedicated positive test would require exception machinery beyond
-  pure-parse observation, which `_common.md` warns is fragile under
-  INTERPRET.
-- The `## Expressions` section lists `AtomExpr ::= ... | '(' Expr (',' Expr)+ ')' -- tuple` but in practice this surface is parsed as comma-operator expressions, not a tuple literal. The actual user-facing tuple construction uses `makeTuple(...)` or an explicit `Tuple<...>` type. The doc should either narrow the production (e.g. "only after a tuple-typed binding context") or remove the standalone tuple-atom form.
-- The `## Types` section lists pointer (`Type '*'`), optional
-  (`Type '?'`), reference (`Type '&'`), and function-type spellings
-  with the caveat "where supported", but does not say which Slang
-  contexts permit each. Anchoring a positive test for those forms
-  would require the doc to enumerate the supported positions.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#generic-followers](../../../docs/llm-generated/syntax-reference/grammar.md#generic-followers) | undocumented-behavior | The `### `<` disambiguation` section lists the "generic-followers" punctuation set (`::`, `.`, `(`, `)`, `[`, `]`, `:`, `,`, `?`, `;`, `==`, `!=`, `>`, `>>`) but does not give a positive example for each follower individually. A claim-per-follower expansion would need either an enumerative example or a follower-specific sub-anchor in the doc. |  |
+| [#lambda-direct-invocation-fails-under-interpret](../../../docs/llm-generated/syntax-reference/grammar.md#lambda-direct-invocation-fails-under-interpret) | undocumented-behavior | The doc lists `LambdaExpr ::= '(' ParamList? ')' '=>' Expr` and the single-parameter form `IDENT '=>' Expr`, but `_common.md` notes that "Lambda direct-invocation fails under INTERPRET", which precludes the simplest positive test. A separate IFunc-constrained idiom would be needed and is better anchored to the lambda feature doc, not this grammar bundle. |  |
+| [#modifiers](../../../docs/llm-generated/syntax-reference/grammar.md#modifiers) | undocumented-behavior | The `## Modifiers` section lists ~50 modifier keywords as one alternative in `ModifierKeyword` without per-modifier syntactic notes; only the production "a modifier list precedes a decl" is a grammar claim. Individual modifier semantics belong to `ast-reference/modifiers.md` or the semantic-check bundle. |  |
+| [#try](../../../docs/llm-generated/syntax-reference/grammar.md#try) | undocumented-behavior | The doc mentions `try` is an expression keyword but states there is no `try { } catch { }` statement, only `do ... catch`. We cover `DoCatchStmt` only indirectly via the statement list; a dedicated positive test would require exception machinery beyond pure-parse observation, which `_common.md` warns is fragile under INTERPRET. |  |
+| [#expressions](../../../docs/llm-generated/syntax-reference/grammar.md#expressions) | undocumented-behavior | The `## Expressions` section lists `AtomExpr ::= ... \| '(' Expr (',' Expr)+ ')' -- tuple` but in practice this surface is parsed as comma-operator expressions, not a tuple literal. The actual user-facing tuple construction uses `makeTuple(...)` or an explicit `Tuple<...>` type. | The doc should either narrow the production (e.g. "only after a tuple-typed binding context") or remove the standalone tuple-atom form. |
+| [#types](../../../docs/llm-generated/syntax-reference/grammar.md#types) | undocumented-behavior | The `## Types` section lists pointer (`Type '*'`), optional (`Type '?'`), reference (`Type '&'`), and function-type spellings with the caveat "where supported", but does not say which Slang contexts permit each. Anchoring a positive test for those forms would require the doc to enumerate the supported positions. |  |
 
 ## Out of scope (no-GPU runner)
 

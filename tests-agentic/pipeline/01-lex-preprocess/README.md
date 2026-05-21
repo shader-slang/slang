@@ -82,79 +82,19 @@ here.
 
 ## Doc gaps observed
 
-- The `## Source-location preservation` section distinguishes three
-  categories of expansion-time tokens — raw body, argument, and
-  constructed — but does not give a directly observable, no-GPU
-  way to verify the **raw-body** vs **argument** distinction
-  (e.g. that an argument token's spelling location remains the
-  call-site rather than the macro body). The distinction is
-  observed through diagnostics whose exact wording is not
-  promised by the doc. Tests deferred until either the
-  diagnostics doc commits to a specific message or the source
-  doc adds an observable claim.
-- `## Lexer flags and special-case rules` mentions
-  `kLexerFlag_SuppressDiagnostics` as state used inside inactive
-  `#if` blocks, but there is no user-surface claim about it
-  beyond "tokens are still emitted as `TokenType::Invalid`".
-  That is internal lexer state with no observable consequence at
-  the slangc/slangi level. Recorded as undocumented-by-design.
-- `## Inputs and outputs` states that "phase 1 runs to completion
-  and produces a flat token list" — this is an architectural
-  invariant rather than a behavioral claim. There is no slangc
-  observable that distinguishes "streamed" from "batched" tokens,
-  so no test is written. Could be moved to an architecture-only
-  section in a future doc revision.
-- `## Preprocessor / Stack of input streams` is described as a
-  data-structure choice with no observable surface claim. Same
-  rationale as above.
-- The `## Preprocessor directives` section says "the standard C /
-  HLSL set" and points readers at the source file to enumerate
-  the list, rather than enumerating it in the doc itself. Tests
-  here cover a representative sample (`#if`/`#ifdef`/`#elif`/
-  `#else`/`#endif`/`#define`/`#undef`/`#error`/`#include`); an
-  authoritative enumeration in the doc would let this bundle
-  grow exhaustively. Suggestion: add an explicit directive table
-  to the doc.
-- The lexer claim "no distinction between identifiers and
-  keywords; the parser resolves keyword status via lookup" is
-  technically a parser-stage observable (parsing succeeds where
-  the user might expect a lexer error). The doc itself hands off
-  to `02-parse-ast.md` for the lookup story, so no test is
-  anchored here.
-- The `## Failure modes` section enumerates only "unbalanced
-  `#if`, unknown directive, missing include" but the compiler
-  also emits a dedicated **cyclic-include** diagnostic
-  (`cyclic-include`, code 15302) — observed by
-  `include-self-cycle-diagnostic.slang`. Suggestion: add the
-  cyclic-include failure mode to the failure-modes list.
-- The doc says the `#if` arithmetic evaluator handles "standard
-  C/HLSL" expressions but does not commit to **integer overflow
-  semantics** inside `#if`. The boundary tests
-  (`if-expression-signed-overflow-wraps.slang`,
-  `if-expression-uint32-max-is-true.slang`) probe the observed
-  behavior (signed wrap, `0xFFFFFFFF` treated as non-zero) but
-  the doc could promise these explicitly.
-- The doc treats `#error`, `#warning`, `#pragma`, and `#line` as
-  members of "the standard C/HLSL set" without further detail.
-  In particular the behavior that `#error` **does not expand
-  macros in its message** (verified by
-  `error-directive-macro-name-in-message.slang`) is not
-  documented; nor is the unknown-pragma policy ("warning, ignore,
-  continue" — verified by `pragma-unknown-emits-warning.slang`).
-  Suggestion: add a short sub-section enumerating each directive
-  and its message-expansion / failure-mode contract.
-- Recursive macro expansion ("a macro that references its own
-  name in its body") is not explicitly addressed in the doc.
-  The doc describes "fresh environment that maps parameter
-  names to pseudo-macros" but does not commit to a
-  recursion-detection rule. Boundary test deferred until the
-  doc commits a claim.
-- The doc's `## Source-location preservation` lists `__LINE__`,
-  `__FILE__`, `#x`, `x##y` as "constructed tokens" but does not
-  discuss the `#line` directive's interaction with `__LINE__`
-  (verified by `line-macro-after-line-directive.slang`).
-  Suggestion: add a sentence noting that `#line N` shifts the
-  logical counter used by constructed `__LINE__` tokens.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#source-location-preservation](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#source-location-preservation) | undocumented-behavior | The `## Source-location preservation` section distinguishes three categories of expansion-time tokens — raw body, argument, and constructed — but does not give a directly observable, no-GPU way to verify the **raw-body** vs **argument** distinction (e.g. that an argument token's spelling location remains the call-site rather than the macro body). The distinction is observed through diagnostics whose exact wording is not promised by the doc. Tests deferred until either the diagnostics doc commits to a specific message or the source doc adds an observable claim. |  |
+| [#if](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#if) | undocumented-behavior | `## Lexer flags and special-case rules` mentions `kLexerFlag_SuppressDiagnostics` as state used inside inactive `#if` blocks, but there is no user-surface claim about it beyond "tokens are still emitted as `TokenType::Invalid`". That is internal lexer state with no observable consequence at the slangc/slangi level. Recorded as undocumented-by-design. |  |
+| [#inputs-and-outputs](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#inputs-and-outputs) | undocumented-behavior | `## Inputs and outputs` states that "phase 1 runs to completion and produces a flat token list" — this is an architectural invariant rather than a behavioral claim. There is no slangc observable that distinguishes "streamed" from "batched" tokens, so no test is written. Could be moved to an architecture-only section in a future doc revision. |  |
+| [#preprocessor-stack-of-input-streams](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#preprocessor-stack-of-input-streams) | undocumented-behavior | `## Preprocessor / Stack of input streams` is described as a data-structure choice with no observable surface claim. Same rationale as above. |  |
+| [#if](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#if) | undocumented-behavior | The `## Preprocessor directives` section says "the standard C / HLSL set" and points readers at the source file to enumerate the list, rather than enumerating it in the doc itself. Tests here cover a representative sample (`#if`/`#ifdef`/`#elif`/ `#else`/`#endif`/`#define`/`#undef`/`#error`/`#include`); an authoritative enumeration in the doc would let this bundle grow exhaustively. Suggestion: add an explicit directive table to the doc. |  |
+| [#02-parse-astmd](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#02-parse-astmd) | undocumented-behavior | The lexer claim "no distinction between identifiers and keywords; the parser resolves keyword status via lookup" is technically a parser-stage observable (parsing succeeds where the user might expect a lexer error). The doc itself hands off to `02-parse-ast.md` for the lookup story, so no test is anchored here. |  |
+| [#if](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#if) | undocumented-behavior | The `## Failure modes` section enumerates only "unbalanced `#if`, unknown directive, missing include" but the compiler also emits a dedicated **cyclic-include** diagnostic (`cyclic-include`, code 15302) — observed by `include-self-cycle-diagnostic.slang`. Suggestion: add the cyclic-include failure mode to the failure-modes list. |  |
+| [#if](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#if) | undocumented-behavior | The doc says the `#if` arithmetic evaluator handles "standard C/HLSL" expressions but does not commit to **integer overflow semantics** inside `#if`. The boundary tests (`if-expression-signed-overflow-wraps.slang`, `if-expression-uint32-max-is-true.slang`) probe the observed behavior (signed wrap, `0xFFFFFFFF` treated as non-zero) but the doc could promise these explicitly. |  |
+| [#error](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#error) | undocumented-behavior | The doc treats `#error`, `#warning`, `#pragma`, and `#line` as members of "the standard C/HLSL set" without further detail. In particular the behavior that `#error` **does not expand macros in its message** (verified by `error-directive-macro-name-in-message.slang`) is not documented; nor is the unknown-pragma policy ("warning, ignore, continue" — verified by `pragma-unknown-emits-warning.slang`). Suggestion: add a short sub-section enumerating each directive and its message-expansion / failure-mode contract. |  |
+| [#a-macro-that-references-its-own-name-in-its-body](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#a-macro-that-references-its-own-name-in-its-body) | undocumented-behavior | Recursive macro expansion ("a macro that references its own name in its body") is not explicitly addressed in the doc. The doc describes "fresh environment that maps parameter names to pseudo-macros" but does not commit to a recursion-detection rule. Boundary test deferred until the doc commits a claim. |  |
+| [#x](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#x) | undocumented-behavior | The doc's `## Source-location preservation` lists `__LINE__`, `__FILE__`, `#x`, `x##y` as "constructed tokens" but does not discuss the `#line` directive's interaction with `__LINE__` (verified by `line-macro-after-line-directive.slang`). Suggestion: add a sentence noting that `#line N` shifts the logical counter used by constructed `__LINE__` tokens. |  |
 
 ## Boundary / stress coverage added in expansion
 

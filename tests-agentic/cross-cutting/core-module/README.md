@@ -123,79 +123,21 @@ module-identity (typedef resolves, `Optional<T>` compiles).
 
 ## Doc gaps observed
 
-- `#core-module` lists `__intrinsic_op` and `__target_intrinsic` as
-  the modifier vocabulary mapping core-module declarations onto IR
-  and per-target spellings, but the per-target spelling table for
-  any specific intrinsic (e.g. `dot`, `length`, `mul`) is not
-  enumerated in `cross-cutting/core-module.md` itself — tests had
-  to discover SPIR-V spellings (`OpDot`, `Length`,
-  `OpVectorTimesMatrix`) by inspection.
-- `#glsl-module` says the GLSL module is "target-conditional ...
-  when the user is compiling GLSL or asks for GLSL-flavoured names
-  from Slang code" but does not name the user-facing flag
-  (`-allow-glsl`) that enables the second mode from Slang source.
-- `#standard-modules` describes the on-demand `import slang.<name>`
-  mechanism but does not describe what happens when a standard-
-  module-namespaced name is referenced without the import — i.e.
-  the doc does not state the negative case used by
-  `standard-module-neural-not-implicit.slang`.
-- `#preludes` lists prelude headers by file name but does not
-  describe which symbols from each prelude appear in emitted
-  output. Tests had to find observable markers
-  (`SLANG_PRELUDE_EXPORT`, `extern "C" __global__`) by inspection.
-- `#what-the-core-module-provides` lists `Optional`, `Result`,
-  `Tuple` but does not describe their public API
-  (`hasValue` property, `value` property, `none` literal).
-- 16-bit float support (`float16_t` / `half`) is mentioned in the
-  doc's typedef list but its per-target capability requirements
-  (e.g. HLSL `-profile sm_6_2`, SPIR-V `Float16` capability) are
-  not documented; we therefore skip a `float16_t` lowering test
-  rather than guess at the right flag set.
-- The doc lists `dot`, `length`, `mul` (and by inference
-  `normalize`) as HLSL-meta-module intrinsics but does not name the
-  documented behaviour of these intrinsics at numeric edges
-  (zero-vector, infinity, NaN) — boundary tests therefore assert
-  only front-end acceptance and emit preservation, not specific
-  per-target runtime values.
-- The doc does not state the per-target spelling of `printf`
-  format conversions (`%d`, `%f` at MIN/MAX/inf/NaN) or whether
-  `slangi` shares the host's libc formatting; boundary printf
-  tests cite the doc's general "HLSL meta-module exposes ...
-  intrinsics" wording and assert string-match on the interpreter
-  output observed today.
-- The doc identifies the GLSL module as "target-conditional" but
-  does not enumerate the GLSL-flavoured arithmetic helpers
-  (`min`, `max`, `clamp`, etc.) that the module re-exports — our
-  `glsl-min-max-clamp-aliases` test had to discover their
-  availability empirically.
-- The doc does not state that the diff meta-module is non-
-  importable by `import diff;` from user code — our negative
-  `import-diff-by-name-fails` test had to discover the
-  loader-search-path behaviour empirically.
-- `#core-module` lists `Texture2D` and `RWTexture2D` as the
-  representative HLSL-named resource types but does not enumerate
-  the full set of texture variants the HLSL meta-module surfaces
-  (`Texture1D`, `Texture3D`, `TextureCube`, `Texture2DArray`,
-  `TextureCubeArray`, `Texture2DMS`, `RWTexture1D`, `RWTexture3D`,
-  `SamplerComparisonState`). Texture-variant expansion tests had
-  to discover the per-target lowering (1D / 3D / Cube image
-  dimensionality, multisampled image marker, Dref opcodes for
-  shadow samplers) from emit inspection rather than from a doc
-  table.
-- `#core-module` does not enumerate which sampling operations
-  (`Sample`, `SampleLevel`, `SampleGrad`, `Load`, `GatherRed`,
-  `SampleCmp`, `SampleCmpLevelZero`) are available on which
-  texture variant, nor the per-variant coordinate shapes
-  (e.g. `Texture3D.Load` takes `int4`, `Texture1D.Load` takes
-  `int2`, `Texture2DMS.Load` takes `(int2, sampleIdx)`). These
-  signatures were determined empirically from compiler errors.
-- `#core-module` does not name which texel-format generics
-  (`float4` / `int4` / `uint4` / `unorm` / `snorm`) are valid on
-  each texture variant, nor describe the per-target sampler-type
-  flavouring (e.g. GLSL `utexture3D` for `uint4` content,
-  `image1D` vs `uimage1D` for the RW variants). Format-variant
-  tests probe only `float4` and `uint4` and leave the
-  `unorm`/`snorm` admission status as a doc gap.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#core-module](../../../docs/llm-generated/cross-cutting/core-module.md#core-module) | undocumented-behavior | `#core-module` lists `__intrinsic_op` and `__target_intrinsic` as the modifier vocabulary mapping core-module declarations onto IR and per-target spellings, but the per-target spelling table for any specific intrinsic (e.g. `dot`, `length`, `mul`) is not enumerated in `cross-cutting/core-module.md` itself — tests had to discover SPIR-V spellings (`OpDot`, `Length`, `OpVectorTimesMatrix`) by inspection. |  |
+| [#glsl-module](../../../docs/llm-generated/cross-cutting/core-module.md#glsl-module) | undocumented-behavior | `#glsl-module` says the GLSL module is "target-conditional ... when the user is compiling GLSL or asks for GLSL-flavoured names from Slang code" but does not name the user-facing flag (`-allow-glsl`) that enables the second mode from Slang source. |  |
+| [#standard-modules](../../../docs/llm-generated/cross-cutting/core-module.md#standard-modules) | undocumented-behavior | `#standard-modules` describes the on-demand `import slang.<name>` mechanism but does not describe what happens when a standard- module-namespaced name is referenced without the import — i.e. the doc does not state the negative case used by `standard-module-neural-not-implicit.slang`. |  |
+| [#preludes](../../../docs/llm-generated/cross-cutting/core-module.md#preludes) | undocumented-behavior | `#preludes` lists prelude headers by file name but does not describe which symbols from each prelude appear in emitted output. Tests had to find observable markers (`SLANG_PRELUDE_EXPORT`, `extern "C" __global__`) by inspection. |  |
+| [#what-the-core-module-provides](../../../docs/llm-generated/cross-cutting/core-module.md#what-the-core-module-provides) | undocumented-behavior | `#what-the-core-module-provides` lists `Optional`, `Result`, `Tuple` but does not describe their public API (`hasValue` property, `value` property, `none` literal). |  |
+| [#float16t](../../../docs/llm-generated/cross-cutting/core-module.md#float16t) | undocumented-behavior | 16-bit float support (`float16_t` / `half`) is mentioned in the doc's typedef list but its per-target capability requirements (e.g. HLSL `-profile sm_6_2`, SPIR-V `Float16` capability) are not documented; we therefore skip a `float16_t` lowering test rather than guess at the right flag set. |  |
+| [#dot](../../../docs/llm-generated/cross-cutting/core-module.md#dot) | undocumented-behavior | The doc lists `dot`, `length`, `mul` (and by inference `normalize`) as HLSL-meta-module intrinsics but does not name the documented behaviour of these intrinsics at numeric edges (zero-vector, infinity, NaN) — boundary tests therefore assert only front-end acceptance and emit preservation, not specific per-target runtime values. |  |
+| [#hlsl-meta-module-exposes-intrinsics](../../../docs/llm-generated/cross-cutting/core-module.md#hlsl-meta-module-exposes-intrinsics) | undocumented-behavior | The doc does not state the per-target spelling of `printf` format conversions (`%d`, `%f` at MIN/MAX/inf/NaN) or whether `slangi` shares the host's libc formatting; boundary printf tests cite the doc's general "HLSL meta-module exposes ... intrinsics" wording and assert string-match on the interpreter output observed today. |  |
+| [#target-conditional](../../../docs/llm-generated/cross-cutting/core-module.md#target-conditional) | undocumented-behavior | The doc identifies the GLSL module as "target-conditional" but does not enumerate the GLSL-flavoured arithmetic helpers (`min`, `max`, `clamp`, etc.) that the module re-exports — our `glsl-min-max-clamp-aliases` test had to discover their availability empirically. |  |
+| (unspecified) | undocumented-behavior | The doc does not state that the diff meta-module is non- importable by `import diff;` from user code — our negative `import-diff-by-name-fails` test had to discover the loader-search-path behaviour empirically. |  |
+| [#core-module](../../../docs/llm-generated/cross-cutting/core-module.md#core-module) | undocumented-behavior | `#core-module` lists `Texture2D` and `RWTexture2D` as the representative HLSL-named resource types but does not enumerate the full set of texture variants the HLSL meta-module surfaces (`Texture1D`, `Texture3D`, `TextureCube`, `Texture2DArray`, `TextureCubeArray`, `Texture2DMS`, `RWTexture1D`, `RWTexture3D`, `SamplerComparisonState`). Texture-variant expansion tests had to discover the per-target lowering (1D / 3D / Cube image dimensionality, multisampled image marker, Dref opcodes for shadow samplers) from emit inspection rather than from a doc table. |  |
+| [#core-module](../../../docs/llm-generated/cross-cutting/core-module.md#core-module) | undocumented-behavior | `#core-module` does not enumerate which sampling operations (`Sample`, `SampleLevel`, `SampleGrad`, `Load`, `GatherRed`, `SampleCmp`, `SampleCmpLevelZero`) are available on which texture variant, nor the per-variant coordinate shapes (e.g. `Texture3D.Load` takes `int4`, `Texture1D.Load` takes `int2`, `Texture2DMS.Load` takes `(int2, sampleIdx)`). These signatures were determined empirically from compiler errors. |  |
+| [#core-module](../../../docs/llm-generated/cross-cutting/core-module.md#core-module) | undocumented-behavior | `#core-module` does not name which texel-format generics (`float4` / `int4` / `uint4` / `unorm` / `snorm`) are valid on each texture variant, nor describe the per-target sampler-type flavouring (e.g. GLSL `utexture3D` for `uint4` content, `image1D` vs `uimage1D` for the RW variants). Format-variant tests probe only `float4` and `uint4` and leave the `unorm`/`snorm` admission status as a doc gap. |  |
 
 ## Out of scope (no-GPU runner)
 

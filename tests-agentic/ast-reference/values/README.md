@@ -69,44 +69,15 @@ that this bundle exercises are:
 
 ## Doc gaps observed
 
-- The doc names `WitnessLookupIntVal` as "an integer value resolved
-  through a witness-table lookup", but the surface spelling that
-  produces this Val is not given. Without a surface form (e.g. an
-  interface with a `static const int` requirement that another
-  generic reads), it is not anchorable.
-- The doc names `FuncCallIntVal` as "a compile-time call to an
-  integer-returning function" but does not name the spelling. Slang
-  has `__intrinsic` / `[__BuiltinFunc]` helpers, but no portable
-  user-spellable form is documented. A doc-level pointer to a
-  minimal example (e.g. a `constexpr`-like function call in array
-  bounds) would let an agent anchor a test.
-- `TypeCastIntVal` is "an integer cast to a different integer type"
-  but the surface that produces this Val (vs. just an inline cast in
-  IR) is not named. A spelling pointer would help.
-- The `Polynomial helpers` section (`PolynomialIntValFactor`,
-  `PolynomialIntValTerm`) is purely internal: they "are not `IntVal`s
-  themselves: they appear as operands of a `PolynomialIntVal`".
-  Their observable surface is identical to `PolynomialIntVal`'s; no
-  user-spellable distinction exists. The doc could state this
-  explicitly under `## Out of scope`.
-- The doc lists `MemberDeclRef`, `LookupDeclRef`, and `DirectDeclRef`
-  in the `DeclRefBase` family but their user-observable surface is
-  the same as a plain identifier lookup. No claim distinguishes them
-  at the surface level (the distinction is internal: "how the
-  declaration was reached"). A doc-level note saying "these three
-  variants are observationally indistinguishable through `slangc`;
-  only `GenericAppDeclRef` produces a distinct surface (generic
-  args)" would clarify boundary ownership.
-- The doc lists all the pack-related `IntVal` and `SubtypeWitness`
-  variants (`FirstIntVal`, `LastIntVal`, `EachIntVal`,
-  `EachSubtypeWitness`, etc.). The user-observable surface for these
-  belongs to the variadic-generic / pack feature bundle. The doc
-  could note that explicitly.
-- The doc lists the `DifferentiateVal` family
-  (`ForwardDifferentiateVal`, `BackwardDifferentiateVal`, ...)
-  alongside autodiff machinery. Their observable surface belongs to
-  the autodiff feature bundle. A doc pointer to that bundle would
-  clarify ownership.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#an-integer-value-resolved-through-a-witness-table-lookup](../../../docs/llm-generated/ast-reference/values.md#an-integer-value-resolved-through-a-witness-table-lookup) | undocumented-behavior | The doc names `WitnessLookupIntVal` as "an integer value resolved through a witness-table lookup", but the surface spelling that produces this Val is not given. | Without a surface form (e.g. an interface with a `static const int` requirement that another generic reads), it is not anchorable. |
+| [#a-compile-time-call-to-an-integer-returning-function](../../../docs/llm-generated/ast-reference/values.md#a-compile-time-call-to-an-integer-returning-function) | undocumented-behavior | The doc names `FuncCallIntVal` as "a compile-time call to an integer-returning function" but does not name the spelling. Slang has `__intrinsic` / `[__BuiltinFunc]` helpers, but no portable user-spellable form is documented. A doc-level pointer to a minimal example (e.g. a `constexpr`-like function call in array bounds) would let an agent anchor a test. |  |
+| [#an-integer-cast-to-a-different-integer-type](../../../docs/llm-generated/ast-reference/values.md#an-integer-cast-to-a-different-integer-type) | undocumented-behavior | `TypeCastIntVal` is "an integer cast to a different integer type" but the surface that produces this Val (vs. just an inline cast in IR) is not named. A spelling pointer would help. |  |
+| [#out-of-scope](../../../docs/llm-generated/ast-reference/values.md#out-of-scope) | undocumented-behavior | The `Polynomial helpers` section (`PolynomialIntValFactor`, `PolynomialIntValTerm`) is purely internal: they "are not `IntVal`s themselves: they appear as operands of a `PolynomialIntVal`". Their observable surface is identical to `PolynomialIntVal`'s; no user-spellable distinction exists. The doc could state this explicitly under `## Out of scope`. |  |
+| [#how-the-declaration-was-reached](../../../docs/llm-generated/ast-reference/values.md#how-the-declaration-was-reached) | undocumented-behavior | The doc lists `MemberDeclRef`, `LookupDeclRef`, and `DirectDeclRef` in the `DeclRefBase` family but their user-observable surface is the same as a plain identifier lookup. No claim distinguishes them at the surface level (the distinction is internal: "how the declaration was reached"). A doc-level note saying "these three variants are observationally indistinguishable through `slangc`; only `GenericAppDeclRef` produces a distinct surface (generic args)" would clarify boundary ownership. |  |
+| [#intval](../../../docs/llm-generated/ast-reference/values.md#intval) | undocumented-behavior | The doc lists all the pack-related `IntVal` and `SubtypeWitness` variants (`FirstIntVal`, `LastIntVal`, `EachIntVal`, `EachSubtypeWitness`, etc.). The user-observable surface for these belongs to the variadic-generic / pack feature bundle. The doc could note that explicitly. |  |
+| [#differentiateval](../../../docs/llm-generated/ast-reference/values.md#differentiateval) | undocumented-behavior | The doc lists the `DifferentiateVal` family (`ForwardDifferentiateVal`, `BackwardDifferentiateVal`, ...) alongside autodiff machinery. Their observable surface belongs to the autodiff feature bundle. A doc pointer to that bundle would clarify ownership. |  |
 
 ## Out of scope
 

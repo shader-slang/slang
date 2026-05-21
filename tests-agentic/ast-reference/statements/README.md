@@ -102,48 +102,14 @@ are unobservable through any allowed `slang-test` directive.
 
 ## Doc gaps observed
 
-- The `UnscopedForStmt` row in `## Nodes` documents the
-  compatibility form "where the loop variable leaks into the
-  surrounding scope", but the parser produces an `UnscopedForStmt`
-  only when the source-language detection sets `SourceLanguage::HLSL`.
-  A `.slang` source file (the only kind `slang-test` exercises with
-  the `INTERPRET` directive) always parses as Slang and never reaches
-  the `UnscopedForStmt` path. The doc could clarify that
-  `UnscopedForStmt` is reachable only from HLSL input and not via a
-  user-spellable `.slang` modifier; without that pointer an agent
-  cannot anchor a test here.
-- `RequireCapabilityStmt` is documented as a statement-level
-  capability requirement, but the doc does not state which spelling
-  produces it (`__requireCapability` is the parser token, while the
-  module-scope `RequireCapabilityDecl` is `__require_capability`).
-  A one-line note ("statement-level keyword is `__requireCapability`")
-  would let the bundle's test anchor more directly than the current
-  prose paragraph.
-- The doc says "BreakStmt inside a SwitchStmt is matched via
-  BreakableStmt::uniqueID" but does not state the user-observable
-  consequence (that a labeled `break` can break out of a non-
-  innermost switch as well as a non-innermost loop). The bundle
-  exercises the labeled-loop case; the labeled-switch case is
-  symmetric but has no separate doc claim and so no separate test.
-- The doc lists `IntrinsicAsmStmt` as a node but notes it is "used by
-  core-module intrinsics"; it has no user spelling. The same applies
-  to `UnparsedStmt` ("reserved-content block deferred to a downstream
-  compiler"). One line ("not user-spellable, exists only inside the
-  core module / inline-HLSL paths") would let an agent skip these
-  without doubt.
-- The doc says `BreakableStmt` has a `uniqueID` "that `ChildStmt`s
-  reference via `targetOuterStmtID`", and that `UniqueStmtIDNode`
-  is "declared in this header as a `Decl` subclass for serialization
-  convenience". The user-facing consequence is the matching of a
-  `break` to its enclosing breakable, which we test indirectly via
-  the labeled-break test; the `uniqueID` mechanism itself is
-  internal and not separately observable.
-- The doc points to `../syntax-reference/grammar.md#statements` for
-  the grammar of each statement form, and to `../pipeline/04-ast-to-ir.md`
-  for the IR lowering of `DeferStmt`, `ThrowStmt`, `CompileTimeForStmt`,
-  and `TargetSwitchStmt`. The bundle exercises the AST-level
-  consequence of each; the IR-side claims belong to
-  `ir-reference/control-flow/`.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | undocumented-behavior | The `UnscopedForStmt` row in `## Nodes` documents the compatibility form "where the loop variable leaks into the surrounding scope", but the parser produces an `UnscopedForStmt` only when the source-language detection sets `SourceLanguage::HLSL`. A `.slang` source file (the only kind `slang-test` exercises with the `INTERPRET` directive) always parses as Slang and never reaches the `UnscopedForStmt` path. The doc could clarify that `UnscopedForStmt` is reachable only from HLSL input and not via a user-spellable `.slang` modifier; without that pointer an agent cannot anchor a test here. |  |
+| [#statement-level-keyword-is-requirecapability](../../../docs/llm-generated/ast-reference/statements.md#statement-level-keyword-is-requirecapability) | undocumented-behavior | `RequireCapabilityStmt` is documented as a statement-level capability requirement, but the doc does not state which spelling produces it (`__requireCapability` is the parser token, while the module-scope `RequireCapabilityDecl` is `__require_capability`). | A one-line note ("statement-level keyword is `__requireCapability`") would let the bundle's test anchor more directly than the current prose paragraph. |
+| [#breakstmt-inside-a-switchstmt-is-matched-via-breakablestmtuniqueid](../../../docs/llm-generated/ast-reference/statements.md#breakstmt-inside-a-switchstmt-is-matched-via-breakablestmtuniqueid) | undocumented-behavior | The doc says "BreakStmt inside a SwitchStmt is matched via BreakableStmt::uniqueID" but does not state the user-observable consequence (that a labeled `break` can break out of a non- innermost switch as well as a non-innermost loop). The bundle exercises the labeled-loop case; the labeled-switch case is symmetric but has no separate doc claim and so no separate test. |  |
+| [#used-by-core-module-intrinsics](../../../docs/llm-generated/ast-reference/statements.md#used-by-core-module-intrinsics) | undocumented-behavior | The doc lists `IntrinsicAsmStmt` as a node but notes it is "used by core-module intrinsics"; it has no user spelling. The same applies to `UnparsedStmt` ("reserved-content block deferred to a downstream compiler"). One line ("not user-spellable, exists only inside the core module / inline-HLSL paths") would let an agent skip these without doubt. |  |
+| [#that-childstmts-reference-via-targetouterstmtid](../../../docs/llm-generated/ast-reference/statements.md#that-childstmts-reference-via-targetouterstmtid) | undocumented-behavior | The doc says `BreakableStmt` has a `uniqueID` "that `ChildStmt`s reference via `targetOuterStmtID`", and that `UniqueStmtIDNode` is "declared in this header as a `Decl` subclass for serialization convenience". The user-facing consequence is the matching of a `break` to its enclosing breakable, which we test indirectly via the labeled-break test; the `uniqueID` mechanism itself is internal and not separately observable. |  |
+| [#statements](../../../docs/llm-generated/ast-reference/statements.md#statements) | undocumented-behavior | The doc points to `../syntax-reference/grammar.md#statements` for the grammar of each statement form, and to `../pipeline/04-ast-to-ir.md` for the IR lowering of `DeferStmt`, `ThrowStmt`, `CompileTimeForStmt`, and `TargetSwitchStmt`. The bundle exercises the AST-level consequence of each; the IR-side claims belong to `ir-reference/control-flow/`. |  |
 
 ## Out of scope
 

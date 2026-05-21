@@ -57,22 +57,11 @@ that does not link against the C++ AST headers.
 
 ## Doc gaps observed
 
-- The doc lists `Decl::inferredCapabilityRequirements` as a field
-  filled in during checking but does not state a user-facing claim
-  about when a capability mismatch is diagnosed; the doc points
-  inward to a private field rather than outward to an observable
-  behavior. The pipeline pages already cover the capability gate;
-  a one-line cross-link from `#decl-declbase` to
-  `pipeline/03-semantic-check.md` (or to a future capabilities doc)
-  would let an agent anchor a capability-check test here.
-- The doc mentions `Decl::checkState` (which checking phases have
-  completed) without stating any externally-observable consequence
-  of `checkState`. The phased-check sequencing is described in
-  `pipeline/03-semantic-check.md`; the cross-reference is implicit.
-- The doc lists `Modifier::keywordName: Name*` but does not name a
-  user-facing consequence of the keyword name beyond appearing in
-  diagnostics. The diagnostic-text dependency is implicit and
-  worth a one-line note.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#decl-declbase](../../../docs/llm-generated/ast-reference/base.md#decl-declbase) | undocumented-behavior | The doc lists `Decl::inferredCapabilityRequirements` as a field filled in during checking but does not state a user-facing claim about when a capability mismatch is diagnosed; the doc points inward to a private field rather than outward to an observable behavior. The pipeline pages already cover the capability gate; a one-line cross-link from `#decl-declbase` to `pipeline/03-semantic-check.md` (or to a future capabilities doc) would let an agent anchor a capability-check test here. |  |
+| [#declcheckstate](../../../docs/llm-generated/ast-reference/base.md#declcheckstate) | undocumented-behavior | The doc mentions `Decl::checkState` (which checking phases have completed) without stating any externally-observable consequence of `checkState`. The phased-check sequencing is described in `pipeline/03-semantic-check.md`; the cross-reference is implicit. |  |
+| (unspecified) | undocumented-behavior | The doc lists `Modifier::keywordName: Name*` but does not name a user-facing consequence of the keyword name beyond appearing in diagnostics. The diagnostic-text dependency is implicit and worth a one-line note. |  |
 
 ## Out of scope (no-GPU runner)
 

@@ -128,53 +128,14 @@ checked code at runtime); diagnostic claims use
 
 ## Doc gaps observed
 
-- The `## Synthesizing implicit code` section names "generated
-  comparison / construction methods" as a category but does not
-  enumerate which comparison operators are auto-synthesized
-  (`==`, `!=`, `<`, `>`, `<=`, `>=`) nor which structural rules
-  trigger them. The bundle tests the construction half (initializer-
-  list constructor) but not comparison-method synthesis; a doc
-  enumeration would let the bundle grow exhaustively in that area.
-- The `## Shader-specific checks` section lists "parameter modifiers
-  (`in`, `out`, `inout` and stage-specific intrinsics)" and "return
-  type compatibility with the stage" as checked, but the doc does
-  not promise specific diagnostic codes or message text. The
-  `entry-point-needs-stage` test anchors to the one concrete claim
-  (a stage attribute or `-stage` is required); the broader
-  parameter-modifier / return-type-per-stage claims need a doc
-  enumeration before a test can anchor to them.
-- The `## Modifier validation` section says
-  slang-check-modifier.cpp validates "which modifiers are allowed on
-  which decls, mutually exclusive combinations, attribute argument
-  types, and HLSL-vs-Slang dialect differences". No specific
-  mutually-exclusive pair is named in the doc. Tests for individual
-  combos (e.g. `static [mutating]`) would be anchoring to undocumented
-  behavior; deferred until the doc lists at least one explicit
-  exclusion.
-- The `## Failure modes` section says overload resolution "returns a
-  synthetic `errorExpr` rather than aborting". The user-visible
-  consequence is "compilation continues past the offending site" —
-  the `recovery-after-error-does-not-cascade` test exercises the
-  general claim, but the doc has no observable surface that
-  specifically distinguishes "synthetic errorExpr" from any other
-  error-recovery placeholder.
-- The `## SemanticsVisitor` and `## Files and responsibilities`
-  sections describe the architectural split (which `.cpp` file
-  handles which concern). Most of those claims are not directly
-  observable from outside the compiler — the bundle anchors negative
-  tests to the file table by treating each row's "concern" as a
-  testable surface claim (e.g. "statement checking validates
-  control-flow rules"). A stronger anchoring would be to add a
-  per-concern subsection enumerating exactly which user-visible
-  behaviors live in each file.
-- The doc points readers to
-  [`../name-resolution/`](../../../docs/llm-generated/name-resolution/)
-  for the lookup algorithm but does not restate any specific
-  consequences in this file. The bundle therefore anchors a handful
-  of tests directly to `lookup.md` and `overload-resolution.md`
-  (which the per-section prompt explicitly permits). If the source
-  doc were extended with one-line summaries of each user-visible
-  lookup behavior, those tests could re-anchor here.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#synthesizing-implicit-code](../../../docs/llm-generated/pipeline/03-semantic-check.md#synthesizing-implicit-code) | undocumented-behavior | The `## Synthesizing implicit code` section names "generated comparison / construction methods" as a category but does not enumerate which comparison operators are auto-synthesized (`==`, `!=`, `<`, `>`, `<=`, `>=`) nor which structural rules trigger them. The bundle tests the construction half (initializer- list constructor) but not comparison-method synthesis; a doc enumeration would let the bundle grow exhaustively in that area. |  |
+| [#shader-specific-checks](../../../docs/llm-generated/pipeline/03-semantic-check.md#shader-specific-checks) | undocumented-behavior | The `## Shader-specific checks` section lists "parameter modifiers (`in`, `out`, `inout` and stage-specific intrinsics)" and "return type compatibility with the stage" as checked, but the doc does not promise specific diagnostic codes or message text. The `entry-point-needs-stage` test anchors to the one concrete claim (a stage attribute or `-stage` is required); the broader parameter-modifier / return-type-per-stage claims need a doc enumeration before a test can anchor to them. |  |
+| [#modifier-validation](../../../docs/llm-generated/pipeline/03-semantic-check.md#modifier-validation) | undocumented-behavior | The `## Modifier validation` section says slang-check-modifier.cpp validates "which modifiers are allowed on which decls, mutually exclusive combinations, attribute argument types, and HLSL-vs-Slang dialect differences". No specific mutually-exclusive pair is named in the doc. Tests for individual combos (e.g. `static [mutating]`) would be anchoring to undocumented behavior; deferred until the doc lists at least one explicit exclusion. |  |
+| [#failure-modes](../../../docs/llm-generated/pipeline/03-semantic-check.md#failure-modes) | undocumented-behavior | The `## Failure modes` section says overload resolution "returns a synthetic `errorExpr` rather than aborting". The user-visible consequence is "compilation continues past the offending site" — the `recovery-after-error-does-not-cascade` test exercises the general claim, but the doc has no observable surface that specifically distinguishes "synthetic errorExpr" from any other error-recovery placeholder. |  |
+| [#semanticsvisitor](../../../docs/llm-generated/pipeline/03-semantic-check.md#semanticsvisitor) | undocumented-behavior | The `## SemanticsVisitor` and `## Files and responsibilities` sections describe the architectural split (which `.cpp` file handles which concern). Most of those claims are not directly observable from outside the compiler — the bundle anchors negative tests to the file table by treating each row's "concern" as a testable surface claim (e.g. "statement checking validates control-flow rules"). A stronger anchoring would be to add a per-concern subsection enumerating exactly which user-visible behaviors live in each file. |  |
+| [#name-resolution](../../../docs/llm-generated/pipeline/03-semantic-check.md#name-resolution) | undocumented-behavior | The doc points readers to [`../name-resolution/`](../../../docs/llm-generated/name-resolution/) for the lookup algorithm but does not restate any specific consequences in this file. The bundle therefore anchors a handful of tests directly to `lookup.md` and `overload-resolution.md` (which the per-section prompt explicitly permits). If the source doc were extended with one-line summaries of each user-visible lookup behavior, those tests could re-anchor here. |  |
 
 ## Out of scope (no-GPU runner)
 

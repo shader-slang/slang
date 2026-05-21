@@ -61,57 +61,15 @@ neighbouring messages the doc does not promise.
 
 ## Doc gaps observed
 
-- The `## Generics ambiguity` section describes the disambiguation
-  strategy in narrative form ("try a generic-application parse and
-  roll back if it does not commit cleanly") but does not enumerate
-  the **set of follower tokens** that decides commit-vs-rollback.
-  Grammar.md's `### \`<\` disambiguation` lists them explicitly
-  (`::`, `.`, `(`, `)`, `[`, `]`, `:`, `,`, `?`, `;`, `==`, `!=`,
-  `>`, `>>`). The parse-AST doc should either copy that table or
-  unambiguously hand off to it; right now a reader could not write a
-  rollback test from the parse-AST doc alone.
-- The `## AST data model` family list mentions `Val` as a sixth
-  family ("compile-time values used by generics") but gives no
-  parse-stage observable that distinguishes a `Val` from a `Type`.
-  No test anchored against `Val` here; it would need a
-  semantics-stage handoff to make a verifiable claim.
-- `## Two-stage parsing` mentions the body parser carries a
-  back-pointer to `SemanticsVisitor` and asks the checker whether
-  the token before `<` resolves to a generic; the doc does not give
-  an *observable* failure case when the heuristic is *wrong*. The
-  recovery from a wrong guess ("parser prefers to produce *some* AST
-  and let the checker emit a more specific error") is named in
-  `## Failure modes` but there is no concrete example the doc
-  promises to the user. A small example pinning the recovery
-  behavior would let this bundle add a regression test.
-- `## Modifier parsing` does not enumerate which contexts accept
-  which attributes (e.g. which attributes are valid on a `Stmt`
-  vs a `Decl`). The bundle tests one attribute on a stmt
-  (`[unroll]`) and one on a decl (`[ForceInline]`) but cannot make a
-  general claim about attribute applicability without further doc
-  detail. Could be filed against the modifier-parsing section.
-- `## Error recovery` says the parser uses "simple
-  skip-to-synchronization-point heuristics (looking for `;`, `}`,
-  or the next declaration keyword)" but does not promise that any
-  specific input produces any specific number of diagnostics. The
-  bundle's error-recovery test relies on the observable fact that
-  two adjacent function bodies each report their own error; if the
-  recovery heuristic changes to merge or suppress one of them the
-  test will need to be updated even though the doc claim hasn't
-  changed. Recorded as fragility; a tighter doc commitment would
-  help.
-- `## AST data model` describes `ASTBuilder` ownership and hash-
-  consing of types, but neither has a slangc/slangi-observable
-  surface (hash-consing identity is hidden by the IR / emit
-  pipelines). Recorded as architecture-only, not testable here.
-- The pure-decl-stage observable that the doc calls out — "Function
-  and method bodies are still unparsed at this stage" — is hard to
-  pin without IR-dump inspection that the agentic suite explicitly
-  excludes (and the doc does not promise any user-visible diagnostic
-  for it). The bundle's `function-body-deferred-to-check-stage.slang`
-  and `body-forward-references-outer-decl.slang` cover the
-  consequence; the cleanest direct test would need a doc-promised
-  observable for "this body has not been parsed yet".
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#generics-ambiguity](../../../docs/llm-generated/pipeline/02-parse-ast.md#generics-ambiguity) | ambiguous-claim | The `## Generics ambiguity` section describes the disambiguation strategy in narrative form ("try a generic-application parse and roll back if it does not commit cleanly") but does not enumerate the **set of follower tokens** that decides commit-vs-rollback. Grammar.md's `### \`<\` disambiguation` lists them explicitly (`::`, `.`, `(`, `)`, `[`, `]`, `:`, `,`, `?`, `;`, `==`, `!=`, `>`, `>>`). The parse-AST doc should either copy that table or unambiguously hand off to it; right now a reader could not write a rollback test from the parse-AST doc alone. |  |
+| [#ast-data-model](../../../docs/llm-generated/pipeline/02-parse-ast.md#ast-data-model) | undocumented-behavior | The `## AST data model` family list mentions `Val` as a sixth family ("compile-time values used by generics") but gives no parse-stage observable that distinguishes a `Val` from a `Type`. No test anchored against `Val` here; it would need a semantics-stage handoff to make a verifiable claim. |  |
+| [#two-stage-parsing](../../../docs/llm-generated/pipeline/02-parse-ast.md#two-stage-parsing) | missing-example | `## Two-stage parsing` mentions the body parser carries a back-pointer to `SemanticsVisitor` and asks the checker whether the token before `<` resolves to a generic; the doc does not give an *observable* failure case when the heuristic is *wrong*. The recovery from a wrong guess ("parser prefers to produce *some* AST and let the checker emit a more specific error") is named in `## Failure modes` but there is no concrete example the doc promises to the user. A small example pinning the recovery behavior would let this bundle add a regression test. |  |
+| [#modifier-parsing](../../../docs/llm-generated/pipeline/02-parse-ast.md#modifier-parsing) | undocumented-behavior | `## Modifier parsing` does not enumerate which contexts accept which attributes (e.g. which attributes are valid on a `Stmt` vs a `Decl`). The bundle tests one attribute on a stmt (`[unroll]`) and one on a decl (`[ForceInline]`) but cannot make a general claim about attribute applicability without further doc detail. Could be filed against the modifier-parsing section. |  |
+| [#error-recovery](../../../docs/llm-generated/pipeline/02-parse-ast.md#error-recovery) | undocumented-behavior | `## Error recovery` says the parser uses "simple skip-to-synchronization-point heuristics (looking for `;`, `}`, or the next declaration keyword)" but does not promise that any specific input produces any specific number of diagnostics. The bundle's error-recovery test relies on the observable fact that two adjacent function bodies each report their own error; if the recovery heuristic changes to merge or suppress one of them the test will need to be updated even though the doc claim hasn't changed. Recorded as fragility; a tighter doc commitment would help. |  |
+| [#ast-data-model](../../../docs/llm-generated/pipeline/02-parse-ast.md#ast-data-model) | undocumented-behavior | `## AST data model` describes `ASTBuilder` ownership and hash- consing of types, but neither has a slangc/slangi-observable surface (hash-consing identity is hidden by the IR / emit pipelines). Recorded as architecture-only, not testable here. |  |
+| [#function-and-method-bodies-are-still-unparsed-at-this-stage](../../../docs/llm-generated/pipeline/02-parse-ast.md#function-and-method-bodies-are-still-unparsed-at-this-stage) | undocumented-behavior | The pure-decl-stage observable that the doc calls out — "Function and method bodies are still unparsed at this stage" — is hard to pin without IR-dump inspection that the agentic suite explicitly excludes (and the doc does not promise any user-visible diagnostic for it). The bundle's `function-body-deferred-to-check-stage.slang` and `body-forward-references-outer-decl.slang` cover the consequence; the cleanest direct test would need a doc-promised observable for "this body has not been parsed yet". |  |
 
 ## Out of scope (no-GPU runner)
 

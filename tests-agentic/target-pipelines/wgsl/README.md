@@ -88,55 +88,16 @@ with `-target wgsl -entry main -stage compute` against the
 
 ## Doc gaps observed
 
-- The doc names the `i32(N)` / `u32(N)` / `<value>f` literal
-  spellings only obliquely (in passing inside the address-space
-  discussion). A short subsection under "Phase D" that pins down
-  the literal-emit shapes (and the `vec<rank><elem>` rule for
-  WGSL vector types) would let tests anchor directly to that
-  subsection instead of to the broad `#phase-d-...` anchor.
-- The doc does not describe the `_MatrixStorage_<spelling>_ColMajorstd430_*`
-  wrapper struct shape produced when a structured buffer holds a
-  matrix element. The `lowerBufferElementTypeToStorageType`
-  paragraph mentions the policy but not the generated struct
-  name. Add an anchor (e.g. `#matrix-storage-wrapper`) under
-  Phase C with the canonical wrapper name.
-- The doc mentions `std140`-shaped struct layouts for constant
-  buffers but does not document the per-field `@align(N)`
-  annotations on the wrapper struct. A subsection describing the
-  `_std140_*` wrapper struct shape and its `@align` decorations
-  would let `constant-buffer-uniform-std140.slang` anchor more
-  precisely.
-- The doc states `lowerCombinedTextureSamplers` fires for WGSL
-  (since WGSL is in the same arm as HLSL/Metal/WGSL) but does
-  not document the naming convention for the split pair
-  (`<name>_texture_*` / `<name>_sampler_*`). The naming is an
-  emit-observable that lacks a marker in the doc.
-- `eliminatePhis` is described in terms of `PhiEliminationOptions`
-  defaults but the doc does not say what the WGSL emit shape of
-  an `if`/`else` merged value looks like (the `var ... : T` +
-  branch assignment pattern). A small example of the emit shape
-  would strengthen the anchor for the eliminate-phis test.
-- The doc names the Phase-D `Texture2D<float4>` emit shape
-  (`texture_2d<f32>`) but does not enumerate the **per-Slang-
-  texture-variant → WGSL `texture_*<f32>` mapping** for
-  `Texture1D` (`texture_1d`), `Texture3D` (`texture_3d`),
-  `TextureCube` (`texture_cube`), `Texture2DArray`
-  (`texture_2d_array`), or `RWTexture2D`
-  (`texture_storage_2d<format, access>`). A Phase-D subsection
-  with the table would let texture-variant tests anchor each
-  mapping precisely.
-- The doc does not describe how Slang lowers the various
-  texture-access intrinsics (`Sample`, `SampleLevel`,
-  `SampleGrad`, `Load`) to their WGSL counterparts
-  (`textureSample`, `textureSampleLevel`, `textureSampleGrad`,
-  `textureLoad`). A subsection would let sample-shape tests
-  anchor concretely.
-- The doc does not document how WGSL's storage-texture format
-  is inferred from the Slang element type
-  (`RWTexture2D<float4>` → `rgba32float`). The
-  `RWTexture2D.Load` / `.Store` test anchors broadly to Phase D;
-  pinning the inferred-format rule would let it anchor
-  precisely.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#phase-d-](../../../docs/llm-generated/target-pipelines/wgsl.md#phase-d-) | undocumented-behavior | The doc names the `i32(N)` / `u32(N)` / `<value>f` literal spellings only obliquely (in passing inside the address-space discussion). | A short subsection under "Phase D" that pins down the literal-emit shapes (and the `vec<rank><elem>` rule for WGSL vector types) would let tests anchor directly to that subsection instead of to the broad `#phase-d-...` anchor. |
+| [#matrix-storage-wrapper](../../../docs/llm-generated/target-pipelines/wgsl.md#matrix-storage-wrapper) | undocumented-behavior | The doc does not describe the `_MatrixStorage_<spelling>_ColMajorstd430_*` wrapper struct shape produced when a structured buffer holds a matrix element. The `lowerBufferElementTypeToStorageType` paragraph mentions the policy but not the generated struct name. Add an anchor (e.g. `#matrix-storage-wrapper`) under Phase C with the canonical wrapper name. |  |
+| [#std140](../../../docs/llm-generated/target-pipelines/wgsl.md#std140) | undocumented-behavior | The doc mentions `std140`-shaped struct layouts for constant buffers but does not document the per-field `@align(N)` annotations on the wrapper struct. A subsection describing the `_std140_*` wrapper struct shape and its `@align` decorations would let `constant-buffer-uniform-std140.slang` anchor more precisely. |  |
+| [#lowercombinedtexturesamplers](../../../docs/llm-generated/target-pipelines/wgsl.md#lowercombinedtexturesamplers) | undocumented-behavior | The doc states `lowerCombinedTextureSamplers` fires for WGSL (since WGSL is in the same arm as HLSL/Metal/WGSL) but does not document the naming convention for the split pair (`<name>_texture_*` / `<name>_sampler_*`). The naming is an emit-observable that lacks a marker in the doc. |  |
+| [#eliminatephis](../../../docs/llm-generated/target-pipelines/wgsl.md#eliminatephis) | undocumented-behavior | `eliminatePhis` is described in terms of `PhiEliminationOptions` defaults but the doc does not say what the WGSL emit shape of an `if`/`else` merged value looks like (the `var ... : T` + branch assignment pattern). A small example of the emit shape would strengthen the anchor for the eliminate-phis test. |  |
+| [#texture2dfloat4](../../../docs/llm-generated/target-pipelines/wgsl.md#texture2dfloat4) | undocumented-behavior | The doc names the Phase-D `Texture2D<float4>` emit shape (`texture_2d<f32>`) but does not enumerate the **per-Slang- texture-variant → WGSL `texture_*<f32>` mapping** for `Texture1D` (`texture_1d`), `Texture3D` (`texture_3d`), `TextureCube` (`texture_cube`), `Texture2DArray` (`texture_2d_array`), or `RWTexture2D` (`texture_storage_2d<format, access>`). A Phase-D subsection with the table would let texture-variant tests anchor each mapping precisely. |  |
+| [#sample](../../../docs/llm-generated/target-pipelines/wgsl.md#sample) | undocumented-behavior | The doc does not describe how Slang lowers the various texture-access intrinsics (`Sample`, `SampleLevel`, `SampleGrad`, `Load`) to their WGSL counterparts (`textureSample`, `textureSampleLevel`, `textureSampleGrad`, `textureLoad`). A subsection would let sample-shape tests anchor concretely. |  |
+| [#rwtexture2dfloat4](../../../docs/llm-generated/target-pipelines/wgsl.md#rwtexture2dfloat4) | undocumented-behavior | The doc does not document how WGSL's storage-texture format is inferred from the Slang element type (`RWTexture2D<float4>` → `rgba32float`). The `RWTexture2D.Load` / `.Store` test anchors broadly to Phase D; pinning the inferred-format rule would let it anchor precisely. |  |
 
 ## Out of scope (no-GPU runner)
 

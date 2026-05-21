@@ -123,26 +123,8 @@ targets, which require no GPU.
 
 ## Doc gaps observed
 
-- The `#how-ast-nodes-lower-to-ir` section names exactly two
-  example mappings (`visitVarDecl -> Var`,
-  `visitInfixExpr -> Add/Sub/Mul`). Tests in this bundle pin
-  both; a third, distinct family of mappings (e.g. an entry-
-  point declaration -> `func` with `[entryPoint(...)]`
-  decoration) is *implied* but not enumerated. The doc could
-  add one or two more concrete examples to strengthen the
-  cross-family AST-to-IR mapping claim without growing the
-  table.
-- The index doc states "Many opcodes have no direct AST source:
-  they are produced by IR passes ... and may even be retired
-  before code emission." but does not provide a user-observable
-  example of a synthesized opcode that survives into a final
-  text dump. We attempted a `specialize`-from-pass observation
-  in test design but dropped it: by the time `-dump-ir` emits
-  the final IR, target legalization has typically removed
-  `specialize` instructions. A natural-surface example that
-  reliably leaves a synthesized opcode in the final dump would
-  make this claim testable at the index level (it is currently
-  only testable inside `pipeline/05-ir-passes`).
-- The `#cross-cutting-topics` and `#pages` sections are pure
-  pointer tables; they are explicitly out of scope per the
-  per-section prompt. No gap, just noted for future readers.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#how-ast-nodes-lower-to-ir](../../../docs/llm-generated/ir-reference/index.md#how-ast-nodes-lower-to-ir) | undocumented-behavior | The `#how-ast-nodes-lower-to-ir` section names exactly two example mappings (`visitVarDecl -> Var`, `visitInfixExpr -> Add/Sub/Mul`). Tests in this bundle pin both; a third, distinct family of mappings (e.g. an entry- point declaration -> `func` with `[entryPoint(...)]` decoration) is *implied* but not enumerated. The doc could add one or two more concrete examples to strengthen the cross-family AST-to-IR mapping claim without growing the table. |  |
+| [#specialize](../../../docs/llm-generated/ir-reference/index.md#specialize) | undocumented-behavior | The index doc states "Many opcodes have no direct AST source: they are produced by IR passes ... and may even be retired before code emission." but does not provide a user-observable example of a synthesized opcode that survives into a final text dump. We attempted a `specialize`-from-pass observation in test design but dropped it: by the time `-dump-ir` emits the final IR, target legalization has typically removed `specialize` instructions. A natural-surface example that reliably leaves a synthesized opcode in the final dump would make this claim testable at the index level (it is currently only testable inside `pipeline/05-ir-passes`). |  |
+| [#cross-cutting-topics](../../../docs/llm-generated/ir-reference/index.md#cross-cutting-topics) | undocumented-behavior | The `#cross-cutting-topics` and `#pages` sections are pure pointer tables; they are explicitly out of scope per the per-section prompt. No gap, just noted for future readers. |  |

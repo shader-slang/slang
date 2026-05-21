@@ -60,39 +60,13 @@ The slangc-observable consequences that *are* tested are:
 
 ## Doc gaps observed
 
-- The doc states `slangLib → prelude` is "a private include dep, not
-  a static link, but is listed here to match `module-map.md`". The
-  CLI consequence (prelude `#include` text in emitted CUDA / CPP) is
-  the *only* way an outside observer can sense the edge; the doc
-  could note this explicitly so readers do not look for a libslang
-  symbol that does not exist.
-- The "Notable invariants" bullet about `SLANG_EMBED_CORE_MODULE`
-  cites the CMake variable but does not state the **default value**.
-  The agentic test that exercises the embedded path implicitly
-  assumes the default is `ON`; a one-line note in the doc would let
-  future regenerations confirm the assumption without consulting the
-  root `CMakeLists.txt`.
-- The "Notable invariants" bullet about `slangc → slang` says
-  "Every other binary that needs compilation services (such as
-  `slangc`) links against `slang` rather than reaching into
-  individual files." The CLI consequence (a single `slangc` invocation
-  can run lex → parse → check → IR → emit on one source) is *implied*
-  by the wording but not spelled out as a slangc-observable rule.
-- The "Edges (intra-project only)" diagram and "Edge citations" table
-  use the bare subsystem name (`coreLib`, `slangLib`, `slangc`) but
-  the per-edge slug used in this bundle's `doc_ref` resolves only at
-  H2 level. Multiple distinct edges share one anchor
-  (`#edges-intra-project-only`). The doc has no H3 sub-anchor per
-  edge; adding one (e.g. `### slang → prelude (private-include)`)
-  would let per-edge tests be cited individually.
-- The doc lists three "no ordinary `LINK_WITH_*` edge" subsystems
-  (`source/standard-modules/`, `source/slang-record-replay/`,
-  `source/slang-llvm/`) but none expose a clean slangc CLI surface.
-  The `standard-modules` `neural/` module is gated behind
-  `-experimental-feature`; `slang-record-replay` is folded into
-  `slang` sources; `slang-llvm` is downloaded out-of-tree. The doc
-  could mark which of these has a CLI observable so future bundles
-  do not waste cycles probing them.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#include](../../../docs/llm-generated/architecture/dependency-graph.md#include) | undocumented-behavior | The doc states `slangLib → prelude` is "a private include dep, not a static link, but is listed here to match `module-map.md`". The CLI consequence (prelude `#include` text in emitted CUDA / CPP) is the *only* way an outside observer can sense the edge; the doc could note this explicitly so readers do not look for a libslang symbol that does not exist. |  |
+| [#notable-invariants](../../../docs/llm-generated/architecture/dependency-graph.md#notable-invariants) | undocumented-behavior | The "Notable invariants" bullet about `SLANG_EMBED_CORE_MODULE` cites the CMake variable but does not state the **default value**. The agentic test that exercises the embedded path implicitly assumes the default is `ON`; a one-line note in the doc would let future regenerations confirm the assumption without consulting the root `CMakeLists.txt`. |  |
+| [#notable-invariants](../../../docs/llm-generated/architecture/dependency-graph.md#notable-invariants) | undocumented-behavior | The "Notable invariants" bullet about `slangc → slang` says "Every other binary that needs compilation services (such as `slangc`) links against `slang` rather than reaching into individual files." The CLI consequence (a single `slangc` invocation can run lex → parse → check → IR → emit on one source) is *implied* by the wording but not spelled out as a slangc-observable rule. |  |
+| [#edges-intra-project-only](../../../docs/llm-generated/architecture/dependency-graph.md#edges-intra-project-only) | undocumented-behavior | The "Edges (intra-project only)" diagram and "Edge citations" table use the bare subsystem name (`coreLib`, `slangLib`, `slangc`) but the per-edge slug used in this bundle's `doc_ref` resolves only at H2 level. Multiple distinct edges share one anchor (`#edges-intra-project-only`). The doc has no H3 sub-anchor per edge; adding one (e.g. `### slang → prelude (private-include)`) would let per-edge tests be cited individually. |  |
+| [#no-ordinary-linkwith-edge](../../../docs/llm-generated/architecture/dependency-graph.md#no-ordinary-linkwith-edge) | undocumented-behavior | The doc lists three "no ordinary `LINK_WITH_*` edge" subsystems (`source/standard-modules/`, `source/slang-record-replay/`, `source/slang-llvm/`) but none expose a clean slangc CLI surface. The `standard-modules` `neural/` module is gated behind `-experimental-feature`; `slang-record-replay` is folded into `slang` sources; `slang-llvm` is downloaded out-of-tree. The doc could mark which of these has a CLI observable so future bundles do not waste cycles probing them. |  |
 
 ## Out of scope (no-GPU runner)
 

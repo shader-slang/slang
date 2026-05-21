@@ -175,91 +175,23 @@ through any directive that `slang-test` runs on a CPU.
 
 ## Doc gaps observed
 
-- The doc's per-family tables are explicitly "representative, not
-  exhaustive". Behaviors that the doc names but does not list a
-  specific opcode for — e.g. the full set of comparison opcodes
-  (`cmpEQ`/`cmpNE`/`cmpLE`/`cmpGE`), the full set of conversion ops
-  (`floatCast`/`bitCast`/`uintCast`), the `matrix` type, the
-  `Texture` type — are deferred to the family-specific bundles
-  (`ir-reference/values`, `ir-reference/types`) where they belong.
-- The doc cites `alloca` with operand `allocSize` but does not name
-  a user-facing language surface that lowers to `alloca`. The
-  Slang surface for dynamically-sized stack allocation is unclear
-  from the doc alone; a one-line note on the source-level construct
-  (`alloca` is currently used internally for some lowering paths)
-  would let an agent anchor a test here.
-- `RequirePrelude`, `RequireTargetExtension`, `Printf`, `StaticAssert`
-  appear in the control-flow row but the doc does not state a
-  user-observable consequence for each — only that they are "other
-  control-flow / backend-hint opcodes". A one-line "user surface"
-  column would let the agent test these.
-- The doc's `makeExistential` row lists "Packs a value plus its
-  witness" but does not state the source-level construct that
-  triggers it (assignment of a concrete type to an interface-typed
-  variable). With the user surface stated, the test would be
-  straightforward.
-- The "Decorations" row says the family has "~180 decorations" but
-  the doc itself names only four. Coverage of the long tail belongs
-  in `ir-reference/decorations`.
-- The doc says `param` is "Block or function parameter; replaces SSA
-  `phi`." but does not give the surface-level construct that creates
-  block params besides loop induction variables — e.g. that the
-  back-edge of a `for` loop carries values via block parameters.
-  The connection between source-level loops and IR `param`s is
-  implicit.
-- The arithmetic family is documented as `add`/`sub`/`mul`/`div` but
-  the unary-negation member of the same family (`neg`) is not named,
-  even though it is the natural 1-operand sibling of the binary
-  operators. Adding `neg` to the value-instructions row would let an
-  agent anchor a boundary test for unary arithmetic directly.
-- The doc's conversion-family entry names `intCast`, `floatCast`, and
-  `bitCast` but does not enumerate the float-to-int and int-to-float
-  numeric conversion opcodes (`castFloatToInt`, `castIntToFloat`)
-  that the front end actually emits for `int(floatExpr)` and
-  `float(intExpr)`. A one-line note on the user surface for each
-  conversion opcode would be a meaningful expansion.
-- The doc's `swizzle` entry does not state the operand shape; the IR
-  actually takes `(base, idx0, idx1, ...)` where the variadic-index
-  arity equals the resulting vector length. Stating this in the
-  memory-instructions row would let agents pin down the lower- vs
-  upper-edge of the swizzle-length axis.
-- The doc cites `globalConstant` only in passing alongside
-  `global_var` / `global_param` but does not name the surface-level
-  construct (`static const`) that produces it. With the surface
-  named, the `globalConstant` opcode could be tested directly.
-- The doc does not document any error or warning text for invalid
-  arithmetic / conversion operands; this restricts the bundle's
-  negative tests to a small surface (struct-arithmetic, bit-cast
-  size mismatch) that survives by general "no overload" /
-  "type mismatch" diagnostics rather than by IR-instruction-specific
-  rules. Naming a few canonical diagnostic codes (e.g. for the
-  bit-width-mismatch rule of `bitCast`) would let agents tie negative
-  tests directly to documented behavior.
-- The doc's `AtomicOperation` row names representative opcodes
-  (`atomicLoad`, `atomicStore`, `atomicAdd`) but does not enumerate
-  the admissible element-type axis. Empirically `Atomic<T>` requires
-  `T : IAtomicable`, which is satisfied by `int32_t`/`uint32_t`/
-  `int64_t`/`uint64_t`/`half`/`float`/`double` (the doc admits
-  `atomicAdd<half>` for example) but rejected for `int8_t`/`int16_t`
-  /`uint8_t`/`uint16_t`. A one-line note enumerating these element
-  types — and the `IAtomicable` interface name — would let agents
-  pin every member of the family at its admissible widths.
-- The doc names the comparison family `cmpEQ/cmpLT/cmpGT/...` but
-  does not state the promotion rule for mixed-precision operands.
-  Empirically the front end emits an `intCast` on the narrower
-  operand before the `cmp*` opcode. Calling this out — and naming
-  the source-level rule that selects the unified width — would
-  let an agent pin the conversion + comparison combination
-  directly to a documented claim.
-- The doc lists `rwstructuredBufferStore` and `structuredBufferLoad`
-  but the read-back companion `rwstructuredBufferLoad` (emitted for
-  `RWStructuredBuffer<T>.Load(idx)`) is not named. A one-line entry
-  in the resource family row would surface this opcode.
-- The doc's `swizzle` entry does not state the result-type rule.
-  Empirically the result type is `Vec(elemTy, indexCount)` when the
-  index list has length > 1 and the bare scalar `elemTy` when the
-  index list has length 1. Naming this in the memory-instructions
-  row would let agents pin the length-1 vs length-N boundary.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#representative-not-exhaustive](../../../docs/llm-generated/cross-cutting/ir-instructions.md#representative-not-exhaustive) | undocumented-behavior | The doc's per-family tables are explicitly "representative, not exhaustive". Behaviors that the doc names but does not list a specific opcode for — e.g. the full set of comparison opcodes (`cmpEQ`/`cmpNE`/`cmpLE`/`cmpGE`), the full set of conversion ops (`floatCast`/`bitCast`/`uintCast`), the `matrix` type, the `Texture` type — are deferred to the family-specific bundles (`ir-reference/values`, `ir-reference/types`) where they belong. |  |
+| [#alloca](../../../docs/llm-generated/cross-cutting/ir-instructions.md#alloca) | ambiguous-claim | The doc cites `alloca` with operand `allocSize` but does not name a user-facing language surface that lowers to `alloca`. The Slang surface for dynamically-sized stack allocation is unclear from the doc alone; a one-line note on the source-level construct (`alloca` is currently used internally for some lowering paths) would let an agent anchor a test here. |  |
+| [#other-control-flow-backend-hint-opcodes](../../../docs/llm-generated/cross-cutting/ir-instructions.md#other-control-flow-backend-hint-opcodes) | undocumented-behavior | `RequirePrelude`, `RequireTargetExtension`, `Printf`, `StaticAssert` appear in the control-flow row but the doc does not state a user-observable consequence for each — only that they are "other control-flow / backend-hint opcodes". | A one-line "user surface" column would let the agent test these. |
+| [#packs-a-value-plus-its-witness](../../../docs/llm-generated/cross-cutting/ir-instructions.md#packs-a-value-plus-its-witness) | undocumented-behavior | The doc's `makeExistential` row lists "Packs a value plus its witness" but does not state the source-level construct that triggers it (assignment of a concrete type to an interface-typed variable). With the user surface stated, the test would be straightforward. |  |
+| [#decorations](../../../docs/llm-generated/cross-cutting/ir-instructions.md#decorations) | undocumented-behavior | The "Decorations" row says the family has "~180 decorations" but the doc itself names only four. Coverage of the long tail belongs in `ir-reference/decorations`. |  |
+| [#block-or-function-parameter-replaces-ssa-phi](../../../docs/llm-generated/cross-cutting/ir-instructions.md#block-or-function-parameter-replaces-ssa-phi) | undocumented-behavior | The doc says `param` is "Block or function parameter; replaces SSA `phi`." but does not give the surface-level construct that creates block params besides loop induction variables — e.g. that the back-edge of a `for` loop carries values via block parameters. The connection between source-level loops and IR `param`s is implicit. |  |
+| [#add](../../../docs/llm-generated/cross-cutting/ir-instructions.md#add) | undocumented-behavior | The arithmetic family is documented as `add`/`sub`/`mul`/`div` but the unary-negation member of the same family (`neg`) is not named, even though it is the natural 1-operand sibling of the binary operators. | Adding `neg` to the value-instructions row would let an agent anchor a boundary test for unary arithmetic directly. |
+| [#intcast](../../../docs/llm-generated/cross-cutting/ir-instructions.md#intcast) | drift-from-source | The doc's conversion-family entry names `intCast`, `floatCast`, and `bitCast` but does not enumerate the float-to-int and int-to-float numeric conversion opcodes (`castFloatToInt`, `castIntToFloat`) that the front end actually emits for `int(floatExpr)` and `float(intExpr)`. | A one-line note on the user surface for each conversion opcode would be a meaningful expansion. |
+| [#swizzle](../../../docs/llm-generated/cross-cutting/ir-instructions.md#swizzle) | undocumented-behavior | The doc's `swizzle` entry does not state the operand shape; the IR actually takes `(base, idx0, idx1, ...)` where the variadic-index arity equals the resulting vector length. | Stating this in the memory-instructions row would let agents pin down the lower- vs upper-edge of the swizzle-length axis. |
+| [#globalconstant](../../../docs/llm-generated/cross-cutting/ir-instructions.md#globalconstant) | undocumented-behavior | The doc cites `globalConstant` only in passing alongside `global_var` / `global_param` but does not name the surface-level construct (`static const`) that produces it. With the surface named, the `globalConstant` opcode could be tested directly. |  |
+| [#no-overload](../../../docs/llm-generated/cross-cutting/ir-instructions.md#no-overload) | undocumented-behavior | The doc does not document any error or warning text for invalid arithmetic / conversion operands; this restricts the bundle's negative tests to a small surface (struct-arithmetic, bit-cast size mismatch) that survives by general "no overload" / "type mismatch" diagnostics rather than by IR-instruction-specific rules. | Naming a few canonical diagnostic codes (e.g. for the bit-width-mismatch rule of `bitCast`) would let agents tie negative tests directly to documented behavior. |
+| [#atomicoperation](../../../docs/llm-generated/cross-cutting/ir-instructions.md#atomicoperation) | undocumented-behavior | The doc's `AtomicOperation` row names representative opcodes (`atomicLoad`, `atomicStore`, `atomicAdd`) but does not enumerate the admissible element-type axis. Empirically `Atomic<T>` requires `T : IAtomicable`, which is satisfied by `int32_t`/`uint32_t`/ `int64_t`/`uint64_t`/`half`/`float`/`double` (the doc admits `atomicAdd<half>` for example) but rejected for `int8_t`/`int16_t` /`uint8_t`/`uint16_t`. | A one-line note enumerating these element types — and the `IAtomicable` interface name — would let agents pin every member of the family at its admissible widths. |
+| [#cmpeqcmpltcmpgt](../../../docs/llm-generated/cross-cutting/ir-instructions.md#cmpeqcmpltcmpgt) | undocumented-behavior | The doc names the comparison family `cmpEQ/cmpLT/cmpGT/...` but does not state the promotion rule for mixed-precision operands. Empirically the front end emits an `intCast` on the narrower operand before the `cmp*` opcode. Calling this out — and naming the source-level rule that selects the unified width — would let an agent pin the conversion + comparison combination directly to a documented claim. |  |
+| [#rwstructuredbufferstore](../../../docs/llm-generated/cross-cutting/ir-instructions.md#rwstructuredbufferstore) | undocumented-behavior | The doc lists `rwstructuredBufferStore` and `structuredBufferLoad` but the read-back companion `rwstructuredBufferLoad` (emitted for `RWStructuredBuffer<T>.Load(idx)`) is not named. | A one-line entry in the resource family row would surface this opcode. |
+| [#swizzle](../../../docs/llm-generated/cross-cutting/ir-instructions.md#swizzle) | undocumented-behavior | The doc's `swizzle` entry does not state the result-type rule. Empirically the result type is `Vec(elemTy, indexCount)` when the index list has length > 1 and the bare scalar `elemTy` when the index list has length 1. | Naming this in the memory-instructions row would let agents pin the length-1 vs length-N boundary. |
 
 ## Out of scope (no-GPU runner)
 

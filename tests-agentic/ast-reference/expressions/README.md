@@ -181,58 +181,16 @@ single capture, and a curried lambda-inside-lambda.
 
 ## Doc gaps observed
 
-- The `## Nodes` table lists ~60 concrete `Expr` subclasses but does
-  not partition them into "user-spellable" vs "synthesized only".
-  This bundle infers the partition by surveying the parser entry
-  points; a one-line column added to the table would let an agent
-  draw the line without consulting `slang-parser.cpp`.
-- `IndexExpr` is documented with `indexExprs: List<Expr*>` and the
-  note "(one or more indices)" — but Slang's surface for the
-  multi-index form (`a[i, j]` vs `a[i][j]`) is left implicit. The
-  AST stores a list; the surface uses chained `[]` for plain arrays
-  and varies for buffer / matrix types. A worked example or a
-  cross-link to `grammar.md` listing the supported surface forms
-  would let us anchor a tighter test.
-- The Differentiate-family Notable Nodes section hands off to
-  `pipeline/05-ir-passes.md` for the autodiff arithmetic. The doc
-  for this bundle could add a one-line claim about the
-  expression-level acceptance contract (i.e. "`__fwd_diff(f)` is
-  accepted when `f` is `[Differentiable]`; otherwise diagnosed");
-  the current claim is silent on the negative case and we did not
-  write a negative test for it.
-- `TryExpr` has user-spellable surface (`try expr` with
-  Standard / Optional / Assert clauseType) but the doc neither
-  spells out a minimal usage example nor lists the diagnostic
-  emitted when the surrounding function is not `throws`. We
-  attempted a test and could not anchor it cleanly to the doc; no
-  test for TryExpr ships in this bundle.
-- `CountOfExpr` is documented as "element count of a static array",
-  but the actual checker requires a type pack or `Tuple<...>` —
-  passing a plain `int[N]` is rejected with "argument to countof
-  can only be a type pack or tuple". The doc's description is
-  misleading; either the implementation or the doc should change,
-  and our test follows the implementation by using a variadic
-  generic.
-- `DispatchKernelExpr` is listed in the Nodes table with a
-  user-spelled form `__dispatch_kernel` but no example of the
-  surface arguments (`threadGroupSize` / `dispatchSize`) or the
-  contexts where it is accepted. We did not write a test for it.
-- The `IndexExpr` row does not commit to a static-bounds behavior
-  for `arr[N]` where `N >= length(arr)`. The implementation emits
-  `E30029 "array index out of bounds"` at a late IR stage that the
-  `DIAGNOSTIC_TEST` runner does not capture by position; we could
-  not anchor a one-past-end boundary test as a portable negative.
-  A short claim in the IndexExpr section naming the rejection
-  contract and the stage at which it fires would let an agent
-  attach a test for the index-`N` / index-`N+1` upper boundary.
-- The `FloatingPointLiteralExpr` row mentions a "parsed value" but
-  does not specify the in-language surface for IEEE-special values
-  (`+inf`, `-inf`, `NaN`). The boundary tests in this bundle observe
-  the values indirectly (overflow, `0/0`, `1/±0`) because no direct
-  literal spelling is documented. A note pointing at the canonical
-  way to spell those values (or confirming there is no direct
-  spelling) would let us write tighter literal-level boundary
-  tests.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#nodes](../../../docs/llm-generated/ast-reference/expressions.md#nodes) | undocumented-behavior | The `## Nodes` table lists ~60 concrete `Expr` subclasses but does not partition them into "user-spellable" vs "synthesized only". This bundle infers the partition by surveying the parser entry points; a one-line column added to the table would let an agent draw the line without consulting `slang-parser.cpp`. |  |
+| [#one-or-more-indices](../../../docs/llm-generated/ast-reference/expressions.md#one-or-more-indices) | ambiguous-claim | `IndexExpr` is documented with `indexExprs: List<Expr*>` and the note "(one or more indices)" — but Slang's surface for the multi-index form (`a[i, j]` vs `a[i][j]`) is left implicit. The AST stores a list; the surface uses chained `[]` for plain arrays and varies for buffer / matrix types. | A worked example or a cross-link to `grammar.md` listing the supported surface forms would let us anchor a tighter test. |
+| [#fwddifff-is-accepted-when-f-is-differentiable-otherwise-diagnosed](../../../docs/llm-generated/ast-reference/expressions.md#fwddifff-is-accepted-when-f-is-differentiable-otherwise-diagnosed) | undocumented-behavior | The Differentiate-family Notable Nodes section hands off to `pipeline/05-ir-passes.md` for the autodiff arithmetic. The doc for this bundle could add a one-line claim about the expression-level acceptance contract (i.e. "`__fwd_diff(f)` is accepted when `f` is `[Differentiable]`; otherwise diagnosed"); the current claim is silent on the negative case and we did not write a negative test for it. |  |
+| [#tryexpr](../../../docs/llm-generated/ast-reference/expressions.md#tryexpr) | missing-example | `TryExpr` has user-spellable surface (`try expr` with Standard / Optional / Assert clauseType) but the doc neither spells out a minimal usage example nor lists the diagnostic emitted when the surrounding function is not `throws`. We attempted a test and could not anchor it cleanly to the doc; no test for TryExpr ships in this bundle. |  |
+| [#element-count-of-a-static-array](../../../docs/llm-generated/ast-reference/expressions.md#element-count-of-a-static-array) | drift-from-source | `CountOfExpr` is documented as "element count of a static array", but the actual checker requires a type pack or `Tuple<...>` — passing a plain `int[N]` is rejected with "argument to countof can only be a type pack or tuple". The doc's description is misleading; either the implementation or the doc should change, and our test follows the implementation by using a variadic generic. |  |
+| [#dispatchkernelexpr](../../../docs/llm-generated/ast-reference/expressions.md#dispatchkernelexpr) | missing-example | `DispatchKernelExpr` is listed in the Nodes table with a user-spelled form `__dispatch_kernel` but no example of the surface arguments (`threadGroupSize` / `dispatchSize`) or the contexts where it is accepted. We did not write a test for it. |  |
+| [#array-index-out-of-bounds](../../../docs/llm-generated/ast-reference/expressions.md#array-index-out-of-bounds) | undocumented-behavior | The `IndexExpr` row does not commit to a static-bounds behavior for `arr[N]` where `N >= length(arr)`. The implementation emits `E30029 "array index out of bounds"` at a late IR stage that the `DIAGNOSTIC_TEST` runner does not capture by position; we could not anchor a one-past-end boundary test as a portable negative. | A short claim in the IndexExpr section naming the rejection contract and the stage at which it fires would let an agent attach a test for the index-`N` / index-`N+1` upper boundary. |
+| [#parsed-value](../../../docs/llm-generated/ast-reference/expressions.md#parsed-value) | undocumented-behavior | The `FloatingPointLiteralExpr` row mentions a "parsed value" but does not specify the in-language surface for IEEE-special values (`+inf`, `-inf`, `NaN`). The boundary tests in this bundle observe the values indirectly (overflow, `0/0`, `1/±0`) because no direct literal spelling is documented. | A note pointing at the canonical way to spell those values (or confirming there is no direct spelling) would let us write tighter literal-level boundary tests. |
 
 ## Out of scope
 

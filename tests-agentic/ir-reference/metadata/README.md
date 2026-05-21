@@ -162,76 +162,14 @@ in this representative bundle:
 
 ## Doc gaps observed
 
-- The Layout-family table lists every opcode's `AST origin` as
-  `(synthesized)`, which is true at the LOWER-TO-IR boundary but
-  is a one-shot loss of information: the layout opcodes *do*
-  have a stable user-side AST surface that triggers them
-  (e.g. `cbuffer X { ... }` → `parameterGroupTypeLayout`,
-  `float arr[4]` field → `arrayTypeLayout`,
-  `float4x4 m` field → `matrixTypeLayout`,
-  `RWStructuredBuffer<T>` global → `structuredBufferTypeLayout`).
-  Documenting the surface→layout-opcode mapping would make this
-  table testable without exploration.
-
-- The Layout-family note "every child is hoistable so identical
-  layouts dedupe to a single IR value" is testable but the doc
-  does not document at which dump point identical layouts have
-  already deduplicated. In practice they dedupe before the first
-  post-LOWER dump (`AFTER validateAndRemoveAssumeAddress`), but
-  the doc could state this explicitly so test authors know
-  which dump section to anchor on.
-
-- The `Attr` table for `size` and `offset` describes them as
-  "Type-size record on a layout, keyed by resource kind" and
-  "Var-offset record on a `varLayout`, keyed by resource kind"
-  respectively, but does not enumerate the resource-kind enum
-  values that appear as the first operand (`size(9 : Int, ...)`
-  vs `size(8 : Int, ...)`). The integer-to-kind mapping is
-  visible in the source but the doc could include a table.
-
-- The `stage` Attr opcode's operand is described as
-  `stageOperand: IRIntLit` but the integer-to-stage mapping is
-  not enumerated. Observed values: compute = 6. A note pointing
-  at the `Stage` enum that produces these tags would let tests
-  pin the exact integer.
-
-- The `systemValueSemantic` row says "(`SemanticAttr` is the
-  grouping parent of `userSemantic` and `systemValueSemantic`;
-  it is not itself an opcode)", which is helpful, but does not
-  state which dump form the index operand takes. Observed:
-  `systemValueSemantic("SV_DispatchThreadID", 0 : Int)` — the
-  index operand is the resolved semantic-index integer, not the
-  `-1` sentinel used in the `semantic` decoration. Documenting
-  the difference between the `semantic` decoration's index
-  (`-1` for "no explicit index") and the `systemValueSemantic`
-  Attr's index (the resolved value) would help.
-
-- The Debug-info-family table notes "the opcodes mirror the
-  SPIR-V NonSemantic.Shader debug-info extension, but the page
-  intentionally avoids citing specific external instruction
-  numbers". This is fine but leaves the dump's exact operand
-  ordering implicit. For `DebugFunction` the table says
-  "(variadic, min=5)" but does not show what the five operands
-  are; observed: `("name", line : UInt, line : UInt,
-  source, funcType)`. Documenting the canonical operand order
-  would let tests pin every operand instead of just the name.
-
-- The `DebugSource` opcode embeds the *full* source file
-  contents as its second string operand. That makes the dump's
-  `DebugSource(...)` line very long and the literal-string
-  match brittle if a test author tries to pin source contents.
-  A note that "the second operand is the file contents — match
-  only the path or the leading prefix" would prevent surprise.
-
-- The `SPIRVAsm` row lists operands as "(variadic)" and notes
-  it is the parent container, but does not document the printed
-  dump form. Observed: `SPIRVAsm %N : <result-type>` on one line
-  followed by indented `SPIRVAsmInst(opcode, type, operand...)`
-  child lines. A worked example would help test authors anchor
-  on either the parent or a specific child instruction.
-
-- The `SPIRVAsmInst` row says "(variadic, min=1)" but does not
-  document that the first operand is the SPIR-V opcode integer
-  (observed: `132 : UInt` for `OpIMul`). Documenting that the
-  first operand is the SPIR-V opcode number would let tests
-  pin the exact instruction by opcode.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| (unspecified) | undocumented-behavior | The Layout-family table lists every opcode's `AST origin` as `(synthesized)`, which is true at the LOWER-TO-IR boundary but is a one-shot loss of information: the layout opcodes *do* have a stable user-side AST surface that triggers them (e.g. `cbuffer X { ... }` → `parameterGroupTypeLayout`, `float arr[4]` field → `arrayTypeLayout`, `float4x4 m` field → `matrixTypeLayout`, `RWStructuredBuffer<T>` global → `structuredBufferTypeLayout`). Documenting the surface→layout-opcode mapping would make this table testable without exploration. |  |
+| [#every-child-is-hoistable-so-identical-layouts-dedupe-to-a-single-ir-value](../../../docs/llm-generated/ir-reference/metadata.md#every-child-is-hoistable-so-identical-layouts-dedupe-to-a-single-ir-value) | undocumented-behavior | The Layout-family note "every child is hoistable so identical layouts dedupe to a single IR value" is testable but the doc does not document at which dump point identical layouts have already deduplicated. In practice they dedupe before the first post-LOWER dump (`AFTER validateAndRemoveAssumeAddress`), but the doc could state this explicitly so test authors know which dump section to anchor on. |  |
+| [#type-size-record-on-a-layout-keyed-by-resource-kind](../../../docs/llm-generated/ir-reference/metadata.md#type-size-record-on-a-layout-keyed-by-resource-kind) | undocumented-behavior | The `Attr` table for `size` and `offset` describes them as "Type-size record on a layout, keyed by resource kind" and "Var-offset record on a `varLayout`, keyed by resource kind" respectively, but does not enumerate the resource-kind enum values that appear as the first operand (`size(9 : Int, ...)` vs `size(8 : Int, ...)`). The integer-to-kind mapping is visible in the source but the doc could include a table. |  |
+| [#stage](../../../docs/llm-generated/ir-reference/metadata.md#stage) | undocumented-behavior | The `stage` Attr opcode's operand is described as `stageOperand: IRIntLit` but the integer-to-stage mapping is not enumerated. Observed values: compute = 6. | A note pointing at the `Stage` enum that produces these tags would let tests pin the exact integer. |
+| [#svdispatchthreadid](../../../docs/llm-generated/ir-reference/metadata.md#svdispatchthreadid) | undocumented-behavior | The `systemValueSemantic` row says "(`SemanticAttr` is the grouping parent of `userSemantic` and `systemValueSemantic`; it is not itself an opcode)", which is helpful, but does not state which dump form the index operand takes. Observed: `systemValueSemantic("SV_DispatchThreadID", 0 : Int)` — the index operand is the resolved semantic-index integer, not the `-1` sentinel used in the `semantic` decoration. Documenting the difference between the `semantic` decoration's index (`-1` for "no explicit index") and the `systemValueSemantic` Attr's index (the resolved value) would help. |  |
+| [#variadic-min5](../../../docs/llm-generated/ir-reference/metadata.md#variadic-min5) | undocumented-behavior | The Debug-info-family table notes "the opcodes mirror the SPIR-V NonSemantic.Shader debug-info extension, but the page intentionally avoids citing specific external instruction numbers". This is fine but leaves the dump's exact operand ordering implicit. For `DebugFunction` the table says "(variadic, min=5)" but does not show what the five operands are; observed: `("name", line : UInt, line : UInt, source, funcType)`. Documenting the canonical operand order would let tests pin every operand instead of just the name. |  |
+| [#debugsource](../../../docs/llm-generated/ir-reference/metadata.md#debugsource) | undocumented-behavior | The `DebugSource` opcode embeds the *full* source file contents as its second string operand. That makes the dump's `DebugSource(...)` line very long and the literal-string match brittle if a test author tries to pin source contents. | A note that "the second operand is the file contents — match only the path or the leading prefix" would prevent surprise. |
+| [#variadic](../../../docs/llm-generated/ir-reference/metadata.md#variadic) | missing-example | The `SPIRVAsm` row lists operands as "(variadic)" and notes it is the parent container, but does not document the printed dump form. Observed: `SPIRVAsm %N : <result-type>` on one line followed by indented `SPIRVAsmInst(opcode, type, operand...)` child lines. | A worked example would help test authors anchor on either the parent or a specific child instruction. |
+| [#variadic-min1](../../../docs/llm-generated/ir-reference/metadata.md#variadic-min1) | undocumented-behavior | The `SPIRVAsmInst` row says "(variadic, min=1)" but does not document that the first operand is the SPIR-V opcode integer (observed: `132 : UInt` for `OpIMul`). Documenting that the first operand is the SPIR-V opcode number would let tests pin the exact instruction by opcode. |  |

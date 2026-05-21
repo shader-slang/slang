@@ -69,9 +69,12 @@ For the bundle as a whole:
    `//META: intent=...` (comma-separated when a claim row groups
    tests of mixed intent).
 9. **Doc gaps recorded.** If the doc has visible claims that the
-   bundle does not cover, the agent should have recorded them under
-   `## Doc gaps observed`. If you can see uncovered claims that are
-   not listed there, flag them.
+   bundle does not cover, the agent should have recorded them as rows
+   in the `## Doc gaps observed` table. If you can see uncovered
+   claims that are not listed there, flag them. Also check that each
+   existing row's `Kind` matches the prose: e.g., a row whose Gap
+   says "doc lists X but does not name a Slang surface" should be
+   `missing-surface`, not `undocumented-behavior`.
 
 ## Report format
 

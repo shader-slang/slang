@@ -113,85 +113,22 @@ Phase A/B/C/D tables that can be observed in
 
 ## Doc gaps observed
 
-- The doc does not pin the specific CUDA-prelude macros and helper
-  symbols (`SLANG_INFINITY`, `__half(...)`, `make_float2`, `tex2DLod`,
-  `FixedArray<T, N>`) that the emitter relies on for numeric and
-  texture boundaries. The boundary tests anchor each through its
-  parent claim section, but a single doc table listing
-  "prelude-symbol → emit-shape" would let boundary tests reference
-  the symbols directly.
-- The doc does not state how out-of-range signed-integer literals
-  (e.g. `int8_t(128)`) are handled by the CUDA pipeline: observed
-  behavior is silent two's-complement wrap with no diagnostic, but
-  the source doc does not anchor this. No negative test was added
-  for this boundary; the documented contract is missing.
-- The doc does not specify the upper-bound for `[numthreads(N,1,1)]`
-  on CUDA emit. Observed: N=1024 (CUDA hardware max-per-dim)
-  compiles cleanly; N=0 is rejected at check time (diagnostic
-  `E31102`). The boundary tests anchor the positive ends to the
-  Phase D emit-wrapping claim, but the upper-bound number is not
-  documented.
-- The doc's Phase D table mentions `CUDASourceEmitter` but does not
-  name `#include "slang-cuda-prelude.h"` or
-  `extern "C" __global__ void` as the canonical CUDA emit-prelude
-  markers, or `extern "C" __constant__ GlobalParams_0` as the
-  canonical resource-collection marker. A one-line statement of
-  these emit-prelude facts would let tests anchor them precisely;
-  this bundle anchors them to the general
-  `#phase-d-cuda-emit-and-downstream-tools` section.
-- The doc states `legalizeEntryPointVaryingParamsForCUDA`
-  restructures kernel-entry-point parameter shapes but does not
-  give the exact text-emit lowering of `SV_DispatchThreadID`
-  (`blockIdx * blockDim + threadIdx`). Documenting the lowering
-  expression would let a test pin the expression instead of
-  inferring it from the source.
-- The doc's `## lowerImmutableBufferLoadForCUDA` says the pass
-  translates loads to `__ldg(...)` but does not state that
-  struct-typed loads go through a generated `slang_ldg` helper
-  that issues per-field `__ldg(&ptr->field)` reads. Documenting
-  the per-field expansion would let the test pin its shape.
-- The doc lists `applyVariableScopeCorrection` as running for
-  CUDA but does not name an observable CUDA-emit pattern. No
-  test.
-- The doc's Phase B table lists `lowerBuiltinTypesForKernelEntryPoints`
-  as stripping shader types from kernel signatures and replacing
-  them with CUDA primitives, but does not enumerate the
-  Slang -> CUDA-primitive substitutions (e.g.
-  `Texture2D -> CUtexObject`, `SamplerState` unchanged). Listing
-  the mapping would let a test pin each substitution.
-  Observed substitutions worth documenting: all read-only
-  `Texture1D` / `Texture2D` / `Texture3D` / `TextureCube` /
-  `Texture2DArray` collapse to `CUtexObject`, while RW textures
-  (`RWTexture2D`, `RWTexture3D`, etc.) collapse to
-  `CUsurfObject`. The per-rank distinction is observable only at
-  the call site (`tex1DLod`, `tex3DLod`, `texCubemapLod`,
-  `tex2DLayeredLod`, `surf2Dwrite`, `surf3Dwrite`, ...). A
-  doc subsection under `#phase-b-...` (or a Texture-types
-  section) with the table would let texture-variant tests
-  anchor each substitution.
-- The doc's `## synthesizeActiveMask` describes converting
-  IR-level active-mask references into a synthesized mask
-  parameter but does not give a Slang-language surface that
-  forces the pass to fire on a compute-stage entry point that
-  the no-GPU bundle can compile. The pass exists but is not
-  exercisable without a warp-sync intrinsic; no test in this
-  bundle.
-- The doc's `## collectOptiXEntryPointUniformParams` is gated on
-  OptiX entry-point shapes (ray-tracing pipeline) which the
-  no-GPU compute bundle does not exercise; no test.
-- The doc states "CUDA has no iterative passes in
-  `linkAndOptimizeIR`" but the consequence is not observable
-  through `slangc -target cuda` text. No test.
-- The doc lists `addDenormalModeDecorations` as always-on in
-  Phase A but does not name an observable CUDA-emit marker for
-  denormal mode. No test.
-- The doc's Phase C table lists `processLateRequireCapabilityInsts`
-  and `cleanUpVoidType` but does not name observable CUDA-emit
-  markers for them. No test.
-- The doc's `## Phase D` table lists `simplifyForEmit` but the
-  effect is observable only as an absence of redundant variables
-  in the emitted text — there is no doc-anchored positive
-  marker. No test.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#prelude-symbol-emit-shape](../../../docs/llm-generated/target-pipelines/cuda.md#prelude-symbol-emit-shape) | undocumented-behavior | The doc does not pin the specific CUDA-prelude macros and helper symbols (`SLANG_INFINITY`, `__half(...)`, `make_float2`, `tex2DLod`, `FixedArray<T, N>`) that the emitter relies on for numeric and texture boundaries. The boundary tests anchor each through its parent claim section, but a single doc table listing "prelude-symbol → emit-shape" would let boundary tests reference the symbols directly. |  |
+| [#int8t128](../../../docs/llm-generated/target-pipelines/cuda.md#int8t128) | undocumented-behavior | The doc does not state how out-of-range signed-integer literals (e.g. `int8_t(128)`) are handled by the CUDA pipeline: observed behavior is silent two's-complement wrap with no diagnostic, but the source doc does not anchor this. No negative test was added for this boundary; the documented contract is missing. |  |
+| [#numthreadsn11](../../../docs/llm-generated/target-pipelines/cuda.md#numthreadsn11) | undocumented-behavior | The doc does not specify the upper-bound for `[numthreads(N,1,1)]` on CUDA emit. Observed: N=1024 (CUDA hardware max-per-dim) compiles cleanly; N=0 is rejected at check time (diagnostic `E31102`). The boundary tests anchor the positive ends to the Phase D emit-wrapping claim, but the upper-bound number is not documented. |  |
+| [#include](../../../docs/llm-generated/target-pipelines/cuda.md#include) | undocumented-behavior | The doc's Phase D table mentions `CUDASourceEmitter` but does not name `#include "slang-cuda-prelude.h"` or `extern "C" __global__ void` as the canonical CUDA emit-prelude markers, or `extern "C" __constant__ GlobalParams_0` as the canonical resource-collection marker. | A one-line statement of these emit-prelude facts would let tests anchor them precisely; this bundle anchors them to the general `#phase-d-cuda-emit-and-downstream-tools` section. |
+| [#legalizeentrypointvaryingparamsforcuda](../../../docs/llm-generated/target-pipelines/cuda.md#legalizeentrypointvaryingparamsforcuda) | undocumented-behavior | The doc states `legalizeEntryPointVaryingParamsForCUDA` restructures kernel-entry-point parameter shapes but does not give the exact text-emit lowering of `SV_DispatchThreadID` (`blockIdx * blockDim + threadIdx`). Documenting the lowering expression would let a test pin the expression instead of inferring it from the source. |  |
+| [#lowerimmutablebufferloadforcuda](../../../docs/llm-generated/target-pipelines/cuda.md#lowerimmutablebufferloadforcuda) | undocumented-behavior | The doc's `## lowerImmutableBufferLoadForCUDA` says the pass translates loads to `__ldg(...)` but does not state that struct-typed loads go through a generated `slang_ldg` helper that issues per-field `__ldg(&ptr->field)` reads. Documenting the per-field expansion would let the test pin its shape. |  |
+| [#applyvariablescopecorrection](../../../docs/llm-generated/target-pipelines/cuda.md#applyvariablescopecorrection) | undocumented-behavior | The doc lists `applyVariableScopeCorrection` as running for CUDA but does not name an observable CUDA-emit pattern. No test. |  |
+| [#phase-b-](../../../docs/llm-generated/target-pipelines/cuda.md#phase-b-) | undocumented-behavior | The doc's Phase B table lists `lowerBuiltinTypesForKernelEntryPoints` as stripping shader types from kernel signatures and replacing them with CUDA primitives, but does not enumerate the Slang -> CUDA-primitive substitutions (e.g. `Texture2D -> CUtexObject`, `SamplerState` unchanged). | Listing the mapping would let a test pin each substitution. Observed substitutions worth documenting: all read-only `Texture1D` / `Texture2D` / `Texture3D` / `TextureCube` / `Texture2DArray` collapse to `CUtexObject`, while RW textures (`RWTexture2D`, `RWTexture3D`, etc.) collapse to `CUsurfObject`. The per-rank distinction is observable only at the call site (`tex1DLod`, `tex3DLod`, `texCubemapLod`, `tex2DLayeredLod`, `surf2Dwrite`, `surf3Dwrite`, ...). A doc subsection under `#phase-b-...` (or a Texture-types section) with the table would let texture-variant tests anchor each substitution. |
+| [#synthesizeactivemask](../../../docs/llm-generated/target-pipelines/cuda.md#synthesizeactivemask) | undocumented-behavior | The doc's `## synthesizeActiveMask` describes converting IR-level active-mask references into a synthesized mask parameter but does not give a Slang-language surface that forces the pass to fire on a compute-stage entry point that the no-GPU bundle can compile. The pass exists but is not exercisable without a warp-sync intrinsic; no test in this bundle. |  |
+| [#collectoptixentrypointuniformparams](../../../docs/llm-generated/target-pipelines/cuda.md#collectoptixentrypointuniformparams) | undocumented-behavior | The doc's `## collectOptiXEntryPointUniformParams` is gated on OptiX entry-point shapes (ray-tracing pipeline) which the no-GPU compute bundle does not exercise; no test. |  |
+| [#cuda-has-no-iterative-passes-in-linkandoptimizeir](../../../docs/llm-generated/target-pipelines/cuda.md#cuda-has-no-iterative-passes-in-linkandoptimizeir) | undocumented-behavior | The doc states "CUDA has no iterative passes in `linkAndOptimizeIR`" but the consequence is not observable through `slangc -target cuda` text. No test. |  |
+| [#adddenormalmodedecorations](../../../docs/llm-generated/target-pipelines/cuda.md#adddenormalmodedecorations) | undocumented-behavior | The doc lists `addDenormalModeDecorations` as always-on in Phase A but does not name an observable CUDA-emit marker for denormal mode. No test. |  |
+| [#processlaterequirecapabilityinsts](../../../docs/llm-generated/target-pipelines/cuda.md#processlaterequirecapabilityinsts) | undocumented-behavior | The doc's Phase C table lists `processLateRequireCapabilityInsts` and `cleanUpVoidType` but does not name observable CUDA-emit markers for them. No test. |  |
+| [#phase-d](../../../docs/llm-generated/target-pipelines/cuda.md#phase-d) | undocumented-behavior | The doc's `## Phase D` table lists `simplifyForEmit` but the effect is observable only as an absence of redundant variables in the emitted text — there is no doc-anchored positive marker. No test. |  |
 
 ## Out of scope (no-GPU runner)
 

@@ -123,26 +123,8 @@ is invoked.
 
 ## Doc gaps observed
 
-- The index doc's `#shared-shape` section enumerates the four
-  phases (A link/entry-prep, B specialize/type-legalize, C
-  target-legalize/lowering/phi-elim, D emit) but does not state
-  any **user-observable** property that distinguishes the phases
-  from each other at the source level. A reader cannot, from the
-  index alone, write a test that pins "this observation comes
-  from Phase B specifically". The four-phase shape test in this
-  bundle therefore observes end-to-end success only; per-phase
-  observations are routed to the peer bundles. The doc could
-  add a sentence per phase naming one user-visible artefact of
-  that phase's work.
-- The cross-target comparison table's "Loops" column tells the
-  reader which targets re-run inner legalization loops, but the
-  index doc does not describe a **user-observable** consequence
-  of looping vs not looping (a source that requires looped
-  legalization is target-specific by definition and so belongs
-  to the SPIR-V bundle). A future revision could add a sentence
-  about what happens to a SPIR-V-only construct compiled to a
-  non-looping target -- the answer would scope a future
-  cross-cutting test.
-- The `#pages` and `#see-also` sections are pure pointer tables;
-  they are explicitly excluded from citation per the per-section
-  prompt. No gap, just noted for future readers.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#shared-shape](../../../docs/llm-generated/target-pipelines/index.md#shared-shape) | undocumented-behavior | The index doc's `#shared-shape` section enumerates the four phases (A link/entry-prep, B specialize/type-legalize, C target-legalize/lowering/phi-elim, D emit) but does not state any **user-observable** property that distinguishes the phases from each other at the source level. A reader cannot, from the index alone, write a test that pins "this observation comes from Phase B specifically". The four-phase shape test in this bundle therefore observes end-to-end success only; per-phase observations are routed to the peer bundles. The doc could add a sentence per phase naming one user-visible artefact of that phase's work. |  |
+| [#loops](../../../docs/llm-generated/target-pipelines/index.md#loops) | undocumented-behavior | The cross-target comparison table's "Loops" column tells the reader which targets re-run inner legalization loops, but the index doc does not describe a **user-observable** consequence of looping vs not looping (a source that requires looped legalization is target-specific by definition and so belongs to the SPIR-V bundle). A future revision could add a sentence about what happens to a SPIR-V-only construct compiled to a non-looping target -- the answer would scope a future cross-cutting test. |  |
+| [#pages](../../../docs/llm-generated/target-pipelines/index.md#pages) | undocumented-behavior | The `#pages` and `#see-also` sections are pure pointer tables; they are explicitly excluded from citation per the per-section prompt. No gap, just noted for future readers. |  |

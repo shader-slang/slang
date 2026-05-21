@@ -83,46 +83,15 @@ additional anchors of those same claims, not new ones.
 
 ## Doc gaps observed
 
-- The doc describes `RightArrow` (`->`), `DoubleRightArrow` (`=>`),
-  `Ellipsis` (`...`), and `Scope` (`::`) as punctuation tokens but
-  does not state user-facing claims about their semantic role beyond
-  one-line notes like "lambda / requirement-binding". Tests for these
-  would need to anchor to `syntax-reference/grammar.md` or
-  `ast-reference/expressions.md`, neither of which has been
-  generated yet. Deferred to Phase C cross-link, or to expansion once
-  those bundles exist.
-- The doc lists `TokenFlags::AtStartOfLine`, `AfterWhitespace`, and
-  `ScrubbingNeeded` (under `#token-flags`) but these are internal
-  lexer state with no surface observable consequence accessible via
-  `slangc`. Recorded as undocumented-by-design rather than a doc gap.
-- Numeric literal suffixes beyond `u` and `f` (`l`, `ul`, `h`, `lf`,
-  ...) are mentioned but not exhaustively enumerated. Expansion pass
-  candidate once a definitive list is added to the doc.
-- Integer-literal bases (decimal / hex `0x` / octal `0` / binary
-  `0b`) are exercised by the lexer but the doc does not enumerate
-  the accepted prefixes. Boundary tests for each base now exist;
-  the doc would benefit from a one-line note that all four bases
-  are accepted.
-- Floating-point literal forms (trailing dot `1.`, leading dot
-  `.5`, decimal exponent `1e3`, hexadecimal float `0x1.0p4`) are
-  accepted by the lexer but only the generic "FloatingPointLiteral"
-  row in `#content-tokens` is documented. A short grammar note in
-  `#content-tokens` listing the four accepted shapes would close
-  this gap.
-- The interaction of `\<newline>` continuation with line comments
-  (the comment swallows the next physical line because continuations
-  are folded before comment recognition) is implied by the
-  "consumed and folded out" wording in `#special-case-lexing-rules`
-  but not stated explicitly. A worked example in the doc would
-  prevent a confusing-looking but correct behavior from surprising
-  readers.
-- Documented diagnostics (`integer literal is too large to be
-  represented in any integer type`, `invalid suffix on integer
-  literal`, `illegal character literal`) have no explicit error
-  codes / messages listed in `tokens.md`. The negative tests in
-  this pass copy the diagnostic text verbatim from the compiler;
-  promoting them to a "Diagnostics" subsection in the doc would
-  let future authors anchor by claim ID rather than by free text.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#lambda-requirement-binding](../../../docs/llm-generated/syntax-reference/tokens.md#lambda-requirement-binding) | undocumented-behavior | The doc describes `RightArrow` (`->`), `DoubleRightArrow` (`=>`), `Ellipsis` (`...`), and `Scope` (`::`) as punctuation tokens but does not state user-facing claims about their semantic role beyond one-line notes like "lambda / requirement-binding". Tests for these would need to anchor to `syntax-reference/grammar.md` or `ast-reference/expressions.md`, neither of which has been generated yet. Deferred to Phase C cross-link, or to expansion once those bundles exist. |  |
+| [#token-flags](../../../docs/llm-generated/syntax-reference/tokens.md#token-flags) | undocumented-behavior | The doc lists `TokenFlags::AtStartOfLine`, `AfterWhitespace`, and `ScrubbingNeeded` (under `#token-flags`) but these are internal lexer state with no surface observable consequence accessible via `slangc`. Recorded as undocumented-by-design rather than a doc gap. |  |
+| [#and](../../../docs/llm-generated/syntax-reference/tokens.md#and) | undocumented-behavior | Numeric literal suffixes beyond `u` and `f` (`l`, `ul`, `h`, `lf`, ...) are mentioned but not exhaustively enumerated. Expansion pass candidate once a definitive list is added to the doc. |  |
+| [#0x](../../../docs/llm-generated/syntax-reference/tokens.md#0x) | undocumented-behavior | Integer-literal bases (decimal / hex `0x` / octal `0` / binary `0b`) are exercised by the lexer but the doc does not enumerate the accepted prefixes. Boundary tests for each base now exist; the doc would benefit from a one-line note that all four bases are accepted. |  |
+| [#content-tokens](../../../docs/llm-generated/syntax-reference/tokens.md#content-tokens) | undocumented-behavior | Floating-point literal forms (trailing dot `1.`, leading dot `.5`, decimal exponent `1e3`, hexadecimal float `0x1.0p4`) are accepted by the lexer but only the generic "FloatingPointLiteral" row in `#content-tokens` is documented. | A short grammar note in `#content-tokens` listing the four accepted shapes would close this gap. |
+| [#special-case-lexing-rules](../../../docs/llm-generated/syntax-reference/tokens.md#special-case-lexing-rules) | missing-example | The interaction of `\<newline>` continuation with line comments (the comment swallows the next physical line because continuations are folded before comment recognition) is implied by the "consumed and folded out" wording in `#special-case-lexing-rules` but not stated explicitly. | A worked example in the doc would prevent a confusing-looking but correct behavior from surprising readers. |
+| [#diagnostics](../../../docs/llm-generated/syntax-reference/tokens.md#diagnostics) | undocumented-behavior | Documented diagnostics (`integer literal is too large to be represented in any integer type`, `invalid suffix on integer literal`, `illegal character literal`) have no explicit error codes / messages listed in `tokens.md`. The negative tests in this pass copy the diagnostic text verbatim from the compiler; promoting them to a "Diagnostics" subsection in the doc would let future authors anchor by claim ID rather than by free text. |  |
 
 ## Out of scope (no-GPU runner)
 

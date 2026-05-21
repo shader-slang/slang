@@ -134,28 +134,10 @@ through this bundle's directives and are recorded here:
 
 ## Doc gaps observed
 
-- The doc enumerates `HLSLNoInterpolationModifier`,
-  `HLSLNoPerspectiveModifier`, `HLSLLinearModifier`,
-  `HLSLSampleModifier`, `HLSLCentroidModifier`, `PerVertexModifier`
-  but does not specify which combinations are mutually exclusive.
-  A reader cannot tell from the doc whether
-  `nointerpolation sample` on the same field is valid or
-  diagnosed.
-- The "Internal / synthesized modifiers" subsection lists modifiers
-  but the doc does not state from which checker pass each one is
-  introduced. A reader cannot tell whether `IgnoreForLookupModifier`
-  is set at parse, check, or IR-lowering time.
-- `[ForceInline]` is documented as `ForceInlineAttribute` but the
-  doc does not state whether the helper function survives in
-  emitted text (helpful guarantee for downstream tooling). The
-  bundle's `force-inline-on-hlsl.slang` documents the observed
-  behavior but the claim itself is not in the doc.
-- The doc mentions `OpenAttribute` and `SealedAttribute` under
-  `InheritanceControlAttribute` but does not specify the default
-  for an interface that carries neither — i.e. whether a bare
-  `interface` is implicitly open or sealed.
-- The visibility default rule ("modern language defaults to
-  `internal`") is mentioned only in the "Visibility modifiers and
-  language version" subsection. A reader looking at the
-  `PublicModifier` / `PrivateModifier` / `InternalModifier` row in
-  the main table would not know the default is per-module-language.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#hlslnointerpolationmodifier](../../../docs/llm-generated/ast-reference/modifiers.md#hlslnointerpolationmodifier) | undocumented-behavior | The doc enumerates `HLSLNoInterpolationModifier`, `HLSLNoPerspectiveModifier`, `HLSLLinearModifier`, `HLSLSampleModifier`, `HLSLCentroidModifier`, `PerVertexModifier` but does not specify which combinations are mutually exclusive. A reader cannot tell from the doc whether `nointerpolation sample` on the same field is valid or diagnosed. |  |
+| [#internal-synthesized-modifiers](../../../docs/llm-generated/ast-reference/modifiers.md#internal-synthesized-modifiers) | undocumented-behavior | The "Internal / synthesized modifiers" subsection lists modifiers but the doc does not state from which checker pass each one is introduced. A reader cannot tell whether `IgnoreForLookupModifier` is set at parse, check, or IR-lowering time. |  |
+| [#forceinline](../../../docs/llm-generated/ast-reference/modifiers.md#forceinline) | undocumented-behavior | `[ForceInline]` is documented as `ForceInlineAttribute` but the doc does not state whether the helper function survives in emitted text (helpful guarantee for downstream tooling). The bundle's `force-inline-on-hlsl.slang` documents the observed behavior but the claim itself is not in the doc. |  |
+| [#openattribute](../../../docs/llm-generated/ast-reference/modifiers.md#openattribute) | undocumented-behavior | The doc mentions `OpenAttribute` and `SealedAttribute` under `InheritanceControlAttribute` but does not specify the default for an interface that carries neither — i.e. whether a bare `interface` is implicitly open or sealed. |  |
+| [#modern-language-defaults-to-internal](../../../docs/llm-generated/ast-reference/modifiers.md#modern-language-defaults-to-internal) | undocumented-behavior | The visibility default rule ("modern language defaults to `internal`") is mentioned only in the "Visibility modifiers and language version" subsection. A reader looking at the `PublicModifier` / `PrivateModifier` / `InternalModifier` row in the main table would not know the default is per-module-language. |  |

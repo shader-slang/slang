@@ -192,127 +192,25 @@ bundle drills into the rest of the catalog without repeating those.
 
 ## Doc gaps observed
 
-- The doc's Logical table lists `logicalAnd` (`InfixExpr` `&&`) and
-  `logicalOr` (`InfixExpr` `||`), but the observed lowering of the
-  short-circuit operators is a pair of `ifElse` terminator blocks
-  joining at a `param` — the same shape the doc describes for the
-  ternary `?:`. No portable surface in this bundle reliably produces
-  a `logicalAnd` or `logicalOr` IR opcode on the LOWER-TO-IR stage.
-  Either the lowering should emit these opcodes (and the doc would
-  be honoured) or the doc should be updated to note that the opcodes
-  are reserved for future use / produced by an IR pass rather than
-  lowering.
-- The doc's `select` notable-opcode note says `select` "lowers from
-  `SelectExpr` and ternary `cond ? a : b`", but the observed
-  lowering of the ternary uses short-circuit `ifElse` + block
-  `param`, not `select`. Only the `select(...)` builtin reliably
-  surfaces the `select` opcode. The doc should narrow the "AST
-  origin" cell to "`SelectExpr` / `select(...)` builtin".
-- The Aggregate constructors table lists `makeStruct` with AST
-  origin "`MakeStructExpr`, aggregate-initializer lowering", but
-  Slang's natural aggregate-initializer surface (`Foo f = { a, b,
-  c };` or `Foo f = Foo();`) lowers to a synthesized
-  `call %Foox5Fx24init(...)` rather than a `makeStruct(...)` IR
-  opcode on the LOWER-TO-IR stage. The doc should either describe
-  the synthesized initializer path or name a surface that reliably
-  surfaces `makeStruct`.
-- The Aggregate constructors table lists `makeArray` with AST
-  origin "`MakeArrayExpr`". The observed lowering of an array
-  initializer (`int arr[3] = { a, b, c };`) streams the components
-  straight into per-index `store` instructions on a local `var`,
-  with no `makeArray` opcode in the dump. The same comment applies
-  as for `makeStruct`.
-- The Aggregate constructors table lists `getTupleElement` for
-  "`MemberExpr` on a tuple". The observed lowering of `t._0`
-  (where `t` is a `Tuple<int, float>`) is a `swizzle(%t, 0 : Int)`
-  — using the same swizzle opcode that handles vector lanes — not
-  `getTupleElement`. The doc should clarify which surface produces
-  `getTupleElement`.
-- The Conversions table lists `outImplicitCast` and
-  `inOutImplicitCast` for "Function-arg lowering for `out` / `inout`
-  parameters". The observed lowering does not emit either opcode
-  when the caller's argument type matches the parameter; an
-  implicit-cast at the out-parameter boundary is rejected by
-  semantic check (error `E30047` "argument must be l-value") rather
-  than producing the cast. The opcodes appear to be reserved for an
-  IR pass; a surface that produces them at LOWER-TO-IR is unclear
-  from the doc.
-- The Conversions table lists `BuiltinCast`, `unmodified`,
-  `reinterpret`, `ReinterpretOptional` and `PtrCast` with various
-  "synthesized" or `BitCastExpr`-style origins, but does not name
-  a portable shader-language surface that produces each. A
-  one-sentence "surface" cell per row would let the agent test them.
-- The Conversions table lists `CastEnumToInt`, `CastIntToEnum`,
-  `EnumCast`. Slang enums do exist as a surface, but the doc does
-  not name which assignment / cast triggers which of the three
-  opcodes (Slang's `enum`-to-`int` conversion is typically implicit
-  on arithmetic; explicit `int(myEnum)` is the natural surface for
-  `CastEnumToInt`, but `EnumCast` between two distinct enums of the
-  same underlying type has no documented surface).
-- The Memory table lists `defaultConstruct` with AST origin
-  "`DefaultConstructExpr` and synthesized in IR passes". Observed
-  lowering of `Foo f = Foo();` or `Foo f = {};` produces a
-  synthesized `call %Foox5Fx24init(0 : Int, 0 : Float)` — that is,
-  the `$init` function call with zero literals — not a
-  `defaultConstruct` opcode on the LOWER-TO-IR stage. The doc
-  should either name a surface that reliably produces
-  `defaultConstruct` at lowering, or move the opcode to a list of
-  IR-pass-introduced opcodes.
-- The Memory table lists `alloca` for "Dynamically-sized stack
-  allocation" with AST origin "`AllocaExpr` / dynamic-stack
-  lowering". Slang's surface for dynamic-sized stack allocation is
-  not documented; on most targets a runtime-size array uses a
-  different lowering path entirely.
-- The Constexpr arithmetic and casts table lists 28 opcodes
-  (`constexprAdd`, `constexprMul`, ..., `constexprCastEnumToInt`)
-  with the note "Hoistable variants ... used to lower compile-time
-  integer expressions (`IntVal` subclasses such as
-  `PolynomialIntVal`) so that identical compile-time values dedupe."
-  These are produced by the IR's compile-time integer evaluator,
-  not by AST-to-IR lowering. The doc should clarify that they are
-  not part of the LOWER-TO-IR catalog and direct the reader to the
-  `pipeline/05-ir-passes` bundle (where they belong if anywhere).
-- The `MakeUInt64` notable-opcode note says it "constructs a 64-bit
-  value from two 32-bit halves" because "several targets do not
-  have a direct `uint64` literal form". Observed lowering of a
-  `uint64_t x = 0xDEADBEEF12345678uL;` and of `uint64_t(hi) << 32 |
-  uint64_t(lo)` compositions does not surface `makeUInt64` at
-  LOWER-TO-IR — it appears to be produced later, during emit.
-- The Strings and native pointers / Object and CUDA helpers
-  families list `makeString`, `getNativeStr`, `getNativePtr`,
-  `getManagedPtrWriteRef`, `ManagedPtrAttach`, `ManagedPtrDetach`,
-  `allocObj`, `CUDA_LDG` — all marked "(synthesized)" or
-  host-side. No portable shader-language surface in the doc
-  produces them; per-opcode tests cannot be anchored.
-- The Conversions table does **not** mention the HLSL-compatible
-  reinterpret builtins `asuint`/`asint`/`asfloat`/`asdouble`. Probing
-  reveals that on the LOWER-TO-IR stage these surface as
-  `call %asuint(...)` etc. with `targetIntrinsic` decoration; they
-  are not lowered to the `bitCast` opcode at lowering time. The
-  doc should either name the surface that lowers these intrinsics
-  to `bitCast` (presumably an emit-side rewrite) or describe them
-  as call-shaped throughout the value pipeline.
-- The Aggregate constructors family lists `makeMatrixFromScalar`,
-  `MakeVectorFromScalar`, `makeArrayFromElement`, `makeCoopVector`,
-  `makeCoopVectorFromValuePack`, `makeCoopMatrixFromScalar`,
-  `makeTargetTuple`, `matrixReshape`, `vectorReshape`,
-  `SumVectorElements`, `SumMatrixElements`, `updateElement` — all
-  with synthesized / implicit origins. The doc should name the
-  surface that produces each (e.g. is `float3(x)` the surface for
-  `MakeVectorFromScalar` or is it lowered as `makeVector(x, x, x)`?).
-- The Result / Optional / Conditional helpers family lists
-  `makeResultValue`/`makeResultError`/`isResultError`/
-  `getResultValue`/`getResultError` for `Result<T, E>`. The core
-  module presumably exposes `Result<T, E>` but the doc does not
-  name the surface form of `Result::makeValue(x)` /
-  `Result::makeError(e)`.
-- The Undefined and default-construct family lists `Poison` and
-  `LoadFromUninitializedMemory` as opcodes "synthesized". The
-  observed IR dump shows a single `Poison` declaration at the top
-  of the LOWER-TO-IR stage (as a sigil), but no surface in the doc
-  produces it as an active operand. The doc should clarify whether
-  the top-of-dump `Poison` line is the entire surface or whether
-  some construct yields an active `Poison`-typed value.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#logicaland](../../../docs/llm-generated/ir-reference/values.md#logicaland) | drift-from-source | The doc's Logical table lists `logicalAnd` (`InfixExpr` `&&`) and `logicalOr` (`InfixExpr` `\|\|`), but the observed lowering of the short-circuit operators is a pair of `ifElse` terminator blocks joining at a `param` — the same shape the doc describes for the ternary `?:`. No portable surface in this bundle reliably produces a `logicalAnd` or `logicalOr` IR opcode on the LOWER-TO-IR stage. | Either the lowering should emit these opcodes (and the doc would be honoured) or the doc should be updated to note that the opcodes are reserved for future use / produced by an IR pass rather than lowering. |
+| [#lowers-from-selectexpr-and-ternary-cond-a-b](../../../docs/llm-generated/ir-reference/values.md#lowers-from-selectexpr-and-ternary-cond-a-b) | drift-from-source | The doc's `select` notable-opcode note says `select` "lowers from `SelectExpr` and ternary `cond ? a : b`", but the observed lowering of the ternary uses short-circuit `ifElse` + block `param`, not `select`. Only the `select(...)` builtin reliably surfaces the `select` opcode. | The doc should narrow the "AST origin" cell to "`SelectExpr` / `select(...)` builtin". |
+| [#makestructexpr-aggregate-initializer-lowering](../../../docs/llm-generated/ir-reference/values.md#makestructexpr-aggregate-initializer-lowering) | undocumented-behavior | The Aggregate constructors table lists `makeStruct` with AST origin "`MakeStructExpr`, aggregate-initializer lowering", but Slang's natural aggregate-initializer surface (`Foo f = { a, b, c };` or `Foo f = Foo();`) lowers to a synthesized `call %Foox5Fx24init(...)` rather than a `makeStruct(...)` IR opcode on the LOWER-TO-IR stage. | The doc should either describe the synthesized initializer path or name a surface that reliably surfaces `makeStruct`. |
+| [#makearrayexpr](../../../docs/llm-generated/ir-reference/values.md#makearrayexpr) | undocumented-behavior | The Aggregate constructors table lists `makeArray` with AST origin "`MakeArrayExpr`". The observed lowering of an array initializer (`int arr[3] = { a, b, c };`) streams the components straight into per-index `store` instructions on a local `var`, with no `makeArray` opcode in the dump. The same comment applies as for `makeStruct`. |  |
+| [#memberexpr-on-a-tuple](../../../docs/llm-generated/ir-reference/values.md#memberexpr-on-a-tuple) | undocumented-behavior | The Aggregate constructors table lists `getTupleElement` for "`MemberExpr` on a tuple". The observed lowering of `t._0` (where `t` is a `Tuple<int, float>`) is a `swizzle(%t, 0 : Int)` — using the same swizzle opcode that handles vector lanes — not `getTupleElement`. | The doc should clarify which surface produces `getTupleElement`. |
+| [#function-arg-lowering-for-out-inout-parameters](../../../docs/llm-generated/ir-reference/values.md#function-arg-lowering-for-out-inout-parameters) | ambiguous-claim | The Conversions table lists `outImplicitCast` and `inOutImplicitCast` for "Function-arg lowering for `out` / `inout` parameters". The observed lowering does not emit either opcode when the caller's argument type matches the parameter; an implicit-cast at the out-parameter boundary is rejected by semantic check (error `E30047` "argument must be l-value") rather than producing the cast. The opcodes appear to be reserved for an IR pass; a surface that produces them at LOWER-TO-IR is unclear from the doc. |  |
+| [#synthesized](../../../docs/llm-generated/ir-reference/values.md#synthesized) | missing-surface | The Conversions table lists `BuiltinCast`, `unmodified`, `reinterpret`, `ReinterpretOptional` and `PtrCast` with various "synthesized" or `BitCastExpr`-style origins, but does not name a portable shader-language surface that produces each. A one-sentence "surface" cell per row would let the agent test them. |  |
+| [#castenumtoint](../../../docs/llm-generated/ir-reference/values.md#castenumtoint) | undocumented-behavior | The Conversions table lists `CastEnumToInt`, `CastIntToEnum`, `EnumCast`. Slang enums do exist as a surface, but the doc does not name which assignment / cast triggers which of the three opcodes (Slang's `enum`-to-`int` conversion is typically implicit on arithmetic; explicit `int(myEnum)` is the natural surface for `CastEnumToInt`, but `EnumCast` between two distinct enums of the same underlying type has no documented surface). |  |
+| [#defaultconstructexpr-and-synthesized-in-ir-passes](../../../docs/llm-generated/ir-reference/values.md#defaultconstructexpr-and-synthesized-in-ir-passes) | undocumented-behavior | The Memory table lists `defaultConstruct` with AST origin "`DefaultConstructExpr` and synthesized in IR passes". Observed lowering of `Foo f = Foo();` or `Foo f = {};` produces a synthesized `call %Foox5Fx24init(0 : Int, 0 : Float)` — that is, the `$init` function call with zero literals — not a `defaultConstruct` opcode on the LOWER-TO-IR stage. | The doc should either name a surface that reliably produces `defaultConstruct` at lowering, or move the opcode to a list of IR-pass-introduced opcodes. |
+| [#dynamically-sized-stack-allocation](../../../docs/llm-generated/ir-reference/values.md#dynamically-sized-stack-allocation) | undocumented-behavior | The Memory table lists `alloca` for "Dynamically-sized stack allocation" with AST origin "`AllocaExpr` / dynamic-stack lowering". Slang's surface for dynamic-sized stack allocation is not documented; on most targets a runtime-size array uses a different lowering path entirely. |  |
+| [#constexpradd](../../../docs/llm-generated/ir-reference/values.md#constexpradd) | undocumented-behavior | The Constexpr arithmetic and casts table lists 28 opcodes (`constexprAdd`, `constexprMul`, ..., `constexprCastEnumToInt`) with the note "Hoistable variants ... used to lower compile-time integer expressions (`IntVal` subclasses such as `PolynomialIntVal`) so that identical compile-time values dedupe." These are produced by the IR's compile-time integer evaluator, not by AST-to-IR lowering. | The doc should clarify that they are not part of the LOWER-TO-IR catalog and direct the reader to the `pipeline/05-ir-passes` bundle (where they belong if anywhere). |
+| [#constructs-a-64-bit-value-from-two-32-bit-halves](../../../docs/llm-generated/ir-reference/values.md#constructs-a-64-bit-value-from-two-32-bit-halves) | undocumented-behavior | The `MakeUInt64` notable-opcode note says it "constructs a 64-bit value from two 32-bit halves" because "several targets do not have a direct `uint64` literal form". Observed lowering of a `uint64_t x = 0xDEADBEEF12345678uL;` and of `uint64_t(hi) << 32 \| uint64_t(lo)` compositions does not surface `makeUInt64` at LOWER-TO-IR — it appears to be produced later, during emit. |  |
+| [#synthesized](../../../docs/llm-generated/ir-reference/values.md#synthesized) | undocumented-behavior | The Strings and native pointers / Object and CUDA helpers families list `makeString`, `getNativeStr`, `getNativePtr`, `getManagedPtrWriteRef`, `ManagedPtrAttach`, `ManagedPtrDetach`, `allocObj`, `CUDA_LDG` — all marked "(synthesized)" or host-side. No portable shader-language surface in the doc produces them; per-opcode tests cannot be anchored. |  |
+| [#asuint](../../../docs/llm-generated/ir-reference/values.md#asuint) | undocumented-behavior | The Conversions table does **not** mention the HLSL-compatible reinterpret builtins `asuint`/`asint`/`asfloat`/`asdouble`. Probing reveals that on the LOWER-TO-IR stage these surface as `call %asuint(...)` etc. with `targetIntrinsic` decoration; they are not lowered to the `bitCast` opcode at lowering time. | The doc should either name the surface that lowers these intrinsics to `bitCast` (presumably an emit-side rewrite) or describe them as call-shaped throughout the value pipeline. |
+| [#makematrixfromscalar](../../../docs/llm-generated/ir-reference/values.md#makematrixfromscalar) | undocumented-behavior | The Aggregate constructors family lists `makeMatrixFromScalar`, `MakeVectorFromScalar`, `makeArrayFromElement`, `makeCoopVector`, `makeCoopVectorFromValuePack`, `makeCoopMatrixFromScalar`, `makeTargetTuple`, `matrixReshape`, `vectorReshape`, `SumVectorElements`, `SumMatrixElements`, `updateElement` — all with synthesized / implicit origins. | The doc should name the surface that produces each (e.g. is `float3(x)` the surface for `MakeVectorFromScalar` or is it lowered as `makeVector(x, x, x)`?). |
+| [#makeresultvalue](../../../docs/llm-generated/ir-reference/values.md#makeresultvalue) | undocumented-behavior | The Result / Optional / Conditional helpers family lists `makeResultValue`/`makeResultError`/`isResultError`/ `getResultValue`/`getResultError` for `Result<T, E>`. The core module presumably exposes `Result<T, E>` but the doc does not name the surface form of `Result::makeValue(x)` / `Result::makeError(e)`. |  |
+| [#synthesized](../../../docs/llm-generated/ir-reference/values.md#synthesized) | undocumented-behavior | The Undefined and default-construct family lists `Poison` and `LoadFromUninitializedMemory` as opcodes "synthesized". The observed IR dump shows a single `Poison` declaration at the top of the LOWER-TO-IR stage (as a sigil), but no surface in the doc produces it as an active operand. | The doc should clarify whether the top-of-dump `Poison` line is the entire surface or whether some construct yields an active `Poison`-typed value. |
 
 ## Out of scope (no-GPU runner)
 

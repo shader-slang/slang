@@ -123,74 +123,15 @@ this bundle.
 
 ## Doc gaps observed
 
-- The `### makeExistential` notable-opcode discussion says the
-  opcode "packs a value of some concrete type `C` and a witness
-  that `C` conforms to the target interface `I` into a single
-  existential value of type `I`", but does not call out the
-  dump shape `let %i : %I = makeExistential(%value, %witness)` —
-  the result type appearing in the `let` is the target
-  interface type, not a constructed `Existential<I>` wrapper. A
-  worked example would prevent test-authors from expecting a
-  wrapper-typed result.
-- The `### specialize` notable-opcode discussion describes the
-  operand layout as `specialize(base, arg0, arg1, ...)` but
-  does not document that the call-site spelling is
-  `call specialize(%base, args...)(callArgs...)` — two
-  parenthesised lists, one for the generic arguments and one
-  for the runtime arguments. A one-line example would anchor
-  consumer tests.
-- The `Witness lookup` table row lists the operands as
-  `(variadic, min=2)` but the prose under `### lookupWitness /
-  LookupWitnessMethod` specifies exactly `witnessTable,
-  requirementKey`. The `min=2` is misleading for the natural
-  LOWER-TO-IR case; clarifying that the variadic form is for
-  later-pass specialized lookups would help.
-- The `### Existential destructuring` table lists
-  `extractExistentialType` as hoistable (`H` flag) but
-  `extractExistentialValue` as not hoistable. The asymmetry is
-  the kind of detail a test author would want explained:
-  whether `extractExistentialValue` deduplicates across
-  identical operands at LOWER-TO-IR is not documented and the
-  dump alone cannot answer it (a single use site shows one
-  call).
-- The doc's `### Generic application` table has a row for
-  `global_generic_param` but the AST-origin note
-  ("`GenericTypeParamDecl` (at module scope)") does not name
-  the actual Slang surface keyword (`type_param`). A two-word
-  hint in the AST-origin column would save a search through the
-  parser.
-- The `witness_table` row in the doc points at
-  `structure.md` for its full operand documentation but does
-  not summarise that the table's *type* (`witness_table_t(%I)(%S)`)
-  is what carries the (interface, implementing-type) pair —
-  this is observable at LOWER-TO-IR and is a stable hook for
-  FileCheck.
-- The `### Generic application` row for `global_generic_param`
-  does not say whether a constrained module-scope generic
-  (`type_param T : IFoo;`) is supported. Empirically the
-  LOWER-TO-IR stage produces a second `let %3 :
-  witness_table_t(%IFoo) = global_generic_param` line, but a
-  later compiler pass crashes (segfault) before SPIR-V emission
-  completes. The doc should either bless the form (and document
-  the dual `global_generic_param` shape) or call it out as
-  unsupported. A separate `negative-` test was not added because
-  the failure mode is a process crash rather than a diagnostic.
-- The `### specialize` row's operand list `base, arg, ...` does
-  not distinguish type arguments from compile-time integer
-  value arguments. Empirically integer literals appear as
-  `N : Int` operands inside `specialize(...)`. A one-line note
-  in the row would clarify that the operand list is
-  type-or-value, not type-only.
-- The `### specialize` notable-opcode prose says the opcode is
-  hoistable but does not give a per-arity ceiling. Empirically
-  the dump accepts arities up to at least 8 type parameters
-  without truncation or change-of-spelling. A "no compiler-side
-  arity cap" sentence would prevent test authors from probing
-  for one.
-- The doc does not describe what `### makeExistential` does
-  when the concrete-type payload is itself an aggregate
-  (struct, vector, array). Empirically the result-type slot
-  remains `%I` regardless of payload shape and the value
-  operand is the aggregate's IR value. A "payload shape is
-  opaque to the opcode" note would clarify the result-type
-  invariant.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#makeexistential](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#makeexistential) | missing-example | The `### makeExistential` notable-opcode discussion says the opcode "packs a value of some concrete type `C` and a witness that `C` conforms to the target interface `I` into a single existential value of type `I`", but does not call out the dump shape `let %i : %I = makeExistential(%value, %witness)` — the result type appearing in the `let` is the target interface type, not a constructed `Existential<I>` wrapper. | A worked example would prevent test-authors from expecting a wrapper-typed result. |
+| [#specialize](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#specialize) | undocumented-behavior | The `### specialize` notable-opcode discussion describes the operand layout as `specialize(base, arg0, arg1, ...)` but does not document that the call-site spelling is `call specialize(%base, args...)(callArgs...)` — two parenthesised lists, one for the generic arguments and one for the runtime arguments. | A one-line example would anchor consumer tests. |
+| [#lookupwitness-lookupwitnessmethod](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#lookupwitness-lookupwitnessmethod) | undocumented-behavior | The `Witness lookup` table row lists the operands as `(variadic, min=2)` but the prose under `### lookupWitness / LookupWitnessMethod` specifies exactly `witnessTable, requirementKey`. The `min=2` is misleading for the natural LOWER-TO-IR case; clarifying that the variadic form is for later-pass specialized lookups would help. |  |
+| [#existential-destructuring](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#existential-destructuring) | undocumented-behavior | The `### Existential destructuring` table lists `extractExistentialType` as hoistable (`H` flag) but `extractExistentialValue` as not hoistable. The asymmetry is the kind of detail a test author would want explained: whether `extractExistentialValue` deduplicates across identical operands at LOWER-TO-IR is not documented and the dump alone cannot answer it (a single use site shows one call). |  |
+| [#generic-application](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#generic-application) | undocumented-behavior | The doc's `### Generic application` table has a row for `global_generic_param` but the AST-origin note ("`GenericTypeParamDecl` (at module scope)") does not name the actual Slang surface keyword (`type_param`). A two-word hint in the AST-origin column would save a search through the parser. |  |
+| [#witnesstable](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#witnesstable) | undocumented-behavior | The `witness_table` row in the doc points at `structure.md` for its full operand documentation but does not summarise that the table's *type* (`witness_table_t(%I)(%S)`) is what carries the (interface, implementing-type) pair — this is observable at LOWER-TO-IR and is a stable hook for FileCheck. |  |
+| [#generic-application](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#generic-application) | undocumented-behavior | The `### Generic application` row for `global_generic_param` does not say whether a constrained module-scope generic (`type_param T : IFoo;`) is supported. Empirically the LOWER-TO-IR stage produces a second `let %3 : witness_table_t(%IFoo) = global_generic_param` line, but a later compiler pass crashes (segfault) before SPIR-V emission completes. | The doc should either bless the form (and document the dual `global_generic_param` shape) or call it out as unsupported. A separate `negative-` test was not added because the failure mode is a process crash rather than a diagnostic. |
+| [#specialize](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#specialize) | undocumented-behavior | The `### specialize` row's operand list `base, arg, ...` does not distinguish type arguments from compile-time integer value arguments. Empirically integer literals appear as `N : Int` operands inside `specialize(...)`. | A one-line note in the row would clarify that the operand list is type-or-value, not type-only. |
+| [#specialize](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#specialize) | undocumented-behavior | The `### specialize` notable-opcode prose says the opcode is hoistable but does not give a per-arity ceiling. Empirically the dump accepts arities up to at least 8 type parameters without truncation or change-of-spelling. A "no compiler-side arity cap" sentence would prevent test authors from probing for one. |  |
+| [#makeexistential](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#makeexistential) | undocumented-behavior | The doc does not describe what `### makeExistential` does when the concrete-type payload is itself an aggregate (struct, vector, array). Empirically the result-type slot remains `%I` regardless of payload shape and the value operand is the aggregate's IR value. A "payload shape is opaque to the opcode" note would clarify the result-type invariant. |  |

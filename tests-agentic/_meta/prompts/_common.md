@@ -80,9 +80,12 @@ strategy (e.g. "one positive + one negative per claim in sections
 
 ## Doc gaps observed
 
-(One bullet per gap. If none, write `(none)`. Each bullet should be a
-single sentence naming the behavior that lacks a documented claim, with
-a suggestion of where it could be added.)
+| Anchor                                                    | Kind            | Gap                                                                                   | Suggested addition                                          |
+| --------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| [#basic-scalar-types](../../docs/llm-generated/<doc>.md#basic-scalar-types) | missing-surface | The doc lists `IntPtr` and `UIntPtr` as opcodes but does not name a Slang surface construct that produces them. | A "user-level surface" column per row, or a note that these are host-side only. |
+| ...                                                       | ...             | ...                                                                                   | ...                                                         |
+
+If there are no gaps, omit the section. Do not write a placeholder row.
 ```
 
 **Coverage table rules:**
@@ -108,6 +111,44 @@ a suggestion of where it could be added.)
 
 The lint pass verifies that every `.slang` file in the bundle directory
 appears in the Coverage table's Tests column.
+
+**Doc-gap table rules:**
+
+The `## Doc gaps observed` section is the **feedback channel into doc
+regeneration**. The downstream doc-regen workflow aggregates every
+bundle's gap rows (grouped by `source_doc`) and uses them as input
+when the next revision of `docs/llm-generated/<doc>.md` is generated.
+That means each row must be self-contained enough for an agent who
+has never seen this bundle to know which doc section to edit and what
+to add.
+
+- **Anchor** is a markdown link to the doc section the gap is about,
+  using the same anchor shape as the Coverage table. If the gap spans
+  multiple sections, pick the most specific anchor and mention the
+  others in the Gap cell.
+- **Kind** is one value from the controlled vocabulary:
+  | Kind                     | When to use                                                                                                       |
+  | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+  | `missing-example`        | Doc names a claim but does not include a minimal example shader that exercises it.                                |
+  | `missing-surface`        | Doc names an IR / AST / internal construct but does not name the user-level syntax or builtin that produces it.   |
+  | `undocumented-behavior`  | Observed compiler behavior is real and reachable but the doc is silent about it (no claim, no caveat, no warning).|
+  | `cascading-only-mention` | Doc describes a diagnostic or behavior that is always shadowed in practice by an earlier diagnostic or pass.      |
+  | `ambiguous-claim`        | Doc claim has more than one reasonable interpretation; tests cannot anchor to it without making a guess.          |
+  | `drift-from-source`      | Observed compiler behavior contradicts what the doc says (e.g., doc says "lowers to `select`" but actually emits `ifElse`). |
+- **Gap** is one to three sentences naming what the doc lacks, in the
+  voice of a reader of the doc. Quote the doc literally when the gap
+  is about its exact wording. Do **not** describe internal compiler
+  details — restrict yourself to observations a doc-only reader could
+  make plus your own test observations.
+- **Suggested addition** is one to three sentences proposing concrete
+  doc edit (e.g., "Add a one-line `user surface` column to the
+  Storage-only floating-point table with the syntax that declares
+  each opcode"). The doc-regen agent reads this verbatim, so write
+  it as an actionable instruction, not a question.
+
+Rows from multiple bundles that report the same anchor + kind are
+merged by the aggregator (`regenerate.py doc-gaps`), so independent
+co-reports are fine — they are useful evidence.
 
 ## Per-test `//META` block
 

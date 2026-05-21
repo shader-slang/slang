@@ -111,54 +111,11 @@ a user can write. They are intentionally not tested here:
 
 ## Doc gaps observed
 
-- The `### BackwardDifferentiate` notable-opcode discussion names
-  `__bwd_diff` as the AST origin of `BackwardDifferentiate`, but
-  the actual LOWER-TO-IR opcode emitted by
-  `slang-lower-to-ir.cpp` for `__bwd_diff(f)` is
-  `LegacyBackwardDifferentiate(%apply_bwd, %remat, %ctx_t)` — the
-  legacy-bridge form. The modern `BackwardDifferentiate` opcode is
-  not produced at LOWER-TO-IR at all; it is synthesized later by
-  the unzip pass when converting the legacy form to the modern
-  primal-/propagate-/remat-triple. A one-line note clarifying
-  that `BackwardDifferentiate` is an unzip-pass opcode (and that
-  `LegacyBackwardDifferentiate` is the LOWER-TO-IR spelling) would
-  prevent test-author confusion. (See
-  `legacy-backward-differentiate.slang` and `bwd-diff-alias.slang`.)
-- The `### Differential-pair construction` and
-  `### Differential-pair projection` tables list every opcode's
-  AST origin as `(synthesized)`, but `MakeDiffPair`, `GetPrimal`,
-  and `GetDifferential` are all routinely produced from
-  user-written surface code (`DifferentialPair<T>(p, d)`
-  constructor calls and `.p`/`.d` field accesses). The
-  AST-origin column should distinguish "synthesized by autodiff
-  passes" from "naturally produced from user surface at
-  LOWER-TO-IR". (See `make-diff-pair.slang`,
-  `get-primal.slang`, `get-differential.slang`.)
-- The doc nowhere documents the **`no_diff`** parameter marker as
-  an IR opcode. At LOWER-TO-IR, `no_diff T x` parameters surface
-  as `param %x : Attributed(T, %no_diff)` where `%no_diff` is a
-  module-scope `let %k : Void = no_diff` IR value. The
-  `no_diff` opcode should appear in the catalog (alongside or in
-  the `Autodiff temporaries` table) with its `Attributed(...)`
-  parameter-wrapper role spelled out. (See
-  `no-diff-parameter-marker.slang`,
-  `no-diff-module-scope-marker.slang`.)
-- The `### ForwardDifferentiate` discussion says "Specialization
-  replaces the opcode with the actual JVP function once `baseFn`
-  is fully known" but does not document the LOWER-TO-IR form
-  before specialization (`let %fwd_diff : Func(DiffPair(T, %w),
-  DiffPair(T, %w)) = ForwardDifferentiate(%f)`). A one-line
-  example showing the pre-specialization shape would anchor
-  reference tests. (See `forward-differentiate.slang`.)
-- The `### detachDerivative` discussion describes the semantic
-  (returns operand unchanged, blocks derivative) but does not
-  show the LOWER-TO-IR form (`let %N : T = detachDerivative(%x)`
-  with operand and result type equal). A one-line example would
-  prevent over-specific pattern construction. (See
-  `detach-derivative.slang`, `detach-derivative-result-type.slang`.)
-- The doc does not describe the **`fwd_diff` / `bwd_diff`
-  unprefixed aliases**. The parser accepts both `__fwd_diff(f)`
-  and `fwd_diff(f)` (similarly for `bwd_diff`); both lower
-  identically. A note that the unprefixed aliases exist would
-  clarify the surface. (See `fwd-diff-alias.slang`,
-  `bwd-diff-alias.slang`.)
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#backwarddifferentiate](../../../docs/llm-generated/ir-reference/differentiation.md#backwarddifferentiate) | drift-from-source | The `### BackwardDifferentiate` notable-opcode discussion names `__bwd_diff` as the AST origin of `BackwardDifferentiate`, but the actual LOWER-TO-IR opcode emitted by `slang-lower-to-ir.cpp` for `__bwd_diff(f)` is `LegacyBackwardDifferentiate(%apply_bwd, %remat, %ctx_t)` — the legacy-bridge form. The modern `BackwardDifferentiate` opcode is not produced at LOWER-TO-IR at all; it is synthesized later by the unzip pass when converting the legacy form to the modern primal-/propagate-/remat-triple. | A one-line note clarifying that `BackwardDifferentiate` is an unzip-pass opcode (and that `LegacyBackwardDifferentiate` is the LOWER-TO-IR spelling) would prevent test-author confusion. (See `legacy-backward-differentiate.slang` and `bwd-diff-alias.slang`.) |
+| [#differential-pair-construction](../../../docs/llm-generated/ir-reference/differentiation.md#differential-pair-construction) | undocumented-behavior | The `### Differential-pair construction` and `### Differential-pair projection` tables list every opcode's AST origin as `(synthesized)`, but `MakeDiffPair`, `GetPrimal`, and `GetDifferential` are all routinely produced from user-written surface code (`DifferentialPair<T>(p, d)` constructor calls and `.p`/`.d` field accesses). The AST-origin column should distinguish "synthesized by autodiff passes" from "naturally produced from user surface at LOWER-TO-IR". (See `make-diff-pair.slang`, `get-primal.slang`, `get-differential.slang`.) |  |
+| [#nodiff](../../../docs/llm-generated/ir-reference/differentiation.md#nodiff) | undocumented-behavior | The doc nowhere documents the **`no_diff`** parameter marker as an IR opcode. At LOWER-TO-IR, `no_diff T x` parameters surface as `param %x : Attributed(T, %no_diff)` where `%no_diff` is a module-scope `let %k : Void = no_diff` IR value. The `no_diff` opcode should appear in the catalog (alongside or in the `Autodiff temporaries` table) with its `Attributed(...)` parameter-wrapper role spelled out. (See `no-diff-parameter-marker.slang`, `no-diff-module-scope-marker.slang`.) |  |
+| [#forwarddifferentiate](../../../docs/llm-generated/ir-reference/differentiation.md#forwarddifferentiate) | undocumented-behavior | The `### ForwardDifferentiate` discussion says "Specialization replaces the opcode with the actual JVP function once `baseFn` is fully known" but does not document the LOWER-TO-IR form before specialization (`let %fwd_diff : Func(DiffPair(T, %w), DiffPair(T, %w)) = ForwardDifferentiate(%f)`). | A one-line example showing the pre-specialization shape would anchor reference tests. (See `forward-differentiate.slang`.) |
+| [#detachderivative](../../../docs/llm-generated/ir-reference/differentiation.md#detachderivative) | undocumented-behavior | The `### detachDerivative` discussion describes the semantic (returns operand unchanged, blocks derivative) but does not show the LOWER-TO-IR form (`let %N : T = detachDerivative(%x)` with operand and result type equal). | A one-line example would prevent over-specific pattern construction. (See `detach-derivative.slang`, `detach-derivative-result-type.slang`.) |
+| [#fwddiff](../../../docs/llm-generated/ir-reference/differentiation.md#fwddiff) | undocumented-behavior | The doc does not describe the **`fwd_diff` / `bwd_diff` unprefixed aliases**. The parser accepts both `__fwd_diff(f)` and `fwd_diff(f)` (similarly for `bwd_diff`); both lower identically. | A note that the unprefixed aliases exist would clarify the surface. (See `fwd-diff-alias.slang`, `bwd-diff-alias.slang`.) |

@@ -238,65 +238,13 @@ right**, sampling its breadth across categories.
 
 ## Doc gaps observed
 
-- The doc's `### entryPoint / EntryPointDecoration` notable-opcodes
-  section states "Its three operands are the profile (an IRIntLit
-  tag), the user-visible name, and an optional module name", but
-  does not specify the source of the module-name operand. In the
-  observed dump it is the source-file stem (e.g. `"two-entry-
-  points-coexist"` for `two-entry-points-coexist.slang`), which
-  means a test that pins the literal module-name string is
-  filename-fragile. A clarifying note that the module-name operand
-  is derived from the file name (or compilation-unit name) would
-  help test authors avoid this pitfall.
-
-- The `Loop and branch hints` table row for `loopControl` lists
-  the operand as `modeOperand: IRConstant` but does not document
-  the integer encoding — observed values are `0` for `[unroll]`
-  and `1` for `[loop]`. Documenting the enum would make the
-  test claim concrete instead of wildcarded.
-
-- The `Interpolation and shader IO` row for `interpolationMode`
-  lists `modeOperand: IRConstant` but does not document the
-  encoding. Observed values include `0` (for `linear`) and
-  `2` (for `nointerpolation`); pinning these would let tests
-  assert the exact mode rather than wildcarding.
-
-- The `Inlining and optimization` row for `unsafeForceInlineEarly`
-  says "Inlines calls immediately after codegen" but does not
-  warn that the decoration's lifetime may be shorter than the
-  LOWER-TO-IR dump can capture in adversarial pass-ordering
-  scenarios. The current dump still includes it, but a note that
-  the decoration may be consumed earlier than other inline hints
-  would prevent surprise if pass ordering changes.
-
-- The `Linkage and lifetime` row for `export` lists the operand
-  as `(variadic, min=1)` but does not show the mangled-name
-  encoding (function `_SR...`, type `_ST...`, variable `_SV...`,
-  witness `_SW...`). A worked example showing the prefix-per-
-  symbol-kind would help authors of cross-cutting tooling that
-  consumes the export linkage.
-
-- The `Naming and provenance` row for `BuiltinDecoration` lists
-  no operands and notes "Marks an inst as a compiler-builtin",
-  but does not specify which built-in core-module declarations
-  carry it. Observed in the dump: `IBufferDataLayout` and other
-  `RWStructuredBuffer`-related core types. Documenting the
-  invariant that "every core-module-declared interface and
-  type-layout carries `BuiltinDecoration`" would make this
-  observable test stable.
-
-- The `Loop and branch hints` row for `ForceUnroll` lists AST
-  origin as `[ForceUnroll]` attribute, but the actual checker
-  rejects `[ForceUnroll]` at function scope: `attribute
-  'ForceUnroll' is not valid here`. The attribute appears to be
-  valid only on loop statements. A clarifying note that
-  `ForceUnroll` is a loop-statement-only attribute (and a list
-  of where it's valid) would prevent misleading test attempts.
-  This bundle does not include a `ForceUnroll` test because of
-  this confusion.
-
-- The doc lists `entryPoint`'s profile operand as `profileInst:
-  IRIntLit`, but the integer-to-stage mapping (compute=6,
-  vertex=1, ...) is not enumerated in the doc. A note pointing at
-  the `Stage` enum that produces these tags would let tests
-  pin the exact integer instead of wildcarding.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#entrypoint-entrypointdecoration](../../../docs/llm-generated/ir-reference/decorations.md#entrypoint-entrypointdecoration) | undocumented-behavior | The doc's `### entryPoint / EntryPointDecoration` notable-opcodes section states "Its three operands are the profile (an IRIntLit tag), the user-visible name, and an optional module name", but does not specify the source of the module-name operand. In the observed dump it is the source-file stem (e.g. `"two-entry- points-coexist"` for `two-entry-points-coexist.slang`), which means a test that pins the literal module-name string is filename-fragile. A clarifying note that the module-name operand is derived from the file name (or compilation-unit name) would help test authors avoid this pitfall. |  |
+| (unspecified) | undocumented-behavior | The `Loop and branch hints` table row for `loopControl` lists the operand as `modeOperand: IRConstant` but does not document the integer encoding — observed values are `0` for `[unroll]` and `1` for `[loop]`. Documenting the enum would make the test claim concrete instead of wildcarded. |  |
+| (unspecified) | undocumented-behavior | The `Interpolation and shader IO` row for `interpolationMode` lists `modeOperand: IRConstant` but does not document the encoding. Observed values include `0` (for `linear`) and `2` (for `nointerpolation`); pinning these would let tests assert the exact mode rather than wildcarding. |  |
+| [#inlines-calls-immediately-after-codegen](../../../docs/llm-generated/ir-reference/decorations.md#inlines-calls-immediately-after-codegen) | undocumented-behavior | The `Inlining and optimization` row for `unsafeForceInlineEarly` says "Inlines calls immediately after codegen" but does not warn that the decoration's lifetime may be shorter than the LOWER-TO-IR dump can capture in adversarial pass-ordering scenarios. The current dump still includes it, but a note that the decoration may be consumed earlier than other inline hints would prevent surprise if pass ordering changes. |  |
+| (unspecified) | missing-example | The `Linkage and lifetime` row for `export` lists the operand as `(variadic, min=1)` but does not show the mangled-name encoding (function `_SR...`, type `_ST...`, variable `_SV...`, witness `_SW...`). | A worked example showing the prefix-per- symbol-kind would help authors of cross-cutting tooling that consumes the export linkage. |
+| [#marks-an-inst-as-a-compiler-builtin](../../../docs/llm-generated/ir-reference/decorations.md#marks-an-inst-as-a-compiler-builtin) | undocumented-behavior | The `Naming and provenance` row for `BuiltinDecoration` lists no operands and notes "Marks an inst as a compiler-builtin", but does not specify which built-in core-module declarations carry it. Observed in the dump: `IBufferDataLayout` and other `RWStructuredBuffer`-related core types. Documenting the invariant that "every core-module-declared interface and type-layout carries `BuiltinDecoration`" would make this observable test stable. |  |
+| (unspecified) | drift-from-source | The `Loop and branch hints` row for `ForceUnroll` lists AST origin as `[ForceUnroll]` attribute, but the actual checker rejects `[ForceUnroll]` at function scope: `attribute 'ForceUnroll' is not valid here`. The attribute appears to be valid only on loop statements. A clarifying note that `ForceUnroll` is a loop-statement-only attribute (and a list of where it's valid) would prevent misleading test attempts. This bundle does not include a `ForceUnroll` test because of this confusion. |  |
+| [#entrypoint](../../../docs/llm-generated/ir-reference/decorations.md#entrypoint) | undocumented-behavior | The doc lists `entryPoint`'s profile operand as `profileInst: IRIntLit`, but the integer-to-stage mapping (compute=6, vertex=1, ...) is not enumerated in the doc. | A note pointing at the `Stage` enum that produces these tags would let tests pin the exact integer instead of wildcarding. |

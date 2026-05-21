@@ -48,41 +48,13 @@ entry points and shared file-scope declarations.
 
 ## Doc gaps observed
 
-- The `## Compilation request lifecycle` section describes the
-  `EntryPointRequest` / `TargetRequest` / `TranslationUnitRequest`
-  objects without naming the **command-line spellings** that drive
-  them (`-entry`, `-stage`, `-target`, `-profile`). The mapping
-  from C++ object to CLI flag is implicit; an agent has to read
-  `slangc -help` or `slang-compile-request.cpp` to anchor a
-  user-surface test. A one-line cross-link from each bullet to the
-  flag would let this bundle anchor more tests directly.
-- The doc lists `TargetRequest` as "an output format combined with
-  a profile (e.g. SPIR-V at `glsl_450`)" but does not name an
-  observable consequence of `-profile` distinct from `-target`.
-  A `-profile`-only test would have to pick a profile-gated
-  feature, which is not described in this doc. No test anchored
-  here; profile semantics belong in a future capabilities or
-  targets doc.
-- The doc lists DXIL as a target output but DXIL is a binary
-  format consumed by `dxc`, not text Slang can emit directly
-  without a downstream toolchain. The textual proxy is HLSL;
-  `multi-target-emit.slang` covers the HLSL path. A future doc
-  revision could clarify which targets are reachable as text and
-  which require a downstream compiler invocation.
-- The `## Purpose` paragraph mentions reflection / layout
-  information as a primary output alongside target code, but the
-  doc does not state how it surfaces at the command line. Slangc
-  has reflection emission but the doc does not commit to a CLI
-  observable; no test anchored here.
-- The `## Compilation request lifecycle` section notes that "HLSL
-  inputs go one-per-unit; Slang inputs all together" — a
-  `TranslationUnitRequest` packing rule. Verifying this requires
-  passing multiple source files on one command line; the doc does
-  not state a user-surface consequence ("declarations in distinct
-  Slang files in the same compile see each other") and a test of
-  that would belong in a pipeline-stage bundle, not the
-  architectural overview. Recorded as a doc-gap for a future
-  cross-link.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#compilation-request-lifecycle](../../../docs/llm-generated/architecture/overview.md#compilation-request-lifecycle) | undocumented-behavior | The `## Compilation request lifecycle` section describes the `EntryPointRequest` / `TargetRequest` / `TranslationUnitRequest` objects without naming the **command-line spellings** that drive them (`-entry`, `-stage`, `-target`, `-profile`). The mapping from C++ object to CLI flag is implicit; an agent has to read `slangc -help` or `slang-compile-request.cpp` to anchor a user-surface test. | A one-line cross-link from each bullet to the flag would let this bundle anchor more tests directly. |
+| [#an-output-format-combined-with-a-profile-eg-spir-v-at-glsl450](../../../docs/llm-generated/architecture/overview.md#an-output-format-combined-with-a-profile-eg-spir-v-at-glsl450) | undocumented-behavior | The doc lists `TargetRequest` as "an output format combined with a profile (e.g. SPIR-V at `glsl_450`)" but does not name an observable consequence of `-profile` distinct from `-target`. A `-profile`-only test would have to pick a profile-gated feature, which is not described in this doc. No test anchored here; profile semantics belong in a future capabilities or targets doc. |  |
+| [#dxc](../../../docs/llm-generated/architecture/overview.md#dxc) | undocumented-behavior | The doc lists DXIL as a target output but DXIL is a binary format consumed by `dxc`, not text Slang can emit directly without a downstream toolchain. The textual proxy is HLSL; `multi-target-emit.slang` covers the HLSL path. A future doc revision could clarify which targets are reachable as text and which require a downstream compiler invocation. |  |
+| [#purpose](../../../docs/llm-generated/architecture/overview.md#purpose) | undocumented-behavior | The `## Purpose` paragraph mentions reflection / layout information as a primary output alongside target code, but the doc does not state how it surfaces at the command line. Slangc has reflection emission but the doc does not commit to a CLI observable; no test anchored here. |  |
+| [#compilation-request-lifecycle](../../../docs/llm-generated/architecture/overview.md#compilation-request-lifecycle) | undocumented-behavior | The `## Compilation request lifecycle` section notes that "HLSL inputs go one-per-unit; Slang inputs all together" — a `TranslationUnitRequest` packing rule. Verifying this requires passing multiple source files on one command line; the doc does not state a user-surface consequence ("declarations in distinct Slang files in the same compile see each other") and a test of that would belong in a pipeline-stage bundle, not the architectural overview. Recorded as a doc-gap for a future cross-link. |  |
 
 ## Out of scope (no-GPU runner)
 

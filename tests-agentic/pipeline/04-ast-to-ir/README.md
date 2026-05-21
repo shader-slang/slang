@@ -180,74 +180,18 @@ lowers to which IR construct").
 
 ## Doc gaps observed
 
-- The doc's "Mapping AST constructs to IR" table is explicitly
-  "illustrative, not exhaustive" — a number of AST families that
-  appear in practice are absent: `IndexExpr` (resource subscript /
-  array element access), `AssignExpr` (the assignment itself, vs.
-  the lvalue-side `get_field_addr` + `store`), `TypeCastExpr`
-  (cast lowering — only mentioned implicitly through the
-  arithmetic/comparison row), `BreakStmt` / `ContinueStmt` (loop
-  exit / continue terminators), `ConditionalExpr` (ternary). A
-  single-line addition per row would let agents anchor tests for
-  each. The bundle covers explicit casts and buffer indexing under
-  the existing rows but with a stretched citation.
-- The doc says "structured branches whose join point is an
-  explicit operand on the terminator" but does not say which
-  operand position is the merge block for each terminator. The
-  `cross-cutting/ir-instructions` doc has more detail on this; an
-  explicit cross-reference would help.
-- "The lowering visitor descends the AST top-down" — the doc names
-  the algorithmic style but does not list any user-observable
-  consequence (e.g. ordering of nameHint decoration emission). An
-  observability hook would let an agent test it.
-- The doc says "Lowering errors flow through the same
-  DiagnosticSink used by the rest of the front-end" but lists no
-  specific construct that produces a lowering-only diagnostic. A
-  single example (e.g. "interface conformance with a missing
-  witness that semantic check could not detect") would unlock
-  diagnostic tests for this stage; without one, all rejection-style
-  tests belong to `pipeline/03-semantic-check`.
-- `generateIRForSpecializedComponentType` and
-  `generateIRForTypeConformance` are described as entry points but
-  the doc does not name a `.slang`-observable surface that
-  triggers each path. They are reachable only through C++ API.
-- The doc says global parameters carry "layout intent" markers,
-  but does not state what those markers look like in the
-  `### LOWER-TO-IR:` stage (the layout decoration appears in later
-  stages). A row of the form "global params carry decoration X at
-  lowering" would let an agent test it; otherwise the topic
-  belongs to `pipeline/04c-layout-ir`.
-- **Type-lowering claims are implicit rather than enumerated.** The
-  doc's table only names which AST-family produces which IR-family
-  (e.g. `StructDecl -> IRStructType`). It does not enumerate the
-  per-scalar-type IR-side spellings that lowering must preserve —
-  `Int8`/`UInt8`/`Int16`/`UInt16`/`Int64`/`UInt64`/`Half`/`Double`,
-  vector/array/matrix composition with each, and the rectangular
-  matrix `Mat(<elem>, R : Int, C : Int, 0 : Int)` shape with row/col
-  order. A "Element types and storage shapes" subsection under
-  "Mapping AST constructs to IR" — or a cross-reference to
-  `cross-cutting/ir-instructions.md` — would let agents anchor
-  tests for these without stretching the existing rows.
-- **`Optional<T>` and `Tuple<...>` are not in the AST-family table.**
-  Optional lowers to `Optional(<T>)` and Tuple to `tuple_type(...)`;
-  both are observable through `-dump-ir`. The doc references the
-  hash-consing rules in `design/ir.md` but no row in the lowering
-  table names these generic-composite types, even though their
-  syntax is part of the documented surface in
-  `pipeline/03-semantic-check`.
-- **`ParameterBlock<T>` lowering is not mentioned by name.** The
-  doc says global VarDecls become `IRGlobalVar`, but
-  `ParameterBlock(%T)` is a distinct IR type, not a plain global.
-  A row "ParameterBlock<T> VarDecl -> IRGlobalParam of type
-  `ParameterBlock(%T)`" would close this gap.
-- **Cast lowering is illustrated by name but not by family.** The
-  doc table mentions `BinaryExpr -> IRAdd/IRMul/IREq, ...`. Explicit
-  type-cast lowering follows a parallel family — `floatCast`,
-  `intCast`, `castFloatToInt`, `castIntToFloat` — with one opcode
-  per source/dest type family. A row "TypeCastExpr -> family of
-  cast pure-value insts" would tie these to the doc directly; the
-  bundle currently anchors them under the more general
-  "Mapping AST constructs to IR" header.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir) | undocumented-behavior | The doc's "Mapping AST constructs to IR" table is explicitly "illustrative, not exhaustive" — a number of AST families that appear in practice are absent: `IndexExpr` (resource subscript / array element access), `AssignExpr` (the assignment itself, vs. the lvalue-side `get_field_addr` + `store`), `TypeCastExpr` (cast lowering — only mentioned implicitly through the arithmetic/comparison row), `BreakStmt` / `ContinueStmt` (loop exit / continue terminators), `ConditionalExpr` (ternary). A single-line addition per row would let agents anchor tests for each. The bundle covers explicit casts and buffer indexing under the existing rows but with a stretched citation. |  |
+| [#structured-branches-whose-join-point-is-an-explicit-operand-on-the-terminator](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#structured-branches-whose-join-point-is-an-explicit-operand-on-the-terminator) | undocumented-behavior | The doc says "structured branches whose join point is an explicit operand on the terminator" but does not say which operand position is the merge block for each terminator. The `cross-cutting/ir-instructions` doc has more detail on this; an explicit cross-reference would help. |  |
+| [#the-lowering-visitor-descends-the-ast-top-down](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#the-lowering-visitor-descends-the-ast-top-down) | undocumented-behavior | "The lowering visitor descends the AST top-down" — the doc names the algorithmic style but does not list any user-observable consequence (e.g. ordering of nameHint decoration emission). An observability hook would let an agent test it. |  |
+| [#pipeline03-semantic-check](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#pipeline03-semantic-check) | undocumented-behavior | The doc says "Lowering errors flow through the same DiagnosticSink used by the rest of the front-end" but lists no specific construct that produces a lowering-only diagnostic. A single example (e.g. "interface conformance with a missing witness that semantic check could not detect") would unlock diagnostic tests for this stage; without one, all rejection-style tests belong to `pipeline/03-semantic-check`. |  |
+| [#generateirforspecializedcomponenttype](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#generateirforspecializedcomponenttype) | undocumented-behavior | `generateIRForSpecializedComponentType` and `generateIRForTypeConformance` are described as entry points but the doc does not name a `.slang`-observable surface that triggers each path. They are reachable only through C++ API. |  |
+| [#lower-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#lower-to-ir) | undocumented-behavior | The doc says global parameters carry "layout intent" markers, but does not state what those markers look like in the `### LOWER-TO-IR:` stage (the layout decoration appears in later stages). A row of the form "global params carry decoration X at lowering" would let an agent test it; otherwise the topic belongs to `pipeline/04c-layout-ir`. |  |
+| [#element-types-and-storage-shapes](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#element-types-and-storage-shapes) | undocumented-behavior | **Type-lowering claims are implicit rather than enumerated.** The doc's table only names which AST-family produces which IR-family (e.g. `StructDecl -> IRStructType`). It does not enumerate the per-scalar-type IR-side spellings that lowering must preserve — `Int8`/`UInt8`/`Int16`/`UInt16`/`Int64`/`UInt64`/`Half`/`Double`, vector/array/matrix composition with each, and the rectangular matrix `Mat(<elem>, R : Int, C : Int, 0 : Int)` shape with row/col order. A "Element types and storage shapes" subsection under "Mapping AST constructs to IR" — or a cross-reference to `cross-cutting/ir-instructions.md` — would let agents anchor tests for these without stretching the existing rows. |  |
+| [#optionalt](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#optionalt) | undocumented-behavior | **`Optional<T>` and `Tuple<...>` are not in the AST-family table.** Optional lowers to `Optional(<T>)` and Tuple to `tuple_type(...)`; both are observable through `-dump-ir`. The doc references the hash-consing rules in `design/ir.md` but no row in the lowering table names these generic-composite types, even though their syntax is part of the documented surface in `pipeline/03-semantic-check`. |  |
+| [#parameterblockt-vardecl---irglobalparam-of-type-parameterblockt](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#parameterblockt-vardecl---irglobalparam-of-type-parameterblockt) | undocumented-behavior | **`ParameterBlock<T>` lowering is not mentioned by name.** The doc says global VarDecls become `IRGlobalVar`, but `ParameterBlock(%T)` is a distinct IR type, not a plain global. A row "ParameterBlock<T> VarDecl -> IRGlobalParam of type `ParameterBlock(%T)`" would close this gap. |  |
+| [#typecastexpr---family-of-cast-pure-value-insts](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#typecastexpr---family-of-cast-pure-value-insts) | undocumented-behavior | **Cast lowering is illustrated by name but not by family.** The doc table mentions `BinaryExpr -> IRAdd/IRMul/IREq, ...`. Explicit type-cast lowering follows a parallel family — `floatCast`, `intCast`, `castFloatToInt`, `castIntToFloat` — with one opcode per source/dest type family. A row "TypeCastExpr -> family of cast pure-value insts" would tie these to the doc directly; the bundle currently anchors them under the more general "Mapping AST constructs to IR" header. |  |
 
 ## Out of scope (no-GPU runner)
 

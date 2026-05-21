@@ -127,6 +127,15 @@ _ALLOWED_INTENTS = (
     "regression",  # anchored to a fixed compiler issue
 )
 
+_ALLOWED_GAP_KINDS = (
+    "missing-example",  # doc names a claim but no minimal example
+    "missing-surface",  # doc names an internal construct but no user-level syntax
+    "undocumented-behavior",  # observable behavior, doc silent
+    "cascading-only-mention",  # diagnostic / behavior shadowed in practice
+    "ambiguous-claim",  # claim has >1 reasonable interpretation
+    "drift-from-source",  # observed behavior contradicts the doc
+)
+
 
 def _rel_to_repo(path: Path) -> str:
     return str(path.relative_to(REPO_ROOT)).replace(os.sep, "/")
@@ -448,6 +457,84 @@ def parse_bundle_front_matter(text: str) -> dict | None:
     return out
 
 
+@dataclass
+class GapRow:
+    """One row from a bundle's ## Doc gaps observed table."""
+
+    anchor: str  # raw cell text, e.g. "[#vec-and-mat](../../docs/.../types.md#vec-and-mat)"
+    anchor_fragment: str  # just "#vec-and-mat", extracted for grouping
+    kind: str  # one of _ALLOWED_GAP_KINDS
+    gap: str
+    suggested_addition: str
+    bundle: str  # bundle key that reported this row
+    source_doc: str  # bundle's source_doc, for aggregation
+
+
+_GAP_ANCHOR_FRAG_RE = re.compile(r"(#[A-Za-z0-9][A-Za-z0-9_-]*)")
+
+
+def parse_gap_rows(text: str, bundle_key: str, source_doc: str) -> list[GapRow]:
+    """Parse the ## Doc gaps observed section of a bundle README.
+
+    Returns an empty list if the section is missing, has no rows, or
+    cannot be parsed. The caller decides whether the empty result is
+    expected or a lint failure.
+    """
+    rows: list[GapRow] = []
+    lines = text.splitlines()
+    i = 0
+    n = len(lines)
+    while i < n:
+        if lines[i].strip() == "## Doc gaps observed":
+            i += 1
+            break
+        i += 1
+    else:
+        return rows
+    # Skip blank lines + header rows; collect any line that starts with `|`
+    # and is not a divider (`| --- | --- |`).
+    while i < n:
+        line = lines[i]
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            break
+        if not stripped.startswith("|"):
+            i += 1
+            continue
+        # Split by `|` while honoring `\|` escapes; markdown tables
+        # allow escaping a pipe inside a cell as `\|`.
+        SENTINEL = "\x00PIPE\x00"
+        protected = stripped.replace("\\|", SENTINEL)
+        raw_cells = protected.split("|")[1:-1]
+        cells = [c.replace(SENTINEL, "|").strip() for c in raw_cells]
+        # Skip header row (contains "Anchor" / "Kind") and divider row.
+        if not cells or all(set(c) <= set("- ") for c in cells):
+            i += 1
+            continue
+        if cells[0].lower() == "anchor":
+            i += 1
+            continue
+        if len(cells) < 4:
+            i += 1
+            continue
+        anchor_cell, kind_cell, gap_cell, suggested_cell = cells[:4]
+        frag_match = _GAP_ANCHOR_FRAG_RE.search(anchor_cell)
+        anchor_fragment = frag_match.group(1) if frag_match else ""
+        rows.append(
+            GapRow(
+                anchor=anchor_cell,
+                anchor_fragment=anchor_fragment,
+                kind=kind_cell,
+                gap=gap_cell,
+                suggested_addition=suggested_cell,
+                bundle=bundle_key,
+                source_doc=source_doc,
+            )
+        )
+        i += 1
+    return rows
+
+
 def parse_test_meta(text: str) -> dict[str, str]:
     """Parse leading //META lines from a .slang test file.
 
@@ -562,7 +649,66 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
     for tf in test_files:
         for issue in _lint_test_file(spec, tf):
             issues.append(issue)
+    # Doc-gaps table: optional section, but if present must be a table
+    # with the controlled Kind vocabulary. Free-form bullets are no
+    # longer accepted; the migration to the table format is one-shot.
+    if "## Doc gaps observed" in text:
+        gap_rows = parse_gap_rows(text, spec.dir, spec.source_doc)
+        if not gap_rows and not _gap_section_explicitly_empty(text):
+            issues.append(
+                LintIssue(
+                    f"{spec.dir}/README.md",
+                    "error",
+                    "## Doc gaps observed section present but no table"
+                    " rows parsed (expected | Anchor | Kind | Gap |"
+                    " Suggested addition | columns)",
+                )
+            )
+        for row in gap_rows:
+            if row.kind not in _ALLOWED_GAP_KINDS:
+                issues.append(
+                    LintIssue(
+                        f"{spec.dir}/README.md",
+                        "error",
+                        f"doc-gap Kind={row.kind!r} not in"
+                        f" {list(_ALLOWED_GAP_KINDS)}",
+                    )
+                )
+            if not row.anchor_fragment:
+                issues.append(
+                    LintIssue(
+                        f"{spec.dir}/README.md",
+                        "warning",
+                        f"doc-gap row Anchor cell has no #fragment:"
+                        f" {row.anchor!r}",
+                    )
+                )
     return issues
+
+
+def _gap_section_explicitly_empty(text: str) -> bool:
+    """True if the gap section starts with an explicit '(none)' marker.
+
+    The (none) can stand alone or be followed by a short explanatory
+    sentence on the same line (e.g., "(none) — this bundle has no
+    section-specific gaps; see peer bundle Y").
+    """
+    in_section = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line == "## Doc gaps observed":
+            in_section = True
+            continue
+        if in_section:
+            if not line:
+                continue
+            if line.startswith("## "):
+                return False
+            if line.startswith("(none)"):
+                return True
+            # Any other content -> not explicitly empty.
+            return False
+    return False
 
 
 def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
@@ -898,6 +1044,110 @@ def cmd_coverage_gaps(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_doc_gaps(args: argparse.Namespace) -> int:
+    """Aggregate ## Doc gaps observed rows across bundles, grouped by source_doc.
+
+    The output is the feedback artifact the doc-regeneration workflow
+    consumes: for each docs/llm-generated/<doc>.md, the list of gaps
+    that bundles testing against it have reported. Rows reported by
+    multiple bundles against the same Anchor + Kind are merged into
+    a single row with a `Reported by` cell.
+    """
+    manifest = load_manifest()
+    specs = list(manifest.bundles.values())
+    if args.source_doc:
+        specs = [s for s in specs if s.source_doc == args.source_doc]
+        if not specs:
+            raise SystemExit(
+                f"no bundle has source_doc={args.source_doc!r}"
+            )
+
+    # source_doc -> list[GapRow]
+    by_doc: dict[str, list[GapRow]] = {}
+    for spec in specs:
+        bdir = REPO_ROOT / spec.dir
+        readme = bdir / "README.md"
+        if not readme.exists():
+            continue
+        text = readme.read_text(encoding="utf-8")
+        rows = parse_gap_rows(text, spec.dir, spec.source_doc)
+        if rows:
+            by_doc.setdefault(spec.source_doc, []).extend(rows)
+
+    if args.format == "json":
+        import json
+
+        payload = {
+            doc: [
+                {
+                    "anchor": r.anchor,
+                    "anchor_fragment": r.anchor_fragment,
+                    "kind": r.kind,
+                    "gap": r.gap,
+                    "suggested_addition": r.suggested_addition,
+                    "reported_by": r.bundle,
+                }
+                for r in rows
+            ]
+            for doc, rows in sorted(by_doc.items())
+        }
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    for doc in sorted(by_doc):
+        rows = by_doc[doc]
+        # Merge rows by (anchor_fragment, kind, gap-prose), tracking
+        # which bundles reported them.
+        merged: dict[tuple[str, str, str], dict] = {}
+        for r in rows:
+            key = (r.anchor_fragment, r.kind, r.gap)
+            slot = merged.setdefault(
+                key,
+                {
+                    "anchor": r.anchor,
+                    "kind": r.kind,
+                    "gap": r.gap,
+                    "suggested_addition": r.suggested_addition,
+                    "reported_by": [],
+                },
+            )
+            if r.bundle not in slot["reported_by"]:
+                slot["reported_by"].append(r.bundle)
+            # If multiple bundles offer Suggested-addition text,
+            # concatenate distinct contributions.
+            if (
+                r.suggested_addition
+                and r.suggested_addition != slot["suggested_addition"]
+                and r.suggested_addition not in slot["suggested_addition"]
+            ):
+                slot["suggested_addition"] = (
+                    slot["suggested_addition"] + " // " + r.suggested_addition
+                ).strip(" /")
+
+        print(f"# Gaps reported against {doc}")
+        print()
+        print(f"Bundle reports: {', '.join(sorted({r.bundle for r in rows}))}")
+        print()
+        print(
+            "| Anchor | Kind | Gap | Suggested addition | Reported by |"
+        )
+        print("| --- | --- | --- | --- | --- |")
+        # Sort by anchor fragment, then kind.
+        sorted_rows = sorted(
+            merged.values(), key=lambda m: (m["anchor"], m["kind"])
+        )
+        for m in sorted_rows:
+            reported = ", ".join(m["reported_by"])
+            print(
+                f"| {m['anchor']} | {m['kind']} | {m['gap']}"
+                f" | {m['suggested_addition']} | {reported} |"
+            )
+        print()
+    if not by_doc:
+        print("# No doc-gap rows recorded across the selected bundles.")
+    return 0
+
+
 def cmd_review_status(args: argparse.Namespace) -> int:
     print(
         "review-status: not yet implemented.\n"
@@ -990,6 +1240,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="path to a per-file llvm-cov report .txt (e.g. *-slangc-report.txt)",
     )
     p_cg.set_defaults(func=cmd_coverage_gaps)
+
+    p_dg = sub.add_parser(
+        "doc-gaps",
+        help="aggregate ## Doc gaps observed rows across bundles, grouped by source_doc",
+    )
+    p_dg.add_argument(
+        "--source-doc",
+        help="restrict to a single docs/llm-generated/<...>.md path",
+    )
+    p_dg.add_argument(
+        "--format",
+        choices=("md", "json"),
+        default="md",
+        help="output format (default: md)",
+    )
+    p_dg.set_defaults(func=cmd_doc_gaps)
 
     p_rs = sub.add_parser(
         "review-status",

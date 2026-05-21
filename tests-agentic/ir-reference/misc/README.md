@@ -55,32 +55,12 @@ them on the LOWER-TO-IR stage. They are recorded under
 
 ## Doc gaps observed
 
-- The `Pack and expansion` row for `Each` is listed with AST origin
-  `(synthesized)`, but the natural surface for projecting one slot
-  of a pack (`each D` inside an `expand` block) lowers to
-  `getTupleElement(%pack, %index)` at LOWER-TO-IR rather than to
-  the `Each` opcode the doc names. The doc could state that `Each`
-  is introduced by a later variadic-specialization pass and is not
-  produced by `slang-lower-to-ir.cpp` directly.
-- The `Type queries and predicates` table claims `IsInt`, `IsBool`,
-  `IsFloat`, `IsHalf`, `IsUnsignedInt`, `IsSignedInt`, `IsVector`,
-  `IsCoopFloat`, and `TypeEquals` are observable, but the only
-  source-level surfaces are the underscore-prefixed core-module
-  intrinsics (`__isInt`, `__isBool`, ...). The doc could either
-  name the user-visible surface (if any) or label the row
-  "(internal / core-module only)".
-- `GetArrayLength` is listed with `ArrayLengthExpr (runtime path)`
-  as its AST origin. The natural surface (`arr.length()` on a
-  fixed-size array) constant-folds at lowering and the opcode does
-  not appear in the IR dump. The doc could state which surface
-  prevents folding (a runtime-sized array binding) or label the
-  row "(runtime-array surface only)".
-- The `Size, alignment, count` rows list `dataLayout?` as the
-  second operand of `sizeOf` / `alignOf` but do not name the
-  default token that fills the operand when the surface call
-  passes only the type argument; from observation that token is
-  `ScalarLayout`. Naming the default would let readers predict the
-  IR-dump shape without reading lowering code.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| (unspecified) | undocumented-behavior | The `Pack and expansion` row for `Each` is listed with AST origin `(synthesized)`, but the natural surface for projecting one slot of a pack (`each D` inside an `expand` block) lowers to `getTupleElement(%pack, %index)` at LOWER-TO-IR rather than to the `Each` opcode the doc names. The doc could state that `Each` is introduced by a later variadic-specialization pass and is not produced by `slang-lower-to-ir.cpp` directly. |  |
+| [#internal-core-module-only](../../../docs/llm-generated/ir-reference/misc.md#internal-core-module-only) | undocumented-behavior | The `Type queries and predicates` table claims `IsInt`, `IsBool`, `IsFloat`, `IsHalf`, `IsUnsignedInt`, `IsSignedInt`, `IsVector`, `IsCoopFloat`, and `TypeEquals` are observable, but the only source-level surfaces are the underscore-prefixed core-module intrinsics (`__isInt`, `__isBool`, ...). The doc could either name the user-visible surface (if any) or label the row "(internal / core-module only)". |  |
+| [#runtime-array-surface-only](../../../docs/llm-generated/ir-reference/misc.md#runtime-array-surface-only) | undocumented-behavior | `GetArrayLength` is listed with `ArrayLengthExpr (runtime path)` as its AST origin. The natural surface (`arr.length()` on a fixed-size array) constant-folds at lowering and the opcode does not appear in the IR dump. The doc could state which surface prevents folding (a runtime-sized array binding) or label the row "(runtime-array surface only)". |  |
+| (unspecified) | undocumented-behavior | The `Size, alignment, count` rows list `dataLayout?` as the second operand of `sizeOf` / `alignOf` but do not name the default token that fills the operand when the surface call passes only the type argument; from observation that token is `ScalarLayout`. | Naming the default would let readers predict the IR-dump shape without reading lowering code. |
 
 ## Out of scope (no-GPU runner)
 

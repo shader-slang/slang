@@ -115,7 +115,7 @@ escalations.)
 | Finding ID | Action                | Rationale                                                                                                            | Edits made                                                                        |
 | ---------- | --------------------- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | F-01       | fixed                 | doc_ref pointed at the wrong anchor; the claim about specialization preference is actually in #generic-substitution. | Updated overload-prefer-specialized.slang //META: doc_ref and doc_section_digest. |
-| F-02       | rejected-out-of-scope | The reviewer wants a test for `extern` linkage corner cases, but the source_doc does not describe them.              | Filed as a doc-gap entry in README.md "Doc gaps observed".                        |
+| F-02       | rejected-out-of-scope | The reviewer wants a test for `extern` linkage corner cases, but the source_doc does not describe them.              | Added a row to the `## Doc gaps observed` table (kind=missing-surface). |
 | ...        | ...                   | ...                                                                                                                  | ...                                                                               |
 ```
 

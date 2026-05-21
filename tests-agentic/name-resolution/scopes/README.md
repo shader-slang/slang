@@ -66,54 +66,14 @@ each test uses a single directive.
 
 ## Doc gaps observed
 
-- The `## Sibling scopes` section enumerates three concrete uses of
-  the sibling chain (multi-file modules, imports, re-opened
-  namespaces) but does not promise a user-visible diagnostic for the
-  "two siblings define the same name" ambiguity case. The closely
-  related ambiguous-reference diagnostic is anchored from
-  `name-resolution/lookup.md` in the pipeline/03-semantic-check
-  bundle; if scopes.md were extended with a one-line note about the
-  ambiguity surface, the test could be re-anchored here.
-- The `## Implicit scopes` section names `parseIfLetStatement`'s
-  twin-`ScopeDecl` desugaring but does not state a user-visible
-  consequence (e.g. "the unwrapped variable is visible only in the
-  positive branch"). A test for `if (let x = opt)` would have to
-  anchor to an unstated claim, so it is deferred. Adding a sentence
-  along the lines of "the unwrapped variable is visible in the
-  positive branch but not in the else branch or after the if" would
-  unblock that test.
-- The `## Edge cases and failure modes` section mentions
-  `UnscopedForStmt` but only describes its existence
-  ("`for` loop's initialization variable leaks into the surrounding
-  scope as HLSL semantics demand"). There is no documented surface
-  for invoking HLSL mode from a `.slang` file at `slang-test` time,
-  so the test cannot anchor to a single-source-file run that flips
-  the language between Slang and HLSL. The doc could note which
-  invocation switch enables UnscopedForStmt behavior to unblock that
-  test.
-- The `## Edge cases and failure modes` section mentions
-  `UnparsedStmt` capturing `currentScope` and `outerScope` at parse
-  time, but its observable consequence (which decls a deferred-body
-  function sees once it is finally parsed) overlaps with
-  pipeline/03-semantic-check's
-  `function-body-checked-after-parser-handoff` test. No additional
-  scopes-specific surface is documented; if the doc enumerated a
-  scope-visibility consequence distinct from the parse-handoff one,
-  a separate test could anchor here.
-- The `## Concepts` section gives a precise description of `Scope`'s
-  three fields and the `containerDecl` ownership convention. None of
-  those properties are observable through `slang-test`; they show up
-  only in IR/AST dumps or in internal asserts. Tests for those would
-  have to fish through `-dump-ir` (which lowers past scopes already)
-  and are not anchorable here.
-- The `## Concepts` section lists `LambdaDecl (parameter scope)` and
-  `parseIfLetStatement (synthetic)` in the scope-bearing table.
-  Lambdas have a complete surface in `tests/language-feature/lambda/`
-  but no scope-specific claim is restated in scopes.md beyond "a
-  dedicated ScopeDecl for the parameter list". A test for
-  "lambda parameter is not visible outside the lambda body" would
-  anchor to an implicit consequence rather than an explicit one;
-  deferred until the doc enumerates that boundary.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#sibling-scopes](../../../docs/llm-generated/name-resolution/scopes.md#sibling-scopes) | ambiguous-claim | The `## Sibling scopes` section enumerates three concrete uses of the sibling chain (multi-file modules, imports, re-opened namespaces) but does not promise a user-visible diagnostic for the "two siblings define the same name" ambiguity case. The closely related ambiguous-reference diagnostic is anchored from `name-resolution/lookup.md` in the pipeline/03-semantic-check bundle; if scopes.md were extended with a one-line note about the ambiguity surface, the test could be re-anchored here. |  |
+| [#implicit-scopes](../../../docs/llm-generated/name-resolution/scopes.md#implicit-scopes) | undocumented-behavior | The `## Implicit scopes` section names `parseIfLetStatement`'s twin-`ScopeDecl` desugaring but does not state a user-visible consequence (e.g. "the unwrapped variable is visible only in the positive branch"). A test for `if (let x = opt)` would have to anchor to an unstated claim, so it is deferred. | Adding a sentence along the lines of "the unwrapped variable is visible in the positive branch but not in the else branch or after the if" would unblock that test. |
+| [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/scopes.md#edge-cases-and-failure-modes) | undocumented-behavior | The `## Edge cases and failure modes` section mentions `UnscopedForStmt` but only describes its existence ("`for` loop's initialization variable leaks into the surrounding scope as HLSL semantics demand"). There is no documented surface for invoking HLSL mode from a `.slang` file at `slang-test` time, so the test cannot anchor to a single-source-file run that flips the language between Slang and HLSL. The doc could note which invocation switch enables UnscopedForStmt behavior to unblock that test. |  |
+| [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/scopes.md#edge-cases-and-failure-modes) | undocumented-behavior | The `## Edge cases and failure modes` section mentions `UnparsedStmt` capturing `currentScope` and `outerScope` at parse time, but its observable consequence (which decls a deferred-body function sees once it is finally parsed) overlaps with pipeline/03-semantic-check's `function-body-checked-after-parser-handoff` test. No additional scopes-specific surface is documented; if the doc enumerated a scope-visibility consequence distinct from the parse-handoff one, a separate test could anchor here. |  |
+| [#concepts](../../../docs/llm-generated/name-resolution/scopes.md#concepts) | undocumented-behavior | The `## Concepts` section gives a precise description of `Scope`'s three fields and the `containerDecl` ownership convention. None of those properties are observable through `slang-test`; they show up only in IR/AST dumps or in internal asserts. Tests for those would have to fish through `-dump-ir` (which lowers past scopes already) and are not anchorable here. |  |
+| [#concepts](../../../docs/llm-generated/name-resolution/scopes.md#concepts) | undocumented-behavior | The `## Concepts` section lists `LambdaDecl (parameter scope)` and `parseIfLetStatement (synthetic)` in the scope-bearing table. Lambdas have a complete surface in `tests/language-feature/lambda/` but no scope-specific claim is restated in scopes.md beyond "a dedicated ScopeDecl for the parameter list". A test for "lambda parameter is not visible outside the lambda body" would anchor to an implicit consequence rather than an explicit one; deferred until the doc enumerates that boundary. |  |
 
 ## Out of scope (no-GPU runner)
 

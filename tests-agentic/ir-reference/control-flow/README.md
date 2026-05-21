@@ -109,62 +109,16 @@ form.
 
 ## Doc gaps observed
 
-- The doc lists `conditionalBranch` with no AST origin and notes
-  that it is the lower-level form, but does not state explicitly
-  that the front-end *never* emits it directly from surface code.
-  A note pinning the producer (some later IR-pass / legalization
-  step) would make the cross-bundle boundary with
-  `cross-cutting/ir-instructions` clearer.
-- The doc's `loop` section names the three structured-join operands
-  but does not call out that a `do`-`while` lowering **inverts** the
-  test (computing `not(cond)` and branching to break on true). A
-  one-line note in the `## loop` heading would prevent readers from
-  expecting `cmpLT` + branch-to-body in the do-while case.
-- The doc says `discard` "is not technically a terminator" but does
-  not name the terminator that *does* end its block in practice
-  (`unconditionalBranch` to the post-`if` merge). A short example
-  of the surrounding shape would help.
-- The doc's `## terminators-no-continuation` heading describes
-  `unreachable` semantically but does not name a natural surface
-  that produces it (every-arm-returns inside a switch is the
-  observed case). An example anchor would help.
-- The doc does not specify the operand layout of `ifElse` when one
-  arm is empty: in practice the lowering reuses the merge block as
-  the empty arm's target (e.g. `ifElse(cond, merge, falseBlock,
-  merge)` for an empty then-arm). Stating this collapsing rule
-  would clarify how the four-operand invariant interacts with
-  degenerate surface forms.
-- The doc does not call out that **both-empty** `if`/`else` blocks
-  (degenerate, both arms empty) are eliminated at LOWER-TO-IR — no
-  `ifElse` is emitted at all. Same for a zero-iteration
-  `for (int i=0; i<0; i++)` and an empty switch body. Naming this
-  collapsing behavior would prevent readers from expecting a
-  terminator that the IR never produces.
-- The doc does not call out that dead code following a
-  `return` (e.g. `return x; return 0;`) is silently dropped during
-  lowering — the second `return_val` does not appear in the IR
-  dump, and no `unreachable` is synthesized either. A note alongside
-  the `return_val` row would clarify why "unreachable after return"
-  is not an observable surface anchor for `unreachable`.
-- The doc does not mention that a `while (true)` loop with the only
-  exit being an internal `return` produces a structured `loop`
-  terminator whose **continueLabel and body are the same block**;
-  the break label is reachable only via the return path and is
-  terminated by `unreachable`. Naming this shape would help readers
-  recognize infinite-loop CFGs.
-- The doc does not mention the `[loopMaxIters(N)]` decoration
-  emitted on `loop` terminators whose trip count is statically
-  known. The decoration is observable in `-dump-ir` output and
-  consumers (unroller, structured emitters) read it. A one-line
-  note alongside `loop` would document its presence.
-- The doc's `#terminators-switches` entry says case-value operands
-  are `(caseValue, caseBlock)` pairs but does not pin the
-  uniqueness invariant: duplicate case values are rejected by the
-  front-end (E30605 in the checker), not by an IR validator. A
-  cross-reference to the diagnostic would explain why the IR never
-  sees a malformed switch.
-- The doc's `#discard` entry describes `discard` as the "HLSL
-  fragment-shader instruction" but does not pin the corresponding
-  diagnostic code emitted when `discard` is used from a compute or
-  vertex entry point (E36107). A cross-reference would make the
-  stage restriction enforceable from the doc.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#conditionalbranch](../../../docs/llm-generated/ir-reference/control-flow.md#conditionalbranch) | undocumented-behavior | The doc lists `conditionalBranch` with no AST origin and notes that it is the lower-level form, but does not state explicitly that the front-end *never* emits it directly from surface code. | A note pinning the producer (some later IR-pass / legalization step) would make the cross-bundle boundary with `cross-cutting/ir-instructions` clearer. |
+| [#loop](../../../docs/llm-generated/ir-reference/control-flow.md#loop) | undocumented-behavior | The doc's `loop` section names the three structured-join operands but does not call out that a `do`-`while` lowering **inverts** the test (computing `not(cond)` and branching to break on true). | A one-line note in the `## loop` heading would prevent readers from expecting `cmpLT` + branch-to-body in the do-while case. |
+| [#is-not-technically-a-terminator](../../../docs/llm-generated/ir-reference/control-flow.md#is-not-technically-a-terminator) | undocumented-behavior | The doc says `discard` "is not technically a terminator" but does not name the terminator that *does* end its block in practice (`unconditionalBranch` to the post-`if` merge). | A short example of the surrounding shape would help. |
+| [#terminators-no-continuation](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-no-continuation) | undocumented-behavior | The doc's `## terminators-no-continuation` heading describes `unreachable` semantically but does not name a natural surface that produces it (every-arm-returns inside a switch is the observed case). An example anchor would help. |  |
+| [#ifelse](../../../docs/llm-generated/ir-reference/control-flow.md#ifelse) | undocumented-behavior | The doc does not specify the operand layout of `ifElse` when one arm is empty: in practice the lowering reuses the merge block as the empty arm's target (e.g. `ifElse(cond, merge, falseBlock, merge)` for an empty then-arm). | Stating this collapsing rule would clarify how the four-operand invariant interacts with degenerate surface forms. |
+| [#if](../../../docs/llm-generated/ir-reference/control-flow.md#if) | undocumented-behavior | The doc does not call out that **both-empty** `if`/`else` blocks (degenerate, both arms empty) are eliminated at LOWER-TO-IR — no `ifElse` is emitted at all. Same for a zero-iteration `for (int i=0; i<0; i++)` and an empty switch body. | Naming this collapsing behavior would prevent readers from expecting a terminator that the IR never produces. |
+| [#unreachable-after-return](../../../docs/llm-generated/ir-reference/control-flow.md#unreachable-after-return) | undocumented-behavior | The doc does not call out that dead code following a `return` (e.g. `return x; return 0;`) is silently dropped during lowering — the second `return_val` does not appear in the IR dump, and no `unreachable` is synthesized either. | A note alongside the `return_val` row would clarify why "unreachable after return" is not an observable surface anchor for `unreachable`. |
+| (unspecified) | undocumented-behavior | The doc does not mention that a `while (true)` loop with the only exit being an internal `return` produces a structured `loop` terminator whose **continueLabel and body are the same block**; the break label is reachable only via the return path and is terminated by `unreachable`. | Naming this shape would help readers recognize infinite-loop CFGs. |
+| [#loopmaxitersn](../../../docs/llm-generated/ir-reference/control-flow.md#loopmaxitersn) | undocumented-behavior | The doc does not mention the `[loopMaxIters(N)]` decoration emitted on `loop` terminators whose trip count is statically known. The decoration is observable in `-dump-ir` output and consumers (unroller, structured emitters) read it. | A one-line note alongside `loop` would document its presence. |
+| [#terminators-switches](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-switches) | undocumented-behavior | The doc's `#terminators-switches` entry says case-value operands are `(caseValue, caseBlock)` pairs but does not pin the uniqueness invariant: duplicate case values are rejected by the front-end (E30605 in the checker), not by an IR validator. A cross-reference to the diagnostic would explain why the IR never sees a malformed switch. |  |
+| [#discard](../../../docs/llm-generated/ir-reference/control-flow.md#discard) | undocumented-behavior | The doc's `#discard` entry describes `discard` as the "HLSL fragment-shader instruction" but does not pin the corresponding diagnostic code emitted when `discard` is used from a compute or vertex entry point (E36107). A cross-reference would make the stage restriction enforceable from the doc. |  |

@@ -61,10 +61,13 @@ contract.
 
 5. **If the doc legitimately does not describe the under-tested
    behavior**, the right output is **not** a synthesized test. The
-   right output is a bullet under `## Doc gaps observed` in
-   `README.md`, naming the area and suggesting which prompt or doc
-   section needs to grow. Doc gaps are first-class output of the
-   expansion loop.
+   right output is a new **row** in the `## Doc gaps observed` table
+   in `README.md`, classified per the controlled `Kind` vocabulary
+   in `_common.md`. Doc gaps are a first-class output of the
+   expansion loop — they are aggregated by `regenerate.py doc-gaps`
+   and fed back into the doc-regeneration workflow. Write the
+   **Suggested addition** cell as an actionable instruction so the
+   doc-regen agent can act on it verbatim.
 
 ## Update README.md
 
@@ -78,7 +81,10 @@ After adding new tests:
   order (by anchor, then by claim). If a new test shares an identical
   purpose with an existing claim row, append its filename to that
   row's Tests cell instead of creating a duplicate row.
-- Update **Doc gaps observed** with anything you turned away from.
+- Add rows to the **Doc gaps observed** table for anything you turned
+  away from. Use the controlled `Kind` vocabulary from `_common.md`
+  and write the **Suggested addition** cell as an actionable
+  instruction.
 
 ## Caps
 

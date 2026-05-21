@@ -106,22 +106,8 @@ emit without a GPU.
 
 ## Doc gaps observed
 
-- The index doc says the family pages describe "shape (parent
-  class, fields, grammar source) rather than behavior", but
-  this is a doc-organization claim and is not directly
-  testable through any `slangc` directive without instrumenting
-  the C++ AST. No test was authored for it; a future revision
-  of the index could either drop the meta-claim or restate it
-  as a user-observable consequence (e.g. "every documented
-  field appears in a grammar production we can point at").
-- The index doc's `#how-to-navigate` section is purely
-  doc-navigation guidance (which page to read first, what each
-  page's table looks like) with no slangc-observable
-  consequence. The bundle therefore did not cite that anchor.
-- The `#pages` table and the `#family-taxonomy` mermaid claim
-  approximate concrete-class counts ("~60", "~90", ...). The
-  numeric approximations are guaranteed only "rounded to the
-  nearest five at the source_commit"; no agent can sensibly
-  anchor a test to a "~60" approximation. Treating the counts
-  as testable would require the doc to commit to a stable
-  exact number or to a programmatic invariant.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#shape-parent-class-fields-grammar-source-rather-than-behavior](../../../docs/llm-generated/ast-reference/index.md#shape-parent-class-fields-grammar-source-rather-than-behavior) | undocumented-behavior | The index doc says the family pages describe "shape (parent class, fields, grammar source) rather than behavior", but this is a doc-organization claim and is not directly testable through any `slangc` directive without instrumenting the C++ AST. No test was authored for it; a future revision of the index could either drop the meta-claim or restate it as a user-observable consequence (e.g. "every documented field appears in a grammar production we can point at"). |  |
+| [#how-to-navigate](../../../docs/llm-generated/ast-reference/index.md#how-to-navigate) | undocumented-behavior | The index doc's `#how-to-navigate` section is purely doc-navigation guidance (which page to read first, what each page's table looks like) with no slangc-observable consequence. The bundle therefore did not cite that anchor. |  |
+| [#pages](../../../docs/llm-generated/ast-reference/index.md#pages) | undocumented-behavior | The `#pages` table and the `#family-taxonomy` mermaid claim approximate concrete-class counts ("~60", "~90", ...). The numeric approximations are guaranteed only "rounded to the nearest five at the source_commit"; no agent can sensibly anchor a test to a "~60" approximation. Treating the counts as testable would require the doc to commit to a stable exact number or to a programmatic invariant. |  |

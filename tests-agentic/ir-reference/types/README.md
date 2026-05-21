@@ -173,68 +173,18 @@ rest of the catalog without repeating those.
 
 ## Doc gaps observed
 
-- The doc's "Basic scalar types" table lists `IntPtr` and `UIntPtr`
-  ("Signed/Unsigned integer with pointer-equivalent width") but does
-  not name a Slang surface construct that produces them. The
-  user-level type names (if any — typically host-side only) are not
-  reachable from a shader, so a `.slang` test cannot anchor here.
-- "Storage-only floating-point" (`FloatE4M3Type`, `FloatE5M2Type`,
-  `BFloat16Type`) lists three opcodes but does not state a portable
-  surface construct that reliably produces them on the no-GPU runner.
-  A user-level surface example (`_E4M3 x;`, `BFloat16 y;`) per row
-  would let the agent anchor a test.
-- "Differentiation types" (`DiffPair`, `DiffRefPair`,
-  `ForwardDiffFuncType`, `BackwardDiffFuncType`, and the seven
-  context-channel types) are produced by the autodiff pass when
-  `[Differentiable]` is in play. The catalog rows do not name the
-  user-level construct that triggers each context-type variant
-  (`Minimal` vs ordinary vs `Trivial`); a one-line "surface" column
-  would let the agent test them.
-- "Existentials and interfaces" lists `BindExistentials`,
-  `BoundInterface`, `AnyValueType`, `DynamicType`, and `rtti_type`
-  / `rtti_handle_type` as opcodes but tags most as "(synthesized)" —
-  they are produced by the existential-elimination IR pass, not by
-  lowering. The doc does not state which `-dump-ir` stage to inspect
-  to observe them; without that hint the doc reader cannot anchor a
-  test in this bundle. Coverage belongs to
-  `ir-reference/generics-and-existentials`.
-- "Pointer types" lists `RefParam`, `BorrowInParam`,
-  `BorrowInOutParam`, `OutParam`, `ComPtr`, `NativePtr`,
-  `DescriptorHandle`, and `PseudoPtr`. The doc gives AST origin
-  rows (`RefType`, `BorrowInType`, etc.) but does not name a
-  user-language keyword for each (Slang's surface for borrow / ref
-  parameters is documented elsewhere). A cross-reference to
-  `docs/llm-generated/ast-reference/types.md` row by row would let
-  the agent anchor tests for each pointer kind.
-- "Sampler and buffer-layout types" — `Std140Layout`,
-  `Std430Layout`, `D3DConstantBufferLayout`,
-  `MetalParameterBlockLayout`, `CUDALayout`, `LLVMLayout`,
-  `CLayout`, `ScalarLayout`, `DefaultLayout`,
-  `DefaultPushConstantLayout` — the doc names each marker but does
-  not state where in the IR they appear (they appear as the third
-  operand of a `RWStructuredBuffer(...)` IR type, for example).
-  A one-line "where to observe" note would let the agent test each
-  marker individually; the current bundle uses one test
-  (`rwstructuredbuffer-type.slang`) to cover the family.
-- "Set-theoretic types" (`UntaggedUnionType`, `ElementOfSetType`,
-  `SetTagType`, `TaggedUnionType`, `OptionalNoneType`) are listed
-  with "(synthesized)" AST origin. The doc does not state a
-  language surface that triggers each; they appear to be produced
-  by the existential-elimination pass. Without a documented
-  surface, no `.slang` test in this bundle can anchor here.
-- "Tensor and torch-tensor types" — Python-binding lowering only;
-  no shader-language surface reaches it.
-- "SPIR-V literals and kinds" — the `Type` (TypeKind),
-  `TypeParameterPack`, `Rate`, `Generic` kind opcodes are listed
-  but their observation requires inspecting the type of a
-  generic-parameter's type (`type_t`'s type is `Type`). The doc
-  does not name a `-dump-ir` line that displays the kind directly;
-  one test (`type-t-generic-param.slang`) covers `type_t` only.
-- The doc's `Mat` row says the fourth operand is a "layout int
-  literal selecting row-major / column-major" but does not name
-  which integer value selects which layout. The current bundle
-  uses a wildcard pattern in the matrix test rather than asserting
-  a specific value.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#basic-scalar-types](../../../docs/llm-generated/ir-reference/types.md#basic-scalar-types) | missing-surface | The doc's "Basic scalar types" table lists `IntPtr` and `UIntPtr` ("Signed/Unsigned integer with pointer-equivalent width") but does not name a Slang surface construct that produces them. The user-level type names (if any — typically host-side only) are not reachable from a shader, so a `.slang` test cannot anchor here. |  |
+| [#storage-only-floating-point](../../../docs/llm-generated/ir-reference/types.md#storage-only-floating-point) | missing-surface | "Storage-only floating-point" (`FloatE4M3Type`, `FloatE5M2Type`, `BFloat16Type`) lists three opcodes but does not state a portable surface construct that reliably produces them on the no-GPU runner. A user-level surface example (`_E4M3 x;`, `BFloat16 y;`) per row would let the agent anchor a test. |  |
+| [#differentiation-types](../../../docs/llm-generated/ir-reference/types.md#differentiation-types) | undocumented-behavior | "Differentiation types" (`DiffPair`, `DiffRefPair`, `ForwardDiffFuncType`, `BackwardDiffFuncType`, and the seven context-channel types) are produced by the autodiff pass when `[Differentiable]` is in play. The catalog rows do not name the user-level construct that triggers each context-type variant (`Minimal` vs ordinary vs `Trivial`); a one-line "surface" column would let the agent test them. |  |
+| [#existentials-and-interfaces](../../../docs/llm-generated/ir-reference/types.md#existentials-and-interfaces) | undocumented-behavior | "Existentials and interfaces" lists `BindExistentials`, `BoundInterface`, `AnyValueType`, `DynamicType`, and `rtti_type` / `rtti_handle_type` as opcodes but tags most as "(synthesized)" — they are produced by the existential-elimination IR pass, not by lowering. The doc does not state which `-dump-ir` stage to inspect to observe them; without that hint the doc reader cannot anchor a test in this bundle. Coverage belongs to `ir-reference/generics-and-existentials`. |  |
+| [#pointer-types](../../../docs/llm-generated/ir-reference/types.md#pointer-types) | undocumented-behavior | "Pointer types" lists `RefParam`, `BorrowInParam`, `BorrowInOutParam`, `OutParam`, `ComPtr`, `NativePtr`, `DescriptorHandle`, and `PseudoPtr`. The doc gives AST origin rows (`RefType`, `BorrowInType`, etc.) but does not name a user-language keyword for each (Slang's surface for borrow / ref parameters is documented elsewhere). A cross-reference to `docs/llm-generated/ast-reference/types.md` row by row would let the agent anchor tests for each pointer kind. |  |
+| [#sampler-and-buffer-layout-types](../../../docs/llm-generated/ir-reference/types.md#sampler-and-buffer-layout-types) | undocumented-behavior | "Sampler and buffer-layout types" — `Std140Layout`, `Std430Layout`, `D3DConstantBufferLayout`, `MetalParameterBlockLayout`, `CUDALayout`, `LLVMLayout`, `CLayout`, `ScalarLayout`, `DefaultLayout`, `DefaultPushConstantLayout` — the doc names each marker but does not state where in the IR they appear (they appear as the third operand of a `RWStructuredBuffer(...)` IR type, for example). | A one-line "where to observe" note would let the agent test each marker individually; the current bundle uses one test (`rwstructuredbuffer-type.slang`) to cover the family. |
+| [#set-theoretic-types](../../../docs/llm-generated/ir-reference/types.md#set-theoretic-types) | undocumented-behavior | "Set-theoretic types" (`UntaggedUnionType`, `ElementOfSetType`, `SetTagType`, `TaggedUnionType`, `OptionalNoneType`) are listed with "(synthesized)" AST origin. The doc does not state a language surface that triggers each; they appear to be produced by the existential-elimination pass. | Without a documented surface, no `.slang` test in this bundle can anchor here. |
+| [#tensor-and-torch-tensor-types](../../../docs/llm-generated/ir-reference/types.md#tensor-and-torch-tensor-types) | undocumented-behavior | "Tensor and torch-tensor types" — Python-binding lowering only; no shader-language surface reaches it. |  |
+| [#spir-v-literals-and-kinds](../../../docs/llm-generated/ir-reference/types.md#spir-v-literals-and-kinds) | undocumented-behavior | "SPIR-V literals and kinds" — the `Type` (TypeKind), `TypeParameterPack`, `Rate`, `Generic` kind opcodes are listed but their observation requires inspecting the type of a generic-parameter's type (`type_t`'s type is `Type`). The doc does not name a `-dump-ir` line that displays the kind directly; one test (`type-t-generic-param.slang`) covers `type_t` only. |  |
+| [#layout-int-literal-selecting-row-major-column-major](../../../docs/llm-generated/ir-reference/types.md#layout-int-literal-selecting-row-major-column-major) | undocumented-behavior | The doc's `Mat` row says the fourth operand is a "layout int literal selecting row-major / column-major" but does not name which integer value selects which layout. The current bundle uses a wildcard pattern in the matrix test rather than asserting a specific value. |  |
 
 ## Out of scope (no-GPU runner)
 
