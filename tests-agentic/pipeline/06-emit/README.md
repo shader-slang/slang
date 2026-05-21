@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T17:00:00+00:00
-source_commit: 3250005059a2746ebc504a9d3f71ed112f1f2b94
+generated_at: 2026-05-22T00:00:00+00:00
+source_commit: 6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 watched_paths_digest: 58e2222aab32a056bd6816440b7e7723f8b7eacefa98bb9064bbf1d76287a24d
 source_doc: docs/llm-generated/pipeline/06-emit.md
 source_doc_digest: a2de47410ee74b8edd850e32a2ffdc06270316e9feb047f181ef4397564602e9
@@ -70,6 +70,7 @@ C++ for positive coverage and GLSL / WGSL for negative coverage).
 | The GLSL backend emits a GLSL source with #version, layout(local_size_x = ...) for the compute stage, and layout(std430, binding = N) for a buffer resource. | functional | [#glsl](../../../docs/llm-generated/pipeline/06-emit.md#glsl) | [`glsl-version-and-layout.slang`](glsl-version-and-layout.slang) |
 | Stress: HLSL `[numthreads(...)]` and `register(uN)` shapes survive a kernel with multiple resources of mixed read/write classification (one RW buffer, one read-only buffer, one cbuffer). | stress | [#hlsl](../../../docs/llm-generated/pipeline/06-emit.md#hlsl) | [`hlsl-numthreads-survives-multi-resource.slang`](hlsl-numthreads-survives-multi-resource.slang) |
 | The HLSL backend emits HLSL source text with [numthreads] and register(uN) annotations for resources. | functional | [#hlsl](../../../docs/llm-generated/pipeline/06-emit.md#hlsl) | [`hlsl-numthreads-and-register.slang`](hlsl-numthreads-and-register.slang) |
+| The HLSL backend's binary route hands its HLSL source off to DXC, producing DXIL bytecode whose disassembly carries an LLVM-style entry-point signature. | expansion | [#hlsl](../../../docs/llm-generated/pipeline/06-emit.md#hlsl) | [`dxil-binary-from-hlsl-backend.slang`](dxil-binary-from-hlsl-backend.slang) |
 | The Metal backend emits Metal source with metal_stdlib include, the kernel function-qualifier, a thread_position_in_grid input, and buffer(N) markers for buffer arguments. | functional | [#metal](../../../docs/llm-generated/pipeline/06-emit.md#metal) | [`metal-kernel-and-buffer-attr.slang`](metal-kernel-and-buffer-attr.slang) |
 | Stress: a deeply nested arithmetic expression `((a+b)*(c+d)) - (a*b) + c*d` is emitted with the minimum parentheses set — additions stay parenthesised when they sit under a multiplication, but mul-precedence subexpressions are not over-wrapped. | stress | [#operator-precedence-and-parenthesization](../../../docs/llm-generated/pipeline/06-emit.md#operator-precedence-and-parenthesization) | [`precedence-deeply-nested-arith-stress.slang`](precedence-deeply-nested-arith-stress.slang) |
 | The precedence helper emits the minimum parentheses needed. `a * b + c` keeps neither operator wrapped (no `(a * b) + c` and no `a * (b + c)`). | functional | [#operator-precedence-and-parenthesization](../../../docs/llm-generated/pipeline/06-emit.md#operator-precedence-and-parenthesization) | [`precedence-omits-unneeded-parens.slang`](precedence-omits-unneeded-parens.slang) |
@@ -90,7 +91,9 @@ C++ for positive coverage and GLSL / WGSL for negative coverage).
 | Boundary/negative: SPIR-V emit does NOT produce a C `#line` directive — instead it emits `OpSource Slang 1` as the source-location anchor in the SPIR-V debug info section. | negative | [#source-writer-abstraction](../../../docs/llm-generated/pipeline/06-emit.md#source-writer-abstraction) | [`spirv-emits-opsource-not-line-directive.slang`](spirv-emits-opsource-not-line-directive.slang) |
 | Boundary/negative: WGSL emit does NOT produce `#line` directives — WGSL has no `#line` syntax, so the SourceWriter on this target omits source-location anchors entirely. | negative | [#source-writer-abstraction](../../../docs/llm-generated/pipeline/06-emit.md#source-writer-abstraction) | [`wgsl-omits-line-directive.slang`](wgsl-omits-line-directive.slang) |
 | SourceWriter::advanceToSourceLocation emits #line directives so downstream compilers can report errors at the user's source position. The directives appear in the HLSL, GLSL, Metal, CUDA, and C++ emit. | functional | [#source-writer-abstraction](../../../docs/llm-generated/pipeline/06-emit.md#source-writer-abstraction) | [`source-writer-emits-line-directives.slang`](source-writer-emits-line-directives.slang) |
+| The direct SPIR-V backend emits a SPIR-V binary (no -asm) whose disassembly carries the same OpCapability/OpEntryPoint/OpExecutionMode/OpDecorate Binding markers as the assembly form. | expansion | [#spir-v-direct](../../../docs/llm-generated/pipeline/06-emit.md#spir-v-direct) | [`spirv-binary-from-direct-backend.slang`](spirv-binary-from-direct-backend.slang) |
 | The direct SPIR-V backend emits SPIR-V text with OpCapability Shader, OpEntryPoint GLCompute, OpExecutionMode LocalSize, and OpDecorate Binding/DescriptorSet for a buffer resource. | functional | [#spir-v-direct](../../../docs/llm-generated/pipeline/06-emit.md#spir-v-direct) | [`spirv-asm-entry-point-and-decorate.slang`](spirv-asm-entry-point-and-decorate.slang) |
+| The Torch backend emits the PyTorch C++ glue for a `[TorchEntryPoint]` function — including a `SLANG_PRELUDE_EXPORT` declaration and a `pybind11`-style `m.def(...)` binding — and references the slang-torch-prelude.h header. | expansion | [#torch](../../../docs/llm-generated/pipeline/06-emit.md#torch) | [`torch-entry-point-cpp-binding.slang`](torch-entry-point-cpp-binding.slang) |
 | The WGSL backend emits WGSL source with @binding(N) @group(N) for resources and @compute / @workgroup_size for the compute entry point. | functional | [#wgsl](../../../docs/llm-generated/pipeline/06-emit.md#wgsl) | [`wgsl-binding-and-workgroup.slang`](wgsl-binding-and-workgroup.slang) |
 
 ## Doc gaps observed
@@ -107,10 +110,7 @@ C++ for positive coverage and GLSL / WGSL for negative coverage).
 
 ## Untested coverable claims
 
-| Anchor | Backend | Claim | Why untested |
-| --- | --- | --- | --- |
-| [#spirv-asm](../../../docs/llm-generated/pipeline/06-emit.md#spirv-asm) | gpu-dxc-dxil | **Binary targets that need extra ecosystem tooling**: raw SPIR-V binary (`-target spirv` without `-asm`) needs SPIR-V validation; DXIL needs DXC; MSL binary needs a Metal compiler; WGSL binary has no such mode. The corresponding text-emit forms (`spirv-asm`, `hlsl`, `metal`, `wgsl`) are tested instead. | Agent runtime has no GPU; CI / local machine does. |
-| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | gpu-other | **Torch glue** (`#backends` > Torch). | Requires a host C++ compiler + PyTorch headers we cannot assume in the no-GPU runner. |
+(none)
 
 ## Out of scope
 

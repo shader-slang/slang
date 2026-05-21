@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T17:13:48Z
-source_commit: ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+generated_at: 2026-05-22T00:00:00+00:00
+source_commit: 6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 watched_paths_digest: 4efe93afbd22f4572d6d334ca82947cebf8058c7572291261103fd18aa04f6bd
 source_doc: docs/llm-generated/ir-reference/decorations.md
 source_doc_digest: fa437f161a85c114f3d1cf9292f389f617cff6186ed550e01d5b609a06a35fd8
@@ -105,6 +105,8 @@ right**, sampling its breadth across categories.
 | Negative - [ForceUnroll] on a function declaration is rejected with E31002 "invalid attribute placement"; the attribute is loop-statement-only despite the doc listing its AST origin generically as "[ForceUnroll] attribute". | negative | [#loop-and-branch-hints](../../../docs/llm-generated/ir-reference/decorations.md#loop-and-branch-hints) | [`force-unroll-on-function-error.slang`](force-unroll-on-function-error.slang) |
 | Stress - a cascade of conditionals with mixed [branch] and [flatten] hints produces multiple independent branch and flatten decorations on distinct ifElse instructions in the same function. | stress | [#loop-and-branch-hints](../../../docs/llm-generated/ir-reference/decorations.md#loop-and-branch-hints) | [`branch-and-flatten-cascade.slang`](branch-and-flatten-cascade.slang) |
 | Two for-loops decorated with different loop-control attributes ([unroll] vs [loop]) each get their own loopControl decoration, demonstrating that two such decorations coexist in the same function. | functional | [#loop-and-branch-hints](../../../docs/llm-generated/ir-reference/decorations.md#loop-and-branch-hints) | [`two-loop-controls-coexist.slang`](two-loop-controls-coexist.slang) |
+| A geometry-shader entry point declaring a `triangle` input parameter lowers to a trianglePrimitiveType decoration on that parameter, with no operands. | expansion | [#mesh-shader-geometry-shader-and-per-vertex](../../../docs/llm-generated/ir-reference/decorations.md#mesh-shader-geometry-shader-and-per-vertex) | [`triangle-primitive-type-on-geometry-input.slang`](triangle-primitive-type-on-geometry-input.slang) |
+| A geometry-shader output declaration using TriangleStream lowers to a streamOutputTypeDecoration recording the HLSL stream-output type. | expansion | [#mesh-shader-geometry-shader-and-per-vertex](../../../docs/llm-generated/ir-reference/decorations.md#mesh-shader-geometry-shader-and-per-vertex) | [`stream-output-type-decoration.slang`](stream-output-type-decoration.slang) |
 | A user-named function carries a nameHint decoration with the source identifier as a string literal operand. | functional | [#namehint-namehintdecoration](../../../docs/llm-generated/ir-reference/decorations.md#namehint-namehintdecoration) | [`name-hint-on-function.slang`](name-hint-on-function.slang) |
 | Two distinct user-named functions each carry their own nameHint decoration with the matching source identifier as the string operand. | functional | [#namehint-namehintdecoration](../../../docs/llm-generated/ir-reference/decorations.md#namehint-namehintdecoration) | [`name-hint-survives-on-call-result.slang`](name-hint-survives-on-call-result.slang) |
 | A nameHint decoration also attaches to function parameters carrying the declared parameter name. | functional | [#naming-and-provenance](../../../docs/llm-generated/ir-reference/decorations.md#naming-and-provenance) | [`name-hint-on-param.slang`](name-hint-on-param.slang) |
@@ -118,7 +120,7 @@ right**, sampling its breadth across categories.
 
 | Anchor | Backend | Claim | Why untested |
 | --- | --- | --- | --- |
-| [#pointprimitivetype](../../../docs/llm-generated/ir-reference/decorations.md#pointprimitivetype) | gpu-non-compute | **Mesh / geometry / hull / domain shader decorations** — `pointPrimitiveType`, `linePrimitiveType`, `trianglePrimitiveType`, `lineAdjPrimitiveType`, `triangleAdjPrimitiveType`, `streamOutputTypeDecoration`, `vertices`, `indices`, `primitives`, `HLSLMeshPayloadDecoration`, `PositionOutput`, `PositionInput`, `PerVertex`, `stageReadAccess`, `stageWriteAccess`, `patchConstantFunc`, `maxTessFactor`, `outputControlPoints`, `outputTopology`, `partitioning`, `domain`, `maxVertexCount`, `instance`, `GeometryInputPrimitiveTypeDecoration`, `MeshOutputDecoration`, `StageAccessDecoration`. These require pipeline-specific entry-point scaffolding distinct from the per-decoration reference angle. | Agent runtime has no GPU; CI / local machine does. |
+| [#mesh-shader-geometry-shader-and-per-vertex](../../../docs/llm-generated/ir-reference/decorations.md#mesh-shader-geometry-shader-and-per-vertex) | gpu-non-compute | **Mesh / geometry / hull / domain shader decorations not yet sampled** — `pointPrimitiveType`, `linePrimitiveType`, `lineAdjPrimitiveType`, `triangleAdjPrimitiveType`, `vertices`, `indices`, `primitives`, `HLSLMeshPayloadDecoration`, `PositionOutput`, `PositionInput`, `PerVertex`, `stageReadAccess`, `stageWriteAccess`, `patchConstantFunc`, `maxTessFactor`, `outputControlPoints`, `outputTopology`, `partitioning`, `domain`, `maxVertexCount`, `instance`, `GeometryInputPrimitiveTypeDecoration`, `MeshOutputDecoration`, `StageAccessDecoration`. `trianglePrimitiveType` and `streamOutputTypeDecoration` are now sampled via a geometry-shader test pair. The remaining decorations each require their own pipeline-specific entry-point scaffolding (mesh / hull / domain). | Agent runtime has no GPU; CI / local machine does. |
 
 ## Out of scope
 

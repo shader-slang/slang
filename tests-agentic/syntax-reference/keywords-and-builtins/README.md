@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T15:00:00+00:00
-source_commit: ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+generated_at: 2026-05-22T00:00:00+00:00
+source_commit: 6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 watched_paths_digest: 46d545d00112e20974ad7c66196cd74864348c29baa96c46b13ae4a26b395634
 source_doc: docs/llm-generated/syntax-reference/keywords-and-builtins.md
 source_doc_digest: 149c069099bcdbf65d61cb7c0a8efad6ebfce473dad9ffb85251ba6cb96f4820
@@ -29,6 +29,7 @@ test confirms that `let` immutability is enforced by the checker.
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
+| `hitAttributeEXT` is a complex modifier in the raytracing family; an HLSL-style intersection shader that calls `ReportHit` with a user-defined hit-attribute struct lowers to GLSL with a `hitAttributeEXT`-decorated variable and pulls in the `GL_EXT_ray_tracing` extension. | expansion | [#complex-modifiers-take-arguments](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#complex-modifiers-take-arguments) | [`modifier-raytracing-hitattributeext.slang`](modifier-raytracing-hitattributeext.slang) |
 | Boundary: HLSL `register(uN)` UAV-binding annotation is part of the HLSL-flavored vocabulary contributed by `hlsl.meta.slang`; it survives into HLSL emit attached to the corresponding buffer. | boundary | [#core-module-supplied-vocabulary](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#core-module-supplied-vocabulary) | [`boundary-register-u0-binding-hlsl.slang`](boundary-register-u0-binding-hlsl.slang) |
 | Boundary: `RWStructuredBuffer<T>` from `hlsl.meta.slang` survives into HLSL emit with an `int(0)` indexing expression at the documented lower-edge index. | boundary | [#core-module-supplied-vocabulary](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#core-module-supplied-vocabulary) | [`boundary-rwstructuredbuffer-index-zero-hlsl.slang`](boundary-rwstructuredbuffer-index-zero-hlsl.slang) |
 | Boundary: `float4` is the maximum-width vector documented in `core.meta.slang`; the four-component `wzyx` swizzle is the full-length reverse, the largest swizzle on a `float4`. | boundary | [#core-module-supplied-vocabulary](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#core-module-supplied-vocabulary) | [`boundary-float4-swizzle-reverse.slang`](boundary-float4-swizzle-reverse.slang) |
@@ -71,6 +72,7 @@ test confirms that `let` immutability is enforced by the checker.
 | `true` and `false` are expression keywords producing boolean-typed values; they select different branches of a conditional. | functional | [#expression-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#expression-keywords) | [`expr-true-false-bool.slang`](expr-true-false-bool.slang) |
 | `SV_`-prefixed identifiers are HLSL system-value semantics; `SV_Position` survives into HLSL emit as `SV_POSITION`. | functional | [#reserved-identifier-prefixes](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#reserved-identifier-prefixes) | [`reserved-sv-prefix-hlsl.slang`](reserved-sv-prefix-hlsl.slang) |
 | `gl_`-prefixed identifiers stand for shader-stage built-ins supplied by `glsl.meta.slang`; the GLSL emit uses the gl_-prefixed spelling. | functional | [#reserved-identifier-prefixes](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#reserved-identifier-prefixes) | [`reserved-gl-prefix-glsl.slang`](reserved-gl-prefix-glsl.slang) |
+| `dyn` is a simple modifier on an `interface` declaration that marks the interface for dynamic dispatch; declaring a `dyn interface` with a conforming struct parses and survives into a clean HLSL / SPIR-V emit. | expansion | [#simple-modifiers](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#simple-modifiers) | [`modifier-dyn-interface.slang`](modifier-dyn-interface.slang) |
 | `groupshared` is a simple HLSL-flavored storage modifier; it lowers to `groupshared` in HLSL emit and to `shared` in GLSL emit. | functional | [#simple-modifiers](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#simple-modifiers) | [`modifier-groupshared-multitarget.slang`](modifier-groupshared-multitarget.slang) |
 | `in`, `out`, and `inout` are simple parameter-direction modifiers; an `out`/`inout` parameter mutation is visible at the caller. | functional | [#simple-modifiers](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#simple-modifiers) | [`modifier-in-out-inout.slang`](modifier-in-out-inout.slang) |
 | `public` and `private` are simple visibility modifiers; a `private` member is still reachable from another member of the same type. | functional | [#simple-modifiers](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#simple-modifiers) | [`modifier-public-private.slang`](modifier-public-private.slang) |
@@ -99,10 +101,7 @@ test confirms that `let` immutability is enforced by the checker.
 
 ## Untested coverable claims
 
-| Anchor | Backend | Claim | Why untested |
-| --- | --- | --- | --- |
-| [#hitattributeext](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#hitattributeext) | gpu-dxr | `[shader("raygeneration")]` / `hitAttributeEXT` raytracing modifiers cannot be exercised without GPU staging. | Agent runtime has no GPU; CI / local machine does. |
-| [#dyn](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#dyn) | gpu-other | `dyn` / dynamic dispatch through `IFunc` requires runtime reflection support that does not surface in the no-GPU CI image. | Agent runtime has no GPU; CI / local machine does. |
+(none)
 
 ## Out of scope
 

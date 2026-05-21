@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-21T00:00:00Z
-source_commit: 2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+generated_at: 2026-05-22T00:00:00+00:00
+source_commit: 6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 watched_paths_digest: 3a231855d2500716d08acc7404223e6d69655007cc529e406477b87c9bf1a697
 source_doc: docs/llm-generated/target-pipelines/wgsl.md
 source_doc_digest: d16c48a1b04e16432afea2867f729fb871e9db503b94181cca95f2b816a5f61d
@@ -26,6 +26,7 @@ with `-target wgsl -entry main -stage compute` against the
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
+| The wgsl-spirv target hands the emitted WGSL text to Tint which produces a SPIR-V module whose OpEntryPoint names main | functional | [#downstream-tint](../../../docs/llm-generated/target-pipelines/wgsl.md#downstream-tint) | [`tint-downstream-spirv-emit.slang`](tint-downstream-spirv-emit.slang) |
 | Five-level nested if/else with a merged value still lowers via the var+per-branch-assignment pattern of eliminatePhis | stress | [#eliminatephis-with-default-options](../../../docs/llm-generated/target-pipelines/wgsl.md#eliminatephis-with-default-options) | [`nested-branches-five-deep-phi.slang`](nested-branches-five-deep-phi.slang) |
 | eliminatePhis with default options replaces phi nodes with an explicit var and per-branch assignments | functional | [#eliminatephis-with-default-options](../../../docs/llm-generated/target-pipelines/wgsl.md#eliminatephis-with-default-options) | [`eliminate-phis-default-options.slang`](eliminate-phis-default-options.slang) |
 | ByteAddressBuffer.Load<uint>(0) at offset zero still emits the array<u32>[...]/4 indexing expression | boundary | [#legalizebyteaddressbufferops-with-wgsl-options](../../../docs/llm-generated/target-pipelines/wgsl.md#legalizebyteaddressbufferops-with-wgsl-options) | [`byte-address-buffer-load-offset-zero.slang`](byte-address-buffer-load-offset-zero.slang) |
@@ -41,7 +42,9 @@ with `-target wgsl -entry main -stage compute` against the
 | A rectangular RWStructuredBuffer<float3x4> wraps in _MatrixStorage_float3x4_ColMajorstd430 with a 4-element array<vec3<f32>> | boundary | [#phase-c-wgsl-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/wgsl.md#phase-c-wgsl-legalization-lowering-phi-elimination) | [`matrix-storage-rectangular-3x4.slang`](matrix-storage-rectangular-3x4.slang) |
 | A small square RWStructuredBuffer<float2x2> wraps in _MatrixStorage_float2x2_ColMajorstd430 with @align(8) | boundary | [#phase-c-wgsl-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/wgsl.md#phase-c-wgsl-legalization-lowering-phi-elimination) | [`matrix-storage-square-2x2.slang`](matrix-storage-square-2x2.slang) |
 | asuint() / asfloat() reinterprets emit as WGSL bitcast<T>(...) expressions | functional | [#phase-c-wgsl-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/wgsl.md#phase-c-wgsl-legalization-lowering-phi-elimination) | [`bitcast-spelling.slang`](bitcast-spelling.slang) |
+| collectCooperativeMetadata is gated on cooperative_matrix or cooperative_vector capability and does not fire for a plain WGSL compute kernel | negative | [#phase-c-wgsl-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/wgsl.md#phase-c-wgsl-legalization-lowering-phi-elimination) | [`cooperative-metadata-not-collected-on-wgsl.slang`](cooperative-metadata-not-collected-on-wgsl.slang) |
 | legalizeArrayReturnType rewrites array-returning functions into out-parameter form on WGSL | functional | [#phase-c-wgsl-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/wgsl.md#phase-c-wgsl-legalization-lowering-phi-elimination) | [`array-return-rewritten-to-out-pointer.slang`](array-return-rewritten-to-out-pointer.slang) |
+| legalizeUniformBufferLoad / invertYOfPositionOutput / rcpWOfPositionInput are gated on isKhronosTarget or HLSL and do not fire for the WGSL target | negative | [#phase-c-wgsl-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/wgsl.md#phase-c-wgsl-legalization-lowering-phi-elimination) | [`uniform-buffer-load-no-khronos-legalization.slang`](uniform-buffer-load-no-khronos-legalization.slang) |
 | lowerBufferElementTypeToStorageType wraps a structured buffer's matrix element in a _MatrixStorage_ struct on WGSL | functional | [#phase-c-wgsl-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/wgsl.md#phase-c-wgsl-legalization-lowering-phi-elimination) | [`structured-buffer-of-matrix-wraps-storage.slang`](structured-buffer-of-matrix-wraps-storage.slang) |
 | +inf and -inf in a float vector emit via the _slang_getInfinity helper because WGSL has no inf literal | boundary | [#phase-d-wgsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/wgsl.md#phase-d-wgsl-emit-and-downstream-tools) | [`float-vector-with-infinity.slang`](float-vector-with-infinity.slang) |
 | A 1024-element function-local int array emits as array<i32, i32(1024)> with the size preserved verbatim | stress | [#phase-d-wgsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/wgsl.md#phase-d-wgsl-emit-and-downstream-tools) | [`large-array-1024-elements.slang`](large-array-1024-elements.slang) |
@@ -101,12 +104,7 @@ with `-target wgsl -entry main -stage compute` against the
 
 ## Untested coverable claims
 
-| Anchor | Backend | Claim | Why untested |
-| --- | --- | --- | --- |
-| [#collectcooperativemetadata](../../../docs/llm-generated/target-pipelines/wgsl.md#collectcooperativemetadata) | gpu-cooperative | **`collectCooperativeMetadata`.** Requires the cooperative matrix or vector capability set. | Agent runtime has no GPU; CI / local machine does. |
-| [#legalizeuniformbufferload](../../../docs/llm-generated/target-pipelines/wgsl.md#legalizeuniformbufferload) | gpu-cross-api-flag | **`legalizeUniformBufferLoad`, `invertYOfPositionOutput`, `rcpWOfPositionInput`.** Khronos / HLSL only. | Agent runtime has no GPU; CI / local machine does. |
-| (unspecified) | gpu-dxr | **DXR / mesh / ray-tracing / graphics-stage entry points.** WGSL through Slang is compute-targeted in this bundle; the runner is no-GPU. | Agent runtime has no GPU; CI / local machine does. |
-| (unspecified) | gpu-wgsl-tint | **Tint downstream invocation.** `-target wgsl-spirv` invokes Tint to translate WGSL to SPIR-V; this bundle stays at `-target wgsl` (text artifact) and does not exercise Tint or any GPU runtime. | Agent runtime has no GPU; CI / local machine does. |
+(none)
 
 ## Out of scope
 
@@ -117,3 +115,4 @@ with `-target wgsl -entry main -stage compute` against the
 | [#legalizeentrypointsforglsl](../../../docs/llm-generated/target-pipelines/wgsl.md#legalizeentrypointsforglsl) | (unclassified) | **`legalizeEntryPointsForGLSL`, `legalizeImageSubscript`, `legalizeConstantBufferLoadForGLSL`.** GLSL/SPIR-V only. | Not reachable via any allowed test directive. |
 | [#linkandoptimizeir](../../../docs/llm-generated/target-pipelines/wgsl.md#linkandoptimizeir) | (unclassified) | **WGSL has no iterative passes (zero loops in `linkAndOptimizeIR`).** A textual claim about the absence of a while loop; not directly observable in emitted text. | Not reachable via any allowed test directive. |
 | (unspecified) | implementation-detail | **Pass-ordering inside Phase A/B/C.** Pass existence is observable from emitted text; intra-phase ordering needs `-dump-ir` anchors that the doc does not pin. | Not reachable via any allowed test directive. |
+| (unspecified) | out-of-bundle | **DXR / mesh / ray-tracing / graphics-stage entry points.** WGSL has no DXR or ray-tracing surface; ray-tracing entry points are covered in the HLSL and SPIR-V target-pipeline bundles instead. | WGSL fundamentally lacks the ray-tracing surface; covered by the `hlsl` / `spirv` sibling bundles. |

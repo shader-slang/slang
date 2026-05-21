@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T16:50:00+00:00
-source_commit: bbd84dc65e58598bfa71fafe72764b4076b0869b
+generated_at: 2026-05-22T00:00:00+00:00
+source_commit: 6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 watched_paths_digest: 0da77494c7202daa683caa86dd59c3c52ee670047c4ae4266818e2cd8b88bf99
 source_doc: docs/llm-generated/ast-reference/modifiers.md
 source_doc_digest: ce606e060d178f7091bd26e74fee49fd1d2442061f54a0d3e8579cc174038e5e
@@ -50,8 +50,10 @@ assignment, `inout` of a literal).
 | The `groupshared` storage modifier survives lowering to emitted HLSL. | functional | [#compatibility-and-hlsl-storage-class-modifiers](../../../docs/llm-generated/ast-reference/modifiers.md#compatibility-and-hlsl-storage-class-modifiers) | [`groupshared-emits-on-hlsl.slang`](groupshared-emits-on-hlsl.slang) |
 | `[ForceInline]` on a small helper inlines it into the caller; the helper's name no longer appears in emitted HLSL. | functional | [#compile-time-hint-attributes-loops-branches-opt-levels](../../../docs/llm-generated/ast-reference/modifiers.md#compile-time-hint-attributes-loops-branches-opt-levels) | [`force-inline-on-hlsl.slang`](force-inline-on-hlsl.slang) |
 | `[unroll]` on a loop appears as an `[unroll]` attribute in emitted HLSL. | functional | [#compile-time-hint-attributes-loops-branches-opt-levels](../../../docs/llm-generated/ast-reference/modifiers.md#compile-time-hint-attributes-loops-branches-opt-levels) | [`unroll-attribute-on-hlsl.slang`](unroll-attribute-on-hlsl.slang) |
+| `CudaKernelAttribute` (`[CudaKernel]`) marks a function as a CUDA kernel; the emitted CUDA carries the `__global__` decoration. | functional | [#cuda-python-ffi-attributes](../../../docs/llm-generated/ast-reference/modifiers.md#cuda-python-ffi-attributes) | [`cuda-kernel-emits-global-decoration.slang`](cuda-kernel-emits-global-decoration.slang) |
 | A `[Differentiable]` function can be passed to `fwd_diff` and produces a sensible derivative. | functional | [#differentiability-attributes](../../../docs/llm-generated/ast-reference/modifiers.md#differentiability-attributes) | [`differentiable-allows-fwd-diff.slang`](differentiable-allows-fwd-diff.slang) |
 | `: register(...)` binding semantic propagates to emitted HLSL. | functional | [#hlsl-semantics-sv](../../../docs/llm-generated/ast-reference/modifiers.md#hlsl-semantics-sv) | [`register-semantic-emits-on-hlsl.slang`](register-semantic-emits-on-hlsl.slang) |
+| `RayPayloadReadSemantic` / `RayPayloadWriteSemantic` access qualifiers on a `[raypayload]` struct field survive to emitted HLSL. | functional | [#hlsl-semantics-sv](../../../docs/llm-generated/ast-reference/modifiers.md#hlsl-semantics-sv) | [`raypayload-read-semantic-emits-on-hlsl.slang`](raypayload-read-semantic-emits-on-hlsl.slang) |
 | An `[open]` interface accepts implementations; a basic implementation works through dynamic dispatch. | functional | [#inheritance-control-attributes](../../../docs/llm-generated/ast-reference/modifiers.md#inheritance-control-attributes) | [`sealed-interface-rejects-inheritance.slang`](sealed-interface-rejects-inheritance.slang) |
 | `nointerpolation` on a pixel-shader varying input survives into emitted HLSL. | functional | [#interpolation-modes](../../../docs/llm-generated/ast-reference/modifiers.md#interpolation-modes) | [`nointerpolation-emits-on-hlsl.slang`](nointerpolation-emits-on-hlsl.slang) |
 | `sample` interpolation modifier is preserved through emitted HLSL. | functional | [#interpolation-modes](../../../docs/llm-generated/ast-reference/modifiers.md#interpolation-modes) | [`sample-interpolation-emits-on-hlsl.slang`](sample-interpolation-emits-on-hlsl.slang) |
@@ -64,6 +66,9 @@ assignment, `inout` of a literal).
 | An `inout` parameter requires an l-value argument; passing a literal is diagnosed. | negative | [#parameter-direction-and-storage-class-modifiers](../../../docs/llm-generated/ast-reference/modifiers.md#parameter-direction-and-storage-class-modifiers) | [`inout-rejects-rvalue.slang`](inout-rejects-rvalue.slang) |
 | An `out` parameter writes a value back to the caller's variable. | functional | [#parameter-direction-and-storage-class-modifiers](../../../docs/llm-generated/ast-reference/modifiers.md#parameter-direction-and-storage-class-modifiers) | [`param-out-writes-back.slang`](param-out-writes-back.slang) |
 | `const` makes a local variable immutable; assigning to it is diagnosed. | negative | [#parameter-direction-and-storage-class-modifiers](../../../docs/llm-generated/ast-reference/modifiers.md#parameter-direction-and-storage-class-modifiers) | [`const-rejects-assignment.slang`](const-rejects-assignment.slang) |
+| `VulkanRayPayloadAttribute` (`[vk::ray_payload]`) on a closesthit payload propagates to emitted GLSL as a `rayPayloadInEXT`-class declaration. | functional | [#ray-tracing-attributes](../../../docs/llm-generated/ast-reference/modifiers.md#ray-tracing-attributes) | [`vk-ray-payload-emits-on-glsl.slang`](vk-ray-payload-emits-on-glsl.slang) |
+| `EarlyDepthStencilAttribute` (`[earlydepthstencil]`) on a fragment entry point survives to emitted HLSL. | functional | [#stage-specific-entry-point-attributes](../../../docs/llm-generated/ast-reference/modifiers.md#stage-specific-entry-point-attributes) | [`earlydepthstencil-emits-on-hlsl.slang`](earlydepthstencil-emits-on-hlsl.slang) |
+| `MaxVertexCountAttribute` (`[maxvertexcount(N)]`) on a geometry entry point appears in emitted HLSL with the documented count. | functional | [#stage-specific-entry-point-attributes](../../../docs/llm-generated/ast-reference/modifiers.md#stage-specific-entry-point-attributes) | [`maxvertexcount-emits-on-hlsl.slang`](maxvertexcount-emits-on-hlsl.slang) |
 | `[numthreads(x,y,z)]` lowers to GLSL `layout(local_size_x=..., local_size_y=..., local_size_z=...)`. | functional | [#stage-specific-entry-point-attributes](../../../docs/llm-generated/ast-reference/modifiers.md#stage-specific-entry-point-attributes) | [`numthreads-emits-on-glsl.slang`](numthreads-emits-on-glsl.slang) |
 | `[numthreads(x,y,z)]` workgroup dimensions appear in emitted HLSL. | functional | [#stage-specific-entry-point-attributes](../../../docs/llm-generated/ast-reference/modifiers.md#stage-specific-entry-point-attributes) | [`numthreads-emits-on-hlsl.slang`](numthreads-emits-on-hlsl.slang) |
 | `[shader("compute")]` marks a function as a compute entry point selectable without -entry. | functional | [#stage-specific-entry-point-attributes](../../../docs/llm-generated/ast-reference/modifiers.md#stage-specific-entry-point-attributes) | [`shader-entrypoint-attribute.slang`](shader-entrypoint-attribute.slang) |
@@ -73,16 +78,13 @@ assignment, `inout` of a literal).
 
 ## Untested coverable claims
 
-| Anchor | Backend | Claim | Why untested |
-| --- | --- | --- | --- |
-| [#raypayloadreadsemantic](../../../docs/llm-generated/ast-reference/modifiers.md#raypayloadreadsemantic) | gpu-dxr | Ray-payload semantics (`RayPayloadReadSemantic`, `RayPayloadWriteSemantic`, `VulkanRayPayloadAttribute`) — exercise a ray-tracing pipeline; the no-GPU runner cannot dispatch them. | Agent runtime has no GPU; CI / local machine does. |
-| (unspecified) | gpu-non-compute | `[earlydepthstencil]`, `[maxvertexcount]`, geometry/tessellation stage attributes — observable through emit text only on specific pipeline stages whose entry-point signatures need GPU pipelines to dispatch. | Agent runtime has no GPU; CI / local machine does. |
-| (unspecified) | gpu-other | CUDA / Python / FFI attributes (`[CudaKernel]`, `[CudaHost]`, `[TorchEntryPoint]`, `[PyExport]`, `[DllImport]`, `[AutoPyBindCuda]`) — require a CUDA toolchain or python runtime that the no-GPU runner does not have. | Agent runtime has no GPU; CI / local machine does. |
+(none)
 
 ## Out of scope
 
 | Anchor | Reason | Claim | Why it's terminal |
 | --- | --- | --- | --- |
+| [#cuda-python-ffi-attributes](../../../docs/llm-generated/ast-reference/modifiers.md#cuda-python-ffi-attributes) | requires-external-tool | Python / FFI attributes (`[TorchEntryPoint]`, `[PyExport]`, `[DllImport]`, `[AutoPyBindCuda]`) ship through a host Python / PyTorch / C ABI runtime that the agent runtime does not include, and that the `slang-test` harness does not invoke. | Verifying these attributes' behavior requires running a Python / PyTorch / loader runtime against the emitted artifact; no `slang-test` directive surfaces that. |
 | (unspecified) | (unclassified) | GLSL `layout(...)` family (`[vk::binding(...)]`, `[vk::location(...)]`, `[push_constant]`, etc.) when the role is best observed via SPIR-V validation on a real Vulkan driver. Emit-text observations for these are partially covered by sibling bundles; we omit duplicates here. | Not reachable via any allowed test directive. |
 | [#inoutmodifier](../../../docs/llm-generated/ast-reference/modifiers.md#inoutmodifier) | (unclassified) | Parent class in the C++ hierarchy (`InOutModifier` derives from `OutModifier`; `Attribute` derives from `AttributeBase` derives from `Modifier`; `HLSLRegisterSemantic` derives from `HLSLLayoutSemantic` derives from `HLSLSemantic`). | Not reachable via any allowed test directive. |
 | [#intrinsicopmodifier](../../../docs/llm-generated/ast-reference/modifiers.md#intrinsicopmodifier) | (unclassified) | Core-module / target binding modifiers (`IntrinsicOpModifier`, `TargetIntrinsicModifier`, `SpecializedForTargetModifier`, `BuiltinTypeModifier`, `MagicTypeModifier`, `BuiltinAttribute`, `AutoDiffBuiltinAttribute`, `KnownBuiltinAttribute`) — not user-spellable outside the core module. | Not reachable via any allowed test directive. |

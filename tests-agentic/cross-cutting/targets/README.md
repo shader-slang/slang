@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T18:30:00+00:00
-source_commit: 1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+generated_at: 2026-05-22T00:00:00+00:00
+source_commit: 6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 watched_paths_digest: 95ca286185fd80c2dcfb776eb9b74e10e9d81f301216a41276a5d3f6a7328814
 source_doc: docs/llm-generated/cross-cutting/targets.md
 source_doc_digest: c52732a0125ff8e2d8f308edaf694a2acd6b3671cb90433ebf99ed2d996ee3cd
@@ -63,6 +63,8 @@ cross-target behavior.
 | Using `RayQuery` (an `sm_6_3` feature) in an entry point with `-profile sm_6_0` under `-restrictive-capability-check` reports the Profile's Version is below the required capability and rejects with `E41013`. | negative | [#runtime-representation](../../../docs/llm-generated/cross-cutting/targets.md#runtime-representation) | [`sm-6-3-feature-on-sm-6-0-rejected-restrictive.slang`](sm-6-3-feature-on-sm-6-0-rejected-restrictive.slang) |
 | A `-target` value that does not appear in the documented target table is rejected with `E00013: unknown code generation target`; target parsing is closed-set against `SlangCompileTarget`. | negative | [#targets](../../../docs/llm-generated/cross-cutting/targets.md#targets) | [`unknown-target-name-rejected.slang`](unknown-target-name-rejected.slang) |
 | Stress probe of the Targets table: the same dense compute kernel (scalar, vector, and matrix work; multiple buffer parameters) compiles to all 7 text-emit targets — HLSL, GLSL, SPIR-V asm, Metal, WGSL, CUDA, C++. | stress | [#targets](../../../docs/llm-generated/cross-cutting/targets.md#targets) | [`all-seven-text-targets-dense-stress.slang`](all-seven-text-targets-dense-stress.slang) |
+| The Targets table lists `SLANG_DXIL` under the HLSL emit backend with DXIL produced downstream by DXC; `-target dxil -profile cs_6_0` emits a DXIL module whose canonical entry-point declaration `define void @main()` is present in the assembly text. | expansion | [#targets](../../../docs/llm-generated/cross-cutting/targets.md#targets) | [`dxil-binary-emission.slang`](dxil-binary-emission.slang) |
+| The Targets table lists `SLANG_METAL_LIB` under the Metal Shading Language emit backend with the Metal library produced downstream by the Apple `metal` toolchain; `-target metallib` emits a Metal library whose canonical entry-point declaration `define void @main` appears in the assembly text. | expansion | [#targets](../../../docs/llm-generated/cross-cutting/targets.md#targets) | [`metallib-binary-emission.slang`](metallib-binary-emission.slang) |
 | The Targets table lists `SLANG_SPIRV` and `SLANG_SPIRV_ASM` as variants of the same emit backend; both `-target spirv-asm` produces SPIR-V text (the assembly-text-form observable in the no-GPU runner). | functional | [#targets](../../../docs/llm-generated/cross-cutting/targets.md#targets) | [`spirv-asm-and-binary-target-variants.slang`](spirv-asm-and-binary-target-variants.slang) |
 | The doc's Targets table lists HLSL/GLSL/SPIR-V/Metal/WGSL/CUDA/C++ as distinct emit backends; the same source compiles successfully to each text-emit target. | functional | [#targets](../../../docs/llm-generated/cross-cutting/targets.md#targets) | [`target-table-all-text-emit.slang`](target-table-all-text-emit.slang) |
 | A stage atom (`compute`) populates the `stage` keyhole; a target atom (`hlsl`, `glsl`, `spirv`, ...) populates the `target` keyhole. Because they populate different keyholes a `compute` entry point is compatible with every text-emit target. | functional | [#vocabulary](../../../docs/llm-generated/cross-cutting/targets.md#vocabulary) | [`capability-conjunction-stage-and-target.slang`](capability-conjunction-stage-and-target.slang) |
@@ -84,10 +86,7 @@ cross-target behavior.
 
 ## Untested coverable claims
 
-| Anchor | Backend | Claim | Why untested |
-| --- | --- | --- | --- |
-| (unspecified) | gpu-dxc-dxil | DXIL binary emission (needs `dxc.exe`). | Agent runtime has no GPU; CI / local machine does. |
-| (unspecified) | gpu-metal-toolchain | MSL binary emission (needs Apple toolchain). | Agent runtime has no GPU; CI / local machine does. |
+(none)
 
 ## Out of scope
 

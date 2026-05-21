@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T17:14:10Z
-source_commit: ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+generated_at: 2026-05-22T00:00:00+00:00
+source_commit: 6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 watched_paths_digest: 0ae70d5983bffa93d300bdc22a2673cef60b90d8c3f77c446bf709e6c35e2e6a
 source_doc: docs/llm-generated/cross-cutting/serialization.md
 source_doc_digest: 53b3dea2b9cfe34f642561251b5ca2a9f9c25cccef2da3b136dd33fba9a90fd5
@@ -28,13 +28,14 @@ template pattern, the Fossil memory-mappable property, the raw RIFF
 chunk layout, the deprecated repro round-trip, and the
 "adding a new serialized field" walkthrough are all out of scope
 because they have no slangc-CLI observable. The bundle is therefore
-small by design (8 tests).
+small by design (9 tests).
 
 ## Coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | Container packaging composes AST + IR + auxiliary data; with -embed-downstream-ir a SPIR-V blob joins the container and surfaces as an EmbeddedDownstreamIR marker under -dump-module. | functional | [#riff-container-format](../../../docs/llm-generated/cross-cutting/serialization.md#riff-container-format) | [`embed-downstream-ir-spirv.slang`](embed-downstream-ir-spirv.slang) |
+| Container packaging composes AST + IR + auxiliary data; with -embed-downstream-ir on -target dxil a DXIL blob joins the container and surfaces as an EmbeddedDownstreamIR(10 : Int, ...) marker under -dump-module. | functional | [#riff-container-format](../../../docs/llm-generated/cross-cutting/serialization.md#riff-container-format) | [`embed-downstream-ir-dxil.slang`](embed-downstream-ir-dxil.slang) |
 | Negative control to the -embed-downstream-ir claim: without the flag, the container does not carry a downstream-IR chunk and -dump-module shows no EmbeddedDownstreamIR marker. | regression | [#riff-container-format](../../../docs/llm-generated/cross-cutting/serialization.md#riff-container-format) | [`no-embed-downstream-ir-absent.slang`](no-embed-downstream-ir-absent.slang) |
 | Source locations survive the compile and reappear in emitted text as #line directives on C-family targets and as OpSource/OpLine markers on SPIR-V. | functional | [#source-location-serialization](../../../docs/llm-generated/cross-cutting/serialization.md#source-location-serialization) | [`source-loc-line-directives-multi-target.slang`](source-loc-line-directives-multi-target.slang) |
 | When debug info is requested, source-location serialization expands to a debug-info stream that names the source file via an OpString in SPIR-V. | functional | [#source-location-serialization](../../../docs/llm-generated/cross-cutting/serialization.md#source-location-serialization) | [`source-loc-spirv-debug.slang`](source-loc-spirv-debug.slang) |
@@ -56,9 +57,7 @@ small by design (8 tests).
 
 ## Untested coverable claims
 
-| Anchor | Backend | Claim | Why untested |
-| --- | --- | --- | --- |
-| [#container-packages-a-downstream-ir-blob](../../../docs/llm-generated/cross-cutting/serialization.md#container-packages-a-downstream-ir-blob) | gpu-dxc-dxil | DXIL `-embed-downstream-ir` — requires `dxc.exe`, not available on the no-GPU runner used here. SPIR-V embedding covers the cross-cutting "container packages a downstream-IR blob" claim. | Agent runtime has no GPU; CI / local machine does. |
+(none)
 
 ## Out of scope
 

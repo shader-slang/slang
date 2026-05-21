@@ -68,16 +68,11 @@ The slangc-observable consequences that *are* tested are:
 | [#edges-intra-project-only](../../../docs/llm-generated/architecture/dependency-graph.md#edges-intra-project-only) | undocumented-behavior | The "Edges (intra-project only)" diagram and "Edge citations" table use the bare subsystem name (`coreLib`, `slangLib`, `slangc`) but the per-edge slug used in this bundle's `doc_ref` resolves only at H2 level. Multiple distinct edges share one anchor (`#edges-intra-project-only`). The doc has no H3 sub-anchor per edge; adding one (e.g. `### slang → prelude (private-include)`) would let per-edge tests be cited individually. |  |
 | [#no-ordinary-linkwith-edge](../../../docs/llm-generated/architecture/dependency-graph.md#no-ordinary-linkwith-edge) | undocumented-behavior | The doc lists three "no ordinary `LINK_WITH_*` edge" subsystems (`source/standard-modules/`, `source/slang-record-replay/`, `source/slang-llvm/`) but none expose a clean slangc CLI surface. The `standard-modules` `neural/` module is gated behind `-experimental-feature`; `slang-record-replay` is folded into `slang` sources; `slang-llvm` is downloaded out-of-tree. The doc could mark which of these has a CLI observable so future bundles do not waste cycles probing them. |  |
 
-## Untested coverable claims
-
-| Anchor | Backend | Claim | Why untested |
-| --- | --- | --- | --- |
-| [#slang-glslang](../../../docs/llm-generated/architecture/dependency-graph.md#slang-glslang) | gpu-spirv-tools | `slang-glslang` external deps: `glslang`, `SPIRV`, `SPIRV-Tools-opt`, `SPIRV-Tools-link`. The CLI consequence is "`slangc` can use glslang as a downstream compiler" — observable but anchored in the targets / downstream-compiler docs, not in the link-graph doc. | Agent runtime has no GPU; CI / local machine does. |
-
 ## Out of scope
 
 | Anchor | Reason | Claim | Why it's terminal |
 | --- | --- | --- | --- |
+| [#slang-glslang](../../../docs/llm-generated/architecture/dependency-graph.md#slang-glslang) | out-of-bundle | `slang-glslang` external deps (`glslang`, `SPIRV`, `SPIRV-Tools-opt`, `SPIRV-Tools-link`). The row itself notes the CLI consequence is "`slangc` can use glslang as a downstream compiler" — observable but anchored in the targets / downstream-compiler docs, not in the link-graph doc. | Anchored in `target-pipelines/` and `cross-cutting/targets`, not the link-graph doc. |
 | (unspecified) | (unclassified) | `capability-lookup → core` and `capability-lookup → capability-defs` from `source/slang/CMakeLists.txt`. The capability system has CLI observables (rejection of unsupported targets, capability error text), but those are anchored in `cross-cutting/capability-system.md`, not in the link graph. | Not reachable via any allowed test directive. |
 | (unspecified) | (unclassified) | `lookup-tables → core` from `source/slang/CMakeLists.txt`. Lookup tables back SPIR-V opcode lookup and similar mappings; their *existence as a separate library* is not slangc-observable. | Not reachable via any allowed test directive. |
 | (unspecified) | (unclassified) | `core-module → core`, `core-module → capability-defs`, `core-module → fiddle-output` from `source/slang-core-module/CMakeLists.txt`. The core module's CLI consequence (built-in types resolve) is tested via C-01; the per-edge structure is not. | Not reachable via any allowed test directive. |
