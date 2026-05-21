@@ -3,6 +3,22 @@
 namespace Slang
 {
 
+static void* _mallocArray(Index count, size_t elementSize)
+{
+    if (count < 0)
+    {
+        return nullptr;
+    }
+
+    const size_t unsignedCount = size_t(count);
+    if (unsignedCount > 0 && elementSize > size_t(-1) / unsignedCount)
+    {
+        return nullptr;
+    }
+
+    return ::malloc(unsignedCount * elementSize);
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RttiTypeFuncs Impls
  * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -61,11 +77,16 @@ struct ListFuncs
 
             if (srcCount > dstList.getCount())
             {
+                void* newBuffer = _mallocArray(count, elementType->m_size);
+                if (!newBuffer && count != 0)
+                {
+                    return;
+                }
+
                 // Allocate new memory
                 const Index dstCapacity = dstList.getCapacity();
                 void* oldBuffer = dstList.detachBuffer();
 
-                void* newBuffer = ::malloc(count * elementType->m_size);
                 // Initialize it all first
                 typeFuncs.ctorArray(typeMap, elementType, newBuffer, count);
                 typeFuncs.copyArray(typeMap, elementType, newBuffer, oldBuffer, count);
@@ -191,11 +212,16 @@ struct StructFuncs
 
             if (srcCount > dstList.getCount())
             {
+                void* newBuffer = _mallocArray(count, elementType->m_size);
+                if (!newBuffer && count != 0)
+                {
+                    return;
+                }
+
                 // Allocate new memory
                 const Index dstCapacity = dstList.getCapacity();
                 void* oldBuffer = dstList.detachBuffer();
 
-                void* newBuffer = ::malloc(count * elementType->m_size);
                 // Initialize it all first
                 typeFuncs.ctorArray(typeMap, elementType, newBuffer, count);
                 typeFuncs.copyArray(typeMap, elementType, newBuffer, oldBuffer, count);
@@ -582,7 +608,12 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
     const auto typeFuncs = typeMap->getFuncsForType(elementType);
     SLANG_ASSERT(typeFuncs.isValid());
 
-    void* newBuffer = ::malloc(count * elementType->m_size);
+    void* newBuffer = _mallocArray(count, elementType->m_size);
+    if (!newBuffer && count != 0)
+    {
+        return SLANG_E_OUT_OF_MEMORY;
+    }
+
     // Initialize it all first
     typeFuncs.ctorArray(typeMap, elementType, newBuffer, count);
 
