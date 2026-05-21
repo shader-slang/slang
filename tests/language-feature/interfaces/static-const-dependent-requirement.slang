@@ -23,10 +23,20 @@ struct WrapperRequirementImpl<let TWidth : uint> : IWrapperRequirement
     }
 }
 
+__generic<T : IWrapperRequirement>
+int readIndirect(T value)
+{
+    let result = value.make();
+    return result.value;
+}
+
 void main()
 {
     WrapperRequirementImpl<7> value = {};
     let result = value.make();
     printf("%d\n", result.value);
+    // CHECK: 7
+
+    printf("%d\n", readIndirect(value));
     // CHECK: 7
 }

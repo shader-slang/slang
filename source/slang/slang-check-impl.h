@@ -3718,7 +3718,13 @@ bool findTypeCoercionWitnessForConstraint(
     bool shouldEmitError);
 
 // Returns `false` if differentiation metadata cannot be proved for the
-// substituted constraint type, and otherwise writes the solved witness.
+// substituted constraint type.
+// * `constraintDecl` is the constraint we need to satisfy.
+// * `genericDeclRef` is the generic decl we are operating on.
+// * `maybeContext` is the context for our current operation. This variable must be filled if
+// `shouldEmitError == true`.
+// * `args` are the current arguments relative to `genericDeclRef`.
+// * `outWitness` receives the solved witness when the constraint is satisfied.
 bool findDiffTypeInfoWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,

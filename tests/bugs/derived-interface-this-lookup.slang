@@ -43,6 +43,45 @@ struct Impl : IGrandDerived
     }
 }
 
+interface ILeftBase
+{
+    This cloneLeft();
+}
+
+interface IRightBase
+{
+    This cloneRight();
+}
+
+interface IDiamond : ILeftBase, IRightBase
+{
+    This cloneDiamond();
+    int getDiamondValue();
+}
+
+struct DiamondImpl : IDiamond
+{
+    DiamondImpl cloneLeft()
+    {
+        return this;
+    }
+
+    DiamondImpl cloneRight()
+    {
+        return this;
+    }
+
+    DiamondImpl cloneDiamond()
+    {
+        return this;
+    }
+
+    int getDiamondValue()
+    {
+        return 41;
+    }
+}
+
 __generic<T : IDerived>
 int readDerived(T value)
 {
@@ -56,6 +95,12 @@ int readGrandDerived(T value)
            value.cloneBase().getValue();
 }
 
+__generic<T : IDiamond>
+int readDiamond(T value)
+{
+    return value.cloneLeft().cloneRight().cloneDiamond().getDiamondValue();
+}
+
 void main()
 {
     Impl value;
@@ -64,4 +109,8 @@ void main()
 
     printf("%d\n", readGrandDerived(value));
     // CHECK: 87
+
+    DiamondImpl diamond;
+    printf("%d\n", readDiamond(diamond));
+    // CHECK: 41
 }
