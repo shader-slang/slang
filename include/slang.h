@@ -4434,6 +4434,12 @@ struct ISession : public ISlangUnknown
 
     /** Checks if a precompiled binary module is up-to-date with the current compiler
      *   option settings and the source file contents.
+     *
+     *   When the module's primary source file cannot be located on the search paths, the
+     *   binary module is treated as a standalone artifact and reported as up-to-date so
+     *   that callers distributing precompiled-only modules can load them. In that case the
+     *   compiler-version and option-set hash carried in the binary are NOT compared. If a
+     *   later (secondary) dependency is missing the module is still reported as stale.
      */
     virtual SLANG_NO_THROW bool SLANG_MCALL
     isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) = 0;
