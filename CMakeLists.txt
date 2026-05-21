@@ -221,6 +221,14 @@ advanced_option(
     ${SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT}
 )
 
+# TODO: Remove this option once SPIRV-Tools fixes the MergeReturnPass UAF:
+# https://github.com/KhronosGroup/SPIRV-Tools/issues/6711
+option(
+    SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
+    "Enable SPIRV-Tools MergeReturnPass in SPIR-V optimization"
+    OFF
+)
+
 option(
     SLANG_SPIRV_HEADERS_INCLUDE_DIR
     "Provide a specific path for the SPIR-V headers and grammar files"
