@@ -64,11 +64,12 @@ on:
         type: string
 
 permissions:
-  contents: read
-  actions: read
+  contents: read # actions/checkout reads the default branch
+  actions: read # ingester needs the runs/jobs/artifacts API endpoints
 
 jobs:
   ingest:
+    name: Ingest one (run_id, run_attempt) into slang_ci
     # workflow_run fires for every completed run of the listed workflows;
     # workflow_dispatch is the manual escape hatch. Both modes share the
     # same ingest path.
@@ -84,11 +85,20 @@ jobs:
     if: |
       (github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch')
       && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    # Serialize ingests for the same (run_id, run_attempt) to avoid the rare
+    # workflow_run ↔ workflow_dispatch race on the same target, and to cap
+    # MERGE retry storms when many workflows complete simultaneously.
+    # Different targets stay parallel because the group key includes the run
+    # id + attempt; cancel-in-progress is false because the loader's
+    # idempotency model means a duplicate ingest is safe to let finish.
+    concurrency:
+      group: ci-telemetry-ingest-${{ github.event.workflow_run.id || inputs.run_id }}-${{ github.event.workflow_run.run_attempt || inputs.run_attempt }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: read
-      actions: read
+      contents: read # actions/checkout
+      actions: read # GitHub API access for runs/jobs/artifacts
       id-token: write # for google-github-actions/auth (OIDC → WIF → ingest SA)
 
     steps:

@@ -44,6 +44,14 @@ _SAFE_TOKEN = re.compile(r"^[A-Za-z0-9_]+$")
 # of "we have exactly one prod project."
 PROJECT = "slang-runners"
 
+# Per-subprocess wall-clock cap for `bq` invocations. The job-level
+# `timeout-minutes` in ci-telemetry.yml is the outer bound, but it kills the
+# whole process group, which would skip the finally-cleanup of staging tables.
+# A per-process timeout lets the loader's exception path run (drop_staging),
+# at the cost of failing the ingest on a stalled CLI/network. Override via
+# the BQ_CMD_TIMEOUT_S env var if a particular run needs longer.
+_BQ_CMD_TIMEOUT_S = int(os.environ.get("BQ_CMD_TIMEOUT_S", "600"))
+
 
 def staging_suffix(
     *,
@@ -110,6 +118,7 @@ def _bq_run(args: list[str]) -> subprocess.CompletedProcess:
         ["bq", *args],
         capture_output=True,
         text=True,
+        timeout=_BQ_CMD_TIMEOUT_S,
     )
     if proc.returncode != 0:
         sys.stderr.write(proc.stderr)
@@ -137,6 +146,7 @@ def _live_schema_path(table: str, *, schema_dir: Path) -> Path:
             check=True,
             capture_output=True,
             text=True,
+            timeout=_BQ_CMD_TIMEOUT_S,
         )
         _schema_cache[table] = json.loads(proc.stdout)
     schema_path = schema_dir / f"{table}.schema.json"
@@ -244,6 +254,7 @@ def run_merge_with_retry(
             input=sql,
             capture_output=True,
             text=True,
+            timeout=_BQ_CMD_TIMEOUT_S,
         )
         if proc.returncode == 0:
             return
