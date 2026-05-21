@@ -2,6 +2,8 @@
 // https://github.com/shader-slang/slang/issues/10267
 
 //TEST:SIMPLE(filecheck=HLSL68): -target hlsl -profile sm_6_8 -stage raygeneration -entry rgen_main
+//TEST:SIMPLE(filecheck=HLSL67): -target hlsl -profile sm_6_7 -stage raygeneration -entry rgen_main
+//TEST:SIMPLE(filecheck=HLSLLIB): -target hlsl -profile lib_6_7 -stage raygeneration -entry rgen_main
 //TEST:SIMPLE(filecheck=HLSL66): -target hlsl -profile sm_6_6 -stage raygeneration -entry rgen_main
 //TEST:SIMPLE(filecheck=DXIL68): -target dxil -profile sm_6_8 -stage raygeneration -entry rgen_main
 //TEST:SIMPLE(filecheck=DXIL66): -target dxil -profile sm_6_6 -stage raygeneration -entry rgen_main
@@ -13,6 +15,14 @@
 // HLSL68-DAG: float3 color_0 : read(caller, anyhit, closesthit, miss) : write(caller, anyhit, closesthit, miss);
 // HLSL68-DAG: struct [raypayload] ExplicitRayPayload
 // HLSL68-DAG: float3 normal_0 : read(caller) : write(miss);
+// HLSL67-DAG: struct [raypayload] RayPayload
+// HLSL67-DAG: float3 color_0 : read(caller, anyhit, closesthit, miss) : write(caller, anyhit, closesthit, miss);
+// HLSL67-DAG: struct [raypayload] ExplicitRayPayload
+// HLSL67-DAG: float3 normal_0 : read(caller) : write(miss);
+// HLSLLIB-DAG: struct [raypayload] RayPayload
+// HLSLLIB-DAG: float3 color_0 : read(caller, anyhit, closesthit, miss) : write(caller, anyhit, closesthit, miss);
+// HLSLLIB-DAG: struct [raypayload] ExplicitRayPayload
+// HLSLLIB-DAG: float3 normal_0 : read(caller) : write(miss);
 // HLSL66-NOT: [raypayload]
 // HLSL66-DAG: struct RayPayload
 // HLSL66-DAG: float3 color_0;
