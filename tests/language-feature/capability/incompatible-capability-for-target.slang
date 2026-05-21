@@ -3,7 +3,8 @@
 // CHECK_ERR: error[E36121]
 // CHECK_ERR: spirv_1_5
 
-// The same SPIRV capability on a SPIRV target is fine.
+// The same SPIRV capability on a SPIRV target is fine (SPIRV caps are auto-converted
+// on this path because -target spirv without -emit-spirv-directly uses GLSL-SPIRV).
 //TEST:SIMPLE(filecheck=CHECK_OK): -target spirv -entry main -stage compute -capability spirv_1_5
 // CHECK_OK: OpEntryPoint
 // CHECK_OK-NOT: E36121
@@ -22,6 +23,11 @@
 //TEST:SIMPLE(filecheck=CHECK_ERR_CPP): -target cpp -entry main -stage compute -capability image_loadstore
 // CHECK_ERR_CPP: error[E36121]
 // CHECK_ERR_CPP: image_loadstore
+
+// Requesting an HLSL capability on a GLSL target should also error.
+//TEST:SIMPLE(filecheck=CHECK_ERR_HLSL_ON_GLSL): -target glsl -entry main -stage compute -capability _sm_6_6
+// CHECK_ERR_HLSL_ON_GLSL: error[E36121]
+// CHECK_ERR_HLSL_ON_GLSL: _sm_6_6
 
 // Note: cross-target version aliases like sm_6_0 intentionally include SPIRV paths
 // (sm_6_0 maps to spirv_1_3 for SPIRV targets), so they do NOT trigger E36121.

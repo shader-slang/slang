@@ -164,6 +164,11 @@ public:
     HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions();
 
 private:
+    /// Returns true if this target emits GLSL or uses the GLSL-SPIRV pipeline.
+    /// Used to determine whether SPIRV capability atoms should be auto-converted
+    /// rather than treated as incompatible. Keep in sync with getTargetCaps().
+    bool isGLSLBasedTarget();
+
     Linkage* linkage = nullptr;
     CompilerOptionSet optionSet;
     CapabilitySet cookedCapabilities;

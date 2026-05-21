@@ -64,6 +64,20 @@ void TargetRequest::setTargetCaps(CapabilitySet capSet)
     cookedCapabilities = capSet;
 }
 
+bool TargetRequest::isGLSLBasedTarget()
+{
+    switch (getTarget())
+    {
+    case CodeGenTarget::GLSL:
+        return true;
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+        return !optionSet.shouldEmitSPIRVDirectly();
+    default:
+        return false;
+    }
+}
+
 CapabilitySet TargetRequest::getTargetCaps()
 {
     // Capabilities are derived lazily and shared across entry-point compiles for the same target.
@@ -96,11 +110,10 @@ CapabilitySet TargetRequest::getTargetCaps()
     // a corresponding atom representing the target version from the profile.
     CapabilitySet profileCaps = optionSet.getProfile().getCapabilityName();
 
-    bool isGLSLTarget = false;
+    bool isGLSLTarget = isGLSLBasedTarget();
     switch (getTarget())
     {
     case CodeGenTarget::GLSL:
-        isGLSLTarget = true;
         atoms.add(CapabilityName::glsl);
         break;
     case CodeGenTarget::SPIRV:
@@ -144,7 +157,6 @@ CapabilitySet TargetRequest::getTargetCaps()
         }
         else
         {
-            isGLSLTarget = true;
             atoms.add(CapabilityName::glsl);
             profileCaps.addSpirvVersionFromOtherAsGlslSpirvVersion(profileCaps);
         }
@@ -244,25 +256,10 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
     if (!sink)
         return;
 
-    // Determine if this is a GLSL-based target. For GLSL targets, SPIRV version and
-    // extension atoms are intentionally converted to their GLSL-SPIRV equivalents
-    // rather than being treated as incompatible, so we skip those.
-    // NOTE: This mirrors the isGLSLTarget logic in getTargetCaps() — keep them in sync
-    // if new GLSL-based targets are added.
-    bool isGLSLTarget = false;
-    switch (getTarget())
-    {
-    case CodeGenTarget::GLSL:
-        isGLSLTarget = true;
-        break;
-    case CodeGenTarget::SPIRV:
-    case CodeGenTarget::SPIRVAssembly:
-        if (!optionSet.shouldEmitSPIRVDirectly())
-            isGLSLTarget = true;
-        break;
-    default:
-        break;
-    }
+    // For GLSL-based targets, SPIRV version and extension atoms are intentionally
+    // converted to their GLSL-SPIRV equivalents by getTargetCaps(), so they are
+    // not an error here.
+    bool isGLSLTarget = isGLSLBasedTarget();
 
     auto cookedCaps = getTargetCaps();
     auto& targetOptionSet = getOptionSet();
