@@ -17,37 +17,39 @@ namespace renderer_test
 {
 using namespace Slang;
 
-// Helper function to convert a feature name to the RHI feature enum.
-static bool parseFeatureName(
+// Helper function to check if a feature name is valid
+static bool isValidFeatureName(
     const UnownedStringSlice& featureName,
-    Feature* outFeature,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    SourceLoc loc)
 {
-#define SLANG_RHI_FEATURES_X(id, name)           \
-    if (featureName == UnownedStringSlice(name)) \
-    {                                            \
-        *outFeature = Feature::id;               \
-        return true;                             \
-    }
-    SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)
-#undef SLANG_RHI_FEATURES_X
-
-    // WAR: Accept cooperative-matrix-2 sub-features until RHI backend supports them.
-    // These features will be gracefully skipped at runtime if hardware does not support them.
+    // WAR: Accept cooperative-matrix-2 sub-features until RHI backend supports them
+    // These features will be gracefully skipped at runtime if hardware doesn't support them
     if (featureName.startsWith("cooperative-matrix-"))
     {
         if (sink)
         {
             sink->diagnoseRaw(
                 Severity::Warning,
-                "warning: Using cooperative-matrix-2 feature that is not yet fully supported "
+                "Using cooperative-matrix-2 feature that is not yet fully supported "
                 "in RHI backend. "
-                "Test will be skipped if hardware does not support it.\n");
+                "Test will be skipped if hardware doesn't support it.");
         }
-        *outFeature = Feature::CooperativeMatrix2;
         return true;
     }
+#define SLANG_RHI_FEATURES_X(id, name) name,
+    static const char* kValidFeatureNames[] = {SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)};
+#undef SLANG_RHI_FEATURES_X
 
+    static const int kFeatureCount = sizeof(kValidFeatureNames) / sizeof(kValidFeatureNames[0]);
+
+    for (int i = 0; i < kFeatureCount; i++)
+    {
+        if (featureName == UnownedStringSlice(kValidFeatureNames[i]))
+        {
+            return true;
+        }
+    }
     return false;
 }
 
@@ -151,8 +153,8 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
 
             for (const auto& value : values)
             {
-                Feature feature;
-                if (!parseFeatureName(value, &feature, &sink))
+                // Validate that the feature name is recognized
+                if (!isValidFeatureName(value, &sink, featuresArg.loc))
                 {
                     sink.diagnose(
                         featuresArg.loc,
@@ -160,7 +162,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
                         value);
                     return SLANG_FAIL;
                 }
-                outOptions.renderFeatures.add(feature);
+                outOptions.renderFeatures.add(value);
             }
         }
         else if (argValue == "-xslang" || argValue == "-compile-arg")

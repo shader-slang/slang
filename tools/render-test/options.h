@@ -78,7 +78,7 @@ struct Options
 
     Slang::String entryPointName;
 
-    Slang::List<Feature> renderFeatures; /// Required render features for this test to run
+    Slang::List<Slang::String> renderFeatures; /// Required render features for this test to run
 
     uint32_t computeDispatchSize[3] = {1, 1, 1};
 

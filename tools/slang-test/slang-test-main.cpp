@@ -2099,58 +2099,6 @@ static bool _areResultsEqual(TestOptions::Type type, const String& a, const Stri
     }
 }
 
-static bool _containsOnlyWarnings(const UnownedStringSlice& text)
-{
-    if (text.trim().getLength() == 0)
-        return true;
-
-    List<UnownedStringSlice> lines;
-    StringUtil::split(text, '\n', lines);
-    for (const auto& line : lines)
-    {
-        auto trimmedLine = line.trim();
-        if (trimmedLine.getLength() == 0)
-            continue;
-        if (trimmedLine.startsWith(UnownedStringSlice::fromLiteral("warning:")))
-            continue;
-        if (trimmedLine.startsWith(UnownedStringSlice::fromLiteral("Warning:")))
-            continue;
-        return false;
-    }
-    return true;
-}
-
-static bool _areResultsEqualAllowingWarnings(const String& actual, const String& expected)
-{
-    if (_areLinesEqual(actual, expected))
-        return true;
-
-    ParseDiagnosticUtil::OutputInfo actualInfo, expectedInfo;
-    if (SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(actual.getUnownedSlice(), actualInfo)) ||
-        SLANG_FAILED(
-            ParseDiagnosticUtil::parseOutputInfo(expected.getUnownedSlice(), expectedInfo)))
-    {
-        return false;
-    }
-
-    if (actualInfo.resultCode != expectedInfo.resultCode ||
-        !StringUtil::areLinesEqual(
-            actualInfo.stdOut.getUnownedSlice(),
-            expectedInfo.stdOut.getUnownedSlice()))
-    {
-        return false;
-    }
-
-    if (expectedInfo.stdError.getUnownedSlice().trim().getLength() != 0)
-    {
-        return StringUtil::areLinesEqual(
-            actualInfo.stdError.getUnownedSlice(),
-            expectedInfo.stdError.getUnownedSlice());
-    }
-
-    return _containsOnlyWarnings(actualInfo.stdError.getUnownedSlice());
-}
-
 static String _calcModulePath(const TestInput& input)
 {
     // Make the module name the same as the source file
@@ -4165,8 +4113,7 @@ TestResult runComputeComparisonImpl(
         input,
         actualOutput,
         false,
-        "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
-        _areResultsEqualAllowingWarnings);
+        "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n");
 
     // check against reference output
     String actualOutputContent;
