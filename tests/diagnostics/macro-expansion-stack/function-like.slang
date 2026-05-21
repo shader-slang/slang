@@ -26,3 +26,19 @@ void test2()
 //diag:      ^ undefined identifier
 //diag:      ^ undefined identifier 'UndefinedArgType'.
 }
+
+// Case 3: a macro invoked as an argument to another macro, with the error
+// inside the inner macro's body.  The chain should still show
+// "expanded from macro 'INNER'" pointing back to the call site.
+#define INNER_MACRO(x) UndefinedInnerType q
+#define OUTER_MACRO(x) x
+
+void test3()
+{
+    OUTER_MACRO(INNER_MACRO(1))
+}
+
+// CHECK: UndefinedInnerType
+// CHECK: undefined identifier
+// CHECK: expanded from macro 'INNER_MACRO'
+// CHECK: function-like.slang:38
