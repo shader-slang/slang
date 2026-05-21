@@ -419,6 +419,23 @@ bundles:
       category: agentic-cross-cutting
     size_cap_files: 30
 
+  cross-cutting/diagnostics-catalog:
+    prompt: prompts/cross-cutting-diagnostics-catalog.md
+    source_doc: docs/llm-generated/cross-cutting/diagnostics.md
+    watched_paths:
+      - source/slang/slang-diagnostics.lua
+      - source/compiler-core/slang-lexer-diagnostic-defs.h
+      - source/compiler-core/slang-misc-diagnostic-defs.h
+      - source/compiler-core/slang-json-diagnostic-defs.h
+    depends_on:
+      - cross-cutting/diagnostics
+    coverage_targets:
+      - source/slang/slang-diagnostics.cpp
+      - source/compiler-core/slang-diagnostic-sink.cpp
+    runner:
+      category: agentic-cross-cutting
+    size_cap_files: 800
+
   # --- ast-reference/ ----------------------------------------------------
 
   ast-reference/index:

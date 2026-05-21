@@ -91,6 +91,13 @@
       "source_doc_digest": "35cfb9612e0af198f089e0c87a82055a4f43737c2865d74d83133722d9f18bda",
       "watched_paths_digest": "a79bc9266564f8d663b4a60ade42dd146b58decdeb8ab1715ae4cd41e01a9a09"
     },
+    "cross-cutting/diagnostics-catalog": {
+      "generated_at": "2026-05-21T08:38:46+00:00",
+      "model": "claude-opus-4-7",
+      "source_commit": "2964da04de136705348240f2bd9affa5f3818226",
+      "source_doc_digest": "35cfb9612e0af198f089e0c87a82055a4f43737c2865d74d83133722d9f18bda",
+      "watched_paths_digest": "d978c673bd877c4c2dbdf69ee7ae59f91418131f0d86559e7a80b68c78f20ed3"
+    },
     "cross-cutting/ir-instructions": {
       "generated_at": "2026-05-21T07:11:06+00:00",
       "model": "claude-opus-4-7",
