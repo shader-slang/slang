@@ -225,6 +225,11 @@ def main():
                 continue
             branch_site = parse_manifest_int(branch_site, "v2 entry branch_site")
             branch_arm = parse_manifest_int(branch_arm, "v2 entry branch_arm")
+            if branch_site < 0 or branch_arm < 0:
+                sys.exit(
+                    "error: manifest v2 entry branch_site and branch_arm "
+                    "must be non-negative"
+                )
             branch_key = (line, branch_site, branch_arm)
             branches_by_source[source][branch_key] = (
                 branches_by_source[source].get(branch_key, 0) + count

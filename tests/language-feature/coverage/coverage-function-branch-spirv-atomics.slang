@@ -28,3 +28,4 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: OpAtomicIAdd
 //CHECK-DAG: OpAtomicIAdd
 //CHECK-DAG: OpAtomicIAdd
+//CHECK-NOT: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_3

@@ -7,4 +7,5 @@ void computeMain()
 }
 
 //CHECK: error[E45104]
+//CHECK-SAME: -trace-function-coverage
 //CHECK-SAME: cannot be combined with `-pass-through`

@@ -27,3 +27,4 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(0\)}}
 //CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(1\)}}
 //CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(2\)}}
+//CHECK-NOT: atomicAdd{{.*_slang_coverage.*int\(3\)}}

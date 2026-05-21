@@ -246,6 +246,31 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             result.stderr,
         )
 
+    def test_rejects_negative_v2_branch_ids(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "entries": [
+                {
+                    "kind": "branch",
+                    "counter": 0,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 13,
+                    "branch_site": -1,
+                    "branch_arm": 0,
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "5\n", check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "error: manifest v2 entry branch_site and branch_arm must be non-negative",
+            result.stderr,
+        )
+
     def test_rejects_unknown_manifest_version(self):
         manifest = {
             "version": 999,
