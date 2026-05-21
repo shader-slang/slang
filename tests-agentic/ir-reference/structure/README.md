@@ -39,59 +39,32 @@ observes a parent / child relationship, a top-level declaration's
 linkage, or a structural cross-link (interface-side and
 witness-side sharing a key, generic body yielding a func).
 
-## Claims enumerated
+## Coverage
 
-| Claim ID | Anchor | Claim (one line) | Tests |
+| Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
-| C-01 | [#func](../../../docs/llm-generated/ir-reference/structure.md#func) | An entry-point function lowers to a `func` parent opcode with the signature on its `Func(...)` result type. | [`func-entry-point.slang`](func-entry-point.slang) |
-| C-02 | [#func](../../../docs/llm-generated/ir-reference/structure.md#func) | A user-named helper function lowers to `func %helper : Func(retT, paramT...)` with `param` children on the entry block. | [`func-helper-signature.slang`](func-helper-signature.slang) |
-| C-03 | [#functions-and-generics](../../../docs/llm-generated/ir-reference/structure.md#functions-and-generics) | A call lowers to a `call` opcode whose first operand is the callee `func` and remaining operands are the arguments. | [`func-call-link.slang`](func-call-link.slang) |
-| C-04 | [#func](../../../docs/llm-generated/ir-reference/structure.md#func) | The entry block of a `func` owns its function parameters as `param` children in declaration order. | [`func-param-on-entry-block.slang`](func-param-on-entry-block.slang) |
-| C-05 | [#func](../../../docs/llm-generated/ir-reference/structure.md#func) | `NameHintDecoration` attaches to the `func` opcode itself, immediately preceding the `func %name` header line in the dump. | [`func-name-hint-decoration.slang`](func-name-hint-decoration.slang) |
-| C-06 | [#struct-internals](../../../docs/llm-generated/ir-reference/structure.md#struct-internals) | A `struct` declaration lowers to a `struct` parent opcode owning `field(key, fieldType)` children. | [`struct-parent-with-fields.slang`](struct-parent-with-fields.slang) |
-| C-07 | [#struct-internals](../../../docs/llm-generated/ir-reference/structure.md#struct-internals) | A `class` declaration lowers to a `class` parent opcode (distinct spelling from `struct`) with the same `field`/`key` child shape. | [`class-parent-with-field.slang`](class-parent-with-field.slang) |
-| C-08 | [#struct-internals](../../../docs/llm-generated/ir-reference/structure.md#struct-internals) | A struct with multiple heterogeneous-typed fields emits one `field(key, T)` child per declared field with matching element type. | [`struct-with-many-fields.slang`](struct-with-many-fields.slang) |
-| C-09 | [#key-structkey](../../../docs/llm-generated/ir-reference/structure.md#key-structkey) | A field-name key is a top-level `let %name : _ = key` carrying an `[export(...)]` decoration recording its mangled linkage name. | [`struct-key-has-export-linkage.slang`](struct-key-has-export-linkage.slang) |
-| C-10 | [#key-structkey](../../../docs/llm-generated/ir-reference/structure.md#key-structkey) | Field-access opcodes (`get_field_addr`) use the `StructKey` as their selector. | [`struct-key-selects-field-access.slang`](struct-key-selects-field-access.slang) |
-| C-11 | [#interface-internals](../../../docs/llm-generated/ir-reference/structure.md#interface-internals) | An `interface` declaration lowers to `interface(...)` whose operands are `interface_req_entry(key, requirementType)` rows. | [`interface-with-requirement.slang`](interface-with-requirement.slang) |
-| C-12 | [#interface-internals](../../../docs/llm-generated/ir-reference/structure.md#interface-internals) | An interface with multiple method requirements emits one `interface_req_entry` per requirement and lists all of them as operands of the `interface` opcode. | [`interface-multiple-requirements.slang`](interface-multiple-requirements.slang) |
-| C-13 | [#witnesstableentry-vs-interfacereqentry](../../../docs/llm-generated/ir-reference/structure.md#witnesstableentry-vs-interfacereqentry) | The `requirementKey` operand of an `interface_req_entry` is the same `StructKey` value used by the satisfying `witness_table_entry`. | [`interface-req-key-shape.slang`](interface-req-key-shape.slang) |
-| C-14 | [#witness-tables-and-witness-facts](../../../docs/llm-generated/ir-reference/structure.md#witness-tables-and-witness-facts) | A struct implementing an interface produces a `witness_table` whose type is `witness_table_t(interface)(implementing-type)`. | [`witness-table-parent.slang`](witness-table-parent.slang) |
-| C-15 | [#witnesstableentry-vs-interfacereqentry](../../../docs/llm-generated/ir-reference/structure.md#witnesstableentry-vs-interfacereqentry) | Each row of a `witness_table` is a `witness_table_entry(requirementKey, satisfyingVal)`. | [`witness-table-entry-pairs.slang`](witness-table-entry-pairs.slang) |
-| C-16 | [#witnesstableentry-vs-interfacereqentry](../../../docs/llm-generated/ir-reference/structure.md#witnesstableentry-vs-interfacereqentry) | Two distinct struct conformances to the same interface produce two distinct `witness_table`s both keyed by the same `requirementKey`. | [`two-impls-share-requirement-key.slang`](two-impls-share-requirement-key.slang) |
-| C-17 | [#witness-tables-and-witness-facts](../../../docs/llm-generated/ir-reference/structure.md#witness-tables-and-witness-facts) | A generic body that calls a method on a constrained type parameter emits a `lookupWitness(witnessTable, requirementKey)` opcode. | [`lookup-witness-in-generic.slang`](lookup-witness-in-generic.slang) |
-| C-18 | [#generic](../../../docs/llm-generated/ir-reference/structure.md#generic) | A generic function lowers to a `generic` parent opcode containing a `func` child whose signature is parameterised by the type parameter. | [`generic-function-parent.slang`](generic-function-parent.slang) |
-| C-19 | [#generic](../../../docs/llm-generated/ir-reference/structure.md#generic) | The generic body produces a `func` value as its yield result; the LOWER-TO-IR dump shows `return_val(%func)` on the generic's single block. | [`generic-body-yields-func.slang`](generic-body-yields-func.slang) |
-| C-20 | [#global-state](../../../docs/llm-generated/ir-reference/structure.md#global-state) | A module-scope `static int` variable lowers to a `global_var %name : Ptr(T)` opcode with a one-block initializer body. | [`global-var-mutable.slang`](global-var-mutable.slang) |
-| C-21 | [#global-state](../../../docs/llm-generated/ir-reference/structure.md#global-state) | A module-scope `uniform` parameter lowers to `let %name : T = global_param`. | [`global-param-uniform.slang`](global-param-uniform.slang) |
-| C-22 | [#global-state](../../../docs/llm-generated/ir-reference/structure.md#global-state) | A module-scope `static const` lowers to `let %name : T = globalConstant(literal)`. | [`global-constant-value.slang`](global-constant-value.slang) |
-
-## Tests in this bundle
-
-| File | Intent | Doc anchor |
-| --- | --- | --- |
-| [`func-entry-point.slang`](func-entry-point.slang) | functional | `#func` |
-| [`func-helper-signature.slang`](func-helper-signature.slang) | functional | `#func` |
-| [`func-call-link.slang`](func-call-link.slang) | functional | `#functions-and-generics` |
-| [`func-param-on-entry-block.slang`](func-param-on-entry-block.slang) | functional | `#func` |
-| [`func-name-hint-decoration.slang`](func-name-hint-decoration.slang) | functional | `#func` |
-| [`struct-parent-with-fields.slang`](struct-parent-with-fields.slang) | functional | `#struct-internals` |
-| [`class-parent-with-field.slang`](class-parent-with-field.slang) | functional | `#struct-internals` |
-| [`struct-with-many-fields.slang`](struct-with-many-fields.slang) | functional | `#struct-internals` |
-| [`struct-key-has-export-linkage.slang`](struct-key-has-export-linkage.slang) | functional | `#key-structkey` |
-| [`struct-key-selects-field-access.slang`](struct-key-selects-field-access.slang) | functional | `#key-structkey` |
-| [`interface-with-requirement.slang`](interface-with-requirement.slang) | functional | `#interface-internals` |
-| [`interface-multiple-requirements.slang`](interface-multiple-requirements.slang) | functional | `#interface-internals` |
-| [`interface-req-key-shape.slang`](interface-req-key-shape.slang) | functional | `#witnesstableentry-vs-interfacereqentry` |
-| [`witness-table-parent.slang`](witness-table-parent.slang) | functional | `#witness-tables-and-witness-facts` |
-| [`witness-table-entry-pairs.slang`](witness-table-entry-pairs.slang) | functional | `#witnesstableentry-vs-interfacereqentry` |
-| [`two-impls-share-requirement-key.slang`](two-impls-share-requirement-key.slang) | functional | `#witnesstableentry-vs-interfacereqentry` |
-| [`lookup-witness-in-generic.slang`](lookup-witness-in-generic.slang) | functional | `#witness-tables-and-witness-facts` |
-| [`generic-function-parent.slang`](generic-function-parent.slang) | functional | `#generic` |
-| [`generic-body-yields-func.slang`](generic-body-yields-func.slang) | functional | `#generic` |
-| [`global-var-mutable.slang`](global-var-mutable.slang) | functional | `#global-state` |
-| [`global-param-uniform.slang`](global-param-uniform.slang) | functional | `#global-state` |
-| [`global-constant-value.slang`](global-constant-value.slang) | functional | `#global-state` |
+| A user-named helper function lowers to func %helper with the signature on its Func(...) result type and parameters as Param children of the entry block. | functional | [#func](../../../docs/llm-generated/ir-reference/structure.md#func) | [`func-helper-signature.slang`](func-helper-signature.slang) |
+| An entry-point function lowers to a func parent opcode whose Func(...) result type carries the signature. | functional | [#func](../../../docs/llm-generated/ir-reference/structure.md#func) | [`func-entry-point.slang`](func-entry-point.slang) |
+| Function-level decorations like NameHint attach to the func opcode itself rather than to its body, per the doc's notable-opcodes note on func. | functional | [#func](../../../docs/llm-generated/ir-reference/structure.md#func) | [`func-name-hint-decoration.slang`](func-name-hint-decoration.slang) |
+| The entry block of a func owns its function parameters as param children in declaration order. | functional | [#func](../../../docs/llm-generated/ir-reference/structure.md#func) | [`func-param-on-entry-block.slang`](func-param-on-entry-block.slang) |
+| A function call lowers to a call opcode whose first operand is the callee func and remaining operands are the arguments. | functional | [#functions-and-generics](../../../docs/llm-generated/ir-reference/structure.md#functions-and-generics) | [`func-call-link.slang`](func-call-link.slang) |
+| A generic body produces a func value as its yield result; the LOWER-TO-IR dump shows this as a return_val(%func) on the generic's single block. | functional | [#generic](../../../docs/llm-generated/ir-reference/structure.md#generic) | [`generic-body-yields-func.slang`](generic-body-yields-func.slang) |
+| A generic function lowers to a generic parent opcode containing a func child whose signature is parameterised by the type parameter. | functional | [#generic](../../../docs/llm-generated/ir-reference/structure.md#generic) | [`generic-function-parent.slang`](generic-function-parent.slang) |
+| A `static const int` at module scope lowers to a globalConstant opcode wrapping the literal value. | functional | [#global-state](../../../docs/llm-generated/ir-reference/structure.md#global-state) | [`global-constant-value.slang`](global-constant-value.slang) |
+| A module-scope `static int` variable lowers to a global_var opcode with a Ptr-typed result and a one-block initializer body. | functional | [#global-state](../../../docs/llm-generated/ir-reference/structure.md#global-state) | [`global-var-mutable.slang`](global-var-mutable.slang) |
+| A module-scope uniform parameter lowers to a global_param opcode at module scope. | functional | [#global-state](../../../docs/llm-generated/ir-reference/structure.md#global-state) | [`global-param-uniform.slang`](global-param-uniform.slang) |
+| An interface declaration lowers to an interface opcode whose operands are interface_req_entry rows pairing a requirement key with the requirement's type. | functional | [#interface-internals](../../../docs/llm-generated/ir-reference/structure.md#interface-internals) | [`interface-with-requirement.slang`](interface-with-requirement.slang) |
+| An interface with multiple method requirements emits one interface_req_entry per requirement, and the interface opcode lists all of them as its operands. | functional | [#interface-internals](../../../docs/llm-generated/ir-reference/structure.md#interface-internals) | [`interface-multiple-requirements.slang`](interface-multiple-requirements.slang) |
+| The requirementKey operand of an interface_req_entry is the same StructKey value that names the requirement on the witness_table_entry that satisfies it. | functional | [#interface-internals](../../../docs/llm-generated/ir-reference/structure.md#interface-internals) | [`interface-req-key-shape.slang`](interface-req-key-shape.slang) |
+| A field-name key is a top-level let with an export-linkage decoration so the same field compares equal across compilation units. | functional | [#key-structkey](../../../docs/llm-generated/ir-reference/structure.md#key-structkey) | [`struct-key-has-export-linkage.slang`](struct-key-has-export-linkage.slang) |
+| Field-access opcodes (get_field_addr) use the StructKey as the selector, confirming that StructKey is the identity of a field rather than a string name. | functional | [#key-structkey](../../../docs/llm-generated/ir-reference/structure.md#key-structkey) | [`struct-key-selects-field-access.slang`](struct-key-selects-field-access.slang) |
+| A class declaration lowers to a class parent opcode (distinct spelling from struct) owning field and key children. | functional | [#struct-internals](../../../docs/llm-generated/ir-reference/structure.md#struct-internals) | [`class-parent-with-field.slang`](class-parent-with-field.slang) |
+| A struct declaration lowers to a struct parent opcode whose children are field opcodes pairing a key with a fieldType. | functional | [#struct-internals](../../../docs/llm-generated/ir-reference/structure.md#struct-internals) | [`struct-parent-with-fields.slang`](struct-parent-with-fields.slang) |
+| A struct with multiple heterogeneous-typed fields emits one field child per declared field, each pairing its own key with its declared type. | functional | [#struct-internals](../../../docs/llm-generated/ir-reference/structure.md#struct-internals) | [`struct-with-many-fields.slang`](struct-with-many-fields.slang) |
+| A generic body that calls a method on a constrained type parameter emits a lookupWitness opcode whose operands are (witness_table, requirementKey). | functional | [#witness-tables-and-witness-facts](../../../docs/llm-generated/ir-reference/structure.md#witness-tables-and-witness-facts) | [`lookup-witness-in-generic.slang`](lookup-witness-in-generic.slang) |
+| A struct that implements an interface produces a witness_table parent whose type is witness_table_t(interface)(implementing-type). | functional | [#witness-tables-and-witness-facts](../../../docs/llm-generated/ir-reference/structure.md#witness-tables-and-witness-facts) | [`witness-table-parent.slang`](witness-table-parent.slang) |
+| Each row of a witness_table is a witness_table_entry pairing a requirementKey with the concrete satisfying function value. | functional | [#witnesstableentry-vs-interfacereqentry](../../../docs/llm-generated/ir-reference/structure.md#witnesstableentry-vs-interfacereqentry) | [`witness-table-entry-pairs.slang`](witness-table-entry-pairs.slang) |
+| Two distinct struct conformances to the same interface produce two distinct witness_tables both keyed by the same requirementKey. | functional | [#witnesstableentry-vs-interfacereqentry](../../../docs/llm-generated/ir-reference/structure.md#witnesstableentry-vs-interfacereqentry) | [`two-impls-share-requirement-key.slang`](two-impls-share-requirement-key.slang) |
 
 ## Out of scope (no-GPU runner)
 

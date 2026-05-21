@@ -38,32 +38,20 @@ have no portable shader-language surface that reliably produces
 them on the LOWER-TO-IR stage. They are recorded under
 `## Out of scope (no-GPU runner)` below.
 
-## Claims enumerated
+## Coverage
 
-| Claim ID | Anchor                       | Claim (one line)                                                                                                                     | Tests                                                                                                                          |
-| -------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| C-01     | #size-alignment-count        | `sizeof(T)` on a generic type parameter lowers to `sizeOf(%T, ScalarLayout)` at LOWER-TO-IR.                                         | [`sizeof-generic.slang`](sizeof-generic.slang), [`sizeof-alignof-data-layout-operand.slang`](sizeof-alignof-data-layout-operand.slang)                                                             |
-| C-02     | #size-alignment-count        | `alignof(T)` on a generic type parameter lowers to `alignOf(%T, ScalarLayout)` at LOWER-TO-IR.                                       | [`alignof-generic.slang`](alignof-generic.slang), [`sizeof-alignof-data-layout-operand.slang`](sizeof-alignof-data-layout-operand.slang)                                                            |
-| C-03     | #size-alignment-count        | `countof(D)` on a variadic int-pack parameter lowers to the `countOf(%D)` opcode.                                                    | [`countof-pack.slang`](countof-pack.slang), [`countof-struct-member.slang`](countof-struct-member.slang)                                                                            |
-| C-04     | #size-alignment-count        | `sizeOf` accepts an explicit data-layout type as its second operand (`Std140Layout` / `Std430Layout` token in the IR).               | [`sizeof-explicit-data-layout.slang`](sizeof-explicit-data-layout.slang)                                                                                            |
-| C-05     | #type-queries-and-predicates | The `is` operator on an existential-typed parameter lowers to `IsType(value, valueWitness, typeOperand, targetWitness)`.             | [`istype-existential.slang`](istype-existential.slang)                                                                                                     |
-| C-06     | #pack-and-expansion          | The `expand` keyword in a variadic-generic body lowers to the `Expand` IR opcode that introduces an iteration scope over a pack.    | [`expand-variadic-pack.slang`](expand-variadic-pack.slang)                                                                                                   |
-| C-07     | #string-hashing              | `getStringHash("<literal>")` lowers to the `getStringHash` opcode carrying the string-literal operand verbatim.                      | [`string-hash.slang`](string-hash.slang), [`string-hash-deterministic.slang`](string-hash-deterministic.slang)                                                                         |
-
-## Tests in this bundle
-
-| File                                          | Intent     | Doc anchor                       |
-| --------------------------------------------- | ---------- | -------------------------------- |
-| [`sizeof-generic.slang`](sizeof-generic.slang)                        | functional | `#size-alignment-count`          |
-| [`alignof-generic.slang`](alignof-generic.slang)                       | functional | `#size-alignment-count`          |
-| [`countof-pack.slang`](countof-pack.slang)                          | functional | `#size-alignment-count`          |
-| [`countof-struct-member.slang`](countof-struct-member.slang)                 | functional | `#size-alignment-count`          |
-| [`sizeof-alignof-data-layout-operand.slang`](sizeof-alignof-data-layout-operand.slang)    | functional | `#size-alignment-count`          |
-| [`sizeof-explicit-data-layout.slang`](sizeof-explicit-data-layout.slang)           | functional | `#size-alignment-count`          |
-| [`istype-existential.slang`](istype-existential.slang)                    | functional | `#type-queries-and-predicates`   |
-| [`expand-variadic-pack.slang`](expand-variadic-pack.slang)                  | functional | `#pack-and-expansion`            |
-| [`string-hash.slang`](string-hash.slang)                           | functional | `#string-hashing`                |
-| [`string-hash-deterministic.slang`](string-hash-deterministic.slang)             | functional | `#string-hashing`                |
+| Claim | Intent | Anchor | Tests |
+| --- | --- | --- | --- |
+| The `expand` keyword on a variadic value pack lowers to the `Expand` IR opcode that introduces an iteration scope over the pack. | functional | [#pack-and-expansion](../../../docs/llm-generated/ir-reference/misc.md#pack-and-expansion) | [`expand-variadic-pack.slang`](expand-variadic-pack.slang) |
+| Both `sizeOf` and `alignOf` opcodes carry an optional data-layout operand (the doc lists `dataLayout?` for both rows). | functional | [#size-alignment-count](../../../docs/llm-generated/ir-reference/misc.md#size-alignment-count) | [`sizeof-alignof-data-layout-operand.slang`](sizeof-alignof-data-layout-operand.slang) |
+| Passing an explicit data-layout type to `sizeof` selects the corresponding layout token (`Std140Layout` / `Std430Layout`) in the second operand of the `sizeOf` opcode. | functional | [#size-alignment-count](../../../docs/llm-generated/ir-reference/misc.md#size-alignment-count) | [`sizeof-explicit-data-layout.slang`](sizeof-explicit-data-layout.slang) |
+| `alignof(T)` in a generic body lowers to the `alignOf` IR opcode with the type operand and an optional data-layout operand. | functional | [#size-alignment-count](../../../docs/llm-generated/ir-reference/misc.md#size-alignment-count) | [`alignof-generic.slang`](alignof-generic.slang) |
+| `countof(D)` inside a `static const` field of a generic struct still surfaces `countOf` in the IR dump at LOWER-TO-IR. | functional | [#size-alignment-count](../../../docs/llm-generated/ir-reference/misc.md#size-alignment-count) | [`countof-struct-member.slang`](countof-struct-member.slang) |
+| `countof(pack)` on a variadic int parameter pack lowers to the `countOf` IR opcode taking the pack as its operand. | functional | [#size-alignment-count](../../../docs/llm-generated/ir-reference/misc.md#size-alignment-count) | [`countof-pack.slang`](countof-pack.slang) |
+| `sizeof(T)` in a generic body lowers to the `sizeOf` IR opcode carrying the type operand and a data-layout token. | functional | [#size-alignment-count](../../../docs/llm-generated/ir-reference/misc.md#size-alignment-count) | [`sizeof-generic.slang`](sizeof-generic.slang) |
+| Two identical `getStringHash(...)` calls reference the same string-literal operand in the IR dump (stable hash, same operand). | functional | [#string-hashing](../../../docs/llm-generated/ir-reference/misc.md#string-hashing) | [`string-hash-deterministic.slang`](string-hash-deterministic.slang) |
+| `getStringHash("...")` lowers to the `getStringHash` IR opcode carrying the literal string operand for a stable compile-time hash. | functional | [#string-hashing](../../../docs/llm-generated/ir-reference/misc.md#string-hashing) | [`string-hash.slang`](string-hash.slang) |
+| The `is` operator on an existential parameter lowers to the `IsType` IR opcode with `(value, valueWitness, typeOperand, targetWitness)`. | functional | [#type-queries-and-predicates](../../../docs/llm-generated/ir-reference/misc.md#type-queries-and-predicates) | [`istype-existential.slang`](istype-existential.slang) |
 
 ## Doc gaps observed
 

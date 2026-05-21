@@ -64,59 +64,32 @@ This bundle is adjacent to:
 - [`cross-cutting/ir-instructions`](../../cross-cutting/ir-instructions/)
   — the category-level view that samples each IR family once.
 
-## Claims enumerated
+## Coverage
 
-| Claim ID | Anchor | Claim (one line) | Tests |
+| Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
-| C-01 | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | The layout pass synthesizes a `varLayout` opcode for each global parameter. | [`varlayout-on-global-param.slang`](varlayout-on-global-param.slang) |
-| C-02 | [#varlayout-and-entrypointlayout](../../../docs/llm-generated/ir-reference/metadata.md#varlayout-and-entrypointlayout) | The layout pass synthesizes an `EntryPointLayout` opcode for each entry point. | [`entry-point-layout.slang`](entry-point-layout.slang) |
-| C-03 | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | A laid-out struct (including the synthetic struct backing a `cbuffer`) produces a `structTypeLayout` opcode. | [`struct-type-layout-on-cbuffer.slang`](struct-type-layout-on-cbuffer.slang) |
-| C-04 | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | A `cbuffer` (parameter-group type) produces a `parameterGroupTypeLayout` opcode. | [`parameter-group-type-layout-on-cbuffer.slang`](parameter-group-type-layout-on-cbuffer.slang) |
-| C-05 | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | An array-typed cbuffer field induces an `arrayTypeLayout` opcode. | [`array-type-layout-on-cbuffer-array.slang`](array-type-layout-on-cbuffer-array.slang) |
-| C-06 | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | A matrix-typed cbuffer field induces a `matrixTypeLayout` opcode whose first operand encodes row-major vs column-major. | [`matrix-type-layout-on-cbuffer.slang`](matrix-type-layout-on-cbuffer.slang) |
-| C-07 | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | An `RWStructuredBuffer` global parameter lowers to a `structuredBufferTypeLayout` opcode. | [`structured-buffer-type-layout.slang`](structured-buffer-type-layout.slang) |
-| C-08 | [#attr-family](../../../docs/llm-generated/ir-reference/metadata.md#attr-family) | The `stage` Attr opcode tags the EntryPointLayout with its pipeline-stage integer; compute is 6. | [`stage-attr-on-entry-point.slang`](stage-attr-on-entry-point.slang) |
-| C-09 | [#usersemantic-vs-systemvaluesemantic](../../../docs/llm-generated/ir-reference/metadata.md#usersemantic-vs-systemvaluesemantic) | An `SV_*` system value lowers to a `systemValueSemantic` Attr opcode with (name, index) operands. | [`system-value-semantic-attr.slang`](system-value-semantic-attr.slang) |
-| C-10 | [#attr-family](../../../docs/llm-generated/ir-reference/metadata.md#attr-family) | The `no_diff` Attr opcode is created from `NoDiffModifier` on a function parameter. | [`no-diff-attr-on-param.slang`](no-diff-attr-on-param.slang) |
-| C-11 | [#attr-family](../../../docs/llm-generated/ir-reference/metadata.md#attr-family) | The `unorm` Attr opcode is created from `UNormModifier` on a buffer element type. | [`unorm-attr-on-buffer-element.slang`](unorm-attr-on-buffer-element.slang) |
-| C-12 | [#attr-family](../../../docs/llm-generated/ir-reference/metadata.md#attr-family) | The `size` Attr opcode records per-resource-kind size on a typeLayout. | [`size-attr-in-layout.slang`](size-attr-in-layout.slang) |
-| C-13 | [#attr-family](../../../docs/llm-generated/ir-reference/metadata.md#attr-family) | The `offset` Attr opcode records per-resource-kind offset on a varLayout. | [`offset-attr-in-varlayout.slang`](offset-attr-in-varlayout.slang) |
-| C-14 | [#attr-family](../../../docs/llm-generated/ir-reference/metadata.md#attr-family) | A `structFieldLayout` Attr opcode is emitted for each field inside a `structTypeLayout`. | [`struct-field-layout-attr.slang`](struct-field-layout-attr.slang) |
-| C-15 | [#debug-info-family](../../../docs/llm-generated/ir-reference/metadata.md#debug-info-family) | With `-g`, the debug-info pass emits a `DebugSource` opcode at module top level. | [`debug-source-with-g.slang`](debug-source-with-g.slang) |
-| C-16 | [#debug-info-family](../../../docs/llm-generated/ir-reference/metadata.md#debug-info-family) | With `-g`, the debug-info pass emits a `DebugFunction` for each function. | [`debug-function-with-g.slang`](debug-function-with-g.slang) |
-| C-17 | [#debugline](../../../docs/llm-generated/ir-reference/metadata.md#debugline) | `DebugLine` pins an instruction to a `(file, startLine, startCol, endLine, endCol)` range under `-g`. | [`debug-line-with-g.slang`](debug-line-with-g.slang) |
-| C-18 | [#debug-info-family](../../../docs/llm-generated/ir-reference/metadata.md#debug-info-family) | `DebugVar` declares a user-visible local; `DebugValue` reports its current value. | [`debug-var-and-value-with-g.slang`](debug-var-and-value-with-g.slang) |
-| C-19 | [#debug-info-family](../../../docs/llm-generated/ir-reference/metadata.md#debug-info-family) | `DebugCompilationUnit` declares the compilation unit and references a `DebugSource`. | [`debug-compilation-unit-with-g.slang`](debug-compilation-unit-with-g.slang) |
-| C-20 | [#spir-v-inline-asm](../../../docs/llm-generated/ir-reference/metadata.md#spir-v-inline-asm) | A `spirv_asm{...}` block lowers to a `SPIRVAsm` parent opcode owning `SPIRVAsmInst` children. | [`spirv-asm-block.slang`](spirv-asm-block.slang) |
-| C-21 | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | Multiple `varLayout` opcodes coexist in one module: one per global plus EntryPointLayout-owned ones. | [`varlayout-uniform-and-entry-point.slang`](varlayout-uniform-and-entry-point.slang) |
-| C-22 | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | The base `typeLayout` opcode (TypeLayoutBase wrapper) carries size/alignment attrs and roots the type-layout hierarchy. | [`type-layout-base.slang`](type-layout-base.slang) |
-
-## Tests in this bundle
-
-| File | Intent | Doc anchor |
-| --- | --- | --- |
-| [`varlayout-on-global-param.slang`](varlayout-on-global-param.slang) | functional | `#layout-family` |
-| [`entry-point-layout.slang`](entry-point-layout.slang) | functional | `#varlayout-and-entrypointlayout` |
-| [`struct-type-layout-on-cbuffer.slang`](struct-type-layout-on-cbuffer.slang) | functional | `#layout-family` |
-| [`parameter-group-type-layout-on-cbuffer.slang`](parameter-group-type-layout-on-cbuffer.slang) | functional | `#layout-family` |
-| [`array-type-layout-on-cbuffer-array.slang`](array-type-layout-on-cbuffer-array.slang) | functional | `#layout-family` |
-| [`matrix-type-layout-on-cbuffer.slang`](matrix-type-layout-on-cbuffer.slang) | functional | `#layout-family` |
-| [`structured-buffer-type-layout.slang`](structured-buffer-type-layout.slang) | functional | `#layout-family` |
-| [`stage-attr-on-entry-point.slang`](stage-attr-on-entry-point.slang) | functional | `#attr-family` |
-| [`system-value-semantic-attr.slang`](system-value-semantic-attr.slang) | functional | `#usersemantic-vs-systemvaluesemantic` |
-| [`no-diff-attr-on-param.slang`](no-diff-attr-on-param.slang) | functional | `#attr-family` |
-| [`unorm-attr-on-buffer-element.slang`](unorm-attr-on-buffer-element.slang) | functional | `#attr-family` |
-| [`size-attr-in-layout.slang`](size-attr-in-layout.slang) | functional | `#attr-family` |
-| [`offset-attr-in-varlayout.slang`](offset-attr-in-varlayout.slang) | functional | `#attr-family` |
-| [`struct-field-layout-attr.slang`](struct-field-layout-attr.slang) | functional | `#attr-family` |
-| [`debug-source-with-g.slang`](debug-source-with-g.slang) | functional | `#debug-info-family` |
-| [`debug-function-with-g.slang`](debug-function-with-g.slang) | functional | `#debug-info-family` |
-| [`debug-line-with-g.slang`](debug-line-with-g.slang) | functional | `#debugline` |
-| [`debug-var-and-value-with-g.slang`](debug-var-and-value-with-g.slang) | functional | `#debug-info-family` |
-| [`debug-compilation-unit-with-g.slang`](debug-compilation-unit-with-g.slang) | functional | `#debug-info-family` |
-| [`spirv-asm-block.slang`](spirv-asm-block.slang) | functional | `#spir-v-inline-asm` |
-| [`varlayout-uniform-and-entry-point.slang`](varlayout-uniform-and-entry-point.slang) | functional | `#layout-family` |
-| [`type-layout-base.slang`](type-layout-base.slang) | functional | `#layout-family` |
+| A structFieldLayout Attr opcode is emitted for each field inside a structTypeLayout; operands are the field key and a varLayout. | functional | [#attr-family](../../../docs/llm-generated/ir-reference/metadata.md#attr-family) | [`struct-field-layout-attr.slang`](struct-field-layout-attr.slang) |
+| The no_diff Attr opcode is created from the NoDiffModifier on a function parameter and surfaces as a bare let-binding in the IR dump. | functional | [#attr-family](../../../docs/llm-generated/ir-reference/metadata.md#attr-family) | [`no-diff-attr-on-param.slang`](no-diff-attr-on-param.slang) |
+| The offset Attr opcode records per-resource-kind offset on a varLayout; it appears as offset(kind, N) in the layout dump. | functional | [#attr-family](../../../docs/llm-generated/ir-reference/metadata.md#attr-family) | [`offset-attr-in-varlayout.slang`](offset-attr-in-varlayout.slang) |
+| The size Attr opcode records per-resource-kind size on a typeLayout; it appears as size(kind, N) in the layout dump. | functional | [#attr-family](../../../docs/llm-generated/ir-reference/metadata.md#attr-family) | [`size-attr-in-layout.slang`](size-attr-in-layout.slang) |
+| The stage attribute tags an EntryPointLayout with its pipeline-stage operand; compute is stage 6. | functional | [#attr-family](../../../docs/llm-generated/ir-reference/metadata.md#attr-family) | [`stage-attr-on-entry-point.slang`](stage-attr-on-entry-point.slang) |
+| The unorm Attr opcode originates from the UNormModifier on a buffer element type and is recorded as a bare no-operand attribute. | functional | [#attr-family](../../../docs/llm-generated/ir-reference/metadata.md#attr-family) | [`unorm-attr-on-buffer-element.slang`](unorm-attr-on-buffer-element.slang) |
+| DebugCompilationUnit declares the compilation unit and references a DebugSource; emitted at module top level under -g. | functional | [#debug-info-family](../../../docs/llm-generated/ir-reference/metadata.md#debug-info-family) | [`debug-compilation-unit-with-g.slang`](debug-compilation-unit-with-g.slang) |
+| DebugVar declares a user-visible local for the debugger; DebugValue reports the current value of a DebugVar. | functional | [#debug-info-family](../../../docs/llm-generated/ir-reference/metadata.md#debug-info-family) | [`debug-var-and-value-with-g.slang`](debug-var-and-value-with-g.slang) |
+| With -g, the debug-info pass emits a DebugFunction opcode for each function, declaring its name, scope, and file for the debugger. | functional | [#debug-info-family](../../../docs/llm-generated/ir-reference/metadata.md#debug-info-family) | [`debug-function-with-g.slang`](debug-function-with-g.slang) |
+| With -g, the debug-info pass emits a DebugSource opcode at module top level that records the source-file path and contents. | functional | [#debug-info-family](../../../docs/llm-generated/ir-reference/metadata.md#debug-info-family) | [`debug-source-with-g.slang`](debug-source-with-g.slang) |
+| DebugLine pins an instruction to a (file, startLine, startCol, endLine, endCol) range and is emitted in source order under -g. | functional | [#debugline](../../../docs/llm-generated/ir-reference/metadata.md#debugline) | [`debug-line-with-g.slang`](debug-line-with-g.slang) |
+| A cbuffer (a parameter-group type) lowers to a parameterGroupTypeLayout opcode in the layout dump. | functional | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | [`parameter-group-type-layout-on-cbuffer.slang`](parameter-group-type-layout-on-cbuffer.slang) |
+| A matrix-typed cbuffer field induces a matrixTypeLayout opcode whose first operand encodes row-major vs column-major. | functional | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | [`matrix-type-layout-on-cbuffer.slang`](matrix-type-layout-on-cbuffer.slang) |
+| An RWStructuredBuffer global parameter lowers to a structuredBufferTypeLayout opcode in the layout dump. | functional | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | [`structured-buffer-type-layout.slang`](structured-buffer-type-layout.slang) |
+| An array-typed cbuffer field induces an arrayTypeLayout opcode in the layout dump. | functional | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | [`array-type-layout-on-cbuffer-array.slang`](array-type-layout-on-cbuffer-array.slang) |
+| The base typeLayout opcode (TypeLayoutBase wrapper) records size, alignment, and resource-usage attrs and is the root of the type-layout hierarchy. | functional | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | [`type-layout-base.slang`](type-layout-base.slang) |
+| The layout pass synthesizes a structTypeLayout opcode for each laid-out struct (including the synthetic struct backing a cbuffer). | functional | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | [`struct-type-layout-on-cbuffer.slang`](struct-type-layout-on-cbuffer.slang) |
+| The layout pass synthesizes a varLayout opcode (per-variable layout record) referenced by the global parameter's [layout(...)] decoration. | functional | [#layout-family](../../../docs/llm-generated/ir-reference/metadata.md#layout-family) | [`varlayout-on-global-param.slang`](varlayout-on-global-param.slang) |
+| A spirv_asm{...} block lowers to a SPIRVAsm parent opcode that owns SPIRVAsmInst children inside the function body. | functional | [#spir-v-inline-asm](../../../docs/llm-generated/ir-reference/metadata.md#spir-v-inline-asm) | [`spirv-asm-block.slang`](spirv-asm-block.slang) |
+| The systemValueSemantic Attr opcode lowers a parameter with an SV_* semantic and tags it inside the layout tree. | functional | [#usersemantic-vs-systemvaluesemantic](../../../docs/llm-generated/ir-reference/metadata.md#usersemantic-vs-systemvaluesemantic) | [`system-value-semantic-attr.slang`](system-value-semantic-attr.slang) |
+| Multiple varLayout opcodes coexist in one module: one for each uniform global, plus the EntryPointLayout's owned varLayouts. | functional | [#varlayout-and-entrypointlayout](../../../docs/llm-generated/ir-reference/metadata.md#varlayout-and-entrypointlayout) | [`varlayout-uniform-and-entry-point.slang`](varlayout-uniform-and-entry-point.slang) |
+| The layout pass synthesizes an EntryPointLayout opcode for each entry point; it owns a varLayout for the parameter group and a stage attribute. | functional | [#varlayout-and-entrypointlayout](../../../docs/llm-generated/ir-reference/metadata.md#varlayout-and-entrypointlayout) | [`entry-point-layout.slang`](entry-point-layout.slang) |
 
 ## Out of scope (no-GPU runner)
 

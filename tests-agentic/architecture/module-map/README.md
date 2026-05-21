@@ -40,27 +40,16 @@ module also backs the GLSL frontend reached via `-allow-glsl`; (e)
 the `prelude/` directory ships per-target prelude headers that are
 literally `#include`d in the emitted text for CUDA and C++ targets.
 
-## Claims enumerated
+## Coverage
 
-| Claim ID | Anchor                                                                                                                                                          | Claim (one line)                                                                                                                              | Tests                                                              |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| C-01     | [#code-emission](../../../docs/llm-generated/architecture/module-map.md#code-emission)                                                                          | An emit dispatcher in `source/slang/` selects per-target backends for HLSL, GLSL, SPIR-V, Metal, WGSL, CPP, and CUDA text output.            | [`emit-dispatcher-multi-target.slang`](emit-dispatcher-multi-target.slang)                                |
-| C-02     | [#sourceslang-core-module-embedded-core-module](../../../docs/llm-generated/architecture/module-map.md#sourceslang-core-module-embedded-core-module)            | The core module is embedded into `libslang`; built-in vector types like `int4` / `float3` work without any `import`.                          | [`core-module-builtin-types.slang`](core-module-builtin-types.slang)                                  |
-| C-03     | [#sourceslang-glsl-module-embedded-glsl-module](../../../docs/llm-generated/architecture/module-map.md#sourceslang-glsl-module-embedded-glsl-module)            | The GLSL module is embedded into `libslang`; `import glsl;` resolves without extra search paths.                                              | [`glsl-module-import.slang`](glsl-module-import.slang)                                         |
-| C-04     | [#sourceslang-glsl-module-embedded-glsl-module](../../../docs/llm-generated/architecture/module-map.md#sourceslang-glsl-module-embedded-glsl-module)            | The GLSL module also backs the GLSL frontend; `-allow-glsl` accepts GLSL source and emits GLSL text.                                          | [`allow-glsl-frontend.slang`](allow-glsl-frontend.slang)                                        |
-| C-05     | [#prelude-per-target-prelude-headers](../../../docs/llm-generated/architecture/module-map.md#prelude-per-target-prelude-headers)                                | `prelude/slang-cuda-prelude.h` is the CUDA prelude; CUDA emit literally `#include`s it.                                                       | [`cuda-prelude-include.slang`](cuda-prelude-include.slang)                                       |
-| C-06     | [#prelude-per-target-prelude-headers](../../../docs/llm-generated/architecture/module-map.md#prelude-per-target-prelude-headers)                                | `prelude/slang-cpp-prelude.h` is the C++ shader-output prelude; CPP emit literally `#include`s it.                                            | [`cpp-prelude-include.slang`](cpp-prelude-include.slang)                                        |
-
-## Tests in this bundle
-
-| File                                    | Intent     | Doc anchor                                            |
-| --------------------------------------- | ---------- | ----------------------------------------------------- |
-| [`emit-dispatcher-multi-target.slang`](emit-dispatcher-multi-target.slang)    | functional | `#code-emission`                                      |
-| [`core-module-builtin-types.slang`](core-module-builtin-types.slang)       | functional | `#sourceslang-core-module-embedded-core-module`       |
-| [`glsl-module-import.slang`](glsl-module-import.slang)              | functional | `#sourceslang-glsl-module-embedded-glsl-module`       |
-| [`allow-glsl-frontend.slang`](allow-glsl-frontend.slang)             | functional | `#sourceslang-glsl-module-embedded-glsl-module`       |
-| [`cuda-prelude-include.slang`](cuda-prelude-include.slang)            | functional | `#prelude-per-target-prelude-headers`                 |
-| [`cpp-prelude-include.slang`](cpp-prelude-include.slang)             | functional | `#prelude-per-target-prelude-headers`                 |
+| Claim | Intent | Anchor | Tests |
+| --- | --- | --- | --- |
+| The "Code emission" table lists an emit dispatcher and per-target backends for HLSL, GLSL, SPIR-V, Metal, WGSL, CPP, and CUDA; the same source compiles to each. | functional | [#code-emission](../../../docs/llm-generated/architecture/module-map.md#code-emission) | [`emit-dispatcher-multi-target.slang`](emit-dispatcher-multi-target.slang) |
+| The `prelude/` directory ships one prelude header per textual target; CPP emit literally includes `slang-cpp-prelude.h`. | functional | [#prelude-per-target-prelude-headers](../../../docs/llm-generated/architecture/module-map.md#prelude-per-target-prelude-headers) | [`cpp-prelude-include.slang`](cpp-prelude-include.slang) |
+| The `prelude/` directory ships one prelude header per textual target; CUDA emit literally includes `slang-cuda-prelude.h`. | functional | [#prelude-per-target-prelude-headers](../../../docs/llm-generated/architecture/module-map.md#prelude-per-target-prelude-headers) | [`cuda-prelude-include.slang`](cuda-prelude-include.slang) |
+| The core module is compiled into libslang; built-in vector types like `int4` and `float3` are available without any import. | functional | [#sourceslang-core-module-embedded-core-module](../../../docs/llm-generated/architecture/module-map.md#sourceslang-core-module-embedded-core-module) | [`core-module-builtin-types.slang`](core-module-builtin-types.slang) |
+| The GLSL module (glsl.meta.slang) is embedded into libslang; `import glsl;` resolves with no extra search path. | functional | [#sourceslang-glsl-module-embedded-glsl-module](../../../docs/llm-generated/architecture/module-map.md#sourceslang-glsl-module-embedded-glsl-module) | [`glsl-module-import.slang`](glsl-module-import.slang) |
+| The GLSL module also backs the GLSL frontend; with `-allow-glsl`, slangc accepts GLSL source syntax and round-trips it to GLSL emit. | functional | [#sourceslang-glsl-module-embedded-glsl-module](../../../docs/llm-generated/architecture/module-map.md#sourceslang-glsl-module-embedded-glsl-module) | [`allow-glsl-frontend.slang`](allow-glsl-frontend.slang) |
 
 ## Doc gaps observed
 

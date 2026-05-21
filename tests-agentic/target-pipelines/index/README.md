@@ -37,25 +37,15 @@ multiple `//TEST` directives in a single file with per-target
 `CHECK_<TARGET>` prefixes so a single source file actually exercises
 the dispatcher.
 
-## Claims enumerated
+## Coverage
 
-| Claim ID | Anchor                      | Claim (one line)                                                                                                                                       | Tests                                     |
-| -------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
-| C-01     | `#target-pipelines`         | The subtree dispatches one Slang source through `linkAndOptimizeIR` to each of five text-emit backends (spirv, hlsl, metal, wgsl, cuda).               | [`multi-target-dispatcher.slang`](multi-target-dispatcher.slang)           |
-| C-02     | `#cross-target-comparison`  | The cross-target table assigns a distinct Phase D emitter per target; the same source produces distinctively different surface text on each.           | [`same-source-distinct-emitters.slang`](same-source-distinct-emitters.slang)     |
-| C-03     | `#shared-shape`             | The shared four-phase shape (link → specialize → target-legalize → emit) runs end-to-end on every text-emit target without user pipeline intervention. | [`four-phase-shape-end-to-end.slang`](four-phase-shape-end-to-end.slang)       |
-| C-04     | `#cross-target-comparison`  | `eliminatePhis` is gated per-target (reg-alloc only for SPIR-V; default options for HLSL, Metal, WGSL, CUDA); SSA-merging code still emits on each.    | [`phi-elim-cross-target-success.slang`](phi-elim-cross-target-success.slang)     |
-| C-05     | `#cross-target-comparison`  | The text-emit `CodeGenTarget` rows reach Phase D as source / asm without invoking the downstream binary tools (DXC, fxc, Apple `metal`, Tint, nvrtc).  | [`text-emit-no-downstream-tools.slang`](text-emit-no-downstream-tools.slang)     |
-
-## Tests in this bundle
-
-| File                                    | Intent     | Doc anchor                  |
-| --------------------------------------- | ---------- | --------------------------- |
-| [`multi-target-dispatcher.slang`](multi-target-dispatcher.slang)         | functional | `#target-pipelines`         |
-| [`same-source-distinct-emitters.slang`](same-source-distinct-emitters.slang)   | functional | `#cross-target-comparison`  |
-| [`four-phase-shape-end-to-end.slang`](four-phase-shape-end-to-end.slang)     | functional | `#shared-shape`             |
-| [`phi-elim-cross-target-success.slang`](phi-elim-cross-target-success.slang)   | functional | `#cross-target-comparison`  |
-| [`text-emit-no-downstream-tools.slang`](text-emit-no-downstream-tools.slang)   | functional | `#cross-target-comparison`  |
+| Claim | Intent | Anchor | Tests |
+| --- | --- | --- | --- |
+| Phi-elimination is gated per-target (register-allocation only for SPIR-V; default options for HLSL, Metal, WGSL, CUDA); a source with merging control flow still emits successfully on every backend. | functional | [#cross-target-comparison](../../../docs/llm-generated/target-pipelines/index.md#cross-target-comparison) | [`phi-elim-cross-target-success.slang`](phi-elim-cross-target-success.slang) |
+| The cross-target table maps each target to a distinct Phase D emitter; the same Slang source therefore produces distinctively different surface syntax on each backend. | functional | [#cross-target-comparison](../../../docs/llm-generated/target-pipelines/index.md#cross-target-comparison) | [`same-source-distinct-emitters.slang`](same-source-distinct-emitters.slang) |
+| The text-emit CodeGenTarget rows in the cross-target table (hlsl, metal, wgsl, cuda source, spirv-asm) reach Phase D source without invoking downstream tools. | functional | [#cross-target-comparison](../../../docs/llm-generated/target-pipelines/index.md#cross-target-comparison) | [`text-emit-no-downstream-tools.slang`](text-emit-no-downstream-tools.slang) |
+| The shared four-phase shape (link / specialize / target-legalize / emit) of linkAndOptimizeIR runs end-to-end for every text-emit target named by the index doc. | functional | [#shared-shape](../../../docs/llm-generated/target-pipelines/index.md#shared-shape) | [`four-phase-shape-end-to-end.slang`](four-phase-shape-end-to-end.slang) |
+| A single Slang source dispatches through the multi-target orchestrator to each of the five text-emit backends named by the index doc (spirv, hlsl, metal, wgsl, cuda). | functional | [#target-pipelines](../../../docs/llm-generated/target-pipelines/index.md#target-pipelines) | [`multi-target-dispatcher.slang`](multi-target-dispatcher.slang) |
 
 ## Out of scope
 

@@ -28,43 +28,24 @@ every entry, so every test's `doc_ref` and `doc_section_digest`
 reference that one anchor; the `purpose` line names the specific
 term being verified.
 
-## Claims enumerated
+## Coverage
 
-| Claim ID | Term                            | Anchor                                                            | Claim (one line)                                                                                            | Tests                                          |
-| -------- | ------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| C-01     | entry point                     | [#terms](../../docs/llm-generated/glossary.md#terms)              | A function plus a pipeline stage defines a kernel that the runner dispatches.                               | [`entry-point-stage-flag.slang`](entry-point-stage-flag.slang)                 |
-| C-02     | lexer                           | [#terms](../../docs/llm-generated/glossary.md#terms)              | The lexer strips `//` and `/* */` comments as trivia before later stages see them.                          | [`lexer-comments-stripped.slang`](lexer-comments-stripped.slang)                |
-| C-03     | preprocessor                    | [#terms](../../docs/llm-generated/glossary.md#terms)              | `#define` macro substitution happens before parsing, so a defined identifier is replaced with its value.    | [`preprocessor-define-substitution.slang`](preprocessor-define-substitution.slang)       |
-| C-04     | parser                          | [#terms](../../docs/llm-generated/glossary.md#terms)              | The parser produces an AST that the rest of the pipeline can execute; nested `if`/`else` parses correctly.  | [`parser-recursive-descent-parses-if.slang`](parser-recursive-descent-parses-if.slang)     |
-| C-05     | name resolution                 | [#terms](../../docs/llm-generated/glossary.md#terms)              | Identifier uses bind to the declarations they refer to, taking scope into account.                          | [`name-resolution-binds-local.slang`](name-resolution-binds-local.slang)            |
-| C-06     | shadowing                       | [#terms](../../docs/llm-generated/glossary.md#terms)              | A name defined in an inner scope hides a same-named name from an outer scope.                               | [`shadowing-inner-hides-outer.slang`](shadowing-inner-hides-outer.slang)            |
-| C-07     | overload resolution             | [#terms](../../docs/llm-generated/glossary.md#terms)              | Among candidates sharing a name, the better-matching one is preferred.                                      | [`overload-resolution-picks-best.slang`](overload-resolution-picks-best.slang)         |
-| C-08     | type inference                  | [#terms](../../docs/llm-generated/glossary.md#terms)              | An omitted type on `var` is inferred from the initializer.                                                  | [`type-inference-var-from-int.slang`](type-inference-var-from-int.slang)            |
-| C-09     | DiagnosticSink                  | [#terms](../../docs/llm-generated/glossary.md#terms)              | The compiler routes diagnostics through a sink; an undefined identifier produces an "undefined identifier". | [`diagnostic-undeclared-identifier.slang`](diagnostic-undeclared-identifier.slang)       |
-| C-10     | inlining                        | [#terms](../../docs/llm-generated/glossary.md#terms)              | A call is replaced with a copy of the callee's body; the inlined form produces the same observable result.  | [`inlining-call-disappears.slang`](inlining-call-disappears.slang)               |
-| C-11     | monomorphization, specialization | [#terms](../../docs/llm-generated/glossary.md#terms)             | Generic functions are specialized to concrete type-argument copies.                                         | [`monomorphization-generic-instantiation.slang`](monomorphization-generic-instantiation.slang) |
-| C-12     | target                          | [#terms](../../docs/llm-generated/glossary.md#terms)              | A target selects a code-generation format; `-target hlsl` produces HLSL text.                               | [`target-hlsl-emits-hlsl.slang`](target-hlsl-emits-hlsl.slang)                 |
-| C-13     | target                          | [#terms](../../docs/llm-generated/glossary.md#terms)              | A target selects a code-generation format; `-target glsl` produces GLSL text.                               | [`target-glsl-emits-glsl.slang`](target-glsl-emits-glsl.slang)                 |
-| C-14     | interpreter (slangi)            | [#terms](../../docs/llm-generated/glossary.md#terms)              | The byte-code interpreter runs a compiled program end-to-end.                                               | [`interpreter-runs-byte-code.slang`](interpreter-runs-byte-code.slang)             |
-
-## Tests in this bundle
-
-| File                                           | Intent     | Doc anchor |
-| ---------------------------------------------- | ---------- | ---------- |
-| [`entry-point-stage-flag.slang`](entry-point-stage-flag.slang)                 | functional | `#terms`   |
-| [`lexer-comments-stripped.slang`](lexer-comments-stripped.slang)                | functional | `#terms`   |
-| [`preprocessor-define-substitution.slang`](preprocessor-define-substitution.slang)       | functional | `#terms`   |
-| [`parser-recursive-descent-parses-if.slang`](parser-recursive-descent-parses-if.slang)     | functional | `#terms`   |
-| [`name-resolution-binds-local.slang`](name-resolution-binds-local.slang)            | functional | `#terms`   |
-| [`shadowing-inner-hides-outer.slang`](shadowing-inner-hides-outer.slang)            | functional | `#terms`   |
-| [`overload-resolution-picks-best.slang`](overload-resolution-picks-best.slang)         | functional | `#terms`   |
-| [`type-inference-var-from-int.slang`](type-inference-var-from-int.slang)            | functional | `#terms`   |
-| [`diagnostic-undeclared-identifier.slang`](diagnostic-undeclared-identifier.slang)       | negative   | `#terms`   |
-| [`inlining-call-disappears.slang`](inlining-call-disappears.slang)               | functional | `#terms`   |
-| [`monomorphization-generic-instantiation.slang`](monomorphization-generic-instantiation.slang) | functional | `#terms`   |
-| [`target-hlsl-emits-hlsl.slang`](target-hlsl-emits-hlsl.slang)                 | functional | `#terms`   |
-| [`target-glsl-emits-glsl.slang`](target-glsl-emits-glsl.slang)                 | functional | `#terms`   |
-| [`interpreter-runs-byte-code.slang`](interpreter-runs-byte-code.slang)             | functional | `#terms`   |
+| Claim | Intent | Anchor | Tests |
+| --- | --- | --- | --- |
+| DiagnosticSink: the compiler emits diagnostics through a sink; a use of an undeclared identifier produces an "undefined identifier" error, observable as text on the compile output. | negative | [#terms](../../docs/llm-generated/glossary.md#terms) | [`diagnostic-undeclared-identifier.slang`](diagnostic-undeclared-identifier.slang) |
+| entry point: a function selected by `-entry NAME -stage STAGE` runs as the kernel; the byte-code interpreter dispatches `main` and produces its observable output. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`entry-point-stage-flag.slang`](entry-point-stage-flag.slang) |
+| inlining: a call instruction is replaced with a copy of the callee's body, so the inlined computation produces the same observable result as the un-inlined form. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`inlining-call-disappears.slang`](inlining-call-disappears.slang) |
+| interpreter (slangi): the `slangi` byte-code interpreter runs a compiled program end-to-end; its `printf` output is the user-visible evidence that compilation + lowering + bytecode-emit + execution all succeeded. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`interpreter-runs-byte-code.slang`](interpreter-runs-byte-code.slang) |
+| lexer: the lexer converts a source character stream into a token stream, stripping `//` line comments and `/* ... */` block comments as trivia so they are not visible to later stages. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`lexer-comments-stripped.slang`](lexer-comments-stripped.slang) |
+| monomorphization / specialization: a generic function is replaced with concrete copies per type argument set, so the emitted target code carries no generic type parameter and computes the concrete result. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`monomorphization-generic-instantiation.slang`](monomorphization-generic-instantiation.slang) |
+| name resolution: identifier uses are bound to their declarations taking scope into account; a use of `n` inside a function body refers to the function's parameter, and an outer free identifier resolves to the corresponding declaration at module scope. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`name-resolution-binds-local.slang`](name-resolution-binds-local.slang) |
+| overload resolution: among candidates sharing a name, the one whose parameter type matches the argument without a conversion is preferred over the one requiring an implicit conversion. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`overload-resolution-picks-best.slang`](overload-resolution-picks-best.slang) |
+| parser: the parser consumes tokens and produces an AST that the checker / lowerer can execute; a nested `if`/`else` statement parses into a control-flow tree that selects the matching branch at run time. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`parser-recursive-descent-parses-if.slang`](parser-recursive-descent-parses-if.slang) |
+| preprocessor: the preprocessor handles `#define` macro substitution on the lexer's token stream before parsing, so an identifier defined as a constant is replaced with that constant in later uses. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`preprocessor-define-substitution.slang`](preprocessor-define-substitution.slang) |
+| shadowing: a name defined in an inner scope hides a same-named name from an outer scope for the duration of that inner scope. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`shadowing-inner-hides-outer.slang`](shadowing-inner-hides-outer.slang) |
+| target: a `TargetRequest` selects a code-generation format; passing `-target hlsl` produces HLSL text containing the entry-point function. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`target-hlsl-emits-hlsl.slang`](target-hlsl-emits-hlsl.slang) |
+| target: switching `-target` switches the emitted code-generation format; `-target glsl` yields GLSL with a `#version` directive and a `main()` function. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`target-glsl-emits-glsl.slang`](target-glsl-emits-glsl.slang) |
+| type inference: an omitted type on a `var` initialized from an int literal is inferred to `int`; overload resolution then picks the int overload. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`type-inference-var-from-int.slang`](type-inference-var-from-int.slang) |
 
 ## Doc gaps observed
 

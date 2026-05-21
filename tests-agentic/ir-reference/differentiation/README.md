@@ -43,47 +43,26 @@ autodiff system. The internal autodiff-pass opcodes
 `checkpointObj`, `loopExitValue`, `PrimalParamRef`, etc.) are not
 user-observable at LOWER-TO-IR and are recorded as out of scope.
 
-## Claims enumerated
+## Coverage
 
-| Claim ID | Anchor | Claim (one line) | Tests |
+| Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
-| C-01 | [#makediffpair](../../../docs/llm-generated/ir-reference/differentiation.md#makediffpair) | A `DifferentialPair<T>(primal, diff)` constructor lowers to a `MakeDiffPair(%primal, %diff)` IR value. | [`make-diff-pair.slang`](make-diff-pair.slang) |
-| C-02 | [#differential-pair-projection](../../../docs/llm-generated/ir-reference/differentiation.md#differential-pair-projection) | The `.p` projection on a `DifferentialPair<T>` value lowers to `GetPrimal(%pair)`. | [`get-primal.slang`](get-primal.slang) |
-| C-03 | [#differential-pair-projection](../../../docs/llm-generated/ir-reference/differentiation.md#differential-pair-projection) | The `.d` projection on a `DifferentialPair<T>` value lowers to `GetDifferential(%pair)`. | [`get-differential.slang`](get-differential.slang) |
-| C-04 | [#forwarddifferentiate](../../../docs/llm-generated/ir-reference/differentiation.md#forwarddifferentiate) | `__fwd_diff(f)` on a `[ForwardDifferentiable]` function lowers to a `ForwardDifferentiate(%f)` IR value whose result type is the JVP `Func(DiffPair, DiffPair)` signature. | [`forward-differentiate.slang`](forward-differentiate.slang) |
-| C-05 | [#forwarddifferentiate](../../../docs/llm-generated/ir-reference/differentiation.md#forwarddifferentiate) | Two source occurrences of `__fwd_diff(f)` dedupe to a single hoistable `let %fwd_diff = ForwardDifferentiate(%f)` binding that both call sites share. | [`forward-differentiate-dedupes.slang`](forward-differentiate-dedupes.slang) |
-| C-06 | [#forward-mode](../../../docs/llm-generated/ir-reference/differentiation.md#forward-mode) | `ForwardDifferentiate` has a single `baseFn` operand, named as the user `func %name`. | [`forward-differentiate-base-fn-operand.slang`](forward-differentiate-base-fn-operand.slang) |
-| C-07 | [#forwarddifferentiate](../../../docs/llm-generated/ir-reference/differentiation.md#forwarddifferentiate) | The unprefixed `fwd_diff(f)` alias also lowers to `ForwardDifferentiate(%f)`. | [`fwd-diff-alias.slang`](fwd-diff-alias.slang) |
-| C-08 | [#legacy-bridge](../../../docs/llm-generated/ir-reference/differentiation.md#legacy-bridge) | `__bwd_diff(f)` on a `[BackwardDifferentiable]` function lowers at LOWER-TO-IR to `LegacyBackwardDifferentiate(%apply_bwd, %remat, %ctx_t)` (not the modern `BackwardDifferentiate` opcode). | [`legacy-backward-differentiate.slang`](legacy-backward-differentiate.slang) |
-| C-09 | [#legacy-bridge](../../../docs/llm-generated/ir-reference/differentiation.md#legacy-bridge) | The unprefixed `bwd_diff(f)` alias also lowers to `LegacyBackwardDifferentiate(...)` at LOWER-TO-IR. | [`bwd-diff-alias.slang`](bwd-diff-alias.slang) |
-| C-10 | [#detachderivative](../../../docs/llm-generated/ir-reference/differentiation.md#detachderivative) | `detach(x)` inside a differentiable function lowers to `let %N : T = detachDerivative(%x)`. | [`detach-derivative.slang`](detach-derivative.slang) |
-| C-11 | [#detachderivative](../../../docs/llm-generated/ir-reference/differentiation.md#detachderivative) | `detachDerivative` returns its operand unchanged: its result type equals the operand type. | [`detach-derivative-result-type.slang`](detach-derivative-result-type.slang) |
-| C-12 | [#opcodes](../../../docs/llm-generated/ir-reference/differentiation.md#opcodes) | A `no_diff T x` parameter on a differentiable function surfaces as `param %x : Attributed(T, %no_diff)` on the entry block. | [`no-diff-parameter-marker.slang`](no-diff-parameter-marker.slang) |
-| C-13 | [#opcodes](../../../docs/llm-generated/ir-reference/differentiation.md#opcodes) | The `no_diff` marker is a unique module-scope `let %k : Void = no_diff` opcode; every `Attributed(T, %k)` parameter wrapper references it. | [`no-diff-module-scope-marker.slang`](no-diff-module-scope-marker.slang) |
-| C-14 | [#makediffpair](../../../docs/llm-generated/ir-reference/differentiation.md#makediffpair) | The result type of `MakeDiffPair` is `DiffPair(T, %witness)` where `%witness` is the `IDifferentiable` witness for `T`. | [`diff-pair-result-type.slang`](diff-pair-result-type.slang) |
-| C-15 | [#makediffpair](../../../docs/llm-generated/ir-reference/differentiation.md#makediffpair) | `MakeDiffPair` works for vector primal/differential types; result is `DiffPair(Vec(T, N), witness)`. | [`make-diff-pair-vector.slang`](make-diff-pair-vector.slang) |
-| C-16 | [#opcodes](../../../docs/llm-generated/ir-reference/differentiation.md#opcodes) | A single entry point that constructs a `DifferentialPair` and reads both `.p` and `.d` exercises `MakeDiffPair`, `GetPrimal`, and `GetDifferential` together. | [`make-diff-pair-and-projections.slang`](make-diff-pair-and-projections.slang) |
-
-## Tests in this bundle
-
-| File | Intent | Doc anchor |
-| --- | --- | --- |
-| [`make-diff-pair.slang`](make-diff-pair.slang) | functional | `#makediffpair` |
-| [`get-primal.slang`](get-primal.slang) | functional | `#differential-pair-projection` |
-| [`get-differential.slang`](get-differential.slang) | functional | `#differential-pair-projection` |
-| [`forward-differentiate.slang`](forward-differentiate.slang) | functional | `#forwarddifferentiate` |
-| [`forward-differentiate-dedupes.slang`](forward-differentiate-dedupes.slang) | functional | `#forwarddifferentiate` |
-| [`forward-differentiate-base-fn-operand.slang`](forward-differentiate-base-fn-operand.slang) | functional | `#forward-mode` |
-| [`fwd-diff-alias.slang`](fwd-diff-alias.slang) | functional | `#forwarddifferentiate` |
-| [`legacy-backward-differentiate.slang`](legacy-backward-differentiate.slang) | functional | `#legacy-bridge` |
-| [`bwd-diff-alias.slang`](bwd-diff-alias.slang) | functional | `#legacy-bridge` |
-| [`detach-derivative.slang`](detach-derivative.slang) | functional | `#detachderivative` |
-| [`detach-derivative-result-type.slang`](detach-derivative-result-type.slang) | functional | `#detachderivative` |
-| [`no-diff-parameter-marker.slang`](no-diff-parameter-marker.slang) | functional | `#opcodes` |
-| [`no-diff-module-scope-marker.slang`](no-diff-module-scope-marker.slang) | functional | `#opcodes` |
-| [`diff-pair-result-type.slang`](diff-pair-result-type.slang) | functional | `#makediffpair` |
-| [`make-diff-pair-vector.slang`](make-diff-pair-vector.slang) | functional | `#makediffpair` |
-| [`make-diff-pair-and-projections.slang`](make-diff-pair-and-projections.slang) | functional | `#opcodes` |
+| detach(x) inside a differentiable function lowers to detachDerivative(%x). | functional | [#detachderivative](../../../docs/llm-generated/ir-reference/differentiation.md#detachderivative) | [`detach-derivative.slang`](detach-derivative.slang) |
+| detachDerivative returns its operand unchanged with the same scalar result type at LOWER-TO-IR. | functional | [#detachderivative](../../../docs/llm-generated/ir-reference/differentiation.md#detachderivative) | [`detach-derivative-result-type.slang`](detach-derivative-result-type.slang) |
+| Reading .d off a returned DifferentialPair lowers to GetDifferential(%pair). | functional | [#differential-pair-projection](../../../docs/llm-generated/ir-reference/differentiation.md#differential-pair-projection) | [`get-differential.slang`](get-differential.slang) |
+| Reading .p off a returned DifferentialPair lowers to GetPrimal(%pair). | functional | [#differential-pair-projection](../../../docs/llm-generated/ir-reference/differentiation.md#differential-pair-projection) | [`get-primal.slang`](get-primal.slang) |
+| ForwardDifferentiate has exactly one operand (baseFn): the user-named func value to differentiate. | functional | [#forward-mode](../../../docs/llm-generated/ir-reference/differentiation.md#forward-mode) | [`forward-differentiate-base-fn-operand.slang`](forward-differentiate-base-fn-operand.slang) |
+| ForwardDifferentiate is hoistable so two syntactic __fwd_diff(f) occurrences on the same base function dedupe to one ForwardDifferentiate(%f) IR value. | functional | [#forwarddifferentiate](../../../docs/llm-generated/ir-reference/differentiation.md#forwarddifferentiate) | [`forward-differentiate-dedupes.slang`](forward-differentiate-dedupes.slang) |
+| The unprefixed fwd_diff(f) form also lowers to ForwardDifferentiate(%f), same as __fwd_diff. | functional | [#forwarddifferentiate](../../../docs/llm-generated/ir-reference/differentiation.md#forwarddifferentiate) | [`fwd-diff-alias.slang`](fwd-diff-alias.slang) |
+| __fwd_diff(f) on a [ForwardDifferentiable] function lowers to a ForwardDifferentiate(%f) IR value whose result type is the JVP signature Func(DiffPair, DiffPair). | functional | [#forwarddifferentiate](../../../docs/llm-generated/ir-reference/differentiation.md#forwarddifferentiate) | [`forward-differentiate.slang`](forward-differentiate.slang) |
+| The unprefixed bwd_diff(f) form also lowers to LegacyBackwardDifferentiate at LOWER-TO-IR, same as __bwd_diff. | functional | [#legacy-bridge](../../../docs/llm-generated/ir-reference/differentiation.md#legacy-bridge) | [`bwd-diff-alias.slang`](bwd-diff-alias.slang) |
+| __bwd_diff(f) on a [BackwardDifferentiable] function lowers at LOWER-TO-IR to LegacyBackwardDifferentiate(%apply_bwd, %remat, %ctx_t), not to BackwardDifferentiate. | functional | [#legacy-bridge](../../../docs/llm-generated/ir-reference/differentiation.md#legacy-bridge) | [`legacy-backward-differentiate.slang`](legacy-backward-differentiate.slang) |
+| DifferentialPair<T>(primal, diff) constructor at a __fwd_diff call site lowers to MakeDiffPair(%primal, %diff). | functional | [#makediffpair](../../../docs/llm-generated/ir-reference/differentiation.md#makediffpair) | [`make-diff-pair.slang`](make-diff-pair.slang) |
+| MakeDiffPair produces a value of type DiffPair(T, witness); the witness operand is the IDifferentiable witness for T. | functional | [#makediffpair](../../../docs/llm-generated/ir-reference/differentiation.md#makediffpair) | [`diff-pair-result-type.slang`](diff-pair-result-type.slang) |
+| MakeDiffPair works on vector primal/differential types; result type is DiffPair(Vec(...), witness). | functional | [#makediffpair](../../../docs/llm-generated/ir-reference/differentiation.md#makediffpair) | [`make-diff-pair-vector.slang`](make-diff-pair-vector.slang) |
+| A no_diff parameter surfaces as Attributed(T, %no_diff) on the function entry block at LOWER-TO-IR. | functional | [#opcodes](../../../docs/llm-generated/ir-reference/differentiation.md#opcodes) | [`no-diff-parameter-marker.slang`](no-diff-parameter-marker.slang) |
+| A single entry point that constructs a DifferentialPair then reads both .p and .d exercises MakeDiffPair, GetPrimal, and GetDifferential in one IR dump. | functional | [#opcodes](../../../docs/llm-generated/ir-reference/differentiation.md#opcodes) | [`make-diff-pair-and-projections.slang`](make-diff-pair-and-projections.slang) |
+| The no_diff parameter marker is implemented by a unique module-scope let %k : Void = no_diff value that all Attributed(T, %k) wrappers reference. | functional | [#opcodes](../../../docs/llm-generated/ir-reference/differentiation.md#opcodes) | [`no-diff-module-scope-marker.slang`](no-diff-module-scope-marker.slang) |
 
 ## Out of scope (no-GPU runner)
 

@@ -33,27 +33,16 @@ index doc itself asserts, observed by `-dump-ir` against a
 text target with `-o /dev/null` (per `_common.md`'s rules for
 IR-dump observation).
 
-## Claims enumerated
+## Coverage
 
-| Claim ID | Anchor                       | Claim (one line)                                                                                                       | Tests                                              |
-| -------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| C-01     | #family-taxonomy             | Arithmetic opcodes belong to the Values family; an integer add lowers to `add` in IR.                                  | [`family-taxonomy-arithmetic-is-values.slang`](family-taxonomy-arithmetic-is-values.slang)       |
-| C-02     | #family-taxonomy             | A struct declaration belongs to the Structure family; the IR dump shows a `struct` parent opcode.                      | [`family-taxonomy-struct-decl-is-structure.slang`](family-taxonomy-struct-decl-is-structure.slang)   |
-| C-03     | #family-taxonomy             | Branches and block terminators belong to the Control-flow family; `if` lowers to `block` + `ifElse`.                   | [`family-taxonomy-if-stmt-is-control-flow.slang`](family-taxonomy-if-stmt-is-control-flow.slang)    |
-| C-04     | #how-ast-nodes-lower-to-ir   | `visitVarDecl` emits a `var` opcode for a local variable accessed by field address.                                    | [`ast-mapping-var-decl-emits-var.slang`](ast-mapping-var-decl-emits-var.slang)             |
-| C-05     | #how-ast-nodes-lower-to-ir   | `visitInfixExpr` dispatches to arithmetic opcodes such as `add`, `sub`, `mul`; mixed-operator code emits each opcode.  | [`ast-mapping-infix-dispatches-to-arith.slang`](ast-mapping-infix-dispatches-to-arith.slang)     |
-| C-06     | #family-taxonomy             | Decorations attach to instructions, not a separate stream; an entry-point `func` carries an `[entryPoint(...)]` token. | [`decoration-attaches-to-host-inst.slang`](decoration-attaches-to-host-inst.slang)           |
-
-## Tests in this bundle
-
-| File                                                | Intent     | Doc anchor                   |
-| --------------------------------------------------- | ---------- | ---------------------------- |
-| [`family-taxonomy-arithmetic-is-values.slang`](family-taxonomy-arithmetic-is-values.slang)        | functional | `#family-taxonomy`           |
-| [`family-taxonomy-struct-decl-is-structure.slang`](family-taxonomy-struct-decl-is-structure.slang)    | functional | `#family-taxonomy`           |
-| [`family-taxonomy-if-stmt-is-control-flow.slang`](family-taxonomy-if-stmt-is-control-flow.slang)     | functional | `#family-taxonomy`           |
-| [`ast-mapping-var-decl-emits-var.slang`](ast-mapping-var-decl-emits-var.slang)              | functional | `#how-ast-nodes-lower-to-ir` |
-| [`ast-mapping-infix-dispatches-to-arith.slang`](ast-mapping-infix-dispatches-to-arith.slang)       | functional | `#how-ast-nodes-lower-to-ir` |
-| [`decoration-attaches-to-host-inst.slang`](decoration-attaches-to-host-inst.slang)            | functional | `#family-taxonomy`           |
+| Claim | Intent | Anchor | Tests |
+| --- | --- | --- | --- |
+| Per the family taxonomy row for the Decoration family, decorations are metadata attached to instructions; an entry-point function shows a decoration token co-located with its host func opcode in the IR dump. | functional | [#family-taxonomy](../../../docs/llm-generated/ir-reference/index.md#family-taxonomy) | [`decoration-attaches-to-host-inst.slang`](decoration-attaches-to-host-inst.slang) |
+| Per the family taxonomy, a struct declaration belongs to the Structure family; the IR dump shows a struct parent opcode. | functional | [#family-taxonomy](../../../docs/llm-generated/ir-reference/index.md#family-taxonomy) | [`family-taxonomy-struct-decl-is-structure.slang`](family-taxonomy-struct-decl-is-structure.slang) |
+| Per the family taxonomy, branches and block terminators belong to the Control-flow family; an if statement lowers to an ifElse/conditional terminator with multiple blocks. | functional | [#family-taxonomy](../../../docs/llm-generated/ir-reference/index.md#family-taxonomy) | [`family-taxonomy-if-stmt-is-control-flow.slang`](family-taxonomy-if-stmt-is-control-flow.slang) |
+| Per the index family taxonomy, arithmetic opcodes belong to the Values family; an integer add lowers to add in the IR. | functional | [#family-taxonomy](../../../docs/llm-generated/ir-reference/index.md#family-taxonomy) | [`family-taxonomy-arithmetic-is-values.slang`](family-taxonomy-arithmetic-is-values.slang) |
+| The index doc names visitInfixExpr as dispatching to arithmetic opcodes like Add, Sub, Mul; mixed-operator code emits each opcode. | functional | [#how-ast-nodes-lower-to-ir](../../../docs/llm-generated/ir-reference/index.md#how-ast-nodes-lower-to-ir) | [`ast-mapping-infix-dispatches-to-arith.slang`](ast-mapping-infix-dispatches-to-arith.slang) |
+| The index doc names visitVarDecl as the AST-to-IR mapping that emits a Var opcode; a struct-typed local should produce a var instruction in the IR. | functional | [#how-ast-nodes-lower-to-ir](../../../docs/llm-generated/ir-reference/index.md#how-ast-nodes-lower-to-ir) | [`ast-mapping-var-decl-emits-var.slang`](ast-mapping-var-decl-emits-var.slang) |
 
 ## Out of scope
 

@@ -34,25 +34,15 @@ Strategy: one observation per cross-cutting claim that the index
 doc itself asserts, using the lightest runner that makes the
 observation visible.
 
-## Claims enumerated
+## Coverage
 
-| Claim ID | Anchor                  | Claim (one line)                                                                                                                                          | Tests                                                 |
-| -------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| C-01     | #family-taxonomy        | The taxonomy is real: a node valid under one root (Expr) is invalid under another (Stmt); a bare `break` outside a loop/switch is family-rejected.        | [`family-taxonomy-stmt-vs-expr-rejected.slang`](family-taxonomy-stmt-vs-expr-rejected.slang)         |
-| C-02     | #family-taxonomy        | A working program composes concrete leaves from every documented root family (Decl, Expr, Stmt, Type, Modifier, Val).                                    | [`multi-family-composition-program.slang`](multi-family-composition-program.slang)              |
-| C-03     | #cross-cutting-topics   | The AST flows through parse + semantic-check + AST-to-IR lowering; a struct declaration in source emits as a struct in HLSL target text.                 | [`ast-survives-parse-check-lower-to-hlsl.slang`](ast-survives-parse-check-lower-to-hlsl.slang)        |
-| C-04     | #cross-cutting-topics   | The syntax-as-declaration model maps attributes to AST node classes; an attribute without a declared mapping is diagnosed.                                | [`syntax-as-declaration-unknown-attribute-rejected.slang`](syntax-as-declaration-unknown-attribute-rejected.slang) |
-| C-05     | #cross-cutting-topics   | AST-to-IR lowering retires most AST nodes; the same source operation emits as the target's idiom rather than the Slang-AST shape.                        | [`ast-lowers-and-retires-into-target-idiom.slang`](ast-lowers-and-retires-into-target-idiom.slang)      |
-
-## Tests in this bundle
-
-| File                                                  | Intent     | Doc anchor               |
-| ----------------------------------------------------- | ---------- | ------------------------ |
-| [`family-taxonomy-stmt-vs-expr-rejected.slang`](family-taxonomy-stmt-vs-expr-rejected.slang)         | negative   | `#family-taxonomy`       |
-| [`multi-family-composition-program.slang`](multi-family-composition-program.slang)              | functional | `#family-taxonomy`       |
-| [`ast-survives-parse-check-lower-to-hlsl.slang`](ast-survives-parse-check-lower-to-hlsl.slang)        | functional | `#cross-cutting-topics`  |
-| [`syntax-as-declaration-unknown-attribute-rejected.slang`](syntax-as-declaration-unknown-attribute-rejected.slang) | negative   | `#cross-cutting-topics`  |
-| [`ast-lowers-and-retires-into-target-idiom.slang`](ast-lowers-and-retires-into-target-idiom.slang)      | functional | `#cross-cutting-topics`  |
+| Claim | Intent | Anchor | Tests |
+| --- | --- | --- | --- |
+| The index doc names the syntax-as-declaration model (via SyntaxDecl and AttributeDecl) as the mapping from keywords and attributes to AST node classes; an attribute that has no declared mapping is diagnosed. | negative | [#cross-cutting-topics](../../../docs/llm-generated/ast-reference/index.md#cross-cutting-topics) | [`syntax-as-declaration-unknown-attribute-rejected.slang`](syntax-as-declaration-unknown-attribute-rejected.slang) |
+| The index doc states that AST nodes lower to Slang IR which retires most of them; a Slang-level matrix-vector multiply emits as the target's mul-idiom rather than as a Slang-AST-shaped artifact. | functional | [#cross-cutting-topics](../../../docs/llm-generated/ast-reference/index.md#cross-cutting-topics) | [`ast-lowers-and-retires-into-target-idiom.slang`](ast-lowers-and-retires-into-target-idiom.slang) |
+| The index doc's cross-cutting topics name parse, semantic-check, and AST-to-IR lowering as the AST's life cycle; a struct declaration survives all three phases and appears as a struct in emitted HLSL target text. | functional | [#cross-cutting-topics](../../../docs/llm-generated/ast-reference/index.md#cross-cutting-topics) | [`ast-survives-parse-check-lower-to-hlsl.slang`](ast-survives-parse-check-lower-to-hlsl.slang) |
+| A working program composes concrete leaves from every AST root family the index taxonomy names (Decl, Expr, Stmt, Type, Modifier, Val), demonstrating that the family partition spans the surface language. | functional | [#family-taxonomy](../../../docs/llm-generated/ast-reference/index.md#family-taxonomy) | [`multi-family-composition-program.slang`](multi-family-composition-program.slang) |
+| The AST family taxonomy is real: a Stmt root and an Expr root are distinct, so a bare break statement outside a loop or switch is diagnosed by the checker (a Stmt-shape constraint, not an Expr-shape one). | negative | [#family-taxonomy](../../../docs/llm-generated/ast-reference/index.md#family-taxonomy) | [`family-taxonomy-stmt-vs-expr-rejected.slang`](family-taxonomy-stmt-vs-expr-rejected.slang) |
 
 ## Out of scope
 

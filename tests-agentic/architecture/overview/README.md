@@ -36,25 +36,15 @@ pipeline stage that `EntryPointRequest` bundles with the name;
 states; (e) a single `TranslationUnitRequest` can hold multiple
 entry points and shared file-scope declarations.
 
-## Claims enumerated
+## Coverage
 
-| Claim ID | Anchor                                                                                                                                       | Claim (one line)                                                                                                                                                | Tests                                              |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| C-01     | [#purpose](../../../docs/llm-generated/architecture/overview.md#purpose)                                                                     | Slang compiles one source to many target languages — DXIL, SPIR-V, GLSL, Metal, WGSL, C++, CUDA, PyTorch glue. The text-emit subset is observable from slangc. | [`multi-target-emit.slang`](multi-target-emit.slang)                          |
-| C-02     | [#purpose](../../../docs/llm-generated/architecture/overview.md#purpose)                                                                     | Slang accepts HLSL-compatible source code; HLSL-flavoured constructs (`cbuffer`) are parsed and lowered to the chosen target.                                  | [`hlsl-compatible-syntax.slang`](hlsl-compatible-syntax.slang)                     |
-| C-03     | [#compilation-request-lifecycle](../../../docs/llm-generated/architecture/overview.md#compilation-request-lifecycle)                         | An `EntryPointRequest` is "a function name plus a pipeline stage"; `-entry foo` selects the function named `foo` from the translation unit.                    | [`entry-point-by-name.slang`](entry-point-by-name.slang)                        |
-| C-04     | [#compilation-request-lifecycle](../../../docs/llm-generated/architecture/overview.md#compilation-request-lifecycle)                         | An `EntryPointRequest` bundles a pipeline stage with the function name; `-stage vertex` produces vertex-shader emit with stage-specific outputs.               | [`stage-selects-pipeline-stage.slang`](stage-selects-pipeline-stage.slang)                |
-| C-05     | [#compilation-request-lifecycle](../../../docs/llm-generated/architecture/overview.md#compilation-request-lifecycle)                         | A `TranslationUnitRequest` is "a collection of source files that share a namespace"; multiple entry points in one Slang file each compile from the same unit.   | [`translation-unit-multiple-entries.slang`](translation-unit-multiple-entries.slang)          |
-
-## Tests in this bundle
-
-| File                                         | Intent     | Doc anchor                          |
-| -------------------------------------------- | ---------- | ----------------------------------- |
-| [`multi-target-emit.slang`](multi-target-emit.slang)                    | functional | `#purpose`                          |
-| [`hlsl-compatible-syntax.slang`](hlsl-compatible-syntax.slang)               | functional | `#purpose`                          |
-| [`entry-point-by-name.slang`](entry-point-by-name.slang)                  | functional | `#compilation-request-lifecycle`    |
-| [`stage-selects-pipeline-stage.slang`](stage-selects-pipeline-stage.slang)         | functional | `#compilation-request-lifecycle`    |
-| [`translation-unit-multiple-entries.slang`](translation-unit-multiple-entries.slang)    | functional | `#compilation-request-lifecycle`    |
+| Claim | Intent | Anchor | Tests |
+| --- | --- | --- | --- |
+| A `TranslationUnitRequest` is "a collection of source files that share a namespace"; multiple entry points in one Slang translation unit each pick up their own emit when `-entry` selects them. | functional | [#compilation-request-lifecycle](../../../docs/llm-generated/architecture/overview.md#compilation-request-lifecycle) | [`translation-unit-multiple-entries.slang`](translation-unit-multiple-entries.slang) |
+| An `EntryPointRequest` bundles a function name with a pipeline stage; `-stage vertex` produces vertex-shader emit and the stage-specific outputs are visible. | functional | [#compilation-request-lifecycle](../../../docs/llm-generated/architecture/overview.md#compilation-request-lifecycle) | [`stage-selects-pipeline-stage.slang`](stage-selects-pipeline-stage.slang) |
+| An `EntryPointRequest` is "a function name plus a pipeline stage"; `-entry foo` on the command line selects the function named `foo` as the entry. | functional | [#compilation-request-lifecycle](../../../docs/llm-generated/architecture/overview.md#compilation-request-lifecycle) | [`entry-point-by-name.slang`](entry-point-by-name.slang) |
+| One Slang source compiles to every text-emit target the doc lists (HLSL, GLSL, SPIR-V, Metal, WGSL, CUDA, C++). | functional | [#purpose](../../../docs/llm-generated/architecture/overview.md#purpose) | [`multi-target-emit.slang`](multi-target-emit.slang) |
+| Slang accepts HLSL-compatible source ("Slang (and HLSL-compatible) source code"); a `cbuffer` block is parsed and lowered to the chosen target. | functional | [#purpose](../../../docs/llm-generated/architecture/overview.md#purpose) | [`hlsl-compatible-syntax.slang`](hlsl-compatible-syntax.slang) |
 
 ## Doc gaps observed
 
