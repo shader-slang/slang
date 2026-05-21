@@ -77,8 +77,8 @@ struct ListFuncs
 
             if (srcCount > dstList.getCount())
             {
-                void* newBuffer = _mallocArray(count, elementType->m_size);
-                if (!newBuffer && count != 0)
+                void* newBuffer = _mallocArray(srcCount, elementType->m_size);
+                if (!newBuffer && srcCount != 0)
                 {
                     return;
                 }
@@ -88,11 +88,16 @@ struct ListFuncs
                 void* oldBuffer = dstList.detachBuffer();
 
                 // Initialize it all first
-                typeFuncs.ctorArray(typeMap, elementType, newBuffer, count);
-                typeFuncs.copyArray(typeMap, elementType, newBuffer, oldBuffer, count);
+                typeFuncs.ctorArray(typeMap, elementType, newBuffer, srcCount);
+                typeFuncs.copyArray(
+                    typeMap,
+                    elementType,
+                    newBuffer,
+                    srcList.getBuffer(),
+                    srcCount);
 
                 // Attach the new buffer
-                dstList.attachBuffer((Byte*)newBuffer, count, count);
+                dstList.attachBuffer((Byte*)newBuffer, srcCount, srcCount);
 
                 // Free the old buffer
                 if (oldBuffer)
@@ -212,8 +217,8 @@ struct StructFuncs
 
             if (srcCount > dstList.getCount())
             {
-                void* newBuffer = _mallocArray(count, elementType->m_size);
-                if (!newBuffer && count != 0)
+                void* newBuffer = _mallocArray(srcCount, elementType->m_size);
+                if (!newBuffer && srcCount != 0)
                 {
                     return;
                 }
@@ -223,11 +228,16 @@ struct StructFuncs
                 void* oldBuffer = dstList.detachBuffer();
 
                 // Initialize it all first
-                typeFuncs.ctorArray(typeMap, elementType, newBuffer, count);
-                typeFuncs.copyArray(typeMap, elementType, newBuffer, oldBuffer, count);
+                typeFuncs.ctorArray(typeMap, elementType, newBuffer, srcCount);
+                typeFuncs.copyArray(
+                    typeMap,
+                    elementType,
+                    newBuffer,
+                    srcList.getBuffer(),
+                    srcCount);
 
                 // Attach the new buffer
-                dstList.attachBuffer((Byte*)newBuffer, count, count);
+                dstList.attachBuffer((Byte*)newBuffer, srcCount, srcCount);
 
                 // Free the old buffer
                 if (oldBuffer)
