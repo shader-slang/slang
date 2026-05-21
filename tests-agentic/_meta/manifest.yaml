@@ -185,9 +185,12 @@ bundles:
       - cross-cutting/ir-instructions
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
+      - source/slang/slang-ast-builder.cpp
+      - source/slang/slang-ast-type.cpp
+      - source/slang/slang-ast-val.cpp
     runner:
       category: agentic-pipeline
-    size_cap_files: 60
+    size_cap_files: 100
 
   pipeline/04b-pre-link-passes:
     prompt: prompts/pipeline-04b-pre-link-passes.md
@@ -202,9 +205,10 @@ bundles:
       - ir-reference/index
     coverage_targets:
       - source/slang/slang-ir-link.cpp
+      - source/slang/slang-ir-legalize-types.cpp
     runner:
       category: agentic-pipeline
-    size_cap_files: 50
+    size_cap_files: 75
 
   pipeline/04c-layout-ir:
     prompt: prompts/pipeline-04c-layout-ir.md
@@ -220,9 +224,10 @@ bundles:
       - ir-reference/index
     coverage_targets:
       - source/slang/slang-parameter-binding.cpp
+      - source/slang/slang-type-layout.cpp
     runner:
       category: agentic-pipeline
-    size_cap_files: 30
+    size_cap_files: 50
 
   pipeline/05-ir-passes:
     prompt: prompts/pipeline-05-ir-passes.md
@@ -235,9 +240,21 @@ bundles:
       - pipeline/04-ast-to-ir
     coverage_targets:
       - source/slang/slang-emit.cpp
+      - source/slang/slang-ir-typeflow-specialize.cpp
+      - source/slang/slang-ir-peephole.cpp
+      - source/slang/slang-ir-any-value-marshalling.cpp
+      - source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp
+      - source/slang/slang-ir-uniformity.cpp
+      - source/slang/slang-ir-synthesize-active-mask.cpp
+      - source/slang/slang-ir-legalize-varying-params.cpp
+      - source/slang/slang-ir-legalize-matrix-types.cpp
+      - source/slang/slang-ir-specialize.cpp
+      - source/slang/slang-ir-specialize-resources.cpp
+      - source/slang/slang-ir-byte-address-legalize.cpp
+      - source/slang/slang-ir-lower-cuda-builtin-types.cpp
     runner:
       category: agentic-pipeline
-    size_cap_files: 100
+    size_cap_files: 150
 
   pipeline/06-emit:
     prompt: prompts/pipeline-06-emit.md
@@ -340,6 +357,8 @@ bundles:
       - architecture/overview
     coverage_targets:
       - source/slang/slang-ir.cpp
+      - source/slang/slang-ir-util.cpp
+      - source/slang/slang-ir-insts.h
     runner:
       category: agentic-cross-cutting
     size_cap_files: 100
@@ -874,9 +893,11 @@ bundles:
     coverage_targets:
       - source/slang/slang-emit-spirv.cpp
       - source/slang/slang-ir-spirv-legalize.cpp
+      - source/slang/slang-ir-glsl-legalize.cpp
+      - source/slang/slang-emit-c-like.cpp
     runner:
       category: agentic-target-pipelines
-    size_cap_files: 100
+    size_cap_files: 150
 
   target-pipelines/hlsl:
     prompt: prompts/target-pipelines-hlsl.md
@@ -895,9 +916,10 @@ bundles:
     coverage_targets:
       - source/slang/slang-emit-hlsl.cpp
       - source/slang/slang-ir-hlsl-legalize.cpp
+      - source/slang/slang-emit-c-like.cpp
     runner:
       category: agentic-target-pipelines
-    size_cap_files: 100
+    size_cap_files: 150
 
   target-pipelines/metal:
     prompt: prompts/target-pipelines-metal.md
@@ -916,6 +938,7 @@ bundles:
     coverage_targets:
       - source/slang/slang-emit-metal.cpp
       - source/slang/slang-ir-metal-legalize.cpp
+      - source/slang/slang-emit-c-like.cpp
     runner:
       category: agentic-target-pipelines
     size_cap_files: 100
@@ -937,6 +960,7 @@ bundles:
     coverage_targets:
       - source/slang/slang-emit-wgsl.cpp
       - source/slang/slang-ir-wgsl-legalize.cpp
+      - source/slang/slang-emit-c-like.cpp
     runner:
       category: agentic-target-pipelines
     size_cap_files: 100
@@ -959,6 +983,8 @@ bundles:
     coverage_targets:
       - source/slang/slang-emit-cuda.cpp
       - source/slang/slang-ir-cuda-immutable-load.cpp
+      - source/slang/slang-emit-cpp.cpp
+      - source/slang/slang-emit-c-like.cpp
     runner:
       category: agentic-target-pipelines
     size_cap_files: 100

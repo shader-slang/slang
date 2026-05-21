@@ -47,6 +47,14 @@ Subcommands
                                bundle keys + scores; source-line detail
                                is intentionally suppressed so it cannot
                                leak into an expansion prompt.
+    coverage-gaps <bundle> [--from <slangc-report.txt>]
+                               Show which of <bundle>'s coverage_targets
+                               are most uncovered, given a per-file
+                               llvm-cov report text dump. Output is
+                               bundle-level only (file names + missed-
+                               line counts), never source-line content.
+                               Used as a priority signal in expansion
+                               briefings while staying doc-anchored.
     review-status [<bundle>...]
                                (Phase D) Per-bundle review/remediation
                                freshness. Currently prints a not-yet-
@@ -808,6 +816,88 @@ def cmd_expansion_candidates(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_coverage_gaps(args: argparse.Namespace) -> int:
+    """Show which coverage_targets of <bundle> are most uncovered.
+
+    Input is a per-file `llvm-cov report` text dump (e.g. the
+    `*-slangc-report.txt` produced by
+    `tmp/run-coverage-comparison.sh`). Output is bundle-level —
+    file names + missed-line counts — never line-level. The agent
+    receiving this hint in an expansion briefing remains
+    doc-anchored; the gap data is just a priority signal.
+
+    The report's columns are space-separated; the relevant ones
+    are Filename (col 0) and Missed Lines (-5), Cover-% (-4).
+    """
+    manifest = load_manifest()
+    spec = manifest.bundles.get(args.bundle)
+    if not spec:
+        raise SystemExit(f"unknown bundle: {args.bundle}")
+    if not spec.coverage_targets:
+        print(f"{args.bundle}: no coverage_targets declared.")
+        return 0
+    if not args.from_report:
+        print(
+            f"{args.bundle}: coverage_targets (no report supplied via --from):",
+            file=sys.stderr,
+        )
+        for tgt in spec.coverage_targets:
+            print(f"  - {tgt}")
+        return 0
+
+    report_path = Path(args.from_report)
+    if not report_path.exists():
+        raise SystemExit(f"report not found: {report_path}")
+
+    # Parse the per-file report. Columns at end of each row:
+    # ... <Lines> <Missed-Lines> <Cover%> <Branches> <Missed-Br> <Br-Cover%>
+    file_data: dict[str, tuple[int, int, float]] = {}
+    for raw in report_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not raw or raw.startswith(("Filename", "----", "TOTAL", "warning:")):
+            continue
+        fields = raw.split()
+        if len(fields) < 11:
+            continue
+        try:
+            missed = int(fields[-5])
+            total = int(fields[-6])
+            pct_str = fields[-4]
+            if not pct_str.endswith("%"):
+                continue
+            pct = float(pct_str.rstrip("%"))
+        except (ValueError, IndexError):
+            continue
+        file_data[fields[0]] = (total, missed, pct)
+
+    rows = []
+    for tgt in spec.coverage_targets:
+        d = file_data.get(tgt)
+        if d is None:
+            rows.append((tgt, None))
+        else:
+            rows.append((tgt, d))
+    # Sort: highest missed-lines first; unowned ("not in report") last.
+    rows.sort(key=lambda r: (-(r[1][1]) if r[1] else 0))
+
+    print(f"# coverage-gaps for {args.bundle}")
+    print(f"# report: {report_path}")
+    print(f"# {len(spec.coverage_targets)} coverage_target file(s)")
+    print()
+    print(f"{'file':<60} {'total':>8} {'missed':>8} {'cov%':>7}")
+    print("-" * 86)
+    for tgt, d in rows:
+        if d is None:
+            print(f"{tgt:<60} {'(no data)':>8}")
+        else:
+            total, missed, pct = d
+            print(f"{tgt:<60} {total:>8} {missed:>8} {pct:>6.1f}%")
+    print()
+    print("Use this list as a priority signal in an expansion briefing.")
+    print("DO NOT show the agent any source-line content; the agent stays")
+    print("doc-anchored. See _meta/prompts/_expand.md.")
+    return 0
+
+
 def cmd_review_status(args: argparse.Namespace) -> int:
     print(
         "review-status: not yet implemented.\n"
@@ -887,6 +977,19 @@ def _build_parser() -> argparse.ArgumentParser:
         help="path to a coverage report JSON",
     )
     p_exp.set_defaults(func=cmd_expansion_candidates)
+
+    p_cg = sub.add_parser(
+        "coverage-gaps",
+        help="show which coverage_targets of a bundle are most uncovered "
+        "(bundle-level only; no source-line content)",
+    )
+    p_cg.add_argument("bundle")
+    p_cg.add_argument(
+        "--from",
+        dest="from_report",
+        help="path to a per-file llvm-cov report .txt (e.g. *-slangc-report.txt)",
+    )
+    p_cg.set_defaults(func=cmd_coverage_gaps)
 
     p_rs = sub.add_parser(
         "review-status",

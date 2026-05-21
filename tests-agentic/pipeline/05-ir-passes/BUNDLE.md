@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T18:00:00+00:00
-source_commit: 1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+generated_at: 2026-05-21T00:00:00+00:00
+source_commit: 1655c2bf8d3567fa220a5226769ef5e3917d55e8
 watched_paths_digest: 8749b5a60327ef9aea96c0b02a10d643c2d39d04195e7cbd40904b69dabc7f6e
 source_doc: docs/llm-generated/pipeline/05-ir-passes.md
 source_doc_digest: 0c1c128f131512193c797738ba0f341f117afd9505bb5ddddf47481f9f70dc7b
@@ -48,13 +48,27 @@ used:
   `operator-shift-overflow`.
 
 This is the largest bundle in the suite by design: `size_cap_files`
-is 100; the bundle has 71 tests covering most categories. The
-initial 45 functional + negative tests have been extended with 26
+is 100; the bundle has 109 tests covering most categories. The
+initial 45 functional + negative tests were extended with 26
 boundary / negative / stress probes that pressure the same claims
 along documented axes (0 / 1 / many / large-N iterations for
 loop-unroll; 0 / 1 / many uniforms for layout-and-binding; narrow
 scalar types — uint8, half, bool — through type-legalization;
-alternative input shapes for the diagnostic passes).
+alternative input shapes for the diagnostic passes). A subsequent
+expansion pass added 38 more tests anchored on under-represented
+doc claims: byte-address-legalize store and vector / non-zero-
+offset shapes; matrix and many-dim vector legalization;
+empty-array elision; three-element tuple decomposition;
+multi-case enum lowering; alternative payload types for the
+optional / float / int8 narrow probes; `__stage_switch` vertex-vs-
+fragment branches; specialize-resources for resource-typed args;
+nested and many-arg specialization stress; pixel-/vertex-stage
+varying-param shapes; SV_GroupID / SV_GroupThreadID built-ins;
+multi-buffer Metal / WGSL legalize; non-default SPIR-V localsize;
+`__ldg(...)` on struct-field uniforms; multi-out-parameter ABI;
+fan-out / depth stress on inlining; nested loop-unroll;
+DCE on unused global uniforms; missing-return on if-only flow;
+3-function recursion cycle.
 Differentiation tests are limited to one observable diagnostic
 (`check-differentiability`) — the rest of the autodiff family
 requires test infrastructure beyond what `slangc` exposes on a
@@ -114,28 +128,36 @@ no-GPU runner and is recorded under `## Out of scope`.
 
 | File                                                                  | Intent     | Doc anchor                            |
 | --------------------------------------------------------------------- | ---------- | ------------------------------------- |
+| `byte-address-legalize-load-at-nonzero-offset.slang`                  | expansion  | `#type-and-value-legalization`        |
 | `byte-address-legalize-lowers-load-on-glsl.slang`                     | functional | `#type-and-value-legalization`        |
+| `byte-address-legalize-store-on-glsl.slang`                           | expansion  | `#type-and-value-legalization`        |
+| `byte-address-legalize-vector-load.slang`                             | expansion  | `#type-and-value-legalization`        |
 | `check-differentiability-rejects-non-differentiable.slang`            | negative   | `#differentiation-autodiff`           |
 | `check-unsupported-inst-rejects-non-target-feature.slang`             | negative   | `#linking-and-validation`             |
 | `collect-global-uniforms-builds-global-params-struct.slang`           | functional | `#layout-and-binding`                 |
+| `cuda-immutable-load-on-struct-field.slang`                           | expansion  | `#target-specific-lowering`           |
 | `cuda-immutable-load-only-on-cuda-not-hlsl.slang`                     | boundary   | `#target-specific-lowering`           |
 | `cuda-immutable-load-wraps-uniform-read-in-ldg.slang`                 | functional | `#target-specific-lowering`           |
 | `dce-keeps-partially-used-struct-field.slang`                         | boundary   | `#ssa-construction-and-basic-cleanup` |
 | `dce-removes-dead-branch-after-const-fold.slang`                      | boundary   | `#ssa-construction-and-basic-cleanup` |
 | `dce-removes-transitively-dead-call-chain.slang`                      | boundary   | `#ssa-construction-and-basic-cleanup` |
+| `dce-removes-unused-global-uniform.slang`                             | expansion  | `#ssa-construction-and-basic-cleanup` |
 | `dce-removes-unused-helper-from-emit.slang`                           | functional | `#ssa-construction-and-basic-cleanup` |
 | `dce-runs-multiple-times-stress.slang`                                | stress     | `#how-the-passes-are-ordered`         |
 | `dll-export-marks-entry-point-with-export-decoration.slang`           | functional | `#inlining-and-call-graph`            |
 | `eliminate-dead-code-runs-multiple-stages.slang`                      | functional | `#how-the-passes-are-ordered`         |
 | `eliminate-phis-converts-out-of-ssa-form.slang`                       | functional | `#ssa-construction-and-basic-cleanup` |
 | `entry-point-decorations-emit-numthreads-marker.slang`                | functional | `#entry-point-and-parameter-handling` |
+| `entry-point-decorations-large-numthreads.slang`                      | expansion  | `#entry-point-and-parameter-handling` |
 | `entry-point-decorations-spirv-localsize.slang`                       | boundary   | `#entry-point-and-parameter-handling` |
 | `entry-point-uniforms-packs-multiple-uniforms-into-one-cbuffer.slang` | functional | `#entry-point-and-parameter-handling` |
 | `explicit-global-context-passes-globals-to-cpu.slang`                 | functional | `#layout-and-binding`                 |
 | `glsl-legalize-emits-std430-ssbo-shape.slang`                         | functional | `#target-specific-lowering`           |
 | `init-local-var-allows-empty-initializer.slang`                       | functional | `#ssa-construction-and-basic-cleanup` |
 | `init-local-var-on-trivial-empty-struct.slang`                        | boundary   | `#ssa-construction-and-basic-cleanup` |
+| `inline-deeply-nested-callees-stress.slang`                           | stress     | `#inlining-and-call-graph`            |
 | `inline-many-call-sites-stress.slang`                                 | stress     | `#inlining-and-call-graph`            |
+| `inline-many-different-callees-stress.slang`                          | stress     | `#inlining-and-call-graph`            |
 | `inline-removes-forceinline-callee-from-emit.slang`                   | functional | `#inlining-and-call-graph`            |
 | `inline-tiny-helper-survives-without-attribute.slang`                 | boundary   | `#inlining-and-call-graph`            |
 | `late-require-capability-emits-extension-for-printf.slang`            | functional | `#layout-and-binding`                 |
@@ -143,51 +165,124 @@ no-GPU runner and is recorded under `## Out of scope`.
 | `layout-pass-emits-binding-and-descriptorset-decorations.slang`       | functional | `#layout-and-binding`                 |
 | `layout-zero-uniforms-no-globalparams.slang`                          | boundary   | `#layout-and-binding`                 |
 | `legalize-binary-operator-routes-int-shift-on-wgsl.slang`             | functional | `#type-and-value-legalization`        |
+| `legalize-binary-operator-uint-shift-amount.slang`                    | expansion  | `#type-and-value-legalization`        |
+| `legalize-empty-array-zero-length.slang`                              | expansion  | `#type-and-value-legalization`        |
+| `legalize-matrix-types-float3x4-emit.slang`                           | expansion  | `#type-and-value-legalization`        |
 | `legalize-types-bool-in-struct.slang`                                 | boundary   | `#type-and-value-legalization`        |
+| `legalize-types-double-through-pipeline.slang`                        | expansion  | `#type-and-value-legalization`        |
 | `legalize-types-half-16bit-through-pipeline.slang`                    | boundary   | `#type-and-value-legalization`        |
 | `legalize-types-uint8-narrow-through-pipeline.slang`                  | boundary   | `#type-and-value-legalization`        |
+| `legalize-varying-params-pixel-shader.slang`                          | expansion  | `#type-and-value-legalization`        |
+| `legalize-varying-params-vertex-shader.slang`                         | expansion  | `#type-and-value-legalization`        |
 | `legalize-vector-types-emits-target-vector.slang`                     | functional | `#type-and-value-legalization`        |
 | `legalize-vector-types-length-one-vector.slang`                       | boundary   | `#type-and-value-legalization`        |
+| `legalize-vector-types-many-dimensions-stress.slang`                  | stress     | `#type-and-value-legalization`        |
 | `loop-unroll-large-iteration-stress.slang`                            | stress     | `#loop-transformations`               |
+| `loop-unroll-nested-stress.slang`                                     | stress     | `#loop-transformations`               |
 | `loop-unroll-removes-static-loop-on-glsl.slang`                       | functional | `#loop-transformations`               |
 | `loop-unroll-single-iteration.slang`                                  | boundary   | `#loop-transformations`               |
 | `loop-unroll-zero-iterations.slang`                                   | boundary   | `#loop-transformations`               |
 | `lower-bit-cast-emits-target-specific-reinterpret.slang`              | functional | `#type-and-value-legalization`        |
+| `lower-bit-cast-float-to-uint-on-spirv.slang`                         | expansion  | `#type-and-value-legalization`        |
+| `lower-buffer-element-type-float-on-glsl.slang`                       | expansion  | `#type-and-value-legalization`        |
 | `lower-buffer-element-type-renders-int-on-glsl.slang`                 | functional | `#type-and-value-legalization`        |
+| `lower-buffer-element-type-struct-on-glsl.slang`                      | expansion  | `#type-and-value-legalization`        |
 | `lower-com-methods-emit-binds-virtual-call.slang`                     | functional | `#specialization-and-generics`        |
 | `lower-defer-emits-cleanup-on-scope-exit.slang`                       | functional | `#type-and-value-legalization`        |
 | `lower-enum-type-emits-integer-on-hlsl.slang`                         | functional | `#type-and-value-legalization`        |
+| `lower-enum-type-on-multiple-cases.slang`                             | expansion  | `#type-and-value-legalization`        |
 | `lower-l-value-cast-routes-through-pointer.slang`                     | functional | `#type-and-value-legalization`        |
 | `lower-optional-type-emits-struct-with-has-value.slang`               | functional | `#type-and-value-legalization`        |
+| `lower-optional-type-on-float-payload.slang`                          | expansion  | `#type-and-value-legalization`        |
+| `lower-out-parameters-on-multiple-out-params.slang`                   | expansion  | `#entry-point-and-parameter-handling` |
 | `lower-out-parameters-preserves-out-keyword.slang`                    | functional | `#type-and-value-legalization`        |
 | `lower-tuple-types-flattens-into-anonymous-values.slang`              | functional | `#type-and-value-legalization`        |
+| `lower-tuple-types-three-element-tuple.slang`                         | expansion  | `#type-and-value-legalization`        |
 | `metal-legalize-emits-positional-buffer-marker.slang`                 | functional | `#target-specific-lowering`           |
+| `metal-legalize-multiple-positional-buffers.slang`                    | expansion  | `#target-specific-lowering`           |
 | `missing-return-on-empty-non-void-body.slang`                         | negative   | `#ssa-construction-and-basic-cleanup` |
+| `missing-return-on-if-only-branch.slang`                              | expansion  | `#ssa-construction-and-basic-cleanup` |
 | `missing-return-warns-on-non-void.slang`                              | negative   | `#ssa-construction-and-basic-cleanup` |
 | `operator-shift-overflow-warns-on-large-shift.slang`                  | negative   | `#ssa-construction-and-basic-cleanup` |
 | `optional-none-usage-check-rejects-always-none.slang`                 | negative   | `#linking-and-validation`             |
 | `optional-none-usage-on-explicit-none-literal.slang`                  | negative   | `#linking-and-validation`             |
+| `optional-none-usage-on-float-payload.slang`                          | expansion  | `#linking-and-validation`             |
 | `recursion-check-rejects-mutual-recursion.slang`                      | negative   | `#linking-and-validation`             |
 | `recursion-check-rejects-self-recursion.slang`                        | negative   | `#linking-and-validation`             |
+| `recursion-check-rejects-three-cycle.slang`                           | expansion  | `#linking-and-validation`             |
+| `shift-overflow-on-int8-shift.slang`                                  | expansion  | `#ssa-construction-and-basic-cleanup` |
 | `shift-overflow-on-uint-32-shift.slang`                               | negative   | `#ssa-construction-and-basic-cleanup` |
 | `simplify-ir-preserves-entry-point.slang`                             | functional | `#ssa-construction-and-basic-cleanup` |
 | `specialize-arrays-allows-generic-array-parameter.slang`              | functional | `#specialization-and-generics`        |
+| `specialize-arrays-different-fixed-sizes.slang`                       | expansion  | `#specialization-and-generics`        |
 | `specialize-many-different-arg-instances.slang`                       | stress     | `#specialization-and-generics`        |
+| `specialize-many-generic-type-args-stress.slang`                      | stress     | `#specialization-and-generics`        |
 | `specialize-module-substitutes-generic-with-concrete-type.slang`      | functional | `#specialization-and-generics`        |
+| `specialize-nested-generic-instantiation.slang`                       | expansion  | `#specialization-and-generics`        |
 | `specialize-one-instance-emits-concrete-type.slang`                   | boundary   | `#specialization-and-generics`        |
+| `specialize-resources-routes-typed-resource-arg.slang`                | expansion  | `#specialization-and-generics`        |
+| `specialize-stage-switch-multiple-stages.slang`                       | expansion  | `#specialization-and-generics`        |
 | `specialize-stage-switch-resolves-stage-conditional.slang`            | functional | `#specialization-and-generics`        |
+| `specialize-target-switch-default-branch.slang`                       | expansion  | `#specialization-and-generics`        |
 | `specialize-target-switch-resolves-target-conditional.slang`          | functional | `#specialization-and-generics`        |
 | `specialize-zero-instances-of-generic.slang`                          | boundary   | `#specialization-and-generics`        |
 | `spirv-legalize-emits-opcapability-shader.slang`                      | functional | `#target-specific-lowering`           |
+| `spirv-legalize-non-default-localsize.slang`                          | expansion  | `#target-specific-lowering`           |
 | `string-hash-pass-deterministic-across-runs.slang`                    | boundary   | `#layout-and-binding`                 |
 | `string-hash-pass-emits-numeric-hash.slang`                           | functional | `#layout-and-binding`                 |
+| `string-hash-pass-empty-string.slang`                                 | expansion  | `#layout-and-binding`                 |
 | `strip-debug-info-keeps-zero-debug-instructions.slang`                | functional | `#ssa-construction-and-basic-cleanup` |
 | `translate-global-varying-var-emits-input-as-parameter.slang`         | functional | `#layout-and-binding`                 |
+| `translate-global-varying-var-sv-groupid.slang`                       | expansion  | `#layout-and-binding`                 |
 | `vk-invert-y-flips-position-y-on-spirv.slang`                         | functional | `#target-specific-lowering`           |
 | `wgsl-legalize-emits-binding-group-and-workgroup-size.slang`          | functional | `#target-specific-lowering`           |
+| `wgsl-legalize-multiple-binding-groups.slang`                         | expansion  | `#target-specific-lowering`           |
 
 ## Doc gaps observed
 
+- The "Specialization and generics" category lists
+  `slang-ir-typeflow-specialize.cpp` and `slang-ir-typeflow-set.cpp`
+  as "Type-flow set construction" / "Specialization based on type
+  flow" but does not name a user-observable footprint of either
+  pass — neither pass shows up in a `### BEFORE/AFTER` dump
+  uniquely, and neither has a distinguishable emit-text consequence
+  that a `.slang` test could anchor on. A short example of what
+  type-flow-based specialization changes (e.g. dynamic-dispatch
+  call resolved via type-flow, observable as a removed
+  `lookup_witness` in the dump) would unlock tests here.
+- The "Type and value legalization" category lists
+  `slang-ir-any-value-marshalling.cpp` and
+  `slang-ir-any-value-inference.cpp` as "Pack / unpack values into
+  `AnyValue`" / "Determines `AnyValue` size for existentials".
+  Both passes run only when `AnyValue` types appear in IR; the
+  doc does not name a Slang-source-level construct that surfaces
+  these in the emit. A pointer to a user-visible `AnyValue`
+  spelling (or the surface of dynamic-dispatch through interfaces
+  that triggers it) would unlock a per-pass test.
+- The "Loop transformations" category lists
+  `slang-ir-uniformity.cpp` ("Uniformity / divergence analysis")
+  as a pass but does not name a user-observable consequence. We
+  could not anchor a test on uniformity output without
+  fabricating one. A short example of what changes — e.g. "a
+  varying conditional triggers a `convergent` requirement in the
+  SPIR-V emit" — would be testable.
+- The "Loop transformations" category also lists
+  `slang-ir-synthesize-active-mask.cpp` with no user-visible
+  footprint enumerated. Same gap as uniformity.
+- The "Target-specific lowering" category lists
+  `slang-ir-lower-cuda-builtin-types.cpp` (CUDA only) but does
+  not enumerate which Slang built-in types are transformed nor
+  what the CUDA emit text looks like before vs after. A short
+  example (e.g. "Slang `RaytracingAccelerationStructure` becomes
+  CUDA `OptixTraversableHandle`") would let us anchor a CUDA
+  builtin-type lowering test.
+- The "Specialization and generics" category includes
+  `slang-ir-specialize-resources.cpp` but does not name the
+  observable post-condition. We anchored a smoke test on
+  "resource argument inlines cleanly", but a stronger doc
+  statement (e.g. "the resource is no longer passed as a
+  parameter; it is referenced directly at the call site") would
+  enable a sharper test.
 - The "Differentiation (autodiff)" category lists nine passes
   (`slang-ir-autodiff*.cpp`) but does not enumerate user-observable
   consequences per pass. Only `check-differentiability` has an

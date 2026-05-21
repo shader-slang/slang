@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T17:30:00+00:00
-source_commit: 330c9a8d807b9f9352e4754f466d1244ae681cff
+generated_at: 2026-05-21T12:00:00+00:00
+source_commit: 1655c2bf8d3567fa220a5226769ef5e3917d55e8
 watched_paths_digest: bd75ad021965ba68fbd7d335d6359ad1cf49b78a95a9be48be867759452b78f1
 source_doc: docs/llm-generated/target-pipelines/spirv.md
 source_doc_digest: b1daf02c9f85dda22a3cac37e70daa316be6cde3c511da1abf8a80d483e1dba1
@@ -99,6 +99,36 @@ text and are out of scope.
 | C-28     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | A `for` loop survives as SPIR-V structured control flow (`OpLoopMerge` / `OpBranchConditional`).                                              | `for-loop-structured-control-flow.slang`         |
 | C-29     | [#option-set-toggles](../../../docs/llm-generated/target-pipelines/spirv.md#option-set-toggles)                                                                                                                                                               | Without `-g`, no `DebugLine` `OpExtInst` calls appear in the emit; the only source marker is `OpSource Slang 1`.                              | `debug-info-opt-in-default-off.slang`            |
 | C-30     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | `float4` lowers to `OpTypeVector %float 4` and `int` / `uint` to `OpTypeInt 32 (1|0)`.                                                        | `primitive-type-emission.slang`                  |
+| C-31     | [#legalizeentrypointsforglsl-despite-the-name](../../../docs/llm-generated/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name)                                                                                                             | `SV_GroupThreadID` lowers to `gl_LocalInvocationID` with `BuiltIn LocalInvocationId`.                                                         | `sv-group-thread-id-builtin.slang`               |
+| C-32     | [#legalizeentrypointsforglsl-despite-the-name](../../../docs/llm-generated/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name)                                                                                                             | `SV_GroupID` lowers to `gl_WorkGroupID` with `BuiltIn WorkgroupId`.                                                                           | `sv-group-id-builtin.slang`                      |
+| C-33     | [#legalizeentrypointsforglsl-despite-the-name](../../../docs/llm-generated/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name)                                                                                                             | `SV_VertexID` lowers to `gl_VertexIndex` with `BuiltIn VertexIndex` (Vulkan-style index).                                                     | `sv-vertex-id-builtin.slang`                     |
+| C-34     | [#legalizeentrypointsforglsl-despite-the-name](../../../docs/llm-generated/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name)                                                                                                             | `SV_InstanceID` lowers to `gl_InstanceIndex` with `BuiltIn InstanceIndex`.                                                                    | `sv-instance-id-builtin.slang`                   |
+| C-35     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | Vector `\|\|` (the OR half of `legalizeLogicalAndOr`) lowers to `OpLogicalOr` on `v3bool`.                                                    | `vector-logical-or.slang`                        |
+| C-36     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `InterlockedCompareExchange` lowers to `OpAtomicCompareExchange` (accepted by `validateAtomicOperations`).                                    | `atomic-compare-exchange.slang`                  |
+| C-37     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `InterlockedMin` / `InterlockedOr` lower to `OpAtomicUMin` / `OpAtomicOr` (additional `validateAtomicOperations`-accepted atomics).           | `atomic-min-or.slang`                            |
+| C-38     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `Texture3D` lowers to `OpTypeImage` with the `3D` dimension.                                                                                  | `texture3d-sampled-image.slang`                  |
+| C-39     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `TextureCube` lowers to `OpTypeImage` with the `Cube` dimension.                                                                              | `texture-cube-sampled-image.slang`               |
+| C-40     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `Texture2DArray` lowers to `OpTypeImage %float 2D <depth> 1` with the Arrayed flag set.                                                       | `texture-2d-array-sampled-image.slang`           |
+| C-41     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `RWByteAddressBuffer.Store<T>` lowers (under `translateToStructuredBufferOps=true`) to `OpAccessChain` + `OpStore`.                           | `rw-byte-address-buffer-store.slang`             |
+| C-42     | [#spir-v-specific-runtime-predicates](../../../docs/llm-generated/target-pipelines/spirv.md#spir-v-specific-runtime-predicates)                                                                                                                               | At SPIR-V 1.5 (Slang default) `discard` lowers to `OpKill` — `shouldEmitDiscardAsDemote` returns `false`.                                     | `discard-fragment-opkill.slang`                  |
+| C-43     | [#spir-v-specific-runtime-predicates](../../../docs/llm-generated/target-pipelines/spirv.md#spir-v-specific-runtime-predicates)                                                                                                                               | At SPIR-V 1.6+ `discard` lowers to `OpDemoteToHelperInvocation` (`shouldEmitDiscardAsDemote` returns `true`).                                 | `discard-spirv-16-demote.slang`                  |
+| C-44     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | `mul(matA, matB)` for 4x4 emits `OpMatrixTimesMatrix`.                                                                                        | `matrix-times-matrix.slang`                      |
+| C-45     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | `mul(matrix, vector)` emits `OpVectorTimesMatrix` (column-major convention).                                                                  | `vector-times-matrix.slang`                      |
+| C-46     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | `int -> float` emits `OpConvertSToF` (distinct from same-width `OpBitcast`).                                                                  | `int-to-float-convert.slang`                     |
+| C-47     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | `float -> int` emits `OpConvertFToS`.                                                                                                         | `float-to-int-convert.slang`                     |
+| C-48     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | `int8_t` storage-buffer element emits `OpCapability Int8`.                                                                                    | `int8-storage-buffer-capability.slang`           |
+| C-49     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | `int4 + int4` emits a single `OpIAdd %v4int` (vector arithmetic without unpacking).                                                           | `vector-int-add.slang`                           |
+| C-50     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | A transcendental builtin (`sin`) emits `OpExtInstImport "GLSL.std.450"` and dispatches via `OpExtInst`.                                       | `extinst-import-glsl-std450.slang`               |
+| C-51     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | Read/write through a `groupshared` element emits `OpAccessChain` through `_ptr_Workgroup_<T>`.                                                | `groupshared-workgroup-store-load.slang`         |
+| C-52     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | `RWStructuredBuffer<T>` emits an `OpTypeRuntimeArray %T` inside the `Block`-decorated struct.                                                 | `runtime-array-type-decl.slang`                  |
+| C-53     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | Nested struct member write chains multiple `OpAccessChain` steps; each member carries its own `OpMemberDecorate Offset`.                      | `nested-struct-access-chain.slang`               |
+| C-54     | [#eliminatephis-with-spir-v-specific-options](../../../docs/llm-generated/target-pipelines/spirv.md#eliminatephis-with-spir-v-specific-options)                                                                                                               | Ternary `?:` emits `OpSelectionMerge` plus per-branch `OpStore` into a `Function`-storage variable (no `OpPhi`).                              | `select-ternary-selection-merge.slang`           |
+| C-55     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | `[SpecializationConstant]` emits `OpSpecConstant` with a `SpecId` decoration.                                                                 | `spec-constant-spec-id.slang`                    |
+| C-56     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | A `float2x2` emits `OpTypeMatrix %v2float 2` with `MatrixStride 8` (the lower matrix-dim edge).                                               | `matrix-2x2-emit.slang`                          |
+| C-57     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | `[unroll]` on a `for` loop emits `OpLoopMerge ... Unroll` (companion to the unattributed `None` form).                                        | `loop-unroll-spirv-attribute.slang`              |
+| C-58     | [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/spirv.md#phase-b-specialization-and-type-legalization)                                                                                                           | Phase B `checkForRecursiveFunctions` rejects a self-recursive call with E55201 before SPIR-V emit.                                            | `negative-recursive-function.slang`              |
+| C-59     | [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/spirv.md#phase-b-specialization-and-type-legalization)                                                                                                           | Phase B `checkForMissingReturns` rejects a non-void function whose paths don't all return.                                                    | `negative-missing-return-non-void.slang`         |
+| C-60     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | Eight `RWStructuredBuffer` globals receive sequential `Binding 0..7` decorations under `DescriptorSet 0`.                                     | `many-uniform-bindings-stress.slang`             |
 
 ## Tests in this bundle
 
@@ -166,6 +196,37 @@ text and are out of scope.
 | `atomic-on-workgroup-storage.slang`               | boundary   | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
 | `negative-out-of-bound-static-array-index.slang`  | negative   | `#phase-b-specialization-and-type-legalization`                           |
 | `negative-undefined-identifier.slang`             | negative   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `sv-group-thread-id-builtin.slang`                | expansion  | `#legalizeentrypointsforglsl-despite-the-name`                            |
+| `sv-group-id-builtin.slang`                       | expansion  | `#legalizeentrypointsforglsl-despite-the-name`                            |
+| `sv-vertex-id-builtin.slang`                      | expansion  | `#legalizeentrypointsforglsl-despite-the-name`                            |
+| `sv-instance-id-builtin.slang`                    | expansion  | `#legalizeentrypointsforglsl-despite-the-name`                            |
+| `numthreads-localsize-one-one-one.slang`          | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `vector-logical-or.slang`                         | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `atomic-compare-exchange.slang`                   | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `atomic-min-or.slang`                             | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture3d-sampled-image.slang`                   | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture-cube-sampled-image.slang`                | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture-2d-array-sampled-image.slang`            | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `rw-byte-address-buffer-store.slang`              | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `discard-fragment-opkill.slang`                   | boundary   | `#spir-v-specific-runtime-predicates`                                     |
+| `discard-spirv-16-demote.slang`                   | boundary   | `#spir-v-specific-runtime-predicates`                                     |
+| `matrix-times-matrix.slang`                       | expansion  | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `vector-times-matrix.slang`                       | expansion  | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `int-to-float-convert.slang`                      | expansion  | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `float-to-int-convert.slang`                      | expansion  | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `int8-storage-buffer-capability.slang`            | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `vector-int-add.slang`                            | expansion  | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `extinst-import-glsl-std450.slang`                | expansion  | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `groupshared-workgroup-store-load.slang`          | expansion  | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `runtime-array-type-decl.slang`                   | expansion  | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `nested-struct-access-chain.slang`                | expansion  | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `select-ternary-selection-merge.slang`            | expansion  | `#eliminatephis-with-spir-v-specific-options`                             |
+| `spec-constant-spec-id.slang`                     | expansion  | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `matrix-2x2-emit.slang`                           | boundary   | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `loop-unroll-spirv-attribute.slang`               | expansion  | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `negative-recursive-function.slang`               | negative   | `#phase-b-specialization-and-type-legalization`                           |
+| `negative-missing-return-non-void.slang`          | negative   | `#phase-b-specialization-and-type-legalization`                           |
+| `many-uniform-bindings-stress.slang`              | stress     | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
 
 ## Doc gaps observed
 
@@ -226,6 +287,46 @@ text and are out of scope.
 - The doc says `legalizeLogicalAndOr` runs for SPIR-V (Khronos
   arm) but does not state the SPIR-V opcode the vector `&&`
   produces. We pin `OpLogicalAnd` from emit-experiment.
+- The doc names `legalizeEntryPointsForGLSL` but does not list
+  the HLSL-SV-to-SPIR-V builtin mapping table
+  (`SV_DispatchThreadID -> gl_GlobalInvocationID`,
+  `SV_GroupThreadID -> gl_LocalInvocationID`,
+  `SV_GroupID -> gl_WorkGroupID`,
+  `SV_VertexID -> gl_VertexIndex`,
+  `SV_InstanceID -> gl_InstanceIndex`, etc.). The new builtin
+  tests pin these mappings from emit-experiment; a doc table
+  would make them anchorable to a specific row.
+- The doc names `validateAtomicOperations` but lists only `IAdd`
+  as the example. We pin `OpAtomicCompareExchange`,
+  `OpAtomicUMin`, and `OpAtomicOr` from emit-experiment as
+  additional accepted opcodes.
+- The doc names `legalizeImageSubscript` and `OpTypeSampledImage`
+  but does not enumerate the SPIR-V image-dim values for the
+  Slang texture-type family (`Texture2D`/`Texture3D`/`TextureCube`/
+  `Texture2DArray`). The dim and Arrayed bit are user-observable
+  in spirv-asm and would benefit from explicit doc rows.
+- The doc references SPIR-V version selection (`isSpirv16OrLater`,
+  `shouldEmitDiscardAsDemote`) but does not name the
+  `-profile spirv_1_6` command-line knob that flips the
+  predicate. The two discard tests pin behavior on both sides;
+  a doc note linking the CLI flag to the predicate would make
+  this anchorable.
+- The doc mentions Khronos-target capability emission per type
+  width but does not enumerate the integer-width capability
+  ladder (`Int8` / `Int16` / `Int64`) or where the corresponding
+  `UniformAndStorageBuffer*BitAccess` extensions trigger.
+- The doc mentions `GLSL.std.450` only obliquely (the via-GLSL
+  legacy path). The SPIR-V direct-emit path also relies on
+  `OpExtInstImport "GLSL.std.450"` for transcendentals; this
+  belongs in the doc's "common to all SPIR-V emit" list.
+- The doc does not name `OpSpecConstant` or the
+  `[SpecializationConstant]` -> `SpecId` mapping. Specialization
+  constants are core to Vulkan but the doc treats them as out of
+  scope; a one-line "spec-constants emit as OpSpecConstant" note
+  would let the bundle anchor that claim.
+- The doc names `OpLoopMerge` for structured control flow but
+  does not state that `[unroll]` adds the `Unroll` annotation
+  (and `[loop]` adds `DontUnroll`). Pinned by emit-experiment.
 
 ## Out of scope (no-GPU runner)
 

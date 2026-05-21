@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T15:00:00+00:00
-source_commit: 74db89b9f77cdced9c4d0c47f377b38fffb9180b
+generated_at: 2026-05-21T12:00:00+00:00
+source_commit: 1655c2bf8d3567fa220a5226769ef5e3917d55e8
 watched_paths_digest: a7b1c184243cc33ab7365f1e766ae76123f4e9039f529babd0a030cb03949933
 source_doc: docs/llm-generated/cross-cutting/ir-instructions.md
 source_doc_digest: a0fb638618164f0a2ef326bfc1eda1d1f8d37d916fbe5842e1ae309d082169f9
@@ -70,6 +70,21 @@ through any directive that `slang-test` runs on a CPU.
 | C-21     | [#value-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#value-instructions)                                                       | A string literal appears as a `StringLit` payload (via `getStringHash`) and the module records it under `global_hashed_string_literals`. | `value-string-lit-hash-ir.slang`               |
 | C-22     | [#type-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#type-instructions)                                                         | A vector parameter is typed `Vec(elementType, elementCount)` in the IR.                                           | `type-vector-ir.slang`                         |
 | C-23     | [#type-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#type-instructions)                                                         | A fixed-size array type appears as `Array(elementType, elementCount)`.                                            | `type-array-ir.slang`                          |
+| C-24     | [#control-flow-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#control-flow-instructions)                                         | `discard` is a return/exit terminator in the `TerminatorInst` family.                                             | `control-flow-discard-ir.slang`                |
+| C-25     | [#control-flow-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#control-flow-instructions)                                         | `unreachable` is the exit terminator for synthesized join blocks whose predecessors all return.                   | `control-flow-unreachable-ir.slang`            |
+| C-26     | [#memory-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#memory-instructions)                                                     | `getElement` is the rvalue indexed-access opcode, operand shape `(base, index)`.                                  | `memory-get-element-array.slang`               |
+| C-27     | [#resource-and-shader-io-opcodes](../../../docs/llm-generated/cross-cutting/ir-instructions.md#resource-and-shader-io-opcodes)                               | `structuredBufferLoad` is the read-only sibling of `rwstructuredBufferStore` for `StructuredBuffer<T>` reads.     | `resource-structured-buffer-load-ir.slang`     |
+| C-28     | [#function-and-module-structure](../../../docs/llm-generated/cross-cutting/ir-instructions.md#function-and-module-structure)                                 | `global_var` is the module-scope storage opcode for mutable `static` module-scope variables.                      | `structure-global-var-ir.slang`                |
+| C-29     | [#specialization-and-existentials](../../../docs/llm-generated/cross-cutting/ir-instructions.md#specialization-and-existentials)                             | `lookupWitness(witnessTable, requirementKey)` resolves an interface requirement to the concrete satisfying value. | `specialization-lookup-witness-ir.slang`       |
+| C-30     | [#specialization-and-existentials](../../../docs/llm-generated/cross-cutting/ir-instructions.md#specialization-and-existentials)                             | `makeExistential(value, witness)` packs a concrete value plus its witness table into an existential.              | `specialization-make-existential-ir.slang`     |
+| C-31     | [#specialization-and-existentials](../../../docs/llm-generated/cross-cutting/ir-instructions.md#specialization-and-existentials)                             | `extractExistentialValue` / `extractExistentialType` / `extractExistentialWitnessTable` project an existential.   | `specialization-extract-existential-ir.slang`  |
+| C-32     | [#function-and-module-structure](../../../docs/llm-generated/cross-cutting/ir-instructions.md#function-and-module-structure)                                 | `generic` is the type-level-computation parent opcode (C++ wrapper `IRGeneric`).                                  | `structure-generic-ir.slang`                   |
+| C-33     | [#type-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#type-instructions)                                                         | `interface` is the parent type opcode (C++ wrapper `InterfaceType`) whose children are `interface_req_entry`.     | `type-interface-ir.slang`                      |
+| C-34     | [#type-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#type-instructions)                                                         | `class` is the parent type opcode (C++ wrapper `ClassType`) for reference-typed user declarations.                | `type-class-ir.slang`                          |
+| C-35     | [#type-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#type-instructions)                                                         | `Bool` is one of the basic scalar type opcodes (C++ wrapper `BoolType`).                                          | `type-bool-ir.slang`                           |
+| C-36     | [#type-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#type-instructions)                                                         | `Texture` is the type opcode for textures, operand `(elementType, shape, isArray, isMS, sampleCount, ...)`.        | `type-texture2d-ir.slang`                      |
+| C-37     | [#value-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#value-instructions)                                                       | `makeVector` is the aggregate-constructor value opcode for vector literals.                                       | `value-make-vector-ir.slang`                   |
+| C-38     | [#decorations](../../../docs/llm-generated/cross-cutting/ir-instructions.md#decorations)                                                                     | Source-level function attributes lower to IR `[<name>(...)]` decoration rows (e.g. `numThreads` from `[numthreads]`). | `decoration-num-threads-ir.slang`           |
 
 ## Tests in this bundle
 
@@ -132,6 +147,34 @@ through any directive that `slang-test` runs on a CPU.
 | `structure-global-constant.slang`          | boundary   | `#function-and-module-structure`      |
 | `negative-arithmetic-add-struct-no-overload.slang` | negative | `#value-instructions`           |
 | `negative-bitcast-size-mismatch.slang`     | negative   | `#value-instructions`                 |
+| `control-flow-discard-ir.slang`            | boundary   | `#control-flow-instructions`          |
+| `control-flow-unreachable-ir.slang`        | boundary   | `#control-flow-instructions`          |
+| `control-flow-block-with-param.slang`      | expansion  | `#control-flow-instructions`          |
+| `memory-get-element-array.slang`           | boundary   | `#memory-instructions`                |
+| `memory-swizzle-two-elements.slang`        | boundary   | `#memory-instructions`                |
+| `memory-ptr-from-var-int.slang`            | boundary   | `#memory-instructions`                |
+| `resource-structured-buffer-load-ir.slang` | expansion  | `#resource-and-shader-io-opcodes`     |
+| `resource-structured-buffer-load-runtime-index.slang` | boundary | `#resource-and-shader-io-opcodes` |
+| `structure-global-var-ir.slang`            | boundary   | `#function-and-module-structure`      |
+| `structure-generic-ir.slang`               | expansion  | `#function-and-module-structure`      |
+| `structure-witness-table-entry-ir.slang`   | boundary   | `#function-and-module-structure`      |
+| `structure-call-void-return.slang`         | expansion  | `#function-and-module-structure`      |
+| `specialization-lookup-witness-ir.slang`   | expansion  | `#specialization-and-existentials`    |
+| `specialization-make-existential-ir.slang` | expansion  | `#specialization-and-existentials`    |
+| `specialization-extract-existential-ir.slang` | expansion | `#specialization-and-existentials` |
+| `type-interface-ir.slang`                  | expansion  | `#type-instructions`                  |
+| `type-class-ir.slang`                      | expansion  | `#type-instructions`                  |
+| `type-bool-ir.slang`                       | boundary   | `#type-instructions`                  |
+| `type-texture2d-ir.slang`                  | expansion  | `#type-instructions`                  |
+| `type-matrix-layout-operand.slang`         | boundary   | `#type-instructions`                  |
+| `conversion-float-to-int-cast-ir.slang`    | expansion  | `#value-instructions`                 |
+| `conversion-floatcast-double-to-float.slang` | boundary | `#value-instructions`                 |
+| `value-make-vector-ir.slang`               | expansion  | `#value-instructions`                 |
+| `value-int-lit-hoistable-stress.slang`     | stress     | `#value-instructions`                 |
+| `arithmetic-neg-float.slang`               | boundary   | `#value-instructions`                 |
+| `decoration-num-threads-ir.slang`          | expansion  | `#decorations`                        |
+| `negative-write-to-static-const.slang`     | negative   | `#function-and-module-structure`      |
+| `negative-runtime-sized-local-array.slang` | negative   | `#type-instructions`                  |
 
 ## Doc gaps observed
 

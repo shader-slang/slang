@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T17:16:11+00:00
-source_commit: ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+generated_at: 2026-05-21T00:00:00+00:00
+source_commit: 1655c2bf8d3567fa220a5226769ef5e3917d55e8
 watched_paths_digest: ee6e5a27774a8a9c7ea3024cc5842f7bc1919255c4c0b9751400d25195f0b7bc
 source_doc: docs/llm-generated/target-pipelines/hlsl.md
 source_doc_digest: 2afce914bae96fe2e024bf6b3685b7339df010398abc456d4a58cb329326fa50
@@ -78,6 +78,15 @@ specifically about HLSL being non-Khronos.
 | C-25     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | A `groupshared` array survives the pipeline as `groupshared T name[N];` on HLSL emit.                                                                             | `groupshared-memory-survives.slang`                                                                                                    |
 | C-26     | [#phase-c-hlsl-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-c-hlsl-legalization-lowering-phi-elimination)                               | An atomic operation on a UAV passes `validateAtomicOperations` and emits as the matching HLSL `Interlocked*` intrinsic.                                           | `atomic-operation-survives.slang`                                                                                                      |
 | C-27     | [#phase-c-hlsl-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-c-hlsl-legalization-lowering-phi-elimination)                               | A `static` module-scope variable is emitted as a `static T name = init;` declaration on HLSL.                                                                     | `move-global-var-init-to-entry.slang`                                                                                                  |
+| C-28     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | Control-flow statements (for / while / do-while / switch / break / continue) emit as their HLSL spellings through the shared CLikeSourceEmitter.                  | `for-loop-statement-emission.slang`, `while-loop-statement-emission.slang`, `do-while-loop-statement-emission.slang`, `switch-case-statement-emission.slang`, `continue-in-loop-emission.slang`, `break-in-loop-emit.slang` |
+| C-29     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | Binary / unary / bitwise / shift operators ride through the shared C-like emitter and emit as HLSL operator spellings.                                            | `expression-binary-precedence-emit.slang`, `expression-bitwise-operators-emit.slang`, `expression-shift-operators-emit.slang`, `expression-unary-negate-emit.slang`                                                                |
+| C-30     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | Explicit primitive type conversions emit as the HLSL constructor-style cast `T(expr)`.                                                                            | `cast-constructor-style-emit.slang`, `cast-uint-to-float-emit.slang`                                                                                                                                                              |
+| C-31     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | User-defined helper functions emit as named HLSL functions with the `_<N>` suffix, callable from the entry point.                                                 | `function-call-user-defined-emit.slang`, `stress-many-function-parameters.slang`                                                                                                                                                  |
+| C-32     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | Local fixed-size array declarations emit as `T name[N]` in HLSL.                                                                                                  | `local-array-declaration-emit.slang`                                                                                                                                                                                              |
+| C-33     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | Texture3D and TextureCube resources keep their HLSL spellings and bind to the `t` register class.                                                                 | `texture3d-sample-emit.slang`, `texturecube-sample-emit.slang`                                                                                                                                                                    |
+| C-34     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | Nested struct fields (a struct containing another user struct) emit both `struct` declarations in HLSL.                                                           | `struct-nested-fields-emit.slang`                                                                                                                                                                                                 |
+| C-35     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | Vector swizzle (`v.xy`) survives HLSL emit using the canonical `.xyzw` spelling.                                                                                  | `vector-swizzle-xyzw-emit.slang`                                                                                                                                                                                                  |
+| C-36     | [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-b-specialization-and-type-legalization)                                           | `checkForMissingReturns` (Phase B, `reqSet.missingReturn`) rejects non-void functions whose control flow can fall off the end before HLSL emit.                   | `missing-return-diag.slang`                                                                                                                                                                                                       |
 
 ## Tests in this bundle
 
@@ -152,6 +161,42 @@ specifically about HLSL being non-Khronos.
 | `stress-all-paths-return.slang`                       | stress     | `#phase-d-hlsl-emit-and-downstream-tools`                 |
 | `stress-structured-buffer-of-double-matrix.slang`     | stress     | `#wrapstructuredbuffersofmatrices`                        |
 | `structured-buffer-of-float-no-wrap.slang`            | boundary   | `#wrapstructuredbuffersofmatrices`                        |
+| `register-s-explicit-zero.slang`                      | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `register-s-explicit-high-index.slang`                | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `register-t-explicit-high-index.slang`                | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `register-b-explicit-high-index.slang`                | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `for-loop-statement-emission.slang`                   | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `while-loop-statement-emission.slang`                 | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `do-while-loop-statement-emission.slang`              | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `switch-case-statement-emission.slang`                | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `continue-in-loop-emission.slang`                     | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `break-in-loop-emit.slang`                            | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `expression-binary-precedence-emit.slang`             | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `expression-bitwise-operators-emit.slang`             | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `expression-shift-operators-emit.slang`               | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `expression-unary-negate-emit.slang`                  | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `cast-constructor-style-emit.slang`                   | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `cast-uint-to-float-emit.slang`                       | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `function-call-user-defined-emit.slang`               | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `local-array-declaration-emit.slang`                  | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `vector-float4-largest-dim.slang`                     | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `vector-swizzle-xyzw-emit.slang`                      | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `int-vector-keeps-hlsl-spelling.slang`                | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `consume-structured-buffer-survives.slang`            | boundary   | `#phase-b-specialization-and-type-legalization`           |
+| `wrap-structured-buffer-of-half-matrix.slang`         | boundary   | `#wrapstructuredbuffersofmatrices`                        |
+| `structured-buffer-of-vector-no-wrap.slang`           | boundary   | `#wrapstructuredbuffersofmatrices`                        |
+| `structured-buffer-of-user-struct-no-wrap.slang`      | boundary   | `#wrapstructuredbuffersofmatrices`                        |
+| `stress-many-case-switch.slang`                       | stress     | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `stress-deeply-nested-for-loops.slang`                | stress     | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `stress-many-function-parameters.slang`               | stress     | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `numthreads-y-max-1024.slang`                         | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `byte-address-buffer-load-float.slang`                | boundary   | `#legalizebyteaddressbufferops-for-hlsl`                  |
+| `missing-return-diag.slang`                           | negative   | `#phase-b-specialization-and-type-legalization`           |
+| `texture3d-sample-emit.slang`                         | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texturecube-sample-emit.slang`                       | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `empty-function-body-emit.slang`                      | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `cbuffer-vector-field.slang`                          | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `struct-nested-fields-emit.slang`                     | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
 
 ## Doc gaps observed
 

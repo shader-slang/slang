@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T16:30:00+00:00
-source_commit: 3250005059a2746ebc504a9d3f71ed112f1f2b94
+generated_at: 2026-05-21T18:00:00+00:00
+source_commit: 1655c2bf8d3567fa220a5226769ef5e3917d55e8
 watched_paths_digest: 3dbc65f6df020239a91b769be66fa5d3b9d250fac6a4422fc500ef569caf3235
 source_doc: docs/llm-generated/pipeline/04-ast-to-ir.md
 source_doc_digest: 2786b3ac65f55d3fefdde03d0c432f013d0d8c9686304746f06a7f61fab79197
@@ -80,6 +80,10 @@ lowers to which IR construct").
 | C-26     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | Phi-style joining is encoded as block parameters (`param` at the start of a block); branches carry the next values as arguments, not via a `phi`. | `block-param-replaces-phi.slang`                               |
 | C-27     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | A subscript-assignment on an `RWStructuredBuffer<T>` lowers to `rwstructuredBufferGetElementPtr` followed by `store`.                           | `rwbuffer-write-lowers-to-getelementptr-store.slang`           |
 | C-28     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | A `return` from a void-returning function lowers to `return_val(void_constant)`.                                                                | `return-void-uses-void-constant.slang`                         |
+| C-29     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | The "Pure value insts (IRAdd, IRMul, IREq, ...)" row covers all integer arithmetic and comparison operators: `+/-/*///%` and `==/!=/</>`.       | `binaryexpr-{sub,mul,div,mod,eq,lt,ne,bitand,shl}-*.slang`     |
+| C-30     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | Unary arithmetic / bitwise operators (`-a`, `~a`) lower to single-operand pure-value insts in the same family (`neg`, `bitnot`).                | `unaryexpr-{neg,bitnot}-*.slang`                               |
+| C-31     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | The "InvokeExpr -> IRCall" row covers method-call expressions and self-recursive calls as well as free-function calls.                          | `invokeexpr-method-call-...slang`, `funcdecl-recursive-*.slang` |
+| C-32     | [#module-level-outputs](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#module-level-outputs)                                              | Only FuncDecls registered as entry points carry an `entryPoint(...)` decoration; non-entry helpers in the same translation unit do not.         | `non-entry-funcdecl-lacks-entry-point-decoration.slang`        |
 
 ## Tests in this bundle
 
@@ -133,6 +137,38 @@ lowers to which IR construct").
 | `cbuffer-mixed-types-lowers-to-struct-with-mixed-fields.slang`            | boundary   | `#module-level-outputs`         |
 | `entry-point-multiple-each-gets-entry-point-decoration.slang`             | boundary   | `#module-level-outputs`         |
 | `entry-missing-name-fires-no-function-found.slang`                        | negative   | `#module-level-outputs`         |
+| `binaryexpr-sub-lowers-to-sub.slang`                                      | boundary   | `#mapping-ast-constructs-to-ir` |
+| `binaryexpr-mul-lowers-to-mul.slang`                                      | boundary   | `#mapping-ast-constructs-to-ir` |
+| `binaryexpr-div-lowers-to-div.slang`                                      | boundary   | `#mapping-ast-constructs-to-ir` |
+| `binaryexpr-mod-lowers-to-irem.slang`                                     | boundary   | `#mapping-ast-constructs-to-ir` |
+| `binaryexpr-eq-lowers-to-cmpeq.slang`                                     | boundary   | `#mapping-ast-constructs-to-ir` |
+| `binaryexpr-lt-lowers-to-cmplt.slang`                                     | boundary   | `#mapping-ast-constructs-to-ir` |
+| `binaryexpr-ne-lowers-to-cmpne.slang`                                     | boundary   | `#mapping-ast-constructs-to-ir` |
+| `binaryexpr-bitand-lowers-to-and.slang`                                   | boundary   | `#mapping-ast-constructs-to-ir` |
+| `binaryexpr-shl-lowers-to-shl.slang`                                      | boundary   | `#mapping-ast-constructs-to-ir` |
+| `unaryexpr-neg-lowers-to-neg.slang`                                       | boundary   | `#mapping-ast-constructs-to-ir` |
+| `unaryexpr-bitnot-lowers-to-bitnot.slang`                                 | boundary   | `#mapping-ast-constructs-to-ir` |
+| `funcdecl-zero-params-no-block-params.slang`                              | boundary   | `#mapping-ast-constructs-to-ir` |
+| `funcdecl-recursive-call-self-references-irfunc.slang`                    | boundary   | `#mapping-ast-constructs-to-ir` |
+| `funcdecl-out-param-lowers-to-outparam-pointer.slang`                     | boundary   | `#mapping-ast-constructs-to-ir` |
+| `structdecl-single-field-lowers-to-one-field.slang`                       | boundary   | `#mapping-ast-constructs-to-ir` |
+| `structdecl-nested-struct-field-lowers-to-field-of-struct-type.slang`     | boundary   | `#mapping-ast-constructs-to-ir` |
+| `interfacedecl-single-method-one-req-entry.slang`                         | boundary   | `#mapping-ast-constructs-to-ir` |
+| `interfacedecl-five-methods-five-req-entries.slang`                       | stress     | `#mapping-ast-constructs-to-ir` |
+| `witness-table-two-methods-two-entries.slang`                             | boundary   | `#generics-and-existentials`    |
+| `ifstmt-no-else-lowers-to-ifelse-merge.slang`                             | boundary   | `#mapping-ast-constructs-to-ir` |
+| `loop-nested-two-deep-emits-two-loop-instructions.slang`                  | stress     | `#mapping-ast-constructs-to-ir` |
+| `switchstmt-default-only-single-default-arm.slang`                        | boundary   | `#mapping-ast-constructs-to-ir` |
+| `switchstmt-five-cases-five-pairs.slang`                                  | stress     | `#mapping-ast-constructs-to-ir` |
+| `shortcircuit-and-encodes-as-ifelse-with-block-param.slang`               | boundary   | `#mapping-ast-constructs-to-ir` |
+| `cast-uint-from-int-lowers-to-intcast.slang`                              | boundary   | `#mapping-ast-constructs-to-ir` |
+| `vardecl-multiple-global-uniforms-each-lowers-to-global-param.slang`      | boundary   | `#mapping-ast-constructs-to-ir` |
+| `invokeexpr-method-call-on-struct-lowers-to-call.slang`                   | boundary   | `#mapping-ast-constructs-to-ir` |
+| `returnstmt-early-return-emits-multiple-return-val.slang`                 | boundary   | `#mapping-ast-constructs-to-ir` |
+| `return-from-inside-loop-emits-return-val-in-loop-block.slang`            | boundary   | `#mapping-ast-constructs-to-ir` |
+| `non-entry-funcdecl-lacks-entry-point-decoration.slang`                   | boundary   | `#module-level-outputs`         |
+| `generic-call-three-distinct-specializations-each-deferred.slang`         | stress     | `#generics-and-existentials`    |
+| `literalexpr-float-literal-lowers-to-float-constant.slang`                | boundary   | `#mapping-ast-constructs-to-ir` |
 
 ## Doc gaps observed
 
