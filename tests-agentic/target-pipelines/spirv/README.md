@@ -223,60 +223,31 @@ text and are out of scope.
 | [#spec-constants-emit-as-opspecconstant](../../../docs/llm-generated/target-pipelines/spirv.md#spec-constants-emit-as-opspecconstant) | undocumented-behavior | The doc does not name `OpSpecConstant` or the `[SpecializationConstant]` -> `SpecId` mapping. Specialization constants are core to Vulkan but the doc treats them as out of scope; a one-line "spec-constants emit as OpSpecConstant" note would let the bundle anchor that claim. |  |
 | [#oploopmerge](../../../docs/llm-generated/target-pipelines/spirv.md#oploopmerge) | undocumented-behavior | The doc names `OpLoopMerge` for structured control flow but does not state that `[unroll]` adds the `Unroll` annotation (and `[loop]` adds `DontUnroll`). Pinned by emit-experiment. |  |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-- **spirv-link** (`#downstream-spirv-link-spirv-val-spirv-opt-chain`).
-  Only invoked when `spirvFiles.getCount() > 1`, i.e. when
-  there is an `IREmbeddedDownstreamIR` of `CodeGenTarget::SPIRV`
-  to merge with the freshly emitted module. The compute-stage
-  bundle does not set up `-embed-downstream-ir`.
-- **spirv-val**. Gated on `SLANG_RUN_SPIRV_VALIDATION` env
-  var or `-validate-spirv` flag; doesn't change the emitted
-  assembly text. The CI runner may set the env var
-  separately; the bundle's tests don't depend on validation.
-- **spirv-opt**. Invoked via the generic downstream path;
-  options-dependent whether it changes anything. The inline
-  `optimizeSPIRV` call site is `#if 0`'d out (doc-only).
-- **`simplifyIRForSpirvLegalization` outer/inner loop bounds**
-  (`kMaxIterations = 8`, `kMaxFuncIterations = 16`). The
-  loops terminate by fixed-point in practice; no documented
-  user-source pattern hits the bound.
-- **Forward-declared-pointer fixup loop** (Phase D step 12).
-  Only fires on recursive struct-pointer graphs.
-  `checkForRecursiveTypes` errors out before Phase D for
-  user-declared recursive structs.
-- **`introduceExplicitGlobalContext`** — gated on
-  `EnableExperimentalPasses`.
-- **`invertYOfPositionOutput` / `rcpWOfPositionInput`** —
-  gated on `VulkanInvertY` / `VulkanUseDxPositionW`.
-- **`legalizeMeshOutputTypes` /
-  `legalizeDispatchMeshPayloadForGLSL`** — mesh entry points.
-- **`collectCooperativeMetadata`** — cooperative matrix /
-  vector capability set.
-- **`unexportNonEmbeddableIR`** — gated on `EmbedDownstreamIR`.
-- **`coverageTracing`-gated passes**
-  (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`).
-- **`autodiff` / `higherOrderFunc` passes**
-  (`checkAutodiffPatterns`, `specializeHigherOrderParameters`,
-  `finalizeAutoDiffPass`).
-- **`dynamicResourceHeap`** — SM 6.6 dynamic resource heap.
-- **`insertFragmentShaderInterlock`** — raster-ordered
-  resources in a fragment entry point.
-- **`removeUnreachableCodeAfterDiscardForOpKill`** — requires
-  `discard` and SPIR-V `< 1.6`; Slang defaults to `>= 1.5`
-  and gates the pass on `!shouldEmitDiscardAsDemote()`.
-- **`replaceLocationIntrinsicsWithRaytracingObject`** — DXR
-  entry points.
-- **`legalizeUniformBufferLoad`** — anchored to an IR-level
-  canonicalization without a documented text-emit marker.
-- **Pass-ordering claims** (Phase A passes 1-19, Phase B
-  passes 1-65, Phase C passes 1-41, Phase D steps 1-20).
-  Pass _existence_ is observable via emit; pass _ordering_
-  would require `-dump-ir` cross-pass comparison without
-  doc-anchored ordering markers. Covered by
-  `pipeline/05-ir-passes`.
-- **Cross-target probes.** The bundle is single-target by
-  design — SPIR-V observations only. "X fires on SPIR-V but
-  Y doesn't" claims are documented in the `## Conditional
-  gates` section of the doc but not exercised as multi-target
-  CHECK tests in this bundle.
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#collectcooperativemetadata](../../../docs/llm-generated/target-pipelines/spirv.md#collectcooperativemetadata) | gpu-cooperative | **`collectCooperativeMetadata`** — cooperative matrix / vector capability set. | Agent runtime has no GPU; CI / local machine does. |
+| [#invertyofpositionoutput](../../../docs/llm-generated/target-pipelines/spirv.md#invertyofpositionoutput) | gpu-cross-api-flag | **`invertYOfPositionOutput` / `rcpWOfPositionInput`** — gated on `VulkanInvertY` / `VulkanUseDxPositionW`. | Agent runtime has no GPU; CI / local machine does. |
+| [#replacelocationintrinsicswithraytracingobject](../../../docs/llm-generated/target-pipelines/spirv.md#replacelocationintrinsicswithraytracingobject) | gpu-dxr | **`replaceLocationIntrinsicsWithRaytracingObject`** — DXR entry points. | Agent runtime has no GPU; CI / local machine does. |
+| [#legalizemeshoutputtypes](../../../docs/llm-generated/target-pipelines/spirv.md#legalizemeshoutputtypes) | gpu-mesh-shader | **`legalizeMeshOutputTypes` / `legalizeDispatchMeshPayloadForGLSL`** — mesh entry points. | Agent runtime has no GPU; CI / local machine does. |
+| [#insertfragmentshaderinterlock](../../../docs/llm-generated/target-pipelines/spirv.md#insertfragmentshaderinterlock) | gpu-non-compute | **`insertFragmentShaderInterlock`** — raster-ordered resources in a fragment entry point. | Agent runtime has no GPU; CI / local machine does. |
+| [#downstream-spirv-link-spirv-val-spirv-opt-chain](../../../docs/llm-generated/target-pipelines/spirv.md#downstream-spirv-link-spirv-val-spirv-opt-chain) | gpu-spirv-tools | **spirv-link** (`#downstream-spirv-link-spirv-val-spirv-opt-chain`). | Only invoked when `spirvFiles.getCount() > 1`, i.e. when there is an `IREmbeddedDownstreamIR` of `CodeGenTarget::SPIRV` to merge with the freshly emitted module. The compute-stage bundle does not set up `-embed-downstream-ir`. |
+| [#if](../../../docs/llm-generated/target-pipelines/spirv.md#if) | gpu-spirv-tools | **spirv-opt**. Invoked via the generic downstream path; options-dependent whether it changes anything. The inline `optimizeSPIRV` call site is `#if 0`'d out (doc-only). | Agent runtime has no GPU; CI / local machine does. |
+| [#slangrunspirvvalidation](../../../docs/llm-generated/target-pipelines/spirv.md#slangrunspirvvalidation) | gpu-spirv-tools | **spirv-val**. | Gated on `SLANG_RUN_SPIRV_VALIDATION` env var or `-validate-spirv` flag; doesn't change the emitted assembly text. The CI runner may set the env var separately; the bundle's tests don't depend on validation. |
+
+## Out of scope
+
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#autodiff](../../../docs/llm-generated/target-pipelines/spirv.md#autodiff) | (unclassified) | **`autodiff` / `higherOrderFunc` passes** (`checkAutodiffPatterns`, `specializeHigherOrderParameters`, `finalizeAutoDiffPass`). | Not reachable via any allowed test directive. |
+| [#checkforrecursivetypes](../../../docs/llm-generated/target-pipelines/spirv.md#checkforrecursivetypes) | (unclassified) | **Forward-declared-pointer fixup loop** (Phase D step 12). | Only fires on recursive struct-pointer graphs. `checkForRecursiveTypes` errors out before Phase D for user-declared recursive structs. |
+| [#coveragetracing](../../../docs/llm-generated/target-pipelines/spirv.md#coveragetracing) | (unclassified) | **`coverageTracing`-gated passes** (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`). | Not reachable via any allowed test directive. |
+| [#dynamicresourceheap](../../../docs/llm-generated/target-pipelines/spirv.md#dynamicresourceheap) | (unclassified) | **`dynamicResourceHeap`** — SM 6.6 dynamic resource heap. | Not reachable via any allowed test directive. |
+| [#introduceexplicitglobalcontext](../../../docs/llm-generated/target-pipelines/spirv.md#introduceexplicitglobalcontext) | (unclassified) | **`introduceExplicitGlobalContext`** — gated on `EnableExperimentalPasses`. | Not reachable via any allowed test directive. |
+| [#legalizeuniformbufferload](../../../docs/llm-generated/target-pipelines/spirv.md#legalizeuniformbufferload) | (unclassified) | **`legalizeUniformBufferLoad`** — anchored to an IR-level canonicalization without a documented text-emit marker. | Not reachable via any allowed test directive. |
+| [#removeunreachablecodeafterdiscardforopkill](../../../docs/llm-generated/target-pipelines/spirv.md#removeunreachablecodeafterdiscardforopkill) | (unclassified) | **`removeUnreachableCodeAfterDiscardForOpKill`** — requires `discard` and SPIR-V `< 1.6`; Slang defaults to `>= 1.5` and gates the pass on `!shouldEmitDiscardAsDemote()`. | Not reachable via any allowed test directive. |
+| [#simplifyirforspirvlegalization](../../../docs/llm-generated/target-pipelines/spirv.md#simplifyirforspirvlegalization) | (unclassified) | **`simplifyIRForSpirvLegalization` outer/inner loop bounds** (`kMaxIterations = 8`, `kMaxFuncIterations = 16`). The loops terminate by fixed-point in practice; no documented user-source pattern hits the bound. | Not reachable via any allowed test directive. |
+| [#unexportnonembeddableir](../../../docs/llm-generated/target-pipelines/spirv.md#unexportnonembeddableir) | (unclassified) | **`unexportNonEmbeddableIR`** — gated on `EmbedDownstreamIR`. | Not reachable via any allowed test directive. |
+| [#x-fires-on-spir-v-but-y-doesnt](../../../docs/llm-generated/target-pipelines/spirv.md#x-fires-on-spir-v-but-y-doesnt) | (unclassified) | **Cross-target probes.** The bundle is single-target by design — SPIR-V observations only. "X fires on SPIR-V but Y doesn't" claims are documented in the `## Conditional gates` section of the doc but not exercised as multi-target CHECK tests in this bundle. | Not reachable via any allowed test directive. |
+| (unspecified) | implementation-detail | **Pass-ordering claims** (Phase A passes 1-19, Phase B passes 1-65, Phase C passes 1-41, Phase D steps 1-20). Pass _existence_ is observable via emit; pass _ordering_ would require `-dump-ir` cross-pass comparison without doc-anchored ordering markers. Covered by `pipeline/05-ir-passes`. | Not reachable via any allowed test directive. |

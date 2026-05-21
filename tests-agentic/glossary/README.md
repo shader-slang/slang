@@ -55,41 +55,9 @@ against those peer documents.
 
 ## Out of scope
 
-The glossary defines many terms whose one-paragraph entries do not
-imply an externally observable behavior reachable via slangc on a
-no-GPU runner. These were considered and dropped after one or more
-attempts to find a clean observable; they belong to their respective
-peer-document bundles (or to no test at all).
-
-- **Internal C++ types / helpers with no slangc surface:**
-  `abstract syntax tree`, `ASTBuilder`, `IRBuilder`, `IRInst`,
-  `IROp`, `IRFunc`, `IRModule`, `IRDecoration`, `decoration`,
-  `parent instruction`, `hoistable instruction`,
-  `terminator instruction`, `block parameter`,
-  `single static assignment (SSA)`, `control-flow graph`,
-  `dominator`, `dataflow analysis`, `decl-ref`,
-  `lookup breadcrumb`, `lookup mask`, `lookup options`,
-  `lookup result`, `linkage`, `session`, `scope`, `source-loc`,
-  `FIDDLE`, `intermediate representation` (the concept; specific IR
-  text is target-specific and unstable for FileCheck).
-- **Serialization back-ends, not user-visible by default:**
-  `fossil format`, `RIFF container`.
-- **IR / type-system vocabulary owned by other bundles:**
-  `existential type`, `witness table`, `differential pair`,
-  `capability atom`, `profile`, `layout IR module`,
-  `mandatory optimization pass`, `target legalization driver`,
-  `target intrinsic`, `core module`, `prelude`, `module`
-  (the `IModule` C++ object; `import` semantics belong to
-  the language-reference module bundle), `translation unit`
-  (the multi-file flag belongs to architecture/overview),
-  `syntax-decl`, `partial generic application`,
-  `transparent member`, `two-stage parsing`,
-  `recursive descent` (the technique; the parsing behavior is
-  covered by `parser-recursive-descent-parses-if.slang`),
-  `dead-code elimination` (the IR pass is real but no contract-stable
-  text artifact ties to it through `-dump-ir`),
-  `conversion cost` (the numeric scoring is internal; the
-  observable consequence — implicit-conversion rejection — is
-  owned by `name-resolution/overload-resolution`).
-- **Already covered by the user-facing visibility bundle:**
-  `visibility`.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| (unspecified) | (unclassified) | **Serialization back-ends, not user-visible by default:** `fossil format`, `RIFF container`. | Not reachable via any allowed test directive. |
+| [#astbuilder](../../docs/llm-generated/glossary.md#astbuilder) | api-only | **Internal C++ types / helpers with no slangc surface:** `abstract syntax tree`, `ASTBuilder`, `IRBuilder`, `IRInst`, `IROp`, `IRFunc`, `IRModule`, `IRDecoration`, `decoration`, `parent instruction`, `hoistable instruction`, `terminator instruction`, `block parameter`, `single static assignment (SSA)`, `control-flow graph`, `dominator`, `dataflow analysis`, `decl-ref`, `lookup breadcrumb`, `lookup mask`, `lookup options`, `lookup result`, `linkage`, `session`, `scope`, `source-loc`, `FIDDLE`, `intermediate representation` (the concept; specific IR text is target-specific and unstable for FileCheck). | Not reachable via any allowed test directive. |
+| [#profile](../../docs/llm-generated/glossary.md#profile) | out-of-bundle | **IR / type-system vocabulary owned by other bundles:** `existential type`, `witness table`, `differential pair`, `capability atom`, `profile`, `layout IR module`, `mandatory optimization pass`, `target legalization driver`, `target intrinsic`, `core module`, `prelude`, `module` (the `IModule` C++ object; `import` semantics belong to the language-reference module bundle), `translation unit` (the multi-file flag belongs to architecture/overview), `syntax-decl`, `partial generic application`, `transparent member`, `two-stage parsing`, `recursive descent` (the technique; the parsing behavior is covered by `parser-recursive-descent-parses-if.slang`), `dead-code elimination` (the IR pass is real but no contract-stable text artifact ties to it through `-dump-ir`), `conversion cost` (the numeric scoring is internal; the observable consequence — implicit-conversion rejection — is owned by `name-resolution/overload-resolution`). | Not reachable via any allowed test directive. |
+| [#visibility](../../docs/llm-generated/glossary.md#visibility) | out-of-bundle | **Already covered by the user-facing visibility bundle:** `visibility`. | Not reachable via any allowed test directive. |

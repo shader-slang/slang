@@ -202,105 +202,33 @@ any allowed `slang-test` directive.
 | [#fp8](../../../docs/llm-generated/ast-reference/types.md#fp8) | missing-surface | The doc lists a "Fp8" family (`FloatE4M3Type`, `FloatE5M2Type`) and a `BFloat16Type` but no portable surface for these is documented. The user-spelling appears target-gated; a doc-level pointer to the minimal targetable spelling would let an agent anchor a test. |  |
 | [#differential-pair-primal-differential-used-by-autodiff](../../../docs/llm-generated/ast-reference/types.md#differential-pair-primal-differential-used-by-autodiff) | undocumented-behavior | `DifferentialPairType` and `DifferentialPtrPairType` are "differential pair (primal, differential) used by autodiff". Observable only through `[Differentiable]` machinery; the autodiff feature lives in a separate bundle. A doc pointer to that bundle would clarify boundary ownership. |  |
 
+## Untested coverable claims
+
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#feedbacktype](../../../docs/llm-generated/ast-reference/types.md#feedbacktype) | gpu-non-compute | **Sampler-feedback** (`FeedbackType`), **subpass-input** (`SubpassInputType`), **raytracing-acceleration-structure** (`RaytracingAccelerationStructureType`), **dynamic-resource** (`DynamicResourceType`), **descriptor-handle** (`DescriptorHandleType`), **tensor-view** (`TensorViewType`) — GPU-only / target-only surfaces; existence is documented but not exercisable from a portable .slang on the no-GPU runner. | Agent runtime has no GPU; CI / local machine does. |
+| [#hlslpatchtype](../../../docs/llm-generated/ast-reference/types.md#hlslpatchtype) | gpu-non-compute | **Geometry / tessellation / mesh IO types** (`HLSLPatchType`, `HLSLInputPatchType`, `HLSLOutputPatchType`, the stream-output family, the mesh-output family) — require a real GPU pipeline stage and are not exercisable on the no-GPU runner. | Agent runtime has no GPU; CI / local machine does. |
+| [#bottomtype](../../../docs/llm-generated/ast-reference/types.md#bottomtype) | gpu-other | **`BottomType`** — bottom of the type lattice, used by `throw`; `throw` is not portably observable on the no-GPU runner under INTERPRET (per `_common.md` lessons). | Agent runtime has no GPU; CI / local machine does. |
+| [#extractexistentialtype](../../../docs/llm-generated/ast-reference/types.md#extractexistentialtype) | gpu-other | **Synthesized / lowering-only types** with no user-written spelling: `ExtractExistentialType`, `ExistentialSpecializedType`, `GenericDeclRefType`, `NamespaceType`, `NativeRefType`, `ExplicitRefType`, `RefParamType` (the `ref T` spelling exists but its observable surface is the same as `inout T` for the no-GPU runner cases we can write; covered indirectly by `paramtype-out-inout-in.slang`). | Agent runtime has no GPU; CI / local machine does. |
+
 ## Out of scope
 
-The doc is overwhelmingly about internal AST shape. The following
-claim families are not observable through `slangc` / `slang-test`
-directives that this bundle can run; they are recorded here rather
-than tested.
-
-- **Internal C++ parent class** of any concrete `Type` (e.g. that
-  `VectorExpressionType` extends `ArithmeticExpressionType`, that
-  `Fp8Type` extends `DeclRefType`, that `BuiltinGenericType`
-  extends `BuiltinType`). Only the user-observable role of each
-  leaf is testable.
-- **Operand-list layout** described under "Key fields" in `## Nodes`
-  ("operand-encoded", "(element-type, count operand-encoded)",
-  ...). The `m_operands: List<ValNodeOperand>` storage and the
-  indices each concrete class uses are not visible at the surface.
-- **Singleton-ness / hash-cons identity** of pseudo-types
-  (`ErrorType`, `BottomType`, `NullPtrType`, `NoneType`,
-  `OverloadGroupType`, `InitializerListType` are each one-per-
-  `ASTBuilder`). Two textually identical Slang types share the
-  same `Val*` after hash-cons, but the surface only sees the
-  post-hoist behavior, not the identity.
-- **Abstract intermediates** from the family hierarchy
-  (`ArithmeticExpressionType`, `Fp8Type`, `BuiltinType`,
-  `DataLayoutType`, `PointerLikeType`, `BuiltinGenericType`,
-  `ResourceType`, `TextureTypeBase`, `TextureShapeType`,
-  `HLSLStructuredBufferTypeBase`, `ParameterGroupType`,
-  `OutParamTypeBase`, `PtrTypeBase`, `ParamPassingModeType`,
-  `UniformParameterGroupType`, `VaryingParameterGroupType`,
-  `UntypedBufferResourceType`, `StringTypeBase`). Each carries no
-  FIDDLE concrete tag and produces no user spelling of its own.
-- **Synthesized / lowering-only types** with no user-written
-  spelling: `ExtractExistentialType`, `ExistentialSpecializedType`,
-  `GenericDeclRefType`, `NamespaceType`, `NativeRefType`,
-  `ExplicitRefType`, `RefParamType` (the `ref T` spelling exists
-  but its observable surface is the same as `inout T` for the
-  no-GPU runner cases we can write; covered indirectly by
-  `paramtype-out-inout-in.slang`).
-- **Fp8 family** (`FloatE4M3Type`, `FloatE5M2Type`, `BFloat16Type`)
-  — storage-only floats; surface support varies by target.
-- **`CoopVectorExpressionType`**, **`DifferentialPairType`**,
-  **`DifferentialPtrPairType`** — subsystem-specific (cooperative
-  math, autodiff); observable surface belongs to those feature
-  bundles.
-- **GLSL-only types** (`GLSLImageType`, `GLSLShaderStorageBufferType`,
-  `GLSLInputParameterGroupType`, `GLSLOutputParameterGroupType`,
-  `GLSLAtomicUintType`, `GLSLInputAttachmentType`) — observable
-  only via GLSL-source ingest; not exercised here.
-- **Data-layout marker types** (`DefaultDataLayoutType`,
-  `Std430DataLayoutType`, `Std140DataLayoutType`,
-  `ScalarDataLayoutType`, `CDataLayoutType`,
-  `DefaultPushConstantDataLayoutType`, `IBufferDataLayoutType`) —
-  visible only inside the buffer-type encoding; not user-spellable
-  in surface Slang.
-- **Geometry / tessellation / mesh IO types** (`HLSLPatchType`,
-  `HLSLInputPatchType`, `HLSLOutputPatchType`, the stream-output
-  family, the mesh-output family) — require a real GPU pipeline
-  stage and are not exercisable on the no-GPU runner.
-- **Sampler-feedback** (`FeedbackType`), **subpass-input**
-  (`SubpassInputType`), **raytracing-acceleration-structure**
-  (`RaytracingAccelerationStructureType`), **dynamic-resource**
-  (`DynamicResourceType`), **descriptor-handle**
-  (`DescriptorHandleType`), **tensor-view** (`TensorViewType`) —
-  GPU-only / target-only surfaces; existence is documented but
-  not exercisable from a portable .slang on the no-GPU runner.
-- **All pack / variadic types** (`EachType`, `ExpandType`,
-  `PackBranchType`, `FirstPackElementType`, `LastPackElementType`,
-  `TrimFirstTypePack`, `TrimLastTypePack`, `ConcreteTypePack`,
-  `ValuePackType`) — observable through the pack-expression family
-  (covered by `ast-reference/expressions`'s pack-related tests and
-  the future `language-feature/generics-and-packs` bundle).
-- **Differentiable-function marker types**
-  (`DifferentiableType`, `DifferentiablePtrType`,
-  `DefaultInitializableType`, `FunctionBaseType`,
-  `DifferentiableFuncBaseType`, `ForwardDiffFuncInterfaceType`,
-  `BwdCallableBaseType`, `BwdDiffFuncInterfaceType`,
-  `LegacyBwdDiffFuncInterfaceType`, `FwdDiffFuncType`,
-  `BwdDiffFuncType`, `BwdCallableFuncType`, `ApplyForBwdFuncType`,
-  `RematFuncType`) — produced by autodiff machinery; observable
-  through the differentiate-expression family
-  (`ast-reference/expressions`).
-- **`DynamicType`** — the dynamic-dispatch erased type, produced
-  by existential elimination. Not user-spellable.
-- **`NativeStringType`** — internal native `const char*`-style
-  string used in low-level lowering; not user-spellable.
-- **`AtomicType`** — surface spelling exists (`Atomic<T>`) but
-  observable behavior depends on the target; recorded as a doc
-  gap above.
-- **`ConditionalType`** — no surface spelling documented; doc gap
-  above.
-- **`EnumTypeType`** — the "kind" of an enum type; no surface
-  observation distinct from `EnumDecl` (covered in
-  `ast-reference/declarations`).
-- **`NamedExpressionType`** — alias-name diagnostic preservation
-  does not hold on the current implementation; doc gap above. The
-  semantic interchangeability of an alias with the original type
-  is covered by `ast-reference/declarations/typedefdecl.slang` and
-  `ast-reference/declarations/typealiasdecl.slang`.
-- **`BottomType`** — bottom of the type lattice, used by `throw`;
-  `throw` is not portably observable on the no-GPU runner under
-  INTERPRET (per `_common.md` lessons).
-- The **`## Family hierarchy`** mermaid diagram itself.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| (unspecified) | (unclassified) | The **`## Family hierarchy`** mermaid diagram itself. | Not reachable via any allowed test directive. |
+| [#arithmeticexpressiontype](../../../docs/llm-generated/ast-reference/types.md#arithmeticexpressiontype) | (unclassified) | **Abstract intermediates** from the family hierarchy (`ArithmeticExpressionType`, `Fp8Type`, `BuiltinType`, `DataLayoutType`, `PointerLikeType`, `BuiltinGenericType`, `ResourceType`, `TextureTypeBase`, `TextureShapeType`, `HLSLStructuredBufferTypeBase`, `ParameterGroupType`, `OutParamTypeBase`, `PtrTypeBase`, `ParamPassingModeType`, `UniformParameterGroupType`, `VaryingParameterGroupType`, `UntypedBufferResourceType`, `StringTypeBase`). Each carries no FIDDLE concrete tag and produces no user spelling of its own. | Not reachable via any allowed test directive. |
+| [#atomictype](../../../docs/llm-generated/ast-reference/types.md#atomictype) | (unclassified) | **`AtomicType`** — surface spelling exists (`Atomic<T>`) but observable behavior depends on the target; recorded as a doc gap above. | Not reachable via any allowed test directive. |
+| [#conditionaltype](../../../docs/llm-generated/ast-reference/types.md#conditionaltype) | (unclassified) | **`ConditionalType`** — no surface spelling documented; doc gap above. | Not reachable via any allowed test directive. |
+| [#coopvectorexpressiontype](../../../docs/llm-generated/ast-reference/types.md#coopvectorexpressiontype) | (unclassified) | **`CoopVectorExpressionType`**, **`DifferentialPairType`**, **`DifferentialPtrPairType`** — subsystem-specific (cooperative math, autodiff); observable surface belongs to those feature bundles. | Not reachable via any allowed test directive. |
+| [#defaultdatalayouttype](../../../docs/llm-generated/ast-reference/types.md#defaultdatalayouttype) | (unclassified) | **Data-layout marker types** (`DefaultDataLayoutType`, `Std430DataLayoutType`, `Std140DataLayoutType`, `ScalarDataLayoutType`, `CDataLayoutType`, `DefaultPushConstantDataLayoutType`, `IBufferDataLayoutType`) — visible only inside the buffer-type encoding; not user-spellable in surface Slang. | Not reachable via any allowed test directive. |
+| [#differentiabletype](../../../docs/llm-generated/ast-reference/types.md#differentiabletype) | (unclassified) | **Differentiable-function marker types** (`DifferentiableType`, `DifferentiablePtrType`, `DefaultInitializableType`, `FunctionBaseType`, `DifferentiableFuncBaseType`, `ForwardDiffFuncInterfaceType`, `BwdCallableBaseType`, `BwdDiffFuncInterfaceType`, `LegacyBwdDiffFuncInterfaceType`, `FwdDiffFuncType`, `BwdDiffFuncType`, `BwdCallableFuncType`, `ApplyForBwdFuncType`, `RematFuncType`) — produced by autodiff machinery; observable through the differentiate-expression family (`ast-reference/expressions`). | Not reachable via any allowed test directive. |
+| [#dynamictype](../../../docs/llm-generated/ast-reference/types.md#dynamictype) | (unclassified) | **`DynamicType`** — the dynamic-dispatch erased type, produced by existential elimination. Not user-spellable. | Not reachable via any allowed test directive. |
+| [#eachtype](../../../docs/llm-generated/ast-reference/types.md#eachtype) | (unclassified) | **All pack / variadic types** (`EachType`, `ExpandType`, `PackBranchType`, `FirstPackElementType`, `LastPackElementType`, `TrimFirstTypePack`, `TrimLastTypePack`, `ConcreteTypePack`, `ValuePackType`) — observable through the pack-expression family (covered by `ast-reference/expressions`'s pack-related tests and the future `language-feature/generics-and-packs` bundle). | Not reachable via any allowed test directive. |
+| [#enumtypetype](../../../docs/llm-generated/ast-reference/types.md#enumtypetype) | (unclassified) | **`EnumTypeType`** — the "kind" of an enum type; no surface observation distinct from `EnumDecl` (covered in `ast-reference/declarations`). | Not reachable via any allowed test directive. |
+| [#floate4m3type](../../../docs/llm-generated/ast-reference/types.md#floate4m3type) | (unclassified) | **Fp8 family** (`FloatE4M3Type`, `FloatE5M2Type`, `BFloat16Type`) — storage-only floats; surface support varies by target. | Not reachable via any allowed test directive. |
+| [#glslimagetype](../../../docs/llm-generated/ast-reference/types.md#glslimagetype) | (unclassified) | **GLSL-only types** (`GLSLImageType`, `GLSLShaderStorageBufferType`, `GLSLInputParameterGroupType`, `GLSLOutputParameterGroupType`, `GLSLAtomicUintType`, `GLSLInputAttachmentType`) — observable only via GLSL-source ingest; not exercised here. | Not reachable via any allowed test directive. |
+| [#key-fields](../../../docs/llm-generated/ast-reference/types.md#key-fields) | (unclassified) | **Operand-list layout** described under "Key fields" in `## Nodes` ("operand-encoded", "(element-type, count operand-encoded)", ...). The `m_operands: List<ValNodeOperand>` storage and the indices each concrete class uses are not visible at the surface. | Not reachable via any allowed test directive. |
+| [#namedexpressiontype](../../../docs/llm-generated/ast-reference/types.md#namedexpressiontype) | (unclassified) | **`NamedExpressionType`** — alias-name diagnostic preservation does not hold on the current implementation; doc gap above. The semantic interchangeability of an alias with the original type is covered by `ast-reference/declarations/typedefdecl.slang` and `ast-reference/declarations/typealiasdecl.slang`. | Not reachable via any allowed test directive. |
+| [#nativestringtype](../../../docs/llm-generated/ast-reference/types.md#nativestringtype) | (unclassified) | **`NativeStringType`** — internal native `const char*`-style string used in low-level lowering; not user-spellable. | Not reachable via any allowed test directive. |
+| [#type](../../../docs/llm-generated/ast-reference/types.md#type) | api-only | **Internal C++ parent class** of any concrete `Type` (e.g. that `VectorExpressionType` extends `ArithmeticExpressionType`, that `Fp8Type` extends `DeclRefType`, that `BuiltinGenericType` extends `BuiltinType`). | Only the user-observable role of each leaf is testable. |
+| [#errortype](../../../docs/llm-generated/ast-reference/types.md#errortype) | implementation-detail | **Singleton-ness / hash-cons identity** of pseudo-types (`ErrorType`, `BottomType`, `NullPtrType`, `NoneType`, `OverloadGroupType`, `InitializerListType` are each one-per- `ASTBuilder`). Two textually identical Slang types share the same `Val*` after hash-cons, but the surface only sees the post-hoist behavior, not the identity. | Not reachable via any allowed test directive. |

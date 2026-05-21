@@ -46,34 +46,16 @@ observation visible.
 
 ## Out of scope
 
-The index doc explicitly delegates these to peer pages; tests
-for them belong to peer bundles, not here:
-
-- Abstract roots (`NodeBase`, `SyntaxNode`, `Val`, `Type`,
-  `Decl`, `Expr`, `Stmt`, `Modifier`) and their per-root
-  observable consequences -- see
-  `tests-agentic/ast-reference/base/`.
-- Concrete `Decl` leaves (`StructDecl`, `FuncDecl`,
-  `InterfaceDecl`, `GenericDecl`, ...) -- see
-  `tests-agentic/ast-reference/declarations/`.
-- Concrete `Expr` leaves (binary, unary, `InvokeExpr`,
-  `MemberExpr`, conversion exprs, ...) -- see
-  `tests-agentic/ast-reference/expressions/`.
-- Concrete `Stmt` leaves (`BlockStmt`, `IfStmt`, loops,
-  `ReturnStmt`, ...) -- see `tests-agentic/ast-reference/statements/`.
-- Concrete `Type` leaves (`VectorType`, `MatrixType`, buffer
-  types, `OptionalType`, ...) -- see
-  `tests-agentic/ast-reference/types/`.
-- Concrete `Modifier` / attribute leaves (per-attribute
-  semantics) -- see `tests-agentic/ast-reference/modifiers/`.
-- `Val` non-Type leaves (`DeclRefBase`, `IntVal`, `Witness`,
-  ...) -- see `tests-agentic/ast-reference/values/`.
-- `SourceLoc`-bearing diagnostic placement at a specific node
-  level -- see `tests-agentic/ast-reference/base/` (claim
-  `syntaxnodebase-source-loc-in-diagnostic.slang`); the index
-  bundle does not re-test this because every family page
-  inherits the same `SourceLoc` shape, and the cross-cutting
-  observation reduces to the base claim.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#decl](../../../docs/llm-generated/ast-reference/index.md#decl) | out-of-bundle | Concrete `Decl` leaves (`StructDecl`, `FuncDecl`, `InterfaceDecl`, `GenericDecl`, ...) -- see `tests-agentic/ast-reference/declarations/`. | Not reachable via any allowed test directive. |
+| [#expr](../../../docs/llm-generated/ast-reference/index.md#expr) | out-of-bundle | Concrete `Expr` leaves (binary, unary, `InvokeExpr`, `MemberExpr`, conversion exprs, ...) -- see `tests-agentic/ast-reference/expressions/`. | Not reachable via any allowed test directive. |
+| [#modifier](../../../docs/llm-generated/ast-reference/index.md#modifier) | out-of-bundle | Concrete `Modifier` / attribute leaves (per-attribute semantics) -- see `tests-agentic/ast-reference/modifiers/`. | Not reachable via any allowed test directive. |
+| [#nodebase](../../../docs/llm-generated/ast-reference/index.md#nodebase) | out-of-bundle | Abstract roots (`NodeBase`, `SyntaxNode`, `Val`, `Type`, `Decl`, `Expr`, `Stmt`, `Modifier`) and their per-root observable consequences -- see `tests-agentic/ast-reference/base/`. | Not reachable via any allowed test directive. |
+| [#sourceloc](../../../docs/llm-generated/ast-reference/index.md#sourceloc) | out-of-bundle | `SourceLoc`-bearing diagnostic placement at a specific node level -- see `tests-agentic/ast-reference/base/` (claim `syntaxnodebase-source-loc-in-diagnostic.slang`); the index bundle does not re-test this because every family page inherits the same `SourceLoc` shape, and the cross-cutting observation reduces to the base claim. | Not reachable via any allowed test directive. |
+| [#stmt](../../../docs/llm-generated/ast-reference/index.md#stmt) | out-of-bundle | Concrete `Stmt` leaves (`BlockStmt`, `IfStmt`, loops, `ReturnStmt`, ...) -- see `tests-agentic/ast-reference/statements/`. | Not reachable via any allowed test directive. |
+| [#type](../../../docs/llm-generated/ast-reference/index.md#type) | out-of-bundle | Concrete `Type` leaves (`VectorType`, `MatrixType`, buffer types, `OptionalType`, ...) -- see `tests-agentic/ast-reference/types/`. | Not reachable via any allowed test directive. |
+| [#val](../../../docs/llm-generated/ast-reference/index.md#val) | out-of-bundle | `Val` non-Type leaves (`DeclRefBase`, `IntVal`, `Witness`, ...) -- see `tests-agentic/ast-reference/values/`. | Not reachable via any allowed test directive. |
 
 ## Sibling-bundle overlap
 
@@ -98,11 +80,6 @@ re-tested here to avoid duplication:
   cites only the index doc's mapping-claim
   (SyntaxDecl/AttributeDecl) and the consequence that an
   unmapped name has no class to bind to.
-
-## Out of scope (no-GPU runner)
-
-(none) -- all tests run on the interpreter or compile to text
-emit without a GPU.
 
 ## Doc gaps observed
 

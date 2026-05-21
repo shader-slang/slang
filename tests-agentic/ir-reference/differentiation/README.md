@@ -64,50 +64,20 @@ user-observable at LOWER-TO-IR and are recorded as out of scope.
 | A single entry point that constructs a DifferentialPair then reads both .p and .d exercises MakeDiffPair, GetPrimal, and GetDifferential in one IR dump. | functional | [#opcodes](../../../docs/llm-generated/ir-reference/differentiation.md#opcodes) | [`make-diff-pair-and-projections.slang`](make-diff-pair-and-projections.slang) |
 | The no_diff parameter marker is implemented by a unique module-scope let %k : Void = no_diff value that all Attributed(T, %k) wrappers reference. | functional | [#opcodes](../../../docs/llm-generated/ir-reference/differentiation.md#opcodes) | [`no-diff-module-scope-marker.slang`](no-diff-module-scope-marker.slang) |
 
-## Out of scope (no-GPU runner)
+## Out of scope
 
-The following opcodes are listed in `differentiation.md` but are
-either produced only by internal autodiff passes (not at
-LOWER-TO-IR from natural surface code) or have no AST origin that
-a user can write. They are intentionally not tested here:
-
-- **`MakeDiffRefPair`** — `(synthesized)`; pointer-typed primal/
-  differential pair used inside autodiff-pass plumbing.
-- **`GetDifferentialPtr`**, **`GetPrimalRef`** — `(synthesized)`
-  pointer-projection counterparts; no natural user surface.
-- **`ForwardDifferentiatePropagate`**, **`TrivialForwardDifferentiate`**
-  — `(synthesized)`; produced by the unzip / transcribe pipeline.
-- **`BackwardDifferentiate`** itself — the doc lists `__bwd_diff`
-  as its AST origin, but LOWER-TO-IR actually emits
-  `LegacyBackwardDifferentiate`. The modern opcode appears only
-  after later passes. See `legacy-backward-differentiate.slang`
-  and the doc gap below.
-- **`BackwardDifferentiatePrimal`**, **`BackwardDifferentiatePropagate`**,
-  **`BackwardRemat`**, **`TrivialBackwardDifferentiate*`** —
-  `(synthesized)` by the unzip pass.
-- **`BackwardFromLegacyBwdDiffFunc`** / `BackwardPrimalFromLegacyBwdDiffFunc`
-  / `BackwardRematFromLegacyBwdDiffFunc` /
-  `BackwardPropagateFromLegacyBwdDiffFunc` — `(synthesized)`
-  legacy-bridge extraction opcodes.
-- **`FunctionCopy`**, **`SynthesizedForwardDerivativeWitnessTable`**,
-  **`SynthesizedBackwardDerivativeWitnessTable`**,
-  **`MakeIDifferentiableWitness`**,
-  **`SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc`**
-  — derivative-witness synthesis, internal. (Note:
-  `SynthesizedForwardDerivativeWitnessTable` and
-  `SynthesizedBackwardDerivativeWitnessTable` do happen to appear
-  near the LOWER-TO-IR output for every user `[Forward/Backward
-  Differentiable]` function, but the doc lists them as
-  `(synthesized)` with no AST origin; their presence is a
-  side-effect of the lowering, not a documented surface mapping.)
-- **`LoadReverseGradient`**, **`ReverseGradientDiffPairRef`**,
-  **`PrimalParamRef`**, **`DiffParamRef`** — autodiff temporaries
-  that do not survive past the splitting / back-prop pass.
-- **`DiffTypeInfo`** — `(synthesized)` type-info container,
-  internal.
-- **`checkpointObj`**, **`loopExitValue`**, **`ReportCheckpointStore`**
-  — checkpointing markers inserted by the reverse-mode pass; no
-  natural surface form at LOWER-TO-IR.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#checkpointobj](../../../docs/llm-generated/ir-reference/differentiation.md#checkpointobj) | (unclassified) | **`checkpointObj`**, **`loopExitValue`**, **`ReportCheckpointStore`** — checkpointing markers inserted by the reverse-mode pass; no natural surface form at LOWER-TO-IR. | Not reachable via any allowed test directive. |
+| [#loadreversegradient](../../../docs/llm-generated/ir-reference/differentiation.md#loadreversegradient) | (unclassified) | **`LoadReverseGradient`**, **`ReverseGradientDiffPairRef`**, **`PrimalParamRef`**, **`DiffParamRef`** — autodiff temporaries that do not survive past the splitting / back-prop pass. | Not reachable via any allowed test directive. |
+| [#backwarddifferentiate](../../../docs/llm-generated/ir-reference/differentiation.md#backwarddifferentiate) | internal-source-fact | **`BackwardDifferentiate`** itself — the doc lists `__bwd_diff` as its AST origin, but LOWER-TO-IR actually emits `LegacyBackwardDifferentiate`. The modern opcode appears only after later passes. See `legacy-backward-differentiate.slang` and the doc gap below. | Not reachable via any allowed test directive. |
+| [#backwarddifferentiateprimal](../../../docs/llm-generated/ir-reference/differentiation.md#backwarddifferentiateprimal) | link-stage-only | **`BackwardDifferentiatePrimal`**, **`BackwardDifferentiatePropagate`**, **`BackwardRemat`**, **`TrivialBackwardDifferentiate*`** — `(synthesized)` by the unzip pass. | Not reachable via any allowed test directive. |
+| [#backwardfromlegacybwddifffunc](../../../docs/llm-generated/ir-reference/differentiation.md#backwardfromlegacybwddifffunc) | link-stage-only | **`BackwardFromLegacyBwdDiffFunc`** / `BackwardPrimalFromLegacyBwdDiffFunc` / `BackwardRematFromLegacyBwdDiffFunc` / `BackwardPropagateFromLegacyBwdDiffFunc` — `(synthesized)` legacy-bridge extraction opcodes. | Not reachable via any allowed test directive. |
+| [#difftypeinfo](../../../docs/llm-generated/ir-reference/differentiation.md#difftypeinfo) | link-stage-only | **`DiffTypeInfo`** — `(synthesized)` type-info container, internal. | Not reachable via any allowed test directive. |
+| [#forwarddifferentiatepropagate](../../../docs/llm-generated/ir-reference/differentiation.md#forwarddifferentiatepropagate) | link-stage-only | **`ForwardDifferentiatePropagate`**, **`TrivialForwardDifferentiate`** — `(synthesized)`; produced by the unzip / transcribe pipeline. | Not reachable via any allowed test directive. |
+| [#functioncopy](../../../docs/llm-generated/ir-reference/differentiation.md#functioncopy) | link-stage-only | **`FunctionCopy`**, **`SynthesizedForwardDerivativeWitnessTable`**, **`SynthesizedBackwardDerivativeWitnessTable`**, **`MakeIDifferentiableWitness`**, **`SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc`** — derivative-witness synthesis, internal. (Note: `SynthesizedForwardDerivativeWitnessTable` and `SynthesizedBackwardDerivativeWitnessTable` do happen to appear near the LOWER-TO-IR output for every user `[Forward/Backward Differentiable]` function, but the doc lists them as `(synthesized)` with no AST origin; their presence is a side-effect of the lowering, not a documented surface mapping.) | Not reachable via any allowed test directive. |
+| [#getdifferentialptr](../../../docs/llm-generated/ir-reference/differentiation.md#getdifferentialptr) | link-stage-only | **`GetDifferentialPtr`**, **`GetPrimalRef`** — `(synthesized)` pointer-projection counterparts; no natural user surface. | Not reachable via any allowed test directive. |
+| [#makediffrefpair](../../../docs/llm-generated/ir-reference/differentiation.md#makediffrefpair) | link-stage-only | **`MakeDiffRefPair`** — `(synthesized)`; pointer-typed primal/ differential pair used inside autodiff-pass plumbing. | Not reachable via any allowed test directive. |
 
 ## Doc gaps observed
 

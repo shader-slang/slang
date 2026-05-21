@@ -134,7 +134,7 @@ Skipped boundary axes:
   document line-continuation behavior inside an include path
   specifically; no observable claim to anchor to.
 
-## Out of scope (no-GPU runner)
+## Out of scope
 
-None for this bundle. All lex- and preprocess-stage claims are
-fully observable through `slangi` or `-target cpp` text emit.
+(none)
+

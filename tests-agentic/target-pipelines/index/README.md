@@ -47,44 +47,22 @@ the dispatcher.
 | The shared four-phase shape (link / specialize / target-legalize / emit) of linkAndOptimizeIR runs end-to-end for every text-emit target named by the index doc. | functional | [#shared-shape](../../../docs/llm-generated/target-pipelines/index.md#shared-shape) | [`four-phase-shape-end-to-end.slang`](four-phase-shape-end-to-end.slang) |
 | A single Slang source dispatches through the multi-target orchestrator to each of the five text-emit backends named by the index doc (spirv, hlsl, metal, wgsl, cuda). | functional | [#target-pipelines](../../../docs/llm-generated/target-pipelines/index.md#target-pipelines) | [`multi-target-dispatcher.slang`](multi-target-dispatcher.slang) |
 
+## Untested coverable claims
+
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#synthesizeactivemask](../../../docs/llm-generated/target-pipelines/index.md#synthesizeactivemask) | gpu-cuda | CUDA per-pass arms (`synthesizeActiveMask`, `legalizeEntryPointVaryingParamsForCUDA`, `lowerImmutableBufferLoadForCUDA`), nvrtc downstream, `__ldg` factoring, the CPU/Metal/CUDA shared `undoParameterCopy` / `transformParamsToConstRef` arms, adjacent PyTorch / OptiX / host-CPP targets -- see `tests-agentic/target-pipelines/cuda/`. | Agent runtime has no GPU; CI / local machine does. |
+| [#wrapstructuredbuffersofmatrices](../../../docs/llm-generated/target-pipelines/index.md#wrapstructuredbuffersofmatrices) | gpu-dxc-dxil | HLSL per-pass arms (`wrapStructuredBuffersOfMatrices`, `legalizeNonStructParameterToStructForHLSL`, `legalizeNonVectorCompositeSelect`, `legalizeEmptyRayPayloadsForHLSL`, `legalizeUniformBufferLoad`, `applyVariableScopeCorrection`), DXC and fxc downstream, per-register class assignments -- see `tests-agentic/target-pipelines/hlsl/`. | Agent runtime has no GPU; CI / local machine does. |
+| [#legalizeirformetal](../../../docs/llm-generated/target-pipelines/index.md#legalizeirformetal) | gpu-metal-toolchain | Metal-specific lowering (`legalizeIRForMetal`, `specializeAddressSpaceForMetal`), Metal `[[buffer(N)]]` positional binding, Apple `metal` compiler downstream -- see `tests-agentic/target-pipelines/metal/`. | Agent runtime has no GPU; CI / local machine does. |
+| [#legalizeirforspirv](../../../docs/llm-generated/target-pipelines/index.md#legalizeirforspirv) | gpu-spirv-tools | SPIR-V direct-emit specifics, `legalizeIRForSPIRV`, `simplifyIRForSpirvLegalization` outer/inner loops, the forward-declared-pointer fixup, the spirv-link / spirv-val / spirv-opt downstream chain -- see `tests-agentic/target-pipelines/spirv/`. | Agent runtime has no GPU; CI / local machine does. |
+| [#isspirv](../../../docs/llm-generated/target-pipelines/index.md#isspirv) | gpu-vulkan-extension | Per-target options, capability sets, target predicates (`isSPIRV`, `isMetalTarget`, `isWGPUTarget`, `isCUDATarget`, `isD3DTarget`, `isKhronosTarget`) -- see the `cross-cutting/targets` bundle. | Agent runtime has no GPU; CI / local machine does. |
+| [#legalizeirforwgsl](../../../docs/llm-generated/target-pipelines/index.md#legalizeirforwgsl) | gpu-wgsl-tint | WGSL-specific lowering (`legalizeIRForWGSL`, `specializeAddressSpaceForWGSL`), Tint downstream for `WGSLSPIRV*` variants -- see `tests-agentic/target-pipelines/wgsl/`. | Agent runtime has no GPU; CI / local machine does. |
+
 ## Out of scope
 
-The index doc explicitly delegates these to peer pages; tests for
-them belong to peer bundles, not here:
-
-- SPIR-V direct-emit specifics, `legalizeIRForSPIRV`,
-  `simplifyIRForSpirvLegalization` outer/inner loops, the
-  forward-declared-pointer fixup, the spirv-link / spirv-val /
-  spirv-opt downstream chain -- see
-  `tests-agentic/target-pipelines/spirv/`.
-- HLSL per-pass arms (`wrapStructuredBuffersOfMatrices`,
-  `legalizeNonStructParameterToStructForHLSL`,
-  `legalizeNonVectorCompositeSelect`,
-  `legalizeEmptyRayPayloadsForHLSL`,
-  `legalizeUniformBufferLoad`, `applyVariableScopeCorrection`),
-  DXC and fxc downstream, per-register class assignments -- see
-  `tests-agentic/target-pipelines/hlsl/`.
-- Metal-specific lowering (`legalizeIRForMetal`,
-  `specializeAddressSpaceForMetal`), Metal `[[buffer(N)]]`
-  positional binding, Apple `metal` compiler downstream -- see
-  `tests-agentic/target-pipelines/metal/`.
-- WGSL-specific lowering (`legalizeIRForWGSL`,
-  `specializeAddressSpaceForWGSL`), Tint downstream for
-  `WGSLSPIRV*` variants -- see
-  `tests-agentic/target-pipelines/wgsl/`.
-- CUDA per-pass arms (`synthesizeActiveMask`,
-  `legalizeEntryPointVaryingParamsForCUDA`,
-  `lowerImmutableBufferLoadForCUDA`), nvrtc downstream, `__ldg`
-  factoring, the CPU/Metal/CUDA shared `undoParameterCopy` /
-  `transformParamsToConstRef` arms, adjacent
-  PyTorch / OptiX / host-CPP targets -- see
-  `tests-agentic/target-pipelines/cuda/`.
-- Unordered topical catalog of every IR pass -- see the
-  `pipeline/05-ir-passes` bundle.
-- Per-target options, capability sets, target predicates
-  (`isSPIRV`, `isMetalTarget`, `isWGPUTarget`, `isCUDATarget`,
-  `isD3DTarget`, `isKhronosTarget`) -- see the
-  `cross-cutting/targets` bundle.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| (unspecified) | (unclassified) | Unordered topical catalog of every IR pass -- see the `pipeline/05-ir-passes` bundle. | Not reachable via any allowed test directive. |
 
 ## Sibling-bundle overlap
 
@@ -113,13 +91,6 @@ re-tested here to avoid duplication:
   bundle's `same-source-distinct-emitters.slang` combines them
   in a single file to assert the cross-target divergence claim
   from the comparison table, not the individual spellings.
-
-## Out of scope (no-GPU runner)
-
-(none) -- all tests use only `//TEST:SIMPLE(filecheck=...)` text-
-emit directives. No directive in this bundle requires a GPU and
-no downstream binary tool (DXC, fxc, Apple `metal`, Tint, nvrtc)
-is invoked.
 
 ## Doc gaps observed
 

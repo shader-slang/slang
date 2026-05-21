@@ -166,15 +166,22 @@ scope on the no-GPU runner.
 | [#phase-d-](../../../docs/llm-generated/target-pipelines/metal.md#phase-d-) | undocumented-behavior | The doc mentions `[[texture(N)]]` slot positionally but does not enumerate the **per-Slang-texture-variant → Metal `texture*<T, access::...>`** mapping (`Texture1D` → `texture1d`, `Texture3D` → `texture3d`, `TextureCube` → `texturecube`, `Texture2DArray` → `texture2d_array`, and `RWTexture3D` → `texture3d<..., access::read_write>`). A small table under `#phase-d-...` (or a Texture-types subsection) would let texture-variant tests anchor more precisely. The `#legalizeimagesubscript` paragraph only mentions `RWTexture2D`; it should generalize to RWTexture1D / RWTexture3D / RWTexture2DArray. |  |
 | [#gradientcube](../../../docs/llm-generated/target-pipelines/metal.md#gradientcube) | undocumented-behavior | The doc does not describe the **`gradientcube(...)` / `gradient2d(...)` / `gradient3d(...)` selector wrappers** that the Metal emitter inserts around explicit-gradient SampleGrad arguments. Anchoring this would let SampleGrad-shape tests pin the gradient selector. |  |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-- **Apple `metal` compiler invocation**, `.metallib` bytecode emission, `.metallib` disassembly. Requires the Xcode toolchain; only triggered by `MetalLib*` targets, which are out of scope on the no-GPU runner.
-- **Pass ordering within Phase A/B/C.** Pass _existence_ is observable through its effect on emitted text; pass _ordering_ is an IR-level claim that requires `-dump-ir` cross-pass annotations the doc does not anchor to a specific marker.
-- **`AppendStructuredBuffer<T>` / `ConsumeStructuredBuffer<T>` lowering on Metal.** Rejected by `checkEntryPointDecorations` on the compute stage; cannot be observed in compute-only emit. (Recorded as a doc gap.)
-- **`legalizeMeshOutputTypes`.** Requires a mesh-shader entry point; not part of the compute-only bundle.
-- **`legalizeSubpassInputsForMetal` ([[color(N)]] fragment input).** Requires a fragment entry point with `SubpassInput<T>`; not part of the compute-only bundle.
-- **`MetalLibAssembly` skipping `wrapCBufferElementsForMetal`.** Observing the resulting MSL difference requires a `-target metallib-asm` build that needs the Apple toolchain.
-- **`collectCooperativeMetadata`.** Requires the cooperative matrix or vector capability set.
-- **`floatNonUniformResourceIndex`.** Requires the `NonUniformResourceIndex(...)` intrinsic with bindless setup not present in the compute-only bundle.
-- **`legalizeUniformBufferLoad`, `invertYOfPositionOutput`, `rcpWOfPositionInput`.** All gated on Khronos / HLSL or cross-API options the Metal bundle does not engage.
-- **Iterative-pass observation.** Metal has **no** iterative passes in `linkAndOptimizeIR`, so the absence of `simplifyIR` iteration cannot be directly tested through `slangc` text emit.
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#floatnonuniformresourceindex](../../../docs/llm-generated/target-pipelines/metal.md#floatnonuniformresourceindex) | gpu-bindless | **`floatNonUniformResourceIndex`.** Requires the `NonUniformResourceIndex(...)` intrinsic with bindless setup not present in the compute-only bundle. | Agent runtime has no GPU; CI / local machine does. |
+| [#collectcooperativemetadata](../../../docs/llm-generated/target-pipelines/metal.md#collectcooperativemetadata) | gpu-cooperative | **`collectCooperativeMetadata`.** Requires the cooperative matrix or vector capability set. | Agent runtime has no GPU; CI / local machine does. |
+| [#legalizeuniformbufferload](../../../docs/llm-generated/target-pipelines/metal.md#legalizeuniformbufferload) | gpu-cross-api-flag | **`legalizeUniformBufferLoad`, `invertYOfPositionOutput`, `rcpWOfPositionInput`.** All gated on Khronos / HLSL or cross-API options the Metal bundle does not engage. | Agent runtime has no GPU; CI / local machine does. |
+| [#legalizemeshoutputtypes](../../../docs/llm-generated/target-pipelines/metal.md#legalizemeshoutputtypes) | gpu-mesh-shader | **`legalizeMeshOutputTypes`.** Requires a mesh-shader entry point; not part of the compute-only bundle. | Agent runtime has no GPU; CI / local machine does. |
+| [#metal](../../../docs/llm-generated/target-pipelines/metal.md#metal) | gpu-metal-toolchain | **Apple `metal` compiler invocation**, `.metallib` bytecode emission, `.metallib` disassembly. | Requires the Xcode toolchain; only triggered by `MetalLib*` targets, which are out of scope on the no-GPU runner. |
+| [#metallibassembly](../../../docs/llm-generated/target-pipelines/metal.md#metallibassembly) | gpu-metal-toolchain | **`MetalLibAssembly` skipping `wrapCBufferElementsForMetal`.** Observing the resulting MSL difference requires a `-target metallib-asm` build that needs the Apple toolchain. | Agent runtime has no GPU; CI / local machine does. |
+| [#legalizesubpassinputsformetal](../../../docs/llm-generated/target-pipelines/metal.md#legalizesubpassinputsformetal) | gpu-non-compute | **`legalizeSubpassInputsForMetal` ([[color(N)]] fragment input).** Requires a fragment entry point with `SubpassInput<T>`; not part of the compute-only bundle. | Agent runtime has no GPU; CI / local machine does. |
+
+## Out of scope
+
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#checkentrypointdecorations](../../../docs/llm-generated/target-pipelines/metal.md#checkentrypointdecorations) | (unclassified) | **`AppendStructuredBuffer<T>` / `ConsumeStructuredBuffer<T>` lowering on Metal.** Rejected by `checkEntryPointDecorations` on the compute stage; cannot be observed in compute-only emit. (Recorded as a doc gap.) | Not reachable via any allowed test directive. |
+| (unspecified) | implementation-detail | **Pass ordering within Phase A/B/C.** Pass _existence_ is observable through its effect on emitted text; pass _ordering_ is an IR-level claim that requires `-dump-ir` cross-pass annotations the doc does not anchor to a specific marker. | Not reachable via any allowed test directive. |
+| [#linkandoptimizeir](../../../docs/llm-generated/target-pipelines/metal.md#linkandoptimizeir) | implementation-detail | **Iterative-pass observation.** Metal has **no** iterative passes in `linkAndOptimizeIR`, so the absence of `simplifyIR` iteration cannot be directly tested through `slangc` text emit. | Not reachable via any allowed test directive. |

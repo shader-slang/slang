@@ -81,96 +81,25 @@ that this bundle exercises are:
 
 ## Out of scope
 
-The doc is overwhelmingly about internal AST shape. The following
-claim families are not observable through `slangc` / `slang-test`
-directives that this bundle can run; they are recorded here rather
-than tested.
-
-- **Hash-cons identity / `Val*` pointer equality** described under
-  [`### Hash-consing and the ASTBuilder`](../../../docs/llm-generated/ast-reference/values.md#hash-consing-and-the-astbuilder).
-  Surface tests can only observe behavioral equivalence (e.g. that
-  two specializations of a generic with the same argument are
-  interchangeable); pointer equality of two `Val*` is not visible.
-  This bundle's `genericappdeclref-same-args-compatible.slang`
-  exercises the **observable** form of this invariant.
-- **Operand-list layout** described under `## Nodes` ("operand
-  semantics" column). The `m_operands: List<ValNodeOperand>` storage
-  and the indices each concrete class uses are not visible at the
-  surface.
-- **Abstract intermediates** named in the doc:
-  `IntVal`, `SizeOfLikeIntVal`, `ShapeTransformIntValPack`, `Witness`,
-  `SubtypeWitness`, `TypeCoercionWitness`. These produce no user
-  spelling of their own; only their concrete descendants are
-  user-anchorable.
-- **The C++ parent class** of any concrete `Val` (e.g. that
-  `SizeOfIntVal` extends `SizeOfLikeIntVal`, that `UNormModifierVal`
-  extends `ResourceFormatModifierVal`). Only the user-observable
-  role of each leaf is testable.
-- **Singleton-ness of `NoneWitness`** (and any other zero-operand
-  Val): hash-cons makes it one-per-`ASTBuilder`, but the surface
-  cannot distinguish two `Val*` from one.
-- **`DirectDeclRef` / `MemberDeclRef` / `LookupDeclRef`** as
-  distinct surface observations. The doc's distinction is internal
-  ("how the declaration was reached"); a plain identifier or a
-  qualified member reference looks the same at the type-checker
-  surface. Only `GenericAppDeclRef`'s presence of generic arguments
-  is user-distinguishable.
-- **`FuncCallIntVal`** — the doc names it but does not give a
-  surface spelling. Recorded as a doc gap above.
-- **`WitnessLookupIntVal`** — same as `FuncCallIntVal`; no surface
-  spelling documented. Recorded as a doc gap.
-- **`TypeCastIntVal`** — no surface-distinct spelling from a plain
-  cast in an array bound. Recorded as a doc gap.
-- **Polynomial helpers** (`PolynomialIntValFactor`,
-  `PolynomialIntValTerm`) — the operands of `PolynomialIntVal`; no
-  user-observable surface distinct from `PolynomialIntVal` itself.
-- **Pack / variadic IntVals and SubtypeWitnesses**:
-  `FirstIntVal`, `LastIntVal`, `ConcreteIntValPack`,
-  `TrimFirstIntValPack`, `TrimLastIntValPack`,
-  `ShapeConcatIntValPack`, `ShapePermuteIntValPack`,
-  `ShapeSwapIntValPack`, `ShapeReduceIntValPack`,
-  `ExpandIntValPack`, `EachIntVal`, `TypePackSubtypeWitness`,
-  `EachSubtypeWitness`, `FirstSubtypeWitness`, `LastSubtypeWitness`,
-  `TrimFirstSubtypeWitness`, `TrimLastSubtypeWitness`,
-  `PackBranchSubtypeWitness`, `ExpandSubtypeWitness`,
-  `NonEmptyPackWitness`. These are observable through the
-  pack-expression / variadic-generic feature; that surface belongs
-  to the `language-feature/generics-and-packs` bundle (or the
-  expressions bundle's pack tests).
-- **Differentiation `Val`s**: `DifferentiateVal`,
-  `ForwardDifferentiateVal`, `BackwardDifferentiateVal`,
-  `BackwardDifferentiateIntermediateTypeVal`,
-  `BackwardDifferentiatePrimalVal`,
-  `BackwardDifferentiatePropagateVal`. Observable through the
-  autodiff feature; that surface belongs to the autodiff bundle.
-- **`HasDiffTypeInfoWitness`**, **`DiffTypeInfoWitness`**,
-  **`HigherOrderDiffTypeTranslationWitness`** — autodiff-specific
-  witnesses; their surface belongs to the autodiff bundle.
-- **`ExtractExistentialSubtypeWitness`** — "evidence carried by an
-  opened existential value". Observable through the existential /
-  `some IFoo` surface, which belongs to the existential-feature
-  bundle.
-- **`DynamicSubtypeWitness`** — "evidence used for `DynamicType`
-  dispatch". `DynamicType` is not user-spellable (it is produced by
-  existential elimination); recorded under types.md's out-of-scope
-  list. The witness has no distinct user-observable surface.
-- **`TypeCoercionWitness`** family (`BuiltinTypeCoercionWitness`,
-  `DeclRefTypeCoercionWitness`) — these underlie implicit-cast
-  insertion. The mechanics of implicit casting are owned by the
-  `pipeline/03-semantic-check` bundle; the witness identities have
-  no distinct surface observation.
-- **`SNormModifierVal`**, **`NoDiffModifierVal`** — additional
-  type-level modifier Vals. `unorm` is exercised
-  (`unormmodifierval-resource-format.slang`); `snorm` / `no_diff`
-  share the same modifier-survival observation and are not
-  duplicated here. `no_diff` in particular belongs to the autodiff
-  bundle.
-- **`UIntSetVal`** — "a hash-consed bitset used by the capability
-  system". The capability system has its own bundle; the bitset
-  identity has no direct user-spelling.
-- **`TypeEqualityWitness`** — surface-observable as "two type
-  aliases yield interchangeable values". That observation is owned
-  by `ast-reference/types`'s `NamedExpressionType` / typedef tests
-  (or by the `pipeline/03-semantic-check` bundle's equality rules).
-  Not duplicated here.
-- **The `## Family hierarchy` mermaid diagram itself.**
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| (unspecified) | (unclassified) | **The `## Family hierarchy` mermaid diagram itself.** | Not reachable via any allowed test directive. |
+| [#directdeclref](../../../docs/llm-generated/ast-reference/values.md#directdeclref) | (unclassified) | **`DirectDeclRef` / `MemberDeclRef` / `LookupDeclRef`** as distinct surface observations. The doc's distinction is internal ("how the declaration was reached"); a plain identifier or a qualified member reference looks the same at the type-checker surface. | Only `GenericAppDeclRef`'s presence of generic arguments is user-distinguishable. |
+| [#dynamicsubtypewitness](../../../docs/llm-generated/ast-reference/values.md#dynamicsubtypewitness) | (unclassified) | **`DynamicSubtypeWitness`** — "evidence used for `DynamicType` dispatch". `DynamicType` is not user-spellable (it is produced by existential elimination); recorded under types.md's out-of-scope list. The witness has no distinct user-observable surface. | Not reachable via any allowed test directive. |
+| [#extractexistentialsubtypewitness](../../../docs/llm-generated/ast-reference/values.md#extractexistentialsubtypewitness) | (unclassified) | **`ExtractExistentialSubtypeWitness`** — "evidence carried by an opened existential value". Observable through the existential / `some IFoo` surface, which belongs to the existential-feature bundle. | Not reachable via any allowed test directive. |
+| [#firstintval](../../../docs/llm-generated/ast-reference/values.md#firstintval) | (unclassified) | **Pack / variadic IntVals and SubtypeWitnesses**: `FirstIntVal`, `LastIntVal`, `ConcreteIntValPack`, `TrimFirstIntValPack`, `TrimLastIntValPack`, `ShapeConcatIntValPack`, `ShapePermuteIntValPack`, `ShapeSwapIntValPack`, `ShapeReduceIntValPack`, `ExpandIntValPack`, `EachIntVal`, `TypePackSubtypeWitness`, `EachSubtypeWitness`, `FirstSubtypeWitness`, `LastSubtypeWitness`, `TrimFirstSubtypeWitness`, `TrimLastSubtypeWitness`, `PackBranchSubtypeWitness`, `ExpandSubtypeWitness`, `NonEmptyPackWitness`. These are observable through the pack-expression / variadic-generic feature; that surface belongs to the `language-feature/generics-and-packs` bundle (or the expressions bundle's pack tests). | Not reachable via any allowed test directive. |
+| [#funccallintval](../../../docs/llm-generated/ast-reference/values.md#funccallintval) | (unclassified) | **`FuncCallIntVal`** — the doc names it but does not give a surface spelling. Recorded as a doc gap above. | Not reachable via any allowed test directive. |
+| [#hasdifftypeinfowitness](../../../docs/llm-generated/ast-reference/values.md#hasdifftypeinfowitness) | (unclassified) | **`HasDiffTypeInfoWitness`**, **`DiffTypeInfoWitness`**, **`HigherOrderDiffTypeTranslationWitness`** — autodiff-specific witnesses; their surface belongs to the autodiff bundle. | Not reachable via any allowed test directive. |
+| [#hash-consing-and-the-astbuilder](../../../docs/llm-generated/ast-reference/values.md#hash-consing-and-the-astbuilder) | (unclassified) | **Hash-cons identity / `Val*` pointer equality** described under [`### Hash-consing and the ASTBuilder`](../../../docs/llm-generated/ast-reference/values.md#hash-consing-and-the-astbuilder). Surface tests can only observe behavioral equivalence (e.g. that two specializations of a generic with the same argument are interchangeable); pointer equality of two `Val*` is not visible. This bundle's `genericappdeclref-same-args-compatible.slang` exercises the **observable** form of this invariant. | Not reachable via any allowed test directive. |
+| [#intval](../../../docs/llm-generated/ast-reference/values.md#intval) | (unclassified) | **Abstract intermediates** named in the doc: `IntVal`, `SizeOfLikeIntVal`, `ShapeTransformIntValPack`, `Witness`, `SubtypeWitness`, `TypeCoercionWitness`. These produce no user spelling of their own; only their concrete descendants are user-anchorable. | Not reachable via any allowed test directive. |
+| [#nonewitness](../../../docs/llm-generated/ast-reference/values.md#nonewitness) | (unclassified) | **Singleton-ness of `NoneWitness`** (and any other zero-operand Val): hash-cons makes it one-per-`ASTBuilder`, but the surface cannot distinguish two `Val*` from one. | Not reachable via any allowed test directive. |
+| [#operand-semantics](../../../docs/llm-generated/ast-reference/values.md#operand-semantics) | (unclassified) | **Operand-list layout** described under `## Nodes` ("operand semantics" column). The `m_operands: List<ValNodeOperand>` storage and the indices each concrete class uses are not visible at the surface. | Not reachable via any allowed test directive. |
+| [#polynomialintvalfactor](../../../docs/llm-generated/ast-reference/values.md#polynomialintvalfactor) | (unclassified) | **Polynomial helpers** (`PolynomialIntValFactor`, `PolynomialIntValTerm`) — the operands of `PolynomialIntVal`; no user-observable surface distinct from `PolynomialIntVal` itself. | Not reachable via any allowed test directive. |
+| [#snormmodifierval](../../../docs/llm-generated/ast-reference/values.md#snormmodifierval) | (unclassified) | **`SNormModifierVal`**, **`NoDiffModifierVal`** — additional type-level modifier Vals. `unorm` is exercised (`unormmodifierval-resource-format.slang`); `snorm` / `no_diff` share the same modifier-survival observation and are not duplicated here. `no_diff` in particular belongs to the autodiff bundle. | Not reachable via any allowed test directive. |
+| [#typecastintval](../../../docs/llm-generated/ast-reference/values.md#typecastintval) | (unclassified) | **`TypeCastIntVal`** — no surface-distinct spelling from a plain cast in an array bound. Recorded as a doc gap. | Not reachable via any allowed test directive. |
+| [#typeequalitywitness](../../../docs/llm-generated/ast-reference/values.md#typeequalitywitness) | (unclassified) | **`TypeEqualityWitness`** — surface-observable as "two type aliases yield interchangeable values". That observation is owned by `ast-reference/types`'s `NamedExpressionType` / typedef tests (or by the `pipeline/03-semantic-check` bundle's equality rules). Not duplicated here. | Not reachable via any allowed test directive. |
+| [#uintsetval](../../../docs/llm-generated/ast-reference/values.md#uintsetval) | (unclassified) | **`UIntSetVal`** — "a hash-consed bitset used by the capability system". The capability system has its own bundle; the bitset identity has no direct user-spelling. | Not reachable via any allowed test directive. |
+| [#val](../../../docs/llm-generated/ast-reference/values.md#val) | (unclassified) | **Differentiation `Val`s**: `DifferentiateVal`, `ForwardDifferentiateVal`, `BackwardDifferentiateVal`, `BackwardDifferentiateIntermediateTypeVal`, `BackwardDifferentiatePrimalVal`, `BackwardDifferentiatePropagateVal`. Observable through the autodiff feature; that surface belongs to the autodiff bundle. | Not reachable via any allowed test directive. |
+| [#witnesslookupintval](../../../docs/llm-generated/ast-reference/values.md#witnesslookupintval) | (unclassified) | **`WitnessLookupIntVal`** — same as `FuncCallIntVal`; no surface spelling documented. Recorded as a doc gap. | Not reachable via any allowed test directive. |
+| [#val](../../../docs/llm-generated/ast-reference/values.md#val) | internal-source-fact | **The C++ parent class** of any concrete `Val` (e.g. that `SizeOfIntVal` extends `SizeOfLikeIntVal`, that `UNormModifierVal` extends `ResourceFormatModifierVal`). | Only the user-observable role of each leaf is testable. |
+| [#typecoercionwitness](../../../docs/llm-generated/ast-reference/values.md#typecoercionwitness) | out-of-bundle | **`TypeCoercionWitness`** family (`BuiltinTypeCoercionWitness`, `DeclRefTypeCoercionWitness`) — these underlie implicit-cast insertion. The mechanics of implicit casting are owned by the `pipeline/03-semantic-check` bundle; the witness identities have no distinct surface observation. | Not reachable via any allowed test directive. |

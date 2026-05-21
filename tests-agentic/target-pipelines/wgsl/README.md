@@ -99,32 +99,21 @@ with `-target wgsl -entry main -stage compute` against the
 | [#sample](../../../docs/llm-generated/target-pipelines/wgsl.md#sample) | undocumented-behavior | The doc does not describe how Slang lowers the various texture-access intrinsics (`Sample`, `SampleLevel`, `SampleGrad`, `Load`) to their WGSL counterparts (`textureSample`, `textureSampleLevel`, `textureSampleGrad`, `textureLoad`). A subsection would let sample-shape tests anchor concretely. |  |
 | [#rwtexture2dfloat4](../../../docs/llm-generated/target-pipelines/wgsl.md#rwtexture2dfloat4) | undocumented-behavior | The doc does not document how WGSL's storage-texture format is inferred from the Slang element type (`RWTexture2D<float4>` → `rgba32float`). The `RWTexture2D.Load` / `.Store` test anchors broadly to Phase D; pinning the inferred-format rule would let it anchor precisely. |  |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-- **Tint downstream invocation.** `-target wgsl-spirv` invokes
-  Tint to translate WGSL to SPIR-V; this bundle stays at
-  `-target wgsl` (text artifact) and does not exercise Tint or
-  any GPU runtime.
-- **Pass-ordering inside Phase A/B/C.** Pass existence is
-  observable from emitted text; intra-phase ordering needs
-  `-dump-ir` anchors that the doc does not pin.
-- **`AppendStructuredBuffer<T>` / `ConsumeStructuredBuffer<T>`.**
-  The Slang front-end rejects these in a WGSL compute entry
-  point with `E36107`, so the `lowerAppendConsumeStructuredBuffers`
-  pass that runs for WGSL is not reachable from a `.slang`
-  source.
-- **HLSL-style `InterlockedAdd` / `InterlockedExchange`.** Slang
-  rejects these for WGSL; use `Atomic<T>` instead (covered by
-  `atomic-add-buffer.slang`).
-- **DXR / mesh / ray-tracing / graphics-stage entry points.**
-  WGSL through Slang is compute-targeted in this bundle; the
-  runner is no-GPU.
-- **`collectCooperativeMetadata`.** Requires the cooperative
-  matrix or vector capability set.
-- **`legalizeUniformBufferLoad`, `invertYOfPositionOutput`,
-  `rcpWOfPositionInput`.** Khronos / HLSL only.
-- **`legalizeEntryPointsForGLSL`, `legalizeImageSubscript`,
-  `legalizeConstantBufferLoadForGLSL`.** GLSL/SPIR-V only.
-- **WGSL has no iterative passes (zero loops in
-  `linkAndOptimizeIR`).** A textual claim about the absence of a
-  while loop; not directly observable in emitted text.
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#collectcooperativemetadata](../../../docs/llm-generated/target-pipelines/wgsl.md#collectcooperativemetadata) | gpu-cooperative | **`collectCooperativeMetadata`.** Requires the cooperative matrix or vector capability set. | Agent runtime has no GPU; CI / local machine does. |
+| [#legalizeuniformbufferload](../../../docs/llm-generated/target-pipelines/wgsl.md#legalizeuniformbufferload) | gpu-cross-api-flag | **`legalizeUniformBufferLoad`, `invertYOfPositionOutput`, `rcpWOfPositionInput`.** Khronos / HLSL only. | Agent runtime has no GPU; CI / local machine does. |
+| (unspecified) | gpu-dxr | **DXR / mesh / ray-tracing / graphics-stage entry points.** WGSL through Slang is compute-targeted in this bundle; the runner is no-GPU. | Agent runtime has no GPU; CI / local machine does. |
+| (unspecified) | gpu-wgsl-tint | **Tint downstream invocation.** `-target wgsl-spirv` invokes Tint to translate WGSL to SPIR-V; this bundle stays at `-target wgsl` (text artifact) and does not exercise Tint or any GPU runtime. | Agent runtime has no GPU; CI / local machine does. |
+
+## Out of scope
+
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#e36107](../../../docs/llm-generated/target-pipelines/wgsl.md#e36107) | (unclassified) | **`AppendStructuredBuffer<T>` / `ConsumeStructuredBuffer<T>`.** The Slang front-end rejects these in a WGSL compute entry point with `E36107`, so the `lowerAppendConsumeStructuredBuffers` pass that runs for WGSL is not reachable from a `.slang` source. | Not reachable via any allowed test directive. |
+| [#interlockedadd](../../../docs/llm-generated/target-pipelines/wgsl.md#interlockedadd) | (unclassified) | **HLSL-style `InterlockedAdd` / `InterlockedExchange`.** Slang rejects these for WGSL; use `Atomic<T>` instead (covered by `atomic-add-buffer.slang`). | Not reachable via any allowed test directive. |
+| [#legalizeentrypointsforglsl](../../../docs/llm-generated/target-pipelines/wgsl.md#legalizeentrypointsforglsl) | (unclassified) | **`legalizeEntryPointsForGLSL`, `legalizeImageSubscript`, `legalizeConstantBufferLoadForGLSL`.** GLSL/SPIR-V only. | Not reachable via any allowed test directive. |
+| [#linkandoptimizeir](../../../docs/llm-generated/target-pipelines/wgsl.md#linkandoptimizeir) | (unclassified) | **WGSL has no iterative passes (zero loops in `linkAndOptimizeIR`).** A textual claim about the absence of a while loop; not directly observable in emitted text. | Not reachable via any allowed test directive. |
+| (unspecified) | implementation-detail | **Pass-ordering inside Phase A/B/C.** Pass existence is observable from emitted text; intra-phase ordering needs `-dump-ir` anchors that the doc does not pin. | Not reachable via any allowed test directive. |

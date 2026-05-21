@@ -186,77 +186,27 @@ rest of the catalog without repeating those.
 | [#spir-v-literals-and-kinds](../../../docs/llm-generated/ir-reference/types.md#spir-v-literals-and-kinds) | undocumented-behavior | "SPIR-V literals and kinds" — the `Type` (TypeKind), `TypeParameterPack`, `Rate`, `Generic` kind opcodes are listed but their observation requires inspecting the type of a generic-parameter's type (`type_t`'s type is `Type`). The doc does not name a `-dump-ir` line that displays the kind directly; one test (`type-t-generic-param.slang`) covers `type_t` only. |  |
 | [#layout-int-literal-selecting-row-major-column-major](../../../docs/llm-generated/ir-reference/types.md#layout-int-literal-selecting-row-major-column-major) | undocumented-behavior | The doc's `Mat` row says the fourth operand is a "layout int literal selecting row-major / column-major" but does not name which integer value selects which layout. The current bundle uses a wildcard pattern in the matrix test rather than asserting a specific value. |  |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-(In this bundle the heading is used for "claims unobservable through
-any allowed test directive", consistent with the
-`cross-cutting/ir-instructions` and `pipeline/04-ast-to-ir` bundles.)
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#atomic](../../../docs/llm-generated/ir-reference/types.md#atomic) | gpu-dxr | **`Atomic`, `CoopVector`, `CoopMatrix`, `DynamicResource`, `RaytracingAccelerationStructure`, `RayQuery`, `HitObject`, `TextureFootprintType`** — specialised surfaces; coverage belongs to `ir-reference/resources-and-atomics`. | Agent runtime has no GPU; CI / local machine does. |
+| [#pointstream](../../../docs/llm-generated/ir-reference/types.md#pointstream) | gpu-mesh-shader | **GLSL/HLSL geometry-shader streams** (`PointStream`, `LineStream`, `TriangleStream`, `Vertices`, `Indices`, `Primitives`, `metal::mesh`, `mesh_grid_properties`) — geometry / mesh shader stage; this bundle's tests are compute-stage only by convention, and the no-GPU runner cannot exercise the geometry/mesh pipeline. | Agent runtime has no GPU; CI / local machine does. |
+| [#inputpatch](../../../docs/llm-generated/ir-reference/types.md#inputpatch) | gpu-non-compute | **HLSL patch types** (`InputPatch`, `OutputPatch`, `GLSLInputAttachment`, `SubpassInputType`) — tessellation / subpass-input stage; same reason. | Agent runtime has no GPU; CI / local machine does. |
+| [#string](../../../docs/llm-generated/ir-reference/types.md#string) | gpu-other | **String types** (`String`, `NativeString`, `Char`) — `String` is observable as `String` in IR for a string literal, but tests that use string operations on the no-GPU runner depend on the core module exposing the relevant methods; the `cross-cutting/ir-instructions` bundle already covers the string-literal claim. Per-type-opcode tests for `Char` and `NativeString` require host-side or DOS-style surfaces that are not portable here. | Agent runtime has no GPU; CI / local machine does. |
 
-- **Hoistability flags** (`H` in the doc's tables) — the dump shows
-  the post-hoist result, not the decision. Two textually identical
-  `Vec(Float, 3 : Int)` types appearing once is observable; the
-  *reason* (hoisting) is not.
-- The **C++ wrapper struct** identity for each opcode (e.g. that
-  `Vec` is a `VectorType` in C++, `Func` is a `FuncType`) —
-  internal API, not surface-visible.
-- The IR's structural type-equality-by-pointer (the
-  `IRInst*`-compare optimisation enabled by hoistable types). This
-  is a runtime property of `IRBuilder` deduplication, not visible
-  in the dump.
-- **Storage-only floats** (`FloatE4M3Type`, `FloatE5M2Type`,
-  `BFloat16Type`) — surface support varies by target and core
-  module; the doc does not name a portable surface for them.
-- **Differentiation context types**
-  (`BackwardDiffIntermediateContextType`,
-  `TrivialBackwardDiffIntermediateContextType`, the `*Minimal*`
-  variants, the legacy-bridge variants, `ForwardDiffFuncType`,
-  `BackwardDiffFuncType`, `ApplyForBwdFuncType`,
-  `BwdCallableFuncType`, `RematFuncType`) — only produced by the
-  autodiff pass with `[Differentiable]` annotations; coverage
-  belongs to `ir-reference/differentiation`.
-- **Existential / RTTI types** (`BindExistentials`, `BoundInterface`,
-  `AnyValueType`, `DynamicType`, `rtti_type`, `rtti_handle_type`,
-  `RTTIPointerType`, `RTTIHandleType`) — produced by the
-  existential-elimination IR pass; coverage belongs to
-  `ir-reference/generics-and-existentials`.
-- **Set-theoretic types** (`UntaggedUnionType`, `ElementOfSetType`,
-  `SetTagType`, `TaggedUnionType`, `OptionalNoneType`) — also
-  pass-produced; not anchored to a surface in the source doc.
-- **Tensor and torch-tensor types** (`TensorView`, `TorchTensor`,
-  `ArrayListVector`, `TensorAddressingTensorLayoutType`,
-  `TensorAddressingTensorViewType`, `MakeTensorAddressingTensor*`)
-  — Python-binding lowering, no shader-language surface.
-- **Host-side pointer types** (`ComPtr`, `NativePtr`,
-  `DescriptorHandle`) — host-side API types, not exercisable from
-  a shader.
-- **Buffer-layout marker family** as individual opcodes
-  (`Std140Layout`, `Std430Layout`, `D3DConstantBufferLayout`,
-  `MetalParameterBlockLayout`, `CUDALayout`, `LLVMLayout`,
-  `CLayout`, `ScalarLayout`, `DefaultPushConstantLayout`) — they
-  appear as operands inside the typed-buffer family IR shapes; the
-  doc lists them but does not provide a per-marker surface trigger.
-  `DefaultLayout` is covered through the typed-buffer tests; per-
-  marker tests are not warranted from the doc claims.
-- The **kinds** (`Type`, `TypeParameterPack`, `Rate`, `Generic`)
-  beyond `type_t` — the doc lists them as kinds but does not name a
-  `-dump-ir` observation that surfaces them directly.
-- **GLSL/HLSL geometry-shader streams** (`PointStream`, `LineStream`,
-  `TriangleStream`, `Vertices`, `Indices`, `Primitives`,
-  `metal::mesh`, `mesh_grid_properties`) — geometry / mesh shader
-  stage; this bundle's tests are compute-stage only by convention,
-  and the no-GPU runner cannot exercise the geometry/mesh pipeline.
-- **HLSL patch types** (`InputPatch`, `OutputPatch`,
-  `GLSLInputAttachment`, `SubpassInputType`) — tessellation /
-  subpass-input stage; same reason.
-- **`Atomic`, `CoopVector`, `CoopMatrix`, `DynamicResource`,
-  `RaytracingAccelerationStructure`, `RayQuery`, `HitObject`,
-  `TextureFootprintType`** — specialised surfaces; coverage
-  belongs to `ir-reference/resources-and-atomics`.
-- **String types** (`String`, `NativeString`, `Char`) — `String`
-  is observable as `String` in IR for a string literal, but tests
-  that use string operations on the no-GPU runner depend on the
-  core module exposing the relevant methods; the
-  `cross-cutting/ir-instructions` bundle already covers the
-  string-literal claim. Per-type-opcode tests for `Char` and
-  `NativeString` require host-side or DOS-style surfaces that are
-  not portable here.
+## Out of scope
+
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#floate4m3type](../../../docs/llm-generated/ir-reference/types.md#floate4m3type) | (unclassified) | **Storage-only floats** (`FloatE4M3Type`, `FloatE5M2Type`, `BFloat16Type`) — surface support varies by target and core module; the doc does not name a portable surface for them. | Not reachable via any allowed test directive. |
+| [#std140layout](../../../docs/llm-generated/ir-reference/types.md#std140layout) | (unclassified) | **Buffer-layout marker family** as individual opcodes (`Std140Layout`, `Std430Layout`, `D3DConstantBufferLayout`, `MetalParameterBlockLayout`, `CUDALayout`, `LLVMLayout`, `CLayout`, `ScalarLayout`, `DefaultPushConstantLayout`) — they appear as operands inside the typed-buffer family IR shapes; the doc lists them but does not provide a per-marker surface trigger. `DefaultLayout` is covered through the typed-buffer tests; per- marker tests are not warranted from the doc claims. | Not reachable via any allowed test directive. |
+| [#tensorview](../../../docs/llm-generated/ir-reference/types.md#tensorview) | (unclassified) | **Tensor and torch-tensor types** (`TensorView`, `TorchTensor`, `ArrayListVector`, `TensorAddressingTensorLayoutType`, `TensorAddressingTensorViewType`, `MakeTensorAddressingTensor*`) — Python-binding lowering, no shader-language surface. | Not reachable via any allowed test directive. |
+| [#type](../../../docs/llm-generated/ir-reference/types.md#type) | (unclassified) | The **kinds** (`Type`, `TypeParameterPack`, `Rate`, `Generic`) beyond `type_t` — the doc lists them as kinds but does not name a `-dump-ir` observation that surfaces them directly. | Not reachable via any allowed test directive. |
+| [#untaggeduniontype](../../../docs/llm-generated/ir-reference/types.md#untaggeduniontype) | (unclassified) | **Set-theoretic types** (`UntaggedUnionType`, `ElementOfSetType`, `SetTagType`, `TaggedUnionType`, `OptionalNoneType`) — also pass-produced; not anchored to a surface in the source doc. | Not reachable via any allowed test directive. |
+| [#vec](../../../docs/llm-generated/ir-reference/types.md#vec) | (unclassified) | The **C++ wrapper struct** identity for each opcode (e.g. that `Vec` is a `VectorType` in C++, `Func` is a `FuncType`) — internal API, not surface-visible. | Not reachable via any allowed test directive. |
+| [#comptr](../../../docs/llm-generated/ir-reference/types.md#comptr) | api-only | **Host-side pointer types** (`ComPtr`, `NativePtr`, `DescriptorHandle`) — host-side API types, not exercisable from a shader. | Not reachable via any allowed test directive. |
+| (unspecified) | implementation-detail | **Hoistability flags** (`H` in the doc's tables) — the dump shows the post-hoist result, not the decision. Two textually identical `Vec(Float, 3 : Int)` types appearing once is observable; the *reason* (hoisting) is not. | Not reachable via any allowed test directive. |
+| [#irbuilder](../../../docs/llm-generated/ir-reference/types.md#irbuilder) | implementation-detail | The IR's structural type-equality-by-pointer (the `IRInst*`-compare optimisation enabled by hoistable types). This is a runtime property of `IRBuilder` deduplication, not visible in the dump. | Not reachable via any allowed test directive. |
+| [#backwarddiffintermediatecontexttype](../../../docs/llm-generated/ir-reference/types.md#backwarddiffintermediatecontexttype) | link-stage-only | **Differentiation context types** (`BackwardDiffIntermediateContextType`, `TrivialBackwardDiffIntermediateContextType`, the `*Minimal*` variants, the legacy-bridge variants, `ForwardDiffFuncType`, `BackwardDiffFuncType`, `ApplyForBwdFuncType`, `BwdCallableFuncType`, `RematFuncType`) — only produced by the autodiff pass with `[Differentiable]` annotations; coverage belongs to `ir-reference/differentiation`. | Not reachable via any allowed test directive. |
+| [#bindexistentials](../../../docs/llm-generated/ir-reference/types.md#bindexistentials) | link-stage-only | **Existential / RTTI types** (`BindExistentials`, `BoundInterface`, `AnyValueType`, `DynamicType`, `rtti_type`, `rtti_handle_type`, `RTTIPointerType`, `RTTIHandleType`) — produced by the existential-elimination IR pass; coverage belongs to `ir-reference/generics-and-existentials`. | Not reachable via any allowed test directive. |

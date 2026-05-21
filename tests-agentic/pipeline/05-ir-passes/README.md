@@ -207,62 +207,22 @@ no-GPU runner and is recorded under `## Out of scope`.
 | [#the-pipeline-is-not-a-fixed-list](../../../docs/llm-generated/pipeline/05-ir-passes.md#the-pipeline-is-not-a-fixed-list) | undocumented-behavior | The doc cites the `linkAndOptimizeIR` orchestration but says "the pipeline is **not** a fixed list" — the only observable ordering claim we could anchor was "DCE runs multiple times" (a weak claim that the orchestrator interleaves cleanup). Any pass-ordering invariant that the doc affirms (e.g. "specialize always runs before inline" or "validate runs first and last") would unlock ordering-based tests, but no such invariant is currently stated. |  |
 | [#target-specific-lowering](../../../docs/llm-generated/pipeline/05-ir-passes.md#target-specific-lowering) | undocumented-behavior | "Target-specific lowering" has `slang-ir-translate.cpp` listed as "Generic translation step used by some targets" — too vague to anchor a test. | Naming the specific surface (e.g. "Translate routes `printf` to OptiX-shaped trace calls") would help. |
 
-## Out of scope (no-GPU runner)
+## Out of scope
 
-(This heading is used here for "claims not observable through any
-allowed `slang-test` directive", consistent with the cross-cutting
-bundles. The doc is overwhelmingly about IR-internal pass
-behavior; most claims are observable via `-dump-ir` or per-target
-emit text. The items below are genuinely outside that
-observability.)
-
-- The exact order in which passes run for a given target. The doc
-  explicitly defers ordering to `linkAndOptimizeIR` and the
-  per-target pipelines under `target-pipelines/`. A textual
-  ordering would be brittle and is not a doc claim here; only the
-  "multiple invocations" claim is preserved.
-- The complete sequence of `### AFTER <pass>:` headers — these
-  vary by target (HLSL has ~64 stages, SPIR-V has ~86) and would
-  be a snapshot test, not a claim test.
-- Per-pass C++ helper functions and class structures (IRBuilder
-  usage inside each pass). Internal API.
-- Hoistable / global flag bits — internal to `IRInst`'s op
-  encoding; not in the `-dump-ir` output.
-- IR pass utilities (`Clone`, `Dominators`, `Util`, `Insts info`,
-  `Insts stable names`) — they are not transformations and have
-  no observable effect of their own.
-- The pre-link region documented in `04b-pre-link-passes.md`. If
-  a claim is about an explicitly pre-link pass, it belongs in
-  that bundle's prompt; tests here are anchored at the post-link
-  orchestrator only.
-- Coverage instrumentation (`-trace-coverage-binding`,
-  `-trace-coverage-reserved-space`) — these are command-line
-  surface; the agentic bundle does not exercise them.
-- Differentiation passes (`autodiff-fwd`, `-rev`, `-transpose`,
-  `-unzip`, `-cfg-norm`, `-loop-analysis`, `-pairs`,
-  `-primal-hoist`, `-region`). The doc names the pass family but
-  does not specify a per-pass user-observable consequence at a
-  level this bundle can anchor cleanly without writing a wider
-  autodiff test fixture. Recorded as a doc gap above.
-- The `obfuscate-loc` pass — gated on `-obfuscate` and intended
-  for distributed modules; not exercised here.
-- The `insert-debug-value-store` and `liveness` passes — gated
-  on debug-info preservation. We exercised the inverse
-  (`strip-debug-info` without `-g`); the positive `-g` path
-  would require a debug emitter we do not target.
-- The `defunctionalization` pass and `lower-expand-type` pass —
-  the source-level constructs (first-class function values,
-  variadic packs) are not core enough to anchor a `.slang` test
-  without inviting a wider language-feature test.
-- `extract-value-from-type`, `bind-existentials`,
-  `any-value-inference`, `any-value-marshalling`,
-  `synthesize-active-mask`, `propagate-func-properties` — internal
-  analysis or marshalling passes with no user-observable footprint
-  that the doc names.
-- The "Other passes" section's `spirv-snippet` — internal helper
-  used by SPIR-V emit; not surface-visible.
-- The "Pass utilities" section — `Clone`, `Dominators`, `Util`,
-  `Insts info`, `Insts stable names` — these are not
-  transformations and have no observable behavior on their own.
-- The "Adding a new pass" workflow — developer guide, not a
-  user-observable behavior.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| (unspecified) | (unclassified) | The complete sequence of `### AFTER <pass>:` headers — these vary by target (HLSL has ~64 stages, SPIR-V has ~86) and would be a snapshot test, not a claim test. | Not reachable via any allowed test directive. |
+| (unspecified) | (unclassified) | Coverage instrumentation (`-trace-coverage-binding`, `-trace-coverage-reserved-space`) — these are command-line surface; the agentic bundle does not exercise them. | Not reachable via any allowed test directive. |
+| [#clone](../../../docs/llm-generated/pipeline/05-ir-passes.md#clone) | (unclassified) | IR pass utilities (`Clone`, `Dominators`, `Util`, `Insts info`, `Insts stable names`) — they are not transformations and have no observable effect of their own. | Not reachable via any allowed test directive. |
+| [#clone](../../../docs/llm-generated/pipeline/05-ir-passes.md#clone) | (unclassified) | The "Pass utilities" section — `Clone`, `Dominators`, `Util`, `Insts info`, `Insts stable names` — these are not transformations and have no observable behavior on their own. | Not reachable via any allowed test directive. |
+| [#defunctionalization](../../../docs/llm-generated/pipeline/05-ir-passes.md#defunctionalization) | (unclassified) | The `defunctionalization` pass and `lower-expand-type` pass — the source-level constructs (first-class function values, variadic packs) are not core enough to anchor a `.slang` test without inviting a wider language-feature test. | Not reachable via any allowed test directive. |
+| [#insert-debug-value-store](../../../docs/llm-generated/pipeline/05-ir-passes.md#insert-debug-value-store) | (unclassified) | The `insert-debug-value-store` and `liveness` passes — gated on debug-info preservation. We exercised the inverse (`strip-debug-info` without `-g`); the positive `-g` path would require a debug emitter we do not target. | Not reachable via any allowed test directive. |
+| [#irinst](../../../docs/llm-generated/pipeline/05-ir-passes.md#irinst) | (unclassified) | Hoistable / global flag bits — internal to `IRInst`'s op encoding; not in the `-dump-ir` output. | Not reachable via any allowed test directive. |
+| [#linkandoptimizeir](../../../docs/llm-generated/pipeline/05-ir-passes.md#linkandoptimizeir) | (unclassified) | The exact order in which passes run for a given target. The doc explicitly defers ordering to `linkAndOptimizeIR` and the per-target pipelines under `target-pipelines/`. A textual ordering would be brittle and is not a doc claim here; only the "multiple invocations" claim is preserved. | Not reachable via any allowed test directive. |
+| [#obfuscate-loc](../../../docs/llm-generated/pipeline/05-ir-passes.md#obfuscate-loc) | (unclassified) | The `obfuscate-loc` pass — gated on `-obfuscate` and intended for distributed modules; not exercised here. | Not reachable via any allowed test directive. |
+| [#spirv-snippet](../../../docs/llm-generated/pipeline/05-ir-passes.md#spirv-snippet) | (unclassified) | The "Other passes" section's `spirv-snippet` — internal helper used by SPIR-V emit; not surface-visible. | Not reachable via any allowed test directive. |
+| (unspecified) | api-only | Per-pass C++ helper functions and class structures (IRBuilder usage inside each pass). Internal API. | Not reachable via any allowed test directive. |
+| [#extract-value-from-type](../../../docs/llm-generated/pipeline/05-ir-passes.md#extract-value-from-type) | implementation-detail | `extract-value-from-type`, `bind-existentials`, `any-value-inference`, `any-value-marshalling`, `synthesize-active-mask`, `propagate-func-properties` — internal analysis or marshalling passes with no user-observable footprint that the doc names. | Not reachable via any allowed test directive. |
+| (unspecified) | link-stage-only | The pre-link region documented in `04b-pre-link-passes.md`. If a claim is about an explicitly pre-link pass, it belongs in that bundle's prompt; tests here are anchored at the post-link orchestrator only. | Not reachable via any allowed test directive. |
+| [#adding-a-new-pass](../../../docs/llm-generated/pipeline/05-ir-passes.md#adding-a-new-pass) | process-doc | The "Adding a new pass" workflow — developer guide, not a user-observable behavior. | Not reachable via any allowed test directive. |
+| [#autodiff-fwd](../../../docs/llm-generated/pipeline/05-ir-passes.md#autodiff-fwd) | requires-external-tool | Differentiation passes (`autodiff-fwd`, `-rev`, `-transpose`, `-unzip`, `-cfg-norm`, `-loop-analysis`, `-pairs`, `-primal-hoist`, `-region`). The doc names the pass family but does not specify a per-pass user-observable consequence at a level this bundle can anchor cleanly without writing a wider autodiff test fixture. Recorded as a doc gap above. | Not reachable via any allowed test directive. |

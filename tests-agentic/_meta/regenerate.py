@@ -136,6 +136,36 @@ _ALLOWED_GAP_KINDS = (
     "drift-from-source",  # observed behavior contradicts the doc
 )
 
+_ALLOWED_COVERABLE_BACKENDS = (
+    "gpu-dxr",
+    "gpu-mesh-shader",
+    "gpu-dxc-dxil",
+    "gpu-fxc-dxbc",
+    "gpu-cuda",
+    "gpu-metal-toolchain",
+    "gpu-wgsl-tint",
+    "gpu-spirv-tools",
+    "gpu-non-compute",
+    "gpu-bindless",
+    "gpu-cooperative",
+    "gpu-vulkan-extension",
+    "gpu-cross-api-flag",
+    "gpu-other",  # general GPU-runtime-required without specific tag
+)
+
+_ALLOWED_OOS_REASONS = (
+    "api-only",
+    "link-stage-only",
+    "out-of-bundle",
+    "deprecated",
+    "process-doc",
+    "internal-source-fact",
+    "compile-time-toggle",
+    "requires-external-tool",
+    "implementation-detail",
+    "(unclassified)",  # accepted in migrated rows; next regen should refine
+)
+
 
 def _rel_to_repo(path: Path) -> str:
     return str(path.relative_to(REPO_ROOT)).replace(os.sep, "/")
@@ -649,6 +679,39 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
     for tf in test_files:
         for issue in _lint_test_file(spec, tf):
             issues.append(issue)
+    # Untested-coverable + Out-of-scope tables: optional sections,
+    # but if present must be tables with the controlled vocabulary.
+    for heading, allowed, col_name in (
+        (
+            "## Untested coverable claims",
+            _ALLOWED_COVERABLE_BACKENDS,
+            "Backend",
+        ),
+        ("## Out of scope", _ALLOWED_OOS_REASONS, "Reason"),
+    ):
+        if heading not in text:
+            continue
+        rows = _parse_tagged_table(text, heading)
+        if not rows and not _section_explicitly_empty(text, heading):
+            issues.append(
+                LintIssue(
+                    f"{spec.dir}/README.md",
+                    "error",
+                    f"{heading} section present but no table rows parsed"
+                    f" (expected | Anchor | {col_name} | ... | ... | columns)",
+                )
+            )
+        for row in rows:
+            tag = row[1]
+            if tag not in allowed:
+                issues.append(
+                    LintIssue(
+                        f"{spec.dir}/README.md",
+                        "error",
+                        f"{heading} {col_name}={tag!r} not in {list(allowed)}",
+                    )
+                )
+
     # Doc-gaps table: optional section, but if present must be a table
     # with the controlled Kind vocabulary. Free-form bullets are no
     # longer accepted; the migration to the table format is one-shot.
@@ -684,6 +747,64 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
                     )
                 )
     return issues
+
+
+def _parse_tagged_table(text: str, heading: str) -> list[tuple[str, str, str, str]]:
+    """Parse a 4-column markdown table that lives under `heading`.
+
+    Returns a list of (col1, col2, col3, col4) tuples. Pipe characters
+    inside cells must be escaped as `\\|`; the parser unescapes them.
+    Header and divider rows are skipped.
+    """
+    rows: list[tuple[str, str, str, str]] = []
+    lines = text.splitlines()
+    n = len(lines)
+    i = 0
+    while i < n and lines[i].strip() != heading:
+        i += 1
+    i += 1
+    while i < n:
+        line = lines[i]
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            break
+        if not stripped.startswith("|"):
+            i += 1
+            continue
+        SENTINEL = "\x00PIPE\x00"
+        protected = stripped.replace("\\|", SENTINEL)
+        raw_cells = protected.split("|")[1:-1]
+        cells = [c.replace(SENTINEL, "|").strip() for c in raw_cells]
+        if not cells or all(set(c) <= set("- ") for c in cells):
+            i += 1
+            continue
+        # Header detection: first cell == "Anchor"
+        if cells[0].lower() == "anchor":
+            i += 1
+            continue
+        if len(cells) >= 4:
+            rows.append((cells[0], cells[1], cells[2], cells[3]))
+        i += 1
+    return rows
+
+
+def _section_explicitly_empty(text: str, heading: str) -> bool:
+    """True if `heading` exists and its body starts with `(none)`."""
+    in_section = False
+    for raw in text.splitlines():
+        s = raw.strip()
+        if s == heading:
+            in_section = True
+            continue
+        if in_section:
+            if not s:
+                continue
+            if s.startswith("## "):
+                return False
+            if s.startswith("(none)"):
+                return True
+            return False
+    return False
 
 
 def _gap_section_explicitly_empty(text: str) -> bool:

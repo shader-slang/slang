@@ -105,32 +105,22 @@ C++ for positive coverage and GLSL / WGSL for negative coverage).
 | [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | undocumented-behavior | The doc's `## Backends` table lists CUDA as emitting CUDA source, but does not state that CUDA uses a `GlobalParams` struct + `SLANG_globalParams` shim to surface module-scope `uniform` declarations. The test in this bundle confirms the `SLANG_globalParams`/`__constant__ GlobalParams_0` shape, which the doc does not currently describe. |  |
 | [#preludes](../../../docs/llm-generated/pipeline/06-emit.md#preludes) | undocumented-behavior | The doc's `## Preludes` table column for "C++ host" points at `slang-cpp-host-prelude.h`, but the doc does not state when this prelude is selected vs. `slang-cpp-prelude.h`. We test only the shader-side prelude (`slang-cpp-prelude.h`) because that is the one chosen by `-target cpp` for a compute entry point. |  |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-- **Torch glue** (`#backends` > Torch). Requires a host C++ compiler
-  + PyTorch headers we cannot assume in the no-GPU runner.
-- **LLVM / native via `slang-llvm`** (`#backends` > LLVM). Requires
-  the LLVM JIT.
-- **VM bytecode** (`#backends` > VM). Exercised by `INTERPRET`-style
-  tests in lower-level bundles; this bundle's focus is per-target
-  text emit.
-- **Slang round-trip** (`#backends` > Slang round-trip). `-target
-  slang` is a debugging output covered by syntax-reference bundles.
-- **`IArtifact` object layout** (`#inputs-and-outputs`). Internal
-  C++ structure. The user-visible consequence ("a successful
-  compile produces text") is implied by every other test passing.
-- **Dependency-file output `.d`** (`#dependency-file-output`). The
-  `-depfile` flag emits a side artefact; this bundle stays on
-  per-target text emission as described in the rest of the doc.
-- **`SourceMap` companion** (`#source-writer-abstraction`).
-  Source-map metadata is an API surface, not a text-emit shape.
-- **Alternative `LineDirectiveMode` values** beyond the default.
-  The mode is a command-line surface (`-line-directive-mode`), not
-  an emit-stage invariant.
-- **"Adding a new backend" workflow** (`#adding-a-new-backend`). A
-  developer guide, not a user-observable behavior.
-- **Binary targets that need extra ecosystem tooling**: raw SPIR-V
-  binary (`-target spirv` without `-asm`) needs SPIR-V validation;
-  DXIL needs DXC; MSL binary needs a Metal compiler; WGSL binary
-  has no such mode. The corresponding text-emit forms (`spirv-asm`,
-  `hlsl`, `metal`, `wgsl`) are tested instead.
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#spirv-asm](../../../docs/llm-generated/pipeline/06-emit.md#spirv-asm) | gpu-dxc-dxil | **Binary targets that need extra ecosystem tooling**: raw SPIR-V binary (`-target spirv` without `-asm`) needs SPIR-V validation; DXIL needs DXC; MSL binary needs a Metal compiler; WGSL binary has no such mode. The corresponding text-emit forms (`spirv-asm`, `hlsl`, `metal`, `wgsl`) are tested instead. | Agent runtime has no GPU; CI / local machine does. |
+| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | gpu-other | **Torch glue** (`#backends` > Torch). | Requires a host C++ compiler + PyTorch headers we cannot assume in the no-GPU runner. |
+
+## Out of scope
+
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | (unclassified) | **LLVM / native via `slang-llvm`** (`#backends` > LLVM). | Requires the LLVM JIT. |
+| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | (unclassified) | **VM bytecode** (`#backends` > VM). Exercised by `INTERPRET`-style tests in lower-level bundles; this bundle's focus is per-target text emit. | Not reachable via any allowed test directive. |
+| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | (unclassified) | **Slang round-trip** (`#backends` > Slang round-trip). `-target slang` is a debugging output covered by syntax-reference bundles. | Not reachable via any allowed test directive. |
+| [#dependency-file-output](../../../docs/llm-generated/pipeline/06-emit.md#dependency-file-output) | (unclassified) | **Dependency-file output `.d`** (`#dependency-file-output`). The `-depfile` flag emits a side artefact; this bundle stays on per-target text emission as described in the rest of the doc. | Not reachable via any allowed test directive. |
+| [#linedirectivemode](../../../docs/llm-generated/pipeline/06-emit.md#linedirectivemode) | (unclassified) | **Alternative `LineDirectiveMode` values** beyond the default. The mode is a command-line surface (`-line-directive-mode`), not an emit-stage invariant. | Not reachable via any allowed test directive. |
+| [#source-writer-abstraction](../../../docs/llm-generated/pipeline/06-emit.md#source-writer-abstraction) | (unclassified) | **`SourceMap` companion** (`#source-writer-abstraction`). Source-map metadata is an API surface, not a text-emit shape. | Not reachable via any allowed test directive. |
+| [#inputs-and-outputs](../../../docs/llm-generated/pipeline/06-emit.md#inputs-and-outputs) | api-only | **`IArtifact` object layout** (`#inputs-and-outputs`). Internal C++ structure. The user-visible consequence ("a successful compile produces text") is implied by every other test passing. | Not reachable via any allowed test directive. |
+| [#adding-a-new-backend](../../../docs/llm-generated/pipeline/06-emit.md#adding-a-new-backend) | process-doc | **"Adding a new backend" workflow** (`#adding-a-new-backend`). A developer guide, not a user-observable behavior. | Not reachable via any allowed test directive. |

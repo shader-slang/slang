@@ -97,9 +97,13 @@ test confirms that `let` immutability is enforced by the checker.
 | [#let](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#let) | undocumented-behavior | The keyword-vs-identifier rules are not spelled out: `let`, `var`, and even `int` can be reused as identifier names in declarator position (e.g. `int let = 5;` is accepted), but `int` cannot appear at the head of an expression-typed declaration (`int x = int + 1;` is rejected with `E30060`). | A short paragraph on which contexts re-classify an identifier as a value vs a type would let us write more precise boundary tests. |
 | [#reserved](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#reserved) | undocumented-behavior | `SV_`-prefixed and `gl_`-prefixed names are documented as "reserved", but in practice a user-named local `int SV_userVar` inside a function compiles and produces the printed value. The prefix policy is therefore advisory rather than enforced; a note to that effect in the doc would justify removing speculative user-prefix boundary tests. |  |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-- `[shader("raygeneration")]` / `hitAttributeEXT` raytracing modifiers
-  cannot be exercised without GPU staging.
-- `dyn` / dynamic dispatch through `IFunc` requires runtime
-  reflection support that does not surface in the no-GPU CI image.
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#hitattributeext](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#hitattributeext) | gpu-dxr | `[shader("raygeneration")]` / `hitAttributeEXT` raytracing modifiers cannot be exercised without GPU staging. | Agent runtime has no GPU; CI / local machine does. |
+| [#dyn](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#dyn) | gpu-other | `dyn` / dynamic dispatch through `IFunc` requires runtime reflection support that does not surface in the no-GPU CI image. | Agent runtime has no GPU; CI / local machine does. |
+
+## Out of scope
+
+(none)

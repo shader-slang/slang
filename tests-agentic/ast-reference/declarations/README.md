@@ -108,63 +108,18 @@ allowed `slang-test` directive.
 
 ## Out of scope
 
-The doc is overwhelmingly about internal AST shape. The following
-claim families are not observable through `slangc` / `slang-test`
-directives that this bundle can run; they are recorded here rather
-than tested.
-
-- The C++ parent class of any concrete `Decl` (e.g. that
-  `LetDecl extends VarDecl`, that `ConstructorDecl` extends
-  `FunctionDeclBase`, that `GenericTypeParamDecl` extends
-  `GenericTypeParamDeclBase`). Only the user-observable behavior
-  is testable.
-- Field names listed in the `## Nodes` table (e.g.
-  `VarDecl::type: TypeExp`, `VarDecl::initExpr: Expr*`,
-  `GenericDecl::inner: Decl*`, `ExtensionDecl::targetType: TypeExp`,
-  `EnumCaseDecl::tagVal: IntVal*`,
-  `InheritanceDecl::witnessTable: RefPtr<WitnessTable>`,
-  `ConstructorDecl::m_flavor: int`, `LambdaDecl::funcDecl`,
-  `ModuleDecl::module: Module*`).
-- The grammar production a parser callback is named (e.g.
-  `parseAggTypeDecl`, `parseRequireCapabilityDecl`,
-  `parseGenericDecl`).
-- The `## Family hierarchy` mermaid diagram as a graph: abstract
-  intermediates (`ContainerDecl`, `CallableDecl`, `AggTypeDeclBase`,
-  `FunctionDeclBase`, `VarDeclBase`, `SimpleTypeDecl`,
-  `TypeConstraintDecl`, `NamespaceDeclBase`,
-  `GenericTypeParamDeclBase`, `FileReferenceDeclBase`,
-  `IncludeDeclBase`) carry no FIDDLE concrete tag and produce no
-  user spelling of their own.
-- Synthesized-only concrete classes that have no user-visible
-  spelling: `SynthesizedStructDecl`, `SynthesizedFuncDecl`,
-  `UnresolvedDecl`, `InterfaceDefaultImplDecl`, `ThisTypeDecl`,
-  `ThisTypeConstraintDecl`. Their existence shows up only through
-  the surrounding feature (interface dispatch, tuple types,
-  default-impl resolution) and the surrounding feature is what we
-  test.
-- The `SyntaxDecl` model of "keyword binding produced by `__syntax`"
-  is the subject of
-  `tests-agentic/syntax-reference/keywords-and-builtins/`, which
-  exercises keyword recognition from the surface-syntax side. The
-  AST-shape claim ("the keyword maps to a parse callback") is not a
-  separate user-observable.
-- `AttributeDecl::syntaxClass` is a reflection handle for an
-  attribute class; the attribute's effect is observable through
-  attribute-bearing tests in other bundles, but the attribute-class
-  identity itself is not.
-- `FuncAliasDecl` (see doc gap above): no user spelling.
-- `EmptyDecl::layout(...) in;` form: the doc cites GLSL-specific
-  syntax; we exercise the simpler bare-`;` form that the parser
-  also produces an `EmptyDecl` for.
-- `ModuleDeclarationDecl` (the `module M;` opener): structuring a
-  multi-file module requires more than one source file and so is
-  outside the single-file `slang-test` surface this bundle can
-  exercise.
-- `IncludeDecl` / `ImplementingDecl` / `__include` /
-  `__implementing`: same reason — they reference companion files.
-- `GLSLInterfaceBlockDecl`: GLSL-only surface; not exercised here
-  (see doc gap above).
-- `Decl::checkState` / `Decl::inferredCapabilityRequirements`:
-  internal checking-phase fields. Capability gating is the subject
-  of `pipeline/03-semantic-check`'s capability tests; this bundle
-  covers the user-spelling-side `RequireCapabilityDecl` only.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| (unspecified) | (unclassified) | `AttributeDecl::syntaxClass` is a reflection handle for an attribute class; the attribute's effect is observable through attribute-bearing tests in other bundles, but the attribute-class identity itself is not. | Not reachable via any allowed test directive. |
+| [#containerdecl](../../../docs/llm-generated/ast-reference/declarations.md#containerdecl) | (unclassified) | The `## Family hierarchy` mermaid diagram as a graph: abstract intermediates (`ContainerDecl`, `CallableDecl`, `AggTypeDeclBase`, `FunctionDeclBase`, `VarDeclBase`, `SimpleTypeDecl`, `TypeConstraintDecl`, `NamespaceDeclBase`, `GenericTypeParamDeclBase`, `FileReferenceDeclBase`, `IncludeDeclBase`) carry no FIDDLE concrete tag and produce no user spelling of their own. | Not reachable via any allowed test directive. |
+| [#emptydecl](../../../docs/llm-generated/ast-reference/declarations.md#emptydecl) | (unclassified) | `EmptyDecl::layout(...) in;` form: the doc cites GLSL-specific syntax; we exercise the simpler bare-`;` form that the parser also produces an `EmptyDecl` for. | Not reachable via any allowed test directive. |
+| [#funcaliasdecl](../../../docs/llm-generated/ast-reference/declarations.md#funcaliasdecl) | (unclassified) | `FuncAliasDecl` (see doc gap above): no user spelling. | Not reachable via any allowed test directive. |
+| [#glslinterfaceblockdecl](../../../docs/llm-generated/ast-reference/declarations.md#glslinterfaceblockdecl) | (unclassified) | `GLSLInterfaceBlockDecl`: GLSL-only surface; not exercised here (see doc gap above). | Not reachable via any allowed test directive. |
+| [#includedecl](../../../docs/llm-generated/ast-reference/declarations.md#includedecl) | (unclassified) | `IncludeDecl` / `ImplementingDecl` / `__include` / `__implementing`: same reason — they reference companion files. | Not reachable via any allowed test directive. |
+| [#moduledeclarationdecl](../../../docs/llm-generated/ast-reference/declarations.md#moduledeclarationdecl) | (unclassified) | `ModuleDeclarationDecl` (the `module M;` opener): structuring a multi-file module requires more than one source file and so is outside the single-file `slang-test` surface this bundle can exercise. | Not reachable via any allowed test directive. |
+| [#requirecapabilitydecl](../../../docs/llm-generated/ast-reference/declarations.md#requirecapabilitydecl) | (unclassified) | `Decl::checkState` / `Decl::inferredCapabilityRequirements`: internal checking-phase fields. Capability gating is the subject of `pipeline/03-semantic-check`'s capability tests; this bundle covers the user-spelling-side `RequireCapabilityDecl` only. | Not reachable via any allowed test directive. |
+| [#syntaxdecl](../../../docs/llm-generated/ast-reference/declarations.md#syntaxdecl) | (unclassified) | The `SyntaxDecl` model of "keyword binding produced by `__syntax`" is the subject of `tests-agentic/syntax-reference/keywords-and-builtins/`, which exercises keyword recognition from the surface-syntax side. The AST-shape claim ("the keyword maps to a parse callback") is not a separate user-observable. | Not reachable via any allowed test directive. |
+| [#synthesizedstructdecl](../../../docs/llm-generated/ast-reference/declarations.md#synthesizedstructdecl) | (unclassified) | Synthesized-only concrete classes that have no user-visible spelling: `SynthesizedStructDecl`, `SynthesizedFuncDecl`, `UnresolvedDecl`, `InterfaceDefaultImplDecl`, `ThisTypeDecl`, `ThisTypeConstraintDecl`. Their existence shows up only through the surrounding feature (interface dispatch, tuple types, default-impl resolution) and the surrounding feature is what we test. | Not reachable via any allowed test directive. |
+| (unspecified) | internal-source-fact | Field names listed in the `## Nodes` table (e.g. `VarDecl::type: TypeExp`, `VarDecl::initExpr: Expr*`, `GenericDecl::inner: Decl*`, `ExtensionDecl::targetType: TypeExp`, `EnumCaseDecl::tagVal: IntVal*`, `InheritanceDecl::witnessTable: RefPtr<WitnessTable>`, `ConstructorDecl::m_flavor: int`, `LambdaDecl::funcDecl`, `ModuleDecl::module: Module*`). | Not reachable via any allowed test directive. |
+| [#decl](../../../docs/llm-generated/ast-reference/declarations.md#decl) | internal-source-fact | The C++ parent class of any concrete `Decl` (e.g. that `LetDecl extends VarDecl`, that `ConstructorDecl` extends `FunctionDeclBase`, that `GenericTypeParamDecl` extends `GenericTypeParamDeclBase`). | Only the user-observable behavior is testable. |
+| [#parseaggtypedecl](../../../docs/llm-generated/ast-reference/declarations.md#parseaggtypedecl) | internal-source-fact | The grammar production a parser callback is named (e.g. `parseAggTypeDecl`, `parseRequireCapabilityDecl`, `parseGenericDecl`). | Not reachable via any allowed test directive. |

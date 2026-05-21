@@ -67,14 +67,14 @@ the point of this bundle.
 | [#line-893-at-sourcecommit](../../../docs/llm-generated/pipeline/overview.md#line-893-at-sourcecommit) | undocumented-behavior | The doc lists `slang-emit.cpp` line numbers ("line 893 at source_commit", "line 2418 at source_commit") for `linkAndOptimizeIR` and `emitEntryPointsSourceFromIR`. These are navigation aids, not user-facing claims; no test anchors them. The fact that linkAndOptimizeIR runs is observed indirectly by successful end-to-end compile of a shader that requires linking (function calls, struct usage) — covered by the existing tests. |  |
 | [#emit](../../../docs/llm-generated/pipeline/overview.md#emit) | undocumented-behavior | The `## Emit` subsection lists Torch glue, LLVM IR / native via `slang-llvm`, and VM bytecode as targets in addition to the text emit backends. Torch and LLVM/native require host compilers we cannot assume in the no-GPU runner; VM bytecode is exercised via `INTERPRET` in lower-level bundles. Recorded as out-of-scope here. |  |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-- Targets that require a host compiler or runtime not available in
-  the agentic runner: Torch glue (`-target torch`), LLVM IR / native
-  via `slang-llvm`, DXIL, MSL binary, SPIRV binary (requires
-  `spirv-val` ecosystem). Text-emit forms (`hlsl`, `glsl`,
-  `spirv-asm`, `metal`, `wgsl`, `cuda`, `cpp`) are tested instead.
-- Determinism of the compiler (compile twice → identical text).
-  `slang-test` would need a custom diff harness for this, and the
-  doc does not currently make a determinism claim; recorded as
-  doc-gap-adjacent and skipped here.
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#slang-llvm](../../../docs/llm-generated/pipeline/overview.md#slang-llvm) | gpu-dxc-dxil | Targets that require a host compiler or runtime not available in the agentic runner: Torch glue (`-target torch`), LLVM IR / native via `slang-llvm`, DXIL, MSL binary, SPIRV binary (requires `spirv-val` ecosystem). Text-emit forms (`hlsl`, `glsl`, `spirv-asm`, `metal`, `wgsl`, `cuda`, `cpp`) are tested instead. | Agent runtime has no GPU; CI / local machine does. |
+
+## Out of scope
+
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#slang-test](../../../docs/llm-generated/pipeline/overview.md#slang-test) | (unclassified) | Determinism of the compiler (compile twice → identical text). `slang-test` would need a custom diff harness for this, and the doc does not currently make a determinism claim; recorded as doc-gap-adjacent and skipped here. | Not reachable via any allowed test directive. |

@@ -62,55 +62,19 @@ them on the LOWER-TO-IR stage. They are recorded under
 | [#runtime-array-surface-only](../../../docs/llm-generated/ir-reference/misc.md#runtime-array-surface-only) | undocumented-behavior | `GetArrayLength` is listed with `ArrayLengthExpr (runtime path)` as its AST origin. The natural surface (`arr.length()` on a fixed-size array) constant-folds at lowering and the opcode does not appear in the IR dump. The doc could state which surface prevents folding (a runtime-sized array binding) or label the row "(runtime-array surface only)". |  |
 | (unspecified) | undocumented-behavior | The `Size, alignment, count` rows list `dataLayout?` as the second operand of `sizeOf` / `alignOf` but do not name the default token that fills the operand when the surface call passes only the type argument; from observation that token is `ScalarLayout`. | Naming the default would let readers predict the IR-dump shape without reading lowering code. |
 
-## Out of scope (no-GPU runner)
+## Out of scope
 
-These opcodes are listed in `misc.md` but have no portable Slang
-shader-language surface that reliably produces them at the LOWER-
-TO-IR stage; they are introduced by later IR passes, host-side
-lowering, or core-module reflection paths:
-
-- **System opcodes** (`nop`, `Unrecognized`) — `nop` is not
-  emitted by `slang-lower-to-ir.cpp`; `Unrecognized` only appears
-  immediately after deserializing a module that uses an opcode the
-  current build does not define.
-- **Tensor and runtime helpers** (`makeArrayList`,
-  `makeTensorView`, `allocTorchTensor`, `TorchGetCudaStream`,
-  `TorchTensorGetView`, `allocateOpaqueHandle`) — host-side
-  runtime opcodes produced by non-shader lowering paths; not
-  reachable from a portable compute entry point.
-- **Pack and expansion (remainder)** (`Each`, `MakeWitnessPack`,
-  `makeValuePack`, `PackBranch`, `ExtractFirstFromPack`,
-  `ExtractLastFromPack`, `TrimFirstOfPack`, `TrimLastOfPack`,
-  `ShapeConcat`, `ShapePermute`, `ShapeSwap`, `ShapeReduce`,
-  `NonEmptyPackWitness`) — all `(synthesized)` per the doc;
-  introduced by the variadic-generic specialization pass after
-  LOWER-TO-IR.
-- **Type queries and predicates (remainder)** (`TypeEquals`,
-  `IsInt`, `IsBool`, `IsFloat`, `IsCoopFloat`, `IsHalf`,
-  `IsUnsignedInt`, `IsSignedInt`, `IsVector`) — only reachable
-  through underscore-prefixed core-module intrinsics, not a
-  user-portable surface.
-- **`GetArrayLength`** — the natural `arr.length()` surface
-  constant-folds at lowering on the fixed-size array path; the
-  doc names a "runtime path" but does not name a portable surface
-  that prevents folding.
-- **Storage-type legalization casts** (`CastStorageToLogical`,
-  `CastStorageToLogicalDeref`, `MakeStorageTypeLoweringConfig`,
-  `CastUInt64ToDescriptorHandle`, `CastDescriptorHandleToUInt64`,
-  `CastDescriptorHandleToResource`, `CastResourceToDescriptorHandle`,
-  `TreatAsDynamicUniform`, `GetLegalizedSPIRVGlobalParamAddr`) —
-  all `(synthesized)` by `slang-ir-lower-buffer-element-type.cpp`
-  after LOWER-TO-IR.
-- **Annotations** (`Annotation`, `WitnessTableAnnotation`,
-  `DifferentiableTypeAnnotation`, `DifferentiableTypeDictionaryItem`)
-  — all `(synthesized)` by IR passes (notably the differentiation
-  pipeline).
-- **Liveness markers** (`liveRangeStart`, `liveRangeEnd`) —
-  `(synthesized)` by `slang-ir-liveness.cpp`.
-- **Kernel launch** (`DispatchKernel`, `CudaKernelLaunch`) —
-  produced by host-side lowering for CUDA / host-shader targets;
-  not reachable from a portable compute entry point on the
-  `-target spirv-asm` path.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#getarraylength](../../../docs/llm-generated/ir-reference/misc.md#getarraylength) | (unclassified) | **`GetArrayLength`** — the natural `arr.length()` surface constant-folds at lowering on the fixed-size array path; the doc names a "runtime path" but does not name a portable surface that prevents folding. | Not reachable via any allowed test directive. |
+| [#nop](../../../docs/llm-generated/ir-reference/misc.md#nop) | (unclassified) | **System opcodes** (`nop`, `Unrecognized`) — `nop` is not emitted by `slang-lower-to-ir.cpp`; `Unrecognized` only appears immediately after deserializing a module that uses an opcode the current build does not define. | Not reachable via any allowed test directive. |
+| [#typeequals](../../../docs/llm-generated/ir-reference/misc.md#typeequals) | (unclassified) | **Type queries and predicates (remainder)** (`TypeEquals`, `IsInt`, `IsBool`, `IsFloat`, `IsCoopFloat`, `IsHalf`, `IsUnsignedInt`, `IsSignedInt`, `IsVector`) — only reachable through underscore-prefixed core-module intrinsics, not a user-portable surface. | Not reachable via any allowed test directive. |
+| [#dispatchkernel](../../../docs/llm-generated/ir-reference/misc.md#dispatchkernel) | api-only | **Kernel launch** (`DispatchKernel`, `CudaKernelLaunch`) — produced by host-side lowering for CUDA / host-shader targets; not reachable from a portable compute entry point on the `-target spirv-asm` path. | Not reachable via any allowed test directive. |
+| [#makearraylist](../../../docs/llm-generated/ir-reference/misc.md#makearraylist) | api-only | **Tensor and runtime helpers** (`makeArrayList`, `makeTensorView`, `allocTorchTensor`, `TorchGetCudaStream`, `TorchTensorGetView`, `allocateOpaqueHandle`) — host-side runtime opcodes produced by non-shader lowering paths; not reachable from a portable compute entry point. | Not reachable via any allowed test directive. |
+| [#annotation](../../../docs/llm-generated/ir-reference/misc.md#annotation) | link-stage-only | **Annotations** (`Annotation`, `WitnessTableAnnotation`, `DifferentiableTypeAnnotation`, `DifferentiableTypeDictionaryItem`) — all `(synthesized)` by IR passes (notably the differentiation pipeline). | Not reachable via any allowed test directive. |
+| [#caststoragetological](../../../docs/llm-generated/ir-reference/misc.md#caststoragetological) | link-stage-only | **Storage-type legalization casts** (`CastStorageToLogical`, `CastStorageToLogicalDeref`, `MakeStorageTypeLoweringConfig`, `CastUInt64ToDescriptorHandle`, `CastDescriptorHandleToUInt64`, `CastDescriptorHandleToResource`, `CastResourceToDescriptorHandle`, `TreatAsDynamicUniform`, `GetLegalizedSPIRVGlobalParamAddr`) — all `(synthesized)` by `slang-ir-lower-buffer-element-type.cpp` after LOWER-TO-IR. | Not reachable via any allowed test directive. |
+| [#each](../../../docs/llm-generated/ir-reference/misc.md#each) | link-stage-only | **Pack and expansion (remainder)** (`Each`, `MakeWitnessPack`, `makeValuePack`, `PackBranch`, `ExtractFirstFromPack`, `ExtractLastFromPack`, `TrimFirstOfPack`, `TrimLastOfPack`, `ShapeConcat`, `ShapePermute`, `ShapeSwap`, `ShapeReduce`, `NonEmptyPackWitness`) — all `(synthesized)` per the doc; introduced by the variadic-generic specialization pass after LOWER-TO-IR. | Not reachable via any allowed test directive. |
+| [#liverangestart](../../../docs/llm-generated/ir-reference/misc.md#liverangestart) | link-stage-only | **Liveness markers** (`liveRangeStart`, `liveRangeEnd`) — `(synthesized)` by `slang-ir-liveness.cpp`. | Not reachable via any allowed test directive. |
 
 ## How to regenerate
 

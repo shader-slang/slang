@@ -93,7 +93,7 @@ additional anchors of those same claims, not new ones.
 | [#special-case-lexing-rules](../../../docs/llm-generated/syntax-reference/tokens.md#special-case-lexing-rules) | missing-example | The interaction of `\<newline>` continuation with line comments (the comment swallows the next physical line because continuations are folded before comment recognition) is implied by the "consumed and folded out" wording in `#special-case-lexing-rules` but not stated explicitly. | A worked example in the doc would prevent a confusing-looking but correct behavior from surprising readers. |
 | [#diagnostics](../../../docs/llm-generated/syntax-reference/tokens.md#diagnostics) | undocumented-behavior | Documented diagnostics (`integer literal is too large to be represented in any integer type`, `invalid suffix on integer literal`, `illegal character literal`) have no explicit error codes / messages listed in `tokens.md`. The negative tests in this pass copy the diagnostic text verbatim from the compiler; promoting them to a "Diagnostics" subsection in the doc would let future authors anchor by claim ID rather than by free text. |  |
 
-## Out of scope (no-GPU runner)
+## Out of scope
 
-None for this bundle. Lexer-level behaviors are fully observable
-through `slangi`.
+(none)
+

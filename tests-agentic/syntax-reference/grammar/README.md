@@ -82,9 +82,7 @@ grammar names, and in what shape they parse.
 | [#expressions](../../../docs/llm-generated/syntax-reference/grammar.md#expressions) | undocumented-behavior | The `## Expressions` section lists `AtomExpr ::= ... \| '(' Expr (',' Expr)+ ')' -- tuple` but in practice this surface is parsed as comma-operator expressions, not a tuple literal. The actual user-facing tuple construction uses `makeTuple(...)` or an explicit `Tuple<...>` type. | The doc should either narrow the production (e.g. "only after a tuple-typed binding context") or remove the standalone tuple-atom form. |
 | [#types](../../../docs/llm-generated/syntax-reference/grammar.md#types) | undocumented-behavior | The `## Types` section lists pointer (`Type '*'`), optional (`Type '?'`), reference (`Type '&'`), and function-type spellings with the caveat "where supported", but does not say which Slang contexts permit each. Anchoring a positive test for those forms would require the doc to enumerate the supported positions. |  |
 
-## Out of scope (no-GPU runner)
+## Out of scope
 
-None: grammar-stage claims are observed via parse + INTERPRET, no
-GPU runtime required. `attribute-bracket-form.slang` uses
-`-target hlsl` text emit only to keep the entry-point attribute in
-the source where the parser must consume it; no GPU is involved.
+(none)
+

@@ -82,16 +82,23 @@ cross-target behavior.
 | [#capability-system](../../../docs/llm-generated/cross-cutting/targets.md#capability-system) | undocumented-behavior | The `-restrictive-capability-check` flag is exercised by tests but not named in `## Capability system`; only the "Computing the join" bullet under Runtime representation hints at its role. |  |
 | (unspecified) | undocumented-behavior | Per-target stage rejection (e.g. fragment-on-cuda) is not robust: one observed shape produced a SIGSEGV rather than a clean diagnostic. | The doc should state which stage × target pairs are rejected at check time vs. accepted vs. unsupported. |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-- DXIL binary emission (needs `dxc.exe`).
-- MSL binary emission (needs Apple toolchain).
-- WebGPU runtime tests.
-- LLVM-native binary emission.
-- Slang round-trip (`-target slang`).
-- VM byte-code target (`-target hostvm`).
-- Torch glue / `slang-python` bindings.
-- Any test that needs runtime device enumeration.
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| (unspecified) | gpu-dxc-dxil | DXIL binary emission (needs `dxc.exe`). | Agent runtime has no GPU; CI / local machine does. |
+| (unspecified) | gpu-metal-toolchain | MSL binary emission (needs Apple toolchain). | Agent runtime has no GPU; CI / local machine does. |
+
+## Out of scope
+
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| (unspecified) | (unclassified) | WebGPU runtime tests. | Not reachable via any allowed test directive. |
+| (unspecified) | (unclassified) | LLVM-native binary emission. | Not reachable via any allowed test directive. |
+| (unspecified) | (unclassified) | Slang round-trip (`-target slang`). | Not reachable via any allowed test directive. |
+| (unspecified) | (unclassified) | VM byte-code target (`-target hostvm`). | Not reachable via any allowed test directive. |
+| (unspecified) | (unclassified) | Any test that needs runtime device enumeration. | Not reachable via any allowed test directive. |
+| [#slang-python](../../../docs/llm-generated/cross-cutting/targets.md#slang-python) | (unclassified) | Torch glue / `slang-python` bindings. | Not reachable via any allowed test directive. |
 
 ## Framework feedback for \_common.md
 

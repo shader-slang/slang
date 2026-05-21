@@ -71,7 +71,7 @@ neighbouring messages the doc does not promise.
 | [#ast-data-model](../../../docs/llm-generated/pipeline/02-parse-ast.md#ast-data-model) | undocumented-behavior | `## AST data model` describes `ASTBuilder` ownership and hash- consing of types, but neither has a slangc/slangi-observable surface (hash-consing identity is hidden by the IR / emit pipelines). Recorded as architecture-only, not testable here. |  |
 | [#function-and-method-bodies-are-still-unparsed-at-this-stage](../../../docs/llm-generated/pipeline/02-parse-ast.md#function-and-method-bodies-are-still-unparsed-at-this-stage) | undocumented-behavior | The pure-decl-stage observable that the doc calls out — "Function and method bodies are still unparsed at this stage" — is hard to pin without IR-dump inspection that the agentic suite explicitly excludes (and the doc does not promise any user-visible diagnostic for it). The bundle's `function-body-deferred-to-check-stage.slang` and `body-forward-references-outer-decl.slang` cover the consequence; the cleanest direct test would need a doc-promised observable for "this body has not been parsed yet". |  |
 
-## Out of scope (no-GPU runner)
+## Out of scope
 
-None for this bundle. All parse-stage claims are fully observable
-through `slangi` or via diagnostic-only tests.
+(none)
+

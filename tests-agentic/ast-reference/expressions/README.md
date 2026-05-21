@@ -194,96 +194,38 @@ single capture, and a curried lambda-inside-lambda.
 
 ## Out of scope
 
-(In this bundle, `## Out of scope` covers AST nodes that are
-checker-synthesized or parser-internal and therefore have no
-user-written spelling we can target through `slangc`. It is not a
-GPU-runner exclusion.)
-
-### Synthesized / non-user-spellable Expr nodes
-
-- `IncompleteExpr` — parser placeholder created after a syntax
-  error; the doc says it "could not be filled".
-- `MakeArrayFromElementExpr` — checker-synthesized; no user
-  spelling.
-- `GetArrayLengthExpr` — checker-synthesized for array-length
-  queries; the surface (`array.getLength()` on dynamic arrays /
-  buffers) does not work for static arrays in the interpreter, so
-  we did not anchor a portable test.
-- `AggTypeCtorExpr` — used internally during checking; no user
-  spelling.
-- `OverloadedExpr` / `OverloadedExpr2` — intermediate nodes that
-  the doc explicitly says "never survives into the IR". Their
-  effects are observable only via the diagnostic when overload
-  resolution fails (covered by `no-applicable-overload-rejected.slang`).
-- `ImplicitCastExpr`, `LValueImplicitCastExpr`, `OutImplicitCastExpr`,
-  `InOutImplicitCastExpr`, `BuiltinCastExpr` — checker-inserted
-  casts; their existence is observable only as "the conversion
-  happened", which is what `cast-to-supertype-implicit.slang` and
-  `explicit-cast-int-to-float.slang` verify implicitly.
-- `MakeRefExpr`, `OpenRefExpr` — checker-synthesized
-  l-value-to-reference conversions; no user spelling.
-- `ExtractExistentialValueExpr` — checker-synthesized; no user
-  spelling.
-- `MakeOptionalExpr` — checker-synthesized; the user surface is
-  the `Optional<T> = ...` initializer, covered by
-  `make-optional-some-and-none.slang`.
-- `ModifierCastExpr` — same-type cast with different modifiers;
-  no user spelling.
-- `ReturnValExpr` — implicit `__return_val` reference for
-  non-copyable returns; no user spelling.
-- `FloatBitCastExpr` — surface is `__floatAsInt` / similar builtins;
-  the doc points at the intrinsic name, but the AST node is
-  populated by the checker, not parsed directly.
-- `FuncAsTypeExpr` / `FuncTypeOfExpr` — checker-internal
-  function-type machinery; no surface.
-- `SharedTypeExpr` — re-used type-expression node; no surface.
-- `PackExpr` — internal bundle of pack arguments built during
-  overload resolution; no surface.
-- `ExpandExpr` / `EachExpr` — pack-expansion surface (`expand E`
-  / `each E`) belongs to the variadic-generics feature whose
-  observable claims are owned by a dedicated bundle
-  (`language-feature/generics-and-packs`, when written), not by
-  this AST-node bundle.
-- `FirstExpr` / `LastExpr` / `TrimFirstExpr` / `TrimLastExpr` —
-  pack-query expressions; same as above.
-- `ShapeConcatExpr` / `ShapePermuteExpr` / `ShapeSwapExpr` /
-  `ShapeReduceExpr` — shape-pack transformations belonging to the
-  shape-pack feature; same reasoning.
-- `SPIRVAsmExpr` — inline-SPIRV-assembly sub-language; out of
-  scope for this AST-node bundle.
-- `PrimalSubstituteExpr` — autodiff selector akin to
-  `__fwd_diff` / `__bwd_diff`; the doc hands off to
-  `pipeline/05-ir-passes.md` for the autodiff machinery, and the
-  user surface is not minimally documented here.
-- `DispatchKernelExpr` — host-side dispatch primitive; doc surface
-  is too thin (see "Doc gaps").
-- `TreatAsDifferentiableExpr` / `DetachExpr` — autodiff annotation
-  surfaces (`no_diff`, `__detach`-style); belong to an autodiff
-  feature bundle.
-- `LetExpr` — `let x = ...; body` expression form; the doc lists
-  it but the surface usage in Slang programs is rare and not
-  exercised by existing tests; we deferred to keep this bundle
-  focused on the more common nodes.
-- `NewExpr` — `new T(...)` allocation; not portable across
-  targets / CPU interpreter without a known allocator surface; we
-  did not include a test.
-- `AddressOfExpr` — `&e` where supported; depends on a pointer
-  feature gate; not portably exercisable through `slangi`.
-- `MatrixSwizzleExpr` — `m._m00_m11` matrix swizzle surface; not
-  exercised in this bundle (the vector swizzle case carries the
-  same "swizzle observable" claim).
-- `DerefMemberExpr` — `a->b` pointer member access; depends on the
-  pointer feature, not portably available through `slangi`.
-- `FuncTypeExpr` (`(T1, T2) -> R`) and `PointerTypeExpr` (`T*`)
-  type-expression surfaces — accepted by the parser but the
-  observable usage requires the function-type / pointer feature
-  gate; not exercised here.
-
-### Internal AST machinery
-
-- The `originalFunctionExpr` field on `AppExprBase`.
-- That `IncompleteExpr` is what a parse error leaves in place.
-- The `argumentDelimeterLocs` field on `InvokeExpr`.
-- Helper data types declared in `slang-ast-expr.h`:
-  `SPIRVAsmOperand`, `SPIRVAsmInst`, `MatrixCoord`.
-- The FIDDLE-generated `ASTNodeType` tag for each expression class.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#addressofexpr](../../../docs/llm-generated/ast-reference/expressions.md#addressofexpr) | (unclassified) | `AddressOfExpr` — `&e` where supported; depends on a pointer feature gate; not portably exercisable through `slangi`. | Not reachable via any allowed test directive. |
+| [#aggtypectorexpr](../../../docs/llm-generated/ast-reference/expressions.md#aggtypectorexpr) | (unclassified) | `AggTypeCtorExpr` — used internally during checking; no user spelling. | Not reachable via any allowed test directive. |
+| [#argumentdelimeterlocs](../../../docs/llm-generated/ast-reference/expressions.md#argumentdelimeterlocs) | (unclassified) | The `argumentDelimeterLocs` field on `InvokeExpr`. | Not reachable via any allowed test directive. |
+| [#astnodetype](../../../docs/llm-generated/ast-reference/expressions.md#astnodetype) | (unclassified) | The FIDDLE-generated `ASTNodeType` tag for each expression class. | Not reachable via any allowed test directive. |
+| [#derefmemberexpr](../../../docs/llm-generated/ast-reference/expressions.md#derefmemberexpr) | (unclassified) | `DerefMemberExpr` — `a->b` pointer member access; depends on the pointer feature, not portably available through `slangi`. | Not reachable via any allowed test directive. |
+| [#dispatchkernelexpr](../../../docs/llm-generated/ast-reference/expressions.md#dispatchkernelexpr) | (unclassified) | `DispatchKernelExpr` — host-side dispatch primitive; doc surface is too thin (see "Doc gaps"). | Not reachable via any allowed test directive. |
+| [#expandexpr](../../../docs/llm-generated/ast-reference/expressions.md#expandexpr) | (unclassified) | `ExpandExpr` / `EachExpr` — pack-expansion surface (`expand E` / `each E`) belongs to the variadic-generics feature whose observable claims are owned by a dedicated bundle (`language-feature/generics-and-packs`, when written), not by this AST-node bundle. | Not reachable via any allowed test directive. |
+| [#extractexistentialvalueexpr](../../../docs/llm-generated/ast-reference/expressions.md#extractexistentialvalueexpr) | (unclassified) | `ExtractExistentialValueExpr` — checker-synthesized; no user spelling. | Not reachable via any allowed test directive. |
+| [#firstexpr](../../../docs/llm-generated/ast-reference/expressions.md#firstexpr) | (unclassified) | `FirstExpr` / `LastExpr` / `TrimFirstExpr` / `TrimLastExpr` — pack-query expressions; same as above. | Not reachable via any allowed test directive. |
+| [#floatbitcastexpr](../../../docs/llm-generated/ast-reference/expressions.md#floatbitcastexpr) | (unclassified) | `FloatBitCastExpr` — surface is `__floatAsInt` / similar builtins; the doc points at the intrinsic name, but the AST node is populated by the checker, not parsed directly. | Not reachable via any allowed test directive. |
+| [#funcastypeexpr](../../../docs/llm-generated/ast-reference/expressions.md#funcastypeexpr) | (unclassified) | `FuncAsTypeExpr` / `FuncTypeOfExpr` — checker-internal function-type machinery; no surface. | Not reachable via any allowed test directive. |
+| [#functypeexpr](../../../docs/llm-generated/ast-reference/expressions.md#functypeexpr) | (unclassified) | `FuncTypeExpr` (`(T1, T2) -> R`) and `PointerTypeExpr` (`T*`) type-expression surfaces — accepted by the parser but the observable usage requires the function-type / pointer feature gate; not exercised here. | Not reachable via any allowed test directive. |
+| [#getarraylengthexpr](../../../docs/llm-generated/ast-reference/expressions.md#getarraylengthexpr) | (unclassified) | `GetArrayLengthExpr` — checker-synthesized for array-length queries; the surface (`array.getLength()` on dynamic arrays / buffers) does not work for static arrays in the interpreter, so we did not anchor a portable test. | Not reachable via any allowed test directive. |
+| [#implicitcastexpr](../../../docs/llm-generated/ast-reference/expressions.md#implicitcastexpr) | (unclassified) | `ImplicitCastExpr`, `LValueImplicitCastExpr`, `OutImplicitCastExpr`, `InOutImplicitCastExpr`, `BuiltinCastExpr` — checker-inserted casts; their existence is observable only as "the conversion happened", which is what `cast-to-supertype-implicit.slang` and `explicit-cast-int-to-float.slang` verify implicitly. | Not reachable via any allowed test directive. |
+| [#incompleteexpr](../../../docs/llm-generated/ast-reference/expressions.md#incompleteexpr) | (unclassified) | `IncompleteExpr` — parser placeholder created after a syntax error; the doc says it "could not be filled". | Not reachable via any allowed test directive. |
+| [#incompleteexpr](../../../docs/llm-generated/ast-reference/expressions.md#incompleteexpr) | (unclassified) | That `IncompleteExpr` is what a parse error leaves in place. | Not reachable via any allowed test directive. |
+| [#letexpr](../../../docs/llm-generated/ast-reference/expressions.md#letexpr) | (unclassified) | `LetExpr` — `let x = ...; body` expression form; the doc lists it but the surface usage in Slang programs is rare and not exercised by existing tests; we deferred to keep this bundle focused on the more common nodes. | Not reachable via any allowed test directive. |
+| [#makearrayfromelementexpr](../../../docs/llm-generated/ast-reference/expressions.md#makearrayfromelementexpr) | (unclassified) | `MakeArrayFromElementExpr` — checker-synthesized; no user spelling. | Not reachable via any allowed test directive. |
+| [#makeoptionalexpr](../../../docs/llm-generated/ast-reference/expressions.md#makeoptionalexpr) | (unclassified) | `MakeOptionalExpr` — checker-synthesized; the user surface is the `Optional<T> = ...` initializer, covered by `make-optional-some-and-none.slang`. | Not reachable via any allowed test directive. |
+| [#makerefexpr](../../../docs/llm-generated/ast-reference/expressions.md#makerefexpr) | (unclassified) | `MakeRefExpr`, `OpenRefExpr` — checker-synthesized l-value-to-reference conversions; no user spelling. | Not reachable via any allowed test directive. |
+| [#matrixswizzleexpr](../../../docs/llm-generated/ast-reference/expressions.md#matrixswizzleexpr) | (unclassified) | `MatrixSwizzleExpr` — `m._m00_m11` matrix swizzle surface; not exercised in this bundle (the vector swizzle case carries the same "swizzle observable" claim). | Not reachable via any allowed test directive. |
+| [#modifiercastexpr](../../../docs/llm-generated/ast-reference/expressions.md#modifiercastexpr) | (unclassified) | `ModifierCastExpr` — same-type cast with different modifiers; no user spelling. | Not reachable via any allowed test directive. |
+| [#newexpr](../../../docs/llm-generated/ast-reference/expressions.md#newexpr) | (unclassified) | `NewExpr` — `new T(...)` allocation; not portable across targets / CPU interpreter without a known allocator surface; we did not include a test. | Not reachable via any allowed test directive. |
+| [#originalfunctionexpr](../../../docs/llm-generated/ast-reference/expressions.md#originalfunctionexpr) | (unclassified) | The `originalFunctionExpr` field on `AppExprBase`. | Not reachable via any allowed test directive. |
+| [#overloadedexpr](../../../docs/llm-generated/ast-reference/expressions.md#overloadedexpr) | (unclassified) | `OverloadedExpr` / `OverloadedExpr2` — intermediate nodes that the doc explicitly says "never survives into the IR". Their effects are observable only via the diagnostic when overload resolution fails (covered by `no-applicable-overload-rejected.slang`). | Not reachable via any allowed test directive. |
+| [#packexpr](../../../docs/llm-generated/ast-reference/expressions.md#packexpr) | (unclassified) | `PackExpr` — internal bundle of pack arguments built during overload resolution; no surface. | Not reachable via any allowed test directive. |
+| [#primalsubstituteexpr](../../../docs/llm-generated/ast-reference/expressions.md#primalsubstituteexpr) | (unclassified) | `PrimalSubstituteExpr` — autodiff selector akin to `__fwd_diff` / `__bwd_diff`; the doc hands off to `pipeline/05-ir-passes.md` for the autodiff machinery, and the user surface is not minimally documented here. | Not reachable via any allowed test directive. |
+| [#returnvalexpr](../../../docs/llm-generated/ast-reference/expressions.md#returnvalexpr) | (unclassified) | `ReturnValExpr` — implicit `__return_val` reference for non-copyable returns; no user spelling. | Not reachable via any allowed test directive. |
+| [#shapeconcatexpr](../../../docs/llm-generated/ast-reference/expressions.md#shapeconcatexpr) | (unclassified) | `ShapeConcatExpr` / `ShapePermuteExpr` / `ShapeSwapExpr` / `ShapeReduceExpr` — shape-pack transformations belonging to the shape-pack feature; same reasoning. | Not reachable via any allowed test directive. |
+| [#sharedtypeexpr](../../../docs/llm-generated/ast-reference/expressions.md#sharedtypeexpr) | (unclassified) | `SharedTypeExpr` — re-used type-expression node; no surface. | Not reachable via any allowed test directive. |
+| [#spirvasmexpr](../../../docs/llm-generated/ast-reference/expressions.md#spirvasmexpr) | (unclassified) | `SPIRVAsmExpr` — inline-SPIRV-assembly sub-language; out of scope for this AST-node bundle. | Not reachable via any allowed test directive. |
+| [#spirvasmoperand](../../../docs/llm-generated/ast-reference/expressions.md#spirvasmoperand) | (unclassified) | Helper data types declared in `slang-ast-expr.h`: `SPIRVAsmOperand`, `SPIRVAsmInst`, `MatrixCoord`. | Not reachable via any allowed test directive. |
+| [#treatasdifferentiableexpr](../../../docs/llm-generated/ast-reference/expressions.md#treatasdifferentiableexpr) | (unclassified) | `TreatAsDifferentiableExpr` / `DetachExpr` — autodiff annotation surfaces (`no_diff`, `__detach`-style); belong to an autodiff feature bundle. | Not reachable via any allowed test directive. |

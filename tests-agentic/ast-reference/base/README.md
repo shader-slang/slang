@@ -63,35 +63,16 @@ that does not link against the C++ AST headers.
 | [#declcheckstate](../../../docs/llm-generated/ast-reference/base.md#declcheckstate) | undocumented-behavior | The doc mentions `Decl::checkState` (which checking phases have completed) without stating any externally-observable consequence of `checkState`. The phased-check sequencing is described in `pipeline/03-semantic-check.md`; the cross-reference is implicit. |  |
 | (unspecified) | undocumented-behavior | The doc lists `Modifier::keywordName: Name*` but does not name a user-facing consequence of the keyword name beyond appearing in diagnostics. The diagnostic-text dependency is implicit and worth a one-line note. |  |
 
-## Out of scope (no-GPU runner)
+## Out of scope
 
-(In this bundle the section heading is used for "claims unobservable
-through any allowed test directive", not literally GPU-bound claims.
-The doc is overwhelmingly about internal compiler structure.)
-
-- `NodeBase::astNodeType` discriminator tag — set internally by
-  `ASTBuilder`; no test directive surfaces it.
-- `NodeBase::_astBuilder` back-pointer — private field; not
-  observable.
-- `as<T>()` / `dynamicCast<T>()` dispatch on AST nodes — internal
-  C++ API.
-- `Val::m_operands` generic operand list — internal layout.
-- `Type::m_astBuilderForReflection` — reflection-only field; not
-  reachable through `slangc` text output we can FileCheck without
-  GPU-bound runtime APIs.
-- `SyntaxClass<T>` reflection handle — internal C++ type.
-- `Scope` as a `NodeBase` — runtime name-lookup data structure,
-  not a parsed AST node.
-- The catalog of support types
-  (`DeclRef<T>`, `Modifiers`, `QualType`, `SubstitutionSet`,
-  `LookupResult`, `LookupResultItem`, `TypeExp`, `WitnessTable`):
-  these are non-node helper types described in
-  `slang-ast-support-types.h`. Their effects bleed through into
-  other observables (a `QualType` is what an `Expr::type` field
-  carries; a `WitnessTable` participates in interface dispatch),
-  but the support types themselves are not surface-visible. The
-  family-page bundles (`ast-reference/values`,
-  `ast-reference/types`, …) are the better home for any tests that
-  do exist; this base bundle deliberately defers.
-- The FIDDLE-generated `ASTNodeType` enum and its stable-tag
-  guarantee — a build-system invariant, not a `slangc` behavior.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| (unspecified) | (unclassified) | `NodeBase::_astBuilder` back-pointer — private field; not observable. | Not reachable via any allowed test directive. |
+| (unspecified) | (unclassified) | `Val::m_operands` generic operand list — internal layout. | Not reachable via any allowed test directive. |
+| [#astbuilder](../../../docs/llm-generated/ast-reference/base.md#astbuilder) | (unclassified) | `NodeBase::astNodeType` discriminator tag — set internally by `ASTBuilder`; no test directive surfaces it. | Not reachable via any allowed test directive. |
+| [#astnodetype](../../../docs/llm-generated/ast-reference/base.md#astnodetype) | (unclassified) | The FIDDLE-generated `ASTNodeType` enum and its stable-tag guarantee — a build-system invariant, not a `slangc` behavior. | Not reachable via any allowed test directive. |
+| [#modifiers](../../../docs/llm-generated/ast-reference/base.md#modifiers) | (unclassified) | The catalog of support types (`DeclRef<T>`, `Modifiers`, `QualType`, `SubstitutionSet`, `LookupResult`, `LookupResultItem`, `TypeExp`, `WitnessTable`): these are non-node helper types described in `slang-ast-support-types.h`. Their effects bleed through into other observables (a `QualType` is what an `Expr::type` field carries; a `WitnessTable` participates in interface dispatch), but the support types themselves are not surface-visible. The family-page bundles (`ast-reference/values`, `ast-reference/types`, …) are the better home for any tests that do exist; this base bundle deliberately defers. | Not reachable via any allowed test directive. |
+| [#scope](../../../docs/llm-generated/ast-reference/base.md#scope) | (unclassified) | `Scope` as a `NodeBase` — runtime name-lookup data structure, not a parsed AST node. | Not reachable via any allowed test directive. |
+| [#slangc](../../../docs/llm-generated/ast-reference/base.md#slangc) | (unclassified) | `Type::m_astBuilderForReflection` — reflection-only field; not reachable through `slangc` text output we can FileCheck without GPU-bound runtime APIs. | Not reachable via any allowed test directive. |
+| (unspecified) | api-only | `as<T>()` / `dynamicCast<T>()` dispatch on AST nodes — internal C++ API. | Not reachable via any allowed test directive. |
+| (unspecified) | api-only | `SyntaxClass<T>` reflection handle — internal C++ type. | Not reachable via any allowed test directive. |

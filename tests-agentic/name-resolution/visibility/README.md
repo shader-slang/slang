@@ -68,19 +68,10 @@ single file with the agentic runner and is captured under
 | [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/visibility.md#edge-cases-and-failure-modes) | undocumented-behavior | The "Edge cases and failure modes" section lists `invalid-use-of-private-visibility` as firing for "a top-level decl … marked `private`," but the same diagnostic also fires for interface requirements (see `private-interface-requirement-rejected.slang`). A second bullet enumerating the interface-requirement case would make the failure-mode list complete. |  |
 | [#defaults-by-language-version](../../../docs/llm-generated/name-resolution/visibility.md#defaults-by-language-version) | undocumented-behavior | "Defaults by language version" describes the legacy-language default of `public` for unannotated decls, but does not surface a single-file way to observe that default. Today the default is only observable across `import` boundaries between modules of different language versions, which the single-file agentic runner cannot express. |  |
 
-## Out of scope (single-file runner)
+## Out of scope
 
-- Cross-module `import`-time visibility: confirming that an
-  `internal` decl in module A is invisible from a separate module
-  B's importing scope (the `getModuleDecl(decl) == getModuleDecl(scope)`
-  branch of `isDeclVisibleFromScope`). This requires two
-  separately-compiled translation units that the single-file
-  agentic tests cannot host. Coverage exists in
-  `tests/diagnostics/extension-visibility*.slang`.
-- Legacy-language-default (`SLANG_LANGUAGE_VERSION_LEGACY`)
-  `public` behaviour. Observing the default's effect requires a
-  modern-language consumer importing a legacy module; same
-  multi-file limitation.
-- Language-server-mode "return unfiltered result" behaviour from
-  `filterLookupResultByVisibilityAndDiagnose`. The agentic runner
-  exercises `slangc` / `slangi`, not the LSP code path.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#filterlookupresultbyvisibilityanddiagnose](../../../docs/llm-generated/name-resolution/visibility.md#filterlookupresultbyvisibilityanddiagnose) | (unclassified) | Language-server-mode "return unfiltered result" behaviour from `filterLookupResultByVisibilityAndDiagnose`. The agentic runner exercises `slangc` / `slangi`, not the LSP code path. | Not reachable via any allowed test directive. |
+| [#import](../../../docs/llm-generated/name-resolution/visibility.md#import) | (unclassified) | Cross-module `import`-time visibility: confirming that an `internal` decl in module A is invisible from a separate module B's importing scope (the `getModuleDecl(decl) == getModuleDecl(scope)` branch of `isDeclVisibleFromScope`). This requires two separately-compiled translation units that the single-file agentic tests cannot host. Coverage exists in `tests/diagnostics/extension-visibility*.slang`. | Not reachable via any allowed test directive. |
+| [#slanglanguageversionlegacy](../../../docs/llm-generated/name-resolution/visibility.md#slanglanguageversionlegacy) | (unclassified) | Legacy-language-default (`SLANG_LANGUAGE_VERSION_LEGACY`) `public` behaviour. Observing the default's effect requires a modern-language consumer importing a legacy module; same multi-file limitation. | Not reachable via any allowed test directive. |

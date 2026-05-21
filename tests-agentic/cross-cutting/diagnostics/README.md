@@ -100,8 +100,7 @@ no multi-backend matrix is needed.
 | [#pragma](../../../docs/llm-generated/cross-cutting/diagnostics.md#pragma) | undocumented-behavior | The doc describes the `#pragma warning` overrides but does not enumerate the legal specifier set (`push`, `pop`, `disable`, `error`, `default`, `suppress`). The `pragma-warning-unknown- specifier-warns.slang` boundary test pins one rejected specifier; the doc could list the accepted set explicitly to pair with the rejection diagnostic. |  |
 | [#rendered-with-their-expansion-stack](../../../docs/llm-generated/cross-cutting/diagnostics.md#rendered-with-their-expansion-stack) | undocumented-behavior | The doc claims macro-expanded locations are "rendered with their expansion stack" but does not describe what an end-of-file-during-conditional diagnostic chain looks like (primary + companion `see 'if' directive` note). The boundary test `error-code-end-of-file-in-conditional.slang` exercises this chain; the doc could add a small example of the multi- record rendering. |  |
 
-## Out of scope (no-GPU runner)
+## Out of scope
 
-None for this bundle. Diagnostic-system behaviors are fully
-observable on the CPU runner via `DIAGNOSTIC_TEST` and
-`//TEST:SIMPLE` directives over text targets.
+(none)
+

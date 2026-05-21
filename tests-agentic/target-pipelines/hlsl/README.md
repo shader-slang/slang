@@ -203,52 +203,24 @@ specifically about HLSL being non-Khronos.
 | [#hlsl-has-no-iterative-passes-in-linkandoptimizeir](../../../docs/llm-generated/target-pipelines/hlsl.md#hlsl-has-no-iterative-passes-in-linkandoptimizeir) | undocumented-behavior | The doc states "HLSL has no iterative passes in `linkAndOptimizeIR`" but the consequence ("no extra simplification loop in the pass log") is not observable through `slangc -target hlsl` text. No test. |  |
 | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools) | undocumented-behavior | The doc's Phase D table mentions `HLSLSourceEmitter` walks the IR and writes HLSL text, but does not enumerate which texture variants survive (`Texture1D`, `Texture2DArray`, `TextureCubeArray`, `Texture2DMS<T,N>`, `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `SamplerComparisonState`) nor the canonical method spellings (`Sample`, `SampleLevel`, `SampleGrad`, `Load`, `GatherRed`/`GatherGreen`/`GatherBlue`/`GatherAlpha`, `SampleCmp`, `SampleCmpLevelZero`). | A one-line statement that each Slang texture/sampler variant emits as the same HLSL native type name with the matching `register(t\|u\|s)` class would let tests anchor more precisely than the general `#phase-d-hlsl-emit-and-downstream-tools` section. |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-- **DXC / fxc invocation** and **DXIL / DXBytecode** output
-  (`#downstream-dxc-fxc`). Requires a DXC binary; not invoked
-  by `-target hlsl`.
-- **`legalizeEmptyRayPayloadsForHLSL`** and
-  **`legalizeNonStructParameterToStructForHLSL`**
-  (`#legalizeemptyraypayloadsforhlsl`,
-  `#legalizenonstructparametertostructforhlsl`). Both require
-  DXR (`closesthit` / `anyhit` / `miss`) entry points; the
-  no-GPU compute runner does not exercise DXR.
-- **`legalizeUniformBufferLoad`**
-  (`#legalizeuniformbufferload`). The doc anchors it as an
-  IR-level canonicalization without naming an emit marker.
-- **`legalizeMeshOutputTypes`**. Requires mesh-shader
-  entry points.
-- **`invertYOfPositionOutput` / `rcpWOfPositionInput`**.
-  Requires Vulkan-cross-API option flags
-  (`VulkanInvertY` / `VulkanUseDxPositionW`); orthogonal to
-  a compute-stage HLSL target.
-- **`collectCooperativeMetadata`**. Requires the
-  `cooperative_matrix` / `cooperative_vector` capability set.
-- **`profile.getVersion() <= DX_5_0` byte-address-buffer
-  flag** (`#legalizebyteaddressbufferops-for-hlsl`). Setting
-  `useBitCastFromUInt=true` requires `-profile sm_5_0`,
-  which routes through fxc — out of scope.
-- **`floatNonUniformResourceIndex`**. The
-  `NonUniformResourceIndex(...)` intrinsic is a
-  bindless-resource feature whose natural source surface
-  is a graphics pipeline.
-- **`coverageTracing`-gated passes**
-  (`instrumentCoverage`,
-  `finalizeCoverageInstrumentationMetadata`). Coverage
-  instrumentation is a debugging flag, not user-observable
-  through text emit.
-- **`autodiff` / `higherOrderFunc` passes**
-  (`checkAutodiffPatterns`,
-  `specializeHigherOrderParameters`,
-  `finalizeAutoDiffPass`, etc.). The doc anchors them to
-  Phase B but the emit-stage observable is a downstream
-  language feature; covered by other bundles.
-- **`dynamicResourceHeap`**. Requires the SM 6.6 dynamic
-  resource heap setup.
-- **Pass-ordering claims** (Phase A passes 1-20, Phase B
-  passes 1-63, Phase C passes 1-31). The doc enumerates the
-  ordered list; pass _existence_ is observable through emit
-  side effects, but pass _ordering_ would require
-  `-dump-ir` cross-pass comparison without doc-anchored
-  ordering markers. Covered by `pipeline/05-ir-passes`.
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#floatnonuniformresourceindex](../../../docs/llm-generated/target-pipelines/hlsl.md#floatnonuniformresourceindex) | gpu-bindless | **`floatNonUniformResourceIndex`**. The `NonUniformResourceIndex(...)` intrinsic is a bindless-resource feature whose natural source surface is a graphics pipeline. | Agent runtime has no GPU; CI / local machine does. |
+| [#invertyofpositionoutput](../../../docs/llm-generated/target-pipelines/hlsl.md#invertyofpositionoutput) | gpu-cross-api-flag | **`invertYOfPositionOutput` / `rcpWOfPositionInput`**. | Requires Vulkan-cross-API option flags (`VulkanInvertY` / `VulkanUseDxPositionW`); orthogonal to a compute-stage HLSL target. |
+| [#downstream-dxc-fxc](../../../docs/llm-generated/target-pipelines/hlsl.md#downstream-dxc-fxc) | gpu-dxc-dxil | **DXC / fxc invocation** and **DXIL / DXBytecode** output (`#downstream-dxc-fxc`). | Requires a DXC binary; not invoked by `-target hlsl`. |
+| [#legalizebyteaddressbufferops-for-hlsl](../../../docs/llm-generated/target-pipelines/hlsl.md#legalizebyteaddressbufferops-for-hlsl) | gpu-dxc-dxil | **`profile.getVersion() <= DX_5_0` byte-address-buffer flag** (`#legalizebyteaddressbufferops-for-hlsl`). Setting `useBitCastFromUInt=true` requires `-profile sm_5_0`, which routes through fxc — out of scope. | Agent runtime has no GPU; CI / local machine does. |
+| [#legalizeemptyraypayloadsforhlsl](../../../docs/llm-generated/target-pipelines/hlsl.md#legalizeemptyraypayloadsforhlsl) | gpu-dxr | **`legalizeEmptyRayPayloadsForHLSL`** and **`legalizeNonStructParameterToStructForHLSL`** (`#legalizeemptyraypayloadsforhlsl`, `#legalizenonstructparametertostructforhlsl`). Both require DXR (`closesthit` / `anyhit` / `miss`) entry points; the no-GPU compute runner does not exercise DXR. | Agent runtime has no GPU; CI / local machine does. |
+| [#legalizemeshoutputtypes](../../../docs/llm-generated/target-pipelines/hlsl.md#legalizemeshoutputtypes) | gpu-mesh-shader | **`legalizeMeshOutputTypes`**. | Requires mesh-shader entry points. |
+| [#collectcooperativemetadata](../../../docs/llm-generated/target-pipelines/hlsl.md#collectcooperativemetadata) | gpu-vulkan-extension | **`collectCooperativeMetadata`**. | Requires the `cooperative_matrix` / `cooperative_vector` capability set. |
+
+## Out of scope
+
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#autodiff](../../../docs/llm-generated/target-pipelines/hlsl.md#autodiff) | (unclassified) | **`autodiff` / `higherOrderFunc` passes** (`checkAutodiffPatterns`, `specializeHigherOrderParameters`, `finalizeAutoDiffPass`, etc.). The doc anchors them to Phase B but the emit-stage observable is a downstream language feature; covered by other bundles. | Not reachable via any allowed test directive. |
+| [#coveragetracing](../../../docs/llm-generated/target-pipelines/hlsl.md#coveragetracing) | (unclassified) | **`coverageTracing`-gated passes** (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`). Coverage instrumentation is a debugging flag, not user-observable through text emit. | Not reachable via any allowed test directive. |
+| [#dynamicresourceheap](../../../docs/llm-generated/target-pipelines/hlsl.md#dynamicresourceheap) | (unclassified) | **`dynamicResourceHeap`**. | Requires the SM 6.6 dynamic resource heap setup. |
+| [#legalizeuniformbufferload](../../../docs/llm-generated/target-pipelines/hlsl.md#legalizeuniformbufferload) | (unclassified) | **`legalizeUniformBufferLoad`** (`#legalizeuniformbufferload`). The doc anchors it as an IR-level canonicalization without naming an emit marker. | Not reachable via any allowed test directive. |
+| (unspecified) | implementation-detail | **Pass-ordering claims** (Phase A passes 1-20, Phase B passes 1-63, Phase C passes 1-31). The doc enumerates the ordered list; pass _existence_ is observable through emit side effects, but pass _ordering_ would require `-dump-ir` cross-pass comparison without doc-anchored ordering markers. Covered by `pipeline/05-ir-passes`. | Not reachable via any allowed test directive. |

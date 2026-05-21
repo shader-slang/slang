@@ -91,74 +91,20 @@ This bundle is adjacent to:
 | Multiple varLayout opcodes coexist in one module: one for each uniform global, plus the EntryPointLayout's owned varLayouts. | functional | [#varlayout-and-entrypointlayout](../../../docs/llm-generated/ir-reference/metadata.md#varlayout-and-entrypointlayout) | [`varlayout-uniform-and-entry-point.slang`](varlayout-uniform-and-entry-point.slang) |
 | The layout pass synthesizes an EntryPointLayout opcode for each entry point; it owns a varLayout for the parameter group and a stage attribute. | functional | [#varlayout-and-entrypointlayout](../../../docs/llm-generated/ir-reference/metadata.md#varlayout-and-entrypointlayout) | [`entry-point-layout.slang`](entry-point-layout.slang) |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-The doc's tables list many opcodes whose AST origin is
-`(synthesized)` and whose surface conditions are too narrow or
-too target-specific to make stable per-opcode reference tests
-in this representative bundle:
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#snorm](../../../docs/llm-generated/ir-reference/metadata.md#snorm) | gpu-bindless | **Attr family — niche attrs**: `snorm` (mirror of `unorm`; same AST origin mechanism, one test is sufficient), `nonuniform` (the `NonuniformResourceIndex(...)` intrinsic lowers to a `nonUniformResourceIndex` *instruction* call, not the `nonuniform` Attr opcode, at the dump points observable here; the Attr surface is attached deeper in the pipeline), `Aligned` (synthesized; no stable AST surface observed), `MemoryScope` (synthesized on atomic/barrier operations after later passes), `caseLayout` (existential / enum-style layout; requires existential surface), `tupleFieldLayout` (tuple-layout-specific), `FuncThrowType` (synthesized — observed not to surface on `throws` functions in the dump points sampled by this bundle), `userSemantic` (the surface `: TEXCOORD0` lowers to `semantic("TEXCOORD0", ...)` decoration rather than to a separate `userSemantic` Attr opcode at the observation points sampled here). | Agent runtime has no GPU; CI / local machine does. |
+| [#streamoutputtypelayout](../../../docs/llm-generated/ir-reference/metadata.md#streamoutputtypelayout) | gpu-non-compute | **Layout family — niche layout kinds**: `streamOutputTypeLayout` (requires a geometry-shader stream-output entry-point), `existentialTypeLayout` (requires existential-typed values visible to layout), `tupleTypeLayout` (tuples are lowered before layout in normal Slang surface), `ptrTypeLayout` (requires explicit pointer-typed laid-out variables). Each is observable in principle with the right surface but requires pipeline-specific scaffolding distinct from the per-opcode reference goal. | Agent runtime has no GPU; CI / local machine does. |
 
-- **Layout family — niche layout kinds**: `streamOutputTypeLayout`
-  (requires a geometry-shader stream-output entry-point),
-  `existentialTypeLayout` (requires existential-typed values
-  visible to layout), `tupleTypeLayout` (tuples are lowered
-  before layout in normal Slang surface), `ptrTypeLayout`
-  (requires explicit pointer-typed laid-out variables). Each
-  is observable in principle with the right surface but
-  requires pipeline-specific scaffolding distinct from the
-  per-opcode reference goal.
+## Out of scope
 
-- **Attr family — niche attrs**: `snorm` (mirror of `unorm`;
-  same AST origin mechanism, one test is sufficient),
-  `nonuniform` (the `NonuniformResourceIndex(...)` intrinsic
-  lowers to a `nonUniformResourceIndex` *instruction* call,
-  not the `nonuniform` Attr opcode, at the dump points
-  observable here; the Attr surface is attached deeper in the
-  pipeline), `Aligned` (synthesized; no stable AST surface
-  observed), `MemoryScope` (synthesized on atomic/barrier
-  operations after later passes), `caseLayout` (existential
-  / enum-style layout; requires existential surface),
-  `tupleFieldLayout` (tuple-layout-specific), `FuncThrowType`
-  (synthesized — observed not to surface on `throws` functions
-  in the dump points sampled by this bundle), `userSemantic`
-  (the surface `: TEXCOORD0` lowers to `semantic("TEXCOORD0",
-  ...)` decoration rather than to a separate `userSemantic`
-  Attr opcode at the observation points sampled here).
-
-- **Debug-info family — niche debug opcodes**:
-  `DebugInlinedAt`, `DebugInlinedVariable` (require an actual
-  inlined call to be observable; would need a `[ForceInline]`
-  helper plus a non-trivial scope), `DebugScope`, `DebugNoScope`
-  (typically pinned to compound statements rather than top-level
-  insts and harder to anchor in a small test), `DebugBuildIdentifier`
-  (synthesized at SPIR-V emission with build-tooling-specific
-  contents and pollutes the test with non-deterministic strings),
-  `EmbeddedDownstreamIR` (requires a precompiled-library workflow,
-  which is out of scope).
-
-- **SPIRVAsmOperand opcode catalog**: the inline-asm operand
-  opcodes (`SPIRVAsmOperandLiteral`, `SPIRVAsmOperandInst`,
-  `SPIRVAsmOperandEnum`, `SPIRVAsmOperandBuiltinVar`,
-  `SPIRVAsmOperandGLSL450Set`, `SPIRVAsmOperandDebugPrintfSet`,
-  `SPIRVAsmOperandId`, `SPIRVAsmOperandResult`,
-  `SPIRVAsmOperandConvertTexel`,
-  `SPIRVAsmOperandRayPayloadFromLocation`,
-  `SPIRVAsmOperandRayAttributeFromLocation`,
-  `SPIRVAsmOperandRayCallableFromLocation`, `__truncate`,
-  `__entryPoint`, `__sampledType`, `__imageType`,
-  `__sampledImageType`) are typed operands of a
-  `SPIRVAsmInst`. The dump prints them inline as the
-  arguments of `SPIRVAsmInst(...)` (e.g. `result`, `param`),
-  not as separately-named opcodes; observing each per-opcode
-  spelling requires an inline-asm fragment exercising that
-  operand kind and a parser of the printed operand syntax
-  that is not stable across compiler versions. One representative
-  `SPIRVAsm` / `SPIRVAsmInst` block is sampled instead.
-
-- **Debug info on inlined call sites**: `DebugInlinedAt` and
-  `DebugInlinedVariable` require the inliner to actually
-  inline a call under `-g`, which depends on inlining
-  decisions and the order of passes — fragile per-test.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#debuginlinedat](../../../docs/llm-generated/ir-reference/metadata.md#debuginlinedat) | (unclassified) | **Debug-info family — niche debug opcodes**: `DebugInlinedAt`, `DebugInlinedVariable` (require an actual inlined call to be observable; would need a `[ForceInline]` helper plus a non-trivial scope), `DebugScope`, `DebugNoScope` (typically pinned to compound statements rather than top-level insts and harder to anchor in a small test), `DebugBuildIdentifier` (synthesized at SPIR-V emission with build-tooling-specific contents and pollutes the test with non-deterministic strings), `EmbeddedDownstreamIR` (requires a precompiled-library workflow, which is out of scope). | Not reachable via any allowed test directive. |
+| [#debuginlinedat](../../../docs/llm-generated/ir-reference/metadata.md#debuginlinedat) | (unclassified) | **Debug info on inlined call sites**: `DebugInlinedAt` and `DebugInlinedVariable` require the inliner to actually inline a call under `-g`, which depends on inlining decisions and the order of passes — fragile per-test. | Not reachable via any allowed test directive. |
+| [#spirvasmoperandliteral](../../../docs/llm-generated/ir-reference/metadata.md#spirvasmoperandliteral) | (unclassified) | **SPIRVAsmOperand opcode catalog**: the inline-asm operand opcodes (`SPIRVAsmOperandLiteral`, `SPIRVAsmOperandInst`, `SPIRVAsmOperandEnum`, `SPIRVAsmOperandBuiltinVar`, `SPIRVAsmOperandGLSL450Set`, `SPIRVAsmOperandDebugPrintfSet`, `SPIRVAsmOperandId`, `SPIRVAsmOperandResult`, `SPIRVAsmOperandConvertTexel`, `SPIRVAsmOperandRayPayloadFromLocation`, `SPIRVAsmOperandRayAttributeFromLocation`, `SPIRVAsmOperandRayCallableFromLocation`, `__truncate`, `__entryPoint`, `__sampledType`, `__imageType`, `__sampledImageType`) are typed operands of a `SPIRVAsmInst`. The dump prints them inline as the arguments of `SPIRVAsmInst(...)` (e.g. `result`, `param`), not as separately-named opcodes; observing each per-opcode spelling requires an inline-asm fragment exercising that operand kind and a parser of the printed operand syntax that is not stable across compiler versions. One representative `SPIRVAsm` / `SPIRVAsmInst` block is sampled instead. | Not reachable via any allowed test directive. |
 
 ## Doc gaps observed
 

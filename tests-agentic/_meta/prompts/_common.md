@@ -86,6 +86,26 @@ strategy (e.g. "one positive + one negative per claim in sections
 | ...                                                       | ...             | ...                                                                                   | ...                                                         |
 
 If there are no gaps, omit the section. Do not write a placeholder row.
+
+## Untested coverable claims
+
+| Anchor                                                    | Backend            | Claim                                                                                | Why untested                                                 |
+| --------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| [#dxr-ray-tracing](../../docs/llm-generated/<doc>.md#dxr-ray-tracing) | gpu-dxr            | The `closesthit` entry point lowers to a DXR `[shader("closesthit")]` HLSL function. | Agent runtime has no GPU; CI nightly has D3D12 + DXR support. |
+| ...                                                       | ...                | ...                                                                                  | ...                                                          |
+
+If every documented claim already has a test in the Coverage table,
+omit this section.
+
+## Out of scope
+
+| Anchor                                                    | Reason          | Claim                                                                                                                                       | Why it's terminal                                                                                            |
+| --------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [#serialize-pattern](../../docs/llm-generated/<doc>.md#serialize-pattern) | api-only        | The doc describes the `serialize(serializer, value)` template pattern that compiler internals use to thread values through serialization.   | No `slangc` CLI surface reaches this template; it is a C++ idiom invoked from the compiler's own source.     |
+| ...                                                       | ...             | ...                                                                                                                                         | ...                                                                                                          |
+
+If every documented claim is either tested or coverable, omit this
+section.
 ```
 
 **Coverage table rules:**
@@ -149,6 +169,69 @@ to add.
 Rows from multiple bundles that report the same anchor + kind are
 merged by the aggregator (`regenerate.py doc-gaps`), so independent
 co-reports are fine — they are useful evidence.
+
+**Untested-coverable table rules:**
+
+The `## Untested coverable claims` section is the **next-wave
+priority list**. Each row is a documented claim the bundle does
+**not** have a test for because the agent runtime (Claude Code,
+Codex, etc.) cannot validate it locally — but CI (nightly,
+GPU-equipped) or a developer's command line can. An expansion wave
+that does have access to the relevant runner is expected to walk
+this table and write tests for it.
+
+- **Anchor**: markdown link to the doc section, same shape as the
+  other tables.
+- **Backend**: controlled vocabulary naming the runner / capability
+  needed:
+
+  | Backend                | Meaning                                                              |
+  | ---------------------- | -------------------------------------------------------------------- |
+  | `gpu-dxr`              | D3D12 + DXR ray-tracing entry points (`closesthit`/`anyhit`/`miss`/`raygen`/`intersection`/`callable`). |
+  | `gpu-mesh-shader`      | Mesh / amplification entry points.                                   |
+  | `gpu-dxc-dxil`         | DXC binary; `-target dxil` / DXBytecode output.                      |
+  | `gpu-fxc-dxbc`         | fxc binary; DXBytecode legacy output.                                |
+  | `gpu-cuda`             | nvrtc / PTX / OptiX runtime.                                         |
+  | `gpu-metal-toolchain`  | Apple `metal` compiler / `.metallib` toolchain.                      |
+  | `gpu-wgsl-tint`        | Tint downstream invocation (`-target wgsl-spirv`).                   |
+  | `gpu-spirv-tools`      | spirv-link / spirv-val / spirv-opt downstream chain.                 |
+  | `gpu-non-compute`      | Vertex / fragment / hull / domain / geometry / tessellation stages.  |
+  | `gpu-bindless`         | Bindless / `NonUniformResourceIndex` capability.                     |
+  | `gpu-cooperative`      | Cooperative matrix / cooperative vector capability.                  |
+  | `gpu-vulkan-extension` | A Vulkan extension or capability set not enabled in the bundle.      |
+  | `gpu-cross-api-flag`   | Vulkan-cross-API option flags (`VulkanInvertY`, `VulkanUseDxPositionW`, etc.). |
+- **Claim**: one to three sentences describing what the test would
+  verify, written in the voice of a future test agent — concrete
+  enough that the agent can write the test from this row alone.
+- **Why untested**: one sentence naming the runner constraint
+  (typically "Agent runtime has no GPU; CI / local machine does.").
+
+**Out-of-scope table rules:**
+
+The `## Out of scope` section is the **permanent exception log**.
+Each row is a doc claim that cannot be tested by `slang-test` even
+with full runner access — it is terminal. The doc-regen workflow
+does **not** consume this table; it exists to make the suite's
+coverage boundary visible to readers.
+
+- **Anchor**: markdown link to the doc section.
+- **Reason**: controlled vocabulary naming why the claim is
+  terminal:
+
+  | Reason                    | Meaning                                                                                                   |
+  | ------------------------- | --------------------------------------------------------------------------------------------------------- |
+  | `api-only`                | The claim is about behavior of a C++ API (`ISession`, `serialize(...)`, template patterns) with no `slangc` CLI surface. |
+  | `link-stage-only`         | The claim is about a `(synthesized)` opcode / pass-output that does not exist at this bundle's `pipeline_stage`. Test belongs in the bundle whose pipeline stage matches. |
+  | `out-of-bundle`           | The claim is about behavior already covered in a sibling bundle. (Name the sibling in the Why cell.)     |
+  | `deprecated`              | The CLI flag or feature is deprecated and will not be tested.                                            |
+  | `process-doc`             | The claim is about a contributor walkthrough / process documentation, not a compiler behavior.            |
+  | `internal-source-fact`    | The claim is an implementation fact (C++ class hierarchy, field names, parser-callback names) with no user-observable consequence. |
+  | `compile-time-toggle`     | The claim is about a preprocessor define or build-time flag baked into the binary. Not observable at run-time. |
+  | `requires-external-tool`  | The claim could be verified but requires a non-Slang tool (`unzip`, hex dumper, etc.) the runner does not include. |
+  | `implementation-detail`   | The claim is about internal compiler choice (pass ordering count, hoistability decisions) with no test-directive that reveals it. |
+- **Claim**: one to three sentences naming what the doc states.
+- **Why it's terminal**: one sentence explaining why no runner
+  upgrade will make this testable.
 
 ## Per-test `//META` block
 

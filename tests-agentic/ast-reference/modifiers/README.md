@@ -71,66 +71,28 @@ assignment, `inout` of a literal).
 | A `private` member is not accessible from outside its enclosing type. | negative | [#visibility-modifiers](../../../docs/llm-generated/ast-reference/modifiers.md#visibility-modifiers) | [`private-rejects-outside-access.slang`](private-rejects-outside-access.slang) |
 | A `public` member is accessible from outside its enclosing type and a `public` function from anywhere. | functional | [#visibility-modifiers](../../../docs/llm-generated/ast-reference/modifiers.md#visibility-modifiers) | [`public-allows-cross-module-access.slang`](public-allows-cross-module-access.slang) |
 
+## Untested coverable claims
+
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#raypayloadreadsemantic](../../../docs/llm-generated/ast-reference/modifiers.md#raypayloadreadsemantic) | gpu-dxr | Ray-payload semantics (`RayPayloadReadSemantic`, `RayPayloadWriteSemantic`, `VulkanRayPayloadAttribute`) — exercise a ray-tracing pipeline; the no-GPU runner cannot dispatch them. | Agent runtime has no GPU; CI / local machine does. |
+| (unspecified) | gpu-non-compute | `[earlydepthstencil]`, `[maxvertexcount]`, geometry/tessellation stage attributes — observable through emit text only on specific pipeline stages whose entry-point signatures need GPU pipelines to dispatch. | Agent runtime has no GPU; CI / local machine does. |
+| (unspecified) | gpu-other | CUDA / Python / FFI attributes (`[CudaKernel]`, `[CudaHost]`, `[TorchEntryPoint]`, `[PyExport]`, `[DllImport]`, `[AutoPyBindCuda]`) — require a CUDA toolchain or python runtime that the no-GPU runner does not have. | Agent runtime has no GPU; CI / local machine does. |
+
 ## Out of scope
 
-Many claims in `modifiers.md` describe **internal AST shape** that
-is not user-observable through `slangc`. These are not testable
-through this bundle's directives and are recorded here:
-
-- C++ class identity of the parser-allocated modifier (e.g. that
-  `groupshared` becomes `HLSLGroupSharedModifier` specifically and
-  not a synonym; that `[unroll]` becomes `UnrollAttribute`).
-- Parent class in the C++ hierarchy (`InOutModifier` derives from
-  `OutModifier`; `Attribute` derives from `AttributeBase` derives
-  from `Modifier`; `HLSLRegisterSemantic` derives from
-  `HLSLLayoutSemantic` derives from `HLSLSemantic`).
-- Private/key field names and types (e.g. the `irOp: uint32_t`
-  field on `IntrinsicOpModifier`, the bitmask on
-  `MemoryQualifierSetModifier`, the version `Token` on
-  `GLSLVersionDirective`).
-- Abstract intermediates that carry no user spelling
-  (`VisibilityModifier`, `InterpolationModeModifier`,
-  `MatrixLayoutModifier`, `HLSLSemantic`, `TypeModifier`,
-  `AttributeBase`, `InheritanceControlAttribute`,
-  `RayPayloadAccessSemantic`).
-- Internal-only modifiers (`ToBeSynthesizedModifier`,
-  `SynthesizedModifier`, `IgnoreForLookupModifier`,
-  `VarReassignedModifier`, `ExistentialOpenedOnVarModifier`,
-  `LocalTempVarModifier`, `ActualGlobalModifier`,
-  `IsOverridingModifier`, `OptionalConstraintModifier`).
-- Core-module / target binding modifiers (`IntrinsicOpModifier`,
-  `TargetIntrinsicModifier`, `SpecializedForTargetModifier`,
-  `BuiltinTypeModifier`, `MagicTypeModifier`,
-  `BuiltinAttribute`, `AutoDiffBuiltinAttribute`,
-  `KnownBuiltinAttribute`) — not user-spellable outside the core
-  module.
-- `UncheckedAttribute` is the parser-time shape before checker
-  resolves it; user-visible behavior is the resolved attribute.
-- `MemoryQualifierSetModifier` bitmask aggregation is a checker-
-  internal representation; user observation is the resulting
-  GLSL emit (where individual qualifiers appear).
-- The mermaid "Family hierarchy" graph as a graph — the topology
-  is structural metadata about the class hierarchy, not user
-  behavior.
-
-## Out of scope (no-GPU runner)
-
-- Ray-payload semantics (`RayPayloadReadSemantic`,
-  `RayPayloadWriteSemantic`, `VulkanRayPayloadAttribute`) — exercise
-  a ray-tracing pipeline; the no-GPU runner cannot dispatch them.
-- `[earlydepthstencil]`, `[maxvertexcount]`, geometry/tessellation
-  stage attributes — observable through emit text only on
-  specific pipeline stages whose entry-point signatures need GPU
-  pipelines to dispatch.
-- CUDA / Python / FFI attributes (`[CudaKernel]`, `[CudaHost]`,
-  `[TorchEntryPoint]`, `[PyExport]`, `[DllImport]`,
-  `[AutoPyBindCuda]`) — require a CUDA toolchain or python
-  runtime that the no-GPU runner does not have.
-- GLSL `layout(...)` family (`[vk::binding(...)]`,
-  `[vk::location(...)]`, `[push_constant]`, etc.) when the role
-  is best observed via SPIR-V validation on a real Vulkan driver.
-  Emit-text observations for these are partially covered by
-  sibling bundles; we omit duplicates here.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| (unspecified) | (unclassified) | GLSL `layout(...)` family (`[vk::binding(...)]`, `[vk::location(...)]`, `[push_constant]`, etc.) when the role is best observed via SPIR-V validation on a real Vulkan driver. Emit-text observations for these are partially covered by sibling bundles; we omit duplicates here. | Not reachable via any allowed test directive. |
+| [#inoutmodifier](../../../docs/llm-generated/ast-reference/modifiers.md#inoutmodifier) | (unclassified) | Parent class in the C++ hierarchy (`InOutModifier` derives from `OutModifier`; `Attribute` derives from `AttributeBase` derives from `Modifier`; `HLSLRegisterSemantic` derives from `HLSLLayoutSemantic` derives from `HLSLSemantic`). | Not reachable via any allowed test directive. |
+| [#intrinsicopmodifier](../../../docs/llm-generated/ast-reference/modifiers.md#intrinsicopmodifier) | (unclassified) | Core-module / target binding modifiers (`IntrinsicOpModifier`, `TargetIntrinsicModifier`, `SpecializedForTargetModifier`, `BuiltinTypeModifier`, `MagicTypeModifier`, `BuiltinAttribute`, `AutoDiffBuiltinAttribute`, `KnownBuiltinAttribute`) — not user-spellable outside the core module. | Not reachable via any allowed test directive. |
+| [#memoryqualifiersetmodifier](../../../docs/llm-generated/ast-reference/modifiers.md#memoryqualifiersetmodifier) | (unclassified) | `MemoryQualifierSetModifier` bitmask aggregation is a checker- internal representation; user observation is the resulting GLSL emit (where individual qualifiers appear). | Not reachable via any allowed test directive. |
+| [#tobesynthesizedmodifier](../../../docs/llm-generated/ast-reference/modifiers.md#tobesynthesizedmodifier) | (unclassified) | Internal-only modifiers (`ToBeSynthesizedModifier`, `SynthesizedModifier`, `IgnoreForLookupModifier`, `VarReassignedModifier`, `ExistentialOpenedOnVarModifier`, `LocalTempVarModifier`, `ActualGlobalModifier`, `IsOverridingModifier`, `OptionalConstraintModifier`). | Not reachable via any allowed test directive. |
+| [#uncheckedattribute](../../../docs/llm-generated/ast-reference/modifiers.md#uncheckedattribute) | (unclassified) | `UncheckedAttribute` is the parser-time shape before checker resolves it; user-visible behavior is the resolved attribute. | Not reachable via any allowed test directive. |
+| [#visibilitymodifier](../../../docs/llm-generated/ast-reference/modifiers.md#visibilitymodifier) | (unclassified) | Abstract intermediates that carry no user spelling (`VisibilityModifier`, `InterpolationModeModifier`, `MatrixLayoutModifier`, `HLSLSemantic`, `TypeModifier`, `AttributeBase`, `InheritanceControlAttribute`, `RayPayloadAccessSemantic`). | Not reachable via any allowed test directive. |
+| [#groupshared](../../../docs/llm-generated/ast-reference/modifiers.md#groupshared) | api-only | C++ class identity of the parser-allocated modifier (e.g. that `groupshared` becomes `HLSLGroupSharedModifier` specifically and not a synonym; that `[unroll]` becomes `UnrollAttribute`). | Not reachable via any allowed test directive. |
+| [#family-hierarchy](../../../docs/llm-generated/ast-reference/modifiers.md#family-hierarchy) | internal-source-fact | The mermaid "Family hierarchy" graph as a graph — the topology is structural metadata about the class hierarchy, not user behavior. | Not reachable via any allowed test directive. |
+| [#intrinsicopmodifier](../../../docs/llm-generated/ast-reference/modifiers.md#intrinsicopmodifier) | internal-source-fact | Private/key field names and types (e.g. the `irOp: uint32_t` field on `IntrinsicOpModifier`, the bitmask on `MemoryQualifierSetModifier`, the version `Token` on `GLSLVersionDirective`). | Not reachable via any allowed test directive. |
 
 ## Doc gaps observed
 

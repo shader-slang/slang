@@ -149,55 +149,27 @@ function bodies of byte-address-buffer accessors).
 | [#texture-resident](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#texture-resident) | undocumented-behavior | Texture `Load`/`Sample`/`Gather`/`SampleCmp` calls all pass the texture shape, array flag, MS flag, and access flag as specialization arguments to the helper at LOWER-TO-IR, but the isMS slot in the `call specialize(...)` arg list for a `Texture2DMS<T>::Load` is `0`, not `1` — the multi-sample-ness is encoded in the texture's `global_param` type, not re-supplied at the call site. | The doc should state which capability slots are "texture-resident" (only on the type) vs "call-resident" (also passed to the helper specialization). |
 | [#samplercomparisonstate](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#samplercomparisonstate) | undocumented-behavior | The doc lists `SamplerComparisonState` only implicitly as a variant of `SamplerState`; no row enumerates its distinct IR resource type. The `samplercomparisonstate-globalparam.slang` test pins it as a distinct top-level `global_param` carrier alongside `SamplerState`. |  |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-These items are documented in the source doc but no portable
-LOWER-TO-IR shader surface produces them in a form that this
-no-GPU-runner bundle can FileCheck cleanly. See the doc gaps above
-for the reasoning per family.
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#loadresourcedescriptorfromheap](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#loadresourcedescriptorfromheap) | gpu-bindless | Descriptor heaps (`LoadResourceDescriptorFromHeap`, `LoadSamplerDescriptorFromHeap`, `SPIRVLoadDescriptorFromHeap`, `SPIRVLoadTexelPointerFromHeap`, `SPIRVResourceHeap`, `SPIRVSamplerHeap`) — bindless-only synthesized opcodes. | Agent runtime has no GPU; CI / local machine does. |
+| [#coopmatmapelementifunc](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#coopmatmapelementifunc) | gpu-cooperative | Cooperative matrix / vector (`CoopMatMapElementIFunc`, `CoopMatMulAdd`, `CoopVecMatMulAdd`, `CoopVecOuterProductAccumulate`, `CoopVecReduceSumAccumulate`) — require capability flags and core-module `CoopMat` / `CoopVec` types. | Agent runtime has no GPU; CI / local machine does. |
+| [#getoptixraypayloadptr](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#getoptixraypayloadptr) | gpu-cuda | Raytracing payload (`getOptiXRayPayloadPtr`, `getOptiXHitAttribute`, `getOptiXSbtDataPointer`, `getOptiXPayloadRegister`, `setOptiXPayloadRegister`, `GetVulkanRayTracingPayloadLocation`) — require raytracing stage / OptiX backend. | Agent runtime has no GPU; CI / local machine does. |
+| [#meshoutputref](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#meshoutputref) | gpu-mesh-shader | Mesh-shader outputs (`meshOutputRef`, `meshOutputSet`, `metalSetVertex`, `metalSetPrimitive`, `metalSetIndices`) — require mesh stage. | Agent runtime has no GPU; CI / local machine does. |
+| [#structuredbufferloadstatus](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#structuredbufferloadstatus) | gpu-vulkan-extension | Status-overload buffer opcodes (`structuredBufferLoadStatus`, `rwstructuredBufferLoadStatus`) — require a capability flag not available in the `compute` stage on `spirv`. | Agent runtime has no GPU; CI / local machine does. |
 
-- Texture and image opcodes (`imageSubscript`, `imageLoad`,
-  `imageStore`, `SubpassLoad`, `MetalCastToDepthTexture`,
-  `IsTextureAccess`, `IsTextureScalarAccess`, `IsTextureArrayAccess`,
-  `ExtractTextureFromTextureAccess`, `ExtractCoordFromTextureAccess`,
-  `ExtractArrayCoordFromTextureAccess`).
-- Sampling and combined-sampler opcodes (`sample`, `sampleGrad`,
-  `makeCombinedTextureSampler`, `MakeCombinedTextureSamplerFromHandle`,
-  `CombinedTextureSamplerGetTexture`, `CombinedTextureSamplerGetSampler`).
-- Status-overload buffer opcodes (`structuredBufferLoadStatus`,
-  `rwstructuredBufferLoadStatus`) — require a capability flag not
-  available in the `compute` stage on `spirv`.
-- The doc's `rwstructuredBufferStore` opcode — actually produced via
-  `rwstructuredBufferGetElementPtr` + `store` lowering.
-- `StructuredBufferGetDimensions` — appears only inside the helper
-  function body, not on `main`.
-- Resource queries and modifier helpers (`getNaturalStride`,
-  `castDynamicResource`, `getEquivalentStructuredBuffer`,
-  `getStructuredBufferPtr`, `getUntypedBufferPtr`,
-  `getRegisterIndex`, `getRegisterSpace`).
-- Mesh-shader outputs (`meshOutputRef`, `meshOutputSet`,
-  `metalSetVertex`, `metalSetPrimitive`, `metalSetIndices`) —
-  require mesh stage.
-- Workgroup / stage introspection (`GetWorkGroupSize`,
-  `GetCurrentStage`) — materialized in the layout / emit pipeline.
-- Barriers (`GroupMemoryBarrierWithGroupSync`, `ControlBarrier`,
-  `BeginFragmentShaderInterlock`, `EndFragmentShaderInterlock`)
-  — surface as `call` at LOWER-TO-IR.
-- Cooperative matrix / vector (`CoopMatMapElementIFunc`,
-  `CoopMatMulAdd`, `CoopVecMatMulAdd`, `CoopVecOuterProductAccumulate`,
-  `CoopVecReduceSumAccumulate`) — require capability flags and
-  core-module `CoopMat` / `CoopVec` types.
-- Wave intrinsics (`waveGetActiveMask`, `waveMaskBallot`,
-  `waveMaskMatch`) — surface as `call` at LOWER-TO-IR.
-- Raytracing payload (`getOptiXRayPayloadPtr`,
-  `getOptiXHitAttribute`, `getOptiXSbtDataPointer`,
-  `getOptiXPayloadRegister`, `setOptiXPayloadRegister`,
-  `GetVulkanRayTracingPayloadLocation`) — require raytracing stage
-  / OptiX backend.
-- Descriptor heaps (`LoadResourceDescriptorFromHeap`,
-  `LoadSamplerDescriptorFromHeap`, `SPIRVLoadDescriptorFromHeap`,
-  `SPIRVLoadTexelPointerFromHeap`, `SPIRVResourceHeap`,
-  `SPIRVSamplerHeap`) — bindless-only synthesized opcodes.
-- `MetalAtomicCast`, `IncrementCoverageCounter` — synthesized.
-- `atomicSub` — `Atomic<T>` does not expose a `.sub(v)` surface; see
-  doc gaps.
+## Out of scope
+
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#atomicsub](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#atomicsub) | (unclassified) | `atomicSub` — `Atomic<T>` does not expose a `.sub(v)` surface; see doc gaps. | Not reachable via any allowed test directive. |
+| [#getnaturalstride](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#getnaturalstride) | (unclassified) | Resource queries and modifier helpers (`getNaturalStride`, `castDynamicResource`, `getEquivalentStructuredBuffer`, `getStructuredBufferPtr`, `getUntypedBufferPtr`, `getRegisterIndex`, `getRegisterSpace`). | Not reachable via any allowed test directive. |
+| [#getworkgroupsize](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#getworkgroupsize) | (unclassified) | Workgroup / stage introspection (`GetWorkGroupSize`, `GetCurrentStage`) — materialized in the layout / emit pipeline. | Not reachable via any allowed test directive. |
+| [#groupmemorybarrierwithgroupsync](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#groupmemorybarrierwithgroupsync) | (unclassified) | Barriers (`GroupMemoryBarrierWithGroupSync`, `ControlBarrier`, `BeginFragmentShaderInterlock`, `EndFragmentShaderInterlock`) — surface as `call` at LOWER-TO-IR. | Not reachable via any allowed test directive. |
+| [#imagesubscript](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#imagesubscript) | (unclassified) | Texture and image opcodes (`imageSubscript`, `imageLoad`, `imageStore`, `SubpassLoad`, `MetalCastToDepthTexture`, `IsTextureAccess`, `IsTextureScalarAccess`, `IsTextureArrayAccess`, `ExtractTextureFromTextureAccess`, `ExtractCoordFromTextureAccess`, `ExtractArrayCoordFromTextureAccess`). | Not reachable via any allowed test directive. |
+| [#metalatomiccast](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#metalatomiccast) | (unclassified) | `MetalAtomicCast`, `IncrementCoverageCounter` — synthesized. | Not reachable via any allowed test directive. |
+| [#rwstructuredbufferstore](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#rwstructuredbufferstore) | (unclassified) | The doc's `rwstructuredBufferStore` opcode — actually produced via `rwstructuredBufferGetElementPtr` + `store` lowering. | Not reachable via any allowed test directive. |
+| [#sample](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#sample) | (unclassified) | Sampling and combined-sampler opcodes (`sample`, `sampleGrad`, `makeCombinedTextureSampler`, `MakeCombinedTextureSamplerFromHandle`, `CombinedTextureSamplerGetTexture`, `CombinedTextureSamplerGetSampler`). | Not reachable via any allowed test directive. |
+| [#structuredbuffergetdimensions](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#structuredbuffergetdimensions) | (unclassified) | `StructuredBufferGetDimensions` — appears only inside the helper function body, not on `main`. | Not reachable via any allowed test directive. |
+| [#wavegetactivemask](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#wavegetactivemask) | (unclassified) | Wave intrinsics (`waveGetActiveMask`, `waveMaskBallot`, `waveMaskMatch`) — surface as `call` at LOWER-TO-IR. | Not reachable via any allowed test directive. |

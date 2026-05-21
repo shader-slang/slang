@@ -114,127 +114,28 @@ right**, sampling its breadth across categories.
 | The synthesized struct initializer carries a constructor decoration; the dump prints constructor(true) with a Bool literal operand. | functional | [#other](../../../docs/llm-generated/ir-reference/decorations.md#other) | [`constructor-decoration.slang`](constructor-decoration.slang) |
 | Calling a core-module built-in pulls in its [targetIntrinsic(capSet, "spelling")] decoration in the IR dump's core-module section. | functional | [#targetintrinsic-targetintrinsicdecoration](../../../docs/llm-generated/ir-reference/decorations.md#targetintrinsic-targetintrinsicdecoration) | [`target-intrinsic-decoration.slang`](target-intrinsic-decoration.slang) |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-- **All `(synthesized)` decorations** — every row whose `AST origin`
-  column reads `(synthesized)` lacks a stable AST-side anchor and is
-  out of scope for this representative bundle. This includes
-  `BinaryInterfaceType`, `PhysicalType`, `AlignedAddressDecoration`,
-  `SizeAndAlignment`, `Offset`, `optimizableTypeDecoration`,
-  `NonDynamicUniformReturnDecoration`, `bindExistentialSlots`,
-  `DispatchFuncDecoration`, `SpecializationDepthDecoration`,
-  `SequentialIDDecoration`, `RTTI_typeSize`, `AnyValueSize`,
-  `transitory`, `InParamProxyVar`, `TempCallArgImmutableVar`,
-  `TempCallArgVar`,
-  `GlobalVariableShadowingGlobalParameterDecoration`,
-  `DisableCopyEliminationDecoration`, `DynamicUniform`,
-  `availableInDownstreamIR`, `downstreamModuleExport`,
-  `downstreamModuleImport`, `PyBindExportFuncInfo`,
-  `ignoreSideEffectsDecoration`, `loopCounterDecoration`,
-  `loopCounterUpdateDecoration`.
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#pointprimitivetype](../../../docs/llm-generated/ir-reference/decorations.md#pointprimitivetype) | gpu-non-compute | **Mesh / geometry / hull / domain shader decorations** — `pointPrimitiveType`, `linePrimitiveType`, `trianglePrimitiveType`, `lineAdjPrimitiveType`, `triangleAdjPrimitiveType`, `streamOutputTypeDecoration`, `vertices`, `indices`, `primitives`, `HLSLMeshPayloadDecoration`, `PositionOutput`, `PositionInput`, `PerVertex`, `stageReadAccess`, `stageWriteAccess`, `patchConstantFunc`, `maxTessFactor`, `outputControlPoints`, `outputTopology`, `partitioning`, `domain`, `maxVertexCount`, `instance`, `GeometryInputPrimitiveTypeDecoration`, `MeshOutputDecoration`, `StageAccessDecoration`. These require pipeline-specific entry-point scaffolding distinct from the per-decoration reference angle. | Agent runtime has no GPU; CI / local machine does. |
 
-- **All Differentiation marker decorations** —
-  `AutoDiffOriginalValueDecoration`, `AutoDiffBuiltinDecoration`,
-  `BackwardDerivativePrimalContextDecoration`,
-  `BackwardDerivativePrimalReturnDecoration`,
-  `PrimalContextDecoration`, `ParamsContextDecoration`,
-  `primalInstDecoration`, `diffInstDecoration`,
-  `mixedDiffInstDecoration`, `RecomputeBlockDecoration`,
-  `primalValueKey`, `primalElementType`,
-  `IntermediateContextFieldDifferentialTypeDecoration`,
-  `ReturnValueContextFieldDecoration`,
-  `derivativeMemberDecoration`,
-  `treatCallAsDifferentiableDecoration`,
-  `differentiableCallDecoration`, `PreferCheckpointDecoration`,
-  `PreferRecomputeDecoration`,
-  `DifferentiableTypeDictionaryDecoration`,
-  `CudaKernelFwdDiffRef`, `CudaKernelBwdDiffRef`. These are
-  introduced by the autodiff pass on transcribed instructions and
-  do not have a stable per-decoration AST-side anchor at
-  LOWER-TO-IR.
+## Out of scope
 
-- **SPIR-V backend hint decorations** —
-  `spvBufferBlock`, `spvBlock`, `NonUniformResource`,
-  `MemoryQualifierSetDecoration`. These are introduced by the
-  SPIR-V backend after LOWER-TO-IR; observing them requires a
-  later dump stage that is out of scope for the per-opcode
-  reference angle of this bundle.
-
-- **Mesh / geometry / hull / domain shader decorations** —
-  `pointPrimitiveType`, `linePrimitiveType`,
-  `trianglePrimitiveType`, `lineAdjPrimitiveType`,
-  `triangleAdjPrimitiveType`, `streamOutputTypeDecoration`,
-  `vertices`, `indices`, `primitives`,
-  `HLSLMeshPayloadDecoration`, `PositionOutput`, `PositionInput`,
-  `PerVertex`, `stageReadAccess`, `stageWriteAccess`,
-  `patchConstantFunc`, `maxTessFactor`, `outputControlPoints`,
-  `outputTopology`, `partitioning`, `domain`, `maxVertexCount`,
-  `instance`, `GeometryInputPrimitiveTypeDecoration`,
-  `MeshOutputDecoration`, `StageAccessDecoration`. These require
-  pipeline-specific entry-point scaffolding distinct from the
-  per-decoration reference angle.
-
-- **NVAPI / CUDA / DLL / Python interop decorations** —
-  `requiresNVAPI`, `nvapiMagic`, `nvapiSlot`,
-  `RequireSPIRVDescriptorIndexingExtensionDecoration`,
-  `dllImport`, `dllExport`, `cudaDeviceExport`, `CudaKernel`,
-  `CudaHost`, `TorchEntryPoint`, `AutoPyBindCUDA`,
-  `PyExportDecoration`, `externCpp`, `externC`,
-  `TargetBuiltinVar`. These require non-default `-target` settings
-  or specialized markers.
-
-- **Capability / availability decorations except spot samples** —
-  `requireCapabilityAtom`, `requireSPIRVVersion`,
-  `requireGLSLVersion`, `requireGLSLExtension`,
-  `requireWGSLExtension`, `requireCUDASMVersion`. These attach to
-  core-module functions during lowering but do not have stable
-  user-side anchors without target-specific surface.
-
-- **Specialization / conformance / existentials decorations** —
-  `SpecializeDecoration`, `DynamicDispatchWitnessDecoration`,
-  `StaticRequirementDecoration`, `TypeConstraintDecoration`,
-  `ResultWitness`, `SpecializationConstantDecoration`. These are
-  largely synthesized by the specialization pass.
-
-- **Debug / reflection decorations** —
-  `DebugLocation`, `DebugFunction`, `CounterBuffer`. Require
-  `-g` or `[counter]` plumbing distinct from a per-opcode
-  reference angle.
-
-- **`UserTypeName`, `COMInterface`, `COMWitnessDecoration`,
-  `UserExtern`, `highLevelDecl`** — observable but require
-  COM / reflection / extern scaffolding that distracts from the
-  representative sample goal.
-
-- **`format`, `output`, `input`, `glslOuterArray`,
-  `vkStructOffset`, `packoffset`, `glslOffset`** — observable
-  in principle but require specialized binding/format surface
-  out of scope for the representative sample.
-
-- **`raypayload`, `vulkanRayPayload`, `vulkanRayPayloadIn`,
-  `vulkanHitAttributes`, `vulkanHitObjectAttributes`,
-  `vulkanCallablePayload`, `vulkanCallablePayloadIn`** —
-  raytracing-pipeline-specific markers requiring raytracing
-  entry-point scaffolding.
-
-- **`fpDenormalPreserve`, `fpDenormalFlushToZero`,
-  `DerivativeGroupQuad`, `DerivativeGroupLinear`,
-  `MaximallyReconverges`, `QuadDerivatives`, `RequireFullQuads`,
-  `FloatingPointModeOverride`, `experimentalModule`,
-  `DisallowSpecializationWithExistentialsDecoration`,
-  `BitFieldAccessorDecoration`** — niche surfaces out of scope
-  for the representative bundle. Each is single-decoration
-  observable in principle; future bundle expansion can add one
-  test per such decoration if its AST surface stabilises.
-
-- **`public`, `hlslExport`, `dependsOn`, `noRefInline`,
-  `nonCopyable`, `alwaysFold`, `readNone`,
-  `AllowPreTranslationInlining`, `DefaultValue`,
-  `perprimitive`, `TargetSystemValue`, `intrinsicOp`,
-  `requirePrelude`, `spirvOpDecoration`** — observable on
-  natural surface but the bundle samples a representative
-  subset of the inlining/optimization and target-intrinsic
-  categories rather than every per-opcode row.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#debuglocation](../../../docs/llm-generated/ir-reference/decorations.md#debuglocation) | (unclassified) | **Debug / reflection decorations** — `DebugLocation`, `DebugFunction`, `CounterBuffer`. Require `-g` or `[counter]` plumbing distinct from a per-opcode reference angle. | Not reachable via any allowed test directive. |
+| [#format](../../../docs/llm-generated/ir-reference/decorations.md#format) | (unclassified) | **`format`, `output`, `input`, `glslOuterArray`, `vkStructOffset`, `packoffset`, `glslOffset`** — observable in principle but require specialized binding/format surface out of scope for the representative sample. | Not reachable via any allowed test directive. |
+| [#fpdenormalpreserve](../../../docs/llm-generated/ir-reference/decorations.md#fpdenormalpreserve) | (unclassified) | **`fpDenormalPreserve`, `fpDenormalFlushToZero`, `DerivativeGroupQuad`, `DerivativeGroupLinear`, `MaximallyReconverges`, `QuadDerivatives`, `RequireFullQuads`, `FloatingPointModeOverride`, `experimentalModule`, `DisallowSpecializationWithExistentialsDecoration`, `BitFieldAccessorDecoration`** — niche surfaces out of scope for the representative bundle. Each is single-decoration observable in principle; future bundle expansion can add one test per such decoration if its AST surface stabilises. | Not reachable via any allowed test directive. |
+| [#public](../../../docs/llm-generated/ir-reference/decorations.md#public) | (unclassified) | **`public`, `hlslExport`, `dependsOn`, `noRefInline`, `nonCopyable`, `alwaysFold`, `readNone`, `AllowPreTranslationInlining`, `DefaultValue`, `perprimitive`, `TargetSystemValue`, `intrinsicOp`, `requirePrelude`, `spirvOpDecoration`** — observable on natural surface but the bundle samples a representative subset of the inlining/optimization and target-intrinsic categories rather than every per-opcode row. | Not reachable via any allowed test directive. |
+| [#raypayload](../../../docs/llm-generated/ir-reference/decorations.md#raypayload) | (unclassified) | **`raypayload`, `vulkanRayPayload`, `vulkanRayPayloadIn`, `vulkanHitAttributes`, `vulkanHitObjectAttributes`, `vulkanCallablePayload`, `vulkanCallablePayloadIn`** — raytracing-pipeline-specific markers requiring raytracing entry-point scaffolding. | Not reachable via any allowed test directive. |
+| [#requirecapabilityatom](../../../docs/llm-generated/ir-reference/decorations.md#requirecapabilityatom) | (unclassified) | **Capability / availability decorations except spot samples** — `requireCapabilityAtom`, `requireSPIRVVersion`, `requireGLSLVersion`, `requireGLSLExtension`, `requireWGSLExtension`, `requireCUDASMVersion`. These attach to core-module functions during lowering but do not have stable user-side anchors without target-specific surface. | Not reachable via any allowed test directive. |
+| [#requiresnvapi](../../../docs/llm-generated/ir-reference/decorations.md#requiresnvapi) | (unclassified) | **NVAPI / CUDA / DLL / Python interop decorations** — `requiresNVAPI`, `nvapiMagic`, `nvapiSlot`, `RequireSPIRVDescriptorIndexingExtensionDecoration`, `dllImport`, `dllExport`, `cudaDeviceExport`, `CudaKernel`, `CudaHost`, `TorchEntryPoint`, `AutoPyBindCUDA`, `PyExportDecoration`, `externCpp`, `externC`, `TargetBuiltinVar`. These require non-default `-target` settings or specialized markers. | Not reachable via any allowed test directive. |
+| [#spvbufferblock](../../../docs/llm-generated/ir-reference/decorations.md#spvbufferblock) | (unclassified) | **SPIR-V backend hint decorations** — `spvBufferBlock`, `spvBlock`, `NonUniformResource`, `MemoryQualifierSetDecoration`. These are introduced by the SPIR-V backend after LOWER-TO-IR; observing them requires a later dump stage that is out of scope for the per-opcode reference angle of this bundle. | Not reachable via any allowed test directive. |
+| [#usertypename](../../../docs/llm-generated/ir-reference/decorations.md#usertypename) | (unclassified) | **`UserTypeName`, `COMInterface`, `COMWitnessDecoration`, `UserExtern`, `highLevelDecl`** — observable but require COM / reflection / extern scaffolding that distracts from the representative sample goal. | Not reachable via any allowed test directive. |
+| [#autodifforiginalvaluedecoration](../../../docs/llm-generated/ir-reference/decorations.md#autodifforiginalvaluedecoration) | link-stage-only | **All Differentiation marker decorations** — `AutoDiffOriginalValueDecoration`, `AutoDiffBuiltinDecoration`, `BackwardDerivativePrimalContextDecoration`, `BackwardDerivativePrimalReturnDecoration`, `PrimalContextDecoration`, `ParamsContextDecoration`, `primalInstDecoration`, `diffInstDecoration`, `mixedDiffInstDecoration`, `RecomputeBlockDecoration`, `primalValueKey`, `primalElementType`, `IntermediateContextFieldDifferentialTypeDecoration`, `ReturnValueContextFieldDecoration`, `derivativeMemberDecoration`, `treatCallAsDifferentiableDecoration`, `differentiableCallDecoration`, `PreferCheckpointDecoration`, `PreferRecomputeDecoration`, `DifferentiableTypeDictionaryDecoration`, `CudaKernelFwdDiffRef`, `CudaKernelBwdDiffRef`. These are introduced by the autodiff pass on transcribed instructions and do not have a stable per-decoration AST-side anchor at LOWER-TO-IR. | Not reachable via any allowed test directive. |
+| [#binaryinterfacetype](../../../docs/llm-generated/ir-reference/decorations.md#binaryinterfacetype) | link-stage-only | **All `(synthesized)` decorations** — every row whose `AST origin` column reads `(synthesized)` lacks a stable AST-side anchor and is out of scope for this representative bundle. This includes `BinaryInterfaceType`, `PhysicalType`, `AlignedAddressDecoration`, `SizeAndAlignment`, `Offset`, `optimizableTypeDecoration`, `NonDynamicUniformReturnDecoration`, `bindExistentialSlots`, `DispatchFuncDecoration`, `SpecializationDepthDecoration`, `SequentialIDDecoration`, `RTTI_typeSize`, `AnyValueSize`, `transitory`, `InParamProxyVar`, `TempCallArgImmutableVar`, `TempCallArgVar`, `GlobalVariableShadowingGlobalParameterDecoration`, `DisableCopyEliminationDecoration`, `DynamicUniform`, `availableInDownstreamIR`, `downstreamModuleExport`, `downstreamModuleImport`, `PyBindExportFuncInfo`, `ignoreSideEffectsDecoration`, `loopCounterDecoration`, `loopCounterUpdateDecoration`. | Not reachable via any allowed test directive. |
+| [#specializedecoration](../../../docs/llm-generated/ir-reference/decorations.md#specializedecoration) | link-stage-only | **Specialization / conformance / existentials decorations** — `SpecializeDecoration`, `DynamicDispatchWitnessDecoration`, `StaticRequirementDecoration`, `TypeConstraintDecoration`, `ResultWitness`, `SpecializationConstantDecoration`. These are largely synthesized by the specialization pass. | Not reachable via any allowed test directive. |
 
 ## Doc gaps observed
 

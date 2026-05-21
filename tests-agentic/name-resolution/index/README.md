@@ -46,23 +46,12 @@ composition observable.
 
 ## Out of scope
 
-The index doc explicitly delegates these to peer pages; tests for
-them belong to peer bundles, not here:
-
-- `Scope` shape, sibling-chain construction, file-scope and
-  namespace boundaries, generic-parameter scope -- see
-  `tests-agentic/name-resolution/scopes/`.
-- `LookupMask` filter, transparent-member injection, breadcrumb
-  construction details, inheritance walk for member lookup,
-  ambiguity / member-not-found diagnostics, container-level
-  overload accumulation, override-wins-over-default -- see
-  `tests-agentic/name-resolution/lookup/`.
-- `public` / `internal` / `private` semantics, accessor
-  visibility, default-visibility rules -- see
-  `tests-agentic/name-resolution/visibility/`.
-- Arity / convertibility filtering, conversion-cost ranking,
-  partial generic application, ambiguous-call diagnostics -- see
-  `tests-agentic/name-resolution/overload-resolution/`.
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| (unspecified) | out-of-bundle | Arity / convertibility filtering, conversion-cost ranking, partial generic application, ambiguous-call diagnostics -- see `tests-agentic/name-resolution/overload-resolution/`. | Not reachable via any allowed test directive. |
+| [#lookupmask](../../../docs/llm-generated/name-resolution/index.md#lookupmask) | out-of-bundle | `LookupMask` filter, transparent-member injection, breadcrumb construction details, inheritance walk for member lookup, ambiguity / member-not-found diagnostics, container-level overload accumulation, override-wins-over-default -- see `tests-agentic/name-resolution/lookup/`. | Not reachable via any allowed test directive. |
+| [#public](../../../docs/llm-generated/name-resolution/index.md#public) | out-of-bundle | `public` / `internal` / `private` semantics, accessor visibility, default-visibility rules -- see `tests-agentic/name-resolution/visibility/`. | Not reachable via any allowed test directive. |
+| [#scope](../../../docs/llm-generated/name-resolution/index.md#scope) | out-of-bundle | `Scope` shape, sibling-chain construction, file-scope and namespace boundaries, generic-parameter scope -- see `tests-agentic/name-resolution/scopes/`. | Not reachable via any allowed test directive. |
 
 ## Sibling-bundle overlap
 
@@ -84,11 +73,6 @@ re-tested here to avoid duplication:
   The index bundle's `visibility-filters-before-overload.slang`
   exercises the composition of phase ordering, not the ranking
   itself.
-
-## Out of scope (no-GPU runner)
-
-(none) -- all tests run on the interpreter or compile to text
-emit without a GPU.
 
 ## Doc gaps observed
 

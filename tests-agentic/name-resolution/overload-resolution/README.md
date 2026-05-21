@@ -90,9 +90,7 @@ here:
 | [#probe-phase-trycheckoverloadcandidate](../../../docs/llm-generated/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | undocumented-behavior | The doc's `## Probe phase: TryCheckOverloadCandidate` step 7 (`TryCheckOverloadCandidateClassNewMatchUp`) is documented as finalize-only; its user-visible surface is the choice between `Class()` and `Class.new()` AST forms. There is no documented diagnostic that fires when this step rejects, and the surface is identical at the call site, so no test anchors here directly. |  |
 | [#probe-phase-trycheckoverloadcandidate](../../../docs/llm-generated/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | undocumented-behavior | The doc's `## Probe phase: TryCheckOverloadCandidate` step 2 (`TryCheckOverloadCandidateFixity`) names catching "calling an infix operator in prefix position". Slang's surface does not let user code write a free `prefix` / `postfix` / `infix` marker on a function, so the fixity-failure path is not reachable from a `.slang` source. A claim that names a user-writable surface for fixity (or a confirmation that fixity is implicit) would unblock a test. |  |
 
-## Out of scope (no-GPU runner)
+## Out of scope
 
-None of the overload-resolution claims in this bundle require a GPU.
-All tests use `//TEST:INTERPRET(filecheck=CHECK):` or
-`//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):`, both of which run on the
-no-GPU runner.
+(none)
+

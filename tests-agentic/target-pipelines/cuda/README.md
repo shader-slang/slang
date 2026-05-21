@@ -130,63 +130,24 @@ Phase A/B/C/D tables that can be observed in
 | [#processlaterequirecapabilityinsts](../../../docs/llm-generated/target-pipelines/cuda.md#processlaterequirecapabilityinsts) | undocumented-behavior | The doc's Phase C table lists `processLateRequireCapabilityInsts` and `cleanUpVoidType` but does not name observable CUDA-emit markers for them. No test. |  |
 | [#phase-d](../../../docs/llm-generated/target-pipelines/cuda.md#phase-d) | undocumented-behavior | The doc's `## Phase D` table lists `simplifyForEmit` but the effect is observable only as an absence of redundant variables in the emitted text — there is no doc-anchored positive marker. No test. |  |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-- **nvrtc / PTX downstream invocation**
-  (`#downstream-nvrtc`). Requires the nvrtc shared library
-  on the runner; `-target cuda` stops at CUDA C++ text.
-- **`collectOptiXEntryPointUniformParams`**
-  (`#collectoptixentrypointuniformparams`). Requires OptiX
-  ray-tracing entry points (`raygeneration` / `closesthit` /
-  `anyhit` / `miss`). The no-GPU compute runner does not
-  exercise the ray-tracing pipeline shape.
-- **`synthesizeActiveMask`**
-  (`#synthesizeactivemask`). Requires a warp-sync intrinsic
-  (`WaveActiveMin` / `__shfl_sync`) surface that triggers the
-  active-mask synthesis; the doc anchors the pass to PTX
-  subgroup intrinsics that are not on the compute-test
-  surface.
-- **`lowerCooperativeVectors`** is gated on the
-  `optix_coopvec` capability not being present
-  (`#phase-b-specialization-and-type-legalization`). Requires
-  a cooperative-vector test surface that the no-GPU bundle
-  does not exercise.
-- **`collectCooperativeMetadata`**
-  (`#phase-c-cuda-legalization-lowering-phi-elimination`).
-  Requires the cooperative-matrix / cooperative-vector
-  capability set.
-- **`coverageTracing`-gated passes**
-  (`instrumentCoverage`,
-  `finalizeCoverageInstrumentationMetadata`). Coverage
-  instrumentation is a debugging flag, not user-observable
-  through text emit.
-- **`autodiff` / `higherOrderFunc` / `derivativePyBindWrapper`
-  passes**
-  (`checkAutodiffPatterns`,
-  `specializeHigherOrderParameters`,
-  `generateDerivativeWrappers`,
-  `finalizeAutoDiffPass`, etc.). Covered by other bundles;
-  the doc anchors them to Phase B but the emit-stage
-  observable is a downstream language feature.
-- **`PyTorchCppBinding`** adjacent target arm
-  (`#adjacent-targets`). Out of scope: shares some Phase B
-  passes but emits via `TorchCppSourceEmitter`, not
-  `CUDASourceEmitter`.
-- **`dynamicResourceHeap`**, **`meshOutput`**,
-  **`bindingQuery`** Phase C gates. Each requires a feature
-  surface that is not on the compute-test envelope.
-- **Pass-ordering claims** (Phase A passes 1-18, Phase B
-  passes 1-62, Phase C passes 1-32). The doc enumerates the
-  ordered list; pass _existence_ is observable through emit
-  side effects, but pass _ordering_ would require
-  `-dump-ir` cross-pass comparison without doc-anchored
-  ordering markers. Covered by `pipeline/05-ir-passes`.
-- **`-target ptx` / `-target cuda-header`** validation.
-  Both are sibling `CodeGenTarget` values that share the
-  same IR pipeline; the doc differentiates only in the
-  downstream-compile dispatch.
-- **`validateAndRemoveAssumeAddress` with `validate=false`**.
-  The doc states CUDA passes `validate=false` (line 960) but
-  the consequence (no validation diagnostic on a malformed
-  address-of) requires a deliberately-malformed input that
-  is out of scope here.
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#phase-c-cuda-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/cuda.md#phase-c-cuda-legalization-lowering-phi-elimination) | gpu-cooperative | **`collectCooperativeMetadata`** (`#phase-c-cuda-legalization-lowering-phi-elimination`). | Requires the cooperative-matrix / cooperative-vector capability set. |
+| [#codegentarget](../../../docs/llm-generated/target-pipelines/cuda.md#codegentarget) | gpu-cuda | **`-target ptx` / `-target cuda-header`** validation. Both are sibling `CodeGenTarget` values that share the same IR pipeline; the doc differentiates only in the downstream-compile dispatch. | Agent runtime has no GPU; CI / local machine does. |
+| [#downstream-nvrtc](../../../docs/llm-generated/target-pipelines/cuda.md#downstream-nvrtc) | gpu-cuda | **nvrtc / PTX downstream invocation** (`#downstream-nvrtc`). | Requires the nvrtc shared library on the runner; `-target cuda` stops at CUDA C++ text. |
+| [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/cuda.md#phase-b-specialization-and-type-legalization) | gpu-cuda | **`lowerCooperativeVectors`** is gated on the `optix_coopvec` capability not being present (`#phase-b-specialization-and-type-legalization`). | Requires a cooperative-vector test surface that the no-GPU bundle does not exercise. |
+| [#synthesizeactivemask](../../../docs/llm-generated/target-pipelines/cuda.md#synthesizeactivemask) | gpu-cuda | **`synthesizeActiveMask`** (`#synthesizeactivemask`). | Requires a warp-sync intrinsic (`WaveActiveMin` / `__shfl_sync`) surface that triggers the active-mask synthesis; the doc anchors the pass to PTX subgroup intrinsics that are not on the compute-test surface. |
+| [#collectoptixentrypointuniformparams](../../../docs/llm-generated/target-pipelines/cuda.md#collectoptixentrypointuniformparams) | gpu-dxr | **`collectOptiXEntryPointUniformParams`** (`#collectoptixentrypointuniformparams`). | Requires OptiX ray-tracing entry points (`raygeneration` / `closesthit` / `anyhit` / `miss`). The no-GPU compute runner does not exercise the ray-tracing pipeline shape. |
+
+## Out of scope
+
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#adjacent-targets](../../../docs/llm-generated/target-pipelines/cuda.md#adjacent-targets) | (unclassified) | **`PyTorchCppBinding`** adjacent target arm (`#adjacent-targets`). Out of scope: shares some Phase B passes but emits via `TorchCppSourceEmitter`, not `CUDASourceEmitter`. | Not reachable via any allowed test directive. |
+| [#autodiff](../../../docs/llm-generated/target-pipelines/cuda.md#autodiff) | (unclassified) | **`autodiff` / `higherOrderFunc` / `derivativePyBindWrapper` passes** (`checkAutodiffPatterns`, `specializeHigherOrderParameters`, `generateDerivativeWrappers`, `finalizeAutoDiffPass`, etc.). Covered by other bundles; the doc anchors them to Phase B but the emit-stage observable is a downstream language feature. | Not reachable via any allowed test directive. |
+| [#coveragetracing](../../../docs/llm-generated/target-pipelines/cuda.md#coveragetracing) | (unclassified) | **`coverageTracing`-gated passes** (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`). Coverage instrumentation is a debugging flag, not user-observable through text emit. | Not reachable via any allowed test directive. |
+| [#dynamicresourceheap](../../../docs/llm-generated/target-pipelines/cuda.md#dynamicresourceheap) | (unclassified) | **`dynamicResourceHeap`**, **`meshOutput`**, **`bindingQuery`** Phase C gates. Each requires a feature surface that is not on the compute-test envelope. | Not reachable via any allowed test directive. |
+| [#validateandremoveassumeaddress](../../../docs/llm-generated/target-pipelines/cuda.md#validateandremoveassumeaddress) | (unclassified) | **`validateAndRemoveAssumeAddress` with `validate=false`**. The doc states CUDA passes `validate=false` (line 960) but the consequence (no validation diagnostic on a malformed address-of) requires a deliberately-malformed input that is out of scope here. | Not reachable via any allowed test directive. |
+| (unspecified) | implementation-detail | **Pass-ordering claims** (Phase A passes 1-18, Phase B passes 1-62, Phase C passes 1-32). The doc enumerates the ordered list; pass _existence_ is observable through emit side effects, but pass _ordering_ would require `-dump-ir` cross-pass comparison without doc-anchored ordering markers. Covered by `pipeline/05-ir-passes`. | Not reachable via any allowed test directive. |

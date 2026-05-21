@@ -212,80 +212,34 @@ bundle drills into the rest of the catalog without repeating those.
 | [#makeresultvalue](../../../docs/llm-generated/ir-reference/values.md#makeresultvalue) | undocumented-behavior | The Result / Optional / Conditional helpers family lists `makeResultValue`/`makeResultError`/`isResultError`/ `getResultValue`/`getResultError` for `Result<T, E>`. The core module presumably exposes `Result<T, E>` but the doc does not name the surface form of `Result::makeValue(x)` / `Result::makeError(e)`. |  |
 | [#synthesized](../../../docs/llm-generated/ir-reference/values.md#synthesized) | undocumented-behavior | The Undefined and default-construct family lists `Poison` and `LoadFromUninitializedMemory` as opcodes "synthesized". The observed IR dump shows a single `Poison` declaration at the top of the LOWER-TO-IR stage (as a sigil), but no surface in the doc produces it as an active operand. | The doc should clarify whether the top-of-dump `Poison` line is the entire surface or whether some construct yields an active `Poison`-typed value. |
 
-## Out of scope (no-GPU runner)
+## Untested coverable claims
 
-(In this bundle the heading is used for "claims unobservable through
-any allowed test directive", consistent with the
-`cross-cutting/ir-instructions`, `ir-reference/types`, and
-`pipeline/04-ast-to-ir` bundles.)
+| Anchor | Backend | Claim | Why untested |
+| --- | --- | --- | --- |
+| [#makecoopvector](../../../docs/llm-generated/ir-reference/values.md#makecoopvector) | gpu-cooperative | **`makeCoopVector`, `makeCoopVectorFromValuePack`, `makeCoopMatrixFromScalar`** — cooperative vector / matrix intrinsics; no portable Slang surface in the doc names them. | Agent runtime has no GPU; CI / local machine does. |
+| [#makeresultvalue](../../../docs/llm-generated/ir-reference/values.md#makeresultvalue) | gpu-other | **`Result<T, E>` helpers** (`makeResultValue`/`makeResultError`/ `isResultError`/`getResultValue`/`getResultError`) — the doc cites `Result<T, E>::makeValue` etc. but the surface form on the no-GPU runner is unclear from the doc. | Agent runtime has no GPU; CI / local machine does. |
 
-- **Hoistability flags** (`H` in the doc's tables) — the IR dump
-  shows the post-hoist result, not the decision. Two identical
-  `IntLit 42` payloads collapsing to a single operand is observable
-  in the dump's textual output, but the *reason* (hoisting via
-  `IRBuilder` deduplication) is an internal mechanism.
-- The **C++ wrapper struct** identity for each opcode (e.g. that
-  `add` is `IRAdd` in C++, `boolConst` is `BoolLit`) — internal API
-  visible only through `<inst>->getOp()` / `as<IRBoolLit>()`.
-- The **`IRBuilder` emitter** for each opcode (`emitAdd`,
-  `emitLoad`, `emitMakeStruct`, ...) — internal C++ API.
-- **`Poison`** as an active operand — the LOWER-TO-IR dump shows
-  `Poison` only as a top-level sigil declaration, not as an active
-  operand of any user instruction. A reading-an-uninitialized-local
-  diagnostic is a frontend check, not a positive observation of an
-  IR opcode.
-- **`LoadFromUninitializedMemory`** — same as `Poison`; the doc
-  describes its semantics ("like LLVM's `freeze(undef)`") but no
-  surface in the doc produces it at LOWER-TO-IR.
-- **`alloca`** — no documented portable Slang surface produces it
-  at LOWER-TO-IR. Runtime-size arrays use a different lowering on
-  most targets.
-- **`copyLogical`, `assumeAddress`, `getAddr`, `getOffsetPtr`,
-  `swizzleSet`, `matrixSwizzleStore`, `updateElement`** —
-  "(synthesized)" per the doc; no portable Slang surface produces
-  them at LOWER-TO-IR.
-- **`makeString`, `getNativeStr`, `getNativePtr`,
-  `getManagedPtrWriteRef`, `ManagedPtrAttach`, `ManagedPtrDetach`,
-  `allocObj`** — host-side or COM-pointer machinery, not
-  exercisable from a shader.
-- **`CUDA_LDG`** — emitted by the CUDA backend's read-only buffer
-  lowering, not by AST-to-IR lowering. The cross-cutting bundle
-  notes the `__ldg` factoring as a CUDA emit consequence.
-- **`makeMatrixFromScalar`, `MakeVectorFromScalar`,
-  `makeArrayFromElement`** — implicit lowerings whose surface is
-  not documented. `float3(x)` may or may not produce them; the
-  observed lowering produces `makeVector(x, x, x)` instead.
-- **`makeCoopVector`, `makeCoopVectorFromValuePack`,
-  `makeCoopMatrixFromScalar`** — cooperative vector / matrix
-  intrinsics; no portable Slang surface in the doc names them.
-- **`makeTargetTuple`, `getTargetTupleElement`** — target-keyed
-  tuple values used by `targetSwitch`; "(synthesized)" per the doc.
-- **`SumVectorElements`, `SumMatrixElements`, `matrixReshape`,
-  `vectorReshape`** — all "(synthesized)" per the doc.
-- **`Result<T, E>` helpers** (`makeResultValue`/`makeResultError`/
-  `isResultError`/`getResultValue`/`getResultError`) — the doc
-  cites `Result<T, E>::makeValue` etc. but the surface form on the
-  no-GPU runner is unclear from the doc.
-- **`makeConditionalValue`/`getConditionalValue`** —
-  "(synthesized)" per the doc; no portable surface.
-- **`extractTaggedUnionTag`/`extractTaggedUnionPayload`** — the
-  doc itself cross-references `generics-and-existentials.md`;
-  produced by existential elimination.
-- **`makeUInt64`** — produced during emit / late lowering, not at
-  LOWER-TO-IR.
-- **`Constexpr*` family** (`constexprAdd`, `constexprMul`, ...,
-  `constexprCastEnumToInt`) — produced by the IR's compile-time
-  integer evaluator (`IntVal` lowering), not by AST-to-IR.
-- **`ReinterpretOptional`, `unmodified`, `outImplicitCast`,
-  `inOutImplicitCast`, `BuiltinCast`, `PtrCast`, `CastPtrToBool`,
-  `CastPtrToInt`, `CastIntToPtr`, `CastUInt2ToDescriptorHandle`,
-  `CastDescriptorHandleToUInt2`** — "(synthesized)" or host-side;
-  no portable Slang surface in the doc names them.
-- **`CastEnumToInt`, `CastIntToEnum`, `EnumCast`** — the doc lists
-  them but does not name which surface produces which (Slang's
-  enum-to-int may be implicit in arithmetic context, blurring the
-  per-opcode boundary).
-- **Hoistable instruction deduplication** — observable only by
-  comparing `IRInst*` identity, not visible in the dump.
-- **The `_debugUID`/`m_op` packed bit layout** — internal to
-  `IRInst::m_op`.
+## Out of scope
+
+| Anchor | Reason | Claim | Why it's terminal |
+| --- | --- | --- | --- |
+| [#add](../../../docs/llm-generated/ir-reference/values.md#add) | (unclassified) | The **C++ wrapper struct** identity for each opcode (e.g. that `add` is `IRAdd` in C++, `boolConst` is `BoolLit`) — internal API visible only through `<inst>->getOp()` / `as<IRBoolLit>()`. | Not reachable via any allowed test directive. |
+| [#alloca](../../../docs/llm-generated/ir-reference/values.md#alloca) | (unclassified) | **`alloca`** — no documented portable Slang surface produces it at LOWER-TO-IR. Runtime-size arrays use a different lowering on most targets. | Not reachable via any allowed test directive. |
+| [#castenumtoint](../../../docs/llm-generated/ir-reference/values.md#castenumtoint) | (unclassified) | **`CastEnumToInt`, `CastIntToEnum`, `EnumCast`** — the doc lists them but does not name which surface produces which (Slang's enum-to-int may be implicit in arithmetic context, blurring the per-opcode boundary). | Not reachable via any allowed test directive. |
+| [#cudaldg](../../../docs/llm-generated/ir-reference/values.md#cudaldg) | (unclassified) | **`CUDA_LDG`** — emitted by the CUDA backend's read-only buffer lowering, not by AST-to-IR lowering. The cross-cutting bundle notes the `__ldg` factoring as a CUDA emit consequence. | Not reachable via any allowed test directive. |
+| [#extracttaggeduniontag](../../../docs/llm-generated/ir-reference/values.md#extracttaggeduniontag) | (unclassified) | **`extractTaggedUnionTag`/`extractTaggedUnionPayload`** — the doc itself cross-references `generics-and-existentials.md`; produced by existential elimination. | Not reachable via any allowed test directive. |
+| [#loadfromuninitializedmemory](../../../docs/llm-generated/ir-reference/values.md#loadfromuninitializedmemory) | (unclassified) | **`LoadFromUninitializedMemory`** — same as `Poison`; the doc describes its semantics ("like LLVM's `freeze(undef)`") but no surface in the doc produces it at LOWER-TO-IR. | Not reachable via any allowed test directive. |
+| [#makematrixfromscalar](../../../docs/llm-generated/ir-reference/values.md#makematrixfromscalar) | (unclassified) | **`makeMatrixFromScalar`, `MakeVectorFromScalar`, `makeArrayFromElement`** — implicit lowerings whose surface is not documented. `float3(x)` may or may not produce them; the observed lowering produces `makeVector(x, x, x)` instead. | Not reachable via any allowed test directive. |
+| [#makeuint64](../../../docs/llm-generated/ir-reference/values.md#makeuint64) | (unclassified) | **`makeUInt64`** — produced during emit / late lowering, not at LOWER-TO-IR. | Not reachable via any allowed test directive. |
+| [#mop](../../../docs/llm-generated/ir-reference/values.md#mop) | (unclassified) | **The `_debugUID`/`m_op` packed bit layout** — internal to `IRInst::m_op`. | Not reachable via any allowed test directive. |
+| [#poison](../../../docs/llm-generated/ir-reference/values.md#poison) | (unclassified) | **`Poison`** as an active operand — the LOWER-TO-IR dump shows `Poison` only as a top-level sigil declaration, not as an active operand of any user instruction. A reading-an-uninitialized-local diagnostic is a frontend check, not a positive observation of an IR opcode. | Not reachable via any allowed test directive. |
+| [#irbuilder](../../../docs/llm-generated/ir-reference/values.md#irbuilder) | api-only | The **`IRBuilder` emitter** for each opcode (`emitAdd`, `emitLoad`, `emitMakeStruct`, ...) — internal C++ API. | Not reachable via any allowed test directive. |
+| [#makestring](../../../docs/llm-generated/ir-reference/values.md#makestring) | api-only | **`makeString`, `getNativeStr`, `getNativePtr`, `getManagedPtrWriteRef`, `ManagedPtrAttach`, `ManagedPtrDetach`, `allocObj`** — host-side or COM-pointer machinery, not exercisable from a shader. | Not reachable via any allowed test directive. |
+| [#constexpradd](../../../docs/llm-generated/ir-reference/values.md#constexpradd) | compile-time-toggle | **`Constexpr*` family** (`constexprAdd`, `constexprMul`, ..., `constexprCastEnumToInt`) — produced by the IR's compile-time integer evaluator (`IntVal` lowering), not by AST-to-IR. | Not reachable via any allowed test directive. |
+| (unspecified) | implementation-detail | **Hoistable instruction deduplication** — observable only by comparing `IRInst*` identity, not visible in the dump. | Not reachable via any allowed test directive. |
+| [#irbuilder](../../../docs/llm-generated/ir-reference/values.md#irbuilder) | implementation-detail | **Hoistability flags** (`H` in the doc's tables) — the IR dump shows the post-hoist result, not the decision. Two identical `IntLit 42` payloads collapsing to a single operand is observable in the dump's textual output, but the *reason* (hoisting via `IRBuilder` deduplication) is an internal mechanism. | Not reachable via any allowed test directive. |
+| [#copylogical](../../../docs/llm-generated/ir-reference/values.md#copylogical) | link-stage-only | **`copyLogical`, `assumeAddress`, `getAddr`, `getOffsetPtr`, `swizzleSet`, `matrixSwizzleStore`, `updateElement`** — "(synthesized)" per the doc; no portable Slang surface produces them at LOWER-TO-IR. | Not reachable via any allowed test directive. |
+| [#makeconditionalvalue](../../../docs/llm-generated/ir-reference/values.md#makeconditionalvalue) | link-stage-only | **`makeConditionalValue`/`getConditionalValue`** — "(synthesized)" per the doc; no portable surface. | Not reachable via any allowed test directive. |
+| [#maketargettuple](../../../docs/llm-generated/ir-reference/values.md#maketargettuple) | link-stage-only | **`makeTargetTuple`, `getTargetTupleElement`** — target-keyed tuple values used by `targetSwitch`; "(synthesized)" per the doc. | Not reachable via any allowed test directive. |
+| [#reinterpretoptional](../../../docs/llm-generated/ir-reference/values.md#reinterpretoptional) | link-stage-only | **`ReinterpretOptional`, `unmodified`, `outImplicitCast`, `inOutImplicitCast`, `BuiltinCast`, `PtrCast`, `CastPtrToBool`, `CastPtrToInt`, `CastIntToPtr`, `CastUInt2ToDescriptorHandle`, `CastDescriptorHandleToUInt2`** — "(synthesized)" or host-side; no portable Slang surface in the doc names them. | Not reachable via any allowed test directive. |
+| [#sumvectorelements](../../../docs/llm-generated/ir-reference/values.md#sumvectorelements) | link-stage-only | **`SumVectorElements`, `SumMatrixElements`, `matrixReshape`, `vectorReshape`** — all "(synthesized)" per the doc. | Not reachable via any allowed test directive. |
