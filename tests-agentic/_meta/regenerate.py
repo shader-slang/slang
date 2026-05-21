@@ -879,6 +879,36 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
                 "no //TEST or //DIAGNOSTIC_TEST directive; slang-test would skip this file",
             )
         )
+    # Each //TEST or //DIAGNOSTIC_TEST directive that declares a
+    # matcher (filecheck=NAME, filecheck-buffer=NAME, or diag=NAME)
+    # must have at least one matching `// NAME:` / `//NAME:` /
+    # `/*NAME:` line in the file. Otherwise the directive runs but
+    # verifies nothing.
+    matcher_names = set()
+    for m in re.finditer(
+        r"//(?:DIAGNOSTIC_)?TEST[^\n]*?(?:filecheck|filecheck-buffer|diag)=([A-Za-z_][A-Za-z0-9_-]*)",
+        text,
+    ):
+        matcher_names.add(m.group(1))
+    for name in sorted(matcher_names):
+        # Accept `// NAME:`, `//NAME:`, `/*NAME:`, plus the FileCheck
+        # variants `NAME-DAG:`, `NAME-NEXT:`, `NAME-NOT:`, `NAME-SAME:`,
+        # `NAME-LABEL:`, `NAME-EMPTY:`, `NAME-COUNT-N:`.
+        body_has_pattern = bool(
+            re.search(
+                rf"(?://\s*|/\*\s*){re.escape(name)}(?:-(?:DAG|NEXT|NOT|SAME|LABEL|EMPTY|COUNT(?:-\d+)?))?:",
+                text,
+            )
+        )
+        if not body_has_pattern:
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    f"//TEST declares matcher {name!r} but no `// {name}:`"
+                    f" pattern is present; the directive would verify nothing",
+                )
+            )
     return issues
 
 

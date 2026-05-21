@@ -261,9 +261,14 @@ The agent can compute this directly from the doc file at
 
 ## Test directives you may use
 
-The bundle is run by `slang-test`. The agentic suite runs on CI runners
-that have **no GPU**, so only directives that work without one are
-allowed:
+The bundle is run by `slang-test`. **CI has full runner access**
+(GPU, DXC, nvrtc, Apple toolchain, etc.); the agent runtime that
+generates tests may not. The agent commits any test that has a
+`//TEST` (or `//DIAGNOSTIC_TEST`) directive and at least one CHECK
+pattern, even if the agent cannot execute the directive locally.
+CI catches behavioral failures.
+
+Allowed directives (any of these — pick what fits the claim):
 
 | Directive                                                                | When to use                                                          |
 | ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
@@ -274,15 +279,30 @@ allowed:
 | `//TEST:SIMPLE(filecheck=CHECK):-target wgsl`                            | Compile to WGSL text and FileCheck the emitted code.                 |
 | `//TEST:SIMPLE(filecheck=CHECK):-target cuda`                            | Compile to CUDA C++ text and FileCheck the emitted code.             |
 | `//TEST:SIMPLE(filecheck=CHECK):-target cpp`                             | Compile to CPU C++ text and FileCheck the emitted code.              |
+| `//TEST:SIMPLE(filecheck=CHECK):-target dxil`                            | Compile to DXIL bytecode and FileCheck the emitted code (CI-only).   |
 | `//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):`                                  | Verify a diagnostic is emitted with the expected text/severity/code. |
 | `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type` | CPU compute kernel; verify the buffer values.                        |
+| `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type`  | Vulkan compute kernel; verify the buffer values (CI-only).           |
+| `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -output-using-type` | D3D12 compute kernel; verify the buffer values (CI-only).            |
+| `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type` | CUDA compute kernel; verify the buffer values (CI-only).             |
 | `//TEST:INTERPRET(filecheck=CHECK):`                                     | Run under `slangi` (byte-code interpreter).                          |
 | `//TEST:SIMPLE...-dump-ir...`                                            | Inspect IR via FileCheck patterns.                                   |
 
-Do **not** use any directive that requires a real GPU (Vulkan, D3D12,
-Metal, WGSL runtime, OptiX, etc.). If a behavior can only be exercised
-on a GPU, document it as a doc-gap-like note in `README.md` under
-`## Out of scope (no-GPU runner)` and skip it.
+**Required for every directive:** at least one `// CHECK:` (or
+`/*CHECK:` block) somewhere in the file that the directive's
+matcher will consume. A `//TEST` directive with no corresponding
+CHECK pattern is rejected by lint — such a test runs but verifies
+nothing.
+
+If a claim is genuinely unobservable through any `slang-test`
+directive even with full runner access (e.g., the claim is about a
+C++ template pattern with no CLI surface), record it in the
+`## Out of scope` table with the appropriate `Reason` tag. If the
+claim is observable but the test would only be validatable in CI
+(needs a GPU runner / DXC / nvrtc / etc.), still write the test —
+CI validates it. Record nothing extra; the `gpu-*` Backend tags in
+the `## Untested coverable claims` table are only used when no test
+has been written yet.
 
 ### Exercise as many backends as the claim allows
 

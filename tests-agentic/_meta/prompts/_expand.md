@@ -54,6 +54,16 @@ contract.
    //META: intent=expansion
    ```
 
+   Every new test must declare at least one matcher
+   (`filecheck=NAME` / `filecheck-buffer=NAME` / `diag=NAME`) and
+   carry at least one matching `// NAME:` pattern (or the FileCheck
+   variants `NAME-DAG:` / `NAME-NEXT:` / etc.). Lint rejects tests
+   that run but verify nothing. You do not need to execute the test
+   locally — CI runs the full matrix and catches behavioral
+   failures. If the test targets a backend your runtime cannot run
+   (`-target dxil`, `-target dx12`, `-target cuda`, etc.), commit it
+   anyway; CI validates it.
+
 4. **Do not modify existing tests.** Bootstrap tests are stable. If
    you find a flaw in an existing test, write the finding into
    `README.md` under `## Bootstrap test issues observed` and let the
