@@ -175,11 +175,14 @@ SLANG_UNIT_TEST(precompiledModuleWithoutSourceWithUpToDateCheck)
         SLANG_CHECK(module != nullptr);
 
         ComPtr<slang::IComponentType> linkedProgram;
-        module->link(linkedProgram.writeRef());
+        SLANG_CHECK(module->link(linkedProgram.writeRef()) == SLANG_OK);
+        SLANG_CHECK(linkedProgram != nullptr);
 
         ComPtr<slang::IBlob> code;
-        linkedProgram->getTargetCode(0, code.writeRef(), diagnosticBlob.writeRef());
-
+        SLANG_CHECK(
+            linkedProgram->getTargetCode(0, code.writeRef(), diagnosticBlob.writeRef()) ==
+            SLANG_OK);
+        SLANG_CHECK(code != nullptr);
         SLANG_CHECK(code->getBufferSize() > 0);
     }
 }
