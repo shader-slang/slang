@@ -3,6 +3,7 @@
 
 //TEST:SIMPLE(filecheck=HLSL68): -target hlsl -profile sm_6_8 -stage raygeneration -entry rgen_main
 //TEST:SIMPLE(filecheck=HLSL67): -target hlsl -profile sm_6_7 -stage raygeneration -entry rgen_main
+//TEST:SIMPLE(filecheck=DXIL67): -target dxil -profile sm_6_7 -stage raygeneration -entry rgen_main
 //TEST:SIMPLE(filecheck=HLSLLIB): -target hlsl -profile lib_6_7 -stage raygeneration -entry rgen_main
 //TEST:SIMPLE(filecheck=HLSL66): -target hlsl -profile sm_6_6 -stage raygeneration -entry rgen_main
 //TEST:SIMPLE(filecheck=DXIL68): -target dxil -profile sm_6_8 -stage raygeneration -entry rgen_main
@@ -32,6 +33,8 @@
 // HLSL66-NOT: : write(
 // DXIL68: define void @
 // DXIL68: !dx.dxrPayloadAnnotations
+// DXIL67: define void @
+// DXIL67: !dx.dxrPayloadAnnotations
 // DXIL66: define void @
 // DXIL66-NOT: !dx.dxrPayloadAnnotations
 
