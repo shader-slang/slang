@@ -10,6 +10,7 @@
 // the collision before synthesizing the second parameter.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -trace-coverage -trace-coverage-binding 3 0 -profile cs_5_0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -trace-branch-coverage -trace-coverage-binding 3 0 -profile cs_5_0
 
 RWStructuredBuffer<uint> userBuf : register(u3, space0);
 //CHECK:                 ^^^^^^^ error E45101

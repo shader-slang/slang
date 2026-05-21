@@ -4621,9 +4621,9 @@ struct CoverageEntryInfo
 
     /// 1-based source line for this coverage entry, or 0 if the entry
     /// could not be attributed to a real source line. The current
-    /// implementation reports line-oriented entries; future revisions
-    /// may attach additional fields describing branch/function/region
-    /// semantics.
+    /// implementation reports line, function, and branch entries;
+    /// future revisions may add source-region entries or additional
+    /// branch forms.
     uint32_t line = 0;
 
     /// Counter slot used by this entry, or
@@ -4719,13 +4719,6 @@ struct ICoverageTracingMetadata : public ISlangCastable
     /// derived from other counters.
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() = 0;
 
-    /// Number of source coverage entries available through
-    /// `getEntryInfo`. The current line/function/branch producers have
-    /// one entry per counter, but future source-region coverage may
-    /// expose entries that do not map one-to-one with runtime counter
-    /// slots.
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() = 0;
-
     /// Populate `outInfo` with attribution info for source coverage
     /// entry `index`. The valid range is `[0, getEntryCount())`. The
     /// caller must pre-set `outInfo->structSize` to the size of the
@@ -4750,6 +4743,13 @@ struct ICoverageTracingMetadata : public ISlangCastable
     /// should query `ISyntheticResourceMetadata` from the same
     /// `IMetadata` object.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo* outInfo) = 0;
+
+    /// Number of source coverage entries available through
+    /// `getEntryInfo`. The current line/function/branch producers have
+    /// one entry per counter, but future source-region coverage may
+    /// expose entries that do not map one-to-one with runtime counter
+    /// slots.
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() = 0;
 };
     #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()
 

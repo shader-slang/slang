@@ -863,7 +863,7 @@ SLANG_UNIT_TEST(coverageTracingSpecializedEntryPointMetadata)
     SLANG_CHECK(coverage->getCounterCount() > 0);
     SLANG_CHECK(coverage->getEntryCount() > 0);
 
-    bool seenGenericHelperFunction = false;
+    uint32_t genericHelperFunctionCount = 0;
     bool seenComputeMainFunction = false;
     bool seenTrueArm = false;
     bool seenFalseArm = false;
@@ -881,7 +881,7 @@ SLANG_UNIT_TEST(coverageTracingSpecializedEntryPointMetadata)
             if (functionName.indexOf(toSlice("computeMain")) != -1)
                 seenComputeMainFunction = true;
             if (functionName.indexOf(toSlice("genericHelper")) != -1)
-                seenGenericHelperFunction = true;
+                genericHelperFunctionCount++;
         }
         else if (entry.kind == slang::CoverageEntryKind::Branch)
         {
@@ -893,7 +893,11 @@ SLANG_UNIT_TEST(coverageTracingSpecializedEntryPointMetadata)
     }
 
     SLANG_CHECK(seenComputeMainFunction);
-    SLANG_CHECK(seenGenericHelperFunction);
+    // Generic specializations share one source-level function coverage
+    // entry. Specialized code may contain multiple calls/clones, but
+    // the metadata stays source-oriented to avoid per-specialization
+    // counter-entry fanout.
+    SLANG_CHECK(genericHelperFunctionCount == 1);
     SLANG_CHECK(seenTrueArm);
     SLANG_CHECK(seenFalseArm);
 }

@@ -201,6 +201,59 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         )
         self.assertEqual(result.stderr, "")
 
+    def test_reads_v2_function_mangled_name_fallback(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "entries": [
+                {
+                    "kind": "function",
+                    "counter": 0,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 11,
+                    "function_mangled": "_S6helper",
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "3\n")
+
+        self.assertEqual(
+            result.stdout,
+            "TN:shader_coverage\n"
+            "SF:shader.slang\n"
+            "FN:11,_S6helper\n"
+            "FNDA:3,_S6helper\n"
+            "FNF:1\n"
+            "FNH:1\n"
+            "end_of_record\n",
+        )
+        self.assertEqual(result.stderr, "")
+
+    def test_skips_v2_function_entries_without_names(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "entries": [
+                {
+                    "kind": "function",
+                    "counter": 0,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 11,
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "3\n")
+
+        self.assertEqual(result.stdout, "TN:shader_coverage\n")
+        self.assertIn(
+            "note: skipped 1 function entries without a name not representable in LCOV",
+            result.stderr,
+        )
+
     def test_reports_unrepresented_v2_kinds(self):
         manifest = {
             "version": 2,
