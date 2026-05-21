@@ -280,7 +280,6 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             copy-dxcompiler
             copy-dxil
             copy-webgpu_dawn
-            copy-dawn
             copy-slang-tint
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
@@ -396,6 +395,17 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         REQUIRED_BY slang-test
         FOLDER test/tools
     )
+
+    if(SLANG_HAS_WEBGPU_SUPPORT AND CMAKE_SYSTEM_NAME MATCHES "Linux|Darwin")
+        # slang-rhi loads Dawn from the directory containing the module/executable that
+        # contains RHI. Put render-test beside the runtime sidecar libraries in WGPU builds.
+        set_target_properties(
+            render-test
+            PROPERTIES
+                LIBRARY_OUTPUT_DIRECTORY
+                    "${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}"
+        )
+    endif()
 
     slang_add_target(
         slang-unit-test

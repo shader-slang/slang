@@ -567,36 +567,6 @@ if(SLANG_WEBGPU_DAWN_BINARY_URL)
     )
 endif()
 
-# slang-rhi copies Dawn next to executables. On non-Windows builds, render-test
-# is a module under lib/ and the WGPU loader expects Dawn next to that module.
-if(
-    SLANG_HAS_WEBGPU_SUPPORT
-    AND TARGET slang-rhi-copy-files
-    AND CMAKE_SYSTEM_NAME MATCHES "Linux|Darwin"
-)
-    set(slang_dawn_shared_library
-        "${CMAKE_SHARED_LIBRARY_PREFIX}dawn${CMAKE_SHARED_LIBRARY_SUFFIX}"
-    )
-    set(slang_dawn_runtime_path
-        "${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/${slang_dawn_shared_library}"
-    )
-    set(slang_dawn_module_path
-        "${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}/${slang_dawn_shared_library}"
-    )
-    add_custom_target(
-        copy-dawn
-        COMMAND
-            ${CMAKE_COMMAND} -E make_directory
-            "${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}"
-        COMMAND
-            ${CMAKE_COMMAND} -E copy_if_different "${slang_dawn_runtime_path}"
-            "${slang_dawn_module_path}"
-        DEPENDS slang-rhi-copy-files
-        VERBATIM
-    )
-    set_target_properties(copy-dawn PROPERTIES FOLDER generated)
-endif()
-
 # slang-tint is only available as a fetched shared library, since it's hosted in the Dawn
 # repository, and Dawn's nested source trees are too large and onerous for us to depend
 # on.
