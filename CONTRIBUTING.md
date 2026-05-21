@@ -13,6 +13,10 @@ This document is designed to guide you in contributing to the project. It is int
 - Changes should ideally come in as small pull requests on top of master, coming from your own personal fork of the project.
 - Large features that will involve multiple contributors or a long development time should be discussed in issues and broken down into smaller pieces that can be implemented and checked in stages.
 
+## AI-Assisted Contributions
+
+By submitting a Contribution to this repository, you additionally represent that, to the extent any of Your Contributions were developed with the assistance of artificial intelligence tools or AI-generated code, You have exercised sufficient review, judgment, and creative direction over such tools and resulting material to reasonably consider it Your original creation, and You are not aware of any third-party license, intellectual property claim, or other restriction arising from such use that is associated with any part of Your Contribution or use thereof.
+
 ## Table of Contents
 
 1. [Contribution Process](#contribution-process)
