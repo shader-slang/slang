@@ -2133,10 +2133,25 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
         }
     }
 
-    if (auto readAccessSemantic = inst->findDecoration<IRStageReadAccessDecoration>())
-        _emitStageAccessSemantic(readAccessSemantic, "read");
-    if (auto writeAccessSemantic = inst->findDecoration<IRStageWriteAccessDecoration>())
-        _emitStageAccessSemantic(writeAccessSemantic, "write");
+    // Payload access qualifiers (`: read(...)` / `: write(...)`) are an
+    // SM 6.7+ feature; suppress them on older profiles to match the
+    // suppression of `[raypayload]` in `emitPostKeywordTypeAttributesImpl`.
+    bool paqsEnabled = false;
+    {
+        auto profile = getTargetProgram()->getOptionSet().getProfile();
+        if (profile.getFamily() == ProfileFamily::DX &&
+            profile.getVersion() >= ProfileVersion::DX_6_7)
+        {
+            paqsEnabled = true;
+        }
+    }
+    if (paqsEnabled)
+    {
+        if (auto readAccessSemantic = inst->findDecoration<IRStageReadAccessDecoration>())
+            _emitStageAccessSemantic(readAccessSemantic, "read");
+        if (auto writeAccessSemantic = inst->findDecoration<IRStageWriteAccessDecoration>())
+            _emitStageAccessSemantic(writeAccessSemantic, "write");
+    }
 
     if (auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
     {
