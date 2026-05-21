@@ -46,7 +46,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -111,13 +111,8 @@ jobs:
 
       # Cores are written to /var/cores by kernel.core_pattern (set in the
       # scaler's startup.sh on the host before this container started).
-      # /var/cores is bind-mounted in via container.options. Install gdb so
-      # the post-test step can extract backtraces.
-      - name: Install gdb for core extraction
-        run: |
-          if ! command -v gdb >/dev/null 2>&1; then
-            apt-get update && apt-get install -y --no-install-recommends gdb
-          fi
+      # /var/cores is bind-mounted in via container.options. gdb is baked
+      # into the container image so the post-test step can extract backtraces.
 
       - name: Test Slang
         run: |
@@ -293,7 +288,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -357,12 +352,8 @@ jobs:
           print-env-info
 
       # Cores land in /var/cores via the host's kernel.core_pattern (set in
-      # the scaler's startup.sh on the host). gdb is needed to extract them.
-      - name: Install gdb for core extraction
-        run: |
-          if ! command -v gdb >/dev/null 2>&1; then
-            apt-get update && apt-get install -y --no-install-recommends gdb
-          fi
+      # the scaler's startup.sh on the host). gdb is baked into the container
+      # image so the post-test step can extract backtraces.
 
       - name: Run slang-rhi tests
         run: |
