@@ -2682,7 +2682,8 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         return nullptr;
 
     // In HLSL, `const` is used to mark compile-time constant expressions.
-    if (!decl->hasModifier<ConstModifier>())
+    // `constexpr` carries `ConstExprModifier` and is also a compile-time constant.
+    if (!decl->hasModifier<ConstModifier>() && !decl->hasModifier<ConstExprModifier>())
         return nullptr;
 
     // The values of specialization constants aren't known at compile time even

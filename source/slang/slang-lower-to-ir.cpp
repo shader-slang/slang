@@ -10786,8 +10786,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo lowerConstantDeclCommon(VarDeclBase* decl)
     {
-        // It's constant, so shoul dhave this modifier
-        SLANG_ASSERT(decl->hasModifier<ConstModifier>());
+        // It's constant, so should have either `const` or `constexpr`.
+        SLANG_ASSERT(decl->hasModifier<ConstModifier>() || decl->hasModifier<ConstExprModifier>());
 
         NestedContext nested(this);
         auto subBuilder = nested.getBuilder();
@@ -10903,9 +10903,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             return lowerGlobalShaderParam(decl);
         }
 
-        // A `static const` global is actually a compile-time constant.
+        // A `static const` global or any `constexpr` global is a compile-time constant.
         //
-        if (decl->hasModifier<HLSLStaticModifier>() && decl->hasModifier<ConstModifier>())
+        if (isConstExprVar(decl))
         {
             return lowerGlobalConstantDecl(decl);
         }
@@ -10979,8 +10979,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo lowerFunctionStaticVarDecl(VarDeclBase* decl)
     {
-        // We know the variable is `static`, but it might also be `const.
-        if (decl->hasModifier<ConstModifier>())
+        // We know the variable is `static`, but it might also be `const` or `constexpr`.
+        if (decl->hasModifier<ConstModifier>() || decl->hasModifier<ConstExprModifier>())
             return lowerFunctionStaticConstVarDecl(decl);
 
         // A function-scope `static` variable is effectively a global,
