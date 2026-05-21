@@ -72,20 +72,24 @@ jobs:
     # workflow_run fires for every completed run of the listed workflows;
     # workflow_dispatch is the manual escape hatch. Both modes share the
     # same ingest path.
-    if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
+    #
+    # Default-branch guard: workflow_dispatch lets the operator choose a
+    # ref, and the chosen ref's copy of this YAML is what executes. Without
+    # this guard, anyone with write access could push a branch that modifies
+    # ci-telemetry.yml and dispatch from there to impersonate the ingest SA.
+    # The WIF binding's workflow_ref condition is the IAM-layer defense; this
+    # is the workflow-layer defense. github.ref is the workflow file's ref,
+    # not the triggering run's ref, so this correctly rejects manual runs
+    # from non-default branches.
+    if: |
+      (github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch')
+      && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
       actions: read
       id-token: write # for google-github-actions/auth (OIDC → WIF → ingest SA)
-
-    env:
-      # The ingester reads this to authenticate to the GitHub API. Inside
-      # workflow_run, GITHUB_TOKEN is auto-scoped to the base repo with
-      # actions:read; reads of run/job/artifact data for the triggering run
-      # are allowed even when that run came from a fork PR.
-      GH_TOKEN: ${{ github.token }}
 
     steps:
       - name: Checkout (master, NEVER the triggering ref)
@@ -133,19 +137,26 @@ jobs:
             run_id="${DISPATCH_RUN_ID}"
             run_attempt="${DISPATCH_RUN_ATTEMPT}"
           fi
-          # Defensive validation: both must be positive integers. ci_bq_ingest
-          # treats them as ints, but reject early so the failure surfaces here
-          # rather than mid-ingest.
+          # Defensive validation: both must be positive integers (run IDs
+          # and attempt numbers are always >= 1 in GitHub Actions).
+          # ci_bq_ingest treats them as ints, but reject early so the failure
+          # surfaces here rather than mid-ingest.
           case "$run_id" in
-            ''|*[!0-9]*) echo "::error::invalid run_id: $run_id"; exit 1 ;;
+            ''|0|*[!0-9]*) echo "::error::invalid run_id: $run_id"; exit 1 ;;
           esac
           case "$run_attempt" in
-            ''|*[!0-9]*) echo "::error::invalid run_attempt: $run_attempt"; exit 1 ;;
+            ''|0|*[!0-9]*) echo "::error::invalid run_attempt: $run_attempt"; exit 1 ;;
           esac
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
           echo "run_attempt=$run_attempt" >> "$GITHUB_OUTPUT"
 
       - name: Ingest
+        # GH_TOKEN is scoped to this single step. The ingester uses it to
+        # call the GitHub API (run/jobs/artifacts endpoints). It's the
+        # only step that touches gh; checkout uses its own
+        # persist-credentials toggle, and the gcloud auth path is separate.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           python extras/ci/analytics/ci_bq_ingest.py \
             --run-id "${{ steps.target.outputs.run_id }}" \
