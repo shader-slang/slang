@@ -35,7 +35,7 @@ Subcommands
                                the current digests, HEAD commit, and
                                now() as the generation timestamp. Pass
                                --commit / --model to override.
-    lint [<bundle>...]         Structural linter (BUNDLE.md front-matter
+    lint [<bundle>...]         Structural linter (README.md front-matter
                                present + valid, every .slang file has a
                                //META block, doc_ref resolves, size cap
                                respected) on the given bundles (default:
@@ -432,7 +432,7 @@ _TEST_META_LINE_RE = re.compile(r"^//META:\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)
 
 
 def parse_bundle_front_matter(text: str) -> dict | None:
-    """Parse BUNDLE.md front-matter as a flat mapping."""
+    """Parse README.md front-matter as a flat mapping."""
     m = _FM_RE.match(text)
     if not m:
         return None
@@ -502,20 +502,20 @@ _REQUIRED_BUNDLE_FM_KEYS = (
 def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
     issues: list[LintIssue] = []
     bdir = REPO_ROOT / spec.dir
-    bundle_md = bdir / "BUNDLE.md"
+    bundle_md = bdir / "README.md"
     if not bdir.exists():
         # Missing bundle is reported by list-stale, not lint. Lint only
         # checks bundles that exist on disk.
         return issues
     if not bundle_md.exists():
-        issues.append(LintIssue(spec.dir, "error", "BUNDLE.md missing"))
+        issues.append(LintIssue(spec.dir, "error", "README.md missing"))
         return issues
     text = bundle_md.read_text(encoding="utf-8")
     fm = parse_bundle_front_matter(text)
     if fm is None:
         issues.append(
             LintIssue(
-                f"{spec.dir}/BUNDLE.md",
+                f"{spec.dir}/README.md",
                 "error",
                 "missing or malformed YAML front-matter",
             )
@@ -525,7 +525,7 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
             if k not in fm:
                 issues.append(
                     LintIssue(
-                        f"{spec.dir}/BUNDLE.md",
+                        f"{spec.dir}/README.md",
                         "error",
                         f"front-matter missing key: {k}",
                     )
@@ -533,7 +533,7 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
         if fm.get("generated", "").lower() != "true":
             issues.append(
                 LintIssue(
-                    f"{spec.dir}/BUNDLE.md",
+                    f"{spec.dir}/README.md",
                     "error",
                     "front-matter generated must be true",
                 )
@@ -541,7 +541,7 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
         if fm.get("source_doc") and fm["source_doc"] != spec.source_doc:
             issues.append(
                 LintIssue(
-                    f"{spec.dir}/BUNDLE.md",
+                    f"{spec.dir}/README.md",
                     "error",
                     "front-matter source_doc"
                     f" {fm['source_doc']!r} does not match manifest source_doc"
@@ -649,8 +649,8 @@ def _classify(
     cur_doc = compute_source_doc_digest(spec)
     entry = freshness.get("bundles", {}).get(spec.key)
     bdir = REPO_ROOT / spec.dir
-    if entry is None or not (bdir / "BUNDLE.md").exists():
-        return "missing", "no freshness entry or BUNDLE.md", cur_watched, cur_doc
+    if entry is None or not (bdir / "README.md").exists():
+        return "missing", "no freshness entry or README.md", cur_watched, cur_doc
     if cur_doc is None:
         return "stale", "source_doc missing on disk", cur_watched, cur_doc
     if entry.get("source_doc_digest") != cur_doc:

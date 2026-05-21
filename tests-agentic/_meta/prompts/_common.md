@@ -9,7 +9,7 @@ per-section prompt wins for that bundle.
 You are producing a **test bundle**: a directory at
 `tests-agentic/<bundle-key>/` containing:
 
-- exactly one `BUNDLE.md` with YAML front-matter and a claims/tests index;
+- exactly one `README.md` with YAML front-matter and a claims/tests index;
 - N `.slang` test files, each with a `//META` block at the top;
 - optionally, `.expected` outputs alongside their `.slang` files.
 
@@ -38,11 +38,11 @@ The right move when an expansion pass is requested is: re-read the
 source doc more carefully, find behaviors that are mentioned but
 under-represented in the current bundle, and add tests for those. If a
 claim isn't in the doc, _don't write a test for it_ — instead, record a
-"doc-gap" finding in `BUNDLE.md` under `## Doc gaps observed`.
+"doc-gap" finding in `README.md` under `## Doc gaps observed`.
 
-## BUNDLE.md front-matter
+## README.md front-matter
 
-Every `BUNDLE.md` must begin with:
+Every `README.md` must begin with:
 
 ```yaml
 ---
@@ -60,7 +60,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 Compute `watched_paths_digest` and `source_doc_digest` with
 `python3 tests-agentic/_meta/regenerate.py digest <bundle>`.
 
-## BUNDLE.md body structure
+## README.md body structure
 
 ```markdown
 # Tests for <bundle-key>
@@ -144,7 +144,7 @@ allowed:
 
 Do **not** use any directive that requires a real GPU (Vulkan, D3D12,
 Metal, WGSL runtime, OptiX, etc.). If a behavior can only be exercised
-on a GPU, document it as a doc-gap-like note in `BUNDLE.md` under
+on a GPU, document it as a doc-gap-like note in `README.md` under
 `## Out of scope (no-GPU runner)` and skip it.
 
 ### Exercise as many backends as the claim allows

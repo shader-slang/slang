@@ -49,7 +49,7 @@ that **the identifier is in fact bound to its documented role**.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. One test file per verifiable claim. A claim is "verifiable" via
    `slangc` / `slangi` if its consequence can be observed in a small,
    self-contained compile:
@@ -112,7 +112,7 @@ doc explicitly hands off):
 - `docs/llm-generated/syntax-reference/grammar.md`
 
 If you would cite anything else, stop and record a doc-gap finding in
-`BUNDLE.md`.
+`README.md`.
 
 ## Source files you may consult for _verification only_
 

@@ -11,7 +11,7 @@
 
 // Expansion: square 3x3 shape with half element type. The
 // interpreter lacks lane-extraction handlers for half matrices
-// (see Compiler-bug observations in BUNDLE.md), so we observe
+// (see Compiler-bug observations in README.md), so we observe
 // the type via HLSL text emission instead.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry main

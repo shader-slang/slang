@@ -278,7 +278,7 @@ anchor names the type involved.
 - `docs/llm-generated/pipeline/03-semantic-check.md`
 
 If you would cite anything else, stop and record a doc-gap finding
-in `BUNDLE.md`.
+in `README.md`.
 
 ## Source files you may consult for verification only
 
@@ -293,7 +293,7 @@ through a particular surface form (e.g. that `T*` produces a
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. Use
+1. `README.md` with the structure named in `_common.md`. Use
    `## Out of scope` for the internal-shape claims and the
    GPU-only / synthesized-only classes named above.
 2. 18 to 35 `.slang` test files (size cap 60). The doc has ~150
@@ -368,9 +368,9 @@ regardless of backend):
 - [ ] No test was written by inspecting an uncovered source line.
       If you find yourself thinking "this would cover the branch at
       `slang-ast-type.h:NNNN`", stop and re-read the doc.
-- [ ] `BUNDLE.md` `## Out of scope` lists the internal-shape and
+- [ ] `README.md` `## Out of scope` lists the internal-shape and
       synthesized-only / GPU-only / autodiff-only / pack-only type
       classes that this bundle does not exercise, with one-line
       reasons.
-- [ ] `BUNDLE.md` `## Doc gaps observed` is honest. If a claim
+- [ ] `README.md` `## Doc gaps observed` is honest. If a claim
       wanted a test but its anchor was too coarse, record the gap.

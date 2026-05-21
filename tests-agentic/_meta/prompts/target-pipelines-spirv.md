@@ -267,7 +267,7 @@ test file.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. 20 to 35 `.slang` test files. Bundle is SPIR-V-target-only,
    so every file carries the single `//TEST:SIMPLE` directive
    targeting `spirv-asm`.
@@ -287,7 +287,7 @@ primary doc explicitly hands off):
 - `docs/llm-generated/cross-cutting/targets.md`
 
 If you would cite anything else, stop and instead record a
-doc-gap finding in `BUNDLE.md`.
+doc-gap finding in `README.md`.
 
 ## Source files you may consult for _verification only_
 

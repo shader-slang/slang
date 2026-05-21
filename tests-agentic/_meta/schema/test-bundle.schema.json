@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/shader-slang/slang/tests-agentic/_meta/schema/test-bundle.schema.json",
-  "title": "tests-agentic BUNDLE.md front-matter",
-  "description": "Schema for the YAML front-matter at the top of every tests-agentic/<bundle>/BUNDLE.md file.",
+  "title": "tests-agentic README.md front-matter",
+  "description": "Schema for the YAML front-matter at the top of every tests-agentic/<bundle>/README.md file.",
   "type": "object",
   "required": [
     "generated",

@@ -190,7 +190,7 @@ adjacent surfaces:
 - `docs/llm-generated/pipeline/03-semantic-check.md`
 
 If you would cite anything else, stop and record a doc-gap finding
-in `BUNDLE.md`.
+in `README.md`.
 
 ## Source files you may consult for verification only
 
@@ -207,7 +207,7 @@ that the doc does not make.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. Use
+1. `README.md` with the structure named in `_common.md`. Use
    `## Out of scope` for internal-shape claims and the
    pack-only / autodiff-only / capability-only `Val` classes.
 2. **8–15** `.slang` test files (the doc is overwhelmingly internal;
@@ -272,9 +272,9 @@ and its checker-attached behavior do not differ across backends):
 - [ ] No test was written by inspecting an uncovered source line.
       If you find yourself thinking "this would cover the branch at
       `slang-ast-val.h:NNNN`", stop and re-read the doc.
-- [ ] `BUNDLE.md` `## Out of scope` lists the internal-shape and
+- [ ] `README.md` `## Out of scope` lists the internal-shape and
       pack / autodiff / capability / existential `Val` classes that
       this bundle does not exercise, with one-line reasons.
-- [ ] `BUNDLE.md` `## Doc gaps observed` is honest. If a doc claim
+- [ ] `README.md` `## Doc gaps observed` is honest. If a doc claim
       lacks a surface spelling, record it as a gap rather than
       writing a source-targeting probe.

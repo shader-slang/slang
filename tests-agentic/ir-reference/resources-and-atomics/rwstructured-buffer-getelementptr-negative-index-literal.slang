@@ -11,7 +11,7 @@
 
 // Boundary probe: literal `-1` on the lvalue path; this hits the
 // signed-underflow corner. The doc states no runtime behavior at this
-// boundary (see Doc gaps observed in BUNDLE.md).
+// boundary (see Doc gaps observed in README.md).
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

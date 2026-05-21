@@ -22,7 +22,7 @@ inheritance, and modifier checking.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. A test file per **verifiable claim** in `pipeline/03-semantic-check.md`.
    A claim is "verifiable" if it makes a statement about observable
    behavior of `slangc`:
@@ -70,7 +70,7 @@ doc explicitly references them):
 - `docs/language-reference/declarations.md`
 
 If you would cite something else, stop and instead record a doc-gap
-finding in `BUNDLE.md`.
+finding in `README.md`.
 
 ## Source files you may consult for _verification only_
 
@@ -131,6 +131,6 @@ claims that the doc does not make.
       you find yourself thinking "this would cover the branch at
       `slang-check-overload.cpp:1234`", stop. Re-read the doc and only
       add the test if the doc supports it.
-- [ ] BUNDLE.md `## Doc gaps observed` is honest. If you wanted a
+- [ ] README.md `## Doc gaps observed` is honest. If you wanted a
       test you could not anchor, write down which claim the doc would
       need to add.

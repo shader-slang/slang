@@ -20,7 +20,7 @@ bundle.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. One test file per **verifiable claim** in
    `pipeline/01-lex-preprocess.md`. A claim is "verifiable" via
    `slangc` / `slangi` if its consequences can be observed in
@@ -68,7 +68,7 @@ primary doc explicitly hands off):
 - `docs/llm-generated/pipeline/overview.md`
 
 If you would cite anything else, stop and record a doc-gap finding
-in `BUNDLE.md`.
+in `README.md`.
 
 ## Source files you may consult for _verification only_
 
@@ -128,7 +128,7 @@ coverage and inflate runtime.
 - [ ] No test depends on a GPU. `INTERPRET`, `-target cpp` text
       emit, and diagnostic-only directives are the only ones used.
 - [ ] No test was written by inspecting an uncovered source line.
-- [ ] `BUNDLE.md` `## Doc gaps observed` is honest. If you wanted
+- [ ] `README.md` `## Doc gaps observed` is honest. If you wanted
       a test you could not anchor — for example a token-paste
       semantics claim more specific than what the doc states —
       write down which claim the doc would need to add.

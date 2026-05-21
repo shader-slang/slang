@@ -85,7 +85,7 @@ the term after 3 attempts and record it under `## Out of scope`.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. The
+1. `README.md` with the structure named in `_common.md`. The
    `## Doc gaps observed` section should be brief — the glossary is a
    lookup aid, not a contract surface; gaps mostly mean "term lacks an
    observable consequence" and should be listed under

@@ -128,7 +128,7 @@ file naming it.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. The
+1. `README.md` with the structure named in `_common.md`. The
    `## Out of scope (no-GPU runner)` section here doubles as the
    place to list file-tree, prefix-convention, and Lua-table
    claims that are not observable via slangc at all. **Expect
@@ -148,7 +148,7 @@ Primary (every `doc_ref` resolves into this):
 
 Secondary citations are not needed for this bundle. If you would
 cite anything else, stop and record a doc-gap finding in
-`BUNDLE.md`.
+`README.md`.
 
 ## Source files you may consult for _verification only_
 
@@ -195,7 +195,7 @@ emitted text, and **`-get-module-info`** round-trip. So:
 - [ ] No test depends on a GPU.
 - [ ] The dispatcher claim is exercised by **at least one test
       that runs against more than one text-emit target**.
-- [ ] `## Out of scope (no-GPU runner)` in `BUNDLE.md` is long
+- [ ] `## Out of scope (no-GPU runner)` in `README.md` is long
       and itemises file-tree claims, prefix conventions, Lua
       tables, IR-pass enumeration, and cross-cutting subsystem
       pointers.

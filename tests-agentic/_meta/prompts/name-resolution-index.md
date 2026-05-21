@@ -85,7 +85,7 @@ single-phase behavior, stop and route it to the peer bundle.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`, including
+1. `README.md` with the structure named in `_common.md`, including
    a `## Out of scope` section listing the peer bundles for the
    topics not covered here.
 2. **5–10 `.slang` tests**, each anchored to an anchor in the
@@ -136,7 +136,7 @@ index doc explicitly references them):
 - `docs/llm-generated/pipeline/04-ast-to-ir.md`
 
 If you would cite anything else, stop and record a doc-gap finding
-in `BUNDLE.md`.
+in `README.md`.
 
 ## Test directives
 
@@ -168,13 +168,13 @@ the test or change the angle to be specifically about
 **composition across phases**.
 
 Record the duplications you intentionally avoided in
-`BUNDLE.md` under `## Sibling-bundle overlap`.
+`README.md` under `## Sibling-bundle overlap`.
 
 ## Drop policy
 
 If you cannot anchor a candidate test to text in the index doc
 after **3 attempts** at re-reading the doc, drop the test and
-record the would-be claim in `BUNDLE.md` under `## Doc gaps
+record the would-be claim in `README.md` under `## Doc gaps
 observed`. The bundle's purpose is orientation; failing to find a
 testable index-level claim is itself a useful signal about the
 doc.
@@ -189,8 +189,8 @@ doc.
       overload).
 - [ ] At least one breadcrumb-to-IR coupling test exists.
 - [ ] No test duplicates a sibling-bundle test verbatim.
-- [ ] `BUNDLE.md` has `## Out of scope` listing the peer bundles
+- [ ] `README.md` has `## Out of scope` listing the peer bundles
       that own each delegated topic.
-- [ ] `BUNDLE.md` has `## Sibling-bundle overlap` listing
+- [ ] `README.md` has `## Sibling-bundle overlap` listing
       intentionally-avoided peer claims.
 - [ ] No `-dump-ir` directive is used. No GPU-only directive.

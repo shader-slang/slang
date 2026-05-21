@@ -17,7 +17,7 @@ observable consequences.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. One test file per **verifiable lexer claim** in the source doc. A
    claim is "verifiable" via `slangc` if its consequences can be
    observed in compilation behavior — for tokens, that usually means:
@@ -60,7 +60,7 @@ doc explicitly hands off):
 - `docs/llm-generated/pipeline/01-lex-preprocess.md`
 
 If you would cite anything else, stop and record a doc-gap finding in
-`BUNDLE.md`.
+`README.md`.
 
 ## Source files you may consult for _verification only_
 

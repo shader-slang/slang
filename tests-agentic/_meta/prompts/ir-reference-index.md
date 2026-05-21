@@ -113,7 +113,7 @@ peer bundle.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`,
+1. `README.md` with the structure named in `_common.md`,
    including a `## Out of scope` section listing the peer
    bundles for the topics not covered here.
 2. **3–8 `.slang` tests**, each anchored to an anchor in the
@@ -158,7 +158,7 @@ index doc explicitly references them):
 - `docs/llm-generated/pipeline/05-ir-passes.md`
 
 If you would cite anything else, stop and record a doc-gap
-finding in `BUNDLE.md`.
+finding in `README.md`.
 
 ## Test directives
 
@@ -189,13 +189,13 @@ specifically about **composition across families** or
 **index-level taxonomy claims**.
 
 Record the duplications you intentionally avoided in
-`BUNDLE.md` under `## Sibling-bundle overlap`.
+`README.md` under `## Sibling-bundle overlap`.
 
 ## Drop policy
 
 If you cannot anchor a candidate test to text in the index doc
 after **3 attempts** at re-reading the doc, drop the test and
-record the would-be claim in `BUNDLE.md` under `## Doc gaps
+record the would-be claim in `README.md` under `## Doc gaps
 observed`. The bundle's purpose is orientation; failing to
 find a testable index-level claim is itself a useful signal
 about the doc.
@@ -210,9 +210,9 @@ about the doc.
 - [ ] At least one AST-to-IR mapping test exists.
 - [ ] At least one decoration-attachment test exists.
 - [ ] No test duplicates a sibling-bundle opcode-catalog row.
-- [ ] `BUNDLE.md` has `## Out of scope` listing the peer
+- [ ] `README.md` has `## Out of scope` listing the peer
       bundles that own each delegated topic.
-- [ ] `BUNDLE.md` has `## Sibling-bundle overlap` listing
+- [ ] `README.md` has `## Sibling-bundle overlap` listing
       intentionally-avoided peer claims.
 - [ ] Every `-dump-ir` directive pairs with a text target and
       `-o /dev/null` (per `_common.md`).

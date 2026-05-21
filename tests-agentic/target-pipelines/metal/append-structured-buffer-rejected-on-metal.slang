@@ -14,7 +14,7 @@
 // `checkEntryPointDecorations` rejects `AppendStructuredBuffer<T>`
 // on the `compute` stage with E36107 before the pass can run.
 // This pins the documented diagnostic verbatim and corroborates
-// the doc-gap noted in BUNDLE.md.
+// the doc-gap noted in README.md.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target metal -entry main -stage compute
 

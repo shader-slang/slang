@@ -13,7 +13,7 @@
 // vector<half, 2>. The (element-type, count) operand pair carries
 // the half element type at the small-N=2 dimension. We add the
 // scalar components rather than the vectors directly because the
-// interpreter (see "compiler-bug observations" in BUNDLE.md) lacks
+// interpreter (see "compiler-bug observations" in README.md) lacks
 // a handler for vectorized half add; the (half, 2) operand pair
 // itself is what this test asserts.
 

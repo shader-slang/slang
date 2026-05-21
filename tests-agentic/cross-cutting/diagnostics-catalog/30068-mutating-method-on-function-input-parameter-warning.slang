@@ -4,7 +4,7 @@
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
 //META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
-//META: purpose=Drop placeholder for E30068 (mutating-method-on-function-input-parameter-warning); see BUNDLE.md
+//META: purpose=Drop placeholder for E30068 (mutating-method-on-function-input-parameter-warning); see README.md
 //META: intent=negative
 //META: pipeline_stage=check
 //META: catalog_code=30068
@@ -13,7 +13,7 @@
 
 // E30068 is the warning variant of E30067 covered by another file; the warning
 // path could not be isolated. Asserts that a trivial program does not spuriously
-// emit E30068. Documented in BUNDLE.md "Codes dropped".
+// emit E30068. Documented in README.md "Codes dropped".
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 

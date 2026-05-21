@@ -14,7 +14,7 @@
 // and does not affect control flow." The HLSL/Slang `select(c, x, y)`
 // builtin is the surface form that lowers to the `select` opcode
 // directly (the ternary `?:` lowers instead to short-circuit
-// `ifElse` — recorded as a doc gap in BUNDLE.md).
+// `ifElse` — recorded as a doc gap in README.md).
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

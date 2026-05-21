@@ -134,7 +134,7 @@ The testable consequences are:
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. 10 to 20 `.slang` test files. The bundle is multi-backend-heavy:
    the typical file carries multiple `//TEST:SIMPLE` directives, one
    per text-emit target where the claim is observable. Use distinct
@@ -161,7 +161,7 @@ doc explicitly hands off):
 - `docs/llm-generated/target-pipelines/index.md`
 
 If you would cite anything else, stop and instead record a doc-gap
-finding in `BUNDLE.md`.
+finding in `README.md`.
 
 ## Source files you may consult for _verification only_
 

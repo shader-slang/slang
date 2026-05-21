@@ -65,7 +65,7 @@ do not write tests that observe opcodes the doc lists as
 `global_hashed_string_literals`, `global_generic_param`) unless
 you can find a natural surface that produces them at the
 LOWER-TO-IR stage. Record any non-natural ones under
-`## Out of scope (no-GPU runner)` in `BUNDLE.md`.
+`## Out of scope (no-GPU runner)` in `README.md`.
 
 ## The translation rule: claims to observations
 
@@ -174,7 +174,7 @@ documented surface mapping.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. Use
+1. `README.md` with the structure named in `_common.md`. Use
    `## Out of scope (no-GPU runner)` as the home for the
    unobservable-via-slangc items listed above.
 2. 15 to 25 `.slang` test files. Aim for one observable opcode (or
@@ -198,7 +198,7 @@ primary doc explicitly hands off):
 - `docs/llm-generated/pipeline/04-ast-to-ir.md`
 
 If you would cite anything else, stop and record a doc-gap
-finding in `BUNDLE.md`.
+finding in `README.md`.
 
 ## Test directives
 
@@ -253,7 +253,7 @@ Do not use any GPU-only directive.
 - [ ] No test asserts a C++ wrapper-struct identity (`IRFunc`,
       `IRStructType`, `IRInterfaceType`, etc.) — the dump shows
       the lowercase opcode spelling (`func`, `struct`, `interface`).
-- [ ] BUNDLE.md `## Doc gaps observed` is honest.
+- [ ] README.md `## Doc gaps observed` is honest.
 
 ## Lessons captured (apply to this bundle as well)
 

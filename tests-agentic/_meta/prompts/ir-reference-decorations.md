@@ -164,7 +164,7 @@ stop — record it as out-of-scope and move on.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. Use
+1. `README.md` with the structure named in `_common.md`. Use
    `## Out of scope (no-GPU runner)` as the home for the
    unobservable items.
 2. **20 to 35** `.slang` test files. Aim for **one decoration per
@@ -187,7 +187,7 @@ primary doc explicitly hands off):
 - `docs/llm-generated/ast-reference/modifiers.md`
 
 If you would cite anything else, stop and record a doc-gap
-finding in `BUNDLE.md`.
+finding in `README.md`.
 
 ## Test directives
 
@@ -243,7 +243,7 @@ Do not use any GPU-only directive.
       (`nameHint`, `entryPoint`).
 - [ ] No test is anchored on a decoration whose `AST origin` is
       `(synthesized)` (record as out-of-scope instead).
-- [ ] BUNDLE.md `## Doc gaps observed` is honest.
+- [ ] README.md `## Doc gaps observed` is honest.
 
 ## Lessons captured (apply to this bundle as well)
 

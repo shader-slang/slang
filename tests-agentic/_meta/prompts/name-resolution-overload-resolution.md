@@ -38,7 +38,7 @@ directive per claim is sufficient.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. A test file per **verifiable overload-resolution claim** in
    `name-resolution/overload-resolution.md`. A claim is "verifiable"
    when its user-visible consequence is one of:
@@ -192,4 +192,4 @@ set** is built. Do not re-claim:
 - [ ] No GPU-only directive.
 - [ ] No test invented from source-line inspection. All claims
       anchor in the doc.
-- [ ] `BUNDLE.md` `## Doc gaps observed` is honest.
+- [ ] `README.md` `## Doc gaps observed` is honest.

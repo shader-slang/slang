@@ -127,7 +127,7 @@ The doc also says:
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. Use
+1. `README.md` with the structure named in `_common.md`. Use
    `## Out of scope (no-GPU runner)` as the home for the
    unobservable-via-slangc items listed above (the heading is a
    convention shared with `cross-cutting/ir-instructions`).
@@ -155,7 +155,7 @@ hand-off boundary):
 - `docs/llm-generated/pipeline/03-semantic-check.md`
 
 If you would cite something else, stop and record a doc-gap finding
-in `BUNDLE.md`.
+in `README.md`.
 
 ## Source files you may consult for _verification only_
 
@@ -233,7 +233,7 @@ Do not use any GPU-only directive.
 - [ ] No test was written by inspecting an uncovered source line.
       If you find yourself thinking "this would cover the branch at
       `slang-lower-to-ir.cpp:NNNN`", stop and re-read the doc.
-- [ ] BUNDLE.md `## Doc gaps observed` is honest. If you wanted a
+- [ ] README.md `## Doc gaps observed` is honest. If you wanted a
       test you could not anchor, write down which claim the doc
       would need to add.
 

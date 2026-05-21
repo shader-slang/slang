@@ -24,7 +24,7 @@ cross-target behavior.
 > **Recovery note.** This bundle was partially produced in wave 4 by
 > a subagent that stalled while iterating on a single diagnostic test
 > (`raytracing-capability-rejected-on-fragment.slang`). The 13 test
-> files survived; the BUNDLE.md and the one failing test's CHECK text
+> files survived; the README.md and the one failing test's CHECK text
 > were completed in the main loop. The stall surfaced one new
 > framework lesson, captured below under `## Framework feedback for
 > _common.md`.

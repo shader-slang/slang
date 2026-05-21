@@ -14,7 +14,7 @@
 // overload, but this overload requires a capability that is not
 // available in the `compute` stage on the `spirv` target. The
 // resulting error is `E36107` "unavailable features in entry point".
-// This is recorded as a doc-gap in BUNDLE.md.
+// This is recorded as a doc-gap in README.md.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -stage compute -entry main
 

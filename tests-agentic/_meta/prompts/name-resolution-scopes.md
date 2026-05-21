@@ -20,7 +20,7 @@ point P" (negative, observe an `undefined identifier` diagnostic).
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. A test file per **verifiable scoping claim** in
    `name-resolution/scopes.md`. A claim is "verifiable" when its
    user-visible consequence is one of:
@@ -74,7 +74,7 @@ doc explicitly references them):
 - `docs/llm-generated/pipeline/03-semantic-check.md`
 
 If you would cite anything else, stop and instead record a doc-gap
-finding in `BUNDLE.md`.
+finding in `README.md`.
 
 ## Source files you may consult for _verification only_
 
@@ -149,6 +149,6 @@ These apply here:
 - [ ] No test was written by inspecting an uncovered source line. If
       you find yourself thinking "this would cover the branch at
       `slang-lookup.cpp:NNNN`", stop. Re-read the doc.
-- [ ] BUNDLE.md `## Doc gaps observed` is honest. If you wanted a
+- [ ] README.md `## Doc gaps observed` is honest. If you wanted a
       test you could not anchor, write down which claim the doc
       would need to add.

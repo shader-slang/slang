@@ -15,7 +15,7 @@
 #   - source_doc is the docs/llm-generated/ file this bundle's tests
 #     derive their claims from. Its sha256 is tracked separately so doc
 #     edits invalidate the bundle.
-#   - depends_on lists other bundles whose BUNDLE.md is provided as
+#   - depends_on lists other bundles whose README.md is provided as
 #     context to the agent (Phase C cross-link pass). Mirrors the
 #     analogous depends_on in the docs manifest.
 #   - coverage_targets names the slangc source files this bundle is

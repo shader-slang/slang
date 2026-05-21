@@ -24,7 +24,7 @@ You produce a single **review report** at
 
 The operator gives you:
 
-- the bundle's `BUNDLE.md` and every `.slang` file in the bundle;
+- the bundle's `README.md` and every `.slang` file in the bundle;
 - the bundle's `source_doc` (the docs/llm-generated/ file the tests are
   anchored to);
 - the per-section prompt;
@@ -59,7 +59,7 @@ For each test in the bundle:
 
 For the bundle as a whole:
 
-7. **Front-matter valid.** Every required key in BUNDLE.md and in every
+7. **Front-matter valid.** Every required key in README.md and in every
    `//META` block.
 8. **Claims table consistent.** Every test file is listed under the
    `## Tests in this bundle` table.
@@ -80,9 +80,9 @@ review_report: true
 reviewer_model: <your model identifier, must NOT contain "claude" or "anthropic">
 reviewed_at: <ISO 8601 timestamp, UTC>
 target_bundle: <bundle-key>
-target_bundle_source_commit: <source_commit from BUNDLE.md>
-target_bundle_watched_paths_digest: <digest from BUNDLE.md>
-target_bundle_source_doc_digest: <digest from BUNDLE.md>
+target_bundle_source_commit: <source_commit from README.md>
+target_bundle_watched_paths_digest: <digest from README.md>
+target_bundle_source_doc_digest: <digest from README.md>
 source_commit: <git HEAD when you reviewed>
 checklist:
   doc_anchored: pass | partial | fail

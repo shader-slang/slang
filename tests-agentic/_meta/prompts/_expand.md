@@ -13,7 +13,7 @@ lines, file diffs, percentages, or any data about which branches of
 `slangc` are unexecuted. The operator gives you only:
 
 - the bundle name,
-- the bundle's `BUNDLE.md` and existing `.slang` files,
+- the bundle's `README.md` and existing `.slang` files,
 - the bundle's `source_doc`, and
 - the per-section prompt + `_common.md`.
 
@@ -41,7 +41,7 @@ contract.
    - parameter-shape variations the doc mentions (scalar / vector /
      matrix / array; precision modes; capability gates).
 
-2. **Cross-check the BUNDLE.md `## Claims enumerated` table.** If a
+2. **Cross-check the README.md `## Claims enumerated` table.** If a
    claim is listed but its `Tests` cell is thinner than peer claims,
    that is a strong signal of where to expand. If a claim is _not_
    listed and the doc supports it, add it to the table.
@@ -55,17 +55,17 @@ contract.
 
 4. **Do not modify existing tests.** Bootstrap tests are stable. If
    you find a flaw in an existing test, write the finding into
-   `BUNDLE.md` under `## Bootstrap test issues observed` and let the
+   `README.md` under `## Bootstrap test issues observed` and let the
    review/remediation loop handle it.
 
 5. **If the doc legitimately does not describe the under-tested
    behavior**, the right output is **not** a synthesized test. The
    right output is a bullet under `## Doc gaps observed` in
-   `BUNDLE.md`, naming the area and suggesting which prompt or doc
+   `README.md`, naming the area and suggesting which prompt or doc
    section needs to grow. Doc gaps are first-class output of the
    expansion loop.
 
-## Update BUNDLE.md
+## Update README.md
 
 After adding new tests:
 

@@ -13,7 +13,7 @@
 // heterogeneous numeric BasicExpressionType fields lowers each
 // field with its declared scalar type to HLSL. Half-field
 // composition fails under INTERPRET on this platform (see
-// BUNDLE.md compiler-bug notes) so we observe via HLSL text.
+// README.md compiler-bug notes) so we observe via HLSL text.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry main
 

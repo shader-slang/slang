@@ -138,7 +138,7 @@ that's an internal probe and the opcode itself isn't surfaced.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. Use
+1. `README.md` with the structure named in `_common.md`. Use
    `## Out of scope (no-GPU runner)` as the home for the
    unobservable-via-slangc items listed above.
 2. 12 to 22 `.slang` test files. Aim for one observable opcode (or
@@ -162,7 +162,7 @@ cross-bundle boundary):
 - `docs/llm-generated/pipeline/04-ast-to-ir.md`
 
 If you would cite anything else, stop and record a doc-gap finding
-in `BUNDLE.md`.
+in `README.md`.
 
 ## Test directives
 
@@ -210,7 +210,7 @@ Do not use any GPU-only directive.
 - [ ] No test asserts a C++ wrapper-struct identity (`IRLoop`,
       `IRIfElse`, etc.) — the dump shows the lowercase opcode
       spelling.
-- [ ] BUNDLE.md `## Doc gaps observed` is honest.
+- [ ] README.md `## Doc gaps observed` is honest.
 
 ## Lessons captured (apply to this bundle as well)
 

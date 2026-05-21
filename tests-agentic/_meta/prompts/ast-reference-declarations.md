@@ -120,7 +120,7 @@ declarations — which C++ field stores the type expression, which
 class is the parent in the C++ hierarchy, which parser callback
 allocates the node, whether `inner` of `GenericDecl` holds the
 genericized decl. These are unobservable through `slangc` text I/O.
-Record them under `## Out of scope` in `BUNDLE.md`. Examples:
+Record them under `## Out of scope` in `README.md`. Examples:
 
 - That `VarDecl::type` is a `TypeExp` (vs. a resolved `Type*`).
 - That `LetDecl` derives from `VarDecl` in C++ (only the immutability
@@ -193,7 +193,7 @@ takes.
 - `docs/llm-generated/pipeline/02-parse-ast.md`
 
 If you would cite anything else, stop and record a doc-gap finding in
-`BUNDLE.md`.
+`README.md`.
 
 ## Source files you may consult for _verification only_
 
@@ -209,7 +209,7 @@ claims that the doc does not make.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. List
+1. `README.md` with the structure named in `_common.md`. List
    internal-AST-shape claims under `## Out of scope` (using the same
    convention as `ast-reference/base/`).
 2. 25 to 50 `.slang` test files (size cap 80). The bundle is large by
@@ -286,11 +286,11 @@ behavior.
 - [ ] No test depends on a GPU. `INTERPRET` and diagnostic-only
       directives carry almost the whole bundle.
 - [ ] No test was written by inspecting an uncovered source line.
-- [ ] `BUNDLE.md` `## Doc gaps observed` is honest. If you wanted
+- [ ] `README.md` `## Doc gaps observed` is honest. If you wanted
       to test a behavior but the doc only describes the AST shape
       and not the user-facing role, write down which claim the doc
       would need to add.
 - [ ] Claims about internal AST shape (parent class in C++,
       private field names, FIDDLE tag, ASTBuilder allocation,
       synthesized-only classes) are recorded under
-      `## Out of scope` in `BUNDLE.md`, not as tests.
+      `## Out of scope` in `README.md`, not as tests.

@@ -12,7 +12,7 @@
 // Boundary axis: numeric edge — normalize of the zero vector. The
 // doc lists `normalize`-class intrinsics as HLSL-meta-module members
 // but says nothing about zero-vector semantics (see doc-gap note in
-// BUNDLE.md). We assert only front-end acceptance and emit-side
+// README.md). We assert only front-end acceptance and emit-side
 // preservation of the call.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute

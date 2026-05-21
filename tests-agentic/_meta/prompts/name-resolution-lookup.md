@@ -30,7 +30,7 @@ check, so a single directive per claim is sufficient (the
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. A test file per **verifiable lookup claim** in
    `name-resolution/lookup.md`. A claim is "verifiable" when its
    user-visible consequence is one of:
@@ -149,7 +149,7 @@ primary doc explicitly references them):
 - `docs/llm-generated/glossary.md`
 
 If you would cite anything else, stop and instead record a doc-gap
-finding in `BUNDLE.md`.
+finding in `README.md`.
 
 ## Source files you may consult for _verification only_
 
@@ -236,7 +236,7 @@ the lookup algorithm resolves once it starts:
   that exercises the sibling-scope lookup path explicitly.
 - builtin-from-implicit-core-module → scopes owns this.
 
-When in doubt, write a one-line note in `BUNDLE.md` under
+When in doubt, write a one-line note in `README.md` under
 `## Sibling-bundle overlap` recording the choice.
 
 ## Quality checklist (in addition to `_common.md`'s)
@@ -260,8 +260,8 @@ When in doubt, write a one-line note in `BUNDLE.md` under
 - [ ] No test was written by inspecting an uncovered source line. If
       you find yourself thinking "this would cover the branch at
       `slang-lookup.cpp:NNNN`", stop. Re-read the doc.
-- [ ] `BUNDLE.md` `## Doc gaps observed` is honest. If you wanted a
+- [ ] `README.md` `## Doc gaps observed` is honest. If you wanted a
       test you could not anchor, write down which claim the doc
       would need to add.
-- [ ] `BUNDLE.md` `## Sibling-bundle overlap` is honest. List the
+- [ ] `README.md` `## Sibling-bundle overlap` is honest. List the
       scopes claims you intentionally avoided.

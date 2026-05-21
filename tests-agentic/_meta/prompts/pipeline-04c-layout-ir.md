@@ -178,7 +178,7 @@ layout-IR module has been merged in.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. Use
+1. `README.md` with the structure named in `_common.md`. Use
    `## Out of scope (no-GPU runner)` as the home for unobservable
    items.
 2. 8–14 `.slang` test files. All are
@@ -196,7 +196,7 @@ Primary (every `doc_ref` resolves into this):
 - `docs/llm-generated/pipeline/04c-layout-ir.md`
 
 If you would cite anything else, stop and record a doc-gap finding
-in `BUNDLE.md`.
+in `README.md`.
 
 ## Source files you may consult for _verification only_
 

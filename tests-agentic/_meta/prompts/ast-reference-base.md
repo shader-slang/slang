@@ -98,7 +98,7 @@ disguise.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. The
+1. `README.md` with the structure named in `_common.md`. The
    `## Out of scope (no-GPU runner)` section here doubles as the
    place to list claims that aren't observable via slangc at all (not
    GPU-related, but identical in spirit: out of reach of the runner).
@@ -118,7 +118,7 @@ doc explicitly hands off):
 - `docs/llm-generated/syntax-reference/grammar.md`
 
 If you would cite anything else, stop and record a doc-gap finding in
-`BUNDLE.md`.
+`README.md`.
 
 ## Source files you may consult for _verification only_
 
@@ -162,5 +162,5 @@ parser/checker that runs before any backend), so:
 - [ ] Claims about internal AST shape (NodeBase discriminator,
       ASTBuilder pointer, `Val::m_operands` layout, support-type
       structure) are recorded under
-      `## Out of scope (no-GPU runner)` in `BUNDLE.md`, not as
+      `## Out of scope (no-GPU runner)` in `README.md`, not as
       tests.

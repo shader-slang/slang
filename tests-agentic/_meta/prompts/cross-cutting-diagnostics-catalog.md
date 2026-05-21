@@ -111,7 +111,7 @@ This makes the bundle browseable by code and by name.
   you can't find a minimum input that fires a specific code after 2
   attempts, **drop it**. List dropped codes under
   `## Codes dropped (could not reach from minimum input)` in
-  `BUNDLE.md` with a one-line reason ("internal diagnostic with no
+  `README.md` with a one-line reason ("internal diagnostic with no
   user trigger" / "requires multi-file test" / "requires API
   surface not available to slangc CLI" / etc.).
 - **Don't lock in buggy behavior.** If the compiler emits something
@@ -123,9 +123,9 @@ This makes the bundle browseable by code and by name.
   notes, info. `intent=negative` for all of them (we are testing
   that the compiler emits the right diagnostic).
 
-## BUNDLE.md structure
+## README.md structure
 
-The first agent to land in this directory creates BUNDLE.md; later
+The first agent to land in this directory creates README.md; later
 agents in the same wave **append** to its tables. Each agent owns
 its bucket's rows. Sections:
 

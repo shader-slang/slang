@@ -14,7 +14,7 @@
 // LOWER-TO-IR dump records this as the `func` being followed by a
 // `return_val(%func)` on the generic's outer single block. (The
 // underlying terminator opcode is `yield`; the dump prints it as
-// `return_val` at this stage — note in `BUNDLE.md` as a doc gap.)
+// `return_val` at this stage — note in `README.md` as a doc gap.)
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

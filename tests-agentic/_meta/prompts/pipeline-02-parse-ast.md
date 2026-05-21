@@ -18,7 +18,7 @@ something the **parser** did, not the lexer.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. One test file per **verifiable claim** in
    `pipeline/02-parse-ast.md`. A claim is "verifiable" via `slangc` /
    `slangi` if its consequences can be observed in compilation
@@ -101,7 +101,7 @@ primary doc explicitly hands off):
   node-family hand-offs the parser doc names.
 
 If you would cite anything else, stop and record a doc-gap finding
-in `BUNDLE.md`.
+in `README.md`.
 
 ## Source files you may consult for _verification only_
 
@@ -187,7 +187,7 @@ Do not use any GPU-only directive.
 - [ ] No test depends on a GPU. `INTERPRET`, `-target cpp` text
       emit, and diagnostic-only directives are the only ones used.
 - [ ] No test was written by inspecting an uncovered source line.
-- [ ] `BUNDLE.md` `## Doc gaps observed` is honest. If you wanted
+- [ ] `README.md` `## Doc gaps observed` is honest. If you wanted
       a test you could not anchor — for example a precise
       precedence-table claim more specific than what the doc
       states — write down which claim the doc would need to add.

@@ -9,7 +9,7 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// BUNDLE.md 'Out of scope' documents that HLSL-style
+// README.md 'Out of scope' documents that HLSL-style
 // InterlockedAdd / InterlockedExchange are rejected for WGSL; the
 // idiomatic path is Atomic<T> (covered positively by
 // atomic-add-buffer.slang). This test asserts the diagnostic

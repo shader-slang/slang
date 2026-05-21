@@ -268,7 +268,7 @@ contrasts are observable as IR-pass side effects in emitted text.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. 20 to 35 `.slang` test files. Metal is the focus, so the
    typical file carries one `//TEST:SIMPLE` directive targeting
    Metal. Cross-target probes are reserved for the "Metal does X
@@ -290,7 +290,7 @@ primary doc explicitly hands off):
 - `docs/llm-generated/cross-cutting/targets.md`
 
 If you would cite anything else, stop and instead record a
-doc-gap finding in `BUNDLE.md`.
+doc-gap finding in `README.md`.
 
 ## Source files you may consult for _verification only_
 

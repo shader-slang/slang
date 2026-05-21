@@ -117,7 +117,7 @@ class stores, whether `MemoryQualifierSetModifier` aggregates a
 bitmask of flags, whether `UncheckedAttribute` is the
 parser-time representation. These are unobservable through
 `slangc` text I/O. Record them under `## Out of scope` in
-`BUNDLE.md`. Examples:
+`README.md`. Examples:
 
 - That `InOutModifier` derives from `OutModifier` in C++ (only
   the `inout` write-back behavior is observable).
@@ -181,7 +181,7 @@ it here.
 - `docs/llm-generated/syntax-reference/keywords-and-builtins.md`
 
 If you would cite anything else, stop and record a doc-gap finding
-in `BUNDLE.md`.
+in `README.md`.
 
 ## Source files you may consult for _verification only_
 
@@ -195,7 +195,7 @@ behavioral claims that the doc does not make.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. List
+1. `README.md` with the structure named in `_common.md`. List
    internal-AST-shape claims under `## Out of scope`.
 2. 15 to 25 `.slang` test files (size cap 60). The doc is large
    but most claims collapse into a few observable categories
@@ -272,7 +272,7 @@ covered by `pipeline/06-emit/` and target-specific bundles).
       `SIMPLE(filecheck=...)`, and `DIAGNOSTIC_TEST` directives
       carry the whole bundle.
 - [ ] No test was written by inspecting an uncovered source line.
-- [ ] `BUNDLE.md` `## Doc gaps observed` is honest.
+- [ ] `README.md` `## Doc gaps observed` is honest.
 - [ ] Internal-AST-shape claims (parent class in C++, private field
       names, FIDDLE tag, synthesized-only classes) are recorded
       under `## Out of scope`, not as tests.

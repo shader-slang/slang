@@ -56,7 +56,7 @@ Anchor each test at the IR opcode that the doc names; do not write
 tests for opcodes the doc lists as `(synthesized)` and that have no
 natural Slang surface — those are internal to the autodiff IR
 passes and never observable from a user program. Record them under
-`## Out of scope (no-GPU runner)` in `BUNDLE.md`.
+`## Out of scope (no-GPU runner)` in `README.md`.
 
 ## The translation rule: claims to observations
 
@@ -173,7 +173,7 @@ internal probe, not a documented surface mapping.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. Use
+1. `README.md` with the structure named in `_common.md`. Use
    `## Out of scope (no-GPU runner)` as the home for the
    unobservable-via-slangc items listed above.
 2. 10 to 18 `.slang` test files. Aim for one observable opcode (or
@@ -196,7 +196,7 @@ primary doc explicitly hands off):
 - `docs/llm-generated/pipeline/05-ir-passes.md`
 
 If you would cite anything else, stop and record a doc-gap finding
-in `BUNDLE.md`.
+in `README.md`.
 
 ## Test directives
 
@@ -245,7 +245,7 @@ Do not use any GPU-only directive.
       the dump shows the camel-case opcode spelling
       (`MakeDiffPair`, `ForwardDifferentiate`, `GetPrimal`,
       `GetDifferential`).
-- [ ] BUNDLE.md `## Doc gaps observed` is honest — explicitly
+- [ ] README.md `## Doc gaps observed` is honest — explicitly
       record that `__bwd_diff` lowers to `LegacyBackwardDifferentiate`
       (not `BackwardDifferentiate`) at LOWER-TO-IR.
 

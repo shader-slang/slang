@@ -47,7 +47,7 @@
           "depends_on": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "Bundle keys whose BUNDLE.md is provided as context to the agent (Phase C cross-link pass)."
+            "description": "Bundle keys whose README.md is provided as context to the agent (Phase C cross-link pass)."
           },
           "coverage_targets": {
             "type": "array",

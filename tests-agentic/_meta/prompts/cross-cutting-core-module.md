@@ -116,7 +116,7 @@ the interpreter.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. 10 to 18 `.slang` test files. Module-identity claims are
    target-independent (one backend suffices). Intrinsic-lowering
    and prelude-inclusion claims carry multiple `//TEST:SIMPLE`
@@ -144,7 +144,7 @@ primary doc explicitly hands off):
 - `docs/llm-generated/pipeline/06-emit.md` (for prelude inclusion)
 
 If you would cite anything else, stop and record a doc-gap finding
-in `BUNDLE.md`.
+in `README.md`.
 
 ## Source files you may consult for _verification only_
 

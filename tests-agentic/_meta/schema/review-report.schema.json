@@ -75,7 +75,7 @@
         },
         "front_matter_validity": {
           "enum": ["pass", "partial", "fail"],
-          "description": "BUNDLE.md and every test //META block validate against the schemas."
+          "description": "README.md and every test //META block validate against the schemas."
         }
       }
     },

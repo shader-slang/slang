@@ -21,7 +21,7 @@ matching one.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. A test file per **enforcement claim** in
    `name-resolution/visibility.md`. A claim is "verifiable" when its
    user-visible consequence is one of:
@@ -75,7 +75,7 @@ primary doc explicitly references them):
 - `docs/llm-generated/ast-reference/modifiers.md`
 
 If you would cite anything else, stop and instead record a doc-gap
-finding in `BUNDLE.md`.
+finding in `README.md`.
 
 ## Source files you may consult for _verification only_
 
@@ -125,7 +125,7 @@ to a different module) is mentioned in the doc but is awkward to
 test in a single `.slang` file. If a cross-module claim cannot be
 expressed in a single-file test using a free function at module
 scope versus a member function inside the struct, record it as a
-doc-gap-like note in `BUNDLE.md` under
+doc-gap-like note in `README.md` under
 `## Out of scope (single-file runner)`.
 
 ## DIAGNOSTIC_TEST gotchas (from earlier bundles)
@@ -166,4 +166,4 @@ These apply here:
 - [ ] No test depends on a GPU. `//TEST:INTERPRET` and
       `//DIAGNOSTIC_TEST` are the only directives used.
 - [ ] No test was written by inspecting an uncovered source line.
-- [ ] BUNDLE.md `## Doc gaps observed` is honest.
+- [ ] README.md `## Doc gaps observed` is honest.

@@ -19,7 +19,7 @@ diagnostic system behaves are observable through `slang-test`.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. One test file per **verifiable diagnostic-system claim** in the
    source doc. The doc is mostly meta — it describes how diagnostics
    are declared, what fields they have, and how they reach the user.
@@ -79,7 +79,7 @@ doc explicitly hands off):
 - `docs/llm-generated/architecture/overview.md`
 
 If you would cite anything else, stop and record a doc-gap finding in
-`BUNDLE.md`.
+`README.md`.
 
 ## Source files you may consult for _verification only_
 

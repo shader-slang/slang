@@ -233,7 +233,7 @@ specific surface-observable claim is named.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. Use
+1. `README.md` with the structure named in `_common.md`. Use
    `## Out of scope (no-GPU runner)` as the home for unobservable
    items.
 2. 20 to 40 `.slang` test files. Many tests are single-target
@@ -264,7 +264,7 @@ the hand-off boundary):
 - `docs/llm-generated/target-pipelines/index.md`
 
 If you would cite anything else, stop and record a doc-gap finding
-in `BUNDLE.md`.
+in `README.md`.
 
 ## Source files you may consult for _verification only_
 

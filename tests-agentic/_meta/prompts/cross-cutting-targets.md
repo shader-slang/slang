@@ -121,7 +121,7 @@ the "feature X is rejected on target Y" claims.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. 10 to 20 `.slang` test files. The bundle is multi-backend-heavy:
    most tests carry multiple `//TEST:SIMPLE` directives, one per
    text-emit target where the claim is observable. Use distinct
@@ -158,7 +158,7 @@ doc explicitly hands off):
 - `docs/llm-generated/target-pipelines/cuda.md`
 
 If you would cite anything else, stop and record a doc-gap finding in
-`BUNDLE.md`.
+`README.md`.
 
 ## Source files you may consult for _verification only_
 

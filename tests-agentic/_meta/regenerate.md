@@ -37,7 +37,7 @@ python3 tests-agentic/_meta/regenerate.py <subcommand> [args...]
 | `digest <bundle>`                                   | Compute current watched-paths and source-doc digests                                                |
 | `show <bundle>`                                     | Manifest entry + resolved source files + source doc                                                 |
 | `mark-fresh <bundle> [--commit SHA] [--model NAME]` | Record a fresh entry                                                                                |
-| `lint [<bundle>...]`                                | Structural linter (BUNDLE.md front-matter, every `.slang` has a `//META` block, `doc_ref` resolves) |
+| `lint [<bundle>...]`                                | Structural linter (README.md front-matter, every `.slang` has a `//META` block, `doc_ref` resolves) |
 | `expansion-candidates [--from <report.json>]`       | (Phase E) rank bundles by under-coverage; outputs bundle keys + scores only                         |
 | `review-status / mark-reviewed / mark-remediated`   | (Phase D) two-stage review/remediation. Stubs currently.                                            |
 
@@ -64,7 +64,7 @@ python3 tests-agentic/_meta/regenerate.py show pipeline/01-lex-preprocess
 
 For each bundle, in dependency order (consult `depends_on` in the
 manifest; bundles that list dependencies should be generated _after_
-their dependencies so the agent can read those bundles' BUNDLE.md
+their dependencies so the agent can read those bundles' README.md
 files as additional context):
 
 1. Open the per-section prompt at
@@ -78,8 +78,8 @@ files as additional context):
    - the per-section prompt,
    - the bundle's `source_doc` (the docs/llm-generated/ file),
    - any allowed secondary docs the per-section prompt names,
-   - any already-generated `depends_on` bundles' BUNDLE.md.
-3. Ask the agent to emit `BUNDLE.md` plus N `.slang` files at
+   - any already-generated `depends_on` bundles' README.md.
+3. Ask the agent to emit `README.md` plus N `.slang` files at
    `tests-agentic/<key>/`.
 4. Run `regenerate.py lint <key>`. Fix structural issues by
    re-prompting — **never** by hand-editing.
@@ -99,7 +99,7 @@ PR merges.
 ## Phase C — Cross-link pass
 
 After every bundle has been generated at least once, re-run each
-bundle with peer bundles' BUNDLE.md as additional context. This pass
+bundle with peer bundles' README.md as additional context. This pass
 typically aligns terminology and removes redundancy between bundles
 whose claims overlap (e.g. parser-level claims appearing in both
 `pipeline/02-parse-ast` and `ast-reference/declarations`).
@@ -137,7 +137,7 @@ asks the agent to re-read the source doc, find under-tested claims,
 and add tests for them.
 
 If documented behavior cannot reach uncovered code, the agent records
-that as a doc-gap finding in the bundle's `BUNDLE.md` under
+that as a doc-gap finding in the bundle's `README.md` under
 `## Doc gaps observed`. The loop does not paper over gaps by writing
 source-targeted tests.
 
@@ -153,7 +153,7 @@ Output is bundle-key + score; no source-line detail leaks.
 ## Hand-edit policy
 
 - `.slang` files in `tests-agentic/<key>/`: **no hand-edits**.
-- `BUNDLE.md`: **no hand-edits**.
+- `README.md`: **no hand-edits**.
 - `_meta/manifest.yaml`, `_meta/schema/*`, `_meta/prompts/*`: hand-edited
   (these are the source of truth for regeneration).
 - `_meta/freshness.json`, `_meta/review-state.json`: driver-edited.

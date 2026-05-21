@@ -35,7 +35,7 @@ may also edit the test files in the bundle.
 The operator gives you:
 
 - the review report from the previous stage;
-- the bundle's `BUNDLE.md` and every `.slang` file;
+- the bundle's `README.md` and every `.slang` file;
 - the bundle's `source_doc` and the per-section prompt + `_common.md`;
 - the resolved watched source files at the **current** HEAD (not the
   bundle's recorded `source_commit` — if HEAD has moved, your fixes
@@ -52,13 +52,13 @@ When you take a `fixed` action that edits a `.slang` file:
 - Keep the rest of the `//META` contract intact (every required key,
   `generated=true`, `warning` banner).
 - If you delete a test entirely, update the **Tests in this bundle**
-  and **Claims enumerated** tables in `BUNDLE.md`.
+  and **Claims enumerated** tables in `README.md`.
 - If you add a new test in response to a finding (e.g. the reviewer
   said an enumerated claim has no test), the new test's `//META` block
   uses your model identifier and **must** still derive from the source
   doc. Do not invent claims.
 
-When you take a `fixed` action that edits `BUNDLE.md`:
+When you take a `fixed` action that edits `README.md`:
 
 - Bump `generated_at`, set `model` to your identifier, set
   `source_commit` to current HEAD.
@@ -92,7 +92,7 @@ remediator_model: <your model identifier, MUST contain "claude" or "anthropic">
 remediated_at: <ISO 8601 timestamp, UTC>
 target_bundle: <bundle-key>
 review_report: tests-agentic/_meta/reviews/<bundle-key>.review.md
-target_bundle_source_commit_before: <source_commit from BUNDLE.md before your edits>
+target_bundle_source_commit_before: <source_commit from README.md before your edits>
 target_bundle_source_commit_after: <git HEAD now>
 actions:
   fixed: <int>
@@ -114,7 +114,7 @@ escalations.)
 | Finding ID | Action                | Rationale                                                                                                            | Edits made                                                                        |
 | ---------- | --------------------- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | F-01       | fixed                 | doc_ref pointed at the wrong anchor; the claim about specialization preference is actually in #generic-substitution. | Updated overload-prefer-specialized.slang //META: doc_ref and doc_section_digest. |
-| F-02       | rejected-out-of-scope | The reviewer wants a test for `extern` linkage corner cases, but the source_doc does not describe them.              | Filed as a doc-gap entry in BUNDLE.md "Doc gaps observed".                        |
+| F-02       | rejected-out-of-scope | The reviewer wants a test for `extern` linkage corner cases, but the source_doc does not describe them.              | Filed as a doc-gap entry in README.md "Doc gaps observed".                        |
 | ...        | ...                   | ...                                                                                                                  | ...                                                                               |
 ```
 

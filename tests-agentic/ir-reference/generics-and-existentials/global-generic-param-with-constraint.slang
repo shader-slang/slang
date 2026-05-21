@@ -16,7 +16,7 @@
 // `GenericTypeParamDecl (at module scope)` as a single
 // declaration. The original "with-constraint" variant probe
 // (constrained `type_param T : IFoo`) crashes the compiler
-// downstream; that crash is recorded as a doc-gap in BUNDLE.md.
+// downstream; that crash is recorded as a doc-gap in README.md.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

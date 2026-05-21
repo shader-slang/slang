@@ -43,7 +43,7 @@ overview bundle records those as "deferred to <bundle>" in
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. One test file per **verifiable end-to-end claim** in
    `pipeline/overview.md`. Each test should not duplicate a stage-
    specific bundle. The dominant claim families are:
@@ -87,7 +87,7 @@ only for "the X stage is observable end-to-end" claims that are
 fundamentally about the data flow, not about the stage's internals.
 
 If you would cite anything else, stop and record a doc-gap finding in
-`BUNDLE.md`.
+`README.md`.
 
 ## Source files you may consult for _verification only_
 

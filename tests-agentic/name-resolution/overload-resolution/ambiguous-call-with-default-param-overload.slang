@@ -13,7 +13,7 @@
 // default parameters > more" should break a tie between these
 // two pick overloads, but the resolver actually reports the
 // candidates as equally good and emits ambiguous-call. This is
-// recorded as a doc gap in BUNDLE.md.
+// recorded as a doc gap in README.md.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 

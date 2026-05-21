@@ -102,7 +102,7 @@ implementation probe.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. The
+1. `README.md` with the structure named in `_common.md`. The
    `## Out of scope (no-GPU runner)` section here doubles as the
    place to list claims that aren't observable via slangc at all (IR
    flag bits, hoisting decisions, opcode-range layout, build-time
@@ -128,7 +128,7 @@ doc explicitly hands off):
 - `docs/llm-generated/pipeline/04-ast-to-ir.md`
 
 If you would cite anything else, stop and record a doc-gap finding in
-`BUNDLE.md`.
+`README.md`.
 
 ## Source files you may consult for _verification only_
 

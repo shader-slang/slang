@@ -9,6 +9,12 @@ when the docs change.
 The suite is **additive** — it does not replace the hand-written
 `tests/` suite, and it runs **nightly only**, not per PR.
 
+**Where to look next:**
+
+- [`INDEX.md`](INDEX.md) — bundle-by-bundle navigation table with per-bundle test counts and links to each bundle's `README.md`.
+- [`_meta/regenerate.md`](_meta/regenerate.md) — operator workflow.
+- [`_meta/prompts/_common.md`](_meta/prompts/_common.md) — universal rules every generation agent inherits.
+
 ## What lives here
 
 | Subtree             | Purpose                                                                      |
@@ -34,7 +40,7 @@ Each bundle directory contains:
 
 ```
 <bundle>/
-├── BUNDLE.md          # YAML front-matter + claims/tests index
+├── README.md          # YAML front-matter + claims/tests index
 ├── <test>.slang       # Test file with a //META header + a //TEST directive
 ├── <test>.expected    # Optional checked-in expected output
 └── ...

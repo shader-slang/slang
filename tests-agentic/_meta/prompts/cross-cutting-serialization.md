@@ -139,7 +139,7 @@ The user-facing surface that survives is:
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. **6 to 12** `.slang` test files. The bundle is intentionally
    small: many doc claims are internal and end up under
    `## Out of scope`.

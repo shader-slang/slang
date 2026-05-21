@@ -57,7 +57,7 @@ Anchor each test at the opcode that the doc names; do not write
 tests that observe opcodes the doc lists as `(synthesized)` unless
 you can find a natural Slang surface that produces them at the
 LOWER-TO-IR stage. Record any non-natural ones under
-`## Out of scope (no-GPU runner)` in `BUNDLE.md`.
+`## Out of scope (no-GPU runner)` in `README.md`.
 
 ## The translation rule: claims to observations
 
@@ -189,7 +189,7 @@ documented surface mapping.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. Use
+1. `README.md` with the structure named in `_common.md`. Use
    `## Out of scope (no-GPU runner)` as the home for the
    synthesized-only opcodes listed above.
 2. 15 to 25 `.slang` test files. Aim for one observable opcode (or
@@ -212,7 +212,7 @@ primary doc explicitly hands off):
 - `docs/llm-generated/cross-cutting/ir-instructions.md`
 
 If you would cite anything else, stop and record a doc-gap
-finding in `BUNDLE.md`.
+finding in `README.md`.
 
 ## Test directives
 
@@ -264,7 +264,7 @@ Do not use any GPU-only directive.
       (`MakeExistential`, `ExtractExistentialValue`, etc.) — the
       dump shows the camelCase opcode spelling
       (`makeExistential`, `extractExistentialValue`).
-- [ ] BUNDLE.md `## Doc gaps observed` is honest.
+- [ ] README.md `## Doc gaps observed` is honest.
 
 ## Lessons captured (apply to this bundle as well)
 

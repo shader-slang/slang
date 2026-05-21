@@ -12,7 +12,7 @@
 // The 'lowerAppendConsumeStructuredBuffers' pass that exists for
 // WGSL is unreachable from .slang source because Slang rejects
 // AppendStructuredBuffer.Append for the WGSL target with E36107
-// before the pass can run. This is documented in BUNDLE.md's
+// before the pass can run. This is documented in README.md's
 // 'Out of scope' list and is asserted here.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target wgsl -entry main -stage compute

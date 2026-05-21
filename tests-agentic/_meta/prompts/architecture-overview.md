@@ -125,7 +125,7 @@ consequence, or record the claim under
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`. The
+1. `README.md` with the structure named in `_common.md`. The
    `## Out of scope (no-GPU runner)` section here doubles as the
    place to list API-shaped and file-tree claims that aren't
    observable via slangc at all (not literally GPU-bound, but
@@ -152,7 +152,7 @@ primary doc explicitly hands off):
 - `docs/llm-generated/pipeline/01-lex-preprocess.md`
 
 If you would cite anything else, stop and record a doc-gap finding
-in `BUNDLE.md`.
+in `README.md`.
 
 ## Source files you may consult for _verification only_
 
@@ -212,7 +212,7 @@ So:
       tests.
 - [ ] Tests use `-entry` / `-stage` explicitly where the claim is
       about those flags.
-- [ ] `## Out of scope (no-GPU runner)` in `BUNDLE.md` is long.
+- [ ] `## Out of scope (no-GPU runner)` in `README.md` is long.
       The doc is overwhelmingly about API / file-tree facts that
       are not observable through `slang-test`; the section should
       itemise the API claims, the directory-layout claims, the

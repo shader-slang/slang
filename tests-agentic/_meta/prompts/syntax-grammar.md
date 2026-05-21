@@ -18,7 +18,7 @@ concern, so `pipeline_stage=parse` dominates this bundle.
 
 ## Required structure
 
-1. `BUNDLE.md` with the structure named in `_common.md`.
+1. `README.md` with the structure named in `_common.md`.
 2. One test file per **verifiable grammar production** in the source
    doc. A production is "verifiable" via `slangc` / `slangi` if its
    syntactic surface can be observed:
@@ -97,7 +97,7 @@ doc explicitly hands off):
   off to.
 
 If you would cite anything else, stop and record a doc-gap finding in
-`BUNDLE.md`.
+`README.md`.
 
 ## Source files you may consult for _verification only_
 
