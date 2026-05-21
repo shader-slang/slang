@@ -122,6 +122,42 @@ jobs:
             packman-
           enableCrossOsArchive: false
 
+      # Drop packman entries we can't fetch (and don't need for
+      # shader compilation) before invoking packman pull. Currently:
+      #
+      #   - ngx_sdk_dlfg: published to NVGTL (NVIDIA-internal remote)
+      #     from v4 onward and requires NVM_GTLAPI_TOKEN. It's used
+      #     by dxvk-remix's C++ code only -- no shader includes any
+      #     header under external/ngx_sdk_dlfg/, so omitting it has
+      #     no effect on build_shaders_only.ps1.
+      #
+      # If a future package needs the same treatment, extend the
+      # python regex below.
+      - name: Strip non-shader / NVGTL-only packman entries
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dxvk-remix
+          xml=packman-external.xml
+          python3 - "$xml" <<'PY'
+          import re
+          import sys
+          path = sys.argv[1]
+          src = open(path).read()
+          # Remove the <dependency name="ngx_sdk_dlfg" ...>...</dependency>
+          # block. The XML uses tabs+spaces for indent, so anchor on the
+          # opening tag and consume through the matching closing tag.
+          pattern = re.compile(
+              r'\s*<dependency\s+name="ngx_sdk_dlfg"[^>]*>.*?</dependency>',
+              re.DOTALL,
+          )
+          new, n = pattern.subn("", src)
+          if n != 1:
+              sys.exit(f"expected exactly 1 ngx_sdk_dlfg dependency, found {n}")
+          open(path, "w").write(new)
+          PY
+          echo "Patched $xml: removed ngx_sdk_dlfg dependency."
+
       # Download shader compilation tools via packman
       # First run: ~2-5 min (downloads ~340MB)
       # Cached run: ~30 seconds
