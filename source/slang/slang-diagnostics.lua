@@ -4663,7 +4663,7 @@ err(
 
 -- 451xx - Coverage instrumentation (-trace-coverage)
 
-warning(
+err(
     "coverage-buffer-reserved-name",
     45100,
     "`__slang_coverage` is reserved by `-trace-coverage`",

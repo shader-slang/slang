@@ -945,20 +945,20 @@ struct ICoverageTracingMetadataProbe : ICoverageTracingMetadata
         lastSlot = 4;
         return 0;
     }
-    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryInfo(uint32_t, CoverageEntryInfo*) SLANG_OVERRIDE
+    SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE
     {
         lastSlot = 5;
-        return SLANG_OK;
+        return 0;
     }
-    SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo*) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryInfo(uint32_t, CoverageEntryInfo*) SLANG_OVERRIDE
     {
         lastSlot = 6;
         return SLANG_OK;
     }
-    SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo*) SLANG_OVERRIDE
     {
         lastSlot = 7;
-        return 0;
+        return SLANG_OK;
     }
 };
 
@@ -970,11 +970,11 @@ SLANG_UNIT_TEST(vtableICoverageTracingMetadata)
     callSlot(&p, 4);
     SLANG_CHECK(p.lastSlot == 4); // getCounterCount
     callSlot(&p, 5);
-    SLANG_CHECK(p.lastSlot == 5); // getEntryInfo
+    SLANG_CHECK(p.lastSlot == 5); // getEntryCount
     callSlot(&p, 6);
-    SLANG_CHECK(p.lastSlot == 6); // getBufferInfo
+    SLANG_CHECK(p.lastSlot == 6); // getEntryInfo
     callSlot(&p, 7);
-    SLANG_CHECK(p.lastSlot == 7); // getEntryCount
+    SLANG_CHECK(p.lastSlot == 7); // getBufferInfo
 }
 
 // ---------------------------------------------------------------------------

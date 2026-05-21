@@ -895,6 +895,13 @@ static slang::CoverageBranchArmKind getBranchArmKindOperand(IRInst* inst, UInt i
 
 struct CoverageInstrumenter
 {
+    struct BranchSiteRemap
+    {
+        IRFunc* parentFunc = nullptr;
+        uint32_t originalSiteID = 0;
+        uint32_t remappedSiteID = 0;
+    };
+
     IRModule* module;
     IRGlobalParam* coverageBuffer;
     SourceManager* sourceManager;
@@ -902,6 +909,8 @@ struct CoverageInstrumenter
     IRType* uintType;
     IRType* uintPtrType;
     IRType* intType;
+    List<BranchSiteRemap> branchSiteRemaps;
+    uint32_t nextBranchSiteID = 1;
 
     CoverageInstrumenter(
         IRModule* m,
@@ -914,6 +923,29 @@ struct CoverageInstrumenter
         uintType = tmpBuilder.getUIntType();
         uintPtrType = tmpBuilder.getPtrType(uintType);
         intType = tmpBuilder.getIntType();
+    }
+
+    uint32_t getRemappedBranchSiteID(IRInst* markerOp, uint32_t originalSiteID)
+    {
+        SLANG_RELEASE_ASSERT(originalSiteID != 0);
+        auto parentFunc = getParentFunc(markerOp);
+        SLANG_RELEASE_ASSERT(parentFunc);
+
+        // Lowering assigns branch-site IDs before module linking, so IDs are
+        // only unique within that lowering context. Remap them here to a single
+        // metadata-local namespace while preserving all arms of the same branch.
+        for (auto& remap : branchSiteRemaps)
+        {
+            if (remap.parentFunc == parentFunc && remap.originalSiteID == originalSiteID)
+                return remap.remappedSiteID;
+        }
+
+        BranchSiteRemap remap;
+        remap.parentFunc = parentFunc;
+        remap.originalSiteID = originalSiteID;
+        remap.remappedSiteID = nextBranchSiteID++;
+        branchSiteRemaps.add(remap);
+        return remap.remappedSiteID;
     }
 
     void populateEntryForMarker(IRInst* markerOp, UInt slot, CoverageTracingEntry& entry)
@@ -931,7 +963,8 @@ struct CoverageInstrumenter
             break;
         case kIROp_IncrementBranchCoverageCounter:
             entry.kind = slang::CoverageEntryKind::Branch;
-            entry.branchSiteID = getUInt32OperandOrZero(markerOp, 0);
+            entry.branchSiteID =
+                getRemappedBranchSiteID(markerOp, getUInt32OperandOrZero(markerOp, 0));
             entry.branchArmID = getUInt32OperandOrZero(markerOp, 1);
             entry.branchArmKind = getBranchArmKindOperand(markerOp, 2);
             break;
@@ -1199,16 +1232,19 @@ void instrumentCoverage(
             sink->diagnose(Diagnostics::CoverageReservedSpaceIgnored{});
     }
 
-    // Surface a warning if the user has declared a global parameter
-    // named `__slang_coverage`. The IR coverage pass synthesizes its
-    // own buffer with that name and the user declaration is silently
-    // shadowed (no counter writes ever target it). Reserving the name
-    // explicitly avoids a class of confusing wrong-coverage outcomes.
-    if (sink)
+    // Reject a user-declared global parameter named `__slang_coverage`.
+    // The IR coverage pass synthesizes its own hidden buffer with that
+    // name; allowing both to coexist would either shadow the user's
+    // resource or leave two globals with the same debug name in the
+    // final artifact.
+    if (auto userBuffer = findUserDeclaredCoverageBuffer(module))
     {
-        if (auto userBuffer = findUserDeclaredCoverageBuffer(module))
+        if (sink)
             sink->diagnose(
                 Diagnostics::CoverageBufferReservedName{.location = userBuffer->sourceLoc});
+        for (auto op : markerOps)
+            op->removeAndDeallocate();
+        return;
     }
 
     // When the user explicitly pins the coverage buffer with

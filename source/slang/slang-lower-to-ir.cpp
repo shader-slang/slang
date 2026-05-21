@@ -8182,10 +8182,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (context->traceBranchCoverage)
             {
                 auto coverageBranchSiteID = allocateCoverageBranchSiteID();
-                auto conditionFalseBlock = builder->createBlock();
-                builder->emitIfElse(invCondition, conditionFalseBlock, mergeBlock, mergeBlock);
+                auto loopExitBlock = builder->createBlock();
+                // `invCondition` is the loop-exit test. Its true arm is the
+                // original condition's false branch, so it receives the
+                // FalseArm marker and exits the loop.
+                builder->emitIfElse(invCondition, loopExitBlock, mergeBlock, mergeBlock);
 
-                insertBlock(conditionFalseBlock);
+                insertBlock(loopExitBlock);
                 emitBranchCoverageMarker(
                     condExpr->loc,
                     coverageBranchSiteID,

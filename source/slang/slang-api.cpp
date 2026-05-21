@@ -1274,12 +1274,15 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
             out << ", \"function_mangled\": ";
             _appendCoverageManifestJsonStringOrNull(out, entry.functionMangledName);
         }
-        if (entry.branchSiteID != 0)
-            out << ", \"branch_site\": " << (int64_t)entry.branchSiteID;
-        if (entry.branchArmID != 0)
-            out << ", \"branch_arm\": " << (int64_t)entry.branchArmID;
-        if (entry.branchArmKind != slang::CoverageBranchArmKind::Unknown)
+        if (entry.kind == slang::CoverageEntryKind::Branch)
         {
+            if (entry.branchSiteID == 0 || entry.branchArmID == 0 ||
+                entry.branchArmKind == slang::CoverageBranchArmKind::Unknown)
+            {
+                return SLANG_FAIL;
+            }
+            out << ", \"branch_site\": " << (int64_t)entry.branchSiteID;
+            out << ", \"branch_arm\": " << (int64_t)entry.branchArmID;
             out << ", \"branch_arm_kind\": \"" << _getCoverageBranchArmKindName(entry.branchArmKind)
                 << "\"";
         }
