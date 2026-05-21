@@ -174,16 +174,6 @@ option(
     ON
 )
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
-if(CMAKE_SYSTEM_NAME MATCHES "Windows")
-    set(SLANG_ENABLE_WEBGPU_DEFAULT ON)
-else()
-    set(SLANG_ENABLE_WEBGPU_DEFAULT OFF)
-endif()
-advanced_option(
-    SLANG_ENABLE_WEBGPU
-    "Enable native WebGPU support through Dawn"
-    ${SLANG_ENABLE_WEBGPU_DEFAULT}
-)
 
 option(
     SLANG_GITHUB_TOKEN
@@ -314,22 +304,18 @@ advanced_option(
     OFF
 )
 
+set(SLANG_EXCLUDE_DAWN_DEFAULT ON)
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(SLANG_EXCLUDE_DAWN_DEFAULT OFF)
+endif()
 advanced_option(
     SLANG_EXCLUDE_DAWN
-    "Optionally exclude webgpu_dawn from the build"
-    OFF
+    "Optionally exclude Dawn WebGPU support from the build"
+    ${SLANG_EXCLUDE_DAWN_DEFAULT}
 )
-if(SLANG_EXCLUDE_DAWN AND SLANG_ENABLE_WEBGPU)
-    message(
-        STATUS
-        "SLANG_EXCLUDE_DAWN=ON disables SLANG_ENABLE_WEBGPU because WebGPU requires Dawn"
-    )
-    set(SLANG_ENABLE_WEBGPU
-        OFF
-        CACHE BOOL
-        "Enable native WebGPU support through Dawn"
-        FORCE
-    )
+set(SLANG_HAS_WEBGPU_SUPPORT OFF)
+if(NOT SLANG_EXCLUDE_DAWN)
+    set(SLANG_HAS_WEBGPU_SUPPORT ON)
 endif()
 
 advanced_option(
@@ -411,7 +397,7 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     )
 endif()
 
-if(SLANG_ENABLE_WEBGPU AND NOT SLANG_EXCLUDE_DAWN)
+if(SLANG_HAS_WEBGPU_SUPPORT)
     if(NOT DEFINED SLANG_WEBGPU_DAWN_BINARY_URL)
         set(webgpu_dawn_release_tag "webgpu_dawn-0")
         if(
@@ -584,7 +570,7 @@ endif()
 # slang-rhi copies Dawn next to executables. On non-Windows builds, render-test
 # is a module under lib/ and the WGPU loader expects Dawn next to that module.
 if(
-    SLANG_ENABLE_WEBGPU
+    SLANG_HAS_WEBGPU_SUPPORT
     AND TARGET slang-rhi-copy-files
     AND CMAKE_SYSTEM_NAME MATCHES "Linux|Darwin"
 )

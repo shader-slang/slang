@@ -291,7 +291,6 @@ error if they can't be found.
 | ----------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
 | `SLANG_ENABLE_DX_ON_VK`             | `FALSE`                              | Enable running the DX11 and DX12 tests on non-WARP Windows platforms via vkd3d-proton, requires system-provided d3d headers |
 | `SLANG_ENABLE_SLANG_RHI`            | `TRUE`                               | Enable building and using [slang-rhi](https://github.com/shader-slang/slang-rhi) for tests                                  |
-| `SLANG_ENABLE_WEBGPU`               | `TRUE` on Windows, `FALSE` elsewhere | Enable native WebGPU support through Dawn; Linux builds can opt in with this flag                                           |
 | `SLANG_USE_SYSTEM_MINIZ`            | `FALSE`                              | Build using system Miniz library instead of the bundled version in [./external](./external)                                 |
 | `SLANG_USE_SYSTEM_LZ4`              | `FALSE`                              | Build using system LZ4 library instead of the bundled version in [./external](./external)                                   |
 | `SLANG_USE_SYSTEM_VULKAN_HEADERS`   | `FALSE`                              | Build using system Vulkan headers instead of the bundled version in [./external](./external)                                |
@@ -301,7 +300,7 @@ error if they can't be found.
 | `SLANG_USE_SYSTEM_GLSLANG`          | `FALSE`                              | Build using system glslang library instead of the bundled version in [./external](./external)                               |
 | `SLANG_SPIRV_HEADERS_INCLUDE_DIR`   | ``                                   | Use this specific path to SPIR-V headers instead of the bundled version in [./external](./external)                         |
 | `SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC` | `FALSE` (`TRUE` on Windows)          | Enable mimalloc allocator for SPIRV-Tools to improve compilation performance                                                |
-| `SLANG_EXCLUDE_DAWN`                | `FALSE`                              | Exclude Dawn WebGPU binaries from the build; this also disables `SLANG_ENABLE_WEBGPU`                                       |
+| `SLANG_EXCLUDE_DAWN`                | `FALSE` on Windows, `TRUE` elsewhere | Exclude Dawn WebGPU support from the build                                                                                  |
 | `SLANG_EXCLUDE_TINT`                | `FALSE`                              | Exclude slang-tint from the build (only relevant on Windows x64)                                                            |
 | `SLANG_ENABLE_TIME_TRACE`           | `FALSE`                              | Enable Clang time trace profiling for build analysis (Clang only)                                                           |
 
