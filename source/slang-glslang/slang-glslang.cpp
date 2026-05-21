@@ -297,6 +297,17 @@ static int glslang_optimizeSPIRV(
         optimizer.RegisterPass(spvtools::CreatePropagateLineInfoPass());
     }
 
+    // shader-slang/slang#11146: MergeReturnPass has a use-after-free in
+    // SPIRV-Tools' DefUseManager that fires when NonSemantic.Shader.DebugInfo
+    // instructions are attached to the rewritten terminator. The pass
+    // re-analyzes the terminator's dbg_line_insts, which are pointers into a
+    // std::vector buffer that may have been invalidated by an earlier pass.
+    // We skip MergeReturnPass (and the InlineExhaustivePass that depends on
+    // it -- see comment in the DEFAULT case below) whenever debug info is
+    // enabled, until the upstream UAF is fixed. Remove this workaround once
+    // the SPIRV-Tools fix lands and the submodule is bumped.
+    const bool skipMergeReturnPass = (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE);
+
     spvtools::OptimizerOptions spvOptOptions;
 
     // To compile some large shaders the default is not enough.
@@ -346,8 +357,11 @@ static int glslang_optimizeSPIRV(
             optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());     // 1
             optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass()); // 2
 
-            optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
-            optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+            if (!skipMergeReturnPass)
+            {
+                optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
+                optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+            }
 
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass()); // 3
 
@@ -401,8 +415,11 @@ static int glslang_optimizeSPIRV(
             // size
             optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
             optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass()); // 15
-            optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
-            optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+            if (!skipMergeReturnPass)
+            {
+                optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
+                optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+            }
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass()); // 9
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
             // optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(0));   // 12
@@ -449,8 +466,11 @@ static int glslang_optimizeSPIRV(
 
             optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
             optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
-            optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
-            optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+            if (!skipMergeReturnPass)
+            {
+                optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
+                optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+            }
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass());
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
