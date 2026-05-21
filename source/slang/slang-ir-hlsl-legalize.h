@@ -16,13 +16,17 @@ void legalizeNonStructParameterToStructForHLSL(IRModule* module);
 
 void legalizeEmptyRayPayloadsForHLSL(IRModule* module);
 
-// For DXIL/HLSL targets at SM 6.7+, DXC requires every field of a `[raypayload]`
-// struct to carry payload access qualifiers. When Slang implicitly tags a struct
-// as a ray payload (e.g. via `__forceVarIntoRayPayloadStructTemporarily`) the
-// fields lack qualifiers. This pass attaches default `read/write(caller, anyhit,
-// closesthit, miss)` decorations to those fields, matching pre-SM 6.7 implicit
-// "any stage may access any field" semantics. Fields that already carry either a
-// read or a write decoration are left untouched.
+// For DXIL/HLSL targets at SM 6.7+, the DXR spec requires that "each field [of
+// a `[raypayload]` struct] must declare one read and one write qualifier"
+// (https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#payload-access-qualifiers).
+// Slang's frontend only diagnoses fields where *both* qualifiers are missing,
+// so two cases reach codegen with incomplete decorations: (1) structs tagged
+// implicitly by `legalizeNonStructParameterToStructForHLSL`, and (2) explicit
+// `[raypayload]` structs where the user wrote only `[read(...)]` or only
+// `[write(...)]`. This pass walks each such struct and fills in whichever side
+// is missing with the full `read/write(caller, anyhit, closesthit, miss)`
+// default — preserving the implicit pre-SM-6.7 "any stage may access any field"
+// semantics. Fields that already carry both qualifiers are left untouched.
 void legalizeRayPayloadAccessQualifiersForHLSL(IRModule* module);
 
 } // namespace Slang

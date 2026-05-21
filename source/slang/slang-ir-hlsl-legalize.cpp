@@ -179,10 +179,21 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
         auto dummyKey = builder.createStructKey();
         builder.addNameHintDecoration(dummyKey, UnownedStringSlice("_slang_dummy"));
 
-        // Add stage access decorations that ray payload fields require
-        IRInst* stageName = builder.getStringValue(UnownedStringSlice("caller"));
-        builder.addDecoration(dummyKey, kIROp_StageReadAccessDecoration, &stageName, 1);
-        builder.addDecoration(dummyKey, kIROp_StageWriteAccessDecoration, &stageName, 1);
+        // Add full-stage read/write access decorations on the synthetic field. The
+        // DXR spec requires every field of a `[raypayload]` struct to declare both
+        // a read and a write qualifier; the dummy is never accessed, but we use
+        // the same four-stage default that legalizeRayPayloadAccessQualifiersForHLSL
+        // applies to every other unqualified ray-payload field, so the synthetic
+        // field is consistent with the rest of the legalized payload.
+        IRInst* stageNames[] = {
+            builder.getStringValue(UnownedStringSlice::fromLiteral("caller")),
+            builder.getStringValue(UnownedStringSlice::fromLiteral("anyhit")),
+            builder.getStringValue(UnownedStringSlice::fromLiteral("closesthit")),
+            builder.getStringValue(UnownedStringSlice::fromLiteral("miss")),
+        };
+        const Int kStageCount = SLANG_COUNT_OF(stageNames);
+        builder.addDecoration(dummyKey, kIROp_StageReadAccessDecoration, stageNames, kStageCount);
+        builder.addDecoration(dummyKey, kIROp_StageWriteAccessDecoration, stageNames, kStageCount);
 
         builder.createStructField(structType, dummyKey, builder.getIntType());
 
@@ -233,21 +244,22 @@ void legalizeRayPayloadAccessQualifiersForHLSL(IRModule* module)
         for (auto field : structType->getFields())
         {
             auto fieldKey = field->getKey();
-            if (fieldKey->findDecoration<IRStageReadAccessDecoration>())
-                continue;
-            if (fieldKey->findDecoration<IRStageWriteAccessDecoration>())
-                continue;
-
-            builder.addDecoration(
-                fieldKey,
-                kIROp_StageReadAccessDecoration,
-                defaultStageOperands,
-                kDefaultStageCount);
-            builder.addDecoration(
-                fieldKey,
-                kIROp_StageWriteAccessDecoration,
-                defaultStageOperands,
-                kDefaultStageCount);
+            if (!fieldKey->findDecoration<IRStageReadAccessDecoration>())
+            {
+                builder.addDecoration(
+                    fieldKey,
+                    kIROp_StageReadAccessDecoration,
+                    defaultStageOperands,
+                    kDefaultStageCount);
+            }
+            if (!fieldKey->findDecoration<IRStageWriteAccessDecoration>())
+            {
+                builder.addDecoration(
+                    fieldKey,
+                    kIROp_StageWriteAccessDecoration,
+                    defaultStageOperands,
+                    kDefaultStageCount);
+            }
         }
     }
 }
