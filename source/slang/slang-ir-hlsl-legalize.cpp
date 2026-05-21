@@ -14,11 +14,10 @@ namespace Slang
 
 static void addDefaultPayloadAccessQualifiersToField(IRBuilder& builder, IRStructKey* fieldKey)
 {
-    if (fieldKey->findDecoration<IRStageReadAccessDecoration>() ||
-        fieldKey->findDecoration<IRStageWriteAccessDecoration>())
-    {
+    const bool hasReadAccess = fieldKey->findDecoration<IRStageReadAccessDecoration>() != nullptr;
+    const bool hasWriteAccess = fieldKey->findDecoration<IRStageWriteAccessDecoration>() != nullptr;
+    if (hasReadAccess && hasWriteAccess)
         return;
-    }
 
     IRInst* stageNames[] = {
         builder.getStringValue(UnownedStringSlice("caller")),
@@ -27,16 +26,23 @@ static void addDefaultPayloadAccessQualifiersToField(IRBuilder& builder, IRStruc
         builder.getStringValue(UnownedStringSlice("miss")),
     };
 
-    builder.addDecoration(
-        fieldKey,
-        kIROp_StageReadAccessDecoration,
-        stageNames,
-        SLANG_COUNT_OF(stageNames));
-    builder.addDecoration(
-        fieldKey,
-        kIROp_StageWriteAccessDecoration,
-        stageNames,
-        SLANG_COUNT_OF(stageNames));
+    if (!hasReadAccess)
+    {
+        builder.addDecoration(
+            fieldKey,
+            kIROp_StageReadAccessDecoration,
+            stageNames,
+            SLANG_COUNT_OF(stageNames));
+    }
+
+    if (!hasWriteAccess)
+    {
+        builder.addDecoration(
+            fieldKey,
+            kIROp_StageWriteAccessDecoration,
+            stageNames,
+            SLANG_COUNT_OF(stageNames));
+    }
 }
 
 static void addDefaultPayloadAccessQualifiersToStruct(IRBuilder& builder, IRStructType* structType)
@@ -229,9 +235,7 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
         builder.addNameHintDecoration(dummyKey, UnownedStringSlice("_slang_dummy"));
 
         // Add stage access decorations that ray payload fields require
-        IRInst* stageName = builder.getStringValue(UnownedStringSlice("caller"));
-        builder.addDecoration(dummyKey, kIROp_StageReadAccessDecoration, &stageName, 1);
-        builder.addDecoration(dummyKey, kIROp_StageWriteAccessDecoration, &stageName, 1);
+        addDefaultPayloadAccessQualifiersToField(builder, dummyKey);
 
         builder.createStructField(structType, dummyKey, builder.getIntType());
 
