@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T16:55:51Z
-source_commit: bbd84dc65e58598bfa71fafe72764b4076b0869b
+generated_at: 2026-05-21T09:38:00Z
+source_commit: 1106750632bd5fb062ea9e50319f7763d34f78d5
 watched_paths_digest: 79f0d532a4fd57a48ed9dba066f683cc3eb4cbf8e598a4baa37929c3e9113855
 source_doc: docs/llm-generated/cross-cutting/core-module.md
 source_doc_digest: 940b46557a03f1e089bcd47c43fb6d5a5cc72aa0dcf703ab83e117d28307a902
@@ -59,6 +59,15 @@ module-identity (typedef resolves, `Optional<T>` compiles).
 | C-14     | `#preludes`                     | C++ prelude is referenced from emitted CPP output (`SLANG_PRELUDE_EXPORT` marker on entry point). | `cpp-prelude-export-marker.slang`                      |
 | C-15     | `#preludes`                     | CUDA prelude is referenced from emitted CUDA output (`extern "C"` + `__global__` on entry point). | `cuda-prelude-extern-c-marker.slang`                   |
 | C-16     | `#standard-modules`             | Standard module `neural` is NOT implicitly imported; `neural`-namespaced names are unresolved.    | `standard-module-neural-not-implicit.slang`            |
+| C-17     | `#core-module`                  | HLSL meta-module's `Texture3D` plus the documented sample/load/gather operations lower per target. | `texture3d-sample.slang`, `texture3d-samplelevel.slang`, `texture3d-samplegrad.slang`, `texture3d-load.slang`, `texture3d-uint-format-load.slang` |
+| C-18     | `#core-module`                  | HLSL meta-module's `TextureCube` plus the documented sample/load/gather operations lower per target. | `texturecube-sample.slang`, `texturecube-samplelevel.slang`, `texturecube-samplegrad.slang`, `texturecube-load.slang`, `texturecube-gatherred.slang` |
+| C-19     | `#core-module`                  | HLSL meta-module's `Texture1D` plus the documented sample/load operations lower per target. | `texture1d-sample.slang`, `texture1d-samplelevel.slang`, `texture1d-samplegrad.slang`, `texture1d-load.slang` |
+| C-20     | `#core-module`                  | HLSL meta-module's `Texture2DArray` plus the documented sample/load/gather operations lower per target. | `texture2darray-sample.slang`, `texture2darray-samplelevel.slang`, `texture2darray-samplegrad.slang`, `texture2darray-load.slang`, `texture2darray-gatherred.slang` |
+| C-21     | `#core-module`                  | HLSL meta-module's `TextureCubeArray` plus the documented sample operations lower per target. | `texturecubearray-sample.slang`, `texturecubearray-samplelevel.slang`, `texturecubearray-samplegrad.slang` |
+| C-22     | `#core-module`                  | HLSL meta-module's `Texture2DMS.Load(coord, sampleIdx)` lowers per target.                        | `texture2dms-load.slang`                               |
+| C-23     | `#core-module`                  | HLSL meta-module's `RWTexture1D` plus `Load` and subscript-store lower per target.                | `rwtexture1d-load.slang`, `rwtexture1d-store.slang`, `rwtexture1d-uint-format-store.slang` |
+| C-24     | `#core-module`                  | HLSL meta-module's `RWTexture3D` plus `Load` and subscript-store lower per target.                | `rwtexture3d-load.slang`, `rwtexture3d-store.slang`    |
+| C-25     | `#core-module`                  | HLSL meta-module's `SamplerComparisonState` plus `SampleCmp`/`SampleCmpLevelZero` lower per target. | `samplercmp-samplecmp.slang`, `samplercmp-samplecmplevelzero.slang` |
 
 ## Tests in this bundle
 
@@ -111,6 +120,36 @@ module-identity (typedef resolves, `Optional<T>` compiles).
 | `dot-many-uses-stress.slang`                               | stress     | `#core-module`                   |
 | `mul-many-uses-stress.slang`                               | stress     | `#core-module`                   |
 | `optional-deep-nesting-stress.slang`                       | stress     | `#what-the-core-module-provides` |
+| `texture3d-sample.slang`                                   | expansion  | `#core-module`                   |
+| `texture3d-samplelevel.slang`                              | expansion  | `#core-module`                   |
+| `texture3d-samplegrad.slang`                               | expansion  | `#core-module`                   |
+| `texture3d-load.slang`                                     | expansion  | `#core-module`                   |
+| `texture3d-uint-format-load.slang`                         | expansion  | `#core-module`                   |
+| `texturecube-sample.slang`                                 | expansion  | `#core-module`                   |
+| `texturecube-samplelevel.slang`                            | expansion  | `#core-module`                   |
+| `texturecube-samplegrad.slang`                             | expansion  | `#core-module`                   |
+| `texturecube-load.slang`                                   | expansion  | `#core-module`                   |
+| `texturecube-gatherred.slang`                              | expansion  | `#core-module`                   |
+| `texture1d-sample.slang`                                   | expansion  | `#core-module`                   |
+| `texture1d-samplelevel.slang`                              | expansion  | `#core-module`                   |
+| `texture1d-samplegrad.slang`                               | expansion  | `#core-module`                   |
+| `texture1d-load.slang`                                     | expansion  | `#core-module`                   |
+| `texture2darray-sample.slang`                              | expansion  | `#core-module`                   |
+| `texture2darray-samplelevel.slang`                         | expansion  | `#core-module`                   |
+| `texture2darray-samplegrad.slang`                          | expansion  | `#core-module`                   |
+| `texture2darray-load.slang`                                | expansion  | `#core-module`                   |
+| `texture2darray-gatherred.slang`                           | expansion  | `#core-module`                   |
+| `texturecubearray-sample.slang`                            | expansion  | `#core-module`                   |
+| `texturecubearray-samplelevel.slang`                       | expansion  | `#core-module`                   |
+| `texturecubearray-samplegrad.slang`                        | expansion  | `#core-module`                   |
+| `texture2dms-load.slang`                                   | expansion  | `#core-module`                   |
+| `rwtexture1d-load.slang`                                   | expansion  | `#core-module`                   |
+| `rwtexture1d-store.slang`                                  | expansion  | `#core-module`                   |
+| `rwtexture1d-uint-format-store.slang`                      | expansion  | `#core-module`                   |
+| `rwtexture3d-load.slang`                                   | expansion  | `#core-module`                   |
+| `rwtexture3d-store.slang`                                  | expansion  | `#core-module`                   |
+| `samplercmp-samplecmp.slang`                               | expansion  | `#core-module`                   |
+| `samplercmp-samplecmplevelzero.slang`                      | expansion  | `#core-module`                   |
 
 ## Doc gaps observed
 
@@ -163,6 +202,30 @@ module-identity (typedef resolves, `Optional<T>` compiles).
   importable by `import diff;` from user code — our negative
   `import-diff-by-name-fails` test had to discover the
   loader-search-path behaviour empirically.
+- `#core-module` lists `Texture2D` and `RWTexture2D` as the
+  representative HLSL-named resource types but does not enumerate
+  the full set of texture variants the HLSL meta-module surfaces
+  (`Texture1D`, `Texture3D`, `TextureCube`, `Texture2DArray`,
+  `TextureCubeArray`, `Texture2DMS`, `RWTexture1D`, `RWTexture3D`,
+  `SamplerComparisonState`). Texture-variant expansion tests had
+  to discover the per-target lowering (1D / 3D / Cube image
+  dimensionality, multisampled image marker, Dref opcodes for
+  shadow samplers) from emit inspection rather than from a doc
+  table.
+- `#core-module` does not enumerate which sampling operations
+  (`Sample`, `SampleLevel`, `SampleGrad`, `Load`, `GatherRed`,
+  `SampleCmp`, `SampleCmpLevelZero`) are available on which
+  texture variant, nor the per-variant coordinate shapes
+  (e.g. `Texture3D.Load` takes `int4`, `Texture1D.Load` takes
+  `int2`, `Texture2DMS.Load` takes `(int2, sampleIdx)`). These
+  signatures were determined empirically from compiler errors.
+- `#core-module` does not name which texel-format generics
+  (`float4` / `int4` / `uint4` / `unorm` / `snorm`) are valid on
+  each texture variant, nor describe the per-target sampler-type
+  flavouring (e.g. GLSL `utexture3D` for `uint4` content,
+  `image1D` vs `uimage1D` for the RW variants). Format-variant
+  tests probe only `float4` and `uint4` and leave the
+  `unorm`/`snorm` admission status as a doc gap.
 
 ## Out of scope (no-GPU runner)
 

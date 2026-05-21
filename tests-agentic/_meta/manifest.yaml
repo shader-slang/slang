@@ -397,7 +397,7 @@ bundles:
     coverage_targets: []
     runner:
       category: agentic-cross-cutting
-    size_cap_files: 50
+    size_cap_files: 100
 
   cross-cutting/serialization:
     prompt: prompts/cross-cutting-serialization.md

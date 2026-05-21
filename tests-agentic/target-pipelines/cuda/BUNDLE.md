@@ -1,7 +1,7 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T17:30:46+00:00
+generated_at: 2026-05-21T00:00:00+00:00
 source_commit: 330c9a8d807b9f9352e4754f466d1244ae681cff
 watched_paths_digest: 9929a933b7e23daa2d56e2d0c08666ee4781a53381b498c723250e39826823db
 source_doc: docs/llm-generated/target-pipelines/cuda.md
@@ -75,6 +75,13 @@ Phase A/B/C/D tables that can be observed in
 | C-18     | [#phase-d-cuda-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/cuda.md#phase-d-cuda-emit-and-downstream-tools)              | The shared `SourceWriter` emits `#line N "<file>"` directives in the CUDA C++ text so nvrtc can map errors back to Slang source.                              | `line-directive-survives.slang`                                                             |
 | C-19     | [#cuda-specific-runtime-predicates](../../../docs/llm-generated/target-pipelines/cuda.md#cuda-specific-runtime-predicates)                          | CUDA is non-D3D / non-Khronos so HLSL `register(uN)`/`register(tN)` annotations do not appear; resources are reached through `globalParams_0`.               | `no-register-binding-on-cuda.slang`                                                         |
 | C-20     | [#phase-d-cuda-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/cuda.md#phase-d-cuda-emit-and-downstream-tools)              | Non-entry-point Slang functions are emitted with `__device__` decoration so nvrtc compiles them as device code.                                               | `device-function-decoration.slang`                                                          |
+| C-21     | [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/cuda.md#phase-b-specialization-and-type-legalization)  | `Texture1D<T>` becomes the CUDA `CUtexObject` primitive and `SampleLevel` lowers to `tex1DLod<T>(...)`.                                                       | `texture1d-emit.slang`                                                                      |
+| C-22     | [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/cuda.md#phase-b-specialization-and-type-legalization)  | `Texture3D<T>` becomes the CUDA `CUtexObject` primitive and `SampleLevel` lowers to `tex3DLod<T>(...)`.                                                       | `texture3d-emit.slang`                                                                      |
+| C-23     | [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/cuda.md#phase-b-specialization-and-type-legalization)  | `TextureCube<T>` becomes the CUDA `CUtexObject` primitive and `SampleLevel` lowers to `texCubemapLod<T>(...)`.                                                | `texturecube-emit.slang`                                                                    |
+| C-24     | [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/cuda.md#phase-b-specialization-and-type-legalization)  | `Texture2DArray<T>` becomes the CUDA `CUtexObject` primitive and `SampleLevel` lowers to `tex2DLayeredLod<T>(...)`.                                           | `texture2darray-emit.slang`                                                                 |
+| C-25     | [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/cuda.md#phase-b-specialization-and-type-legalization)  | `RWTexture3D<T>` becomes the CUDA `CUsurfObject` primitive; subscript-store lowers to `surf3Dwrite`, subscript-load to `surf3Dread`.                          | `rwtexture3d-emit.slang`                                                                    |
+| C-26     | [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/cuda.md#phase-b-specialization-and-type-legalization)  | `RWTexture2D<T>` becomes the CUDA `CUsurfObject` primitive; subscript-store lowers to `surf2Dwrite`, subscript-load to `surf2Dread`.                          | `rwtexture2d-emit.slang`                                                                    |
+| C-27     | [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/cuda.md#phase-b-specialization-and-type-legalization)  | All read-only Slang `Texture*` variants share a single `CUtexObject` GlobalParams field type; per-rank distinction is only at the call site (`tex*Lod`).      | `texture-variants-globalparams-emit.slang`                                                  |
 
 ## Tests in this bundle
 
@@ -128,6 +135,13 @@ Phase A/B/C/D tables that can be observed in
 | `stress-eight-buffer-params.slang`              | stress     | `#phase-a-link-and-entry-point-prep`                        |
 | `stress-deeply-nested-control-flow.slang`       | stress     | `#eliminatephis-with-default-options`                       |
 | `stress-recursive-function-rejected.slang`      | negative   | `#phase-b-specialization-and-type-legalization`             |
+| `texture1d-emit.slang`                          | expansion  | `#phase-b-specialization-and-type-legalization`             |
+| `texture3d-emit.slang`                          | expansion  | `#phase-b-specialization-and-type-legalization`             |
+| `texturecube-emit.slang`                        | expansion  | `#phase-b-specialization-and-type-legalization`             |
+| `texture2darray-emit.slang`                     | expansion  | `#phase-b-specialization-and-type-legalization`             |
+| `rwtexture3d-emit.slang`                        | expansion  | `#phase-b-specialization-and-type-legalization`             |
+| `rwtexture2d-emit.slang`                        | expansion  | `#phase-b-specialization-and-type-legalization`             |
+| `texture-variants-globalparams-emit.slang`      | expansion  | `#phase-b-specialization-and-type-legalization`             |
 
 ## Doc gaps observed
 
@@ -177,6 +191,16 @@ Phase A/B/C/D tables that can be observed in
   Slang -> CUDA-primitive substitutions (e.g.
   `Texture2D -> CUtexObject`, `SamplerState` unchanged). Listing
   the mapping would let a test pin each substitution.
+  Observed substitutions worth documenting: all read-only
+  `Texture1D` / `Texture2D` / `Texture3D` / `TextureCube` /
+  `Texture2DArray` collapse to `CUtexObject`, while RW textures
+  (`RWTexture2D`, `RWTexture3D`, etc.) collapse to
+  `CUsurfObject`. The per-rank distinction is observable only at
+  the call site (`tex1DLod`, `tex3DLod`, `texCubemapLod`,
+  `tex2DLayeredLod`, `surf2Dwrite`, `surf3Dwrite`, ...). A
+  doc subsection under `#phase-b-...` (or a Texture-types
+  section) with the table would let texture-variant tests
+  anchor each substitution.
 - The doc's `## synthesizeActiveMask` describes converting
   IR-level active-mask references into a synthesized mask
   parameter but does not give a Slang-language surface that

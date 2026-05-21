@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T17:00:00+00:00
-source_commit: ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+generated_at: 2026-05-21T09:40:00+00:00
+source_commit: 1106750632bd5fb062ea9e50319f7763d34f78d5
 watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
 source_doc: docs/llm-generated/ir-reference/resources-and-atomics.md
 source_doc_digest: 3ac0724b29539a4ec7edd0c37f2e44add27803e6c97e8427e2d67a80b87bb345
@@ -53,6 +53,9 @@ function bodies of byte-address-buffer accessors).
 | C-12     | #atomic-operations                                    | `Atomic<T>::exchange(v)` lowers to `atomicExchange(%ptr, %val, %order)`.                                                                      | `atomic-exchange.slang`                                                                                                                                                                                                                                                |
 | C-13     | #atomiccompareexchange                                | `Atomic<T>::compareExchange(e, d)` lowers to `atomicCompareExchange(%ptr, %expected, %desired, ...)`.                                         | `atomic-compare-exchange.slang`                                                                                                                                                                                                                                        |
 | C-14     | #atomic-operations                                    | `Atomic<T>::load()` and `::store(v)` lower to dedicated `atomicLoad` / `atomicStore` opcodes (not RMW).                                       | `atomic-load-store.slang`                                                                                                                                                                                                                                              |
+| C-15     | #shader-io                                            | Each documented `Texture*` / `RWTexture*` / `SamplerComparisonState` variant surfaces as a `global_param` carrying its distinct `TextureType(..., TextureShape*Type, isArray, isMS, ..., isRW, ...)` or `SamplerComparisonState` result type. | `texture1d-globalparam.slang`, `texture3d-globalparam.slang`, `texturecube-globalparam.slang`, `texture2darray-globalparam.slang`, `texturecubearray-globalparam.slang`, `texture2dms-globalparam.slang`, `rwtexture1d-globalparam.slang`, `rwtexture3d-globalparam.slang`, `samplercomparisonstate-globalparam.slang` |
+| C-16     | #sampling-and-combined-samplers                       | `Texture*::Sample` / `SampleGrad` / `Gather` / `SampleCmp` at LOWER-TO-IR surface in `main` as `call specialize(%helper, ..., TextureShape*Type, ...)(%tex, %samp, ...)`; the doc's `sample` / `sampleGrad` opcodes live inside the library helper. | `texture1d-sample-ir.slang`, `texture3d-sample-ir.slang`, `texturecube-sample-ir.slang`, `texture2darray-sample-ir.slang`, `texturecubearray-sample-ir.slang`, `texturecube-samplegrad-ir.slang`, `texture2d-gather-ir.slang`, `texture2d-samplecmp-sampcmp-ir.slang` |
+| C-17     | #texture-and-image                                    | `Texture*::Load`, `RWTexture*[i]` rvalue, and `RWTexture*[i] = v` assignment at LOWER-TO-IR surface in `main` as `call specialize(%helper, ..., TextureShape*Type, ...)`; the doc's `imageLoad` / `imageSubscript` / `imageStore` opcodes live inside the library helper. | `texture1d-load-ir.slang`, `texture3d-load-ir.slang`, `texture2dms-load-ir.slang`, `rwtexture1d-load-ir.slang`, `rwtexture3d-load-ir.slang`, `rwtexture1d-store-ir.slang`, `rwtexture3d-store-ir.slang` |
 
 ## Tests in this bundle
 
@@ -119,6 +122,30 @@ function bodies of byte-address-buffer accessors).
 | `structured-buffer-load-struct.slang`                                             | functional | `#buffer-load-and-store`            |
 | `structured-buffer-load.slang`                                                    | functional | `#buffer-load-and-store`            |
 | `structured-buffer-types-globalparam.slang`                                       | functional | `#shader-io`                        |
+| `rwtexture1d-globalparam.slang`                                                   | expansion  | `#shader-io`                        |
+| `rwtexture1d-load-ir.slang`                                                       | expansion  | `#texture-and-image`                |
+| `rwtexture1d-store-ir.slang`                                                      | expansion  | `#texture-and-image`                |
+| `rwtexture3d-globalparam.slang`                                                   | expansion  | `#shader-io`                        |
+| `rwtexture3d-load-ir.slang`                                                       | expansion  | `#texture-and-image`                |
+| `rwtexture3d-store-ir.slang`                                                      | expansion  | `#texture-and-image`                |
+| `samplercomparisonstate-globalparam.slang`                                        | expansion  | `#shader-io`                        |
+| `texture1d-globalparam.slang`                                                     | expansion  | `#shader-io`                        |
+| `texture1d-load-ir.slang`                                                         | expansion  | `#texture-and-image`                |
+| `texture1d-sample-ir.slang`                                                       | expansion  | `#sampling-and-combined-samplers`   |
+| `texture2d-gather-ir.slang`                                                       | expansion  | `#sampling-and-combined-samplers`   |
+| `texture2d-samplecmp-sampcmp-ir.slang`                                            | expansion  | `#sampling-and-combined-samplers`   |
+| `texture2darray-globalparam.slang`                                                | expansion  | `#shader-io`                        |
+| `texture2darray-sample-ir.slang`                                                  | expansion  | `#sampling-and-combined-samplers`   |
+| `texture2dms-globalparam.slang`                                                   | expansion  | `#shader-io`                        |
+| `texture2dms-load-ir.slang`                                                       | expansion  | `#texture-and-image`                |
+| `texture3d-globalparam.slang`                                                     | expansion  | `#shader-io`                        |
+| `texture3d-load-ir.slang`                                                         | expansion  | `#texture-and-image`                |
+| `texture3d-sample-ir.slang`                                                       | expansion  | `#sampling-and-combined-samplers`   |
+| `texturecube-globalparam.slang`                                                   | expansion  | `#shader-io`                        |
+| `texturecube-sample-ir.slang`                                                     | expansion  | `#sampling-and-combined-samplers`   |
+| `texturecube-samplegrad-ir.slang`                                                 | expansion  | `#sampling-and-combined-samplers`   |
+| `texturecubearray-globalparam.slang`                                              | expansion  | `#shader-io`                        |
+| `texturecubearray-sample-ir.slang`                                                | expansion  | `#sampling-and-combined-samplers`   |
 
 ## Doc gaps observed
 
@@ -231,6 +258,38 @@ function bodies of byte-address-buffer accessors).
   diagnostic is a use-of-uninitialized warning on the `status`
   variable), and so its documented opcode `rwstructuredBufferLoadStatus`
   has no portable Slang surface in this bundle's coverage.
+- The `texture-and-image` and `sampling-and-combined-samplers`
+  tables enumerate eight `TextureShape*` carriers (1D / 2D / 3D /
+  Cube, each with optional array, plus 2DMS) and an RW flag on
+  `RWTexture*`. The mapping between those Slang surface types and
+  the IR `TextureShape*Type` tokens (`TextureShape1DType`,
+  `TextureShape2DType`, `TextureShape3DType`, `TextureShapeCubeDType`,
+  plus the trailing array / isMS / isRW operand slots on
+  `TextureType(...)`) is not stated in the doc. Tests in this
+  expansion (`texture*-globalparam.slang`) pin the mapping in IR.
+- The doc's `sampling-and-combined-samplers` table lists `sample`
+  and `sampleGrad` but does not enumerate `Gather`, `SampleCmp`,
+  `SampleCmpLevelZero`, `SampleBias`, or `SampleLevel`. All five
+  are documented surfaces on `Texture*` in the core module and
+  all of them lower through the same `call specialize(%helper,
+  ..., TextureShape*Type, ...)` pre-inline shape in `main`. The
+  doc should either name additional opcodes that correspond to
+  them or note that they share the `sample` / `sampleGrad`
+  opcodes after inlining.
+- Texture `Load`/`Sample`/`Gather`/`SampleCmp` calls all pass the
+  texture shape, array flag, MS flag, and access flag as
+  specialization arguments to the helper at LOWER-TO-IR, but the
+  isMS slot in the `call specialize(...)` arg list for a
+  `Texture2DMS<T>::Load` is `0`, not `1` — the multi-sample-ness
+  is encoded in the texture's `global_param` type, not re-supplied
+  at the call site. The doc should state which capability slots
+  are "texture-resident" (only on the type) vs "call-resident"
+  (also passed to the helper specialization).
+- The doc lists `SamplerComparisonState` only implicitly as a
+  variant of `SamplerState`; no row enumerates its distinct IR
+  resource type. The `samplercomparisonstate-globalparam.slang`
+  test pins it as a distinct top-level `global_param` carrier
+  alongside `SamplerState`.
 
 ## Out of scope (no-GPU runner)
 

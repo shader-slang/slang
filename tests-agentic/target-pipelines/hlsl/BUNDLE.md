@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-21T00:00:00+00:00
-source_commit: 1655c2bf8d3567fa220a5226769ef5e3917d55e8
+generated_at: 2026-05-21T12:00:00+00:00
+source_commit: 1106750632bd5fb062ea9e50319f7763d34f78d5
 watched_paths_digest: ee6e5a27774a8a9c7ea3024cc5842f7bc1919255c4c0b9751400d25195f0b7bc
 source_doc: docs/llm-generated/target-pipelines/hlsl.md
 source_doc_digest: 2afce914bae96fe2e024bf6b3685b7339df010398abc456d4a58cb329326fa50
@@ -83,7 +83,7 @@ specifically about HLSL being non-Khronos.
 | C-30     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | Explicit primitive type conversions emit as the HLSL constructor-style cast `T(expr)`.                                                                            | `cast-constructor-style-emit.slang`, `cast-uint-to-float-emit.slang`                                                                                                                                                              |
 | C-31     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | User-defined helper functions emit as named HLSL functions with the `_<N>` suffix, callable from the entry point.                                                 | `function-call-user-defined-emit.slang`, `stress-many-function-parameters.slang`                                                                                                                                                  |
 | C-32     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | Local fixed-size array declarations emit as `T name[N]` in HLSL.                                                                                                  | `local-array-declaration-emit.slang`                                                                                                                                                                                              |
-| C-33     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | Texture3D and TextureCube resources keep their HLSL spellings and bind to the `t` register class.                                                                 | `texture3d-sample-emit.slang`, `texturecube-sample-emit.slang`                                                                                                                                                                    |
+| C-33     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | Texture3D and TextureCube resources keep their HLSL spellings and bind to the `t` register class.                                                                 | `texture3d-sample-emit.slang`, `texturecube-sample-emit.slang`, `texture1d-emit.slang`, `texture1d-load-emit.slang`, `texture1d-explicit-register-zero.slang`, `texture3d-emit.slang`, `texture3d-samplelevel-emit.slang`, `texture3d-explicit-t-high-index.slang`, `texturecube-samplegrad-emit.slang`, `texture2d-samplegrad-emit.slang`, `texturecubearray-emit.slang`, `texture2darray-emit.slang`, `texture2dms-emit.slang`, `texture2dms-sample-count-eight.slang`, `texture2dms-load-sample-index.slang`, `rwtexture1d-emit.slang`, `rwtexture2d-emit.slang`, `rwtexture3d-emit.slang`, `rwtexture3d-explicit-u0.slang`, `rwtexture1d-explicit-u-high-index.slang`, `samplercmp-emit.slang`, `samplercmp-explicit-s0.slang`, `samplercmp-samplecmplevelzero-emit.slang`, `texture2d-gatherred-emit.slang`, `texture2d-gathergreen-emit.slang`, `texture2darray-load-emit.slang`, `multiple-textures-distinct-t-registers.slang`, `rwtexture-and-srv-texture-distinct-registers.slang`, `texturecube-element-float-emit.slang`, `texture-and-samplercmp-distinct-s-registers.slang`, `texture2d-sample-emit.slang`, `texture3d-and-rwtexture3d-share-binding-space.slang` |
 | C-34     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | Nested struct fields (a struct containing another user struct) emit both `struct` declarations in HLSL.                                                           | `struct-nested-fields-emit.slang`                                                                                                                                                                                                 |
 | C-35     | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools)                                                       | Vector swizzle (`v.xy`) survives HLSL emit using the canonical `.xyzw` spelling.                                                                                  | `vector-swizzle-xyzw-emit.slang`                                                                                                                                                                                                  |
 | C-36     | [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-b-specialization-and-type-legalization)                                           | `checkForMissingReturns` (Phase B, `reqSet.missingReturn`) rejects non-void functions whose control flow can fall off the end before HLSL emit.                   | `missing-return-diag.slang`                                                                                                                                                                                                       |
@@ -197,6 +197,36 @@ specifically about HLSL being non-Khronos.
 | `empty-function-body-emit.slang`                      | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
 | `cbuffer-vector-field.slang`                          | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
 | `struct-nested-fields-emit.slang`                     | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture1d-emit.slang`                                | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture1d-load-emit.slang`                           | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture1d-explicit-register-zero.slang`              | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture3d-emit.slang`                                | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture3d-samplelevel-emit.slang`                    | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texturecube-samplegrad-emit.slang`                   | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture2d-samplegrad-emit.slang`                     | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texturecubearray-emit.slang`                         | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture2darray-emit.slang`                           | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture2dms-emit.slang`                              | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture2dms-sample-count-eight.slang`                | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `rwtexture1d-emit.slang`                              | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `rwtexture3d-emit.slang`                              | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `rwtexture2d-emit.slang`                              | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `rwtexture3d-explicit-u0.slang`                       | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `samplercmp-emit.slang`                               | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `samplercmp-explicit-s0.slang`                        | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `samplercmp-samplecmplevelzero-emit.slang`            | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture2d-gatherred-emit.slang`                      | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture2d-gathergreen-emit.slang`                    | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture2darray-load-emit.slang`                      | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `multiple-textures-distinct-t-registers.slang`        | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `rwtexture-and-srv-texture-distinct-registers.slang`  | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture3d-explicit-t-high-index.slang`               | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `rwtexture1d-explicit-u-high-index.slang`             | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texturecube-element-float-emit.slang`                | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture2dms-load-sample-index.slang`                 | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture-and-samplercmp-distinct-s-registers.slang`   | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture2d-sample-emit.slang`                         | expansion  | `#phase-d-hlsl-emit-and-downstream-tools`                 |
+| `texture3d-and-rwtexture3d-share-binding-space.slang` | boundary   | `#phase-d-hlsl-emit-and-downstream-tools`                 |
 
 ## Doc gaps observed
 
@@ -254,6 +284,18 @@ specifically about HLSL being non-Khronos.
   `linkAndOptimizeIR`" but the consequence ("no extra
   simplification loop in the pass log") is not observable
   through `slangc -target hlsl` text. No test.
+- The doc's Phase D table mentions `HLSLSourceEmitter` walks the
+  IR and writes HLSL text, but does not enumerate which texture
+  variants survive (`Texture1D`, `Texture2DArray`,
+  `TextureCubeArray`, `Texture2DMS<T,N>`, `RWTexture1D`,
+  `RWTexture2D`, `RWTexture3D`, `SamplerComparisonState`) nor
+  the canonical method spellings (`Sample`, `SampleLevel`,
+  `SampleGrad`, `Load`, `GatherRed`/`GatherGreen`/`GatherBlue`/`GatherAlpha`,
+  `SampleCmp`, `SampleCmpLevelZero`). A one-line statement that
+  each Slang texture/sampler variant emits as the same HLSL
+  native type name with the matching `register(t|u|s)` class
+  would let tests anchor more precisely than the general
+  `#phase-d-hlsl-emit-and-downstream-tools` section.
 
 ## Out of scope (no-GPU runner)
 

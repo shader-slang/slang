@@ -1,7 +1,7 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T17:52:31Z
+generated_at: 2026-05-21T00:00:00Z
 source_commit: 2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
 watched_paths_digest: 3a231855d2500716d08acc7404223e6d69655007cc529e406477b87c9bf1a697
 source_doc: docs/llm-generated/target-pipelines/wgsl.md
@@ -49,6 +49,13 @@ with `-target wgsl -entry main -stage compute` against the
 | C-21     | #phase-d-wgsl-emit-and-downstream-tools                        | Multiple resources at module scope receive distinct sequential `@binding` indices.              | `multiple-resources-distinct-bindings.slang`         |
 | C-22     | #phase-d-wgsl-emit-and-downstream-tools                        | Slang integer constants emit as `i32(N)` / `u32(N)` (constructor-style spelling).               | `integer-literal-spelling.slang`                     |
 | C-23     | #phase-d-wgsl-emit-and-downstream-tools                        | Slang vector types spell out as `vec<rank><elem>` (no `uintN`/`floatN` shorthand).              | `uint3-becomes-vec3-u32.slang`                       |
+| C-24     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture1D<T>` emits as `texture_1d<f32>` with a `@binding`/`@group` annotation.                | `texture1d-emit.slang`                               |
+| C-25     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture3D<T>` emits as `texture_3d<f32>` with a `@binding`/`@group` annotation.                | `texture3d-emit.slang`                               |
+| C-26     | #phase-d-wgsl-emit-and-downstream-tools                        | `TextureCube<T>` emits as `texture_cube<f32>` and `SampleLevel` lowers to `textureSampleLevel`. | `texturecube-emit.slang`                             |
+| C-27     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture2DArray<T>` emits as `texture_2d_array<f32>` with WGSL splitting `.xy` / `i32(layer)` at the sample call. | `texture2darray-emit.slang`                  |
+| C-28     | #phase-d-wgsl-emit-and-downstream-tools                        | `RWTexture2D<T>` emits as `texture_storage_2d<...,read_write>`; subscript-store lowers to `textureStore`, subscript-load to `textureLoad`. | `rwtexture2d-storage-emit.slang`               |
+| C-29     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture2D.Load(int3(xy, lod))` lowers to `textureLoad(tex, xy, lod)` without a sampler.        | `texture2d-load-emit.slang`                          |
+| C-30     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture2D.Sample(samp, uv)` lowers to `textureSample(tex, samp, uv)` (no explicit LOD).        | `texture2d-sample-emit.slang`                        |
 
 ## Tests in this bundle
 
@@ -106,6 +113,13 @@ with `-target wgsl -entry main -stage compute` against the
 | `numthreads-zero-rejected.slang`                      | negative   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
 | `storage-uniform-explicit-address-space.slang`        | boundary   | `#specializeaddressspaceforwgsl`                                 |
 | `vec3-padding-trailing-field.slang`                   | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `texture1d-emit.slang`                                | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `texture3d-emit.slang`                                | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `texturecube-emit.slang`                              | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `texture2darray-emit.slang`                           | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `rwtexture2d-storage-emit.slang`                      | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `texture2d-load-emit.slang`                           | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| `texture2d-sample-emit.slang`                         | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
 
 ## Doc gaps observed
 
@@ -137,6 +151,27 @@ with `-target wgsl -entry main -stage compute` against the
   an `if`/`else` merged value looks like (the `var ... : T` +
   branch assignment pattern). A small example of the emit shape
   would strengthen the anchor for the eliminate-phis test.
+- The doc names the Phase-D `Texture2D<float4>` emit shape
+  (`texture_2d<f32>`) but does not enumerate the **per-Slang-
+  texture-variant → WGSL `texture_*<f32>` mapping** for
+  `Texture1D` (`texture_1d`), `Texture3D` (`texture_3d`),
+  `TextureCube` (`texture_cube`), `Texture2DArray`
+  (`texture_2d_array`), or `RWTexture2D`
+  (`texture_storage_2d<format, access>`). A Phase-D subsection
+  with the table would let texture-variant tests anchor each
+  mapping precisely.
+- The doc does not describe how Slang lowers the various
+  texture-access intrinsics (`Sample`, `SampleLevel`,
+  `SampleGrad`, `Load`) to their WGSL counterparts
+  (`textureSample`, `textureSampleLevel`, `textureSampleGrad`,
+  `textureLoad`). A subsection would let sample-shape tests
+  anchor concretely.
+- The doc does not document how WGSL's storage-texture format
+  is inferred from the Slang element type
+  (`RWTexture2D<float4>` → `rgba32float`). The
+  `RWTexture2D.Load` / `.Store` test anchors broadly to Phase D;
+  pinning the inferred-format rule would let it anchor
+  precisely.
 
 ## Out of scope (no-GPU runner)
 

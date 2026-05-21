@@ -1,7 +1,7 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T17:50:00Z
+generated_at: 2026-05-21T00:00:00Z
 source_commit: 2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
 watched_paths_digest: 346898dc4d064ddc3802d3a68b0195bea085b7a106cf552f607ca57a1f3da4ec
 source_doc: docs/llm-generated/target-pipelines/metal.md
@@ -118,6 +118,11 @@ scope on the no-GPU runner.
 | C-29     | [#phase-d-metal-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools)                                             | Texture parameter binding uses an independent `[[texture(N)]]` slot space (not shared with `[[buffer]]` / `[[sampler]]`).                                   | `texture-binding-positional-zero.slang`                        |
 | C-30     | [#phase-d-metal-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools)                                             | `[numthreads(X,Y,Z)]` is HLSL-specific and does not survive as a `numthreads(...)` attribute on Metal — threadgroup size is a dispatch-time concern.        | `numthreads-not-an-emitted-attribute.slang`                    |
 | C-31     | [#downstream-apple-metal-compiler](../../../docs/llm-generated/target-pipelines/metal.md#downstream-apple-metal-compiler)                                                             | Bare `-target metal` stops at Metal text; no `.metallib` is produced and the entry function appears as `main_0` (not an HLSL-style `main`).                 | `downstream-stops-at-text-no-metallib.slang`                   |
+| C-32     | [#phase-d-metal-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools)                                             | `Texture1D<T>` emits as `metal::texture1d<T, access::sample>` with `[[texture(N)]]`.                                                                        | `texture1d-emit.slang`                                         |
+| C-33     | [#phase-d-metal-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools)                                             | `Texture3D<T>` emits as `metal::texture3d<T, access::sample>` with `[[texture(N)]]`.                                                                        | `texture3d-emit.slang`, `texture3d-samplelevel-emit.slang`     |
+| C-34     | [#phase-d-metal-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools)                                             | `TextureCube<T>` emits as `metal::texturecube<T, access::sample>` with `[[texture(N)]]`; SampleGrad uses `gradientcube(...)`.                               | `texturecube-emit.slang`, `texturecube-samplegrad-emit.slang`  |
+| C-35     | [#phase-d-metal-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools)                                             | `Texture2DArray<T>` emits as `metal::texture2d_array<T, access::sample>` with `[[texture(N)]]`; multi-texture parameter list packs positionally in order.   | `texture2darray-emit.slang`, `texture2darray-binding-multi.slang` |
+| C-36     | [#legalizeimagesubscript](../../../docs/llm-generated/target-pipelines/metal.md#legalizeimagesubscript)                                                                               | `RWTexture3D<T>` emits as `metal::texture3d<T, access::read_write>` and `legalizeImageSubscript` rewrites subscript into `.write(...)` / `.read(...)`.       | `rwtexture3d-emit.slang`                                       |
 
 ## Tests in this bundle
 
@@ -181,6 +186,14 @@ scope on the no-GPU runner.
 | `deeply-nested-control-flow-stress.slang`                  | stress     | `#eliminatephis-with-default-options`                     |
 | `enum-with-int-max-collapses-to-literal.slang`             | boundary   | `#phase-a-link-and-entry-point-prep`                      |
 | `append-structured-buffer-rejected-on-metal.slang`         | negative   | `#phase-b-specialization-and-type-legalization`           |
+| `texture1d-emit.slang`                                     | expansion  | `#phase-d-metal-emit-and-downstream-tools`                |
+| `texture3d-emit.slang`                                     | expansion  | `#phase-d-metal-emit-and-downstream-tools`                |
+| `texturecube-emit.slang`                                   | expansion  | `#phase-d-metal-emit-and-downstream-tools`                |
+| `texture2darray-emit.slang`                                | expansion  | `#phase-d-metal-emit-and-downstream-tools`                |
+| `rwtexture3d-emit.slang`                                   | expansion  | `#legalizeimagesubscript`                                 |
+| `texturecube-samplegrad-emit.slang`                        | expansion  | `#phase-d-metal-emit-and-downstream-tools`                |
+| `texture3d-samplelevel-emit.slang`                         | expansion  | `#phase-d-metal-emit-and-downstream-tools`                |
+| `texture2darray-binding-multi.slang`                       | expansion  | `#phase-d-metal-emit-and-downstream-tools`                |
 
 ## Doc gaps observed
 
@@ -189,6 +202,8 @@ scope on the no-GPU runner.
 - The doc says Metal hits `[[kernel]]`, `[[buffer(N)]]`, etc., but does not call out that **threadgroup size is *not* an emitted attribute** — i.e. `[numthreads(X,Y,Z)]` is dropped in Metal text and the dimensions come from the dispatch call. Worth mentioning in Phase D.
 - The doc enumerates `wrapCBufferElementsForMetal` but does not describe the **specific wrapper-struct naming** that downstream tests would key on (`SLANG_ParameterGroup_<name>_natural_<N>` containing `_MatrixStorage_<spelling>natural_<M>`). A concrete emit example in `#wrapcbufferelementsformetal` would prevent test drift.
 - The doc names the Metal-arm `legalizeByteAddressBufferOps` options but does not show the **emitted form** (`as_type<uint>(buf[(off)>>2])`); a one-line example would let tests assert against a concrete pattern.
+- The doc mentions `[[texture(N)]]` slot positionally but does not enumerate the **per-Slang-texture-variant → Metal `texture*<T, access::...>`** mapping (`Texture1D` → `texture1d`, `Texture3D` → `texture3d`, `TextureCube` → `texturecube`, `Texture2DArray` → `texture2d_array`, and `RWTexture3D` → `texture3d<..., access::read_write>`). A small table under `#phase-d-...` (or a Texture-types subsection) would let texture-variant tests anchor more precisely. The `#legalizeimagesubscript` paragraph only mentions `RWTexture2D`; it should generalize to RWTexture1D / RWTexture3D / RWTexture2DArray.
+- The doc does not describe the **`gradientcube(...)` / `gradient2d(...)` / `gradient3d(...)` selector wrappers** that the Metal emitter inserts around explicit-gradient SampleGrad arguments. Anchoring this would let SampleGrad-shape tests pin the gradient selector.
 
 ## Out of scope (no-GPU runner)
 

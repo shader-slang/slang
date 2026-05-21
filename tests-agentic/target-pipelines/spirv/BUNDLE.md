@@ -1,7 +1,7 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-21T12:00:00+00:00
+generated_at: 2026-05-21T13:00:00+00:00
 source_commit: 1655c2bf8d3567fa220a5226769ef5e3917d55e8
 watched_paths_digest: bd75ad021965ba68fbd7d335d6359ad1cf49b78a95a9be48be867759452b78f1
 source_doc: docs/llm-generated/target-pipelines/spirv.md
@@ -129,6 +129,25 @@ text and are out of scope.
 | C-58     | [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/spirv.md#phase-b-specialization-and-type-legalization)                                                                                                           | Phase B `checkForRecursiveFunctions` rejects a self-recursive call with E55201 before SPIR-V emit.                                            | `negative-recursive-function.slang`              |
 | C-59     | [#phase-b-specialization-and-type-legalization](../../../docs/llm-generated/target-pipelines/spirv.md#phase-b-specialization-and-type-legalization)                                                                                                           | Phase B `checkForMissingReturns` rejects a non-void function whose paths don't all return.                                                    | `negative-missing-return-non-void.slang`         |
 | C-60     | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools)                                                                       | Eight `RWStructuredBuffer` globals receive sequential `Binding 0..7` decorations under `DescriptorSet 0`.                                     | `many-uniform-bindings-stress.slang`             |
+| C-61     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `Texture1D<float4>` lowers to `OpTypeImage %float 1D ...` and requires `OpCapability Sampled1D`.                                              | `texture1d-image-type.slang`, `texture1d-samplelevel-explicit-lod.slang` |
+| C-62     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `Texture1DArray<float4>` lowers to `OpTypeImage %float 1D 2 1 0 1` (1D dim, Arrayed=1) and keeps the `Sampled1D` capability.                  | `texture1darray-image-type.slang`                |
+| C-63     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `TextureCubeArray<float4>` lowers to `OpTypeImage %float Cube 2 1 0 1` (Cube dim with Arrayed=1).                                             | `texturecubearray-image-type.slang`              |
+| C-64     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `Texture2DMS<float4>.Load(coord, sampleIdx)` lowers to `OpTypeImage %float 2D 2 0 1 1` (MS=1) and `OpImageFetch ... Sample`.                  | `texture2dms-image-type.slang`, `texture2dms-load-fetch.slang` |
+| C-65     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `Texture2DMSArray<float4>` lowers to `OpTypeImage %float 2D 2 1 1 1` (Arrayed=1 AND MS=1 combined).                                           | `texture2dmsarray-image-type.slang`              |
+| C-66     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `Buffer<float4>` lowers to `OpTypeImage %float Buffer ...`, requires `OpCapability SampledBuffer`, and dispatches `OpImageFetch`.             | `buffer-image-type.slang`, `buffer-sampledbuffer-capability.slang` |
+| C-67     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `RWBuffer<float4>` lowers to `OpTypeImage %float Buffer 2 0 0 2 ...`, requires `OpCapability ImageBuffer`, and writes lower to `OpImageWrite`. | `rwbuffer-image-type.slang`, `rwbuffer-imagebuffer-capability.slang` |
+| C-68     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `RWTexture1D<float4>` lowers to `OpTypeImage %float 1D 2 0 0 2 ...`, requires `OpCapability Image1D`, and uses `OpImageWrite` / `OpImageRead`. | `rwtexture1d-imagewrite.slang`, `rwtexture1d-image1d-capability.slang` |
+| C-69     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `RWTexture3D<float4>` lowers to `OpTypeImage %float 3D 2 0 0 2 ...` and requires `StorageImageReadWithoutFormat` / `StorageImageWriteWithoutFormat` for an unresolved format. | `rwtexture3d-imagewrite.slang`, `rwtexture3d-storageimage-capability.slang` |
+| C-70     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `RWTexture2DArray<float4>` lowers to `OpTypeImage %float 2D 2 1 0 2 ...` (Arrayed=1 + storage sampled-bit).                                   | `rwtexture2darray-imagewrite.slang`              |
+| C-71     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `RWTexture2D<uint4>` emits `OpTypeImage %uint 2D 2 0 0 2 Rgba32ui` — sampled type tracks the Slang element type and the format is filled by `resolveTextureFormat`. | `rwtexture2d-uint4-format.slang`, `texture2d-int-sampled-type.slang` |
+| C-72     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `Texture*.SampleLevel(...)` dispatches via `OpImageSampleExplicitLod` with the `Lod` image operand for each dim variant.                      | `texture3d-samplelevel.slang`, `texturecube-samplelevel.slang`, `texture1d-samplelevel-explicit-lod.slang` |
+| C-73     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `Texture*.SampleGrad(...)` dispatches via `OpImageSampleExplicitLod` with the `Grad` image operand across 2D, 3D, Cube, and arrayed images.   | `texture3d-samplegrad.slang`, `texturecube-samplegrad.slang`, `texture2darray-samplegrad.slang` |
+| C-74     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `Texture2D.Sample(...)` in a fragment shader (implicit derivatives) dispatches via `OpImageSampleImplicitLod`.                                | `texture2d-sample-implicit-lod.slang`            |
+| C-75     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `Texture2D.Load(int3 coord)` dispatches via `OpImageFetch` with the `Lod` image operand (mip from the coord's last component).                | `texture2d-load-imagefetch.slang`                |
+| C-76     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `Texture*.GetDimensions(mip, ...)` lowers to `OpImageQuerySizeLod` (and `OpImageQueryLevels`) requiring `OpCapability ImageQuery`; the result vector width tracks the image dimensionality (uint, v2uint, v3uint). | `texture2d-getdimensions-querysize-lod.slang`, `texture3d-getdimensions-3d.slang`, `texture1d-getdimensions-scalar.slang`, `texturecube-getdimensions-v2.slang`, `texture-imagequery-capability.slang` |
+| C-77     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `RWTexture2D.GetDimensions(...)` on a storage image dispatches via `OpImageQuerySize` (no Lod operand).                                       | `rwtexture2d-getdimensions-querysize.slang`      |
+| C-78     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | A `Texture2D<float>` paired with `SamplerComparisonState` dispatches `SampleCmpLevelZero` via `OpImageSampleDrefExplicitLod`.                 | `texture-samplecmp-dref.slang`                   |
+| C-79     | [#phase-c-spir-v-legalization-lowering-phi-elimination](../../../docs/llm-generated/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination)                                                                                           | `Sampler2DArray` (combined image+sampler with Arrayed=1) lowers to `OpTypeSampledImage` over an `OpTypeImage %float 2D ... 1` — combining the combined-sampler claim with the array-dim claim. | `sampler2darray-combined.slang`                  |
 
 ## Tests in this bundle
 
@@ -227,6 +246,39 @@ text and are out of scope.
 | `negative-recursive-function.slang`               | negative   | `#phase-b-specialization-and-type-legalization`                           |
 | `negative-missing-return-non-void.slang`          | negative   | `#phase-b-specialization-and-type-legalization`                           |
 | `many-uniform-bindings-stress.slang`              | stress     | `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools`         |
+| `texture1d-image-type.slang`                      | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture1darray-image-type.slang`                 | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texturecubearray-image-type.slang`               | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture2dms-image-type.slang`                    | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture2dmsarray-image-type.slang`               | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `buffer-image-type.slang`                         | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `rwbuffer-image-type.slang`                       | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `rwtexture1d-imagewrite.slang`                    | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `rwtexture3d-imagewrite.slang`                    | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `rwtexture2darray-imagewrite.slang`               | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `rwtexture2d-uint4-format.slang`                  | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture3d-samplelevel.slang`                     | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texturecube-samplelevel.slang`                   | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture1d-samplelevel-explicit-lod.slang`        | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture3d-samplegrad.slang`                      | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texturecube-samplegrad.slang`                    | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture2darray-samplegrad.slang`                 | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture2d-sample-implicit-lod.slang`             | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture2d-load-imagefetch.slang`                 | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture2dms-load-fetch.slang`                    | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture2d-getdimensions-querysize-lod.slang`     | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture3d-getdimensions-3d.slang`                | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture1d-getdimensions-scalar.slang`            | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texturecube-getdimensions-v2.slang`              | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `rwtexture2d-getdimensions-querysize.slang`       | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture-imagequery-capability.slang`             | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture-samplecmp-dref.slang`                    | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `sampler2darray-combined.slang`                   | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `rwtexture1d-image1d-capability.slang`            | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `buffer-sampledbuffer-capability.slang`           | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `rwbuffer-imagebuffer-capability.slang`           | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `rwtexture3d-storageimage-capability.slang`       | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
+| `texture2d-int-sampled-type.slang`                | expansion  | `#phase-c-spir-v-legalization-lowering-phi-elimination`                   |
 
 ## Doc gaps observed
 
@@ -305,6 +357,36 @@ text and are out of scope.
   Slang texture-type family (`Texture2D`/`Texture3D`/`TextureCube`/
   `Texture2DArray`). The dim and Arrayed bit are user-observable
   in spirv-asm and would benefit from explicit doc rows.
+- The doc does not state the full 7-operand `OpTypeImage` encoding
+  emitted by Slang (`%sampled-type Dim Depth Arrayed MS Sampled
+  Format`). In particular: the Depth operand is `2` ("no
+  indication" / Unknown) rather than the SPIR-V-spec default of
+  `0`, and the Format operand is `Unknown` for `Texture*<floatN>`
+  but `Rgba32ui` for `RWTexture*<uintN>` (set by
+  `resolveTextureFormat`). The new image-type tests pin these
+  bit positions from emit-experiment.
+- The doc enumerates `legalizeImageSubscript` for storage-image
+  writes/reads but does not name the SPIR-V capability ladder for
+  the texture-type family: `Sampled1D` / `Image1D` (1D dim split
+  by sampled-vs-storage), `SampledBuffer` / `ImageBuffer` (Buffer
+  dim split), and `StorageImageReadWithoutFormat` /
+  `StorageImageWriteWithoutFormat` (RW texture with unresolved
+  format). The new capability tests pin these.
+- The doc does not separate the sampled-image dispatch family
+  (`OpImageSampleImplicitLod` / `OpImageSampleExplicitLod` with
+  `Lod` / `Grad` operands / `OpImageSampleDrefExplicitLod` for the
+  comparison form) from the texel-fetch family (`OpImageFetch`
+  with `Lod` for sampled images, `Sample` for MS images,
+  `OpImageRead` for storage images). All these opcodes are
+  user-observable in spirv-asm; the new SampleLevel /
+  SampleGrad / SampleImplicitLod / Load / SampleCmpLevelZero
+  tests pin them from emit-experiment.
+- The doc does not name the SPIR-V size-query opcode pair
+  `OpImageQuerySizeLod` (sampled images) vs `OpImageQuerySize`
+  (storage images, no Lod) and `OpImageQueryLevels` for the mip
+  count, nor that the `ImageQuery` capability is emitted only
+  when a size/level query is present. The new GetDimensions
+  tests pin this distinction.
 - The doc references SPIR-V version selection (`isSpirv16OrLater`,
   `shouldEmitDiscardAsDemote`) but does not name the
   `-profile spirv_1_6` command-line knob that flips the
