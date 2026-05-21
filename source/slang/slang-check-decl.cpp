@@ -1393,7 +1393,14 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
 
     void visitExtensionDecl(ExtensionDecl* extensionDecl);
 
+    void visitSubscriptDecl(SubscriptDecl* subscriptDecl);
+
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
+
+    // Check that a callable extension member's own [require(...)] attributes are
+    // compatible with the extension's target type capabilities. Shared by
+    // visitFunctionDeclBase (functions and constructors) and visitSubscriptDecl.
+    void _checkExtensionMemberCapConflict(Decl* memberDecl);
 
     enum class UndeclaredCapabilityDiagnosticKind
     {
@@ -19214,44 +19221,70 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
     //
     // Note: ExtensionDecl is AggTypeDeclBase but not AggTypeDecl, so
     // getParentAggTypeDecl returns nullptr for extension members; we use
-    // getParentAggTypeDeclBase instead.
-    if (!isEffectivelyStatic(funcDecl))
+    // getParentAggTypeDeclBase instead (see _checkExtensionMemberCapConflict).
+    //
+    // Constructors are also checked despite isEffectivelyStatic returning true for
+    // them: a [require(hlsl)] __init inside a [require(glsl)] extension target is
+    // a genuine conflict even though there is no implicit `this` pointer.
+    if (!isEffectivelyStatic(funcDecl) || as<ConstructorDecl>(funcDecl))
+        _checkExtensionMemberCapConflict(funcDecl);
+}
+
+// Verify that a callable extension member's own [require(...)] attributes are
+// compatible with the extension's target type capabilities.
+//
+// We check only the member's own [require(...)] attributes rather than the
+// full declaredCaps (which includes caps inherited from the parent extension)
+// for two reasons:
+//  1. Avoids cascading errors: when the extension itself has an incompatible
+//     [require(X)] (already caught by visitExtensionDecl), members that inherit
+//     X should not also generate errors — fixing the extension fixes them too.
+//  2. Catches a case that full declaredCaps misses: if an extension has a
+//     compatible [require(glsl)] and a member adds its own [require(hlsl)],
+//     declaredCaps would be {hlsl|glsl} and joining that with {glsl} gives the
+//     valid {glsl}, hiding the conflict. Using just {hlsl} detects it.
+void SemanticsDeclCapabilityVisitor::_checkExtensionMemberCapConflict(Decl* memberDecl)
+{
+    CapabilitySet ownDeclaredCaps;
+    for (auto mod : memberDecl->modifiers)
     {
-        CapabilitySet ownDeclaredCaps;
-        for (auto mod : funcDecl->modifiers)
+        if (auto req = as<RequireCapabilityAttribute>(mod))
+            ownDeclaredCaps.unionWith(req->capabilitySet);
+    }
+    if (!ownDeclaredCaps.isEmpty())
+    {
+        if (auto extensionDecl = as<ExtensionDecl>(getParentAggTypeDeclBase(memberDecl)))
         {
-            if (auto req = as<RequireCapabilityAttribute>(mod))
-                ownDeclaredCaps.unionWith(req->capabilitySet);
-        }
-        if (!ownDeclaredCaps.isEmpty())
-        {
-            if (auto extensionDecl = as<ExtensionDecl>(getParentAggTypeDeclBase(funcDecl)))
+            if (auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType.type))
             {
-                if (auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType.type))
+                if (auto targetTypeDecl = targetDeclRefType->getDeclRef().getDecl())
                 {
-                    if (auto targetTypeDecl = targetDeclRefType->getDeclRef().getDecl())
-                    {
-                        // Ensure the target type is capability-checked before reading its
-                        // inferredCapabilityRequirements. _propagateRequirement evaluates
-                        // its nodeCaps argument before its internal ensureDecl call, so we
-                        // must pre-compute it here to avoid reading a null/stale pointer.
-                        // Call unconditionally; _propagateRequirement's own isBeingChecked()
-                        // early-exit handles genuine cycles without needing a guard here.
-                        ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
-                        _propagateRequirement(
-                            this,
-                            ownDeclaredCaps,
-                            funcDecl,
-                            targetTypeDecl,
-                            targetTypeDecl->inferredCapabilityRequirements,
-                            funcDecl->loc);
-                        // Intentionally do not use ownDeclaredCaps after this: we only
-                        // called _propagateRequirement for its conflict-detection side-effect.
-                    }
+                    // Ensure the target type is capability-checked before reading its
+                    // inferredCapabilityRequirements. _propagateRequirement evaluates
+                    // its nodeCaps argument before its internal ensureDecl call, so we
+                    // must pre-compute it here to avoid reading a null/stale pointer.
+                    // Call unconditionally; _propagateRequirement's own isBeingChecked()
+                    // early-exit handles genuine cycles without needing a guard here.
+                    ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
+                    _propagateRequirement(
+                        this,
+                        ownDeclaredCaps,
+                        memberDecl,
+                        targetTypeDecl,
+                        targetTypeDecl->inferredCapabilityRequirements,
+                        memberDecl->loc);
+                    // Intentionally do not use ownDeclaredCaps after this: we only
+                    // called _propagateRequirement for its conflict-detection side-effect.
                 }
             }
         }
     }
+}
+
+void SemanticsDeclCapabilityVisitor::visitSubscriptDecl(SubscriptDecl* subscriptDecl)
+{
+    visitContainerDecl(subscriptDecl);
+    _checkExtensionMemberCapConflict(subscriptDecl);
 }
 
 void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inheritanceDecl)

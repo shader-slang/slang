@@ -38,3 +38,24 @@ extension Baz
 //CHECK: ^^^^ conflicting capability requirement
 //CHECK: ^^^^ requires capability
 }
+
+// ext4: constructor in extension declares [require(hlsl)] but Bar only supports glsl -- should error
+extension Bar
+{
+    [require(hlsl)]
+    __init(int x) {}
+/*CHECK:
+    ^^^^^^ conflicting capability requirement
+    ^^^^^^ requires capability
+*/
+}
+
+// ext5: subscript in extension declares [require(hlsl)] but Bar only supports glsl -- should error
+extension Bar
+{
+    [require(hlsl)]
+    __subscript(int i) -> int
+//CHECK:       ^ conflicting capability requirement
+//CHECK:       ^ requires capability
+    { get { return 0; } }
+}

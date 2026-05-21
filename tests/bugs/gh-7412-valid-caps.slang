@@ -80,3 +80,17 @@ extension StaticHost
     [require(hlsl)]
     static void staticHelper() {}
 }
+
+// Case 8: Constructor with compatible [require] in extension -- no error.
+extension Foo
+{
+    [require(glsl)]
+    __init(int x) {}
+}
+
+// Case 9: Subscript with compatible [require] in extension -- no error.
+extension Foo
+{
+    [require(glsl)]
+    __subscript(int i) -> int { get { return 0; } }
+}
