@@ -107,6 +107,10 @@ Pipeline architecture
 Enabling one or more coverage tracing options runs three pipeline
 stages:
 
+For a focused description of exactly where line, function, and branch
+counters are inserted, with examples, see
+[`shader-coverage-counter-placement.md`](shader-coverage-counter-placement.md).
+
 1. **AST lowering** (`source/slang/slang-lower-to-ir.cpp`). Before
    source code is lowered to IR, the front-end emits semantic marker
    ops:

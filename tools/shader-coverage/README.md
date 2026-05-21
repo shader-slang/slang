@@ -59,6 +59,8 @@ weighed, see
 [`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md)
 and
 [`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).
+For examples showing where each coverage mode inserts counters, see
+[`docs/design/shader-coverage-counter-placement.md`](../../docs/design/shader-coverage-counter-placement.md).
 
 ## Pinning the coverage buffer at an explicit slot
 
