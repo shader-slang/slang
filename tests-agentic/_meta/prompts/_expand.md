@@ -41,10 +41,11 @@ contract.
    - parameter-shape variations the doc mentions (scalar / vector /
      matrix / array; precision modes; capability gates).
 
-2. **Cross-check the README.md `## Claims enumerated` table.** If a
-   claim is listed but its `Tests` cell is thinner than peer claims,
-   that is a strong signal of where to expand. If a claim is _not_
-   listed and the doc supports it, add it to the table.
+2. **Cross-check the README.md `## Coverage` table.** If a claim row's
+   `Tests` cell is thinner than peer claims under the same anchor, that
+   is a strong signal of where to expand. If the doc supports a claim
+   the table does not yet describe, add a new row for it (one row per
+   unique claim — never duplicate).
 
 3. **Add new `.slang` files** to the bundle, following the
    `//META` block contract in `_common.md`. Mark every new test with:
@@ -72,9 +73,11 @@ After adding new tests:
 - Bump `generated_at` and `model` in the front-matter.
 - Recompute `watched_paths_digest` and `source_doc_digest` only if the
   source side has actually changed since the bundle was last produced.
-- Append new rows to the **Tests in this bundle** table.
-- If you found new claims worth testing, append them to **Claims
-  enumerated** with new claim IDs.
+- Add new rows to the **Coverage** table — one row per unique claim
+  (matching the new test's `//META: purpose=...`), preserving the sort
+  order (by anchor, then by claim). If a new test shares an identical
+  purpose with an existing claim row, append its filename to that
+  row's Tests cell instead of creating a duplicate row.
 - Update **Doc gaps observed** with anything you turned away from.
 
 ## Caps

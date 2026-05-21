@@ -137,8 +137,14 @@ its bucket's rows. Sections:
    ```
    | Bucket | Codes in bucket | Tests added | Codes dropped |
    ```
-4. `## Tests in this bundle` — one row per test, sorted by code:
-   `| <code>-<name>.slang | E<code> | <severity> | <pipeline stage> |`
+4. `## Coverage` — one row per test (each diagnostic code is its own
+   claim), sorted by code. Columns per the universal Coverage rule in
+   `_common.md`: `Claim | Intent | Anchor | Tests`. For this bundle
+   the **Claim** cell is the test's `//META: purpose` line (typically
+   `Fires diagnostic E<code> (<name>) — <message>`); **Intent** is
+   `negative`; **Anchor** is `source/slang/slang-diagnostics.lua` or
+   the relevant `*-diagnostic-defs.h`; **Tests** is the single
+   `[<code>-<name>.slang](<code>-<name>.slang)` link.
 5. `## Codes dropped (could not reach from minimum input)` — one
    row per dropped code with the drop reason.
 

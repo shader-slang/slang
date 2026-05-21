@@ -61,8 +61,13 @@ For the bundle as a whole:
 
 7. **Front-matter valid.** Every required key in README.md and in every
    `//META` block.
-8. **Claims table consistent.** Every test file is listed under the
-   `## Tests in this bundle` table.
+8. **Coverage table consistent.** Every `.slang` file in the bundle
+   appears in the `## Coverage` table's Tests column exactly once. The
+   Claim cell of each row matches the corresponding test's
+   `//META: purpose=...` line verbatim. The Anchor column matches
+   `//META: doc_ref=...`. The Intent column matches
+   `//META: intent=...` (comma-separated when a claim row groups
+   tests of mixed intent).
 9. **Doc gaps recorded.** If the doc has visible claims that the
    bundle does not cover, the agent should have recorded them under
    `## Doc gaps observed`. If you can see uncovered claims that are

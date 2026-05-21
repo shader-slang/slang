@@ -51,8 +51,9 @@ When you take a `fixed` action that edits a `.slang` file:
   `doc_section_digest` if `doc_ref` changed.
 - Keep the rest of the `//META` contract intact (every required key,
   `generated=true`, `warning` banner).
-- If you delete a test entirely, update the **Tests in this bundle**
-  and **Claims enumerated** tables in `README.md`.
+- If you delete a test entirely, remove its filename from the
+  Tests cell in the `## Coverage` table. If that filename was the
+  only test on its claim row, drop the row.
 - If you add a new test in response to a finding (e.g. the reviewer
   said an enumerated claim has no test), the new test's `//META` block
   uses your model identifier and **must** still derive from the source

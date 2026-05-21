@@ -71,19 +71,12 @@ One short paragraph: which doc this bundle exercises, and the coverage
 strategy (e.g. "one positive + one negative per claim in sections
 3.1–3.5").
 
-## Claims enumerated
+## Coverage
 
-| Claim ID | Anchor               | Claim (one line)                                                               | Tests                               |
-| -------- | -------------------- | ------------------------------------------------------------------------------ | ----------------------------------- |
-| C-01     | #overload-resolution | The more specialized generic wins when both candidates are equally accessible. | `overload-prefer-specialized.slang` |
-| ...      | ...                  | ...                                                                            | ...                                 |
-
-## Tests in this bundle
-
-| File                                | Intent     | Doc anchor             |
-| ----------------------------------- | ---------- | ---------------------- |
-| `overload-prefer-specialized.slang` | functional | `#overload-resolution` |
-| ...                                 | ...        | ...                    |
+| Claim                                                                          | Intent     | Anchor                                                          | Tests                                                                  |
+| ------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| The more specialized generic wins when both candidates are equally accessible. | functional | [#overload-resolution](../../docs/llm-generated/<doc>.md#overload-resolution) | [`overload-prefer-specialized.slang`](overload-prefer-specialized.slang) |
+| ...                                                                            | ...        | ...                                                             | ...                                                                    |
 
 ## Doc gaps observed
 
@@ -92,9 +85,29 @@ single sentence naming the behavior that lacks a documented claim, with
 a suggestion of where it could be added.)
 ```
 
-The lint pass verifies that every test file appears in the **Tests in
-this bundle** table and that every Claim ID appears in at least one
-test's `//META: claim_ids` if you choose to use that field.
+**Coverage table rules:**
+
+- One row per documented claim. The **Claim** cell paraphrases what the
+  test verifies in one plain-English sentence; it must match the test's
+  `//META: purpose=...` line verbatim.
+- **Intent** uses the controlled vocabulary `functional | boundary |
+  negative | expansion | regression` and matches the test's
+  `//META: intent=...` field. When multiple tests with different
+  intents share one claim row, list them comma-separated
+  (`functional, boundary`).
+- **Anchor** is a markdown link to the cited section of the source doc:
+  `[#anchor-name](<relative-path-to-doc>#anchor-name)`. Use the same
+  anchor that appears in the tests' `//META: doc_ref=...` fields.
+- **Tests** is a comma-separated list of clickable filenames in the
+  bundle directory, formatted `` [`filename.slang`](filename.slang) ``.
+  Never repeat a claim across rows — if multiple tests verify the same
+  claim (identical purpose), group them in the Tests cell of a single
+  row.
+- Rows are sorted by anchor, then by claim text, so claims under the
+  same doc section cluster.
+
+The lint pass verifies that every `.slang` file in the bundle directory
+appears in the Coverage table's Tests column.
 
 ## Per-test `//META` block
 
