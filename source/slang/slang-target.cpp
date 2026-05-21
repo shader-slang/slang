@@ -303,8 +303,7 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
             continue;
 
         // The requested capability is incompatible with the code-gen target.
-        auto targetCapName =
-            capabilityNameToString((CapabilityName)cookedCaps.getCompileTarget());
+        auto targetCapName = capabilityNameToString((CapabilityName)cookedCaps.getCompileTarget());
         maybeDiagnose(
             sink,
             getLinkage()->m_optionSet,
