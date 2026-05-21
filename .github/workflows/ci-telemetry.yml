@@ -1,0 +1,154 @@
+# BigQuery CI telemetry ingester.
+#
+# Fires on completion of in-scope workflows, ingests the run + its jobs +
+# steps into per-attempt staging tables in slang-runners:slang_ci_staging,
+# then atomically MERGEs the staged data into the live slang_ci dataset.
+#
+# Design notes are in slang-ci-docs:plans/bigquery-reporting.md. The two
+# things worth recalling here:
+#
+# - This workflow ONLY runs from the default branch. workflow_run gives it
+#   elevated privileges (secrets + writable GITHUB_TOKEN) even when the
+#   triggering run was a fork PR, so the workflow's contents — and every
+#   action it pulls in — are the entire trust boundary.
+# - Each action is therefore pinned to a commit SHA, not a tag.
+#
+# This commit lands the `ingest` job only. The `publish-snapshot` job (and
+# the hourly schedule trigger) follow in a separate commit once at least
+# one snapshot query exists to publish.
+
+name: CI Telemetry
+
+on:
+  workflow_run:
+    workflows:
+      # Tier 1 (parse_graph) — kept in sync with PARSE_GRAPH_WORKFLOWS in
+      # extras/ci/analytics/_bq_ingest_lib.py.
+      - CI
+      - CMake Options
+      - Falcor Tests
+      - Falcor Compiler Perf-Test
+      - RTX Remix Shaders (Nightly)
+      - Sascha Willems Vulkan Shaders (Nightly)
+      - VK-GL-CTS Nightly
+      # Tier 2 (record_only) — housekeeping workflows that consume hosted-
+      # runner slots and are worth tracking for the quota-exhaustion chart.
+      # Add liberally: Tier 2 is cheap (no YAML fetch, no artifact downloads).
+      - Verify PR Labels
+      - Check Formatting (comment /format to auto-fix)
+      - Check Table of Contents (comment /regenerate-toc to auto-fix)
+      - Check Command Line Reference (comment /regenerate-cmdline-ref to auto-fix)
+      - Check Container Image Consistency
+      - Check SPIRV Generated Files
+      - Check Python Scripts (Core Python Only)
+      - Compile Regression-Test
+      - Format
+      - Nightly Sanitizer
+      - Coverage (Nightly)
+      - MDL Benchmark
+      - Populate sccache
+    types: [completed]
+  # Manual dispatch for ingesting a specific historical run without waiting
+  # for a real workflow_run event. Lets us validate the WIF auth path on
+  # master before any real ingest hits.
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Triggering CI run ID to ingest
+        required: true
+        type: string
+      run_attempt:
+        description: Triggering CI run attempt (1, 2, …)
+        required: true
+        default: "1"
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  ingest:
+    # workflow_run fires for every completed run of the listed workflows;
+    # workflow_dispatch is the manual escape hatch. Both modes share the
+    # same ingest path.
+    if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      id-token: write # for google-github-actions/auth (OIDC → WIF → ingest SA)
+
+    env:
+      # The ingester reads this to authenticate to the GitHub API. Inside
+      # workflow_run, GITHUB_TOKEN is auto-scoped to the base repo with
+      # actions:read; reads of run/job/artifact data for the triggering run
+      # are allowed even when that run came from a fork PR.
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout (master, NEVER the triggering ref)
+        # workflow_run defaults to checking out the default branch, but
+        # being explicit about ref guards against future refactors that
+        # accidentally point at the triggering run's head_sha.
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Install Python deps
+        run: python -m pip install --no-deps pyyaml==6.0.2
+
+      - name: Authenticate to GCP via WIF
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
+          service_account: slang-ci-ingest@slang-runners.iam.gserviceaccount.com
+
+      - name: Set up gcloud (provides bq)
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          project_id: slang-runners
+
+      - name: Resolve target run from event payload
+        id: target
+        env:
+          # Avoid passing event payload through shell expansion.
+          WF_RUN_ID: ${{ github.event.workflow_run.id }}
+          WF_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          DISPATCH_RUN_ID: ${{ inputs.run_id }}
+          DISPATCH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            run_id="${WF_RUN_ID}"
+            run_attempt="${WF_RUN_ATTEMPT}"
+          else
+            run_id="${DISPATCH_RUN_ID}"
+            run_attempt="${DISPATCH_RUN_ATTEMPT}"
+          fi
+          # Defensive validation: both must be positive integers. ci_bq_ingest
+          # treats them as ints, but reject early so the failure surfaces here
+          # rather than mid-ingest.
+          case "$run_id" in
+            ''|*[!0-9]*) echo "::error::invalid run_id: $run_id"; exit 1 ;;
+          esac
+          case "$run_attempt" in
+            ''|*[!0-9]*) echo "::error::invalid run_attempt: $run_attempt"; exit 1 ;;
+          esac
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "run_attempt=$run_attempt" >> "$GITHUB_OUTPUT"
+
+      - name: Ingest
+        run: |
+          python extras/ci/analytics/ci_bq_ingest.py \
+            --run-id "${{ steps.target.outputs.run_id }}" \
+            --run-attempt "${{ steps.target.outputs.run_attempt }}" \
+            --validate \
+            --load-to-bq
