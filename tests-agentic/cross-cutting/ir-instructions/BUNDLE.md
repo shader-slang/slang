@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-21T12:00:00+00:00
-source_commit: 1655c2bf8d3567fa220a5226769ef5e3917d55e8
+generated_at: 2026-05-21T18:00:00+00:00
+source_commit: 690f6a3084801386b77186394e0f6e8c120824a4
 watched_paths_digest: a7b1c184243cc33ab7365f1e766ae76123f4e9039f529babd0a030cb03949933
 source_doc: docs/llm-generated/cross-cutting/ir-instructions.md
 source_doc_digest: a0fb638618164f0a2ef326bfc1eda1d1f8d37d916fbe5842e1ae309d082169f9
@@ -85,6 +85,12 @@ through any directive that `slang-test` runs on a CPU.
 | C-36     | [#type-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#type-instructions)                                                         | `Texture` is the type opcode for textures, operand `(elementType, shape, isArray, isMS, sampleCount, ...)`.        | `type-texture2d-ir.slang`                      |
 | C-37     | [#value-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#value-instructions)                                                       | `makeVector` is the aggregate-constructor value opcode for vector literals.                                       | `value-make-vector-ir.slang`                   |
 | C-38     | [#decorations](../../../docs/llm-generated/cross-cutting/ir-instructions.md#decorations)                                                                     | Source-level function attributes lower to IR `[<name>(...)]` decoration rows (e.g. `numThreads` from `[numthreads]`). | `decoration-num-threads-ir.slang`           |
+| C-39     | [#resource-and-shader-io-opcodes](../../../docs/llm-generated/cross-cutting/ir-instructions.md#resource-and-shader-io-opcodes)                               | The `atomicLoad / atomicStore / atomicAdd / atomicMin / atomicMax / atomicExchange / atomicCompareExchange / atomicAnd / atomicOr / atomicXor` opcodes are the named members of the `AtomicOperation` family; the family extends over scalar element-type widths admitted by `IAtomicable` (`int32/uint32/int64/uint64/half`); `int8_t`/`int16_t`/`uint8_t`/`uint16_t` are not `IAtomicable`. | `atomic-add-uint64.slang`, `atomic-add-int64.slang`, `atomic-min-int64.slang`, `atomic-max-int64.slang`, `atomic-exchange-uint64.slang`, `atomic-compare-exchange-int64.slang`, `atomic-load-int64.slang`, `atomic-store-int64.slang`, `atomic-or-uint64.slang`, `atomic-and-uint.slang`, `atomic-xor-uint64.slang`, `atomic-add-half.slang`, `negative-atomic-int16-not-atomicable.slang` |
+| C-40     | [#memory-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#memory-instructions)                                                     | The `swizzle` opcode applies across scalar element-type widths (`half`, `double`, `uint8_t`) without changing operand shape; the result type follows the source vector's element width. | `swizzle-half3-single-element.slang`, `swizzle-half3-xyz.slang`, `swizzle-half2-yx.slang`, `swizzle-double4-wxyz.slang`, `swizzle-double4-single-w.slang`, `swizzle-uint8-vec-single-element.slang` |
+| C-41     | [#value-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#value-instructions)                                                       | The `and`/`or`/`xor`/`bitnot`/`shl`/`shr` bit-op family applies on integer scalar widths (`int8_t`/`uint8_t`/`int16_t`/`int64_t`/`uint64_t`); the IR opcode name does not vary with width or signedness. | `bitwise-and-int8.slang`, `bitwise-and-uint8.slang`, `bitwise-or-int16.slang`, `bitwise-or-uint8.slang`, `bitwise-xor-int64.slang`, `bitwise-and-uint64.slang`, `bitwise-not-int16.slang`, `bitwise-shl-int8.slang`, `bitwise-shl-int64.slang`, `bitwise-shr-uint64.slang` |
+| C-42     | [#value-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#value-instructions)                                                       | The `cmpEQ/cmpNE/cmpLT/cmpLE/cmpGT/cmpGE` comparison opcodes apply across narrow and 64-bit integer scalar widths; mixed-precision operands force an `intCast` promotion before the comparison. | `comparison-cmpeq-int8.slang`, `comparison-cmplt-uint64.slang`, `comparison-cmpge-int16.slang`, `comparison-cmpne-int16.slang`, `comparison-cmpgt-uint64.slang`, `comparison-cmple-int8.slang`, `comparison-cmplt-mixed-int8-int16.slang` |
+| C-43     | [#resource-and-shader-io-opcodes](../../../docs/llm-generated/cross-cutting/ir-instructions.md#resource-and-shader-io-opcodes)                               | `RWStructuredBuffer<T>.Load(idx)` lowers to `rwstructuredBufferLoad(base, index)`; `StructuredBuffer<T>.Load(idx)` lowers to `structuredBufferLoad(base, index)`; both opcodes are typed by the buffer's element type (including narrow / vector elements). | `rwbuffer-load-int8-element.slang`, `rwbuffer-load-half3-element.slang`, `sbuffer-load-int8-element.slang` |
+| C-44     | [#value-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#value-instructions)                                                       | A vector constructor with heterogeneous scalar operands inserts the documented conversion opcode (`castIntToFloat` / `intCast`) on each operand whose type does not match the target element type, then collects the unified operands via `makeVector`. | `makevec-float-from-int-and-float.slang` |
 
 ## Tests in this bundle
 
@@ -175,6 +181,46 @@ through any directive that `slang-test` runs on a CPU.
 | `decoration-num-threads-ir.slang`          | expansion  | `#decorations`                        |
 | `negative-write-to-static-const.slang`     | negative   | `#function-and-module-structure`      |
 | `negative-runtime-sized-local-array.slang` | negative   | `#type-instructions`                  |
+| `atomic-add-uint64.slang`                  | expansion  | `#resource-and-shader-io-opcodes`     |
+| `atomic-add-int64.slang`                   | expansion  | `#resource-and-shader-io-opcodes`     |
+| `atomic-min-int64.slang`                   | expansion  | `#resource-and-shader-io-opcodes`     |
+| `atomic-max-int64.slang`                   | expansion  | `#resource-and-shader-io-opcodes`     |
+| `atomic-exchange-uint64.slang`             | expansion  | `#resource-and-shader-io-opcodes`     |
+| `atomic-compare-exchange-int64.slang`      | expansion  | `#resource-and-shader-io-opcodes`     |
+| `atomic-load-int64.slang`                  | expansion  | `#resource-and-shader-io-opcodes`     |
+| `atomic-store-int64.slang`                 | expansion  | `#resource-and-shader-io-opcodes`     |
+| `atomic-or-uint64.slang`                   | expansion  | `#resource-and-shader-io-opcodes`     |
+| `atomic-and-uint.slang`                    | expansion  | `#resource-and-shader-io-opcodes`     |
+| `atomic-xor-uint64.slang`                  | expansion  | `#resource-and-shader-io-opcodes`     |
+| `atomic-add-half.slang`                    | expansion  | `#resource-and-shader-io-opcodes`     |
+| `negative-atomic-int16-not-atomicable.slang` | negative | `#resource-and-shader-io-opcodes`     |
+| `swizzle-half3-single-element.slang`       | expansion  | `#memory-instructions`                |
+| `swizzle-half3-xyz.slang`                  | expansion  | `#memory-instructions`                |
+| `swizzle-half2-yx.slang`                   | expansion  | `#memory-instructions`                |
+| `swizzle-double4-wxyz.slang`               | expansion  | `#memory-instructions`                |
+| `swizzle-double4-single-w.slang`           | expansion  | `#memory-instructions`                |
+| `swizzle-uint8-vec-single-element.slang`   | expansion  | `#memory-instructions`                |
+| `bitwise-and-int8.slang`                   | expansion  | `#value-instructions`                 |
+| `bitwise-and-uint8.slang`                  | expansion  | `#value-instructions`                 |
+| `bitwise-or-int16.slang`                   | expansion  | `#value-instructions`                 |
+| `bitwise-or-uint8.slang`                   | expansion  | `#value-instructions`                 |
+| `bitwise-xor-int64.slang`                  | expansion  | `#value-instructions`                 |
+| `bitwise-and-uint64.slang`                 | expansion  | `#value-instructions`                 |
+| `bitwise-not-int16.slang`                  | expansion  | `#value-instructions`                 |
+| `bitwise-shl-int8.slang`                   | expansion  | `#value-instructions`                 |
+| `bitwise-shl-int64.slang`                  | expansion  | `#value-instructions`                 |
+| `bitwise-shr-uint64.slang`                 | expansion  | `#value-instructions`                 |
+| `comparison-cmpeq-int8.slang`              | expansion  | `#value-instructions`                 |
+| `comparison-cmplt-uint64.slang`            | expansion  | `#value-instructions`                 |
+| `comparison-cmpge-int16.slang`             | expansion  | `#value-instructions`                 |
+| `comparison-cmpne-int16.slang`             | expansion  | `#value-instructions`                 |
+| `comparison-cmpgt-uint64.slang`            | expansion  | `#value-instructions`                 |
+| `comparison-cmple-int8.slang`              | expansion  | `#value-instructions`                 |
+| `comparison-cmplt-mixed-int8-int16.slang`  | expansion  | `#value-instructions`                 |
+| `rwbuffer-load-int8-element.slang`         | expansion  | `#resource-and-shader-io-opcodes`     |
+| `rwbuffer-load-half3-element.slang`        | expansion  | `#resource-and-shader-io-opcodes`     |
+| `sbuffer-load-int8-element.slang`          | expansion  | `#resource-and-shader-io-opcodes`     |
+| `makevec-float-from-int-and-float.slang`   | expansion  | `#value-instructions`                 |
 
 ## Doc gaps observed
 
@@ -238,6 +284,31 @@ through any directive that `slang-test` runs on a CPU.
   rules. Naming a few canonical diagnostic codes (e.g. for the
   bit-width-mismatch rule of `bitCast`) would let agents tie negative
   tests directly to documented behavior.
+- The doc's `AtomicOperation` row names representative opcodes
+  (`atomicLoad`, `atomicStore`, `atomicAdd`) but does not enumerate
+  the admissible element-type axis. Empirically `Atomic<T>` requires
+  `T : IAtomicable`, which is satisfied by `int32_t`/`uint32_t`/
+  `int64_t`/`uint64_t`/`half`/`float`/`double` (the doc admits
+  `atomicAdd<half>` for example) but rejected for `int8_t`/`int16_t`
+  /`uint8_t`/`uint16_t`. A one-line note enumerating these element
+  types — and the `IAtomicable` interface name — would let agents
+  pin every member of the family at its admissible widths.
+- The doc names the comparison family `cmpEQ/cmpLT/cmpGT/...` but
+  does not state the promotion rule for mixed-precision operands.
+  Empirically the front end emits an `intCast` on the narrower
+  operand before the `cmp*` opcode. Calling this out — and naming
+  the source-level rule that selects the unified width — would
+  let an agent pin the conversion + comparison combination
+  directly to a documented claim.
+- The doc lists `rwstructuredBufferStore` and `structuredBufferLoad`
+  but the read-back companion `rwstructuredBufferLoad` (emitted for
+  `RWStructuredBuffer<T>.Load(idx)`) is not named. A one-line entry
+  in the resource family row would surface this opcode.
+- The doc's `swizzle` entry does not state the result-type rule.
+  Empirically the result type is `Vec(elemTy, indexCount)` when the
+  index list has length > 1 and the bare scalar `elemTy` when the
+  index list has length 1. Naming this in the memory-instructions
+  row would let agents pin the length-1 vs length-N boundary.
 
 ## Out of scope (no-GPU runner)
 

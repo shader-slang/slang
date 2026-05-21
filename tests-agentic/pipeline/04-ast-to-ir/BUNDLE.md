@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-21T18:00:00+00:00
-source_commit: 1655c2bf8d3567fa220a5226769ef5e3917d55e8
+generated_at: 2026-05-21T20:00:00+00:00
+source_commit: 690f6a3084801386b77186394e0f6e8c120824a4
 watched_paths_digest: 3dbc65f6df020239a91b769be66fa5d3b9d250fac6a4422fc500ef569caf3235
 source_doc: docs/llm-generated/pipeline/04-ast-to-ir.md
 source_doc_digest: 2786b3ac65f55d3fefdde03d0c432f013d0d8c9686304746f06a7f61fab79197
@@ -84,6 +84,14 @@ lowers to which IR construct").
 | C-30     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | Unary arithmetic / bitwise operators (`-a`, `~a`) lower to single-operand pure-value insts in the same family (`neg`, `bitnot`).                | `unaryexpr-{neg,bitnot}-*.slang`                               |
 | C-31     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | The "InvokeExpr -> IRCall" row covers method-call expressions and self-recursive calls as well as free-function calls.                          | `invokeexpr-method-call-...slang`, `funcdecl-recursive-*.slang` |
 | C-32     | [#module-level-outputs](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#module-level-outputs)                                              | Only FuncDecls registered as entry points carry an `entryPoint(...)` decoration; non-entry helpers in the same translation unit do not.         | `non-entry-funcdecl-lacks-entry-point-decoration.slang`        |
+| C-33     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | The element-type axis of the "VarDecl(global) -> IRGlobalVar" row carries each narrow integer (`Int8`/`UInt8`/`Int16`/`UInt16`/`Int64`/`UInt64`) through to the IR-side `global_param` type. | `lower-{int8,uint8,int16,uint16,int64,uint64}-scalar.slang`     |
+| C-34     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | Narrow integer element types compose with the vector/array/struct-field/buffer-element storage forms — `Vec(IntN, ...)`, `Array(IntN, ...)`, `field(..., IntN)`, `Ptr(IntN)`. | `lower-{int8,uint16,int64}-vector.slang`, `lower-{int8,uint64}-array.slang`, `lower-{int16,uint8}-struct-field.slang`, `lower-int64-buffer-element.slang`, `lower-int8-arithmetic.slang` |
+| C-35     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | `half` and `double` lower with IR types `Half` and `Double`, and compose with the vector/matrix/array/struct-field storage forms.               | `lower-half-{scalar,arithmetic,struct-field,matrix,array}.slang`, `lower-half3-vector.slang`, `lower-double-{scalar,arithmetic,struct-field,matrix,array}.slang`, `lower-double3-vector.slang` |
+| C-36     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | Rectangular matrices (`R != C`) lower to `Mat(<elem>, R : Int, C : Int, 0 : Int)`, preserving row-then-column operand order regardless of orientation or element precision. | `lower-mat2x4-rectangular.slang`, `lower-mat4x2-rectangular.slang`, `lower-mat-half-rectangular.slang`, `lower-mat-double-rectangular.slang` |
+| C-37     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | Composite generic types `Optional<T>` lower to `Optional(<lowered T>)`, and `Tuple<...>` lowers to `tuple_type(...)` with one operand per element type, including narrow precisions. | `lower-optional-{int,half3}.slang`, `lower-tuple-{heterogeneous,narrow-pair}.slang` |
+| C-38     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | Struct-of-arrays and array-of-structs produce visibly distinct IR layouts: the former has fields whose IR types are `Array(...)`; the latter has IR type `Array(%Struct, N : Int)` at the storage site. | `lower-struct-of-arrays.slang`, `lower-array-of-structs.slang`, `lower-struct-of-mixed-precision.slang` |
+| C-39     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | A `ParameterBlock<Narrow>` over a struct of narrow types lowers to `ParameterBlock(%Narrow)`, and `RWStructuredBuffer<Narrow>` to a per-element `Ptr(%Narrow)` — both preserving the inner struct's narrow-typed field rows. | `lower-parameter-block-narrow-struct.slang`, `lower-buffer-of-struct-with-narrow-types.slang` |
+| C-40     | [#mapping-ast-constructs-to-ir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                              | Explicit cast lowerings split by source/dest family: `floatCast(...)` for float-to-float (half<->float, double<->float), `intCast(...)` for int-to-int (int8/int64<->int).                                | `lower-cast-{half,double}-to-float.slang`, `lower-cast-{int8,int64}-to-int.slang` |
 
 ## Tests in this bundle
 
@@ -169,6 +177,51 @@ lowers to which IR construct").
 | `non-entry-funcdecl-lacks-entry-point-decoration.slang`                   | boundary   | `#module-level-outputs`         |
 | `generic-call-three-distinct-specializations-each-deferred.slang`         | stress     | `#generics-and-existentials`    |
 | `literalexpr-float-literal-lowers-to-float-constant.slang`                | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-int8-scalar.slang`                                                 | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-uint8-scalar.slang`                                                | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-int16-scalar.slang`                                                | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-uint16-scalar.slang`                                               | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-int64-scalar.slang`                                                | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-uint64-scalar.slang`                                               | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-int8-vector.slang`                                                 | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-uint16-vector.slang`                                               | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-int64-vector.slang`                                                | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-int8-array.slang`                                                  | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-uint64-array.slang`                                                | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-int16-struct-field.slang`                                          | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-uint8-struct-field.slang`                                          | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-int64-buffer-element.slang`                                        | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-int8-arithmetic.slang`                                             | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-half-scalar.slang`                                                 | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-half3-vector.slang`                                                | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-half-matrix.slang`                                                 | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-half-array.slang`                                                  | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-half-struct-field.slang`                                           | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-half-arithmetic.slang`                                             | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-double-scalar.slang`                                               | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-double3-vector.slang`                                              | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-double-matrix.slang`                                               | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-double-array.slang`                                                | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-double-struct-field.slang`                                         | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-double-arithmetic.slang`                                           | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-uint64-arithmetic.slang`                                           | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-mat2x4-rectangular.slang`                                          | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-mat4x2-rectangular.slang`                                          | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-mat-half-rectangular.slang`                                        | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-mat-double-rectangular.slang`                                      | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-optional-half3.slang`                                              | expansion  | `#mapping-ast-constructs-to-ir` |
+| `lower-optional-int.slang`                                                | expansion  | `#mapping-ast-constructs-to-ir` |
+| `lower-tuple-heterogeneous.slang`                                         | expansion  | `#mapping-ast-constructs-to-ir` |
+| `lower-tuple-narrow-pair.slang`                                           | expansion  | `#mapping-ast-constructs-to-ir` |
+| `lower-struct-of-mixed-precision.slang`                                   | expansion  | `#mapping-ast-constructs-to-ir` |
+| `lower-struct-of-arrays.slang`                                            | expansion  | `#mapping-ast-constructs-to-ir` |
+| `lower-array-of-structs.slang`                                            | expansion  | `#mapping-ast-constructs-to-ir` |
+| `lower-parameter-block-narrow-struct.slang`                               | expansion  | `#mapping-ast-constructs-to-ir` |
+| `lower-buffer-of-struct-with-narrow-types.slang`                          | expansion  | `#mapping-ast-constructs-to-ir` |
+| `lower-cast-half-to-float.slang`                                          | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-cast-double-to-float.slang`                                        | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-cast-int8-to-int.slang`                                            | boundary   | `#mapping-ast-constructs-to-ir` |
+| `lower-cast-int64-to-int.slang`                                           | boundary   | `#mapping-ast-constructs-to-ir` |
 
 ## Doc gaps observed
 
@@ -209,6 +262,37 @@ lowers to which IR construct").
   stages). A row of the form "global params carry decoration X at
   lowering" would let an agent test it; otherwise the topic
   belongs to `pipeline/04c-layout-ir`.
+- **Type-lowering claims are implicit rather than enumerated.** The
+  doc's table only names which AST-family produces which IR-family
+  (e.g. `StructDecl -> IRStructType`). It does not enumerate the
+  per-scalar-type IR-side spellings that lowering must preserve —
+  `Int8`/`UInt8`/`Int16`/`UInt16`/`Int64`/`UInt64`/`Half`/`Double`,
+  vector/array/matrix composition with each, and the rectangular
+  matrix `Mat(<elem>, R : Int, C : Int, 0 : Int)` shape with row/col
+  order. A "Element types and storage shapes" subsection under
+  "Mapping AST constructs to IR" — or a cross-reference to
+  `cross-cutting/ir-instructions.md` — would let agents anchor
+  tests for these without stretching the existing rows.
+- **`Optional<T>` and `Tuple<...>` are not in the AST-family table.**
+  Optional lowers to `Optional(<T>)` and Tuple to `tuple_type(...)`;
+  both are observable through `-dump-ir`. The doc references the
+  hash-consing rules in `design/ir.md` but no row in the lowering
+  table names these generic-composite types, even though their
+  syntax is part of the documented surface in
+  `pipeline/03-semantic-check`.
+- **`ParameterBlock<T>` lowering is not mentioned by name.** The
+  doc says global VarDecls become `IRGlobalVar`, but
+  `ParameterBlock(%T)` is a distinct IR type, not a plain global.
+  A row "ParameterBlock<T> VarDecl -> IRGlobalParam of type
+  `ParameterBlock(%T)`" would close this gap.
+- **Cast lowering is illustrated by name but not by family.** The
+  doc table mentions `BinaryExpr -> IRAdd/IRMul/IREq, ...`. Explicit
+  type-cast lowering follows a parallel family — `floatCast`,
+  `intCast`, `castFloatToInt`, `castIntToFloat` — with one opcode
+  per source/dest type family. A row "TypeCastExpr -> family of
+  cast pure-value insts" would tie these to the doc directly; the
+  bundle currently anchors them under the more general
+  "Mapping AST constructs to IR" header.
 
 ## Out of scope (no-GPU runner)
 

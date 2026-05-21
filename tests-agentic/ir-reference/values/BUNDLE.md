@@ -1,7 +1,7 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T17:00:00+00:00
+generated_at: 2026-05-21T00:00:00+00:00
 source_commit: 331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
 watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
 source_doc: docs/llm-generated/ir-reference/values.md
@@ -168,6 +168,51 @@ bundle drills into the rest of the catalog without repeating those.
 | `makeMatrix-float4x4-largest-documented.slang`| stress     | `#aggregate-constructors`                 |
 | `_probe_diag.slang`                           | stress     | `#aggregate-constructors`                 |
 | `select-true-literal-bool.slang`              | boundary   | `#select`                                 |
+| `intcast-int32-to-int8-narrow.slang`          | expansion  | `#conversions`                            |
+| `intcast-int8-to-int16-widen.slang`           | expansion  | `#conversions`                            |
+| `intcast-int8-to-int64-widen-across-extend.slang` | expansion | `#conversions`                          |
+| `intcast-int64-to-uint16-narrow-across-signedness.slang` | expansion | `#conversions`                   |
+| `intcast-uint8-to-int32-zero-extend.slang`    | expansion  | `#conversions`                            |
+| `intcast-uint64-to-int64-same-width-flip.slang` | expansion | `#conversions`                          |
+| `intcast-uint32-to-int8-narrow-across-signedness.slang` | expansion | `#conversions`                    |
+| `intcast-int16-to-uint8-narrow-across-signedness.slang` | expansion | `#conversions`                    |
+| `intcast-int32-to-int64-sign-extend.slang`    | expansion  | `#conversions`                            |
+| `intcast-int64-to-int32-truncate.slang`       | expansion  | `#conversions`                            |
+| `floatcast-double-to-float-narrow.slang`      | expansion  | `#conversions`                            |
+| `floatcast-double-to-half-precision-loss.slang` | expansion | `#conversions`                          |
+| `floatcast-half-to-float-widen.slang`         | expansion  | `#conversions`                            |
+| `floatcast-float-to-double-widen.slang`       | expansion  | `#conversions`                            |
+| `castinttofloat-int32-to-float.slang`         | expansion  | `#conversions`                            |
+| `castinttofloat-uint32-to-float.slang`        | expansion  | `#conversions`                            |
+| `castinttofloat-int64-to-double.slang`        | expansion  | `#conversions`                            |
+| `castinttofloat-uint8-to-float.slang`         | expansion  | `#conversions`                            |
+| `castinttofloat-int32-to-half.slang`          | expansion  | `#conversions`                            |
+| `castinttofloat-int16-to-double.slang`        | expansion  | `#conversions`                            |
+| `castfloattoint-float-to-int32.slang`         | expansion  | `#conversions`                            |
+| `castfloattoint-double-to-int32.slang`        | expansion  | `#conversions`                            |
+| `castfloattoint-double-to-int64.slang`        | expansion  | `#conversions`                            |
+| `castfloattoint-double-to-int8-narrow.slang`  | expansion  | `#conversions`                            |
+| `castfloattoint-half-to-uint32.slang`         | expansion  | `#conversions`                            |
+| `castfloattoint-float-to-uint32.slang`        | expansion  | `#conversions`                            |
+| `castfloattoint-half-to-int16.slang`          | expansion  | `#conversions`                            |
+| `bitcast-float-to-uint32-reinterpret.slang`   | expansion  | `#conversions`                            |
+| `bitcast-uint64-to-double-reinterpret.slang`  | expansion  | `#conversions`                            |
+| `bitcast-double-to-uint64-reinterpret.slang`  | expansion  | `#conversions`                            |
+| `bitcast-uint16-to-half-reinterpret.slang`    | expansion  | `#conversions`                            |
+| `bitcast-half-to-uint16-reinterpret.slang`    | expansion  | `#conversions`                            |
+| `bitcast-int32-to-float-reinterpret.slang`    | expansion  | `#conversions`                            |
+| `bitcast-different-width-rejected.slang`      | negative   | `#conversions`                            |
+| `cmplt-int-vs-float-implicit-conversion.slang` | expansion | `#conversions`                           |
+| `cmpeq-int-vs-half-implicit-conversion.slang` | expansion  | `#conversions`                            |
+| `select-mixed-int-float-arms-implicit-conversion.slang` | expansion | `#conversions`                    |
+| `add-int8-plus-int16-promotes-via-intcast.slang` | expansion | `#conversions`                         |
+| `select-vector-float3-arms.slang`             | expansion  | `#select`                                 |
+| `select-int64-arms.slang`                     | expansion  | `#select`                                 |
+| `select-double-arms.slang`                    | expansion  | `#select`                                 |
+| `cmpeq-int8-uniform.slang`                    | expansion  | `#comparison`                             |
+| `cmplt-int64-uniform.slang`                   | expansion  | `#comparison`                             |
+| `cmpne-uint-uniform.slang`                    | expansion  | `#comparison`                             |
+| `cmple-double-uniform.slang`                  | expansion  | `#comparison`                             |
 
 ## Housekeeping
 
@@ -271,6 +316,14 @@ bundle drills into the rest of the catalog without repeating those.
   `allocObj`, `CUDA_LDG` — all marked "(synthesized)" or
   host-side. No portable shader-language surface in the doc
   produces them; per-opcode tests cannot be anchored.
+- The Conversions table does **not** mention the HLSL-compatible
+  reinterpret builtins `asuint`/`asint`/`asfloat`/`asdouble`. Probing
+  reveals that on the LOWER-TO-IR stage these surface as
+  `call %asuint(...)` etc. with `targetIntrinsic` decoration; they
+  are not lowered to the `bitCast` opcode at lowering time. The
+  doc should either name the surface that lowers these intrinsics
+  to `bitCast` (presumably an emit-side rewrite) or describe them
+  as call-shaped throughout the value pipeline.
 - The Aggregate constructors family lists `makeMatrixFromScalar`,
   `MakeVectorFromScalar`, `makeArrayFromElement`, `makeCoopVector`,
   `makeCoopVectorFromValuePack`, `makeCoopMatrixFromScalar`,

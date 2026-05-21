@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T13:50:00+00:00
-source_commit: 1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+generated_at: 2026-05-21T00:00:00+00:00
+source_commit: 690f6a3084801386b77186394e0f6e8c120824a4
 watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
 source_doc: docs/llm-generated/ir-reference/types.md
 source_doc_digest: 1c525783aca7f77dc841cbd36fd6911b8ec56b1fee8cffc96d4938b604220a84
@@ -81,6 +81,20 @@ rest of the catalog without repeating those.
 | C-24     | [#resource-and-texture-types](../../../docs/llm-generated/ir-reference/types.md#resource-and-texture-types)                                                                                           | A `uniform SamplerState` declaration lowers to a `global_param` of IR type `SamplerState`.                                                | `samplerstate-type.slang`                      |
 | C-25     | [#resource-and-texture-types](../../../docs/llm-generated/ir-reference/types.md#resource-and-texture-types)                                                                                           | A `uniform Texture2D<float4>` declaration lowers to a `global_param` whose IR type starts with `Texture2D` (a `TextureType` instance).    | `texture-type.slang`                           |
 | C-26     | [#vec-and-mat](../../../docs/llm-generated/ir-reference/types.md#vec-and-mat)                                                                                                                         | Assigning a `vector<int,3>` to a `vector<int,4>` is rejected as a type mismatch.                                                          | `vector-size-mismatch-negative.slang`          |
+| C-27     | [#basic-scalar-types](../../../docs/llm-generated/ir-reference/types.md#basic-scalar-types)                                                                                                           | Arithmetic and comparison on the narrow integer scalars (`Int8`, `UInt8`, `Int16`, `Int64`) preserve the operand width in the result type. | `int8-arithmetic-add.slang`, `uint8-comparison-eq.slang`, `int16-comparison-lt.slang`, `int64-comparison-lt.slang` |
+| C-28     | [#basic-scalar-types](../../../docs/llm-generated/ir-reference/types.md#basic-scalar-types)                                                                                                           | A narrowing integer conversion (`int -> int8_t`, `uint64_t -> uint16_t`) produces an `intCast` whose result type is the narrower scalar opcode. | `int32-to-int8-narrow.slang`, `uint64-to-uint16-narrow.slang` |
+| C-29     | [#basic-scalar-types](../../../docs/llm-generated/ir-reference/types.md#basic-scalar-types)                                                                                                           | A widening integer conversion (`uint8_t -> uint`) produces an `intCast` whose result type is the wider scalar opcode.                     | `uint8-to-uint-widen.slang`                    |
+| C-30     | [#basic-scalar-types](../../../docs/llm-generated/ir-reference/types.md#basic-scalar-types)                                                                                                           | Floating-point narrowing and widening (`double -> half`, `half -> float`) produce `floatCast` instructions whose result type matches the destination width. | `double-to-half-narrow.slang`, `half-to-float-widen.slang` |
+| C-31     | [#vec-and-mat](../../../docs/llm-generated/ir-reference/types.md#vec-and-mat)                                                                                                                         | `Vec(elementType, elementCount)` composes with each narrow integer scalar (`Int8`, `UInt8`, `Int16`, `UInt16`) as the element type.       | `int8-vector3-global-param.slang`, `uint8-vector4-global-param.slang`, `int16-vector2-global-param.slang`, `uint16-vector3-global-param.slang` |
+| C-32     | [#vec-and-mat](../../../docs/llm-generated/ir-reference/types.md#vec-and-mat)                                                                                                                         | `Vec(elementType, elementCount)` composes with each 64-bit integer scalar (`Int64`, `UInt64`) as the element type.                        | `int64-vector2-global-param.slang`, `uint64-vector2-global-param.slang` |
+| C-33     | [#vec-and-mat](../../../docs/llm-generated/ir-reference/types.md#vec-and-mat)                                                                                                                         | `Vec(elementType, elementCount)` composes with `Half` to produce `Vec(Half, N)` at the documented element counts 2 / 3 / 4.               | `half-vector2-global-param.slang`, `half-vector3-global-param.slang`, `half-vector4-global-param.slang` |
+| C-34     | [#vec-and-mat](../../../docs/llm-generated/ir-reference/types.md#vec-and-mat)                                                                                                                         | `Vec(elementType, elementCount)` composes with `Double` to produce `Vec(Double, N)` at the documented element counts 2 / 3 / 4.            | `double-vector2-global-param.slang`, `double-vector3-global-param.slang`, `double-vector4-global-param.slang` |
+| C-35     | [#vec-and-mat](../../../docs/llm-generated/ir-reference/types.md#vec-and-mat)                                                                                                                         | Vector arithmetic on `Vec(Half, N)` and `Vec(Double, N)` operands yields a result of the same vector type.                                | `half2-arithmetic.slang`, `half-vector3-arithmetic.slang`, `double-vector3-arithmetic.slang` |
+| C-36     | [#vec-and-mat](../../../docs/llm-generated/ir-reference/types.md#vec-and-mat)                                                                                                                         | Element-wise narrowing of a vector (`double4 -> float4`) yields a vector value typed `Vec(<narrower>, N)`.                                | `double4-narrow-to-float4.slang`               |
+| C-37     | [#arrays](../../../docs/llm-generated/ir-reference/types.md#arrays)                                                                                                                                   | `Array(elementType, elementCount)` composes with the narrow integer (`Int8`, `UInt8`, `Int16`, `UInt16`), 64-bit integer (`Int64`, `UInt64`), and `Half` / `Double` floating-point scalars. | `int8-array-element.slang`, `uint8-array-element.slang`, `int16-array-element.slang`, `uint16-array-element.slang`, `int64-array-element.slang`, `uint64-array-element.slang`, `half-array-element.slang`, `double-array-element.slang` |
+| C-38     | [#struct-and-class-containers](../../../docs/llm-generated/ir-reference/types.md#struct-and-class-containers)                                                                                         | A `struct` field of each narrow / wide / non-`Float` floating-point scalar (`Int8`, `UInt8`, `Int16`, `UInt16`, `Int64`, `UInt64`, `Half`, `Double`) lowers to a `field(%key, <Scalar>)` row. | `int8-struct-field.slang`, `uint8-struct-field.slang`, `int16-struct-field.slang`, `uint16-struct-field.slang`, `int64-struct-field.slang`, `uint64-struct-field.slang`, `half-struct-field.slang`, `double-struct-field.slang` |
+| C-39     | [#resource-and-texture-types](../../../docs/llm-generated/ir-reference/types.md#resource-and-texture-types)                                                                                           | `RWStructuredBuffer` accepts each narrow / 64-bit / `Half` / `Double` scalar (and `half4` / `double4` vectors) as its element-type operand. | `int8-rwstructuredbuffer-element.slang`, `uint8-rwstructuredbuffer-element.slang`, `int16-rwstructuredbuffer-element.slang`, `uint16-rwstructuredbuffer-element.slang`, `int64-rwstructuredbuffer-element.slang`, `uint64-rwstructuredbuffer-element.slang`, `half-rwstructuredbuffer-element.slang`, `half4-rwstructuredbuffer-element.slang`, `double-rwstructuredbuffer-element.slang`, `double4-rwstructuredbuffer-element.slang` |
+| C-40     | [#basic-scalar-types](../../../docs/llm-generated/ir-reference/types.md#basic-scalar-types)                                                                                                           | A scalar `Int16` / `UInt16` global_param surfaces the narrow integer opcode as the IR type, complementing the existing `Int8` / `UInt64` boundary tests. | `int16-global-param.slang`, `uint16-global-param.slang` |
 
 ## Tests in this bundle
 
@@ -148,6 +162,59 @@ rest of the catalog without repeating those.
 | `tuple-three-element-stress.slang`            | stress     | `#tuples-packs-and-target-tuples`                     |
 | `witness-table-two-conformances.slang`        | stress     | `#witness-table-types`                                |
 | `generic-on-vector-element.slang`             | stress     | `#spir-v-literals-and-kinds`                          |
+| `int8-vector3-global-param.slang`             | expansion  | `#vec-and-mat`                                        |
+| `int8-array-element.slang`                    | expansion  | `#arrays`                                             |
+| `int8-struct-field.slang`                     | expansion  | `#struct-and-class-containers`                        |
+| `int8-rwstructuredbuffer-element.slang`       | expansion  | `#resource-and-texture-types`                         |
+| `int32-to-int8-narrow.slang`                  | expansion  | `#basic-scalar-types`                                 |
+| `int8-arithmetic-add.slang`                   | expansion  | `#basic-scalar-types`                                 |
+| `uint8-vector4-global-param.slang`            | expansion  | `#vec-and-mat`                                        |
+| `uint8-array-element.slang`                   | expansion  | `#arrays`                                             |
+| `uint8-struct-field.slang`                    | expansion  | `#struct-and-class-containers`                        |
+| `uint8-rwstructuredbuffer-element.slang`      | expansion  | `#resource-and-texture-types`                         |
+| `uint8-comparison-eq.slang`                   | expansion  | `#basic-scalar-types`                                 |
+| `uint8-to-uint-widen.slang`                   | expansion  | `#basic-scalar-types`                                 |
+| `int16-global-param.slang`                    | expansion  | `#basic-scalar-types`                                 |
+| `int16-vector2-global-param.slang`            | expansion  | `#vec-and-mat`                                        |
+| `int16-array-element.slang`                   | expansion  | `#arrays`                                             |
+| `int16-struct-field.slang`                    | expansion  | `#struct-and-class-containers`                        |
+| `int16-rwstructuredbuffer-element.slang`      | expansion  | `#resource-and-texture-types`                         |
+| `int16-comparison-lt.slang`                   | expansion  | `#basic-scalar-types`                                 |
+| `uint16-global-param.slang`                   | expansion  | `#basic-scalar-types`                                 |
+| `uint16-vector3-global-param.slang`           | expansion  | `#vec-and-mat`                                        |
+| `uint16-array-element.slang`                  | expansion  | `#arrays`                                             |
+| `uint16-struct-field.slang`                   | expansion  | `#struct-and-class-containers`                        |
+| `uint16-rwstructuredbuffer-element.slang`     | expansion  | `#resource-and-texture-types`                         |
+| `uint64-to-uint16-narrow.slang`               | expansion  | `#basic-scalar-types`                                 |
+| `int64-vector2-global-param.slang`            | expansion  | `#vec-and-mat`                                        |
+| `int64-array-element.slang`                   | expansion  | `#arrays`                                             |
+| `int64-struct-field.slang`                    | expansion  | `#struct-and-class-containers`                        |
+| `int64-rwstructuredbuffer-element.slang`      | expansion  | `#resource-and-texture-types`                         |
+| `int64-comparison-lt.slang`                   | expansion  | `#basic-scalar-types`                                 |
+| `uint64-vector2-global-param.slang`           | expansion  | `#vec-and-mat`                                        |
+| `uint64-array-element.slang`                  | expansion  | `#arrays`                                             |
+| `uint64-struct-field.slang`                   | expansion  | `#struct-and-class-containers`                        |
+| `uint64-rwstructuredbuffer-element.slang`     | expansion  | `#resource-and-texture-types`                         |
+| `half-vector2-global-param.slang`             | expansion  | `#vec-and-mat`                                        |
+| `half-vector3-global-param.slang`             | expansion  | `#vec-and-mat`                                        |
+| `half-vector4-global-param.slang`             | expansion  | `#vec-and-mat`                                        |
+| `half-vector3-arithmetic.slang`               | expansion  | `#vec-and-mat`                                        |
+| `half2-arithmetic.slang`                      | expansion  | `#vec-and-mat`                                        |
+| `half-array-element.slang`                    | expansion  | `#arrays`                                             |
+| `half-struct-field.slang`                     | expansion  | `#struct-and-class-containers`                        |
+| `half-rwstructuredbuffer-element.slang`       | expansion  | `#resource-and-texture-types`                         |
+| `half4-rwstructuredbuffer-element.slang`      | expansion  | `#resource-and-texture-types`                         |
+| `half-to-float-widen.slang`                   | expansion  | `#basic-scalar-types`                                 |
+| `double-to-half-narrow.slang`                 | expansion  | `#basic-scalar-types`                                 |
+| `double-vector2-global-param.slang`           | expansion  | `#vec-and-mat`                                        |
+| `double-vector3-global-param.slang`           | expansion  | `#vec-and-mat`                                        |
+| `double-vector4-global-param.slang`           | expansion  | `#vec-and-mat`                                        |
+| `double-vector3-arithmetic.slang`             | expansion  | `#vec-and-mat`                                        |
+| `double-array-element.slang`                  | expansion  | `#arrays`                                             |
+| `double-struct-field.slang`                   | expansion  | `#struct-and-class-containers`                        |
+| `double-rwstructuredbuffer-element.slang`     | expansion  | `#resource-and-texture-types`                         |
+| `double4-narrow-to-float4.slang`              | expansion  | `#vec-and-mat`                                        |
+| `double4-rwstructuredbuffer-element.slang`    | expansion  | `#resource-and-texture-types`                         |
 
 ## Doc gaps observed
 

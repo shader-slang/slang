@@ -190,7 +190,7 @@ bundles:
       - source/slang/slang-ast-val.cpp
     runner:
       category: agentic-pipeline
-    size_cap_files: 100
+    size_cap_files: 150
 
   pipeline/04b-pre-link-passes:
     prompt: prompts/pipeline-04b-pre-link-passes.md
@@ -361,7 +361,7 @@ bundles:
       - source/slang/slang-ir-insts.h
     runner:
       category: agentic-cross-cutting
-    size_cap_files: 100
+    size_cap_files: 150
 
   cross-cutting/targets:
     prompt: prompts/cross-cutting-targets.md
@@ -530,7 +530,7 @@ bundles:
     coverage_targets: []
     runner:
       category: agentic-ast
-    size_cap_files: 60
+    size_cap_files: 120
 
   ast-reference/modifiers:
     prompt: prompts/ast-reference-modifiers.md
@@ -697,7 +697,7 @@ bundles:
       - source/slang/slang-lower-to-ir.cpp
     runner:
       category: agentic-ir
-    size_cap_files: 80
+    size_cap_files: 150
 
   ir-reference/values:
     prompt: prompts/ir-reference-values.md
@@ -717,7 +717,7 @@ bundles:
       - source/slang/slang-lower-to-ir.cpp
     runner:
       category: agentic-ir
-    size_cap_files: 120
+    size_cap_files: 150
 
   ir-reference/control-flow:
     prompt: prompts/ir-reference-control-flow.md

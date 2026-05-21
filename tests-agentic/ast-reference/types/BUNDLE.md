@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4-7
-generated_at: 2026-05-20T22:00:00+00:00
-source_commit: 331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+generated_at: 2026-05-21T00:00:00+00:00
+source_commit: 690f6a3084801386b77186394e0f6e8c120824a4
 watched_paths_digest: 05b1016228f8c0bbf2fd6e6ea6d165c4d173a37c116aea0c0eccdb47c10abf97
 source_doc: docs/llm-generated/ast-reference/types.md
 source_doc_digest: 7007cb8ec84defc795a9f755431fcd600ec3df44f2f392d04896c57ec9ce17b9
@@ -141,6 +141,85 @@ any allowed `slang-test` directive.
 | `parameterblocktype-struct-of-arrays.slang`       | boundary   | `#parameter-group-constant-buffer-types`                                  |
 | `stringtype-empty-literal.slang`                  | boundary   | `#string-dynamic-misc`                                                    |
 | `stringtype-long-literal-stress.slang`            | stress     | `#string-dynamic-misc`                                                    |
+| `vec2-half-arithmetic.slang`                      | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec3-half-arithmetic.slang`                      | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec4-half-construction.slang`                    | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec2-double-arithmetic.slang`                    | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec3-double-arithmetic.slang`                    | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec4-double-construction.slang`                  | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec2-int8-construction.slang`                    | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec3-uint8-construction.slang`                   | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec4-uint8-construction.slang`                   | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec3-int16-arithmetic.slang`                     | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec4-uint16-construction.slang`                  | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec2-int64-arithmetic.slang`                     | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec3-uint64-arithmetic.slang`                    | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec2-bool-logical.slang`                         | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec3-bool-construction.slang`                    | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec3-half-zero-and-negzero.slang`                | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec3-float-inf-nan.slang`                        | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec4-double-extremes.slang`                      | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec3-to-vec2-truncation.slang`                   | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec2-to-vec3-extension.slang`                    | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec2-vec3-implicit-rejected.slang`               | negative   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec3-int-to-float-conversion.slang`              | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec3-uint8-wrap-overflow.slang`                  | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec4-int8-min.slang`                             | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec2-double-zero-and-negzero.slang`              | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec4-uint-zero-and-max.slang`                    | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `vec3-int-min-max.slang`                          | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `mat2x3-float-construction.slang`                 | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `mat2x4-float-construction.slang`                 | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `mat4x2-float-construction.slang`                 | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `mat3x4-float-arithmetic.slang`                   | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `mat4x3-float-construction.slang`                 | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `mat2x4-int-construction.slang`                   | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `mat2x3-double-construction.slang`                | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `mat3x3-double-square.slang`                      | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `mat4x4-int-square.slang`                         | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `mat3x3-half-hlsl-emit.slang`                     | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `mat2x4-add-arithmetic.slang`                     | expansion  | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `mat-rectangular-shape-mismatch-rejected.slang`   | negative   | `#basicexpressiontype-vectorexpressiontype-matrixexpressiontype`          |
+| `tuple-mixed-precision.slang`                     | expansion  | `#aggregate-collection-types`                                             |
+| `optional-double2.slang`                          | expansion  | `#aggregate-collection-types`                                             |
+| `optional-half3.slang`                            | expansion  | `#aggregate-collection-types`                                             |
+| `array-of-half3.slang`                            | expansion  | `#aggregate-collection-types`                                             |
+| `array-of-double2.slang`                          | expansion  | `#aggregate-collection-types`                                             |
+| `struct-mixed-precision-hlsl-emit.slang`          | expansion  | `#declreftype`                                                            |
+
+## Bootstrap test issues observed
+
+(none)
+
+## Compiler-bug observations
+
+- Under `slangi` (INTERPRET), elementwise add of two
+  `vector<half, N>` values aborts with
+  `Cannot find execution handler for instruction add.f16v2`
+  (and presumably `add.f16v3` / `add.f16v4`). Scalar half add via
+  per-lane reads works fine. The expansion tests
+  `vec2-half-arithmetic.slang` and `vec3-half-arithmetic.slang`
+  therefore add per-lane, not at the vector level.
+- Under `slangi`, casting a `half` lane read from a
+  `matrix<half, R, C>` to `int` or `float` aborts with
+  `Cannot find execution handler for instruction cast.i32.f16` /
+  `cast.f32.f16` even though the same cast works for a scalar
+  `half` local. The half-matrix corner is therefore observed
+  through `-target hlsl` text emission
+  (`mat3x3-half-hlsl-emit.slang`) instead of INTERPRET.
+- Under `slangi`, `isnan(...)` and `isinf(...)` resolve to
+  intrinsics whose `__target_switch` has no interpreter-
+  compatible branch (`E41011`). The float-inf/nan vector
+  boundary test (`vec3-float-inf-nan.slang`) uses the
+  documented `x != x` (NaN) and `x > 1e38f` (inf) per-lane
+  predicates instead.
+- Under `slangi`, default-initializing a struct that contains a
+  `half` field and then writing each field by assignment aborts
+  with SIGSEGV (138/139). Using an aggregate initializer
+  (`Mixed m = { half(1.5), ..., 4 };`) crashes the interpreter
+  too. The struct-mixed-precision observation
+  (`struct-mixed-precision-hlsl-emit.slang`) therefore uses
+  `-target hlsl` text emission instead of INTERPRET.
 
 ## Doc gaps observed
 
