@@ -78,7 +78,8 @@ struct ListFuncs
             if (srcCount > dstList.getCount())
             {
                 void* newBuffer = _mallocArray(srcCount, elementType->m_size);
-                if (!newBuffer && srcCount != 0)
+                SLANG_RELEASE_ASSERT(newBuffer || srcCount == 0);
+                if (!newBuffer)
                 {
                     return;
                 }
@@ -218,7 +219,8 @@ struct StructFuncs
             if (srcCount > dstList.getCount())
             {
                 void* newBuffer = _mallocArray(srcCount, elementType->m_size);
-                if (!newBuffer && srcCount != 0)
+                SLANG_RELEASE_ASSERT(newBuffer || srcCount == 0);
+                if (!newBuffer)
                 {
                     return;
                 }
