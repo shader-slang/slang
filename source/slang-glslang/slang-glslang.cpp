@@ -290,6 +290,20 @@ static int glslang_optimizeSPIRV(
     };
     optimizer.SetMessageConsumer(messageConsumer);
 
+    // If debug info is being generated at Minimal level or above, propagate
+    // line information into all SPIR-V instructions. This avoids loss of
+    // information when instructions are deleted or moved. Later, remove
+    // redundant information to minimize final SPRIR-V size.
+    //
+    // Note: kept unconditionally — the SPIRV-Tools UAF tracked at
+    // https://github.com/KhronosGroup/SPIRV-Tools/issues/6711 only affects
+    // MergeReturnPass, which is gated below. PropagateLineInfoPass remains
+    // paired with the RedundantLineInfoElimPass call later in this function.
+    if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
+    {
+        optimizer.RegisterPass(spvtools::CreatePropagateLineInfoPass());
+    }
+
     spvtools::OptimizerOptions spvOptOptions;
 
     // To compile some large shaders the default is not enough.

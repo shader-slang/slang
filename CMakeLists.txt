@@ -223,9 +223,9 @@ advanced_option(
 
 # TODO: Remove this option once SPIRV-Tools fixes the MergeReturnPass UAF:
 # https://github.com/KhronosGroup/SPIRV-Tools/issues/6711
-option(
+advanced_option(
     SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
-    "Enable SPIRV-Tools MergeReturnPass in SPIR-V optimization"
+    "Enable SPIRV-Tools MergeReturnPass + InlineExhaustivePass in SPIR-V optimization (workaround for upstream UAF)"
     OFF
 )
 
