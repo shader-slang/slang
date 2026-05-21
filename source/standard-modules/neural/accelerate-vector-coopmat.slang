@@ -37,7 +37,10 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     public int getCount() { return N; }
 
     [ForceInline]
-    public __init() {}
+    public __init()
+    {
+        cleanPaddingData();
+    }
 
     [ForceInline]
     public __init(T value)
@@ -61,6 +64,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     internal __init(T[Uint4AlignedInputSize] inData)
     {
         this.data = inData;
+        cleanPaddingData();
     }
 
     [ForceInline]

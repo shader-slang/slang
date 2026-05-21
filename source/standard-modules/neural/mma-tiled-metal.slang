@@ -90,27 +90,11 @@ internal struct TiledMMAMetal<T, int InputSize, int OutputSize, int SubgroupSize
     // current warp's shmem region, in the layout expected by
     // `BMatrix.Load<ColumnMajor, uint4>`.
     //
-    // - For half:  1 uint4 = 8 halfs = 1 tile, so one uint4 store per lane.
-    //              The WTV's `Uint4AlignedInputSize` already guarantees
-    //              at least 1-uint4 (= 1 tile) of storage past the logical
-    //              `InputSize`, so a full-tile read is always in-bounds
-    //              and no bounds check is needed.
-    // - For float: 1 uint4 = 4 floats = half a tile, so two uint4 stores
-    //              per lane. The WTV's storage is 1-uint4 aligned for
-    //              float (= half a tile), so if `InputSize` is not a
-    //              multiple of MetalTile, the last k-iteration's read
-    //              would exceed the caller's logical input.
-    //
-    // The float path uses a single per-tile branch
-    // (`srcStart + MetalTile <= InputSize`) to pick between:
-    //   - Fast path: both uint4 stores unchecked. Taken for every tile
-    //     when `InputSize` is tile-aligned (the compile-time constant
-    //     `InputSize % MetalTile == 0` short-circuits the condition, so
-    //     the slow path is dead-code-eliminated), and for all but the
-    //     last partial tile otherwise.
-    //   - Slow path: per-element bounds check, zero-pad OOB slots so
-    //     the MMA's last partial tile sees zeros rather than
-    //     uninitialized storage. Runs at most once per `forward` call.
+    // The WTV's `Uint4AlignedInputSize` uses half-style uint4 alignment,
+    // so storage is rounded up to a full MetalTile (= 8) elements even for
+    // float vectors. WaveTangledVector keeps padding zeroed, which lets every
+    // contract tile read a full 8-element slice without per-element bounds
+    // checks. For half this is one uint4 store per lane; for float it is two.
     // =========================================================================
 
     [ForceInline]
@@ -133,13 +117,8 @@ internal struct TiledMMAMetal<T, int InputSize, int OutputSize, int SubgroupSize
                 __realCast<half>(input.data[srcStart + 7])));
             ShMemPool.data[shMemDstUint4] = uint4(u0.x, u0.y, u1.x, u1.y);
         }
-        else if (SrcSize % MetalTile == 0 || srcStart + MetalTile <= SrcSize)
+        else
         {
-            // Fast path. Taken when either:
-            //   (a) `SrcSize` is tile-aligned, so no contract iteration can
-            //       exceed it (compile-time-foldable), or
-            //   (b) this tile is fully in-bounds (runtime check, true for
-            //       every iteration except the last partial one).
             ShMemPool.data[shMemDstUint4 + 0] = uint4(
                 bit_cast<uint>(input.data[srcStart + 0]),
                 bit_cast<uint>(input.data[srcStart + 1]),
@@ -150,22 +129,6 @@ internal struct TiledMMAMetal<T, int InputSize, int OutputSize, int SubgroupSize
                 bit_cast<uint>(input.data[srcStart + 5]),
                 bit_cast<uint>(input.data[srcStart + 6]),
                 bit_cast<uint>(input.data[srcStart + 7]));
-        }
-        else
-        {
-            // Slow path: float's last partial tile on a non-tile-aligned
-            // `SrcSize`. Per-element bounds check, zero OOB slots so the
-            // MMA accumulator sees zeros rather than uninitialized storage.
-            let e0 = (srcStart + 0 < SrcSize) ? bit_cast<uint>(input.data[srcStart + 0]) : 0u;
-            let e1 = (srcStart + 1 < SrcSize) ? bit_cast<uint>(input.data[srcStart + 1]) : 0u;
-            let e2 = (srcStart + 2 < SrcSize) ? bit_cast<uint>(input.data[srcStart + 2]) : 0u;
-            let e3 = (srcStart + 3 < SrcSize) ? bit_cast<uint>(input.data[srcStart + 3]) : 0u;
-            let e4 = (srcStart + 4 < SrcSize) ? bit_cast<uint>(input.data[srcStart + 4]) : 0u;
-            let e5 = (srcStart + 5 < SrcSize) ? bit_cast<uint>(input.data[srcStart + 5]) : 0u;
-            let e6 = (srcStart + 6 < SrcSize) ? bit_cast<uint>(input.data[srcStart + 6]) : 0u;
-            let e7 = (srcStart + 7 < SrcSize) ? bit_cast<uint>(input.data[srcStart + 7]) : 0u;
-            ShMemPool.data[shMemDstUint4 + 0] = uint4(e0, e1, e2, e3);
-            ShMemPool.data[shMemDstUint4 + 1] = uint4(e4, e5, e6, e7);
         }
     }
 
@@ -215,10 +178,8 @@ internal struct TiledMMAMetal<T, int InputSize, int OutputSize, int SubgroupSize
         // instruction window / register budget. Code-size grows ~3x.
         for (int c = 0; c < TILES_C; c++)
         {
-            // Each lane packs its MetalTile-element slice of `input.data`
-            // into `TileWidthUint4_` uint4 stores in shmem. See
-            // `packInputTileToShmem`'s doc block for the bounds-check
-            // rationale for float with non-tile-aligned `ContractSize`.
+            // Each lane packs its padded MetalTile-element slice of
+            // `input.data` into `TileWidthUint4_` uint4 stores in shmem.
             packInputTileToShmem<ContractSize>(
                 input,
                 c * MetalTile,
@@ -364,6 +325,7 @@ internal struct TiledMMAMetal<T, int InputSize, int OutputSize, int SubgroupSize
                 output.data[i] = output.data[i] + biasAddress.value[uint(i)];
         }
 
+        output.cleanPaddingData();
         return output;
     }
 
@@ -413,6 +375,7 @@ internal struct TiledMMAMetal<T, int InputSize, int OutputSize, int SubgroupSize
             writebackMgGroup<InputSize>(output, acc, kg, shmemPtr, lane);
         }
 
+        output.cleanPaddingData();
         return output;
     }
 
