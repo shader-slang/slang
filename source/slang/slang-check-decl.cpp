@@ -11919,8 +11919,7 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
     if (!bodyDeclRefType)
         return;
 
-    auto genericAppDeclRef =
-        SubstitutionSet(bodyDeclRefType->getDeclRef()).findGenericAppDeclRef();
+    auto genericAppDeclRef = SubstitutionSet(bodyDeclRefType->getDeclRef()).findGenericAppDeclRef();
     if (!genericAppDeclRef)
         return;
 
@@ -11963,13 +11962,12 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
             {
                 // Compute the substituted sub/sup types for this constraint by applying
                 // the body type's generic substitution to the constraint's declaration.
-                auto substConstraintDeclRef =
-                    m_astBuilder
-                        ->getGenericAppDeclRef(
-                            bodyGenericDeclRef,
-                            genericAppDeclRef->getArgs(),
-                            constraintDecl)
-                        .as<GenericTypeConstraintDecl>();
+                auto substConstraintDeclRef = m_astBuilder
+                                                  ->getGenericAppDeclRef(
+                                                      bodyGenericDeclRef,
+                                                      genericAppDeclRef->getArgs(),
+                                                      constraintDecl)
+                                                  .as<GenericTypeConstraintDecl>();
                 auto subType = getSub(m_astBuilder, substConstraintDeclRef);
                 auto supType = getSup(m_astBuilder, substConstraintDeclRef);
 
