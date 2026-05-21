@@ -141,12 +141,22 @@ jobs:
           # and attempt numbers are always >= 1 in GitHub Actions).
           # ci_bq_ingest treats them as ints, but reject early so the failure
           # surfaces here rather than mid-ingest.
-          case "$run_id" in
-            ''|0|*[!0-9]*) echo "::error::invalid run_id: $run_id"; exit 1 ;;
-          esac
-          case "$run_attempt" in
-            ''|0|*[!0-9]*) echo "::error::invalid run_attempt: $run_attempt"; exit 1 ;;
-          esac
+          #
+          # Two-stage check per field:
+          #   1. case-glob: must be non-empty and all digits. Cheap and
+          #      catches injection-shaped input before reaching `test`.
+          #   2. POSIX arithmetic test: must be > 0. Handles "0", "00",
+          #      "000" etc. which the case-glob alone would accept.
+          for var in run_id run_attempt; do
+            eval "val=\$$var"
+            case "$val" in
+              ''|*[!0-9]*) echo "::error::invalid $var: $val"; exit 1 ;;
+            esac
+            if [ "$val" -le 0 ]; then
+              echo "::error::$var must be positive, got: $val"
+              exit 1
+            fi
+          done
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
           echo "run_attempt=$run_attempt" >> "$GITHUB_OUTPUT"
 
