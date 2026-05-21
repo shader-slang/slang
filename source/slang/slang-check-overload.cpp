@@ -296,6 +296,22 @@ static bool isArrayDecl(Decl* decl)
     return false;
 }
 
+static Count getFullGenericSubstitutionArgCount(GenericDecl* genericDecl)
+{
+    Count count = 0;
+    for (auto member : genericDecl->getDirectMemberDecls())
+    {
+        if (as<GenericTypeParamDeclBase>(member) || as<GenericValuePackParamDecl>(member) ||
+            as<GenericValueParamDecl>(member) || as<GenericTypeConstraintDecl>(member) ||
+            as<TypeCoercionConstraintDecl>(member) || as<NonEmptyPackConstraintDecl>(member) ||
+            as<HasDiffTypeInfoConstraintDecl>(member))
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
 bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     OverloadResolveContext& context,
     OverloadCandidate& candidate)
@@ -1088,12 +1104,11 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
     auto substArgs = tryGetGenericArguments(candidate.subst, genericDeclRef.getDecl());
     SLANG_ASSERT(substArgs.getCount());
 
-    Count ordinaryParamCount =
-        genericDeclRef.getDecl()->getMembersOfType<GenericTypeParamDeclBase>().getCount() +
-        genericDeclRef.getDecl()->getMembersOfType<GenericValueParamDecl>().getCount() +
-        genericDeclRef.getDecl()->getMembersOfType<GenericValuePackParamDecl>().getCount();
-    if (substArgs.getCount() > ordinaryParamCount)
+    Count fullSubstitutionArgCount = getFullGenericSubstitutionArgCount(genericDeclRef.getDecl());
+    if (substArgs.getCount() == fullSubstitutionArgCount)
         return true;
+    if (substArgs.getCount() > fullSubstitutionArgCount)
+        return false;
 
     ShortList<Val*> newArgs;
     for (auto arg : substArgs)

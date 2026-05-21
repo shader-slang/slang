@@ -15,7 +15,12 @@ interface IDerived : IBase
     int getValue();
 }
 
-struct Impl : IDerived
+interface IGrandDerived : IDerived
+{
+    This cloneGrandDerived();
+}
+
+struct Impl : IGrandDerived
 {
     Impl cloneBase()
     {
@@ -23,6 +28,11 @@ struct Impl : IDerived
     }
 
     Impl cloneDerived()
+    {
+        return this;
+    }
+
+    Impl cloneGrandDerived()
     {
         return this;
     }
@@ -39,9 +49,19 @@ int readDerived(T value)
     return value.cloneDerived().getValue() + value.cloneBase().getValue();
 }
 
+__generic<T : IGrandDerived>
+int readGrandDerived(T value)
+{
+    return value.cloneGrandDerived().getValue() + value.cloneDerived().getValue() +
+           value.cloneBase().getValue();
+}
+
 void main()
 {
     Impl value;
     printf("%d\n", readDerived(value));
     // CHECK: 58
+
+    printf("%d\n", readGrandDerived(value));
+    // CHECK: 87
 }
