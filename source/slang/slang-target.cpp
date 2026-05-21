@@ -310,12 +310,11 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
             capabilityNameToString((CapabilityName)cookedCaps.getCompileTarget());
         maybeDiagnose(
             sink,
-            targetOptionSet,
+            getLinkage()->m_optionSet,
             DiagnosticCategory::Capability,
             Diagnostics::RequestedCapabilityIncompatibleWithTarget{
                 .requestedCap = requestedCapName,
-                .target = String(targetCapName),
-                .location = SourceLoc{}});
+                .target = String(targetCapName)});
     }
 }
 

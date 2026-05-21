@@ -157,7 +157,8 @@ public:
     void setTargetCaps(CapabilitySet capSet);
 
     /// Validate that any explicitly requested capabilities are compatible with the code-gen target.
-    /// Emits an error diagnostic for each incompatible capability.
+    /// May emit an error diagnostic for each incompatible capability, unless capability
+    /// checking is suppressed by compiler options (e.g. -ignore-capabilities).
     void checkCapabilities(DiagnosticSink* sink);
 
     HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions();

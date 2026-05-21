@@ -2229,8 +2229,7 @@ err(
 err(
     "requested-capability-incompatible-with-target",
     36121,
-    "capability incompatible with compilation target",
-    span { loc = "location", message = "requested capability '~requestedCap' is incompatible with compilation target '~target'." }
+    "requested capability '~requestedCap' is incompatible with compilation target '~target'"
 )
 
 
