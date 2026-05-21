@@ -118,7 +118,9 @@ SlangResult PersistentCache::readEntry(const Key& key, ISlangBlob** outData)
     SlangResult result = File::readAllBytes(entryFileName, data);
     if (result == SLANG_OK)
     {
-        auto dataHash = SHA1::compute(data.getData(), (SlangInt)data.getSizeInBytes());
+        SHA1 sha1;
+        sha1.update(data.getData(), data.getSizeInBytes());
+        auto dataHash = sha1.finalize();
         if (dataHash == cacheIndex[entryIndex].dataHash)
         {
             --m_stats.missCount;
@@ -189,10 +191,9 @@ SlangResult PersistentCache::writeEntry(const Key& key, ISlangBlob* data)
     SLANG_RETURN_ON_FAIL(
         File::writeAllBytes(entryFileName, data->getBufferPointer(), data->getBufferSize()));
 
-    CacheEntry cacheEntry{
-        key,
-        SHA1::compute(data->getBufferPointer(), (SlangInt)data->getBufferSize()),
-        0};
+    SHA1 sha1;
+    sha1.update(data->getBufferPointer(), data->getBufferSize());
+    CacheEntry cacheEntry{key, sha1.finalize(), 0};
 
     // Update the index.
     if (existingEntryIndex >= 0)
