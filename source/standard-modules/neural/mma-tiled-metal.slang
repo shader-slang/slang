@@ -480,8 +480,8 @@ internal struct TiledMMAMetal<T, int InputSize, int OutputSize, int SubgroupSize
         typealias OPABMatrix = linalg.CoopMat<U, MemoryScope.Subgroup, MetalTile, MetalTile, linalg.CoopMatMatrixUse.MatrixB>;
         typealias OPACMatrix = linalg.CoopMat<U, MemoryScope.Subgroup, MetalTile, MetalTile, linalg.CoopMatMatrixUse.MatrixAccumulator>;
 
-        static const int TILES_M_ = OutputSize / MetalTile;
-        static const int TILES_K_ = InputSize / MetalTile;
+        static const int TILES_M_ = (OutputSize + MetalTile - 1) / MetalTile;
+        static const int TILES_K_ = (InputSize + MetalTile - 1) / MetalTile;
         static const int OPA_N_BLOCK = (TILES_K_ % 2 == 0) ? 2 : 1;
         static const int TILES_LANE_ = SubgroupSize / MetalTile;
 
