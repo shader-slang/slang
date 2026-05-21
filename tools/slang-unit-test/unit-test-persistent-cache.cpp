@@ -361,6 +361,18 @@ struct CorruptionTest : public PersistentCacheTest
         writeEntry(entries[0]);
         SLANG_CHECK(readEntry(entries[0]) == true);
 
+        // Test behavior when a cached entry file is modified externally before reading.
+        writeEntry(entries[0]);
+        SLANG_CHECK(readEntry(entries[0]) == true);
+        auto tamperedData = createRandomBlob(4096);
+        SLANG_CHECK(
+            File::writeAllBytes(
+                getEntryFileName(entries[0]),
+                tamperedData->getBufferPointer(),
+                tamperedData->getBufferSize()) == SLANG_OK);
+        SLANG_CHECK(cache->readEntry(entries[0].key, data.writeRef()) == SLANG_E_NOT_FOUND);
+        SLANG_CHECK(cache->readEntry(entries[0].key, data.writeRef()) == SLANG_E_NOT_FOUND);
+
         // Test behavior when the index file is removed before reading.
         writeEntry(entries[0]);
         SLANG_CHECK(readEntry(entries[0]) == true);

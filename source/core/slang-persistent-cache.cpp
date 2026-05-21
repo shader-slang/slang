@@ -118,11 +118,21 @@ SlangResult PersistentCache::readEntry(const Key& key, ISlangBlob** outData)
     SlangResult result = File::readAllBytes(entryFileName, data);
     if (result == SLANG_OK)
     {
-        --m_stats.missCount;
-        ++m_stats.hitCount;
-        cacheIndex[entryIndex].age = 0;
-        auto blob = RawBlob::moveCreate(data);
-        *outData = blob.detach();
+        auto dataHash = SHA1::compute(data.getData(), (SlangInt)data.getSizeInBytes());
+        if (dataHash == cacheIndex[entryIndex].dataHash)
+        {
+            --m_stats.missCount;
+            ++m_stats.hitCount;
+            cacheIndex[entryIndex].age = 0;
+            auto blob = RawBlob::moveCreate(data);
+            *outData = blob.detach();
+        }
+        else
+        {
+            result = SLANG_E_NOT_FOUND;
+            cacheIndex.removeAt(entryIndex);
+            File::remove(entryFileName);
+        }
     }
     else
     {
@@ -156,12 +166,17 @@ SlangResult PersistentCache::writeEntry(const Key& key, ISlangBlob* data)
 
     // Increase the age of all entries in the cache and get the index of
     // the oldest entry.
+    Index existingEntryIndex = -1;
     Index oldestEntryIndex = -1;
     uint32_t oldestEntryAge = 0;
     for (Index entryIndex = 0; entryIndex < cacheIndex.getCount(); ++entryIndex)
     {
         auto& entry = cacheIndex[entryIndex];
         ++entry.age;
+        if (entry.key == key && existingEntryIndex == -1)
+        {
+            existingEntryIndex = entryIndex;
+        }
         if (entry.age > oldestEntryAge)
         {
             oldestEntryIndex = entryIndex;
@@ -174,18 +189,28 @@ SlangResult PersistentCache::writeEntry(const Key& key, ISlangBlob* data)
     SLANG_RETURN_ON_FAIL(
         File::writeAllBytes(entryFileName, data->getBufferPointer(), data->getBufferSize()));
 
+    CacheEntry cacheEntry{
+        key,
+        SHA1::compute(data->getBufferPointer(), (SlangInt)data->getBufferSize()),
+        0};
+
     // Update the index.
-    if (m_maxEntryCount > 0 && cacheIndex.getCount() >= m_maxEntryCount)
+    if (existingEntryIndex >= 0)
+    {
+        // Update existing entry.
+        cacheIndex[existingEntryIndex] = cacheEntry;
+    }
+    else if (m_maxEntryCount > 0 && cacheIndex.getCount() >= m_maxEntryCount)
     {
         // Replace oldest entry.
         SLANG_ASSERT(oldestEntryIndex >= 0);
         File::remove(getEntryFileName(cacheIndex[oldestEntryIndex].key));
-        cacheIndex[oldestEntryIndex] = CacheEntry{key, 0};
+        cacheIndex[oldestEntryIndex] = cacheEntry;
     }
     else
     {
         // Add new entry.
-        cacheIndex.add(CacheEntry{key, 0});
+        cacheIndex.add(cacheEntry);
     }
 
     // Write the cache index.
@@ -239,7 +264,7 @@ struct CacheIndexHeader
 };
 
 static const char* kMagic = "SLS$";
-static const uint32_t kVersion = 1;
+static const uint32_t kVersion = 2;
 
 SlangResult PersistentCache::readIndex(const String& fileName, CacheIndex& outIndex)
 {

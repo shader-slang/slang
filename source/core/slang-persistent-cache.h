@@ -58,6 +58,7 @@ private:
     struct CacheEntry
     {
         Key key;
+        SHA1::Digest dataHash;
         uint32_t age;
     };
 
