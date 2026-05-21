@@ -2789,7 +2789,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             }
         }
         if (!varDecl->findModifier<ConstExprModifier>() &&
-            (!varDecl->findModifier<HLSLStaticModifier>() || !varDecl->findModifier<ConstModifier>()))
+            (!varDecl->findModifier<HLSLStaticModifier>() ||
+             !varDecl->findModifier<ConstModifier>()))
         {
             getSink()->diagnose(
                 Diagnostics::ValueRequirementMustBeCompileTimeConst{.decl = varDecl});
@@ -3261,7 +3262,8 @@ static bool _initExprIsRuntimeValue(Expr* expr)
         if (auto varDecl = as<VarDeclBase>(declRefExpr->declRef.getDecl()))
         {
             // References to static const or constexpr globals are fine — compile-time constants.
-            if ((varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>()) ||
+            if ((varDecl->hasModifier<HLSLStaticModifier>() &&
+                 varDecl->hasModifier<ConstModifier>()) ||
                 varDecl->hasModifier<ConstExprModifier>())
                 return false;
             // Any other global variable (including plain `static float foo`) is mutable.
