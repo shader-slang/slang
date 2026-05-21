@@ -7,6 +7,8 @@
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <stdio.h>
+
 using namespace Slang;
 
 namespace
@@ -750,4 +752,148 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(counter.isValid());
         SLANG_CHECK(counter.type == JSONValue::Type::Null);
     }
+}
+
+SLANG_UNIT_TEST(coverageTracingSpecializedEntryPointMetadata)
+{
+    const char* shaderSource = R"(
+        RWStructuredBuffer<uint> outputBuffer;
+
+        [noinline]
+        __generic<T>
+        uint genericHelper(uint value)
+        {
+            uint scale = uint(sizeof(T));
+            if ((value & 1u) != 0u)
+                return value + scale;
+            return value + scale + 1u;
+        }
+
+        [shader("compute")]
+        [numthreads(groupSize, 1, 1)]
+        void computeMain<int groupSize>(uint3 tid : SV_DispatchThreadID)
+        {
+            uint accum = genericHelper<int>(tid.x);
+            accum += genericHelper<float2>(tid.x);
+            if ((tid.x & 1u) != 0u)
+                accum += uint(groupSize);
+            else
+                accum += uint(groupSize + 1);
+            outputBuffer[tid.x] = accum;
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_CPP_SOURCE;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+
+    slang::CompilerOptionEntry coverageOptions[2] = {};
+    coverageOptions[0].name = slang::CompilerOptionName::TraceFunctionCoverage;
+    coverageOptions[0].value.kind = slang::CompilerOptionValueKind::Int;
+    coverageOptions[0].value.intValue0 = 1;
+    coverageOptions[1].name = slang::CompilerOptionName::TraceBranchCoverage;
+    coverageOptions[1].value.kind = slang::CompilerOptionValueKind::Int;
+    coverageOptions[1].value.intValue0 = 1;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntryCount = SLANG_COUNT_OF(coverageOptions);
+    sessionDesc.compilerOptionEntries = coverageOptions;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromSourceString(
+        "coverageSpecialized",
+        "coverageSpecialized.slang",
+        shaderSource,
+        diagnostics.writeRef());
+    if (!module && diagnostics)
+    {
+        fprintf(
+            stderr,
+            "coverageTracingSpecializedEntryPointMetadata module diagnostics:\n%s\n",
+            (const char*)diagnostics->getBufferPointer());
+    }
+    SLANG_CHECK(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    module->findAndCheckEntryPoint(
+        "computeMain",
+        SLANG_STAGE_COMPUTE,
+        entryPoint.writeRef(),
+        diagnostics.writeRef());
+    SLANG_CHECK(entryPoint != nullptr);
+
+    slang::SpecializationArg arg = slang::SpecializationArg::fromExpr("4");
+    ComPtr<slang::IComponentType> specializedEntryPoint;
+    SLANG_CHECK(
+        entryPoint->specialize(&arg, 1, specializedEntryPoint.writeRef(), diagnostics.writeRef()) ==
+        SLANG_OK);
+
+    slang::IComponentType* components[] = {module, specializedEntryPoint.get()};
+    ComPtr<slang::IComponentType> program;
+    SLANG_CHECK(
+        session->createCompositeComponentType(
+            components,
+            2,
+            program.writeRef(),
+            diagnostics.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IComponentType> linked;
+    SLANG_CHECK(program->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> codeBlob;
+    SLANG_CHECK(
+        linked->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IMetadata> metadata;
+    SLANG_CHECK(
+        linked->getEntryPointMetadata(0, 0, metadata.writeRef(), diagnostics.writeRef()) ==
+        SLANG_OK);
+
+    auto coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
+        slang::ICoverageTracingMetadata::getTypeGuid());
+    SLANG_CHECK(coverage != nullptr);
+    SLANG_CHECK(coverage->getCounterCount() > 0);
+    SLANG_CHECK(coverage->getEntryCount() > 0);
+
+    bool seenGenericHelperFunction = false;
+    bool seenComputeMainFunction = false;
+    bool seenTrueArm = false;
+    bool seenFalseArm = false;
+    for (uint32_t i = 0; i < coverage->getEntryCount(); ++i)
+    {
+        slang::CoverageEntryInfo entry;
+        SLANG_CHECK(coverage->getEntryInfo(i, &entry) == SLANG_OK);
+        SLANG_CHECK(entry.counterIndex != slang::kInvalidCoverageCounterIndex);
+        SLANG_CHECK(entry.counterIndex < coverage->getCounterCount());
+
+        if (entry.kind == slang::CoverageEntryKind::Function)
+        {
+            SLANG_CHECK(entry.functionName != nullptr);
+            auto functionName = UnownedStringSlice(entry.functionName);
+            if (functionName.indexOf(toSlice("computeMain")) != -1)
+                seenComputeMainFunction = true;
+            if (functionName.indexOf(toSlice("genericHelper")) != -1)
+                seenGenericHelperFunction = true;
+        }
+        else if (entry.kind == slang::CoverageEntryKind::Branch)
+        {
+            if (entry.branchArmKind == slang::CoverageBranchArmKind::TrueArm)
+                seenTrueArm = true;
+            if (entry.branchArmKind == slang::CoverageBranchArmKind::FalseArm)
+                seenFalseArm = true;
+        }
+    }
+
+    SLANG_CHECK(seenComputeMainFunction);
+    SLANG_CHECK(seenGenericHelperFunction);
+    SLANG_CHECK(seenTrueArm);
+    SLANG_CHECK(seenFalseArm);
 }
