@@ -301,6 +301,7 @@ error if they can't be found.
 | `SLANG_USE_SYSTEM_GLSLANG`          | `FALSE`                              | Build using system glslang library instead of the bundled version in [./external](./external)                               |
 | `SLANG_SPIRV_HEADERS_INCLUDE_DIR`   | ``                                   | Use this specific path to SPIR-V headers instead of the bundled version in [./external](./external)                         |
 | `SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC` | `FALSE` (`TRUE` on Windows)          | Enable mimalloc allocator for SPIRV-Tools to improve compilation performance                                                |
+| `SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN` | `FALSE`                            | Enable SPIRV-Tools `MergeReturnPass` + `InlineExhaustivePass` in SPIR-V optimization (workaround for upstream UAF — see [SPIRV-Tools#6711](https://github.com/KhronosGroup/SPIRV-Tools/issues/6711)) |
 | `SLANG_EXCLUDE_DAWN`                | `FALSE` on Windows, `TRUE` elsewhere | Exclude Dawn WebGPU support from the build                                                                                  |
 | `SLANG_EXCLUDE_TINT`                | `FALSE`                              | Exclude slang-tint from the build (only relevant on Windows x64)                                                            |
 | `SLANG_ENABLE_TIME_TRACE`           | `FALSE`                              | Enable Clang time trace profiling for build analysis (Clang only)                                                           |
