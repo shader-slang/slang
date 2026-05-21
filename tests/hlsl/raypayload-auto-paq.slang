@@ -15,6 +15,9 @@
 // HLSL66-DAG: float3 color_0;
 // HLSL66-DAG: struct ExplicitRayPayload
 // HLSL66-DAG: float3 normal_0;
+// HLSL66-DAG: struct PartialRayPayload
+// HLSL66-DAG: float3 readOnly_0;
+// HLSL66-DAG: float3 writeOnly_0;
 // HLSL66-DAG: struct EmptyRayPayload
 // HLSL66-DAG: int _slang_dummy_0;
 // HLSL66-NOT: : read(
@@ -23,6 +26,9 @@
 // HLSL67-DAG: float3 color_0 : read(caller, anyhit, closesthit, miss) : write(caller, anyhit, closesthit, miss);
 // HLSL67-DAG: struct [raypayload] ExplicitRayPayload
 // HLSL67-DAG: float3 normal_0 : read(caller) : write(miss);
+// HLSL67-DAG: struct [raypayload] PartialRayPayload
+// HLSL67-DAG: float3 readOnly_0 : read(caller) : write(caller, anyhit, closesthit, miss);
+// HLSL67-DAG: float3 writeOnly_0 : read(caller, anyhit, closesthit, miss) : write(caller);
 // HLSL67-DAG: struct [raypayload] EmptyRayPayload
 // HLSL67-DAG: int _slang_dummy_0 : read(caller, anyhit, closesthit, miss) : write(caller, anyhit, closesthit, miss);
 // DXIL66: define void @
@@ -47,6 +53,13 @@ struct ExplicitRayPayload
 };
 
 [raypayload]
+struct PartialRayPayload
+{
+    float3 readOnly : read(caller);
+    float3 writeOnly : write(caller);
+};
+
+[raypayload]
 struct EmptyRayPayload
 {
 };
@@ -64,10 +77,14 @@ void rgen_main()
     payload.color = float3(0, 0, 0);
     ExplicitRayPayload explicitPayload;
     explicitPayload.normal = float3(0, 0, 1);
+    PartialRayPayload partialPayload;
+    partialPayload.readOnly = float3(0, 1, 0);
+    partialPayload.writeOnly = float3(1, 0, 0);
     EmptyRayPayload emptyPayload;
 
     TraceRay(topLevelAS, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, payload);
     TraceRay(topLevelAS, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, explicitPayload);
+    TraceRay(topLevelAS, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, partialPayload);
     TraceRay(topLevelAS, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, emptyPayload);
 
     outputImage[DispatchRaysIndex().xy] = float4(payload.color, 1.0);
