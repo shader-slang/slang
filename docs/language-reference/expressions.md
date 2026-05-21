@@ -9,8 +9,8 @@ Examples of atomic expressions (also called leaf expressions) are [literal expre
 [identifier expressions](expressions-identifier.md), and the [`this` expression](expressions-this.md).
 
 Operator expressions range from single-operand prefix and postfix expressions to binary expressions and
-ternary conditional expressions. The grouping of operators is determined by [operator
-precedence](expressions-operator-precedence.md).
+ternary conditional expressions. The grouping of operators is determined by
+[operator precedence](expressions-operator-precedence.md).
 
 Expressions may have side effects. That is, they produce observable effects beyond their resulting value.
 Notably, an assignment expression has the side effect of storing a value, and a function call expression may
@@ -28,8 +28,8 @@ When the types of operands do not match the operator type requirements, a
 it automatically, or explicit, where the program applies a conversion operator.
 
 An expression may be evaluated at translation time or at runtime. Translation-time-evaluated values are generally
-called _constants_, as opposed to _runtime values_. This is discussed in more detail in [evaluation of
-expressions](expressions-evaluation-classes.md).
+called _constants_, as opposed to _runtime values_. This is discussed in more detail in
+[evaluation of expressions](expressions-evaluation-classes.md).
 
 
 Contents
