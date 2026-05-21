@@ -122,18 +122,23 @@ jobs:
             packman-
           enableCrossOsArchive: false
 
-      # Drop packman entries we can't fetch (and don't need for
-      # shader compilation) before invoking packman pull. Currently:
+      # Pin packman entries we can't fetch back to a public-CDN
+      # version before invoking packman pull. Currently:
       #
-      #   - ngx_sdk_dlfg: published to NVGTL (NVIDIA-internal remote)
-      #     from v4 onward and requires NVM_GTLAPI_TOKEN. It's used
-      #     by dxvk-remix's C++ code only -- no shader includes any
-      #     header under external/ngx_sdk_dlfg/, so omitting it has
-      #     no effect on build_shaders_only.ps1.
+      #   - rtx-remix-ngx_sdk_dlfg v4 is published only to NVIDIA's
+      #     internal NVGTL packman remote (which requires
+      #     NVM_GTLAPI_TOKEN). v3 is still on the public CloudFront
+      #     CDN. The DLFG SDK is consumed by dxvk-remix's C++ code
+      #     only -- no shader includes any header under
+      #     external/ngx_sdk_dlfg/ -- but meson resolves
+      #     include_directories('../../external/ngx_sdk_dlfg/include')
+      #     during configure even for build_shaders_only.ps1, so the
+      #     directory has to exist. Pinning to v3 gives meson the
+      #     directory it wants without needing the NVGTL token.
       #
       # If a future package needs the same treatment, extend the
       # python regex below.
-      - name: Strip non-shader / NVGTL-only packman entries
+      - name: Pin NVGTL-only packman entries to public-CDN versions
         shell: bash
         run: |
           set -euo pipefail
@@ -144,19 +149,23 @@ jobs:
           import sys
           path = sys.argv[1]
           src = open(path).read()
-          # Remove the <dependency name="ngx_sdk_dlfg" ...>...</dependency>
-          # block. The XML uses tabs+spaces for indent, so anchor on the
-          # opening tag and consume through the matching closing tag.
+          # Rewrite the version attribute inside the
+          # <package name="rtx-remix-ngx_sdk_dlfg" version="N" />
+          # element from any value to "3". The version attribute is
+          # the only thing on that line that needs rewriting; the
+          # surrounding <dependency> wrapper stays intact.
           pattern = re.compile(
-              r'\s*<dependency\s+name="ngx_sdk_dlfg"[^>]*>.*?</dependency>',
-              re.DOTALL,
+              r'(<package\s+name="rtx-remix-ngx_sdk_dlfg"\s+version=")[^"]*(")'
           )
-          new, n = pattern.subn("", src)
+          new, n = pattern.subn(r"\g<1>3\g<2>", src)
           if n != 1:
-              sys.exit(f"expected exactly 1 ngx_sdk_dlfg dependency, found {n}")
+              sys.exit(
+                  f"expected exactly 1 rtx-remix-ngx_sdk_dlfg package "
+                  f"entry, found {n}"
+              )
           open(path, "w").write(new)
           PY
-          echo "Patched $xml: removed ngx_sdk_dlfg dependency."
+          echo "Patched $xml: pinned rtx-remix-ngx_sdk_dlfg to v3 (public CDN)."
 
       # Download shader compilation tools via packman
       # First run: ~2-5 min (downloads ~340MB)
