@@ -4805,6 +4805,44 @@ struct ExprLoweringContext
         else if (auto staticMemberFuncExpr = as<StaticMemberExpr>(funcExpr))
         {
             outInfo->funcDeclRef = resolveAliases(staticMemberFuncExpr->declRef);
+            // The semantic checker rewrites `__fwd_diff(curve.eval)` /
+            // `__bwd_diff(curve.eval)` for non-static interface methods
+            // into `curve.eval.fwd_diff` — a static lookup on the
+            // function-as-type of `curve.eval`. The result is a
+            // `StaticMemberExpr` whose `baseExpression` is a
+            // `SharedTypeExpr` preserving the original receiver expr in
+            // `base.exp`. `getThisParamTypeForCallable` already handles
+            // this AD 2.0 lookup shape by recursing through the
+            // `LookupDeclRef` whose lookup source is the underlying
+            // callable's function-as-type, returning the receiver's
+            // owning type as the implicit `this` type. We must surface
+            // the preserved receiver here so the implicit-`this` path in
+            // `visitInvokeExprImpl` can find it; otherwise the IR call
+            // drops the receiver and trips the
+            // `argCount == funcType->getParamCount()` check, which a
+            // release build later masks until `propagateConstExpr`'s
+            // operand-count assertion fires (shader-slang/slang#11004).
+            //
+            // Scope the rewrite tightly to the AD 2.0 lookup shape so we
+            // don't accidentally synthesize a `this` argument for plain
+            // static-member calls of the form `obj.someStaticMember()`,
+            // where the receiver expression is preserved by the same
+            // `SharedTypeExpr` mechanism but no implicit `this` should
+            // be threaded.
+            if (auto lookup = as<LookupDeclRef>(outInfo->funcDeclRef.declRefBase))
+            {
+                if (isDeclRefTypeOf<CallableDecl>(lookup->getLookupSource()))
+                {
+                    if (auto sharedTypeBase =
+                            as<SharedTypeExpr>(staticMemberFuncExpr->baseExpression))
+                    {
+                        if (auto preservedReceiver = sharedTypeBase->base.exp)
+                        {
+                            outInfo->baseExpr = preservedReceiver;
+                        }
+                    }
+                }
+            }
             return true;
         }
         else if (auto varExpr = as<VarExpr>(funcExpr))
@@ -5277,26 +5315,67 @@ struct ExprLoweringContext
                 auto resolvedFuncType = as<FuncType>(expr->functionExpr->type);
                 funcTypeInfo.type = lowerType(context, resolvedFuncType);
                 // Insert a this type to the front of the param types
-
+                //
+                // For the AD 2.0 lookup shape — `__fwd_diff(curve.eval)` /
+                // `__bwd_diff(curve.eval)` rewritten by the semantic
+                // checker into `curve.eval.fwd_diff` — `FwdDiffFuncType`'s
+                // (and `BwdDiffFuncType`'s) `_resolveImplOverride()` has
+                // already substituted the underlying member method's
+                // implicit `this` into the resolved `FuncType` as its
+                // first parameter. In that case we must NOT prepend
+                // `thisType` again (which would double-count the
+                // receiver in `funcTypeInfo.type`), and we must skip the
+                // implicit `this` slot when iterating the user-written
+                // direct arguments. See shader-slang/slang#11004.
+                bool funcTypeAlreadyHasImplicitThis = false;
                 if (baseExpr)
                 {
                     if (auto thisType = getThisParamTypeForCallable(context, funcDeclRef))
                     {
-                        auto irThisType = lowerType(context, thisType);
+                        funcTypeAlreadyHasImplicitThis =
+                            resolvedFuncType->getParamCount() ==
+                                static_cast<Count>(expr->arguments.getCount()) + 1;
 
-                        List<IRType*> paramTypes;
-                        paramTypes.add(irThisType);
-                        for (auto paramType : cast<IRFuncType>(funcTypeInfo.type)->getParamTypes())
-                            paramTypes.add(paramType);
+                        if (!funcTypeAlreadyHasImplicitThis)
+                        {
+                            auto irThisType = lowerType(context, thisType);
 
-                        funcTypeInfo.type = context->irBuilder->getFuncType(
-                            paramTypes.getCount(),
-                            paramTypes.getBuffer(),
-                            cast<IRFuncType>(funcTypeInfo.type)->getResultType());
+                            List<IRType*> paramTypes;
+                            paramTypes.add(irThisType);
+                            for (auto paramType :
+                                 cast<IRFuncType>(funcTypeInfo.type)->getParamTypes())
+                                paramTypes.add(paramType);
+
+                            funcTypeInfo.type = context->irBuilder->getFuncType(
+                                paramTypes.getCount(),
+                                paramTypes.getBuffer(),
+                                cast<IRFuncType>(funcTypeInfo.type)->getResultType());
+                        }
                     }
                 }
 
-                addDirectCallArgs(expr, resolvedFuncType, &irArgs, &argFixups);
+                if (funcTypeAlreadyHasImplicitThis)
+                {
+                    // Iterate over the user-written direct arguments
+                    // only, advancing past the implicit `this` parameter
+                    // that already exists in `resolvedFuncType`.
+                    Count argCount = expr->arguments.getCount();
+                    for (Index i = 0; i < argCount; ++i)
+                    {
+                        auto paramInfo = resolvedFuncType->getParamInfo(i + 1);
+                        addDirectCallArgs(
+                            expr,
+                            i,
+                            paramInfo.mode,
+                            DeclRef<ParamDecl>(),
+                            &irArgs,
+                            &argFixups);
+                    }
+                }
+                else
+                {
+                    addDirectCallArgs(expr, resolvedFuncType, &irArgs, &argFixups);
+                }
             }
             else
             {
