@@ -38,21 +38,21 @@ observation visible.
 
 | Claim ID | Anchor                  | Claim (one line)                                                                                                                                          | Tests                                                 |
 | -------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| C-01     | #family-taxonomy        | The taxonomy is real: a node valid under one root (Expr) is invalid under another (Stmt); a bare `break` outside a loop/switch is family-rejected.        | `family-taxonomy-stmt-vs-expr-rejected.slang`         |
-| C-02     | #family-taxonomy        | A working program composes concrete leaves from every documented root family (Decl, Expr, Stmt, Type, Modifier, Val).                                    | `multi-family-composition-program.slang`              |
-| C-03     | #cross-cutting-topics   | The AST flows through parse + semantic-check + AST-to-IR lowering; a struct declaration in source emits as a struct in HLSL target text.                 | `ast-survives-parse-check-lower-to-hlsl.slang`        |
-| C-04     | #cross-cutting-topics   | The syntax-as-declaration model maps attributes to AST node classes; an attribute without a declared mapping is diagnosed.                                | `syntax-as-declaration-unknown-attribute-rejected.slang` |
-| C-05     | #cross-cutting-topics   | AST-to-IR lowering retires most AST nodes; the same source operation emits as the target's idiom rather than the Slang-AST shape.                        | `ast-lowers-and-retires-into-target-idiom.slang`      |
+| C-01     | #family-taxonomy        | The taxonomy is real: a node valid under one root (Expr) is invalid under another (Stmt); a bare `break` outside a loop/switch is family-rejected.        | [`family-taxonomy-stmt-vs-expr-rejected.slang`](family-taxonomy-stmt-vs-expr-rejected.slang)         |
+| C-02     | #family-taxonomy        | A working program composes concrete leaves from every documented root family (Decl, Expr, Stmt, Type, Modifier, Val).                                    | [`multi-family-composition-program.slang`](multi-family-composition-program.slang)              |
+| C-03     | #cross-cutting-topics   | The AST flows through parse + semantic-check + AST-to-IR lowering; a struct declaration in source emits as a struct in HLSL target text.                 | [`ast-survives-parse-check-lower-to-hlsl.slang`](ast-survives-parse-check-lower-to-hlsl.slang)        |
+| C-04     | #cross-cutting-topics   | The syntax-as-declaration model maps attributes to AST node classes; an attribute without a declared mapping is diagnosed.                                | [`syntax-as-declaration-unknown-attribute-rejected.slang`](syntax-as-declaration-unknown-attribute-rejected.slang) |
+| C-05     | #cross-cutting-topics   | AST-to-IR lowering retires most AST nodes; the same source operation emits as the target's idiom rather than the Slang-AST shape.                        | [`ast-lowers-and-retires-into-target-idiom.slang`](ast-lowers-and-retires-into-target-idiom.slang)      |
 
 ## Tests in this bundle
 
 | File                                                  | Intent     | Doc anchor               |
 | ----------------------------------------------------- | ---------- | ------------------------ |
-| `family-taxonomy-stmt-vs-expr-rejected.slang`         | negative   | `#family-taxonomy`       |
-| `multi-family-composition-program.slang`              | functional | `#family-taxonomy`       |
-| `ast-survives-parse-check-lower-to-hlsl.slang`        | functional | `#cross-cutting-topics`  |
-| `syntax-as-declaration-unknown-attribute-rejected.slang` | negative   | `#cross-cutting-topics`  |
-| `ast-lowers-and-retires-into-target-idiom.slang`      | functional | `#cross-cutting-topics`  |
+| [`family-taxonomy-stmt-vs-expr-rejected.slang`](family-taxonomy-stmt-vs-expr-rejected.slang)         | negative   | `#family-taxonomy`       |
+| [`multi-family-composition-program.slang`](multi-family-composition-program.slang)              | functional | `#family-taxonomy`       |
+| [`ast-survives-parse-check-lower-to-hlsl.slang`](ast-survives-parse-check-lower-to-hlsl.slang)        | functional | `#cross-cutting-topics`  |
+| [`syntax-as-declaration-unknown-attribute-rejected.slang`](syntax-as-declaration-unknown-attribute-rejected.slang) | negative   | `#cross-cutting-topics`  |
+| [`ast-lowers-and-retires-into-target-idiom.slang`](ast-lowers-and-retires-into-target-idiom.slang)      | functional | `#cross-cutting-topics`  |
 
 ## Out of scope
 

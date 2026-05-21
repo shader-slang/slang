@@ -45,25 +45,25 @@ the point of this bundle.
 
 | Claim ID | Anchor                                                                                                 | Claim (one line)                                                                                                                                | Tests                                                                                |
 | -------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| C-01     | [#emit](../../../docs/llm-generated/pipeline/overview.md#emit)                                         | The emit dispatcher selects a backend per TargetRequest and produces target text for HLSL, GLSL, SPIR-V, Metal, WGSL, CUDA, and C++.            | `multi-target-emit-dispatch.slang`, `entry-point-flows-to-target-marker.slang`       |
-| C-02     | [#ir-passes](../../../docs/llm-generated/pipeline/overview.md#ir-passes)                               | The IR pass list is target-sensitive; the same source emits target-shaped output (not just textually identical) for each backend.               | `pipeline-is-target-sensitive.slang`                                                 |
-| C-03     | [#end-to-end-flow](../../../docs/llm-generated/pipeline/overview.md#end-to-end-flow)                   | A non-trivial source successfully traverses lex / preprocess / parse / check / lower / IR passes / emit to produce SPIR-V text.                 | `end-to-end-flow-spirv.slang`                                                        |
-| C-04     | [#end-to-end-flow](../../../docs/llm-generated/pipeline/overview.md#end-to-end-flow)                   | The same end-to-end claim, on the HLSL text path.                                                                                               | `end-to-end-flow-hlsl.slang`                                                         |
-| C-05     | [#ast-ir-lowering](../../../docs/llm-generated/pipeline/overview.md#ast-ir-lowering)                   | AST decls (here a struct) lower into IR types and re-emerge in the emitted target text after IR passes.                                         | `ast-to-ir-lowers-struct.slang`                                                      |
-| C-06     | [#ast-ir-lowering](../../../docs/llm-generated/pipeline/overview.md#ast-ir-lowering)                   | AST statements (here an if/else) become basic blocks in IR and re-emerge as target-appropriate branching in the emitted text.                   | `ast-to-ir-lowers-control-flow.slang`                                                |
-| C-07     | [#emit](../../../docs/llm-generated/pipeline/overview.md#emit)                                         | The [shader("compute")] entry-point attribute set in source survives every stage and emerges as the target's compute-kernel marker.             | `entry-point-flows-to-target-marker.slang`                                           |
+| C-01     | [#emit](../../../docs/llm-generated/pipeline/overview.md#emit)                                         | The emit dispatcher selects a backend per TargetRequest and produces target text for HLSL, GLSL, SPIR-V, Metal, WGSL, CUDA, and C++.            | [`multi-target-emit-dispatch.slang`](multi-target-emit-dispatch.slang), [`entry-point-flows-to-target-marker.slang`](entry-point-flows-to-target-marker.slang)       |
+| C-02     | [#ir-passes](../../../docs/llm-generated/pipeline/overview.md#ir-passes)                               | The IR pass list is target-sensitive; the same source emits target-shaped output (not just textually identical) for each backend.               | [`pipeline-is-target-sensitive.slang`](pipeline-is-target-sensitive.slang)                                                 |
+| C-03     | [#end-to-end-flow](../../../docs/llm-generated/pipeline/overview.md#end-to-end-flow)                   | A non-trivial source successfully traverses lex / preprocess / parse / check / lower / IR passes / emit to produce SPIR-V text.                 | [`end-to-end-flow-spirv.slang`](end-to-end-flow-spirv.slang)                                                        |
+| C-04     | [#end-to-end-flow](../../../docs/llm-generated/pipeline/overview.md#end-to-end-flow)                   | The same end-to-end claim, on the HLSL text path.                                                                                               | [`end-to-end-flow-hlsl.slang`](end-to-end-flow-hlsl.slang)                                                         |
+| C-05     | [#ast-ir-lowering](../../../docs/llm-generated/pipeline/overview.md#ast-ir-lowering)                   | AST decls (here a struct) lower into IR types and re-emerge in the emitted target text after IR passes.                                         | [`ast-to-ir-lowers-struct.slang`](ast-to-ir-lowers-struct.slang)                                                      |
+| C-06     | [#ast-ir-lowering](../../../docs/llm-generated/pipeline/overview.md#ast-ir-lowering)                   | AST statements (here an if/else) become basic blocks in IR and re-emerge as target-appropriate branching in the emitted text.                   | [`ast-to-ir-lowers-control-flow.slang`](ast-to-ir-lowers-control-flow.slang)                                                |
+| C-07     | [#emit](../../../docs/llm-generated/pipeline/overview.md#emit)                                         | The [shader("compute")] entry-point attribute set in source survives every stage and emerges as the target's compute-kernel marker.             | [`entry-point-flows-to-target-marker.slang`](entry-point-flows-to-target-marker.slang)                                           |
 
 ## Tests in this bundle
 
 | File                                          | Intent     | Doc anchor          |
 | --------------------------------------------- | ---------- | ------------------- |
-| `multi-target-emit-dispatch.slang`            | functional | `#emit`             |
-| `pipeline-is-target-sensitive.slang`          | functional | `#ir-passes`        |
-| `end-to-end-flow-spirv.slang`                 | functional | `#end-to-end-flow`  |
-| `end-to-end-flow-hlsl.slang`                  | functional | `#end-to-end-flow`  |
-| `ast-to-ir-lowers-struct.slang`               | functional | `#ast-ir-lowering`  |
-| `ast-to-ir-lowers-control-flow.slang`         | functional | `#ast-ir-lowering`  |
-| `entry-point-flows-to-target-marker.slang`    | functional | `#emit`             |
+| [`multi-target-emit-dispatch.slang`](multi-target-emit-dispatch.slang)            | functional | `#emit`             |
+| [`pipeline-is-target-sensitive.slang`](pipeline-is-target-sensitive.slang)          | functional | `#ir-passes`        |
+| [`end-to-end-flow-spirv.slang`](end-to-end-flow-spirv.slang)                 | functional | `#end-to-end-flow`  |
+| [`end-to-end-flow-hlsl.slang`](end-to-end-flow-hlsl.slang)                  | functional | `#end-to-end-flow`  |
+| [`ast-to-ir-lowers-struct.slang`](ast-to-ir-lowers-struct.slang)               | functional | `#ast-ir-lowering`  |
+| [`ast-to-ir-lowers-control-flow.slang`](ast-to-ir-lowers-control-flow.slang)         | functional | `#ast-ir-lowering`  |
+| [`entry-point-flows-to-target-marker.slang`](entry-point-flows-to-target-marker.slang)    | functional | `#emit`             |
 
 ## Doc gaps observed
 

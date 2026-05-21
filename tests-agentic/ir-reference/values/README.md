@@ -57,162 +57,162 @@ bundle drills into the rest of the catalog without repeating those.
 
 | Claim ID | Anchor                                                                                                                                                                              | Claim (one line)                                                                                                                              | Tests                                          |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| C-01     | [#literal-payload-encoding](../../../docs/llm-generated/ir-reference/values.md#literal-payload-encoding)                                                                            | Constant-family opcodes (`IntLit`/`FloatLit`/`BoolLit`/`VoidLit`) store their payload inline; literals appear as `<value> : <Type>` operands. | `literals-inline-payload.slang`                |
-| C-02     | [#literals-constant-group](../../../docs/llm-generated/ir-reference/values.md#literals-constant-group)                                                                              | A `void` function's terminator is `return_val(void_constant)`, exposing the `VoidLit` unique value.                                           | `return-val-void-constant.slang`               |
-| C-03     | [#arithmetic-and-bitwise](../../../docs/llm-generated/ir-reference/values.md#arithmetic-and-bitwise)                                                                                | Integer `%` lowers to `irem`, float `%` lowers to `frem`, prefix `-` lowers to `neg`.                                                         | `arith-irem-frem-neg.slang`                    |
-| C-04     | [#arithmetic-and-bitwise](../../../docs/llm-generated/ir-reference/values.md#arithmetic-and-bitwise)                                                                                | `<<` lowers to `shl` and `>>` lowers to `shr`.                                                                                                | `arith-shifts.slang`                           |
-| C-05     | [#arithmetic-and-bitwise](../../../docs/llm-generated/ir-reference/values.md#arithmetic-and-bitwise)                                                                                | Bitwise `&` / `|` / `^` lower to `and` / `or` / `xor`; prefix `~` lowers to `bitnot`.                                                         | `arith-bitwise.slang`                          |
-| C-06     | [#arithmetic-and-bitwise](../../../docs/llm-generated/ir-reference/values.md#arithmetic-and-bitwise)                                                                                | Prefix `!` on a `bool` lowers to the `not` opcode.                                                                                            | `logical-not.slang`                            |
-| C-07     | [#arithmetic-and-bitwise](../../../docs/llm-generated/ir-reference/values.md#arithmetic-and-bitwise)                                                                                | `bitfieldExtract(v, off, count)` and `bitfieldInsert(b, ins, off, count)` builtins lower to opcodes of the same names.                       | `bitfield-extract-insert.slang`                |
-| C-08     | [#select](../../../docs/llm-generated/ir-reference/values.md#select)                                                                                                                | The `select(c, x, y)` builtin lowers to the branch-free `select` IR opcode.                                                                   | `select-builtin.slang`                         |
-| C-09     | [#comparison](../../../docs/llm-generated/ir-reference/values.md#comparison)                                                                                                        | `==` lowers to `cmpEQ` and `!=` lowers to `cmpNE`.                                                                                            | `comparison-eq-ne.slang`                       |
-| C-10     | [#comparison](../../../docs/llm-generated/ir-reference/values.md#comparison)                                                                                                        | `<` / `<=` / `>=` lower to `cmpLT` / `cmpLE` / `cmpGE`.                                                                                       | `comparison-lt-le-ge.slang`                    |
-| C-11     | [#conversions](../../../docs/llm-generated/ir-reference/values.md#conversions)                                                                                                      | `intCast` covers both narrowing and widening integer conversions.                                                                             | `conversion-intcast-narrow.slang`              |
-| C-12     | [#conversions](../../../docs/llm-generated/ir-reference/values.md#conversions)                                                                                                      | A precision-changing float-to-float cast lowers to `floatCast`.                                                                               | `conversion-floatcast.slang`                   |
-| C-13     | [#conversions](../../../docs/llm-generated/ir-reference/values.md#conversions)                                                                                                      | `float(intVal)` lowers to `castIntToFloat`; `int(floatVal)` lowers to `castFloatToInt`.                                                       | `conversion-int-float.slang`                   |
-| C-14     | [#conversions](../../../docs/llm-generated/ir-reference/values.md#conversions)                                                                                                      | The `bit_cast<T>(value)` builtin lowers to the `bitCast` opcode (reinterpret).                                                                | `conversion-bitcast.slang`                     |
-| C-15     | [#conversions](../../../docs/llm-generated/ir-reference/values.md#conversions)                                                                                                      | A `(void)expr` statement discards its operand via the `castToVoid` opcode.                                                                    | `conversion-cast-to-void.slang`                |
-| C-16     | [#fieldaddress-vs-fieldextract](../../../docs/llm-generated/ir-reference/values.md#fieldaddress-vs-fieldextract)                                                                    | A `MemberExpr` on a struct *value* (rvalue) lowers to `get_field`; the lvalue path uses `get_field_addr`.                                     | `memory-get-field-rvalue.slang`                |
-| C-17     | [#getelementptr-vs-getelement](../../../docs/llm-generated/ir-reference/values.md#getelementptr-vs-getelement)                                                                      | Array indexing on a pointer/lvalue lowers to `getElementPtr`; indexing on a value lowers to `getElement`.                                     | `memory-getelement-and-getelementptr.slang`    |
-| C-18     | [#memory](../../../docs/llm-generated/ir-reference/values.md#memory)                                                                                                                | A module-scope `static const` declaration lowers to `globalConstant(<value>)`.                                                                | `memory-global-constant.slang`                 |
-| C-19     | [#swizzle-swizzleset-swizzledstore](../../../docs/llm-generated/ir-reference/values.md#swizzle-swizzleset-swizzledstore)                                                            | A multi-component swizzle (`v.xyz`) lowers to `swizzle(%v, 0 : Int, 1 : Int, 2 : Int)`.                                                       | `swizzle-multi-component.slang`                |
-| C-20     | [#swizzle-swizzleset-swizzledstore](../../../docs/llm-generated/ir-reference/values.md#swizzle-swizzleset-swizzledstore)                                                            | A swizzle in lvalue position (`dst.xy = ...`) lowers to `swizzledStore`.                                                                      | `swizzle-store-lvalue.slang`                   |
-| C-21     | [#swizzle-swizzleset-swizzledstore](../../../docs/llm-generated/ir-reference/values.md#swizzle-swizzleset-swizzledstore)                                                            | Vector swizzle emits as `.xyz`-style member access on HLSL/GLSL/Metal/WGSL; CPP renders the same component reads inside a `Vector<>` brace.   | `swizzle-emit-multi-target.slang`              |
-| C-22     | [#aggregate-constructors](../../../docs/llm-generated/ir-reference/values.md#aggregate-constructors)                                                                                | A `floatN(...)` constructor call lowers to `makeVector(<components>)`.                                                                        | `aggregate-makevector.slang`                   |
-| C-23     | [#aggregate-constructors](../../../docs/llm-generated/ir-reference/values.md#aggregate-constructors)                                                                                | A `floatRxC(...)` constructor lowers to `makeMatrix(<components>)`.                                                                           | `aggregate-makematrix.slang`                   |
-| C-24     | [#aggregate-constructors](../../../docs/llm-generated/ir-reference/values.md#aggregate-constructors)                                                                                | `makeTuple(a, b)` lowers to the `makeTuple` opcode producing a `tuple_type(...)` value.                                                       | `aggregate-maketuple.slang`                    |
-| C-25     | [#result-optional-conditional-helpers](../../../docs/llm-generated/ir-reference/values.md#result-optional-conditional-helpers)                                                      | `Optional<T>` constructors and accessors lower to `makeOptionalValue` / `makeOptionalNone` / `optionalHasValue` / `getOptionalValue`.         | `optional-make-has-value.slang`                |
-| C-26     | [#conversions](../../../docs/llm-generated/ir-reference/values.md#conversions)                                                                                                      | An `out T` parameter has IR type `OutParam(T)`; the caller passes a `Ptr(T)` from a local `var`.                                              | `out-param-type.slang`                         |
-| C-27     | [#literal-payload-encoding](../../../docs/llm-generated/ir-reference/values.md#literal-payload-encoding)                                                                            | Integer and floating-point literal payloads survive lowering and emit as recognizable numeric tokens on every text-emit target.               | `literal-emit-multi-target.slang`              |
+| C-01     | [#literal-payload-encoding](../../../docs/llm-generated/ir-reference/values.md#literal-payload-encoding)                                                                            | Constant-family opcodes (`IntLit`/`FloatLit`/`BoolLit`/`VoidLit`) store their payload inline; literals appear as `<value> : <Type>` operands. | [`literals-inline-payload.slang`](literals-inline-payload.slang)                |
+| C-02     | [#literals-constant-group](../../../docs/llm-generated/ir-reference/values.md#literals-constant-group)                                                                              | A `void` function's terminator is `return_val(void_constant)`, exposing the `VoidLit` unique value.                                           | [`return-val-void-constant.slang`](return-val-void-constant.slang)               |
+| C-03     | [#arithmetic-and-bitwise](../../../docs/llm-generated/ir-reference/values.md#arithmetic-and-bitwise)                                                                                | Integer `%` lowers to `irem`, float `%` lowers to `frem`, prefix `-` lowers to `neg`.                                                         | [`arith-irem-frem-neg.slang`](arith-irem-frem-neg.slang)                    |
+| C-04     | [#arithmetic-and-bitwise](../../../docs/llm-generated/ir-reference/values.md#arithmetic-and-bitwise)                                                                                | `<<` lowers to `shl` and `>>` lowers to `shr`.                                                                                                | [`arith-shifts.slang`](arith-shifts.slang)                           |
+| C-05     | [#arithmetic-and-bitwise](../../../docs/llm-generated/ir-reference/values.md#arithmetic-and-bitwise)                                                                                | Bitwise `&` / `|` / `^` lower to `and` / `or` / `xor`; prefix `~` lowers to `bitnot`.                                                         | [`arith-bitwise.slang`](arith-bitwise.slang)                          |
+| C-06     | [#arithmetic-and-bitwise](../../../docs/llm-generated/ir-reference/values.md#arithmetic-and-bitwise)                                                                                | Prefix `!` on a `bool` lowers to the `not` opcode.                                                                                            | [`logical-not.slang`](logical-not.slang)                            |
+| C-07     | [#arithmetic-and-bitwise](../../../docs/llm-generated/ir-reference/values.md#arithmetic-and-bitwise)                                                                                | `bitfieldExtract(v, off, count)` and `bitfieldInsert(b, ins, off, count)` builtins lower to opcodes of the same names.                       | [`bitfield-extract-insert.slang`](bitfield-extract-insert.slang)                |
+| C-08     | [#select](../../../docs/llm-generated/ir-reference/values.md#select)                                                                                                                | The `select(c, x, y)` builtin lowers to the branch-free `select` IR opcode.                                                                   | [`select-builtin.slang`](select-builtin.slang)                         |
+| C-09     | [#comparison](../../../docs/llm-generated/ir-reference/values.md#comparison)                                                                                                        | `==` lowers to `cmpEQ` and `!=` lowers to `cmpNE`.                                                                                            | [`comparison-eq-ne.slang`](comparison-eq-ne.slang)                       |
+| C-10     | [#comparison](../../../docs/llm-generated/ir-reference/values.md#comparison)                                                                                                        | `<` / `<=` / `>=` lower to `cmpLT` / `cmpLE` / `cmpGE`.                                                                                       | [`comparison-lt-le-ge.slang`](comparison-lt-le-ge.slang)                    |
+| C-11     | [#conversions](../../../docs/llm-generated/ir-reference/values.md#conversions)                                                                                                      | `intCast` covers both narrowing and widening integer conversions.                                                                             | [`conversion-intcast-narrow.slang`](conversion-intcast-narrow.slang)              |
+| C-12     | [#conversions](../../../docs/llm-generated/ir-reference/values.md#conversions)                                                                                                      | A precision-changing float-to-float cast lowers to `floatCast`.                                                                               | [`conversion-floatcast.slang`](conversion-floatcast.slang)                   |
+| C-13     | [#conversions](../../../docs/llm-generated/ir-reference/values.md#conversions)                                                                                                      | `float(intVal)` lowers to `castIntToFloat`; `int(floatVal)` lowers to `castFloatToInt`.                                                       | [`conversion-int-float.slang`](conversion-int-float.slang)                   |
+| C-14     | [#conversions](../../../docs/llm-generated/ir-reference/values.md#conversions)                                                                                                      | The `bit_cast<T>(value)` builtin lowers to the `bitCast` opcode (reinterpret).                                                                | [`conversion-bitcast.slang`](conversion-bitcast.slang)                     |
+| C-15     | [#conversions](../../../docs/llm-generated/ir-reference/values.md#conversions)                                                                                                      | A `(void)expr` statement discards its operand via the `castToVoid` opcode.                                                                    | [`conversion-cast-to-void.slang`](conversion-cast-to-void.slang)                |
+| C-16     | [#fieldaddress-vs-fieldextract](../../../docs/llm-generated/ir-reference/values.md#fieldaddress-vs-fieldextract)                                                                    | A `MemberExpr` on a struct *value* (rvalue) lowers to `get_field`; the lvalue path uses `get_field_addr`.                                     | [`memory-get-field-rvalue.slang`](memory-get-field-rvalue.slang)                |
+| C-17     | [#getelementptr-vs-getelement](../../../docs/llm-generated/ir-reference/values.md#getelementptr-vs-getelement)                                                                      | Array indexing on a pointer/lvalue lowers to `getElementPtr`; indexing on a value lowers to `getElement`.                                     | [`memory-getelement-and-getelementptr.slang`](memory-getelement-and-getelementptr.slang)    |
+| C-18     | [#memory](../../../docs/llm-generated/ir-reference/values.md#memory)                                                                                                                | A module-scope `static const` declaration lowers to `globalConstant(<value>)`.                                                                | [`memory-global-constant.slang`](memory-global-constant.slang)                 |
+| C-19     | [#swizzle-swizzleset-swizzledstore](../../../docs/llm-generated/ir-reference/values.md#swizzle-swizzleset-swizzledstore)                                                            | A multi-component swizzle (`v.xyz`) lowers to `swizzle(%v, 0 : Int, 1 : Int, 2 : Int)`.                                                       | [`swizzle-multi-component.slang`](swizzle-multi-component.slang)                |
+| C-20     | [#swizzle-swizzleset-swizzledstore](../../../docs/llm-generated/ir-reference/values.md#swizzle-swizzleset-swizzledstore)                                                            | A swizzle in lvalue position (`dst.xy = ...`) lowers to `swizzledStore`.                                                                      | [`swizzle-store-lvalue.slang`](swizzle-store-lvalue.slang)                   |
+| C-21     | [#swizzle-swizzleset-swizzledstore](../../../docs/llm-generated/ir-reference/values.md#swizzle-swizzleset-swizzledstore)                                                            | Vector swizzle emits as `.xyz`-style member access on HLSL/GLSL/Metal/WGSL; CPP renders the same component reads inside a `Vector<>` brace.   | [`swizzle-emit-multi-target.slang`](swizzle-emit-multi-target.slang)              |
+| C-22     | [#aggregate-constructors](../../../docs/llm-generated/ir-reference/values.md#aggregate-constructors)                                                                                | A `floatN(...)` constructor call lowers to `makeVector(<components>)`.                                                                        | [`aggregate-makevector.slang`](aggregate-makevector.slang)                   |
+| C-23     | [#aggregate-constructors](../../../docs/llm-generated/ir-reference/values.md#aggregate-constructors)                                                                                | A `floatRxC(...)` constructor lowers to `makeMatrix(<components>)`.                                                                           | [`aggregate-makematrix.slang`](aggregate-makematrix.slang)                   |
+| C-24     | [#aggregate-constructors](../../../docs/llm-generated/ir-reference/values.md#aggregate-constructors)                                                                                | `makeTuple(a, b)` lowers to the `makeTuple` opcode producing a `tuple_type(...)` value.                                                       | [`aggregate-maketuple.slang`](aggregate-maketuple.slang)                    |
+| C-25     | [#result-optional-conditional-helpers](../../../docs/llm-generated/ir-reference/values.md#result-optional-conditional-helpers)                                                      | `Optional<T>` constructors and accessors lower to `makeOptionalValue` / `makeOptionalNone` / `optionalHasValue` / `getOptionalValue`.         | [`optional-make-has-value.slang`](optional-make-has-value.slang)                |
+| C-26     | [#conversions](../../../docs/llm-generated/ir-reference/values.md#conversions)                                                                                                      | An `out T` parameter has IR type `OutParam(T)`; the caller passes a `Ptr(T)` from a local `var`.                                              | [`out-param-type.slang`](out-param-type.slang)                         |
+| C-27     | [#literal-payload-encoding](../../../docs/llm-generated/ir-reference/values.md#literal-payload-encoding)                                                                            | Integer and floating-point literal payloads survive lowering and emit as recognizable numeric tokens on every text-emit target.               | [`literal-emit-multi-target.slang`](literal-emit-multi-target.slang)              |
 
 ## Tests in this bundle
 
 | File                                          | Intent     | Doc anchor                                |
 | --------------------------------------------- | ---------- | ----------------------------------------- |
-| `literals-inline-payload.slang`               | functional | `#literal-payload-encoding`               |
-| `return-val-void-constant.slang`              | functional | `#literals-constant-group`                |
-| `arith-irem-frem-neg.slang`                   | functional | `#arithmetic-and-bitwise`                 |
-| `arith-shifts.slang`                          | functional | `#arithmetic-and-bitwise`                 |
-| `arith-bitwise.slang`                         | functional | `#arithmetic-and-bitwise`                 |
-| `logical-not.slang`                           | functional | `#arithmetic-and-bitwise`                 |
-| `bitfield-extract-insert.slang`               | functional | `#arithmetic-and-bitwise`                 |
-| `select-builtin.slang`                        | functional | `#select`                                 |
-| `comparison-eq-ne.slang`                      | functional | `#comparison`                             |
-| `comparison-lt-le-ge.slang`                   | functional | `#comparison`                             |
-| `conversion-intcast-narrow.slang`             | functional | `#conversions`                            |
-| `conversion-floatcast.slang`                  | functional | `#conversions`                            |
-| `conversion-int-float.slang`                  | functional | `#conversions`                            |
-| `conversion-bitcast.slang`                    | functional | `#conversions`                            |
-| `conversion-cast-to-void.slang`               | functional | `#conversions`                            |
-| `memory-get-field-rvalue.slang`               | functional | `#fieldaddress-vs-fieldextract`           |
-| `memory-getelement-and-getelementptr.slang`   | functional | `#getelementptr-vs-getelement`            |
-| `memory-global-constant.slang`                | functional | `#memory`                                 |
-| `swizzle-multi-component.slang`               | functional | `#swizzle-swizzleset-swizzledstore`       |
-| `swizzle-store-lvalue.slang`                  | functional | `#swizzle-swizzleset-swizzledstore`       |
-| `swizzle-emit-multi-target.slang`             | functional | `#swizzle-swizzleset-swizzledstore`       |
-| `aggregate-makevector.slang`                  | functional | `#aggregate-constructors`                 |
-| `aggregate-makematrix.slang`                  | functional | `#aggregate-constructors`                 |
-| `aggregate-maketuple.slang`                   | functional | `#aggregate-constructors`                 |
-| `optional-make-has-value.slang`               | functional | `#result-optional-conditional-helpers`    |
-| `out-param-type.slang`                        | functional | `#conversions`                            |
-| `literal-emit-multi-target.slang`             | functional | `#literal-payload-encoding`               |
-| `add-int32-max-literal.slang`                 | boundary   | `#literal-payload-encoding`               |
-| `add-int32-min-literal.slang`                 | boundary   | `#literal-payload-encoding`               |
-| `add-uint32-max-literal.slang`                | boundary   | `#literal-payload-encoding`               |
-| `cast-uint8-max-plus-one-wraps.slang`         | boundary   | `#literal-payload-encoding`               |
-| `add-int64-max-literal.slang`                 | boundary   | `#literal-payload-encoding`               |
-| `store-int8-min-literal.slang`                | boundary   | `#literal-payload-encoding`               |
-| `store-uint8-max-literal.slang`               | boundary   | `#literal-payload-encoding`               |
-| `store-int16-max-literal.slang`               | boundary   | `#literal-payload-encoding`               |
-| `mul-float-pos-zero-literal.slang`            | boundary   | `#literal-payload-encoding`               |
-| `mul-float-neg-zero-literal.slang`            | boundary   | `#literal-payload-encoding`               |
-| `add-float-max-literal.slang`                 | boundary   | `#literal-payload-encoding`               |
-| `add-float-smallest-normal-literal.slang`     | boundary   | `#literal-payload-encoding`               |
-| `add-double-overflow-folds-to-inf.slang`      | boundary   | `#literal-payload-encoding`               |
-| `int-literal-overflow-any-type-rejected.slang`| negative   | `#literal-payload-encoding`               |
-| `cmpEQ-float-pos-zero-literal.slang`          | boundary   | `#comparison`                             |
-| `cmpEQ-float-neg-zero-literal.slang`          | boundary   | `#comparison`                             |
-| `cmpEQ-self-uniform-float.slang`              | boundary   | `#comparison`                             |
-| `cmpNE-self-uniform-float.slang`              | boundary   | `#comparison`                             |
-| `cmpLE-cmpGE-float-uniform.slang`             | boundary   | `#comparison`                             |
-| `intCast-int-to-uint8-narrowing.slang`        | boundary   | `#conversions`                            |
-| `intCast-int-to-uint64-widening.slang`        | boundary   | `#conversions`                            |
-| `intCast-int-to-uint-same-width.slang`        | boundary   | `#conversions`                            |
-| `floatCast-float-to-half-narrowing.slang`     | boundary   | `#conversions`                            |
-| `floatCast-half-to-double-widening.slang`     | boundary   | `#conversions`                            |
-| `bitCast-uint-to-float-reinterpret.slang`     | boundary   | `#conversions`                            |
-| `swizzle-single-component-from-vec4.slang`    | boundary   | `#swizzle-swizzleset-swizzledstore`       |
-| `swizzle-full-length-xyzw.slang`              | boundary   | `#swizzle-swizzleset-swizzledstore`       |
-| `swizzle-repeat-component-xxxx.slang`         | boundary   | `#swizzle-swizzleset-swizzledstore`       |
-| `swizzle-mixed-xxxy-from-vec2.slang`          | boundary   | `#swizzle-swizzleset-swizzledstore`       |
-| `swizzle-z-on-vec2-rejected.slang`            | negative   | `#swizzle-swizzleset-swizzledstore`       |
-| `swizzle-w-on-vec3-rejected.slang`            | negative   | `#swizzle-swizzleset-swizzledstore`       |
-| `bitfieldExtract-count-zero.slang`            | boundary   | `#arithmetic-and-bitwise`                 |
-| `bitfieldExtract-count-full-width.slang`      | boundary   | `#arithmetic-and-bitwise`                 |
-| `bitfieldExtract-offset-high-edge.slang`      | boundary   | `#arithmetic-and-bitwise`                 |
-| `bitfieldInsert-count-full-width.slang`       | boundary   | `#arithmetic-and-bitwise`                 |
-| `shl-uint-by-zero.slang`                      | boundary   | `#arithmetic-and-bitwise`                 |
-| `shl-uint-by-width-minus-one.slang`           | boundary   | `#arithmetic-and-bitwise`                 |
-| `shl-uint-by-width-overflow.slang`            | boundary   | `#arithmetic-and-bitwise`                 |
-| `shr-int-by-zero.slang`                       | boundary   | `#arithmetic-and-bitwise`                 |
-| `shr-int-by-width-minus-one.slang`            | boundary   | `#arithmetic-and-bitwise`                 |
-| `irem-int-by-one.slang`                       | boundary   | `#arithmetic-and-bitwise`                 |
-| `neg-uniform-int.slang`                       | boundary   | `#arithmetic-and-bitwise`                 |
-| `neg-uniform-float.slang`                     | boundary   | `#arithmetic-and-bitwise`                 |
-| `mul-uint-by-max-literal.slang`               | boundary   | `#arithmetic-and-bitwise`                 |
-| `div-float-by-positive-zero-uniform.slang`    | boundary   | `#arithmetic-and-bitwise`                 |
-| `int-divide-by-zero-literal-rejected.slang`   | negative   | `#arithmetic-and-bitwise`                 |
-| `optional-always-none.slang`                  | boundary   | `#result-optional-conditional-helpers`    |
-| `optional-always-value.slang`                 | boundary   | `#result-optional-conditional-helpers`    |
-| `makeVector-float2-smallest-vector.slang`     | boundary   | `#aggregate-constructors`                 |
-| `makeMatrix-float4x4-largest-documented.slang`| stress     | `#aggregate-constructors`                 |
-| `_probe_diag.slang`                           | stress     | `#aggregate-constructors`                 |
-| `select-true-literal-bool.slang`              | boundary   | `#select`                                 |
-| `intcast-int32-to-int8-narrow.slang`          | expansion  | `#conversions`                            |
-| `intcast-int8-to-int16-widen.slang`           | expansion  | `#conversions`                            |
-| `intcast-int8-to-int64-widen-across-extend.slang` | expansion | `#conversions`                          |
-| `intcast-int64-to-uint16-narrow-across-signedness.slang` | expansion | `#conversions`                   |
-| `intcast-uint8-to-int32-zero-extend.slang`    | expansion  | `#conversions`                            |
-| `intcast-uint64-to-int64-same-width-flip.slang` | expansion | `#conversions`                          |
-| `intcast-uint32-to-int8-narrow-across-signedness.slang` | expansion | `#conversions`                    |
-| `intcast-int16-to-uint8-narrow-across-signedness.slang` | expansion | `#conversions`                    |
-| `intcast-int32-to-int64-sign-extend.slang`    | expansion  | `#conversions`                            |
-| `intcast-int64-to-int32-truncate.slang`       | expansion  | `#conversions`                            |
-| `floatcast-double-to-float-narrow.slang`      | expansion  | `#conversions`                            |
-| `floatcast-double-to-half-precision-loss.slang` | expansion | `#conversions`                          |
-| `floatcast-half-to-float-widen.slang`         | expansion  | `#conversions`                            |
-| `floatcast-float-to-double-widen.slang`       | expansion  | `#conversions`                            |
-| `castinttofloat-int32-to-float.slang`         | expansion  | `#conversions`                            |
-| `castinttofloat-uint32-to-float.slang`        | expansion  | `#conversions`                            |
-| `castinttofloat-int64-to-double.slang`        | expansion  | `#conversions`                            |
-| `castinttofloat-uint8-to-float.slang`         | expansion  | `#conversions`                            |
-| `castinttofloat-int32-to-half.slang`          | expansion  | `#conversions`                            |
-| `castinttofloat-int16-to-double.slang`        | expansion  | `#conversions`                            |
-| `castfloattoint-float-to-int32.slang`         | expansion  | `#conversions`                            |
-| `castfloattoint-double-to-int32.slang`        | expansion  | `#conversions`                            |
-| `castfloattoint-double-to-int64.slang`        | expansion  | `#conversions`                            |
-| `castfloattoint-double-to-int8-narrow.slang`  | expansion  | `#conversions`                            |
-| `castfloattoint-half-to-uint32.slang`         | expansion  | `#conversions`                            |
-| `castfloattoint-float-to-uint32.slang`        | expansion  | `#conversions`                            |
-| `castfloattoint-half-to-int16.slang`          | expansion  | `#conversions`                            |
-| `bitcast-float-to-uint32-reinterpret.slang`   | expansion  | `#conversions`                            |
-| `bitcast-uint64-to-double-reinterpret.slang`  | expansion  | `#conversions`                            |
-| `bitcast-double-to-uint64-reinterpret.slang`  | expansion  | `#conversions`                            |
-| `bitcast-uint16-to-half-reinterpret.slang`    | expansion  | `#conversions`                            |
-| `bitcast-half-to-uint16-reinterpret.slang`    | expansion  | `#conversions`                            |
-| `bitcast-int32-to-float-reinterpret.slang`    | expansion  | `#conversions`                            |
-| `bitcast-different-width-rejected.slang`      | negative   | `#conversions`                            |
-| `cmplt-int-vs-float-implicit-conversion.slang` | expansion | `#conversions`                           |
-| `cmpeq-int-vs-half-implicit-conversion.slang` | expansion  | `#conversions`                            |
-| `select-mixed-int-float-arms-implicit-conversion.slang` | expansion | `#conversions`                    |
-| `add-int8-plus-int16-promotes-via-intcast.slang` | expansion | `#conversions`                         |
-| `select-vector-float3-arms.slang`             | expansion  | `#select`                                 |
-| `select-int64-arms.slang`                     | expansion  | `#select`                                 |
-| `select-double-arms.slang`                    | expansion  | `#select`                                 |
-| `cmpeq-int8-uniform.slang`                    | expansion  | `#comparison`                             |
-| `cmplt-int64-uniform.slang`                   | expansion  | `#comparison`                             |
-| `cmpne-uint-uniform.slang`                    | expansion  | `#comparison`                             |
-| `cmple-double-uniform.slang`                  | expansion  | `#comparison`                             |
+| [`literals-inline-payload.slang`](literals-inline-payload.slang)               | functional | `#literal-payload-encoding`               |
+| [`return-val-void-constant.slang`](return-val-void-constant.slang)              | functional | `#literals-constant-group`                |
+| [`arith-irem-frem-neg.slang`](arith-irem-frem-neg.slang)                   | functional | `#arithmetic-and-bitwise`                 |
+| [`arith-shifts.slang`](arith-shifts.slang)                          | functional | `#arithmetic-and-bitwise`                 |
+| [`arith-bitwise.slang`](arith-bitwise.slang)                         | functional | `#arithmetic-and-bitwise`                 |
+| [`logical-not.slang`](logical-not.slang)                           | functional | `#arithmetic-and-bitwise`                 |
+| [`bitfield-extract-insert.slang`](bitfield-extract-insert.slang)               | functional | `#arithmetic-and-bitwise`                 |
+| [`select-builtin.slang`](select-builtin.slang)                        | functional | `#select`                                 |
+| [`comparison-eq-ne.slang`](comparison-eq-ne.slang)                      | functional | `#comparison`                             |
+| [`comparison-lt-le-ge.slang`](comparison-lt-le-ge.slang)                   | functional | `#comparison`                             |
+| [`conversion-intcast-narrow.slang`](conversion-intcast-narrow.slang)             | functional | `#conversions`                            |
+| [`conversion-floatcast.slang`](conversion-floatcast.slang)                  | functional | `#conversions`                            |
+| [`conversion-int-float.slang`](conversion-int-float.slang)                  | functional | `#conversions`                            |
+| [`conversion-bitcast.slang`](conversion-bitcast.slang)                    | functional | `#conversions`                            |
+| [`conversion-cast-to-void.slang`](conversion-cast-to-void.slang)               | functional | `#conversions`                            |
+| [`memory-get-field-rvalue.slang`](memory-get-field-rvalue.slang)               | functional | `#fieldaddress-vs-fieldextract`           |
+| [`memory-getelement-and-getelementptr.slang`](memory-getelement-and-getelementptr.slang)   | functional | `#getelementptr-vs-getelement`            |
+| [`memory-global-constant.slang`](memory-global-constant.slang)                | functional | `#memory`                                 |
+| [`swizzle-multi-component.slang`](swizzle-multi-component.slang)               | functional | `#swizzle-swizzleset-swizzledstore`       |
+| [`swizzle-store-lvalue.slang`](swizzle-store-lvalue.slang)                  | functional | `#swizzle-swizzleset-swizzledstore`       |
+| [`swizzle-emit-multi-target.slang`](swizzle-emit-multi-target.slang)             | functional | `#swizzle-swizzleset-swizzledstore`       |
+| [`aggregate-makevector.slang`](aggregate-makevector.slang)                  | functional | `#aggregate-constructors`                 |
+| [`aggregate-makematrix.slang`](aggregate-makematrix.slang)                  | functional | `#aggregate-constructors`                 |
+| [`aggregate-maketuple.slang`](aggregate-maketuple.slang)                   | functional | `#aggregate-constructors`                 |
+| [`optional-make-has-value.slang`](optional-make-has-value.slang)               | functional | `#result-optional-conditional-helpers`    |
+| [`out-param-type.slang`](out-param-type.slang)                        | functional | `#conversions`                            |
+| [`literal-emit-multi-target.slang`](literal-emit-multi-target.slang)             | functional | `#literal-payload-encoding`               |
+| [`add-int32-max-literal.slang`](add-int32-max-literal.slang)                 | boundary   | `#literal-payload-encoding`               |
+| [`add-int32-min-literal.slang`](add-int32-min-literal.slang)                 | boundary   | `#literal-payload-encoding`               |
+| [`add-uint32-max-literal.slang`](add-uint32-max-literal.slang)                | boundary   | `#literal-payload-encoding`               |
+| [`cast-uint8-max-plus-one-wraps.slang`](cast-uint8-max-plus-one-wraps.slang)         | boundary   | `#literal-payload-encoding`               |
+| [`add-int64-max-literal.slang`](add-int64-max-literal.slang)                 | boundary   | `#literal-payload-encoding`               |
+| [`store-int8-min-literal.slang`](store-int8-min-literal.slang)                | boundary   | `#literal-payload-encoding`               |
+| [`store-uint8-max-literal.slang`](store-uint8-max-literal.slang)               | boundary   | `#literal-payload-encoding`               |
+| [`store-int16-max-literal.slang`](store-int16-max-literal.slang)               | boundary   | `#literal-payload-encoding`               |
+| [`mul-float-pos-zero-literal.slang`](mul-float-pos-zero-literal.slang)            | boundary   | `#literal-payload-encoding`               |
+| [`mul-float-neg-zero-literal.slang`](mul-float-neg-zero-literal.slang)            | boundary   | `#literal-payload-encoding`               |
+| [`add-float-max-literal.slang`](add-float-max-literal.slang)                 | boundary   | `#literal-payload-encoding`               |
+| [`add-float-smallest-normal-literal.slang`](add-float-smallest-normal-literal.slang)     | boundary   | `#literal-payload-encoding`               |
+| [`add-double-overflow-folds-to-inf.slang`](add-double-overflow-folds-to-inf.slang)      | boundary   | `#literal-payload-encoding`               |
+| [`int-literal-overflow-any-type-rejected.slang`](int-literal-overflow-any-type-rejected.slang)| negative   | `#literal-payload-encoding`               |
+| [`cmpEQ-float-pos-zero-literal.slang`](cmpEQ-float-pos-zero-literal.slang)          | boundary   | `#comparison`                             |
+| [`cmpEQ-float-neg-zero-literal.slang`](cmpEQ-float-neg-zero-literal.slang)          | boundary   | `#comparison`                             |
+| [`cmpEQ-self-uniform-float.slang`](cmpEQ-self-uniform-float.slang)              | boundary   | `#comparison`                             |
+| [`cmpNE-self-uniform-float.slang`](cmpNE-self-uniform-float.slang)              | boundary   | `#comparison`                             |
+| [`cmpLE-cmpGE-float-uniform.slang`](cmpLE-cmpGE-float-uniform.slang)             | boundary   | `#comparison`                             |
+| [`intCast-int-to-uint8-narrowing.slang`](intCast-int-to-uint8-narrowing.slang)        | boundary   | `#conversions`                            |
+| [`intCast-int-to-uint64-widening.slang`](intCast-int-to-uint64-widening.slang)        | boundary   | `#conversions`                            |
+| [`intCast-int-to-uint-same-width.slang`](intCast-int-to-uint-same-width.slang)        | boundary   | `#conversions`                            |
+| [`floatCast-float-to-half-narrowing.slang`](floatCast-float-to-half-narrowing.slang)     | boundary   | `#conversions`                            |
+| [`floatCast-half-to-double-widening.slang`](floatCast-half-to-double-widening.slang)     | boundary   | `#conversions`                            |
+| [`bitCast-uint-to-float-reinterpret.slang`](bitCast-uint-to-float-reinterpret.slang)     | boundary   | `#conversions`                            |
+| [`swizzle-single-component-from-vec4.slang`](swizzle-single-component-from-vec4.slang)    | boundary   | `#swizzle-swizzleset-swizzledstore`       |
+| [`swizzle-full-length-xyzw.slang`](swizzle-full-length-xyzw.slang)              | boundary   | `#swizzle-swizzleset-swizzledstore`       |
+| [`swizzle-repeat-component-xxxx.slang`](swizzle-repeat-component-xxxx.slang)         | boundary   | `#swizzle-swizzleset-swizzledstore`       |
+| [`swizzle-mixed-xxxy-from-vec2.slang`](swizzle-mixed-xxxy-from-vec2.slang)          | boundary   | `#swizzle-swizzleset-swizzledstore`       |
+| [`swizzle-z-on-vec2-rejected.slang`](swizzle-z-on-vec2-rejected.slang)            | negative   | `#swizzle-swizzleset-swizzledstore`       |
+| [`swizzle-w-on-vec3-rejected.slang`](swizzle-w-on-vec3-rejected.slang)            | negative   | `#swizzle-swizzleset-swizzledstore`       |
+| [`bitfieldExtract-count-zero.slang`](bitfieldExtract-count-zero.slang)            | boundary   | `#arithmetic-and-bitwise`                 |
+| [`bitfieldExtract-count-full-width.slang`](bitfieldExtract-count-full-width.slang)      | boundary   | `#arithmetic-and-bitwise`                 |
+| [`bitfieldExtract-offset-high-edge.slang`](bitfieldExtract-offset-high-edge.slang)      | boundary   | `#arithmetic-and-bitwise`                 |
+| [`bitfieldInsert-count-full-width.slang`](bitfieldInsert-count-full-width.slang)       | boundary   | `#arithmetic-and-bitwise`                 |
+| [`shl-uint-by-zero.slang`](shl-uint-by-zero.slang)                      | boundary   | `#arithmetic-and-bitwise`                 |
+| [`shl-uint-by-width-minus-one.slang`](shl-uint-by-width-minus-one.slang)           | boundary   | `#arithmetic-and-bitwise`                 |
+| [`shl-uint-by-width-overflow.slang`](shl-uint-by-width-overflow.slang)            | boundary   | `#arithmetic-and-bitwise`                 |
+| [`shr-int-by-zero.slang`](shr-int-by-zero.slang)                       | boundary   | `#arithmetic-and-bitwise`                 |
+| [`shr-int-by-width-minus-one.slang`](shr-int-by-width-minus-one.slang)            | boundary   | `#arithmetic-and-bitwise`                 |
+| [`irem-int-by-one.slang`](irem-int-by-one.slang)                       | boundary   | `#arithmetic-and-bitwise`                 |
+| [`neg-uniform-int.slang`](neg-uniform-int.slang)                       | boundary   | `#arithmetic-and-bitwise`                 |
+| [`neg-uniform-float.slang`](neg-uniform-float.slang)                     | boundary   | `#arithmetic-and-bitwise`                 |
+| [`mul-uint-by-max-literal.slang`](mul-uint-by-max-literal.slang)               | boundary   | `#arithmetic-and-bitwise`                 |
+| [`div-float-by-positive-zero-uniform.slang`](div-float-by-positive-zero-uniform.slang)    | boundary   | `#arithmetic-and-bitwise`                 |
+| [`int-divide-by-zero-literal-rejected.slang`](int-divide-by-zero-literal-rejected.slang)   | negative   | `#arithmetic-and-bitwise`                 |
+| [`optional-always-none.slang`](optional-always-none.slang)                  | boundary   | `#result-optional-conditional-helpers`    |
+| [`optional-always-value.slang`](optional-always-value.slang)                 | boundary   | `#result-optional-conditional-helpers`    |
+| [`makeVector-float2-smallest-vector.slang`](makeVector-float2-smallest-vector.slang)     | boundary   | `#aggregate-constructors`                 |
+| [`makeMatrix-float4x4-largest-documented.slang`](makeMatrix-float4x4-largest-documented.slang)| stress     | `#aggregate-constructors`                 |
+| [`_probe_diag.slang`](_probe_diag.slang)                           | stress     | `#aggregate-constructors`                 |
+| [`select-true-literal-bool.slang`](select-true-literal-bool.slang)              | boundary   | `#select`                                 |
+| [`intcast-int32-to-int8-narrow.slang`](intcast-int32-to-int8-narrow.slang)          | expansion  | `#conversions`                            |
+| [`intcast-int8-to-int16-widen.slang`](intcast-int8-to-int16-widen.slang)           | expansion  | `#conversions`                            |
+| [`intcast-int8-to-int64-widen-across-extend.slang`](intcast-int8-to-int64-widen-across-extend.slang) | expansion | `#conversions`                          |
+| [`intcast-int64-to-uint16-narrow-across-signedness.slang`](intcast-int64-to-uint16-narrow-across-signedness.slang) | expansion | `#conversions`                   |
+| [`intcast-uint8-to-int32-zero-extend.slang`](intcast-uint8-to-int32-zero-extend.slang)    | expansion  | `#conversions`                            |
+| [`intcast-uint64-to-int64-same-width-flip.slang`](intcast-uint64-to-int64-same-width-flip.slang) | expansion | `#conversions`                          |
+| [`intcast-uint32-to-int8-narrow-across-signedness.slang`](intcast-uint32-to-int8-narrow-across-signedness.slang) | expansion | `#conversions`                    |
+| [`intcast-int16-to-uint8-narrow-across-signedness.slang`](intcast-int16-to-uint8-narrow-across-signedness.slang) | expansion | `#conversions`                    |
+| [`intcast-int32-to-int64-sign-extend.slang`](intcast-int32-to-int64-sign-extend.slang)    | expansion  | `#conversions`                            |
+| [`intcast-int64-to-int32-truncate.slang`](intcast-int64-to-int32-truncate.slang)       | expansion  | `#conversions`                            |
+| [`floatcast-double-to-float-narrow.slang`](floatcast-double-to-float-narrow.slang)      | expansion  | `#conversions`                            |
+| [`floatcast-double-to-half-precision-loss.slang`](floatcast-double-to-half-precision-loss.slang) | expansion | `#conversions`                          |
+| [`floatcast-half-to-float-widen.slang`](floatcast-half-to-float-widen.slang)         | expansion  | `#conversions`                            |
+| [`floatcast-float-to-double-widen.slang`](floatcast-float-to-double-widen.slang)       | expansion  | `#conversions`                            |
+| [`castinttofloat-int32-to-float.slang`](castinttofloat-int32-to-float.slang)         | expansion  | `#conversions`                            |
+| [`castinttofloat-uint32-to-float.slang`](castinttofloat-uint32-to-float.slang)        | expansion  | `#conversions`                            |
+| [`castinttofloat-int64-to-double.slang`](castinttofloat-int64-to-double.slang)        | expansion  | `#conversions`                            |
+| [`castinttofloat-uint8-to-float.slang`](castinttofloat-uint8-to-float.slang)         | expansion  | `#conversions`                            |
+| [`castinttofloat-int32-to-half.slang`](castinttofloat-int32-to-half.slang)          | expansion  | `#conversions`                            |
+| [`castinttofloat-int16-to-double.slang`](castinttofloat-int16-to-double.slang)        | expansion  | `#conversions`                            |
+| [`castfloattoint-float-to-int32.slang`](castfloattoint-float-to-int32.slang)         | expansion  | `#conversions`                            |
+| [`castfloattoint-double-to-int32.slang`](castfloattoint-double-to-int32.slang)        | expansion  | `#conversions`                            |
+| [`castfloattoint-double-to-int64.slang`](castfloattoint-double-to-int64.slang)        | expansion  | `#conversions`                            |
+| [`castfloattoint-double-to-int8-narrow.slang`](castfloattoint-double-to-int8-narrow.slang)  | expansion  | `#conversions`                            |
+| [`castfloattoint-half-to-uint32.slang`](castfloattoint-half-to-uint32.slang)         | expansion  | `#conversions`                            |
+| [`castfloattoint-float-to-uint32.slang`](castfloattoint-float-to-uint32.slang)        | expansion  | `#conversions`                            |
+| [`castfloattoint-half-to-int16.slang`](castfloattoint-half-to-int16.slang)          | expansion  | `#conversions`                            |
+| [`bitcast-float-to-uint32-reinterpret.slang`](bitcast-float-to-uint32-reinterpret.slang)   | expansion  | `#conversions`                            |
+| [`bitcast-uint64-to-double-reinterpret.slang`](bitcast-uint64-to-double-reinterpret.slang)  | expansion  | `#conversions`                            |
+| [`bitcast-double-to-uint64-reinterpret.slang`](bitcast-double-to-uint64-reinterpret.slang)  | expansion  | `#conversions`                            |
+| [`bitcast-uint16-to-half-reinterpret.slang`](bitcast-uint16-to-half-reinterpret.slang)    | expansion  | `#conversions`                            |
+| [`bitcast-half-to-uint16-reinterpret.slang`](bitcast-half-to-uint16-reinterpret.slang)    | expansion  | `#conversions`                            |
+| [`bitcast-int32-to-float-reinterpret.slang`](bitcast-int32-to-float-reinterpret.slang)    | expansion  | `#conversions`                            |
+| [`bitcast-different-width-rejected.slang`](bitcast-different-width-rejected.slang)      | negative   | `#conversions`                            |
+| [`cmplt-int-vs-float-implicit-conversion.slang`](cmplt-int-vs-float-implicit-conversion.slang) | expansion | `#conversions`                           |
+| [`cmpeq-int-vs-half-implicit-conversion.slang`](cmpeq-int-vs-half-implicit-conversion.slang) | expansion  | `#conversions`                            |
+| [`select-mixed-int-float-arms-implicit-conversion.slang`](select-mixed-int-float-arms-implicit-conversion.slang) | expansion | `#conversions`                    |
+| [`add-int8-plus-int16-promotes-via-intcast.slang`](add-int8-plus-int16-promotes-via-intcast.slang) | expansion | `#conversions`                         |
+| [`select-vector-float3-arms.slang`](select-vector-float3-arms.slang)             | expansion  | `#select`                                 |
+| [`select-int64-arms.slang`](select-int64-arms.slang)                     | expansion  | `#select`                                 |
+| [`select-double-arms.slang`](select-double-arms.slang)                    | expansion  | `#select`                                 |
+| [`cmpeq-int8-uniform.slang`](cmpeq-int8-uniform.slang)                    | expansion  | `#comparison`                             |
+| [`cmplt-int64-uniform.slang`](cmplt-int64-uniform.slang)                   | expansion  | `#comparison`                             |
+| [`cmpne-uint-uniform.slang`](cmpne-uint-uniform.slang)                    | expansion  | `#comparison`                             |
+| [`cmple-double-uniform.slang`](cmple-double-uniform.slang)                  | expansion  | `#comparison`                             |
 
 ## Housekeeping
 

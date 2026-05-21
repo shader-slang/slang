@@ -51,109 +51,109 @@ right**, sampling its breadth across categories.
 
 | Claim ID | Anchor | Claim (one line) | Tests |
 | --- | --- | --- | --- |
-| C-01 | [#namehint-namehintdecoration](../../../docs/llm-generated/ir-reference/decorations.md#namehint-namehintdecoration) | A user-named function carries a `nameHint` decoration whose string operand is the source identifier. | `name-hint-on-function.slang` |
-| C-02 | [#naming-and-provenance](../../../docs/llm-generated/ir-reference/decorations.md#naming-and-provenance) | `nameHint` attaches to function parameters as well as functions. | `name-hint-on-param.slang` |
-| C-03 | [#naming-and-provenance](../../../docs/llm-generated/ir-reference/decorations.md#naming-and-provenance) | `nameHint` attaches to top-level struct declarations carrying the source name. | `name-hint-on-struct.slang` |
-| C-04 | [#namehint-namehintdecoration](../../../docs/llm-generated/ir-reference/decorations.md#namehint-namehintdecoration) | Multiple co-existing user-named functions each surface their own `nameHint`. | `name-hint-survives-on-call-result.slang` |
-| C-05 | [#naming-and-provenance](../../../docs/llm-generated/ir-reference/decorations.md#naming-and-provenance) | Core-module declarations (`IBufferDataLayout`) carry a `BuiltinDecoration` line. | `builtin-decoration.slang` |
-| C-06 | [#layout-layoutdecoration](../../../docs/llm-generated/ir-reference/decorations.md#layout-layoutdecoration) | A global parameter carries a `layout(%N)` decoration linking it to its computed `Layout` opcode. | `layout-decoration.slang` |
-| C-07 | [#layout-and-binding](../../../docs/llm-generated/ir-reference/decorations.md#layout-and-binding) | A global with an explicit `register(uN)` carries a bare `HasExplicitHLSLBinding` decoration. | `hlsl-binding-decoration.slang` |
-| C-08 | [#layout-and-binding](../../../docs/llm-generated/ir-reference/decorations.md#layout-and-binding) | A field decorated with `[vk::location(N)]` lowers to a `glslLocation(N : Int)` decoration. | `glsl-location-decoration.slang` |
-| C-09 | [#loop-and-branch-hints](../../../docs/llm-generated/ir-reference/decorations.md#loop-and-branch-hints) | An `[unroll]` attribute on a for-loop produces a `loopControl(N : Int)` decoration recording the mode. | `loop-control-unroll.slang` |
-| C-10 | [#loop-and-branch-hints](../../../docs/llm-generated/ir-reference/decorations.md#loop-and-branch-hints) | A `[flatten]` attribute on a conditional produces a bare `flatten` decoration. | `flatten-decoration.slang` |
-| C-11 | [#loop-and-branch-hints](../../../docs/llm-generated/ir-reference/decorations.md#loop-and-branch-hints) | A `[branch]` attribute on a conditional produces a bare `branch` decoration. | `branch-decoration.slang` |
-| C-12 | [#loop-and-branch-hints](../../../docs/llm-generated/ir-reference/decorations.md#loop-and-branch-hints) | Two coexisting loop-control hints (`[unroll]` mode 0 and `[loop]` mode 1) each surface independently. | `two-loop-controls-coexist.slang` |
-| C-13 | [#targetintrinsic-targetintrinsicdecoration](../../../docs/llm-generated/ir-reference/decorations.md#targetintrinsic-targetintrinsicdecoration) | Calling a core-module built-in pulls in its `[targetIntrinsic(capSet, "spelling")]` decoration. | `target-intrinsic-decoration.slang` |
-| C-14 | [#interpolation-and-shader-io](../../../docs/llm-generated/ir-reference/decorations.md#interpolation-and-shader-io) | A parameter declared with `SV_DispatchThreadID` lowers to a `semantic("SV_DispatchThreadID", -1 : Int)` decoration. | `semantic-decoration.slang` |
-| C-15 | [#interpolation-and-shader-io](../../../docs/llm-generated/ir-reference/decorations.md#interpolation-and-shader-io) | A struct field declared with a `TEXCOORD0` semantic carries a `semantic("TEXCOORD0", -1 : Int)` decoration on its key. | `semantic-on-struct-field.slang` |
-| C-16 | [#interpolation-and-shader-io](../../../docs/llm-generated/ir-reference/decorations.md#interpolation-and-shader-io) | A vertex parameter with `: POSITION` lowers to a `semantic("POSITION", -1 : Int)` decoration. | `system-value-semantic-on-param.slang` |
-| C-17 | [#interpolation-and-shader-io](../../../docs/llm-generated/ir-reference/decorations.md#interpolation-and-shader-io) | A field declared with `nointerpolation` produces an `interpolationMode(N : Int)` decoration. | `interpolation-mode-decoration.slang` |
-| C-18 | [#interpolation-and-shader-io](../../../docs/llm-generated/ir-reference/decorations.md#interpolation-and-shader-io) | A `precise`-modified parameter produces a bare `precise` decoration. | `precise-decoration.slang` |
-| C-19 | [#interpolation-and-shader-io](../../../docs/llm-generated/ir-reference/decorations.md#interpolation-and-shader-io) | An `[earlydepthstencil]` attribute produces a bare `earlyDepthStencil` decoration. | `early-depth-stencil-decoration.slang` |
-| C-20 | [#entrypoint-entrypointdecoration](../../../docs/llm-generated/ir-reference/decorations.md#entrypoint-entrypointdecoration) | A compute function with `[numthreads(...)]` lowers to a `func` with `entryPoint(profile : Int, "name", "module")`. | `entry-point-decoration.slang` |
-| C-21 | [#entrypoint-entrypointdecoration](../../../docs/llm-generated/ir-reference/decorations.md#entrypoint-entrypointdecoration) | A vertex entry point uses a different profile-tag integer than a compute entry point in its `entryPoint` decoration. | `entry-point-profile-and-module.slang` |
-| C-22 | [#entry-point-and-stage](../../../docs/llm-generated/ir-reference/decorations.md#entry-point-and-stage) | `[numthreads(x,y,z)]` lowers to `numThreads(x : Int, y : Int, z : Int)` with the three operands in source order. | `num-threads-decoration.slang` |
-| C-23 | [#entry-point-and-stage](../../../docs/llm-generated/ir-reference/decorations.md#entry-point-and-stage) | `[WaveSize(N)]` lowers to `waveSize(N : Int)`. | `wave-size-decoration.slang` |
-| C-24 | [#entrypoint-entrypointdecoration](../../../docs/llm-generated/ir-reference/decorations.md#entrypoint-entrypointdecoration) | A user helper called from `main` keeps a `nameHint` but does not receive an `entryPoint` decoration; only the entry-point function does. | `two-entry-points-coexist.slang` |
-| C-25 | [#linkage-and-lifetime](../../../docs/llm-generated/ir-reference/decorations.md#linkage-and-lifetime) | Every user-declared top-level function carries an `export` decoration with the function-linkage mangled name. | `export-linkage-decoration.slang` |
-| C-26 | [#linkage-and-lifetime](../../../docs/llm-generated/ir-reference/decorations.md#linkage-and-lifetime) | A top-level struct declaration carries an `export` decoration with the type-linkage mangled name (prefix `_ST`). | `export-on-struct.slang` |
-| C-27 | [#linkage-and-lifetime](../../../docs/llm-generated/ir-reference/decorations.md#linkage-and-lifetime) | A global parameter carries an `export` decoration with the variable-linkage mangled name (prefix `_SV`). | `export-on-global-param.slang` |
-| C-28 | [#keepalivedecoration](../../../docs/llm-generated/ir-reference/decorations.md#keepalivedecoration) | The front-end attaches a `keepAlive` decoration to global parameters so they survive DCE. | `keep-alive-on-global-param.slang` |
-| C-29 | [#keepalivedecoration](../../../docs/llm-generated/ir-reference/decorations.md#keepalivedecoration) | The compute entry-point function is also kept alive by a `keepAlive` decoration. | `keep-alive-on-entry-point.slang` |
-| C-30 | [#inlining-and-optimization](../../../docs/llm-generated/ir-reference/decorations.md#inlining-and-optimization) | `[ForceInline]` on a function lowers to a bare `ForceInline` decoration. | `force-inline-decoration.slang` |
-| C-31 | [#inlining-and-optimization](../../../docs/llm-generated/ir-reference/decorations.md#inlining-and-optimization) | `[noinline]` on a function lowers to a bare `noInline` decoration. | `no-inline-decoration.slang` |
-| C-32 | [#inlining-and-optimization](../../../docs/llm-generated/ir-reference/decorations.md#inlining-and-optimization) | `[__NoSideEffect]` on a function lowers to a bare `noSideEffect` decoration. | `no-side-effect-decoration.slang` |
-| C-33 | [#inlining-and-optimization](../../../docs/llm-generated/ir-reference/decorations.md#inlining-and-optimization) | `[__unsafe_force_inline_early]` on a function lowers to a bare `unsafeForceInlineEarly` decoration. | `unsafe-force-inline-early-decoration.slang` |
-| C-34 | [#inlining-and-optimization](../../../docs/llm-generated/ir-reference/decorations.md#inlining-and-optimization) | Two functions with opposing inlining hints (`[ForceInline]` and `[noinline]`) coexist in the same module without interference. | `two-inlining-hints-coexist.slang` |
-| C-35 | [#other](../../../docs/llm-generated/ir-reference/decorations.md#other) | A struct member function carries a bare `method` decoration. | `method-decoration.slang` |
-| C-36 | [#other](../../../docs/llm-generated/ir-reference/decorations.md#other) | The synthesized struct `__init` carries a `constructor(true)` decoration with a Bool literal operand. | `constructor-decoration.slang` |
+| C-01 | [#namehint-namehintdecoration](../../../docs/llm-generated/ir-reference/decorations.md#namehint-namehintdecoration) | A user-named function carries a `nameHint` decoration whose string operand is the source identifier. | [`name-hint-on-function.slang`](name-hint-on-function.slang) |
+| C-02 | [#naming-and-provenance](../../../docs/llm-generated/ir-reference/decorations.md#naming-and-provenance) | `nameHint` attaches to function parameters as well as functions. | [`name-hint-on-param.slang`](name-hint-on-param.slang) |
+| C-03 | [#naming-and-provenance](../../../docs/llm-generated/ir-reference/decorations.md#naming-and-provenance) | `nameHint` attaches to top-level struct declarations carrying the source name. | [`name-hint-on-struct.slang`](name-hint-on-struct.slang) |
+| C-04 | [#namehint-namehintdecoration](../../../docs/llm-generated/ir-reference/decorations.md#namehint-namehintdecoration) | Multiple co-existing user-named functions each surface their own `nameHint`. | [`name-hint-survives-on-call-result.slang`](name-hint-survives-on-call-result.slang) |
+| C-05 | [#naming-and-provenance](../../../docs/llm-generated/ir-reference/decorations.md#naming-and-provenance) | Core-module declarations (`IBufferDataLayout`) carry a `BuiltinDecoration` line. | [`builtin-decoration.slang`](builtin-decoration.slang) |
+| C-06 | [#layout-layoutdecoration](../../../docs/llm-generated/ir-reference/decorations.md#layout-layoutdecoration) | A global parameter carries a `layout(%N)` decoration linking it to its computed `Layout` opcode. | [`layout-decoration.slang`](layout-decoration.slang) |
+| C-07 | [#layout-and-binding](../../../docs/llm-generated/ir-reference/decorations.md#layout-and-binding) | A global with an explicit `register(uN)` carries a bare `HasExplicitHLSLBinding` decoration. | [`hlsl-binding-decoration.slang`](hlsl-binding-decoration.slang) |
+| C-08 | [#layout-and-binding](../../../docs/llm-generated/ir-reference/decorations.md#layout-and-binding) | A field decorated with `[vk::location(N)]` lowers to a `glslLocation(N : Int)` decoration. | [`glsl-location-decoration.slang`](glsl-location-decoration.slang) |
+| C-09 | [#loop-and-branch-hints](../../../docs/llm-generated/ir-reference/decorations.md#loop-and-branch-hints) | An `[unroll]` attribute on a for-loop produces a `loopControl(N : Int)` decoration recording the mode. | [`loop-control-unroll.slang`](loop-control-unroll.slang) |
+| C-10 | [#loop-and-branch-hints](../../../docs/llm-generated/ir-reference/decorations.md#loop-and-branch-hints) | A `[flatten]` attribute on a conditional produces a bare `flatten` decoration. | [`flatten-decoration.slang`](flatten-decoration.slang) |
+| C-11 | [#loop-and-branch-hints](../../../docs/llm-generated/ir-reference/decorations.md#loop-and-branch-hints) | A `[branch]` attribute on a conditional produces a bare `branch` decoration. | [`branch-decoration.slang`](branch-decoration.slang) |
+| C-12 | [#loop-and-branch-hints](../../../docs/llm-generated/ir-reference/decorations.md#loop-and-branch-hints) | Two coexisting loop-control hints (`[unroll]` mode 0 and `[loop]` mode 1) each surface independently. | [`two-loop-controls-coexist.slang`](two-loop-controls-coexist.slang) |
+| C-13 | [#targetintrinsic-targetintrinsicdecoration](../../../docs/llm-generated/ir-reference/decorations.md#targetintrinsic-targetintrinsicdecoration) | Calling a core-module built-in pulls in its `[targetIntrinsic(capSet, "spelling")]` decoration. | [`target-intrinsic-decoration.slang`](target-intrinsic-decoration.slang) |
+| C-14 | [#interpolation-and-shader-io](../../../docs/llm-generated/ir-reference/decorations.md#interpolation-and-shader-io) | A parameter declared with `SV_DispatchThreadID` lowers to a `semantic("SV_DispatchThreadID", -1 : Int)` decoration. | [`semantic-decoration.slang`](semantic-decoration.slang) |
+| C-15 | [#interpolation-and-shader-io](../../../docs/llm-generated/ir-reference/decorations.md#interpolation-and-shader-io) | A struct field declared with a `TEXCOORD0` semantic carries a `semantic("TEXCOORD0", -1 : Int)` decoration on its key. | [`semantic-on-struct-field.slang`](semantic-on-struct-field.slang) |
+| C-16 | [#interpolation-and-shader-io](../../../docs/llm-generated/ir-reference/decorations.md#interpolation-and-shader-io) | A vertex parameter with `: POSITION` lowers to a `semantic("POSITION", -1 : Int)` decoration. | [`system-value-semantic-on-param.slang`](system-value-semantic-on-param.slang) |
+| C-17 | [#interpolation-and-shader-io](../../../docs/llm-generated/ir-reference/decorations.md#interpolation-and-shader-io) | A field declared with `nointerpolation` produces an `interpolationMode(N : Int)` decoration. | [`interpolation-mode-decoration.slang`](interpolation-mode-decoration.slang) |
+| C-18 | [#interpolation-and-shader-io](../../../docs/llm-generated/ir-reference/decorations.md#interpolation-and-shader-io) | A `precise`-modified parameter produces a bare `precise` decoration. | [`precise-decoration.slang`](precise-decoration.slang) |
+| C-19 | [#interpolation-and-shader-io](../../../docs/llm-generated/ir-reference/decorations.md#interpolation-and-shader-io) | An `[earlydepthstencil]` attribute produces a bare `earlyDepthStencil` decoration. | [`early-depth-stencil-decoration.slang`](early-depth-stencil-decoration.slang) |
+| C-20 | [#entrypoint-entrypointdecoration](../../../docs/llm-generated/ir-reference/decorations.md#entrypoint-entrypointdecoration) | A compute function with `[numthreads(...)]` lowers to a `func` with `entryPoint(profile : Int, "name", "module")`. | [`entry-point-decoration.slang`](entry-point-decoration.slang) |
+| C-21 | [#entrypoint-entrypointdecoration](../../../docs/llm-generated/ir-reference/decorations.md#entrypoint-entrypointdecoration) | A vertex entry point uses a different profile-tag integer than a compute entry point in its `entryPoint` decoration. | [`entry-point-profile-and-module.slang`](entry-point-profile-and-module.slang) |
+| C-22 | [#entry-point-and-stage](../../../docs/llm-generated/ir-reference/decorations.md#entry-point-and-stage) | `[numthreads(x,y,z)]` lowers to `numThreads(x : Int, y : Int, z : Int)` with the three operands in source order. | [`num-threads-decoration.slang`](num-threads-decoration.slang) |
+| C-23 | [#entry-point-and-stage](../../../docs/llm-generated/ir-reference/decorations.md#entry-point-and-stage) | `[WaveSize(N)]` lowers to `waveSize(N : Int)`. | [`wave-size-decoration.slang`](wave-size-decoration.slang) |
+| C-24 | [#entrypoint-entrypointdecoration](../../../docs/llm-generated/ir-reference/decorations.md#entrypoint-entrypointdecoration) | A user helper called from `main` keeps a `nameHint` but does not receive an `entryPoint` decoration; only the entry-point function does. | [`two-entry-points-coexist.slang`](two-entry-points-coexist.slang) |
+| C-25 | [#linkage-and-lifetime](../../../docs/llm-generated/ir-reference/decorations.md#linkage-and-lifetime) | Every user-declared top-level function carries an `export` decoration with the function-linkage mangled name. | [`export-linkage-decoration.slang`](export-linkage-decoration.slang) |
+| C-26 | [#linkage-and-lifetime](../../../docs/llm-generated/ir-reference/decorations.md#linkage-and-lifetime) | A top-level struct declaration carries an `export` decoration with the type-linkage mangled name (prefix `_ST`). | [`export-on-struct.slang`](export-on-struct.slang) |
+| C-27 | [#linkage-and-lifetime](../../../docs/llm-generated/ir-reference/decorations.md#linkage-and-lifetime) | A global parameter carries an `export` decoration with the variable-linkage mangled name (prefix `_SV`). | [`export-on-global-param.slang`](export-on-global-param.slang) |
+| C-28 | [#keepalivedecoration](../../../docs/llm-generated/ir-reference/decorations.md#keepalivedecoration) | The front-end attaches a `keepAlive` decoration to global parameters so they survive DCE. | [`keep-alive-on-global-param.slang`](keep-alive-on-global-param.slang) |
+| C-29 | [#keepalivedecoration](../../../docs/llm-generated/ir-reference/decorations.md#keepalivedecoration) | The compute entry-point function is also kept alive by a `keepAlive` decoration. | [`keep-alive-on-entry-point.slang`](keep-alive-on-entry-point.slang) |
+| C-30 | [#inlining-and-optimization](../../../docs/llm-generated/ir-reference/decorations.md#inlining-and-optimization) | `[ForceInline]` on a function lowers to a bare `ForceInline` decoration. | [`force-inline-decoration.slang`](force-inline-decoration.slang) |
+| C-31 | [#inlining-and-optimization](../../../docs/llm-generated/ir-reference/decorations.md#inlining-and-optimization) | `[noinline]` on a function lowers to a bare `noInline` decoration. | [`no-inline-decoration.slang`](no-inline-decoration.slang) |
+| C-32 | [#inlining-and-optimization](../../../docs/llm-generated/ir-reference/decorations.md#inlining-and-optimization) | `[__NoSideEffect]` on a function lowers to a bare `noSideEffect` decoration. | [`no-side-effect-decoration.slang`](no-side-effect-decoration.slang) |
+| C-33 | [#inlining-and-optimization](../../../docs/llm-generated/ir-reference/decorations.md#inlining-and-optimization) | `[__unsafe_force_inline_early]` on a function lowers to a bare `unsafeForceInlineEarly` decoration. | [`unsafe-force-inline-early-decoration.slang`](unsafe-force-inline-early-decoration.slang) |
+| C-34 | [#inlining-and-optimization](../../../docs/llm-generated/ir-reference/decorations.md#inlining-and-optimization) | Two functions with opposing inlining hints (`[ForceInline]` and `[noinline]`) coexist in the same module without interference. | [`two-inlining-hints-coexist.slang`](two-inlining-hints-coexist.slang) |
+| C-35 | [#other](../../../docs/llm-generated/ir-reference/decorations.md#other) | A struct member function carries a bare `method` decoration. | [`method-decoration.slang`](method-decoration.slang) |
+| C-36 | [#other](../../../docs/llm-generated/ir-reference/decorations.md#other) | The synthesized struct `__init` carries a `constructor(true)` decoration with a Bool literal operand. | [`constructor-decoration.slang`](constructor-decoration.slang) |
 
 ## Tests in this bundle
 
 | File | Intent | Doc anchor |
 | --- | --- | --- |
-| `name-hint-on-function.slang` | functional | `#namehint-namehintdecoration` |
-| `name-hint-on-param.slang` | functional | `#naming-and-provenance` |
-| `name-hint-on-struct.slang` | functional | `#naming-and-provenance` |
-| `name-hint-survives-on-call-result.slang` | functional | `#namehint-namehintdecoration` |
-| `builtin-decoration.slang` | functional | `#naming-and-provenance` |
-| `layout-decoration.slang` | functional | `#layout-layoutdecoration` |
-| `hlsl-binding-decoration.slang` | functional | `#layout-and-binding` |
-| `glsl-location-decoration.slang` | functional | `#layout-and-binding` |
-| `loop-control-unroll.slang` | functional | `#loop-and-branch-hints` |
-| `flatten-decoration.slang` | functional | `#loop-and-branch-hints` |
-| `branch-decoration.slang` | functional | `#loop-and-branch-hints` |
-| `two-loop-controls-coexist.slang` | functional | `#loop-and-branch-hints` |
-| `target-intrinsic-decoration.slang` | functional | `#targetintrinsic-targetintrinsicdecoration` |
-| `semantic-decoration.slang` | functional | `#interpolation-and-shader-io` |
-| `semantic-on-struct-field.slang` | functional | `#interpolation-and-shader-io` |
-| `system-value-semantic-on-param.slang` | functional | `#interpolation-and-shader-io` |
-| `interpolation-mode-decoration.slang` | functional | `#interpolation-and-shader-io` |
-| `precise-decoration.slang` | functional | `#interpolation-and-shader-io` |
-| `early-depth-stencil-decoration.slang` | functional | `#interpolation-and-shader-io` |
-| `entry-point-decoration.slang` | functional | `#entrypoint-entrypointdecoration` |
-| `entry-point-profile-and-module.slang` | functional | `#entrypoint-entrypointdecoration` |
-| `num-threads-decoration.slang` | functional | `#entry-point-and-stage` |
-| `wave-size-decoration.slang` | functional | `#entry-point-and-stage` |
-| `two-entry-points-coexist.slang` | functional | `#entrypoint-entrypointdecoration` |
-| `export-linkage-decoration.slang` | functional | `#linkage-and-lifetime` |
-| `export-on-struct.slang` | functional | `#linkage-and-lifetime` |
-| `export-on-global-param.slang` | functional | `#linkage-and-lifetime` |
-| `keep-alive-on-global-param.slang` | functional | `#keepalivedecoration` |
-| `keep-alive-on-entry-point.slang` | functional | `#keepalivedecoration` |
-| `force-inline-decoration.slang` | functional | `#inlining-and-optimization` |
-| `no-inline-decoration.slang` | functional | `#inlining-and-optimization` |
-| `no-side-effect-decoration.slang` | functional | `#inlining-and-optimization` |
-| `unsafe-force-inline-early-decoration.slang` | functional | `#inlining-and-optimization` |
-| `two-inlining-hints-coexist.slang` | functional | `#inlining-and-optimization` |
-| `method-decoration.slang` | functional | `#other` |
-| `constructor-decoration.slang` | functional | `#other` |
-| `num-threads-min.slang` | boundary | `#entry-point-and-stage` |
-| `num-threads-large-x.slang` | boundary | `#entry-point-and-stage` |
-| `num-threads-x-only.slang` | boundary | `#entry-point-and-stage` |
-| `wave-size-min.slang` | boundary | `#entry-point-and-stage` |
-| `wave-size-max.slang` | boundary | `#entry-point-and-stage` |
-| `glsl-location-zero.slang` | boundary | `#layout-and-binding` |
-| `glsl-location-large.slang` | boundary | `#layout-and-binding` |
-| `packoffset-decoration.slang` | boundary | `#layout-and-binding` |
-| `semantic-explicit-index.slang` | boundary | `#interpolation-and-shader-io` |
-| `interpolation-mode-linear.slang` | boundary | `#interpolation-and-shader-io` |
-| `interpolation-mode-sample.slang` | boundary | `#interpolation-and-shader-io` |
-| `interpolation-mode-nointerpolation.slang` | boundary | `#interpolation-and-shader-io` |
-| `loop-control-loop-mode.slang` | boundary | `#loop-and-branch-hints` |
-| `force-unroll-on-loop.slang` | boundary | `#loop-and-branch-hints` |
-| `loop-max-iters.slang` | boundary | `#loop-and-branch-hints` |
-| `entry-point-vertex-profile.slang` | boundary | `#entrypoint-entrypointdecoration` |
-| `export-witness-table-prefix.slang` | boundary | `#linkage-and-lifetime` |
-| `read-none-decoration.slang` | boundary | `#inlining-and-optimization` |
-| `numthreads-zero-error.slang` | negative | `#entry-point-and-stage` |
-| `numthreads-negative-error.slang` | negative | `#entry-point-and-stage` |
-| `numthreads-arg-count-error.slang` | negative | `#entry-point-and-stage` |
-| `force-unroll-on-function-error.slang` | negative | `#loop-and-branch-hints` |
-| `function-with-many-decorations.slang` | stress | `#inlining-and-optimization` |
-| `struct-with-many-field-decorations.slang` | stress | `#interpolation-and-shader-io` |
-| `entry-point-with-many-attributes.slang` | stress | `#entry-point-and-stage` |
-| `branch-and-flatten-cascade.slang` | stress | `#loop-and-branch-hints` |
+| [`name-hint-on-function.slang`](name-hint-on-function.slang) | functional | `#namehint-namehintdecoration` |
+| [`name-hint-on-param.slang`](name-hint-on-param.slang) | functional | `#naming-and-provenance` |
+| [`name-hint-on-struct.slang`](name-hint-on-struct.slang) | functional | `#naming-and-provenance` |
+| [`name-hint-survives-on-call-result.slang`](name-hint-survives-on-call-result.slang) | functional | `#namehint-namehintdecoration` |
+| [`builtin-decoration.slang`](builtin-decoration.slang) | functional | `#naming-and-provenance` |
+| [`layout-decoration.slang`](layout-decoration.slang) | functional | `#layout-layoutdecoration` |
+| [`hlsl-binding-decoration.slang`](hlsl-binding-decoration.slang) | functional | `#layout-and-binding` |
+| [`glsl-location-decoration.slang`](glsl-location-decoration.slang) | functional | `#layout-and-binding` |
+| [`loop-control-unroll.slang`](loop-control-unroll.slang) | functional | `#loop-and-branch-hints` |
+| [`flatten-decoration.slang`](flatten-decoration.slang) | functional | `#loop-and-branch-hints` |
+| [`branch-decoration.slang`](branch-decoration.slang) | functional | `#loop-and-branch-hints` |
+| [`two-loop-controls-coexist.slang`](two-loop-controls-coexist.slang) | functional | `#loop-and-branch-hints` |
+| [`target-intrinsic-decoration.slang`](target-intrinsic-decoration.slang) | functional | `#targetintrinsic-targetintrinsicdecoration` |
+| [`semantic-decoration.slang`](semantic-decoration.slang) | functional | `#interpolation-and-shader-io` |
+| [`semantic-on-struct-field.slang`](semantic-on-struct-field.slang) | functional | `#interpolation-and-shader-io` |
+| [`system-value-semantic-on-param.slang`](system-value-semantic-on-param.slang) | functional | `#interpolation-and-shader-io` |
+| [`interpolation-mode-decoration.slang`](interpolation-mode-decoration.slang) | functional | `#interpolation-and-shader-io` |
+| [`precise-decoration.slang`](precise-decoration.slang) | functional | `#interpolation-and-shader-io` |
+| [`early-depth-stencil-decoration.slang`](early-depth-stencil-decoration.slang) | functional | `#interpolation-and-shader-io` |
+| [`entry-point-decoration.slang`](entry-point-decoration.slang) | functional | `#entrypoint-entrypointdecoration` |
+| [`entry-point-profile-and-module.slang`](entry-point-profile-and-module.slang) | functional | `#entrypoint-entrypointdecoration` |
+| [`num-threads-decoration.slang`](num-threads-decoration.slang) | functional | `#entry-point-and-stage` |
+| [`wave-size-decoration.slang`](wave-size-decoration.slang) | functional | `#entry-point-and-stage` |
+| [`two-entry-points-coexist.slang`](two-entry-points-coexist.slang) | functional | `#entrypoint-entrypointdecoration` |
+| [`export-linkage-decoration.slang`](export-linkage-decoration.slang) | functional | `#linkage-and-lifetime` |
+| [`export-on-struct.slang`](export-on-struct.slang) | functional | `#linkage-and-lifetime` |
+| [`export-on-global-param.slang`](export-on-global-param.slang) | functional | `#linkage-and-lifetime` |
+| [`keep-alive-on-global-param.slang`](keep-alive-on-global-param.slang) | functional | `#keepalivedecoration` |
+| [`keep-alive-on-entry-point.slang`](keep-alive-on-entry-point.slang) | functional | `#keepalivedecoration` |
+| [`force-inline-decoration.slang`](force-inline-decoration.slang) | functional | `#inlining-and-optimization` |
+| [`no-inline-decoration.slang`](no-inline-decoration.slang) | functional | `#inlining-and-optimization` |
+| [`no-side-effect-decoration.slang`](no-side-effect-decoration.slang) | functional | `#inlining-and-optimization` |
+| [`unsafe-force-inline-early-decoration.slang`](unsafe-force-inline-early-decoration.slang) | functional | `#inlining-and-optimization` |
+| [`two-inlining-hints-coexist.slang`](two-inlining-hints-coexist.slang) | functional | `#inlining-and-optimization` |
+| [`method-decoration.slang`](method-decoration.slang) | functional | `#other` |
+| [`constructor-decoration.slang`](constructor-decoration.slang) | functional | `#other` |
+| [`num-threads-min.slang`](num-threads-min.slang) | boundary | `#entry-point-and-stage` |
+| [`num-threads-large-x.slang`](num-threads-large-x.slang) | boundary | `#entry-point-and-stage` |
+| [`num-threads-x-only.slang`](num-threads-x-only.slang) | boundary | `#entry-point-and-stage` |
+| [`wave-size-min.slang`](wave-size-min.slang) | boundary | `#entry-point-and-stage` |
+| [`wave-size-max.slang`](wave-size-max.slang) | boundary | `#entry-point-and-stage` |
+| [`glsl-location-zero.slang`](glsl-location-zero.slang) | boundary | `#layout-and-binding` |
+| [`glsl-location-large.slang`](glsl-location-large.slang) | boundary | `#layout-and-binding` |
+| [`packoffset-decoration.slang`](packoffset-decoration.slang) | boundary | `#layout-and-binding` |
+| [`semantic-explicit-index.slang`](semantic-explicit-index.slang) | boundary | `#interpolation-and-shader-io` |
+| [`interpolation-mode-linear.slang`](interpolation-mode-linear.slang) | boundary | `#interpolation-and-shader-io` |
+| [`interpolation-mode-sample.slang`](interpolation-mode-sample.slang) | boundary | `#interpolation-and-shader-io` |
+| [`interpolation-mode-nointerpolation.slang`](interpolation-mode-nointerpolation.slang) | boundary | `#interpolation-and-shader-io` |
+| [`loop-control-loop-mode.slang`](loop-control-loop-mode.slang) | boundary | `#loop-and-branch-hints` |
+| [`force-unroll-on-loop.slang`](force-unroll-on-loop.slang) | boundary | `#loop-and-branch-hints` |
+| [`loop-max-iters.slang`](loop-max-iters.slang) | boundary | `#loop-and-branch-hints` |
+| [`entry-point-vertex-profile.slang`](entry-point-vertex-profile.slang) | boundary | `#entrypoint-entrypointdecoration` |
+| [`export-witness-table-prefix.slang`](export-witness-table-prefix.slang) | boundary | `#linkage-and-lifetime` |
+| [`read-none-decoration.slang`](read-none-decoration.slang) | boundary | `#inlining-and-optimization` |
+| [`numthreads-zero-error.slang`](numthreads-zero-error.slang) | negative | `#entry-point-and-stage` |
+| [`numthreads-negative-error.slang`](numthreads-negative-error.slang) | negative | `#entry-point-and-stage` |
+| [`numthreads-arg-count-error.slang`](numthreads-arg-count-error.slang) | negative | `#entry-point-and-stage` |
+| [`force-unroll-on-function-error.slang`](force-unroll-on-function-error.slang) | negative | `#loop-and-branch-hints` |
+| [`function-with-many-decorations.slang`](function-with-many-decorations.slang) | stress | `#inlining-and-optimization` |
+| [`struct-with-many-field-decorations.slang`](struct-with-many-field-decorations.slang) | stress | `#interpolation-and-shader-io` |
+| [`entry-point-with-many-attributes.slang`](entry-point-with-many-attributes.slang) | stress | `#entry-point-and-stage` |
+| [`branch-and-flatten-cascade.slang`](branch-and-flatten-cascade.slang) | stress | `#loop-and-branch-hints` |
 
 ## Out of scope (no-GPU runner)
 

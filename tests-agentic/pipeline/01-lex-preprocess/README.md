@@ -36,72 +36,72 @@ here.
 
 | Claim ID | Anchor                                                                                                                  | Claim (one line)                                                                                                  | Tests                                                          |
 | -------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| C-01     | [#lexer-flags-and-special-case-rules](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#lexer-flags-and-special-case-rules) | Backslash before newline is consumed by the lexer; a token may span physical lines.                               | `backslash-line-continuation-in-macro.slang`                   |
-| C-02     | [#lexer-flags-and-special-case-rules](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#lexer-flags-and-special-case-rules) | After a `#include` directive, `<foo/bar.h>` lexes as a single string-like token instead of a comparison expression. | `include-angle-bracket-mode.slang`                             |
-| C-03     | [#macro-expansion](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#macro-expansion)                          | Object-like `#define` stores a lexed token sequence that is replayed on use.                                      | `object-macro-expansion.slang`                                 |
-| C-04     | [#macro-expansion](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#macro-expansion)                          | Function-style macros bind parameter names to argument tokens and substitute on expansion.                        | `function-macro-argument-substitution.slang`                   |
-| C-05     | [#macro-expansion](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#macro-expansion)                          | Inactive `#if` branches are not expanded; their tokens are discarded.                                             | `inactive-if-branch-not-expanded.slang`                        |
-| C-06     | [#macro-expansion](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#macro-expansion)                          | Inside an inactive block, only directives that toggle the active/inactive state are evaluated.                    | `inactive-block-skips-non-conditional-directives.slang`        |
-| C-07     | [#preprocessor-directives](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#preprocessor-directives)          | The standard C/HLSL directive set includes `#ifdef` to test whether a name is defined.                            | `ifdef-selects-branch.slang`                                   |
-| C-08     | [#preprocessor-directives](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#preprocessor-directives)          | The directive set includes `#undef`, which removes a macro definition.                                            | `undef-makes-ifdef-false.slang`                                |
-| C-09     | [#preprocessor-directives](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#preprocessor-directives)          | The directive set includes `#elif` for multi-arm conditional selection.                                           | `elif-chain-selects-first-true.slang`                          |
-| C-10     | [#preprocessor-directives](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#preprocessor-directives)          | The directive set includes `#error`, which surfaces the message text as a preprocessor diagnostic.                | `error-directive-emits-diagnostic.slang`                       |
-| C-11     | [#include-resolution](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#include-resolution)                    | `#include` resolves the target through `IncludeSystem` and pushes a fresh input stream for the file.              | `include-pushes-fresh-stream.slang`                            |
-| C-12     | [#source-location-preservation](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#source-location-preservation) | `__LINE__` is a constructed token synthesized at the invocation site (line of use).                              | `line-macro-is-constructed-token.slang`                        |
-| C-13     | [#source-location-preservation](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#source-location-preservation) | `__FILE__` is a constructed token synthesized at the invocation site (file path string).                          | `file-macro-is-constructed-token.slang`                        |
-| C-14     | [#source-location-preservation](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#source-location-preservation) | The stringize operator `#x` synthesizes a fresh string-literal token from the spelling of its argument.           | `stringize-operator.slang`                                     |
-| C-15     | [#source-location-preservation](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#source-location-preservation) | The token-paste operator `x##y` synthesizes a fresh single token from the concatenation of its operands.          | `token-paste-operator.slang`                                   |
-| C-16     | [#failure-modes](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#failure-modes)                              | A `#include` whose target cannot be resolved emits a preprocessor diagnostic.                                     | `missing-include-diagnostic.slang`                             |
-| C-17     | [#failure-modes](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#failure-modes)                              | An unknown preprocessor directive emits a diagnostic naming the directive.                                        | `unknown-directive-diagnostic.slang`                           |
-| C-18     | [#failure-modes](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#failure-modes)                              | A `#if` with no matching `#endif` emits an end-of-file-in-conditional diagnostic.                                 | `unbalanced-if-diagnostic.slang`                               |
+| C-01     | [#lexer-flags-and-special-case-rules](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#lexer-flags-and-special-case-rules) | Backslash before newline is consumed by the lexer; a token may span physical lines.                               | [`backslash-line-continuation-in-macro.slang`](backslash-line-continuation-in-macro.slang)                   |
+| C-02     | [#lexer-flags-and-special-case-rules](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#lexer-flags-and-special-case-rules) | After a `#include` directive, `<foo/bar.h>` lexes as a single string-like token instead of a comparison expression. | [`include-angle-bracket-mode.slang`](include-angle-bracket-mode.slang)                             |
+| C-03     | [#macro-expansion](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#macro-expansion)                          | Object-like `#define` stores a lexed token sequence that is replayed on use.                                      | [`object-macro-expansion.slang`](object-macro-expansion.slang)                                 |
+| C-04     | [#macro-expansion](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#macro-expansion)                          | Function-style macros bind parameter names to argument tokens and substitute on expansion.                        | [`function-macro-argument-substitution.slang`](function-macro-argument-substitution.slang)                   |
+| C-05     | [#macro-expansion](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#macro-expansion)                          | Inactive `#if` branches are not expanded; their tokens are discarded.                                             | [`inactive-if-branch-not-expanded.slang`](inactive-if-branch-not-expanded.slang)                        |
+| C-06     | [#macro-expansion](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#macro-expansion)                          | Inside an inactive block, only directives that toggle the active/inactive state are evaluated.                    | [`inactive-block-skips-non-conditional-directives.slang`](inactive-block-skips-non-conditional-directives.slang)        |
+| C-07     | [#preprocessor-directives](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#preprocessor-directives)          | The standard C/HLSL directive set includes `#ifdef` to test whether a name is defined.                            | [`ifdef-selects-branch.slang`](ifdef-selects-branch.slang)                                   |
+| C-08     | [#preprocessor-directives](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#preprocessor-directives)          | The directive set includes `#undef`, which removes a macro definition.                                            | [`undef-makes-ifdef-false.slang`](undef-makes-ifdef-false.slang)                                |
+| C-09     | [#preprocessor-directives](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#preprocessor-directives)          | The directive set includes `#elif` for multi-arm conditional selection.                                           | [`elif-chain-selects-first-true.slang`](elif-chain-selects-first-true.slang)                          |
+| C-10     | [#preprocessor-directives](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#preprocessor-directives)          | The directive set includes `#error`, which surfaces the message text as a preprocessor diagnostic.                | [`error-directive-emits-diagnostic.slang`](error-directive-emits-diagnostic.slang)                       |
+| C-11     | [#include-resolution](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#include-resolution)                    | `#include` resolves the target through `IncludeSystem` and pushes a fresh input stream for the file.              | [`include-pushes-fresh-stream.slang`](include-pushes-fresh-stream.slang)                            |
+| C-12     | [#source-location-preservation](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#source-location-preservation) | `__LINE__` is a constructed token synthesized at the invocation site (line of use).                              | [`line-macro-is-constructed-token.slang`](line-macro-is-constructed-token.slang)                        |
+| C-13     | [#source-location-preservation](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#source-location-preservation) | `__FILE__` is a constructed token synthesized at the invocation site (file path string).                          | [`file-macro-is-constructed-token.slang`](file-macro-is-constructed-token.slang)                        |
+| C-14     | [#source-location-preservation](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#source-location-preservation) | The stringize operator `#x` synthesizes a fresh string-literal token from the spelling of its argument.           | [`stringize-operator.slang`](stringize-operator.slang)                                     |
+| C-15     | [#source-location-preservation](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#source-location-preservation) | The token-paste operator `x##y` synthesizes a fresh single token from the concatenation of its operands.          | [`token-paste-operator.slang`](token-paste-operator.slang)                                   |
+| C-16     | [#failure-modes](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#failure-modes)                              | A `#include` whose target cannot be resolved emits a preprocessor diagnostic.                                     | [`missing-include-diagnostic.slang`](missing-include-diagnostic.slang)                             |
+| C-17     | [#failure-modes](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#failure-modes)                              | An unknown preprocessor directive emits a diagnostic naming the directive.                                        | [`unknown-directive-diagnostic.slang`](unknown-directive-diagnostic.slang)                           |
+| C-18     | [#failure-modes](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#failure-modes)                              | A `#if` with no matching `#endif` emits an end-of-file-in-conditional diagnostic.                                 | [`unbalanced-if-diagnostic.slang`](unbalanced-if-diagnostic.slang)                               |
 
 ## Tests in this bundle
 
 | File                                                          | Intent     | Doc anchor                            |
 | ------------------------------------------------------------- | ---------- | ------------------------------------- |
-| `backslash-line-continuation-in-macro.slang`                  | functional | `#lexer-flags-and-special-case-rules` |
-| `include-angle-bracket-mode.slang`                            | functional | `#lexer-flags-and-special-case-rules` |
-| `object-macro-expansion.slang`                                | functional | `#macro-expansion`                    |
-| `function-macro-argument-substitution.slang`                  | functional | `#macro-expansion`                    |
-| `inactive-if-branch-not-expanded.slang`                       | functional | `#macro-expansion`                    |
-| `inactive-block-skips-non-conditional-directives.slang`       | functional | `#macro-expansion`                    |
-| `ifdef-selects-branch.slang`                                  | functional | `#preprocessor-directives`            |
-| `undef-makes-ifdef-false.slang`                               | functional | `#preprocessor-directives`            |
-| `elif-chain-selects-first-true.slang`                         | functional | `#preprocessor-directives`            |
-| `error-directive-emits-diagnostic.slang`                      | negative   | `#preprocessor-directives`            |
-| `include-pushes-fresh-stream.slang`                           | functional | `#include-resolution`                 |
-| `line-macro-is-constructed-token.slang`                       | functional | `#source-location-preservation`       |
-| `file-macro-is-constructed-token.slang`                       | functional | `#source-location-preservation`       |
-| `stringize-operator.slang`                                    | functional | `#source-location-preservation`       |
-| `token-paste-operator.slang`                                  | functional | `#source-location-preservation`       |
-| `missing-include-diagnostic.slang`                            | negative   | `#failure-modes`                      |
-| `unknown-directive-diagnostic.slang`                          | negative   | `#failure-modes`                      |
-| `unbalanced-if-diagnostic.slang`                              | negative   | `#failure-modes`                      |
-| `if-expression-zero-is-false.slang`                           | boundary   | `#preprocessor-directives`            |
-| `if-expression-uint32-max-is-true.slang`                      | boundary   | `#preprocessor-directives`            |
-| `if-expression-int32-max-is-true.slang`                       | boundary   | `#preprocessor-directives`            |
-| `if-expression-signed-overflow-wraps.slang`                   | boundary   | `#preprocessor-directives`            |
-| `if-undefined-macro-is-zero.slang`                            | boundary   | `#preprocessor-directives`            |
-| `if-nested-five-deep.slang`                                   | stress     | `#preprocessor-directives`            |
-| `elif-chain-five-arms.slang`                                  | stress     | `#preprocessor-directives`            |
-| `function-macro-zero-args.slang`                              | boundary   | `#macro-expansion`                    |
-| `function-macro-eight-args.slang`                             | stress     | `#macro-expansion`                    |
-| `function-macro-empty-argument.slang`                         | boundary   | `#macro-expansion`                    |
-| `stringize-empty-argument.slang`                              | boundary   | `#source-location-preservation`       |
-| `token-paste-with-empty-rhs.slang`                            | boundary   | `#source-location-preservation`       |
-| `line-macro-after-line-directive.slang`                       | boundary   | `#source-location-preservation`       |
-| `include-nested-5deep.slang`                                  | stress     | `#include-resolution`                 |
-| `include-self-cycle-diagnostic.slang`                         | negative   | `#failure-modes`                      |
-| `header-guard-pattern.slang`                                  | boundary   | `#preprocessor-directives`            |
-| `backslash-line-continuation-in-string.slang`                 | boundary   | `#lexer-flags-and-special-case-rules` |
-| `error-directive-empty-message.slang`                         | boundary   | `#preprocessor-directives`            |
-| `error-directive-long-message.slang`                          | boundary   | `#preprocessor-directives`            |
-| `error-directive-macro-name-in-message.slang`                 | boundary   | `#preprocessor-directives`            |
-| `warning-directive-empty-message.slang`                       | boundary   | `#preprocessor-directives`            |
-| `pragma-unknown-emits-warning.slang`                          | boundary   | `#preprocessor-directives`            |
-| `pragma-unknown-with-args.slang`                              | boundary   | `#preprocessor-directives`            |
-| `pragma-once-prevents-redefinition.slang`                     | boundary   | `#preprocessor-directives`            |
-| `macro-wrong-argument-count-diagnostic.slang`                 | negative   | `#macro-expansion`                    |
+| [`backslash-line-continuation-in-macro.slang`](backslash-line-continuation-in-macro.slang)                  | functional | `#lexer-flags-and-special-case-rules` |
+| [`include-angle-bracket-mode.slang`](include-angle-bracket-mode.slang)                            | functional | `#lexer-flags-and-special-case-rules` |
+| [`object-macro-expansion.slang`](object-macro-expansion.slang)                                | functional | `#macro-expansion`                    |
+| [`function-macro-argument-substitution.slang`](function-macro-argument-substitution.slang)                  | functional | `#macro-expansion`                    |
+| [`inactive-if-branch-not-expanded.slang`](inactive-if-branch-not-expanded.slang)                       | functional | `#macro-expansion`                    |
+| [`inactive-block-skips-non-conditional-directives.slang`](inactive-block-skips-non-conditional-directives.slang)       | functional | `#macro-expansion`                    |
+| [`ifdef-selects-branch.slang`](ifdef-selects-branch.slang)                                  | functional | `#preprocessor-directives`            |
+| [`undef-makes-ifdef-false.slang`](undef-makes-ifdef-false.slang)                               | functional | `#preprocessor-directives`            |
+| [`elif-chain-selects-first-true.slang`](elif-chain-selects-first-true.slang)                         | functional | `#preprocessor-directives`            |
+| [`error-directive-emits-diagnostic.slang`](error-directive-emits-diagnostic.slang)                      | negative   | `#preprocessor-directives`            |
+| [`include-pushes-fresh-stream.slang`](include-pushes-fresh-stream.slang)                           | functional | `#include-resolution`                 |
+| [`line-macro-is-constructed-token.slang`](line-macro-is-constructed-token.slang)                       | functional | `#source-location-preservation`       |
+| [`file-macro-is-constructed-token.slang`](file-macro-is-constructed-token.slang)                       | functional | `#source-location-preservation`       |
+| [`stringize-operator.slang`](stringize-operator.slang)                                    | functional | `#source-location-preservation`       |
+| [`token-paste-operator.slang`](token-paste-operator.slang)                                  | functional | `#source-location-preservation`       |
+| [`missing-include-diagnostic.slang`](missing-include-diagnostic.slang)                            | negative   | `#failure-modes`                      |
+| [`unknown-directive-diagnostic.slang`](unknown-directive-diagnostic.slang)                          | negative   | `#failure-modes`                      |
+| [`unbalanced-if-diagnostic.slang`](unbalanced-if-diagnostic.slang)                              | negative   | `#failure-modes`                      |
+| [`if-expression-zero-is-false.slang`](if-expression-zero-is-false.slang)                           | boundary   | `#preprocessor-directives`            |
+| [`if-expression-uint32-max-is-true.slang`](if-expression-uint32-max-is-true.slang)                      | boundary   | `#preprocessor-directives`            |
+| [`if-expression-int32-max-is-true.slang`](if-expression-int32-max-is-true.slang)                       | boundary   | `#preprocessor-directives`            |
+| [`if-expression-signed-overflow-wraps.slang`](if-expression-signed-overflow-wraps.slang)                   | boundary   | `#preprocessor-directives`            |
+| [`if-undefined-macro-is-zero.slang`](if-undefined-macro-is-zero.slang)                            | boundary   | `#preprocessor-directives`            |
+| [`if-nested-five-deep.slang`](if-nested-five-deep.slang)                                   | stress     | `#preprocessor-directives`            |
+| [`elif-chain-five-arms.slang`](elif-chain-five-arms.slang)                                  | stress     | `#preprocessor-directives`            |
+| [`function-macro-zero-args.slang`](function-macro-zero-args.slang)                              | boundary   | `#macro-expansion`                    |
+| [`function-macro-eight-args.slang`](function-macro-eight-args.slang)                             | stress     | `#macro-expansion`                    |
+| [`function-macro-empty-argument.slang`](function-macro-empty-argument.slang)                         | boundary   | `#macro-expansion`                    |
+| [`stringize-empty-argument.slang`](stringize-empty-argument.slang)                              | boundary   | `#source-location-preservation`       |
+| [`token-paste-with-empty-rhs.slang`](token-paste-with-empty-rhs.slang)                            | boundary   | `#source-location-preservation`       |
+| [`line-macro-after-line-directive.slang`](line-macro-after-line-directive.slang)                       | boundary   | `#source-location-preservation`       |
+| [`include-nested-5deep.slang`](include-nested-5deep.slang)                                  | stress     | `#include-resolution`                 |
+| [`include-self-cycle-diagnostic.slang`](include-self-cycle-diagnostic.slang)                         | negative   | `#failure-modes`                      |
+| [`header-guard-pattern.slang`](header-guard-pattern.slang)                                  | boundary   | `#preprocessor-directives`            |
+| [`backslash-line-continuation-in-string.slang`](backslash-line-continuation-in-string.slang)                 | boundary   | `#lexer-flags-and-special-case-rules` |
+| [`error-directive-empty-message.slang`](error-directive-empty-message.slang)                         | boundary   | `#preprocessor-directives`            |
+| [`error-directive-long-message.slang`](error-directive-long-message.slang)                          | boundary   | `#preprocessor-directives`            |
+| [`error-directive-macro-name-in-message.slang`](error-directive-macro-name-in-message.slang)                 | boundary   | `#preprocessor-directives`            |
+| [`warning-directive-empty-message.slang`](warning-directive-empty-message.slang)                       | boundary   | `#preprocessor-directives`            |
+| [`pragma-unknown-emits-warning.slang`](pragma-unknown-emits-warning.slang)                          | boundary   | `#preprocessor-directives`            |
+| [`pragma-unknown-with-args.slang`](pragma-unknown-with-args.slang)                              | boundary   | `#preprocessor-directives`            |
+| [`pragma-once-prevents-redefinition.slang`](pragma-once-prevents-redefinition.slang)                     | boundary   | `#preprocessor-directives`            |
+| [`macro-wrong-argument-count-diagnostic.slang`](macro-wrong-argument-count-diagnostic.slang)                 | negative   | `#macro-expansion`                    |
 
 ## Doc gaps observed
 

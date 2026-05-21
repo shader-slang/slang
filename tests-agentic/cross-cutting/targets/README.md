@@ -33,58 +33,58 @@ cross-target behavior.
 
 | Claim ID | Anchor                          | Claim (one line)                                                                                                              | Tests                                                                                                                                                  |
 | -------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| C-01     | `#vocabulary`                   | A capability alias expands to a disjunction of conjunctions; conjoining stage + target atoms is satisfied by matching builds. | `capability-conjunction-stage-and-target.slang`                                                                                                        |
-| C-02     | `#capability-system`            | Using a target-only feature in a non-matching profile is rejected with a capability-mismatch diagnostic.                      | `capability-mismatch-fragment-in-compute.slang`                                                                                                        |
-| C-03     | `#capability-system`            | Using a stage-restricted intrinsic from a non-matching stage is rejected with a stage-mismatch diagnostic.                    | `raytracing-capability-rejected-on-fragment.slang`                                                                                                     |
-| C-04     | `#how-target-choice-affects-ir` | Selecting `-target cuda` lowers immutable global reads to `__ldg(...)`.                                                       | `cuda-immutable-load-uses-ldg.slang`                                                                                                                   |
-| C-05     | `#how-target-choice-affects-ir` | The entry-point marker differs per target (HLSL `[shader(...)]` vs. SPIR-V `OpEntryPoint` vs. Metal `[[kernel]]`).             | `per-target-entry-point-marker.slang`                                                                                                                  |
-| C-06     | `#how-target-choice-affects-ir` | Resource bindings are legalized per target (HLSL `register(u0)` vs. SPIR-V `Binding 0`).                                      | `per-target-legalize-resource-binding.slang`                                                                                                           |
-| C-07     | `#how-target-choice-affects-ir` | Vector types are legalized to per-target spellings (`float3` vs. `vec3` vs. SPIR-V composite).                                | `per-target-legalize-vector-type-shape.slang`                                                                                                          |
-| C-08     | `#how-target-choice-affects-ir` | A `#if SLANG_*` (or target-conditional construct) selects the active branch per `-target`.                                    | `target-switch-selects-active-branch.slang`                                                                                                            |
-| C-09     | `#profiles`                     | Profile binds stage and family (`cs_6_5` → compute / SM 6.5).                                                                 | `profile-binds-stage-and-family.slang`                                                                                                                 |
-| C-10     | `#profiles`                     | A SPIR-V profile (`-profile spirv_1_5`) compiles cleanly when capabilities match.                                             | `profile-spirv-1-5-compiles.slang`                                                                                                                     |
-| C-11     | `#runtime-representation`       | A `__target_switch` / restrictive capability check rejects a missing atom.                                                    | `restrictive-capability-check-rejects-missing-atom.slang`                                                                                              |
-| C-12     | `#targets`                      | `-target spirv-asm` (text) and `-target spirv` (binary) both compile.                                                         | `spirv-asm-and-binary-target-variants.slang`                                                                                                           |
-| C-13     | `#targets`                      | All documented text-emit targets accept a minimal compute kernel.                                                             | `target-table-all-text-emit.slang`                                                                                                                     |
+| C-01     | `#vocabulary`                   | A capability alias expands to a disjunction of conjunctions; conjoining stage + target atoms is satisfied by matching builds. | [`capability-conjunction-stage-and-target.slang`](capability-conjunction-stage-and-target.slang)                                                                                                        |
+| C-02     | `#capability-system`            | Using a target-only feature in a non-matching profile is rejected with a capability-mismatch diagnostic.                      | [`capability-mismatch-fragment-in-compute.slang`](capability-mismatch-fragment-in-compute.slang)                                                                                                        |
+| C-03     | `#capability-system`            | Using a stage-restricted intrinsic from a non-matching stage is rejected with a stage-mismatch diagnostic.                    | [`raytracing-capability-rejected-on-fragment.slang`](raytracing-capability-rejected-on-fragment.slang)                                                                                                     |
+| C-04     | `#how-target-choice-affects-ir` | Selecting `-target cuda` lowers immutable global reads to `__ldg(...)`.                                                       | [`cuda-immutable-load-uses-ldg.slang`](cuda-immutable-load-uses-ldg.slang)                                                                                                                   |
+| C-05     | `#how-target-choice-affects-ir` | The entry-point marker differs per target (HLSL `[shader(...)]` vs. SPIR-V `OpEntryPoint` vs. Metal `[[kernel]]`).             | [`per-target-entry-point-marker.slang`](per-target-entry-point-marker.slang)                                                                                                                  |
+| C-06     | `#how-target-choice-affects-ir` | Resource bindings are legalized per target (HLSL `register(u0)` vs. SPIR-V `Binding 0`).                                      | [`per-target-legalize-resource-binding.slang`](per-target-legalize-resource-binding.slang)                                                                                                           |
+| C-07     | `#how-target-choice-affects-ir` | Vector types are legalized to per-target spellings (`float3` vs. `vec3` vs. SPIR-V composite).                                | [`per-target-legalize-vector-type-shape.slang`](per-target-legalize-vector-type-shape.slang)                                                                                                          |
+| C-08     | `#how-target-choice-affects-ir` | A `#if SLANG_*` (or target-conditional construct) selects the active branch per `-target`.                                    | [`target-switch-selects-active-branch.slang`](target-switch-selects-active-branch.slang)                                                                                                            |
+| C-09     | `#profiles`                     | Profile binds stage and family (`cs_6_5` → compute / SM 6.5).                                                                 | [`profile-binds-stage-and-family.slang`](profile-binds-stage-and-family.slang)                                                                                                                 |
+| C-10     | `#profiles`                     | A SPIR-V profile (`-profile spirv_1_5`) compiles cleanly when capabilities match.                                             | [`profile-spirv-1-5-compiles.slang`](profile-spirv-1-5-compiles.slang)                                                                                                                     |
+| C-11     | `#runtime-representation`       | A `__target_switch` / restrictive capability check rejects a missing atom.                                                    | [`restrictive-capability-check-rejects-missing-atom.slang`](restrictive-capability-check-rejects-missing-atom.slang)                                                                                              |
+| C-12     | `#targets`                      | `-target spirv-asm` (text) and `-target spirv` (binary) both compile.                                                         | [`spirv-asm-and-binary-target-variants.slang`](spirv-asm-and-binary-target-variants.slang)                                                                                                           |
+| C-13     | `#targets`                      | All documented text-emit targets accept a minimal compute kernel.                                                             | [`target-table-all-text-emit.slang`](target-table-all-text-emit.slang)                                                                                                                     |
 
 ## Tests in this bundle
 
 | File                                                       | Intent     | Doc anchor                       |
 | ---------------------------------------------------------- | ---------- | -------------------------------- |
-| `capability-conjunction-stage-and-target.slang`            | functional | `#vocabulary`                    |
-| `capability-mismatch-fragment-in-compute.slang`            | negative   | `#capability-system`             |
-| `cuda-immutable-load-uses-ldg.slang`                       | functional | `#how-target-choice-affects-ir`  |
-| `per-target-entry-point-marker.slang`                      | functional | `#how-target-choice-affects-ir`  |
-| `per-target-legalize-resource-binding.slang`               | functional | `#how-target-choice-affects-ir`  |
-| `per-target-legalize-vector-type-shape.slang`              | functional | `#how-target-choice-affects-ir`  |
-| `profile-binds-stage-and-family.slang`                     | functional | `#profiles`                      |
-| `profile-spirv-1-5-compiles.slang`                         | functional | `#profiles`                      |
-| `raytracing-capability-rejected-on-fragment.slang`         | negative   | `#capability-system`             |
-| `restrictive-capability-check-rejects-missing-atom.slang`  | negative   | `#runtime-representation`        |
-| `spirv-asm-and-binary-target-variants.slang`               | functional | `#targets`                       |
-| `target-switch-selects-active-branch.slang`                | functional | `#how-target-choice-affects-ir`  |
-| `target-table-all-text-emit.slang`                         | functional | `#targets`                       |
-| `profile-edge-lowest-sm-4-0.slang`                         | boundary   | `#profiles`                      |
-| `profile-edge-highest-sm-6-9.slang`                        | boundary   | `#profiles`                      |
-| `profile-edge-spirv-1-0.slang`                             | boundary   | `#profiles`                      |
-| `profile-edge-spirv-1-6.slang`                             | boundary   | `#profiles`                      |
-| `profile-edge-glsl-460.slang`                              | boundary   | `#profiles`                      |
-| `profile-unknown-name-rejected.slang`                      | negative   | `#profiles`                      |
-| `profile-stage-conflict-with-explicit-stage-rejected.slang`| negative   | `#profiles`                      |
-| `target-switch-single-arm.slang`                           | boundary   | `#how-target-choice-affects-ir`  |
-| `target-switch-only-default-arm.slang`                     | boundary   | `#how-target-choice-affects-ir`  |
-| `target-switch-all-fallthrough.slang`                      | boundary   | `#how-target-choice-affects-ir`  |
-| `target-switch-empty-body.slang`                           | boundary   | `#how-target-choice-affects-ir`  |
-| `target-switch-missing-arm-falls-to-default.slang`         | boundary   | `#how-target-choice-affects-ir`  |
-| `target-switch-missing-arm-rejected.slang`                 | negative   | `#how-target-choice-affects-ir`  |
-| `target-switch-nested-stress.slang`                        | stress     | `#how-target-choice-affects-ir`  |
-| `capability-stage-and-target-conjunction-cuda.slang`       | boundary   | `#vocabulary`                    |
-| `capability-conflict-two-target-atoms-rejected.slang`      | negative   | `#capability-system`             |
-| `raytracing-intrinsic-on-vertex-stage-rejected.slang`      | negative   | `#capability-system`             |
-| `sm-6-3-feature-on-sm-6-0-rejected-restrictive.slang`      | negative   | `#runtime-representation`        |
-| `wave-active-sum-on-cpp-rejected.slang`                    | negative   | `#capability-system`             |
-| `unknown-target-name-rejected.slang`                       | negative   | `#targets`                       |
-| `all-seven-text-targets-dense-stress.slang`                | stress     | `#targets`                       |
+| [`capability-conjunction-stage-and-target.slang`](capability-conjunction-stage-and-target.slang)            | functional | `#vocabulary`                    |
+| [`capability-mismatch-fragment-in-compute.slang`](capability-mismatch-fragment-in-compute.slang)            | negative   | `#capability-system`             |
+| [`cuda-immutable-load-uses-ldg.slang`](cuda-immutable-load-uses-ldg.slang)                       | functional | `#how-target-choice-affects-ir`  |
+| [`per-target-entry-point-marker.slang`](per-target-entry-point-marker.slang)                      | functional | `#how-target-choice-affects-ir`  |
+| [`per-target-legalize-resource-binding.slang`](per-target-legalize-resource-binding.slang)               | functional | `#how-target-choice-affects-ir`  |
+| [`per-target-legalize-vector-type-shape.slang`](per-target-legalize-vector-type-shape.slang)              | functional | `#how-target-choice-affects-ir`  |
+| [`profile-binds-stage-and-family.slang`](profile-binds-stage-and-family.slang)                     | functional | `#profiles`                      |
+| [`profile-spirv-1-5-compiles.slang`](profile-spirv-1-5-compiles.slang)                         | functional | `#profiles`                      |
+| [`raytracing-capability-rejected-on-fragment.slang`](raytracing-capability-rejected-on-fragment.slang)         | negative   | `#capability-system`             |
+| [`restrictive-capability-check-rejects-missing-atom.slang`](restrictive-capability-check-rejects-missing-atom.slang)  | negative   | `#runtime-representation`        |
+| [`spirv-asm-and-binary-target-variants.slang`](spirv-asm-and-binary-target-variants.slang)               | functional | `#targets`                       |
+| [`target-switch-selects-active-branch.slang`](target-switch-selects-active-branch.slang)                | functional | `#how-target-choice-affects-ir`  |
+| [`target-table-all-text-emit.slang`](target-table-all-text-emit.slang)                         | functional | `#targets`                       |
+| [`profile-edge-lowest-sm-4-0.slang`](profile-edge-lowest-sm-4-0.slang)                         | boundary   | `#profiles`                      |
+| [`profile-edge-highest-sm-6-9.slang`](profile-edge-highest-sm-6-9.slang)                        | boundary   | `#profiles`                      |
+| [`profile-edge-spirv-1-0.slang`](profile-edge-spirv-1-0.slang)                             | boundary   | `#profiles`                      |
+| [`profile-edge-spirv-1-6.slang`](profile-edge-spirv-1-6.slang)                             | boundary   | `#profiles`                      |
+| [`profile-edge-glsl-460.slang`](profile-edge-glsl-460.slang)                              | boundary   | `#profiles`                      |
+| [`profile-unknown-name-rejected.slang`](profile-unknown-name-rejected.slang)                      | negative   | `#profiles`                      |
+| [`profile-stage-conflict-with-explicit-stage-rejected.slang`](profile-stage-conflict-with-explicit-stage-rejected.slang)| negative   | `#profiles`                      |
+| [`target-switch-single-arm.slang`](target-switch-single-arm.slang)                           | boundary   | `#how-target-choice-affects-ir`  |
+| [`target-switch-only-default-arm.slang`](target-switch-only-default-arm.slang)                     | boundary   | `#how-target-choice-affects-ir`  |
+| [`target-switch-all-fallthrough.slang`](target-switch-all-fallthrough.slang)                      | boundary   | `#how-target-choice-affects-ir`  |
+| [`target-switch-empty-body.slang`](target-switch-empty-body.slang)                           | boundary   | `#how-target-choice-affects-ir`  |
+| [`target-switch-missing-arm-falls-to-default.slang`](target-switch-missing-arm-falls-to-default.slang)         | boundary   | `#how-target-choice-affects-ir`  |
+| [`target-switch-missing-arm-rejected.slang`](target-switch-missing-arm-rejected.slang)                 | negative   | `#how-target-choice-affects-ir`  |
+| [`target-switch-nested-stress.slang`](target-switch-nested-stress.slang)                        | stress     | `#how-target-choice-affects-ir`  |
+| [`capability-stage-and-target-conjunction-cuda.slang`](capability-stage-and-target-conjunction-cuda.slang)       | boundary   | `#vocabulary`                    |
+| [`capability-conflict-two-target-atoms-rejected.slang`](capability-conflict-two-target-atoms-rejected.slang)      | negative   | `#capability-system`             |
+| [`raytracing-intrinsic-on-vertex-stage-rejected.slang`](raytracing-intrinsic-on-vertex-stage-rejected.slang)      | negative   | `#capability-system`             |
+| [`sm-6-3-feature-on-sm-6-0-rejected-restrictive.slang`](sm-6-3-feature-on-sm-6-0-rejected-restrictive.slang)      | negative   | `#runtime-representation`        |
+| [`wave-active-sum-on-cpp-rejected.slang`](wave-active-sum-on-cpp-rejected.slang)                    | negative   | `#capability-system`             |
+| [`unknown-target-name-rejected.slang`](unknown-target-name-rejected.slang)                       | negative   | `#targets`                       |
+| [`all-seven-text-targets-dense-stress.slang`](all-seven-text-targets-dense-stress.slang)                | stress     | `#targets`                       |
 
 ## Doc gaps observed
 

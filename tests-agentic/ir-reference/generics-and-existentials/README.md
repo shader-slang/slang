@@ -46,68 +46,68 @@ shapes.
 
 | Claim ID | Anchor | Claim (one line) | Tests |
 | --- | --- | --- | --- |
-| C-01 | [#specialize](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#specialize) | A call to a generic function with concrete type argument lowers to `call specialize(%generic, T)(%args)`. | `specialize-generic-function.slang` |
-| C-02 | [#generic-application](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#generic-application) | A reference to a generic struct instantiated at a concrete type produces a `specialize(%type, T)` type-level value. | `specialize-generic-type.slang` |
-| C-03 | [#specialize](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#specialize) | When a generic carries an interface constraint, the `specialize` call passes the type argument followed by the conforming witness table. | `specialize-with-witness-arg.slang` |
-| C-04 | [#specialize](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#specialize) | The `specialize` opcode is hoistable: a single textually-spelled `specialize(%base, args)` site appears in the dump at most once per (base, args) tuple. | `specialize-hoistable.slang` |
-| C-05 | [#lookupwitness-lookupwitnessmethod](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#lookupwitness-lookupwitnessmethod) | A method call on a generic-constrained value lowers to `lookupWitness(%witness, %requirementKey)` whose two operands are `(witnessTable, requirementKey)`. | `lookup-witness-operands.slang` |
-| C-06 | [#witness-lookup](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#witness-lookup) | The result type of `lookupWitness` is the requirement's function type — for `int run(int x)` the result is `Func(Int, %T, Int)`. | `lookup-witness-result-type.slang` |
-| C-07 | [#makeexistential](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#makeexistential) | Casting a concrete value `a : A` to an interface variable `IFoo i = a` produces `makeExistential(%a, %witnessA_IFoo)` — the two operands are `(value, witness)`. | `make-existential-operands.slang` |
-| C-08 | [#makeexistential](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#makeexistential) | The result type of `makeExistential` is the target interface type — `let %i : %IFoo = makeExistential(...)`. | `make-existential-result-type.slang` |
-| C-09 | [#existential-destructuring](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#existential-destructuring) | Dispatching through an interface-typed value produces `extractExistentialType(%i)` whose result type is `Type`. | `extract-existential-type.slang` |
-| C-10 | [#existential-destructuring](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#existential-destructuring) | Dispatching through an interface-typed value produces `extractExistentialValue(%i)` reading the packed concrete-typed value. | `extract-existential-value.slang` |
-| C-11 | [#existential-destructuring](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#existential-destructuring) | Dispatching through an interface-typed value produces `extractExistentialWitnessTable(%i)` whose result type is `witness_table_t(%I)`. | `extract-existential-witness-table.slang` |
-| C-12 | [#existential-destructuring](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#existential-destructuring) | Interface dispatch on an existential follows the sequence `extractExistentialType` → `extractExistentialValue` + `extractExistentialWitnessTable` → `lookupWitness` → `call`, all four opcodes appearing in order in the same dispatch site. | `existential-dispatch-sequence.slang` |
-| C-13 | [#witness-tables-and-witness-facts](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#witness-tables-and-witness-facts) | A `struct S : I` emits a `witness_table %N : witness_table_t(%I)(%S)` whose type's parenthesised pair is `(interface, implementing-type)`. | `witness-table-type-shape.slang` |
-| C-14 | [#witnesstable-and-witnesstableentry](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#witnesstable-and-witnesstableentry) | Each row inside a `witness_table` body is `witness_table_entry(%Ix5Freq, %Sx5Freq)` — first operand is the requirement key, second is the satisfying value. | `witness-table-entry-operands.slang` |
-| C-15 | [#interfacereqentry](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#interfacereqentry) | `interface I { int run(int x); }` emits `interface_req_entry(%Ix5Frun, Func(Int, this_type(%I), Int))` — first operand is the requirement key, second is the requirement's function type. | `interface-req-entry-operands.slang` |
-| C-16 | [#interfacereqentry](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#interfacereqentry) | The function type carried in an `interface_req_entry` uses `this_type(%I)` for the receiver parameter. | `interface-req-this-type.slang` |
-| C-17 | [#interfacereqentry](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#interfacereqentry) | An interface declaration appears as `let %I : Type = interface(%req, ...)` whose operands are the `interface_req_entry` value-ids. | `interface-lists-req-entries.slang` |
-| C-18 | [#generic-application](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#generic-application) | A module-scope `type_param T;` declaration lowers to `let %T : Type = global_generic_param`. | `global-generic-param.slang` |
+| C-01 | [#specialize](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#specialize) | A call to a generic function with concrete type argument lowers to `call specialize(%generic, T)(%args)`. | [`specialize-generic-function.slang`](specialize-generic-function.slang) |
+| C-02 | [#generic-application](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#generic-application) | A reference to a generic struct instantiated at a concrete type produces a `specialize(%type, T)` type-level value. | [`specialize-generic-type.slang`](specialize-generic-type.slang) |
+| C-03 | [#specialize](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#specialize) | When a generic carries an interface constraint, the `specialize` call passes the type argument followed by the conforming witness table. | [`specialize-with-witness-arg.slang`](specialize-with-witness-arg.slang) |
+| C-04 | [#specialize](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#specialize) | The `specialize` opcode is hoistable: a single textually-spelled `specialize(%base, args)` site appears in the dump at most once per (base, args) tuple. | [`specialize-hoistable.slang`](specialize-hoistable.slang) |
+| C-05 | [#lookupwitness-lookupwitnessmethod](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#lookupwitness-lookupwitnessmethod) | A method call on a generic-constrained value lowers to `lookupWitness(%witness, %requirementKey)` whose two operands are `(witnessTable, requirementKey)`. | [`lookup-witness-operands.slang`](lookup-witness-operands.slang) |
+| C-06 | [#witness-lookup](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#witness-lookup) | The result type of `lookupWitness` is the requirement's function type — for `int run(int x)` the result is `Func(Int, %T, Int)`. | [`lookup-witness-result-type.slang`](lookup-witness-result-type.slang) |
+| C-07 | [#makeexistential](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#makeexistential) | Casting a concrete value `a : A` to an interface variable `IFoo i = a` produces `makeExistential(%a, %witnessA_IFoo)` — the two operands are `(value, witness)`. | [`make-existential-operands.slang`](make-existential-operands.slang) |
+| C-08 | [#makeexistential](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#makeexistential) | The result type of `makeExistential` is the target interface type — `let %i : %IFoo = makeExistential(...)`. | [`make-existential-result-type.slang`](make-existential-result-type.slang) |
+| C-09 | [#existential-destructuring](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#existential-destructuring) | Dispatching through an interface-typed value produces `extractExistentialType(%i)` whose result type is `Type`. | [`extract-existential-type.slang`](extract-existential-type.slang) |
+| C-10 | [#existential-destructuring](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#existential-destructuring) | Dispatching through an interface-typed value produces `extractExistentialValue(%i)` reading the packed concrete-typed value. | [`extract-existential-value.slang`](extract-existential-value.slang) |
+| C-11 | [#existential-destructuring](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#existential-destructuring) | Dispatching through an interface-typed value produces `extractExistentialWitnessTable(%i)` whose result type is `witness_table_t(%I)`. | [`extract-existential-witness-table.slang`](extract-existential-witness-table.slang) |
+| C-12 | [#existential-destructuring](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#existential-destructuring) | Interface dispatch on an existential follows the sequence `extractExistentialType` → `extractExistentialValue` + `extractExistentialWitnessTable` → `lookupWitness` → `call`, all four opcodes appearing in order in the same dispatch site. | [`existential-dispatch-sequence.slang`](existential-dispatch-sequence.slang) |
+| C-13 | [#witness-tables-and-witness-facts](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#witness-tables-and-witness-facts) | A `struct S : I` emits a `witness_table %N : witness_table_t(%I)(%S)` whose type's parenthesised pair is `(interface, implementing-type)`. | [`witness-table-type-shape.slang`](witness-table-type-shape.slang) |
+| C-14 | [#witnesstable-and-witnesstableentry](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#witnesstable-and-witnesstableentry) | Each row inside a `witness_table` body is `witness_table_entry(%Ix5Freq, %Sx5Freq)` — first operand is the requirement key, second is the satisfying value. | [`witness-table-entry-operands.slang`](witness-table-entry-operands.slang) |
+| C-15 | [#interfacereqentry](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#interfacereqentry) | `interface I { int run(int x); }` emits `interface_req_entry(%Ix5Frun, Func(Int, this_type(%I), Int))` — first operand is the requirement key, second is the requirement's function type. | [`interface-req-entry-operands.slang`](interface-req-entry-operands.slang) |
+| C-16 | [#interfacereqentry](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#interfacereqentry) | The function type carried in an `interface_req_entry` uses `this_type(%I)` for the receiver parameter. | [`interface-req-this-type.slang`](interface-req-this-type.slang) |
+| C-17 | [#interfacereqentry](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#interfacereqentry) | An interface declaration appears as `let %I : Type = interface(%req, ...)` whose operands are the `interface_req_entry` value-ids. | [`interface-lists-req-entries.slang`](interface-lists-req-entries.slang) |
+| C-18 | [#generic-application](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#generic-application) | A module-scope `type_param T;` declaration lowers to `let %T : Type = global_generic_param`. | [`global-generic-param.slang`](global-generic-param.slang) |
 
 ## Tests in this bundle
 
 | File | Intent | Doc anchor |
 | --- | --- | --- |
-| `specialize-generic-function.slang` | functional | `#specialize` |
-| `specialize-generic-type.slang` | functional | `#generic-application` |
-| `specialize-with-witness-arg.slang` | functional | `#specialize` |
-| `specialize-hoistable.slang` | functional | `#specialize` |
-| `lookup-witness-operands.slang` | functional | `#lookupwitness-lookupwitnessmethod` |
-| `lookup-witness-result-type.slang` | functional | `#witness-lookup` |
-| `make-existential-operands.slang` | functional | `#makeexistential` |
-| `make-existential-result-type.slang` | functional | `#makeexistential` |
-| `extract-existential-type.slang` | functional | `#existential-destructuring` |
-| `extract-existential-value.slang` | functional | `#existential-destructuring` |
-| `extract-existential-witness-table.slang` | functional | `#existential-destructuring` |
-| `existential-dispatch-sequence.slang` | functional | `#existential-destructuring` |
-| `witness-table-type-shape.slang` | functional | `#witness-tables-and-witness-facts` |
-| `witness-table-entry-operands.slang` | functional | `#witnesstable-and-witnesstableentry` |
-| `interface-req-entry-operands.slang` | functional | `#interfacereqentry` |
-| `interface-req-this-type.slang` | functional | `#interfacereqentry` |
-| `interface-lists-req-entries.slang` | functional | `#interfacereqentry` |
-| `global-generic-param.slang` | functional | `#generic-application` |
-| `specialize-two-type-params.slang` | boundary | `#specialize` |
-| `specialize-four-type-params.slang` | boundary | `#specialize` |
-| `specialize-value-param.slang` | boundary | `#specialize` |
-| `specialize-no-constraint.slang` | boundary | `#specialize` |
-| `specialize-multi-constraint.slang` | boundary | `#specialize` |
-| `global-generic-param-with-constraint.slang` | boundary | `#generic-application` |
-| `empty-interface-witness-table.slang` | boundary | `#witness-tables-and-witness-facts` |
-| `empty-interface-no-req-entries.slang` | boundary | `#interfacereqentry` |
-| `witness-table-three-method-rows.slang` | boundary | `#witnesstable-and-witnesstableentry` |
-| `interface-three-req-entries.slang` | boundary | `#interfacereqentry` |
-| `lookup-witness-multi-method-dispatch.slang` | boundary | `#lookupwitness-lookupwitnessmethod` |
-| `make-existential-vector-payload.slang` | boundary | `#makeexistential` |
-| `make-existential-struct-payload.slang` | boundary | `#makeexistential` |
-| `recursive-generic-depth-two.slang` | boundary | `#generic-application` |
-| `stress-eight-type-params.slang` | stress | `#specialize` |
-| `stress-recursive-generic-depth-five.slang` | stress | `#generic-application` |
-| `stress-many-specialize-call-sites.slang` | stress | `#specialize` |
-| `stress-specialize-with-existential-payload.slang` | stress | `#specialize` |
-| `negative-constraint-not-satisfied.slang` | negative | `#specialize` |
-| `negative-zero-type-args-no-inference.slang` | negative | `#specialize` |
-| `negative-undefined-type-arg.slang` | negative | `#specialize` |
+| [`specialize-generic-function.slang`](specialize-generic-function.slang) | functional | `#specialize` |
+| [`specialize-generic-type.slang`](specialize-generic-type.slang) | functional | `#generic-application` |
+| [`specialize-with-witness-arg.slang`](specialize-with-witness-arg.slang) | functional | `#specialize` |
+| [`specialize-hoistable.slang`](specialize-hoistable.slang) | functional | `#specialize` |
+| [`lookup-witness-operands.slang`](lookup-witness-operands.slang) | functional | `#lookupwitness-lookupwitnessmethod` |
+| [`lookup-witness-result-type.slang`](lookup-witness-result-type.slang) | functional | `#witness-lookup` |
+| [`make-existential-operands.slang`](make-existential-operands.slang) | functional | `#makeexistential` |
+| [`make-existential-result-type.slang`](make-existential-result-type.slang) | functional | `#makeexistential` |
+| [`extract-existential-type.slang`](extract-existential-type.slang) | functional | `#existential-destructuring` |
+| [`extract-existential-value.slang`](extract-existential-value.slang) | functional | `#existential-destructuring` |
+| [`extract-existential-witness-table.slang`](extract-existential-witness-table.slang) | functional | `#existential-destructuring` |
+| [`existential-dispatch-sequence.slang`](existential-dispatch-sequence.slang) | functional | `#existential-destructuring` |
+| [`witness-table-type-shape.slang`](witness-table-type-shape.slang) | functional | `#witness-tables-and-witness-facts` |
+| [`witness-table-entry-operands.slang`](witness-table-entry-operands.slang) | functional | `#witnesstable-and-witnesstableentry` |
+| [`interface-req-entry-operands.slang`](interface-req-entry-operands.slang) | functional | `#interfacereqentry` |
+| [`interface-req-this-type.slang`](interface-req-this-type.slang) | functional | `#interfacereqentry` |
+| [`interface-lists-req-entries.slang`](interface-lists-req-entries.slang) | functional | `#interfacereqentry` |
+| [`global-generic-param.slang`](global-generic-param.slang) | functional | `#generic-application` |
+| [`specialize-two-type-params.slang`](specialize-two-type-params.slang) | boundary | `#specialize` |
+| [`specialize-four-type-params.slang`](specialize-four-type-params.slang) | boundary | `#specialize` |
+| [`specialize-value-param.slang`](specialize-value-param.slang) | boundary | `#specialize` |
+| [`specialize-no-constraint.slang`](specialize-no-constraint.slang) | boundary | `#specialize` |
+| [`specialize-multi-constraint.slang`](specialize-multi-constraint.slang) | boundary | `#specialize` |
+| [`global-generic-param-with-constraint.slang`](global-generic-param-with-constraint.slang) | boundary | `#generic-application` |
+| [`empty-interface-witness-table.slang`](empty-interface-witness-table.slang) | boundary | `#witness-tables-and-witness-facts` |
+| [`empty-interface-no-req-entries.slang`](empty-interface-no-req-entries.slang) | boundary | `#interfacereqentry` |
+| [`witness-table-three-method-rows.slang`](witness-table-three-method-rows.slang) | boundary | `#witnesstable-and-witnesstableentry` |
+| [`interface-three-req-entries.slang`](interface-three-req-entries.slang) | boundary | `#interfacereqentry` |
+| [`lookup-witness-multi-method-dispatch.slang`](lookup-witness-multi-method-dispatch.slang) | boundary | `#lookupwitness-lookupwitnessmethod` |
+| [`make-existential-vector-payload.slang`](make-existential-vector-payload.slang) | boundary | `#makeexistential` |
+| [`make-existential-struct-payload.slang`](make-existential-struct-payload.slang) | boundary | `#makeexistential` |
+| [`recursive-generic-depth-two.slang`](recursive-generic-depth-two.slang) | boundary | `#generic-application` |
+| [`stress-eight-type-params.slang`](stress-eight-type-params.slang) | stress | `#specialize` |
+| [`stress-recursive-generic-depth-five.slang`](stress-recursive-generic-depth-five.slang) | stress | `#generic-application` |
+| [`stress-many-specialize-call-sites.slang`](stress-many-specialize-call-sites.slang) | stress | `#specialize` |
+| [`stress-specialize-with-existential-payload.slang`](stress-specialize-with-existential-payload.slang) | stress | `#specialize` |
+| [`negative-constraint-not-satisfied.slang`](negative-constraint-not-satisfied.slang) | negative | `#specialize` |
+| [`negative-zero-type-args-no-inference.slang`](negative-zero-type-args-no-inference.slang) | negative | `#specialize` |
+| [`negative-undefined-type-arg.slang`](negative-undefined-type-arg.slang) | negative | `#specialize` |
 
 ## Out of scope (no-GPU runner)
 

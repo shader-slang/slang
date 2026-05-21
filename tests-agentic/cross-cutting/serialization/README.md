@@ -34,29 +34,29 @@ small by design (8 tests).
 
 | Claim ID | Anchor                                       | Claim (one line)                                                                                                       | Tests                                                       |
 | -------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| C-01     | `#what-is-serialized`                        | A `.slang-module` written by slangc can be re-read and its IR dumped, demonstrating the AST/IR/container round-trip.   | `module-round-trip-dump.slang`                              |
-| C-02     | `#what-is-serialized`                        | AST serialization preserves the checked AST of a public symbol — its mangled export name and signature survive.        | `module-roundtrip-preserves-public-symbol.slang`            |
-| C-03     | `#versioning-and-backwards-compatibility`    | A serialized module carries its module name and module-version integer; `-get-module-info` reads them back.            | `module-info-name-version.slang`                            |
-| C-04     | `#versioning-and-backwards-compatibility`    | The compiler exposes the inclusive `[min, max]` range of module versions it accepts via `-get-supported-module-versions`. | `supported-module-versions.slang`                           |
-| C-05     | `#versioning-and-backwards-compatibility`    | Every module written by this build stamps a positive integer version (the version-gate plumbing always writes a value). | `module-version-in-range.slang`                             |
-| C-06     | `#riff-container-format`                     | With `-embed-downstream-ir`, the container gains a downstream-IR chunk surfacing as `EmbeddedDownstreamIR(...)` under `-dump-module`. | `embed-downstream-ir-spirv.slang`                           |
-| C-07     | `#riff-container-format`                     | Without `-embed-downstream-ir`, the container omits the downstream-IR chunk and no `EmbeddedDownstreamIR` marker appears. | `no-embed-downstream-ir-absent.slang`                       |
-| C-08     | `#source-location-serialization`             | Source locations survive compilation to text as `#line` directives on C-family targets and `OpSource` on SPIR-V.       | `source-loc-line-directives-multi-target.slang`             |
-| C-09     | `#source-location-serialization`             | When `-g2` is set, the SPIR-V debug-info stream carries an `OpString` naming the source file.                          | `source-loc-spirv-debug.slang`                              |
+| C-01     | `#what-is-serialized`                        | A `.slang-module` written by slangc can be re-read and its IR dumped, demonstrating the AST/IR/container round-trip.   | [`module-round-trip-dump.slang`](module-round-trip-dump.slang)                              |
+| C-02     | `#what-is-serialized`                        | AST serialization preserves the checked AST of a public symbol — its mangled export name and signature survive.        | [`module-roundtrip-preserves-public-symbol.slang`](module-roundtrip-preserves-public-symbol.slang)            |
+| C-03     | `#versioning-and-backwards-compatibility`    | A serialized module carries its module name and module-version integer; `-get-module-info` reads them back.            | [`module-info-name-version.slang`](module-info-name-version.slang)                            |
+| C-04     | `#versioning-and-backwards-compatibility`    | The compiler exposes the inclusive `[min, max]` range of module versions it accepts via `-get-supported-module-versions`. | [`supported-module-versions.slang`](supported-module-versions.slang)                           |
+| C-05     | `#versioning-and-backwards-compatibility`    | Every module written by this build stamps a positive integer version (the version-gate plumbing always writes a value). | [`module-version-in-range.slang`](module-version-in-range.slang)                             |
+| C-06     | `#riff-container-format`                     | With `-embed-downstream-ir`, the container gains a downstream-IR chunk surfacing as `EmbeddedDownstreamIR(...)` under `-dump-module`. | [`embed-downstream-ir-spirv.slang`](embed-downstream-ir-spirv.slang)                           |
+| C-07     | `#riff-container-format`                     | Without `-embed-downstream-ir`, the container omits the downstream-IR chunk and no `EmbeddedDownstreamIR` marker appears. | [`no-embed-downstream-ir-absent.slang`](no-embed-downstream-ir-absent.slang)                       |
+| C-08     | `#source-location-serialization`             | Source locations survive compilation to text as `#line` directives on C-family targets and `OpSource` on SPIR-V.       | [`source-loc-line-directives-multi-target.slang`](source-loc-line-directives-multi-target.slang)             |
+| C-09     | `#source-location-serialization`             | When `-g2` is set, the SPIR-V debug-info stream carries an `OpString` naming the source file.                          | [`source-loc-spirv-debug.slang`](source-loc-spirv-debug.slang)                              |
 
 ## Tests in this bundle
 
 | File                                              | Intent     | Doc anchor                                |
 | ------------------------------------------------- | ---------- | ----------------------------------------- |
-| `embed-downstream-ir-spirv.slang`                 | functional | `#riff-container-format`                  |
-| `module-info-name-version.slang`                  | functional | `#versioning-and-backwards-compatibility` |
-| `module-round-trip-dump.slang`                    | functional | `#what-is-serialized`                     |
-| `module-roundtrip-preserves-public-symbol.slang`  | functional | `#what-is-serialized`                     |
-| `module-version-in-range.slang`                   | functional | `#versioning-and-backwards-compatibility` |
-| `no-embed-downstream-ir-absent.slang`             | regression | `#riff-container-format`                  |
-| `source-loc-line-directives-multi-target.slang`   | functional | `#source-location-serialization`          |
-| `source-loc-spirv-debug.slang`                    | functional | `#source-location-serialization`          |
-| `supported-module-versions.slang`                 | functional | `#versioning-and-backwards-compatibility` |
+| [`embed-downstream-ir-spirv.slang`](embed-downstream-ir-spirv.slang)                 | functional | `#riff-container-format`                  |
+| [`module-info-name-version.slang`](module-info-name-version.slang)                  | functional | `#versioning-and-backwards-compatibility` |
+| [`module-round-trip-dump.slang`](module-round-trip-dump.slang)                    | functional | `#what-is-serialized`                     |
+| [`module-roundtrip-preserves-public-symbol.slang`](module-roundtrip-preserves-public-symbol.slang)  | functional | `#what-is-serialized`                     |
+| [`module-version-in-range.slang`](module-version-in-range.slang)                   | functional | `#versioning-and-backwards-compatibility` |
+| [`no-embed-downstream-ir-absent.slang`](no-embed-downstream-ir-absent.slang)             | regression | `#riff-container-format`                  |
+| [`source-loc-line-directives-multi-target.slang`](source-loc-line-directives-multi-target.slang)   | functional | `#source-location-serialization`          |
+| [`source-loc-spirv-debug.slang`](source-loc-spirv-debug.slang)                    | functional | `#source-location-serialization`          |
+| [`supported-module-versions.slang`](supported-module-versions.slang)                 | functional | `#versioning-and-backwards-compatibility` |
 
 ## Doc gaps observed
 

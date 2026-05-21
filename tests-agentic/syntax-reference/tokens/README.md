@@ -29,54 +29,54 @@ rest of the suite is bootstrapped.
 
 | Claim ID | Anchor                                                                                                                   | Claim (one line)                                                               | Tests                                |
 | -------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ | ------------------------------------ |
-| C-01     | [#content-tokens](../../../docs/llm-generated/syntax-reference/tokens.md#content-tokens)                                 | Integer literal suffixes (e.g. `u`) are part of the token and decide its type. | `numeric-suffix-u-is-uint.slang`     |
-| C-02     | [#content-tokens](../../../docs/llm-generated/syntax-reference/tokens.md#content-tokens)                                 | Floating-point literal suffixes (e.g. `f`) are part of the token.              | `numeric-suffix-f-is-float.slang`    |
-| C-03     | [#content-tokens](../../../docs/llm-generated/syntax-reference/tokens.md#content-tokens)                                 | Single-quoted character literals are tokenized as `CharLiteral`.               | `char-literal-value.slang`           |
-| C-04     | [#content-tokens](../../../docs/llm-generated/syntax-reference/tokens.md#content-tokens)                                 | Double-quoted string literals are recognized and usable.                       | `string-literal-basic.slang`         |
-| C-05     | [#special-case-lexing-rules](../../../docs/llm-generated/syntax-reference/tokens.md#special-case-lexing-rules)           | Raw string literals do not perform escape processing.                          | `raw-string-no-escape.slang`         |
-| C-06     | [#trivia-whitespace-and-comments](../../../docs/llm-generated/syntax-reference/tokens.md#trivia-whitespace-and-comments) | `//` line comments end at the end of the physical line.                        | `line-comment-ends-at-newline.slang` |
-| C-07     | [#trivia-whitespace-and-comments](../../../docs/llm-generated/syntax-reference/tokens.md#trivia-whitespace-and-comments) | `/* ... */` block comments are removed from the token stream.                  | `block-comment-removed.slang`        |
-| C-08     | [#special-case-lexing-rules](../../../docs/llm-generated/syntax-reference/tokens.md#special-case-lexing-rules)           | Block comments do not nest; an outer `/* ... */` ends at the first `*/`.       | `block-comment-no-nesting.slang`     |
-| C-09     | [#special-case-lexing-rules](../../../docs/llm-generated/syntax-reference/tokens.md#special-case-lexing-rules)           | A backslash immediately before a newline is consumed and folded out.           | `backslash-line-continuation.slang`  |
+| C-01     | [#content-tokens](../../../docs/llm-generated/syntax-reference/tokens.md#content-tokens)                                 | Integer literal suffixes (e.g. `u`) are part of the token and decide its type. | [`numeric-suffix-u-is-uint.slang`](numeric-suffix-u-is-uint.slang)     |
+| C-02     | [#content-tokens](../../../docs/llm-generated/syntax-reference/tokens.md#content-tokens)                                 | Floating-point literal suffixes (e.g. `f`) are part of the token.              | [`numeric-suffix-f-is-float.slang`](numeric-suffix-f-is-float.slang)    |
+| C-03     | [#content-tokens](../../../docs/llm-generated/syntax-reference/tokens.md#content-tokens)                                 | Single-quoted character literals are tokenized as `CharLiteral`.               | [`char-literal-value.slang`](char-literal-value.slang)           |
+| C-04     | [#content-tokens](../../../docs/llm-generated/syntax-reference/tokens.md#content-tokens)                                 | Double-quoted string literals are recognized and usable.                       | [`string-literal-basic.slang`](string-literal-basic.slang)         |
+| C-05     | [#special-case-lexing-rules](../../../docs/llm-generated/syntax-reference/tokens.md#special-case-lexing-rules)           | Raw string literals do not perform escape processing.                          | [`raw-string-no-escape.slang`](raw-string-no-escape.slang)         |
+| C-06     | [#trivia-whitespace-and-comments](../../../docs/llm-generated/syntax-reference/tokens.md#trivia-whitespace-and-comments) | `//` line comments end at the end of the physical line.                        | [`line-comment-ends-at-newline.slang`](line-comment-ends-at-newline.slang) |
+| C-07     | [#trivia-whitespace-and-comments](../../../docs/llm-generated/syntax-reference/tokens.md#trivia-whitespace-and-comments) | `/* ... */` block comments are removed from the token stream.                  | [`block-comment-removed.slang`](block-comment-removed.slang)        |
+| C-08     | [#special-case-lexing-rules](../../../docs/llm-generated/syntax-reference/tokens.md#special-case-lexing-rules)           | Block comments do not nest; an outer `/* ... */` ends at the first `*/`.       | [`block-comment-no-nesting.slang`](block-comment-no-nesting.slang)     |
+| C-09     | [#special-case-lexing-rules](../../../docs/llm-generated/syntax-reference/tokens.md#special-case-lexing-rules)           | A backslash immediately before a newline is consumed and folded out.           | [`backslash-line-continuation.slang`](backslash-line-continuation.slang)  |
 
 ## Tests in this bundle
 
 | File                                 | Intent     | Doc anchor                        |
 | ------------------------------------ | ---------- | --------------------------------- |
-| `numeric-suffix-u-is-uint.slang`     | functional | `#content-tokens`                 |
-| `numeric-suffix-f-is-float.slang`    | functional | `#content-tokens`                 |
-| `char-literal-value.slang`           | functional | `#content-tokens`                 |
-| `string-literal-basic.slang`         | functional | `#content-tokens`                 |
-| `raw-string-no-escape.slang`         | functional | `#special-case-lexing-rules`      |
-| `line-comment-ends-at-newline.slang` | functional | `#trivia-whitespace-and-comments` |
-| `block-comment-removed.slang`        | functional | `#trivia-whitespace-and-comments` |
-| `block-comment-no-nesting.slang`     | functional | `#special-case-lexing-rules`      |
-| `backslash-line-continuation.slang`  | functional | `#special-case-lexing-rules`      |
-| `int-literal-zero.slang`                 | boundary | `#content-tokens`                 |
-| `int-literal-int32-max.slang`            | boundary | `#content-tokens`                 |
-| `int-literal-hex-base.slang`             | boundary | `#content-tokens`                 |
-| `int-literal-octal-base.slang`           | boundary | `#content-tokens`                 |
-| `int-literal-binary-base.slang`          | boundary | `#content-tokens`                 |
-| `int-literal-hex-promotes-to-64bit.slang`| boundary | `#content-tokens`                 |
-| `numeric-suffix-ll-is-int64.slang`       | boundary | `#content-tokens`                 |
-| `numeric-suffix-ull-is-uint64.slang`     | boundary | `#content-tokens`                 |
-| `numeric-suffix-h-is-half.slang`         | boundary | `#content-tokens`                 |
-| `numeric-suffix-lf-is-double.slang`      | boundary | `#content-tokens`                 |
-| `float-literal-hex-form.slang`           | boundary | `#content-tokens`                 |
-| `float-literal-leading-dot.slang`        | boundary | `#content-tokens`                 |
-| `float-literal-exponent-form.slang`      | boundary | `#content-tokens`                 |
-| `string-literal-empty.slang`             | boundary | `#content-tokens`                 |
-| `string-literal-escape-sequences.slang`  | boundary | `#content-tokens`                 |
-| `raw-string-empty-delimiter.slang`       | boundary | `#special-case-lexing-rules`      |
-| `raw-string-multi-char-delimiter.slang`  | boundary | `#special-case-lexing-rules`      |
-| `char-literal-null.slang`                | boundary | `#content-tokens`                 |
-| `char-literal-escape-backslash.slang`    | boundary | `#content-tokens`                 |
-| `block-comment-empty.slang`              | boundary | `#trivia-whitespace-and-comments` |
-| `line-comment-backslash-extends.slang`   | boundary | `#special-case-lexing-rules`      |
-| `block-comment-multi-fake-nest.slang`    | stress   | `#special-case-lexing-rules`      |
-| `negative-integer-literal-too-large.slang` | negative | `#content-tokens`               |
-| `negative-invalid-int-suffix.slang`      | negative | `#content-tokens`                 |
-| `negative-multi-char-literal.slang`      | negative | `#content-tokens`                 |
+| [`numeric-suffix-u-is-uint.slang`](numeric-suffix-u-is-uint.slang)     | functional | `#content-tokens`                 |
+| [`numeric-suffix-f-is-float.slang`](numeric-suffix-f-is-float.slang)    | functional | `#content-tokens`                 |
+| [`char-literal-value.slang`](char-literal-value.slang)           | functional | `#content-tokens`                 |
+| [`string-literal-basic.slang`](string-literal-basic.slang)         | functional | `#content-tokens`                 |
+| [`raw-string-no-escape.slang`](raw-string-no-escape.slang)         | functional | `#special-case-lexing-rules`      |
+| [`line-comment-ends-at-newline.slang`](line-comment-ends-at-newline.slang) | functional | `#trivia-whitespace-and-comments` |
+| [`block-comment-removed.slang`](block-comment-removed.slang)        | functional | `#trivia-whitespace-and-comments` |
+| [`block-comment-no-nesting.slang`](block-comment-no-nesting.slang)     | functional | `#special-case-lexing-rules`      |
+| [`backslash-line-continuation.slang`](backslash-line-continuation.slang)  | functional | `#special-case-lexing-rules`      |
+| [`int-literal-zero.slang`](int-literal-zero.slang)                 | boundary | `#content-tokens`                 |
+| [`int-literal-int32-max.slang`](int-literal-int32-max.slang)            | boundary | `#content-tokens`                 |
+| [`int-literal-hex-base.slang`](int-literal-hex-base.slang)             | boundary | `#content-tokens`                 |
+| [`int-literal-octal-base.slang`](int-literal-octal-base.slang)           | boundary | `#content-tokens`                 |
+| [`int-literal-binary-base.slang`](int-literal-binary-base.slang)          | boundary | `#content-tokens`                 |
+| [`int-literal-hex-promotes-to-64bit.slang`](int-literal-hex-promotes-to-64bit.slang)| boundary | `#content-tokens`                 |
+| [`numeric-suffix-ll-is-int64.slang`](numeric-suffix-ll-is-int64.slang)       | boundary | `#content-tokens`                 |
+| [`numeric-suffix-ull-is-uint64.slang`](numeric-suffix-ull-is-uint64.slang)     | boundary | `#content-tokens`                 |
+| [`numeric-suffix-h-is-half.slang`](numeric-suffix-h-is-half.slang)         | boundary | `#content-tokens`                 |
+| [`numeric-suffix-lf-is-double.slang`](numeric-suffix-lf-is-double.slang)      | boundary | `#content-tokens`                 |
+| [`float-literal-hex-form.slang`](float-literal-hex-form.slang)           | boundary | `#content-tokens`                 |
+| [`float-literal-leading-dot.slang`](float-literal-leading-dot.slang)        | boundary | `#content-tokens`                 |
+| [`float-literal-exponent-form.slang`](float-literal-exponent-form.slang)      | boundary | `#content-tokens`                 |
+| [`string-literal-empty.slang`](string-literal-empty.slang)             | boundary | `#content-tokens`                 |
+| [`string-literal-escape-sequences.slang`](string-literal-escape-sequences.slang)  | boundary | `#content-tokens`                 |
+| [`raw-string-empty-delimiter.slang`](raw-string-empty-delimiter.slang)       | boundary | `#special-case-lexing-rules`      |
+| [`raw-string-multi-char-delimiter.slang`](raw-string-multi-char-delimiter.slang)  | boundary | `#special-case-lexing-rules`      |
+| [`char-literal-null.slang`](char-literal-null.slang)                | boundary | `#content-tokens`                 |
+| [`char-literal-escape-backslash.slang`](char-literal-escape-backslash.slang)    | boundary | `#content-tokens`                 |
+| [`block-comment-empty.slang`](block-comment-empty.slang)              | boundary | `#trivia-whitespace-and-comments` |
+| [`line-comment-backslash-extends.slang`](line-comment-backslash-extends.slang)   | boundary | `#special-case-lexing-rules`      |
+| [`block-comment-multi-fake-nest.slang`](block-comment-multi-fake-nest.slang)    | stress   | `#special-case-lexing-rules`      |
+| [`negative-integer-literal-too-large.slang`](negative-integer-literal-too-large.slang) | negative | `#content-tokens`               |
+| [`negative-invalid-int-suffix.slang`](negative-invalid-int-suffix.slang)      | negative | `#content-tokens`                 |
+| [`negative-multi-char-literal.slang`](negative-multi-char-literal.slang)      | negative | `#content-tokens`                 |
 
 ## Boundary / negative / stress probes (expansion pass)
 

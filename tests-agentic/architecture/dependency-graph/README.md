@@ -52,21 +52,21 @@ The slangc-observable consequences that *are* tested are:
 
 | Claim ID | Anchor                                                                                                                                            | Claim (one line)                                                                                                                                       | Tests                                |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
-| C-01     | [#notable-invariants](../../../docs/llm-generated/architecture/dependency-graph.md#notable-invariants)                                            | The default build links the core module into `slang` (`SLANG_EMBED_CORE_MODULE`); built-in vector types resolve without `import`.                      | `core-module-embedded-default.slang` |
-| C-02     | [#notable-invariants](../../../docs/llm-generated/architecture/dependency-graph.md#notable-invariants)                                            | `source/slang/` is the only target carrying AST/IR/emit; `slangc` links against `slang` and exposes that pipeline at the CLI.                          | `slangc-driver-emits-text.slang`     |
-| C-03     | [#edges-intra-project-only](../../../docs/llm-generated/architecture/dependency-graph.md#edges-intra-project-only)                                | The `slang → prelude` private-include edge ships per-target prelude headers; CUDA emit literally `#include`s `slang-cuda-prelude.h`.                   | `cuda-prelude-include.slang`         |
-| C-03     | [#edges-intra-project-only](../../../docs/llm-generated/architecture/dependency-graph.md#edges-intra-project-only)                                | The `slang → prelude` private-include edge ships per-target prelude headers; CPP emit literally `#include`s `slang-cpp-prelude.h`.                     | `cpp-prelude-include.slang`          |
-| C-04     | [#edges-intra-project-only](../../../docs/llm-generated/architecture/dependency-graph.md#edges-intra-project-only)                                | The `glslModule → coreLib` edge plus `slangLib → coreModule` linkage make the GLSL module reachable; `import glsl;` resolves with no extra paths.      | `glsl-module-via-slang-lib.slang`    |
+| C-01     | [#notable-invariants](../../../docs/llm-generated/architecture/dependency-graph.md#notable-invariants)                                            | The default build links the core module into `slang` (`SLANG_EMBED_CORE_MODULE`); built-in vector types resolve without `import`.                      | [`core-module-embedded-default.slang`](core-module-embedded-default.slang) |
+| C-02     | [#notable-invariants](../../../docs/llm-generated/architecture/dependency-graph.md#notable-invariants)                                            | `source/slang/` is the only target carrying AST/IR/emit; `slangc` links against `slang` and exposes that pipeline at the CLI.                          | [`slangc-driver-emits-text.slang`](slangc-driver-emits-text.slang)     |
+| C-03     | [#edges-intra-project-only](../../../docs/llm-generated/architecture/dependency-graph.md#edges-intra-project-only)                                | The `slang → prelude` private-include edge ships per-target prelude headers; CUDA emit literally `#include`s `slang-cuda-prelude.h`.                   | [`cuda-prelude-include.slang`](cuda-prelude-include.slang)         |
+| C-03     | [#edges-intra-project-only](../../../docs/llm-generated/architecture/dependency-graph.md#edges-intra-project-only)                                | The `slang → prelude` private-include edge ships per-target prelude headers; CPP emit literally `#include`s `slang-cpp-prelude.h`.                     | [`cpp-prelude-include.slang`](cpp-prelude-include.slang)          |
+| C-04     | [#edges-intra-project-only](../../../docs/llm-generated/architecture/dependency-graph.md#edges-intra-project-only)                                | The `glslModule → coreLib` edge plus `slangLib → coreModule` linkage make the GLSL module reachable; `import glsl;` resolves with no extra paths.      | [`glsl-module-via-slang-lib.slang`](glsl-module-via-slang-lib.slang)    |
 
 ## Tests in this bundle
 
 | File                                   | Intent     | Doc anchor                  |
 | -------------------------------------- | ---------- | --------------------------- |
-| `core-module-embedded-default.slang`   | functional | `#notable-invariants`       |
-| `slangc-driver-emits-text.slang`       | functional | `#notable-invariants`       |
-| `cuda-prelude-include.slang`           | functional | `#edges-intra-project-only` |
-| `cpp-prelude-include.slang`            | functional | `#edges-intra-project-only` |
-| `glsl-module-via-slang-lib.slang`      | functional | `#edges-intra-project-only` |
+| [`core-module-embedded-default.slang`](core-module-embedded-default.slang)   | functional | `#notable-invariants`       |
+| [`slangc-driver-emits-text.slang`](slangc-driver-emits-text.slang)       | functional | `#notable-invariants`       |
+| [`cuda-prelude-include.slang`](cuda-prelude-include.slang)           | functional | `#edges-intra-project-only` |
+| [`cpp-prelude-include.slang`](cpp-prelude-include.slang)            | functional | `#edges-intra-project-only` |
+| [`glsl-module-via-slang-lib.slang`](glsl-module-via-slang-lib.slang)      | functional | `#edges-intra-project-only` |
 
 ## Doc gaps observed
 

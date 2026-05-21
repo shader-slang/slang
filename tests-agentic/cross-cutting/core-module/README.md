@@ -43,113 +43,113 @@ module-identity (typedef resolves, `Optional<T>` compiles).
 
 | Claim ID | Anchor                          | Claim (one line)                                                                                  | Tests                                                  |
 | -------- | ------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| C-01     | `#what-the-core-module-provides`| `int32_t` typedef resolves without explicit import and lowers to 32-bit signed int per target.    | `core-typedef-int32-resolves.slang`                    |
-| C-02     | `#what-the-core-module-provides`| `uint32_t` typedef resolves and lowers to 32-bit unsigned int per target.                         | `core-typedef-uint32-resolves.slang`                   |
-| C-03     | `#what-the-core-module-provides`| `float32_t` typedef resolves and lowers to a 32-bit float per target.                             | `core-typedef-float32-resolves.slang`                  |
-| C-04     | `#what-the-core-module-provides`| `float64_t` typedef resolves and lowers to a 64-bit float on HLSL and CUDA.                       | `core-typedef-float64-resolves.slang`                  |
-| C-05     | `#what-the-core-module-provides`| Core vector and matrix types (`float3`, `float3x3`) lower to per-target spellings.                | `core-vector-matrix-types-lower.slang`                 |
-| C-06     | `#what-the-core-module-provides`| `Optional<T>` is a core-module type usable without explicit import.                                | `core-optional-type-usable.slang`                      |
-| C-07     | `#core-module`                  | HLSL meta-module's `dot` intrinsic lowers per target (`dot` / `dot` / `OpDot`).                   | `hlsl-intrinsic-dot-lowers-per-target.slang`           |
-| C-08     | `#core-module`                  | HLSL meta-module's `length` intrinsic lowers per target (`length` / `length` / `Length`).         | `hlsl-intrinsic-length-lowers-per-target.slang`        |
-| C-09     | `#core-module`                  | HLSL meta-module's `mul(matrix, vector)` lowers per target (`mul` / `*` / `OpVectorTimesMatrix`). | `hlsl-intrinsic-mul-matrix-lowers-per-target.slang`    |
-| C-10     | `#core-module`                  | HLSL meta-module's `RWStructuredBuffer<T>` lowers to per-target binding shapes.                   | `hlsl-resource-rwstructuredbuffer-lowers-per-target.slang` |
-| C-11     | `#core-module`                  | HLSL meta-module's `Texture2D` lowers per target (HLSL keeps name, GLSL/SPIR-V emit image type).  | `hlsl-resource-texture2d-lowers-per-target.slang`      |
-| C-12     | `#core-module`                  | Diff meta-module declares `IDifferentiable`; a conforming struct is accepted by the front-end.    | `diff-idifferentiable-frontend-accepts.slang`          |
-| C-13     | `#glsl-module`                  | GLSL module supplies `vec3` alias when loaded via `-allow-glsl`; lowers to per-target spellings.  | `glsl-module-vec3-alias.slang`                         |
-| C-14     | `#preludes`                     | C++ prelude is referenced from emitted CPP output (`SLANG_PRELUDE_EXPORT` marker on entry point). | `cpp-prelude-export-marker.slang`                      |
-| C-15     | `#preludes`                     | CUDA prelude is referenced from emitted CUDA output (`extern "C"` + `__global__` on entry point). | `cuda-prelude-extern-c-marker.slang`                   |
-| C-16     | `#standard-modules`             | Standard module `neural` is NOT implicitly imported; `neural`-namespaced names are unresolved.    | `standard-module-neural-not-implicit.slang`            |
-| C-17     | `#core-module`                  | HLSL meta-module's `Texture3D` plus the documented sample/load/gather operations lower per target. | `texture3d-sample.slang`, `texture3d-samplelevel.slang`, `texture3d-samplegrad.slang`, `texture3d-load.slang`, `texture3d-uint-format-load.slang` |
-| C-18     | `#core-module`                  | HLSL meta-module's `TextureCube` plus the documented sample/load/gather operations lower per target. | `texturecube-sample.slang`, `texturecube-samplelevel.slang`, `texturecube-samplegrad.slang`, `texturecube-load.slang`, `texturecube-gatherred.slang` |
-| C-19     | `#core-module`                  | HLSL meta-module's `Texture1D` plus the documented sample/load operations lower per target. | `texture1d-sample.slang`, `texture1d-samplelevel.slang`, `texture1d-samplegrad.slang`, `texture1d-load.slang` |
-| C-20     | `#core-module`                  | HLSL meta-module's `Texture2DArray` plus the documented sample/load/gather operations lower per target. | `texture2darray-sample.slang`, `texture2darray-samplelevel.slang`, `texture2darray-samplegrad.slang`, `texture2darray-load.slang`, `texture2darray-gatherred.slang` |
-| C-21     | `#core-module`                  | HLSL meta-module's `TextureCubeArray` plus the documented sample operations lower per target. | `texturecubearray-sample.slang`, `texturecubearray-samplelevel.slang`, `texturecubearray-samplegrad.slang` |
-| C-22     | `#core-module`                  | HLSL meta-module's `Texture2DMS.Load(coord, sampleIdx)` lowers per target.                        | `texture2dms-load.slang`                               |
-| C-23     | `#core-module`                  | HLSL meta-module's `RWTexture1D` plus `Load` and subscript-store lower per target.                | `rwtexture1d-load.slang`, `rwtexture1d-store.slang`, `rwtexture1d-uint-format-store.slang` |
-| C-24     | `#core-module`                  | HLSL meta-module's `RWTexture3D` plus `Load` and subscript-store lower per target.                | `rwtexture3d-load.slang`, `rwtexture3d-store.slang`    |
-| C-25     | `#core-module`                  | HLSL meta-module's `SamplerComparisonState` plus `SampleCmp`/`SampleCmpLevelZero` lower per target. | `samplercmp-samplecmp.slang`, `samplercmp-samplecmplevelzero.slang` |
+| C-01     | `#what-the-core-module-provides`| `int32_t` typedef resolves without explicit import and lowers to 32-bit signed int per target.    | [`core-typedef-int32-resolves.slang`](core-typedef-int32-resolves.slang)                    |
+| C-02     | `#what-the-core-module-provides`| `uint32_t` typedef resolves and lowers to 32-bit unsigned int per target.                         | [`core-typedef-uint32-resolves.slang`](core-typedef-uint32-resolves.slang)                   |
+| C-03     | `#what-the-core-module-provides`| `float32_t` typedef resolves and lowers to a 32-bit float per target.                             | [`core-typedef-float32-resolves.slang`](core-typedef-float32-resolves.slang)                  |
+| C-04     | `#what-the-core-module-provides`| `float64_t` typedef resolves and lowers to a 64-bit float on HLSL and CUDA.                       | [`core-typedef-float64-resolves.slang`](core-typedef-float64-resolves.slang)                  |
+| C-05     | `#what-the-core-module-provides`| Core vector and matrix types (`float3`, `float3x3`) lower to per-target spellings.                | [`core-vector-matrix-types-lower.slang`](core-vector-matrix-types-lower.slang)                 |
+| C-06     | `#what-the-core-module-provides`| `Optional<T>` is a core-module type usable without explicit import.                                | [`core-optional-type-usable.slang`](core-optional-type-usable.slang)                      |
+| C-07     | `#core-module`                  | HLSL meta-module's `dot` intrinsic lowers per target (`dot` / `dot` / `OpDot`).                   | [`hlsl-intrinsic-dot-lowers-per-target.slang`](hlsl-intrinsic-dot-lowers-per-target.slang)           |
+| C-08     | `#core-module`                  | HLSL meta-module's `length` intrinsic lowers per target (`length` / `length` / `Length`).         | [`hlsl-intrinsic-length-lowers-per-target.slang`](hlsl-intrinsic-length-lowers-per-target.slang)        |
+| C-09     | `#core-module`                  | HLSL meta-module's `mul(matrix, vector)` lowers per target (`mul` / `*` / `OpVectorTimesMatrix`). | [`hlsl-intrinsic-mul-matrix-lowers-per-target.slang`](hlsl-intrinsic-mul-matrix-lowers-per-target.slang)    |
+| C-10     | `#core-module`                  | HLSL meta-module's `RWStructuredBuffer<T>` lowers to per-target binding shapes.                   | [`hlsl-resource-rwstructuredbuffer-lowers-per-target.slang`](hlsl-resource-rwstructuredbuffer-lowers-per-target.slang) |
+| C-11     | `#core-module`                  | HLSL meta-module's `Texture2D` lowers per target (HLSL keeps name, GLSL/SPIR-V emit image type).  | [`hlsl-resource-texture2d-lowers-per-target.slang`](hlsl-resource-texture2d-lowers-per-target.slang)      |
+| C-12     | `#core-module`                  | Diff meta-module declares `IDifferentiable`; a conforming struct is accepted by the front-end.    | [`diff-idifferentiable-frontend-accepts.slang`](diff-idifferentiable-frontend-accepts.slang)          |
+| C-13     | `#glsl-module`                  | GLSL module supplies `vec3` alias when loaded via `-allow-glsl`; lowers to per-target spellings.  | [`glsl-module-vec3-alias.slang`](glsl-module-vec3-alias.slang)                         |
+| C-14     | `#preludes`                     | C++ prelude is referenced from emitted CPP output (`SLANG_PRELUDE_EXPORT` marker on entry point). | [`cpp-prelude-export-marker.slang`](cpp-prelude-export-marker.slang)                      |
+| C-15     | `#preludes`                     | CUDA prelude is referenced from emitted CUDA output (`extern "C"` + `__global__` on entry point). | [`cuda-prelude-extern-c-marker.slang`](cuda-prelude-extern-c-marker.slang)                   |
+| C-16     | `#standard-modules`             | Standard module `neural` is NOT implicitly imported; `neural`-namespaced names are unresolved.    | [`standard-module-neural-not-implicit.slang`](standard-module-neural-not-implicit.slang)            |
+| C-17     | `#core-module`                  | HLSL meta-module's `Texture3D` plus the documented sample/load/gather operations lower per target. | [`texture3d-sample.slang`](texture3d-sample.slang), [`texture3d-samplelevel.slang`](texture3d-samplelevel.slang), [`texture3d-samplegrad.slang`](texture3d-samplegrad.slang), [`texture3d-load.slang`](texture3d-load.slang), [`texture3d-uint-format-load.slang`](texture3d-uint-format-load.slang) |
+| C-18     | `#core-module`                  | HLSL meta-module's `TextureCube` plus the documented sample/load/gather operations lower per target. | [`texturecube-sample.slang`](texturecube-sample.slang), [`texturecube-samplelevel.slang`](texturecube-samplelevel.slang), [`texturecube-samplegrad.slang`](texturecube-samplegrad.slang), [`texturecube-load.slang`](texturecube-load.slang), [`texturecube-gatherred.slang`](texturecube-gatherred.slang) |
+| C-19     | `#core-module`                  | HLSL meta-module's `Texture1D` plus the documented sample/load operations lower per target. | [`texture1d-sample.slang`](texture1d-sample.slang), [`texture1d-samplelevel.slang`](texture1d-samplelevel.slang), [`texture1d-samplegrad.slang`](texture1d-samplegrad.slang), [`texture1d-load.slang`](texture1d-load.slang) |
+| C-20     | `#core-module`                  | HLSL meta-module's `Texture2DArray` plus the documented sample/load/gather operations lower per target. | [`texture2darray-sample.slang`](texture2darray-sample.slang), [`texture2darray-samplelevel.slang`](texture2darray-samplelevel.slang), [`texture2darray-samplegrad.slang`](texture2darray-samplegrad.slang), [`texture2darray-load.slang`](texture2darray-load.slang), [`texture2darray-gatherred.slang`](texture2darray-gatherred.slang) |
+| C-21     | `#core-module`                  | HLSL meta-module's `TextureCubeArray` plus the documented sample operations lower per target. | [`texturecubearray-sample.slang`](texturecubearray-sample.slang), [`texturecubearray-samplelevel.slang`](texturecubearray-samplelevel.slang), [`texturecubearray-samplegrad.slang`](texturecubearray-samplegrad.slang) |
+| C-22     | `#core-module`                  | HLSL meta-module's `Texture2DMS.Load(coord, sampleIdx)` lowers per target.                        | [`texture2dms-load.slang`](texture2dms-load.slang)                               |
+| C-23     | `#core-module`                  | HLSL meta-module's `RWTexture1D` plus `Load` and subscript-store lower per target.                | [`rwtexture1d-load.slang`](rwtexture1d-load.slang), [`rwtexture1d-store.slang`](rwtexture1d-store.slang), [`rwtexture1d-uint-format-store.slang`](rwtexture1d-uint-format-store.slang) |
+| C-24     | `#core-module`                  | HLSL meta-module's `RWTexture3D` plus `Load` and subscript-store lower per target.                | [`rwtexture3d-load.slang`](rwtexture3d-load.slang), [`rwtexture3d-store.slang`](rwtexture3d-store.slang)    |
+| C-25     | `#core-module`                  | HLSL meta-module's `SamplerComparisonState` plus `SampleCmp`/`SampleCmpLevelZero` lower per target. | [`samplercmp-samplecmp.slang`](samplercmp-samplecmp.slang), [`samplercmp-samplecmplevelzero.slang`](samplercmp-samplecmplevelzero.slang) |
 
 ## Tests in this bundle
 
 | File                                                       | Intent     | Doc anchor                       |
 | ---------------------------------------------------------- | ---------- | -------------------------------- |
-| `core-optional-type-usable.slang`                          | functional | `#what-the-core-module-provides` |
-| `core-typedef-float32-resolves.slang`                      | functional | `#what-the-core-module-provides` |
-| `core-typedef-float64-resolves.slang`                      | functional | `#what-the-core-module-provides` |
-| `core-typedef-int32-resolves.slang`                        | functional | `#what-the-core-module-provides` |
-| `core-typedef-uint32-resolves.slang`                       | functional | `#what-the-core-module-provides` |
-| `core-vector-matrix-types-lower.slang`                     | functional | `#what-the-core-module-provides` |
-| `cpp-prelude-export-marker.slang`                          | functional | `#preludes`                      |
-| `cuda-prelude-extern-c-marker.slang`                       | functional | `#preludes`                      |
-| `diff-idifferentiable-frontend-accepts.slang`              | functional | `#core-module`                   |
-| `glsl-module-vec3-alias.slang`                             | functional | `#glsl-module`                   |
-| `hlsl-intrinsic-dot-lowers-per-target.slang`               | functional | `#core-module`                   |
-| `hlsl-intrinsic-length-lowers-per-target.slang`            | functional | `#core-module`                   |
-| `hlsl-intrinsic-mul-matrix-lowers-per-target.slang`        | functional | `#core-module`                   |
-| `hlsl-resource-rwstructuredbuffer-lowers-per-target.slang` | functional | `#core-module`                   |
-| `hlsl-resource-texture2d-lowers-per-target.slang`          | functional | `#core-module`                   |
-| `standard-module-neural-not-implicit.slang`                | negative   | `#standard-modules`              |
-| `dot-zero-vector.slang`                                    | boundary   | `#core-module`                   |
-| `dot-inf-vector.slang`                                     | boundary   | `#core-module`                   |
-| `dot-nan-vector.slang`                                     | boundary   | `#core-module`                   |
-| `length-zero-vector.slang`                                 | boundary   | `#core-module`                   |
-| `length-nan-vector.slang`                                  | boundary   | `#core-module`                   |
-| `normalize-zero-vector.slang`                              | boundary   | `#core-module`                   |
-| `mul-matrix-vector-2x2.slang`                              | boundary   | `#core-module`                   |
-| `mul-matrix-vector-4x4.slang`                              | boundary   | `#core-module`                   |
-| `mul-zero-matrix-vector.slang`                             | boundary   | `#core-module`                   |
-| `core-typedef-int32-max.slang`                             | boundary   | `#what-the-core-module-provides` |
-| `core-typedef-uint32-max.slang`                            | boundary   | `#what-the-core-module-provides` |
-| `core-typedef-float32-inf.slang`                           | boundary   | `#what-the-core-module-provides` |
-| `core-typedef-float32-nan.slang`                           | boundary   | `#what-the-core-module-provides` |
-| `conv-int32-max-to-float32.slang`                          | boundary   | `#what-the-core-module-provides` |
-| `conv-half-roundtrip.slang`                                | boundary   | `#what-the-core-module-provides` |
-| `printf-int-max.slang`                                     | boundary   | `#core-module`                   |
-| `printf-int-min.slang`                                     | boundary   | `#core-module`                   |
-| `printf-float-inf.slang`                                   | boundary   | `#core-module`                   |
-| `printf-float-nan.slang`                                   | boundary   | `#core-module`                   |
-| `printf-no-args.slang`                                     | boundary   | `#core-module`                   |
-| `printf-many-args.slang`                                   | stress     | `#core-module`                   |
-| `texture-sample-uv-center.slang`                           | boundary   | `#core-module`                   |
-| `texture-sample-uv-corner.slang`                           | boundary   | `#core-module`                   |
-| `glsl-mat4-allow-glsl.slang`                               | boundary   | `#glsl-module`                   |
-| `glsl-min-max-clamp-aliases.slang`                         | boundary   | `#glsl-module`                   |
-| `import-nonexistent-module.slang`                          | negative   | `#standard-modules`              |
-| `glsl-vec3-without-allow-glsl.slang`                       | negative   | `#glsl-module`                   |
-| `import-diff-by-name-fails.slang`                          | negative   | `#standard-modules`              |
-| `dot-many-uses-stress.slang`                               | stress     | `#core-module`                   |
-| `mul-many-uses-stress.slang`                               | stress     | `#core-module`                   |
-| `optional-deep-nesting-stress.slang`                       | stress     | `#what-the-core-module-provides` |
-| `texture3d-sample.slang`                                   | expansion  | `#core-module`                   |
-| `texture3d-samplelevel.slang`                              | expansion  | `#core-module`                   |
-| `texture3d-samplegrad.slang`                               | expansion  | `#core-module`                   |
-| `texture3d-load.slang`                                     | expansion  | `#core-module`                   |
-| `texture3d-uint-format-load.slang`                         | expansion  | `#core-module`                   |
-| `texturecube-sample.slang`                                 | expansion  | `#core-module`                   |
-| `texturecube-samplelevel.slang`                            | expansion  | `#core-module`                   |
-| `texturecube-samplegrad.slang`                             | expansion  | `#core-module`                   |
-| `texturecube-load.slang`                                   | expansion  | `#core-module`                   |
-| `texturecube-gatherred.slang`                              | expansion  | `#core-module`                   |
-| `texture1d-sample.slang`                                   | expansion  | `#core-module`                   |
-| `texture1d-samplelevel.slang`                              | expansion  | `#core-module`                   |
-| `texture1d-samplegrad.slang`                               | expansion  | `#core-module`                   |
-| `texture1d-load.slang`                                     | expansion  | `#core-module`                   |
-| `texture2darray-sample.slang`                              | expansion  | `#core-module`                   |
-| `texture2darray-samplelevel.slang`                         | expansion  | `#core-module`                   |
-| `texture2darray-samplegrad.slang`                          | expansion  | `#core-module`                   |
-| `texture2darray-load.slang`                                | expansion  | `#core-module`                   |
-| `texture2darray-gatherred.slang`                           | expansion  | `#core-module`                   |
-| `texturecubearray-sample.slang`                            | expansion  | `#core-module`                   |
-| `texturecubearray-samplelevel.slang`                       | expansion  | `#core-module`                   |
-| `texturecubearray-samplegrad.slang`                        | expansion  | `#core-module`                   |
-| `texture2dms-load.slang`                                   | expansion  | `#core-module`                   |
-| `rwtexture1d-load.slang`                                   | expansion  | `#core-module`                   |
-| `rwtexture1d-store.slang`                                  | expansion  | `#core-module`                   |
-| `rwtexture1d-uint-format-store.slang`                      | expansion  | `#core-module`                   |
-| `rwtexture3d-load.slang`                                   | expansion  | `#core-module`                   |
-| `rwtexture3d-store.slang`                                  | expansion  | `#core-module`                   |
-| `samplercmp-samplecmp.slang`                               | expansion  | `#core-module`                   |
-| `samplercmp-samplecmplevelzero.slang`                      | expansion  | `#core-module`                   |
+| [`core-optional-type-usable.slang`](core-optional-type-usable.slang)                          | functional | `#what-the-core-module-provides` |
+| [`core-typedef-float32-resolves.slang`](core-typedef-float32-resolves.slang)                      | functional | `#what-the-core-module-provides` |
+| [`core-typedef-float64-resolves.slang`](core-typedef-float64-resolves.slang)                      | functional | `#what-the-core-module-provides` |
+| [`core-typedef-int32-resolves.slang`](core-typedef-int32-resolves.slang)                        | functional | `#what-the-core-module-provides` |
+| [`core-typedef-uint32-resolves.slang`](core-typedef-uint32-resolves.slang)                       | functional | `#what-the-core-module-provides` |
+| [`core-vector-matrix-types-lower.slang`](core-vector-matrix-types-lower.slang)                     | functional | `#what-the-core-module-provides` |
+| [`cpp-prelude-export-marker.slang`](cpp-prelude-export-marker.slang)                          | functional | `#preludes`                      |
+| [`cuda-prelude-extern-c-marker.slang`](cuda-prelude-extern-c-marker.slang)                       | functional | `#preludes`                      |
+| [`diff-idifferentiable-frontend-accepts.slang`](diff-idifferentiable-frontend-accepts.slang)              | functional | `#core-module`                   |
+| [`glsl-module-vec3-alias.slang`](glsl-module-vec3-alias.slang)                             | functional | `#glsl-module`                   |
+| [`hlsl-intrinsic-dot-lowers-per-target.slang`](hlsl-intrinsic-dot-lowers-per-target.slang)               | functional | `#core-module`                   |
+| [`hlsl-intrinsic-length-lowers-per-target.slang`](hlsl-intrinsic-length-lowers-per-target.slang)            | functional | `#core-module`                   |
+| [`hlsl-intrinsic-mul-matrix-lowers-per-target.slang`](hlsl-intrinsic-mul-matrix-lowers-per-target.slang)        | functional | `#core-module`                   |
+| [`hlsl-resource-rwstructuredbuffer-lowers-per-target.slang`](hlsl-resource-rwstructuredbuffer-lowers-per-target.slang) | functional | `#core-module`                   |
+| [`hlsl-resource-texture2d-lowers-per-target.slang`](hlsl-resource-texture2d-lowers-per-target.slang)          | functional | `#core-module`                   |
+| [`standard-module-neural-not-implicit.slang`](standard-module-neural-not-implicit.slang)                | negative   | `#standard-modules`              |
+| [`dot-zero-vector.slang`](dot-zero-vector.slang)                                    | boundary   | `#core-module`                   |
+| [`dot-inf-vector.slang`](dot-inf-vector.slang)                                     | boundary   | `#core-module`                   |
+| [`dot-nan-vector.slang`](dot-nan-vector.slang)                                     | boundary   | `#core-module`                   |
+| [`length-zero-vector.slang`](length-zero-vector.slang)                                 | boundary   | `#core-module`                   |
+| [`length-nan-vector.slang`](length-nan-vector.slang)                                  | boundary   | `#core-module`                   |
+| [`normalize-zero-vector.slang`](normalize-zero-vector.slang)                              | boundary   | `#core-module`                   |
+| [`mul-matrix-vector-2x2.slang`](mul-matrix-vector-2x2.slang)                              | boundary   | `#core-module`                   |
+| [`mul-matrix-vector-4x4.slang`](mul-matrix-vector-4x4.slang)                              | boundary   | `#core-module`                   |
+| [`mul-zero-matrix-vector.slang`](mul-zero-matrix-vector.slang)                             | boundary   | `#core-module`                   |
+| [`core-typedef-int32-max.slang`](core-typedef-int32-max.slang)                             | boundary   | `#what-the-core-module-provides` |
+| [`core-typedef-uint32-max.slang`](core-typedef-uint32-max.slang)                            | boundary   | `#what-the-core-module-provides` |
+| [`core-typedef-float32-inf.slang`](core-typedef-float32-inf.slang)                           | boundary   | `#what-the-core-module-provides` |
+| [`core-typedef-float32-nan.slang`](core-typedef-float32-nan.slang)                           | boundary   | `#what-the-core-module-provides` |
+| [`conv-int32-max-to-float32.slang`](conv-int32-max-to-float32.slang)                          | boundary   | `#what-the-core-module-provides` |
+| [`conv-half-roundtrip.slang`](conv-half-roundtrip.slang)                                | boundary   | `#what-the-core-module-provides` |
+| [`printf-int-max.slang`](printf-int-max.slang)                                     | boundary   | `#core-module`                   |
+| [`printf-int-min.slang`](printf-int-min.slang)                                     | boundary   | `#core-module`                   |
+| [`printf-float-inf.slang`](printf-float-inf.slang)                                   | boundary   | `#core-module`                   |
+| [`printf-float-nan.slang`](printf-float-nan.slang)                                   | boundary   | `#core-module`                   |
+| [`printf-no-args.slang`](printf-no-args.slang)                                     | boundary   | `#core-module`                   |
+| [`printf-many-args.slang`](printf-many-args.slang)                                   | stress     | `#core-module`                   |
+| [`texture-sample-uv-center.slang`](texture-sample-uv-center.slang)                           | boundary   | `#core-module`                   |
+| [`texture-sample-uv-corner.slang`](texture-sample-uv-corner.slang)                           | boundary   | `#core-module`                   |
+| [`glsl-mat4-allow-glsl.slang`](glsl-mat4-allow-glsl.slang)                               | boundary   | `#glsl-module`                   |
+| [`glsl-min-max-clamp-aliases.slang`](glsl-min-max-clamp-aliases.slang)                         | boundary   | `#glsl-module`                   |
+| [`import-nonexistent-module.slang`](import-nonexistent-module.slang)                          | negative   | `#standard-modules`              |
+| [`glsl-vec3-without-allow-glsl.slang`](glsl-vec3-without-allow-glsl.slang)                       | negative   | `#glsl-module`                   |
+| [`import-diff-by-name-fails.slang`](import-diff-by-name-fails.slang)                          | negative   | `#standard-modules`              |
+| [`dot-many-uses-stress.slang`](dot-many-uses-stress.slang)                               | stress     | `#core-module`                   |
+| [`mul-many-uses-stress.slang`](mul-many-uses-stress.slang)                               | stress     | `#core-module`                   |
+| [`optional-deep-nesting-stress.slang`](optional-deep-nesting-stress.slang)                       | stress     | `#what-the-core-module-provides` |
+| [`texture3d-sample.slang`](texture3d-sample.slang)                                   | expansion  | `#core-module`                   |
+| [`texture3d-samplelevel.slang`](texture3d-samplelevel.slang)                              | expansion  | `#core-module`                   |
+| [`texture3d-samplegrad.slang`](texture3d-samplegrad.slang)                               | expansion  | `#core-module`                   |
+| [`texture3d-load.slang`](texture3d-load.slang)                                     | expansion  | `#core-module`                   |
+| [`texture3d-uint-format-load.slang`](texture3d-uint-format-load.slang)                         | expansion  | `#core-module`                   |
+| [`texturecube-sample.slang`](texturecube-sample.slang)                                 | expansion  | `#core-module`                   |
+| [`texturecube-samplelevel.slang`](texturecube-samplelevel.slang)                            | expansion  | `#core-module`                   |
+| [`texturecube-samplegrad.slang`](texturecube-samplegrad.slang)                             | expansion  | `#core-module`                   |
+| [`texturecube-load.slang`](texturecube-load.slang)                                   | expansion  | `#core-module`                   |
+| [`texturecube-gatherred.slang`](texturecube-gatherred.slang)                              | expansion  | `#core-module`                   |
+| [`texture1d-sample.slang`](texture1d-sample.slang)                                   | expansion  | `#core-module`                   |
+| [`texture1d-samplelevel.slang`](texture1d-samplelevel.slang)                              | expansion  | `#core-module`                   |
+| [`texture1d-samplegrad.slang`](texture1d-samplegrad.slang)                               | expansion  | `#core-module`                   |
+| [`texture1d-load.slang`](texture1d-load.slang)                                     | expansion  | `#core-module`                   |
+| [`texture2darray-sample.slang`](texture2darray-sample.slang)                              | expansion  | `#core-module`                   |
+| [`texture2darray-samplelevel.slang`](texture2darray-samplelevel.slang)                         | expansion  | `#core-module`                   |
+| [`texture2darray-samplegrad.slang`](texture2darray-samplegrad.slang)                          | expansion  | `#core-module`                   |
+| [`texture2darray-load.slang`](texture2darray-load.slang)                                | expansion  | `#core-module`                   |
+| [`texture2darray-gatherred.slang`](texture2darray-gatherred.slang)                           | expansion  | `#core-module`                   |
+| [`texturecubearray-sample.slang`](texturecubearray-sample.slang)                            | expansion  | `#core-module`                   |
+| [`texturecubearray-samplelevel.slang`](texturecubearray-samplelevel.slang)                       | expansion  | `#core-module`                   |
+| [`texturecubearray-samplegrad.slang`](texturecubearray-samplegrad.slang)                        | expansion  | `#core-module`                   |
+| [`texture2dms-load.slang`](texture2dms-load.slang)                                   | expansion  | `#core-module`                   |
+| [`rwtexture1d-load.slang`](rwtexture1d-load.slang)                                   | expansion  | `#core-module`                   |
+| [`rwtexture1d-store.slang`](rwtexture1d-store.slang)                                  | expansion  | `#core-module`                   |
+| [`rwtexture1d-uint-format-store.slang`](rwtexture1d-uint-format-store.slang)                      | expansion  | `#core-module`                   |
+| [`rwtexture3d-load.slang`](rwtexture3d-load.slang)                                   | expansion  | `#core-module`                   |
+| [`rwtexture3d-store.slang`](rwtexture3d-store.slang)                                  | expansion  | `#core-module`                   |
+| [`samplercmp-samplecmp.slang`](samplercmp-samplecmp.slang)                               | expansion  | `#core-module`                   |
+| [`samplercmp-samplecmplevelzero.slang`](samplercmp-samplecmplevelzero.slang)                      | expansion  | `#core-module`                   |
 
 ## Doc gaps observed
 

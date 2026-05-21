@@ -42,66 +42,66 @@ form.
 
 | Claim ID | Anchor | Claim (one line) | Tests |
 | --- | --- | --- | --- |
-| C-01 | [#ifelse](../../../docs/llm-generated/ir-reference/control-flow.md#ifelse) | `if (a) ... else ...` lowers to `ifElse(cond, trueBlock, falseBlock, mergeBlock)` with an explicit four-operand structured-join. | `ifelse-structured-merge.slang` |
-| C-02 | [#ifelse](../../../docs/llm-generated/ir-reference/control-flow.md#ifelse) | An `if` without `else` still produces a four-operand `ifElse` with a synthesized merge block. | `ifelse-empty-else-arm.slang` |
-| C-03 | [#ifelse](../../../docs/llm-generated/ir-reference/control-flow.md#ifelse) | Nested `if` statements produce nested `ifElse` terminators, each with its own four-operand tuple. | `nested-ifelse.slang` |
-| C-04 | [#terminators-returns-and-yields](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-returns-and-yields) | `return expr;` in a value-returning function terminates with `return_val(val)`. | `return-val-int.slang` |
-| C-05 | [#terminators-returns-and-yields](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-returns-and-yields) | A `void` function terminates with `return_val(void_constant)`. | `return-val-void-constant.slang` |
-| C-06 | [#terminators-returns-and-yields](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-returns-and-yields) | An early `return` from inside a loop body produces `return_val` as the terminator of the in-loop block. | `early-return-from-loop.slang` |
-| C-07 | [#loop](../../../docs/llm-generated/ir-reference/control-flow.md#loop) | A `for` loop lowers to `loop(body, break, continue, ...)` with initial induction values as trailing operands. | `loop-for-induction-param.slang` |
-| C-08 | [#loop](../../../docs/llm-generated/ir-reference/control-flow.md#loop) | A `while` loop lowers to the same `loop` opcode as `for`. | `loop-while.slang` |
-| C-09 | [#loop](../../../docs/llm-generated/ir-reference/control-flow.md#loop) | A `do`-`while` loop also lowers to `loop`; the trailing predicate is inverted so the `ifElse` branches to break on true. | `loop-do-while.slang` |
-| C-10 | [#loop](../../../docs/llm-generated/ir-reference/control-flow.md#loop) | The back-edge from a loop iteration is an `unconditionalBranch` carrying updated induction values. | `loop-induction-update-on-branch.slang` |
-| C-11 | [#terminators-unconditional-branches](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-unconditional-branches) | `break;` and `continue;` lower to `unconditionalBranch`es targeting the loop's break / continue labels. | `loop-break-continue.slang` |
-| C-12 | [#terminators-unconditional-branches](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-unconditional-branches) | `unconditionalBranch` carries argument operands that bind to the target block's `param`s (SSA phi handoff). | `unconditional-branch-with-args.slang` |
-| C-13 | [#terminators-switches](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-switches) | A `switch` lowers to `switch(value, breakLabel, defaultLabel, caseVal1, caseBlock1, ...)`. | `switch-multi-case.slang` |
-| C-14 | [#terminators-switches](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-switches) | Case-label values from `static const int` declarations resolve to inline `<N> : Int` literal operands on the switch terminator. | `switch-static-const-case-label.slang` |
-| C-15 | [#terminators-no-continuation](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-no-continuation) | When every switch arm `return`s, the synthesized merge block is terminated by `unreachable`. | `switch-unreachable-merge.slang` |
-| C-16 | [#block-and-param](../../../docs/llm-generated/ir-reference/control-flow.md#block-and-param) | A block `param` is Slang IR's encoding of an SSA phi — predecessor branches supply matching argument operands. | `block-param-from-switch-merge.slang` |
-| C-17 | [#conditionalbranch-vs-ifelse](../../../docs/llm-generated/ir-reference/control-flow.md#conditionalbranch-vs-ifelse) | The front-end emits structured `ifElse` (with explicit merge) — never `conditionalBranch` — for surface-level conditions. | `loop-conditional-via-ifelse.slang` |
-| C-18 | [#discard](../../../docs/llm-generated/ir-reference/control-flow.md#discard) | `discard` is not a terminator; it sits as an ordinary in-block instruction followed by the block's real terminator (an `unconditionalBranch`). | `discard-non-terminator.slang` |
+| C-01 | [#ifelse](../../../docs/llm-generated/ir-reference/control-flow.md#ifelse) | `if (a) ... else ...` lowers to `ifElse(cond, trueBlock, falseBlock, mergeBlock)` with an explicit four-operand structured-join. | [`ifelse-structured-merge.slang`](ifelse-structured-merge.slang) |
+| C-02 | [#ifelse](../../../docs/llm-generated/ir-reference/control-flow.md#ifelse) | An `if` without `else` still produces a four-operand `ifElse` with a synthesized merge block. | [`ifelse-empty-else-arm.slang`](ifelse-empty-else-arm.slang) |
+| C-03 | [#ifelse](../../../docs/llm-generated/ir-reference/control-flow.md#ifelse) | Nested `if` statements produce nested `ifElse` terminators, each with its own four-operand tuple. | [`nested-ifelse.slang`](nested-ifelse.slang) |
+| C-04 | [#terminators-returns-and-yields](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-returns-and-yields) | `return expr;` in a value-returning function terminates with `return_val(val)`. | [`return-val-int.slang`](return-val-int.slang) |
+| C-05 | [#terminators-returns-and-yields](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-returns-and-yields) | A `void` function terminates with `return_val(void_constant)`. | [`return-val-void-constant.slang`](return-val-void-constant.slang) |
+| C-06 | [#terminators-returns-and-yields](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-returns-and-yields) | An early `return` from inside a loop body produces `return_val` as the terminator of the in-loop block. | [`early-return-from-loop.slang`](early-return-from-loop.slang) |
+| C-07 | [#loop](../../../docs/llm-generated/ir-reference/control-flow.md#loop) | A `for` loop lowers to `loop(body, break, continue, ...)` with initial induction values as trailing operands. | [`loop-for-induction-param.slang`](loop-for-induction-param.slang) |
+| C-08 | [#loop](../../../docs/llm-generated/ir-reference/control-flow.md#loop) | A `while` loop lowers to the same `loop` opcode as `for`. | [`loop-while.slang`](loop-while.slang) |
+| C-09 | [#loop](../../../docs/llm-generated/ir-reference/control-flow.md#loop) | A `do`-`while` loop also lowers to `loop`; the trailing predicate is inverted so the `ifElse` branches to break on true. | [`loop-do-while.slang`](loop-do-while.slang) |
+| C-10 | [#loop](../../../docs/llm-generated/ir-reference/control-flow.md#loop) | The back-edge from a loop iteration is an `unconditionalBranch` carrying updated induction values. | [`loop-induction-update-on-branch.slang`](loop-induction-update-on-branch.slang) |
+| C-11 | [#terminators-unconditional-branches](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-unconditional-branches) | `break;` and `continue;` lower to `unconditionalBranch`es targeting the loop's break / continue labels. | [`loop-break-continue.slang`](loop-break-continue.slang) |
+| C-12 | [#terminators-unconditional-branches](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-unconditional-branches) | `unconditionalBranch` carries argument operands that bind to the target block's `param`s (SSA phi handoff). | [`unconditional-branch-with-args.slang`](unconditional-branch-with-args.slang) |
+| C-13 | [#terminators-switches](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-switches) | A `switch` lowers to `switch(value, breakLabel, defaultLabel, caseVal1, caseBlock1, ...)`. | [`switch-multi-case.slang`](switch-multi-case.slang) |
+| C-14 | [#terminators-switches](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-switches) | Case-label values from `static const int` declarations resolve to inline `<N> : Int` literal operands on the switch terminator. | [`switch-static-const-case-label.slang`](switch-static-const-case-label.slang) |
+| C-15 | [#terminators-no-continuation](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-no-continuation) | When every switch arm `return`s, the synthesized merge block is terminated by `unreachable`. | [`switch-unreachable-merge.slang`](switch-unreachable-merge.slang) |
+| C-16 | [#block-and-param](../../../docs/llm-generated/ir-reference/control-flow.md#block-and-param) | A block `param` is Slang IR's encoding of an SSA phi — predecessor branches supply matching argument operands. | [`block-param-from-switch-merge.slang`](block-param-from-switch-merge.slang) |
+| C-17 | [#conditionalbranch-vs-ifelse](../../../docs/llm-generated/ir-reference/control-flow.md#conditionalbranch-vs-ifelse) | The front-end emits structured `ifElse` (with explicit merge) — never `conditionalBranch` — for surface-level conditions. | [`loop-conditional-via-ifelse.slang`](loop-conditional-via-ifelse.slang) |
+| C-18 | [#discard](../../../docs/llm-generated/ir-reference/control-flow.md#discard) | `discard` is not a terminator; it sits as an ordinary in-block instruction followed by the block's real terminator (an `unconditionalBranch`). | [`discard-non-terminator.slang`](discard-non-terminator.slang) |
 
 ## Tests in this bundle
 
 | File | Intent | Doc anchor |
 | --- | --- | --- |
-| `ifelse-structured-merge.slang` | functional | `#ifelse` |
-| `ifelse-empty-else-arm.slang` | functional | `#ifelse` |
-| `nested-ifelse.slang` | functional | `#ifelse` |
-| `return-val-int.slang` | functional | `#terminators-returns-and-yields` |
-| `return-val-void-constant.slang` | functional | `#terminators-returns-and-yields` |
-| `early-return-from-loop.slang` | functional | `#terminators-returns-and-yields` |
-| `loop-for-induction-param.slang` | functional | `#loop` |
-| `loop-while.slang` | functional | `#loop` |
-| `loop-do-while.slang` | functional | `#loop` |
-| `loop-induction-update-on-branch.slang` | functional | `#loop` |
-| `loop-break-continue.slang` | functional | `#terminators-unconditional-branches` |
-| `unconditional-branch-with-args.slang` | functional | `#terminators-unconditional-branches` |
-| `switch-multi-case.slang` | functional | `#terminators-switches` |
-| `switch-static-const-case-label.slang` | functional | `#terminators-switches` |
-| `switch-unreachable-merge.slang` | functional | `#terminators-no-continuation` |
-| `block-param-from-switch-merge.slang` | functional | `#block-and-param` |
-| `loop-conditional-via-ifelse.slang` | functional | `#conditionalbranch-vs-ifelse` |
-| `discard-non-terminator.slang` | functional | `#discard` |
-| `ifelse-empty-then-arm.slang` | boundary | `#ifelse` |
-| `ifelse-deeply-nested-5.slang` | stress | `#ifelse` |
-| `ifelse-ternary-expression.slang` | boundary | `#ifelse` |
-| `switch-single-case-with-default.slang` | boundary | `#terminators-switches` |
-| `switch-no-default.slang` | boundary | `#terminators-switches` |
-| `switch-default-before-cases.slang` | boundary | `#terminators-switches` |
-| `switch-eight-case-arms.slang` | stress | `#terminators-switches` |
-| `switch-duplicate-case-labels-rejected.slang` | negative | `#terminators-switches` |
-| `loop-single-iteration-bound.slang` | boundary | `#loop` |
-| `loop-nested-two-deep.slang` | stress | `#loop` |
-| `loop-infinite-while-true.slang` | boundary | `#loop` |
-| `early-return-in-switch-case.slang` | boundary | `#terminators-returns-and-yields` |
-| `early-return-at-depth-three.slang` | boundary | `#terminators-returns-and-yields` |
-| `all-paths-return-ifelse.slang` | boundary | `#terminators-no-continuation` |
-| `block-param-from-ifelse-merge.slang` | boundary | `#block-and-param` |
-| `block-param-loop-header-induction.slang` | boundary | `#block-and-param` |
-| `break-from-inner-loop-only.slang` | boundary | `#terminators-unconditional-branches` |
-| `break-from-switch-inside-loop.slang` | boundary | `#terminators-unconditional-branches` |
-| `discard-rejected-in-compute-stage.slang` | negative | `#discard` |
+| [`ifelse-structured-merge.slang`](ifelse-structured-merge.slang) | functional | `#ifelse` |
+| [`ifelse-empty-else-arm.slang`](ifelse-empty-else-arm.slang) | functional | `#ifelse` |
+| [`nested-ifelse.slang`](nested-ifelse.slang) | functional | `#ifelse` |
+| [`return-val-int.slang`](return-val-int.slang) | functional | `#terminators-returns-and-yields` |
+| [`return-val-void-constant.slang`](return-val-void-constant.slang) | functional | `#terminators-returns-and-yields` |
+| [`early-return-from-loop.slang`](early-return-from-loop.slang) | functional | `#terminators-returns-and-yields` |
+| [`loop-for-induction-param.slang`](loop-for-induction-param.slang) | functional | `#loop` |
+| [`loop-while.slang`](loop-while.slang) | functional | `#loop` |
+| [`loop-do-while.slang`](loop-do-while.slang) | functional | `#loop` |
+| [`loop-induction-update-on-branch.slang`](loop-induction-update-on-branch.slang) | functional | `#loop` |
+| [`loop-break-continue.slang`](loop-break-continue.slang) | functional | `#terminators-unconditional-branches` |
+| [`unconditional-branch-with-args.slang`](unconditional-branch-with-args.slang) | functional | `#terminators-unconditional-branches` |
+| [`switch-multi-case.slang`](switch-multi-case.slang) | functional | `#terminators-switches` |
+| [`switch-static-const-case-label.slang`](switch-static-const-case-label.slang) | functional | `#terminators-switches` |
+| [`switch-unreachable-merge.slang`](switch-unreachable-merge.slang) | functional | `#terminators-no-continuation` |
+| [`block-param-from-switch-merge.slang`](block-param-from-switch-merge.slang) | functional | `#block-and-param` |
+| [`loop-conditional-via-ifelse.slang`](loop-conditional-via-ifelse.slang) | functional | `#conditionalbranch-vs-ifelse` |
+| [`discard-non-terminator.slang`](discard-non-terminator.slang) | functional | `#discard` |
+| [`ifelse-empty-then-arm.slang`](ifelse-empty-then-arm.slang) | boundary | `#ifelse` |
+| [`ifelse-deeply-nested-5.slang`](ifelse-deeply-nested-5.slang) | stress | `#ifelse` |
+| [`ifelse-ternary-expression.slang`](ifelse-ternary-expression.slang) | boundary | `#ifelse` |
+| [`switch-single-case-with-default.slang`](switch-single-case-with-default.slang) | boundary | `#terminators-switches` |
+| [`switch-no-default.slang`](switch-no-default.slang) | boundary | `#terminators-switches` |
+| [`switch-default-before-cases.slang`](switch-default-before-cases.slang) | boundary | `#terminators-switches` |
+| [`switch-eight-case-arms.slang`](switch-eight-case-arms.slang) | stress | `#terminators-switches` |
+| [`switch-duplicate-case-labels-rejected.slang`](switch-duplicate-case-labels-rejected.slang) | negative | `#terminators-switches` |
+| [`loop-single-iteration-bound.slang`](loop-single-iteration-bound.slang) | boundary | `#loop` |
+| [`loop-nested-two-deep.slang`](loop-nested-two-deep.slang) | stress | `#loop` |
+| [`loop-infinite-while-true.slang`](loop-infinite-while-true.slang) | boundary | `#loop` |
+| [`early-return-in-switch-case.slang`](early-return-in-switch-case.slang) | boundary | `#terminators-returns-and-yields` |
+| [`early-return-at-depth-three.slang`](early-return-at-depth-three.slang) | boundary | `#terminators-returns-and-yields` |
+| [`all-paths-return-ifelse.slang`](all-paths-return-ifelse.slang) | boundary | `#terminators-no-continuation` |
+| [`block-param-from-ifelse-merge.slang`](block-param-from-ifelse-merge.slang) | boundary | `#block-and-param` |
+| [`block-param-loop-header-induction.slang`](block-param-loop-header-induction.slang) | boundary | `#block-and-param` |
+| [`break-from-inner-loop-only.slang`](break-from-inner-loop-only.slang) | boundary | `#terminators-unconditional-branches` |
+| [`break-from-switch-inside-loop.slang`](break-from-switch-inside-loop.slang) | boundary | `#terminators-unconditional-branches` |
+| [`discard-rejected-in-compute-stage.slang`](discard-rejected-in-compute-stage.slang) | negative | `#discard` |
 
 ## Out of scope (no-GPU runner)
 

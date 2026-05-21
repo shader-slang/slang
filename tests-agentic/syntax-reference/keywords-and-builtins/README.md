@@ -29,95 +29,95 @@ test confirms that `let` immutability is enforced by the checker.
 
 | Claim ID | Anchor                                                                                                                                       | Claim (one line)                                                                                                | Tests                                       |
 | -------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| C-01     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `if`/`else` form the conditional statement and dispatch to the correct arm.                                     | `statement-if-else.slang`                   |
-| C-02     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `for (init; cond; update) { body }` is the counted-loop statement.                                              | `statement-for-loop.slang`                  |
-| C-03     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `while (c) { ... }` and `do { ... } while (c)` are head-tested and tail-tested loop statements respectively.    | `statement-while-do.slang`                  |
-| C-04     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `break` exits the enclosing loop; `continue` skips to the next iteration.                                       | `statement-break-continue.slang`            |
-| C-05     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `return <expr>` hands a value back to the caller and halts the function body.                                   | `statement-return.slang`                    |
-| C-06     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `switch`/`case`/`default` form the multi-way dispatch statement.                                                | `statement-switch-case.slang`               |
-| C-07     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `discard` is a fragment-shader statement terminating the current invocation.                                    | `statement-discard-fragment.slang`          |
-| C-08     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `typealias` binds a name to a type; the alias resolves to its underlying type for overload resolution.          | `decl-typealias.slang`                      |
-| C-09     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `let` is an immutable binding; `var` is a mutable binding.                                                      | `decl-let-var.slang`                        |
-| C-10     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | A `let`-bound name cannot be reassigned (checker rejects with an l-value diagnostic).                           | `decl-let-immutable-rejected.slang`         |
-| C-11     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `func name(params) -> RetType { ... }` is the Slang-style function-decl form.                                   | `decl-func-arrow.slang`                     |
-| C-12     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `interface` declares a protocol-style requirement set that other types conform to via `:`.                      | `decl-interface-conformance.slang`          |
-| C-13     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `extension <Type> { ... }` adds members to an existing type.                                                    | `decl-extension-method.slang`               |
-| C-14     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `namespace name { ... }` introduces a named scope; members are reached with `::` qualification.                 | `decl-namespace-scope.slang`                |
-| C-15     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `enum Name { Case = N, ... }` declares an enumeration with explicit case values (dispatched via direct lookahead, not the syntax table). | `decl-enum-value.slang`                     |
-| C-16     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `__init` is the compiler-internal spelling of the constructor decl; it is invoked when the type name is used as a callable. | `decl-init-constructor.slang`               |
-| C-17     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `__subscript(args) -> T { get { ... } }` binds `v[args]` syntax to a user-defined accessor.                     | `decl-subscript-index.slang`                |
-| C-18     | [#simple-modifiers](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#simple-modifiers)                                  | `in`, `out`, `inout` are simple parameter-direction modifiers; an `out`/`inout` mutation is visible at the caller. | `modifier-in-out-inout.slang`               |
-| C-19     | [#simple-modifiers](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#simple-modifiers)                                  | `static const` at file scope is a compile-time-known read-only binding.                                         | `modifier-static-const.slang`               |
-| C-20     | [#simple-modifiers](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#simple-modifiers)                                  | `public` and `private` are visibility modifiers; a `private` member is reachable from another member of the same type. | `modifier-public-private.slang`             |
-| C-21     | [#simple-modifiers](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#simple-modifiers)                                  | `groupshared` is an HLSL-flavored storage modifier; it lowers to `groupshared` in HLSL and to `shared` in GLSL. | `modifier-groupshared-multitarget.slang`    |
-| C-22     | [#expression-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#expression-keywords)                            | `this` is an expression keyword denoting the current object inside a member function.                           | `expr-this-self-reference.slang`            |
-| C-23     | [#expression-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#expression-keywords)                            | `true` and `false` produce boolean-typed values that select different branches of a conditional.                | `expr-true-false-bool.slang`                |
-| C-24     | [#expression-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#expression-keywords)                            | `none` is the empty value of `Optional<T>`; `hasValue` discriminates the empty case from the present case.      | `expr-none-optional.slang`                  |
-| C-25     | [#expression-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#expression-keywords)                            | `sizeof(T)` is a compile-time-known size, in bytes, of `T`.                                                     | `expr-sizeof-int.slang`                     |
-| C-26     | [#core-module-supplied-vocabulary](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#core-module-supplied-vocabulary)    | `int`, `uint`, `float`, `bool` are core-module type names distinguishable by overload resolution.               | `builtin-numeric-types-overload.slang`      |
-| C-27     | [#core-module-supplied-vocabulary](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#core-module-supplied-vocabulary)    | `vec3` is supplied by `glsl.meta.slang` and is available in GLSL emit.                                          | `builtin-glsl-vec3.slang`                   |
-| C-28     | [#core-module-supplied-vocabulary](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#core-module-supplied-vocabulary)    | `StructuredBuffer<T>` is supplied by `hlsl.meta.slang` and survives into the emitted HLSL text.                 | `builtin-hlsl-structured-buffer.slang`      |
-| C-29     | [#reserved-identifier-prefixes](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#reserved-identifier-prefixes)          | `SV_`-prefixed identifiers are HLSL system-value semantics surviving into HLSL emit.                            | `reserved-sv-prefix-hlsl.slang`             |
-| C-30     | [#reserved-identifier-prefixes](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#reserved-identifier-prefixes)          | `gl_`-prefixed identifiers stand for GLSL-stage built-ins in the GLSL emit.                                     | `reserved-gl-prefix-glsl.slang`             |
+| C-01     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `if`/`else` form the conditional statement and dispatch to the correct arm.                                     | [`statement-if-else.slang`](statement-if-else.slang)                   |
+| C-02     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `for (init; cond; update) { body }` is the counted-loop statement.                                              | [`statement-for-loop.slang`](statement-for-loop.slang)                  |
+| C-03     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `while (c) { ... }` and `do { ... } while (c)` are head-tested and tail-tested loop statements respectively.    | [`statement-while-do.slang`](statement-while-do.slang)                  |
+| C-04     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `break` exits the enclosing loop; `continue` skips to the next iteration.                                       | [`statement-break-continue.slang`](statement-break-continue.slang)            |
+| C-05     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `return <expr>` hands a value back to the caller and halts the function body.                                   | [`statement-return.slang`](statement-return.slang)                    |
+| C-06     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `switch`/`case`/`default` form the multi-way dispatch statement.                                                | [`statement-switch-case.slang`](statement-switch-case.slang)               |
+| C-07     | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords)                              | `discard` is a fragment-shader statement terminating the current invocation.                                    | [`statement-discard-fragment.slang`](statement-discard-fragment.slang)          |
+| C-08     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `typealias` binds a name to a type; the alias resolves to its underlying type for overload resolution.          | [`decl-typealias.slang`](decl-typealias.slang)                      |
+| C-09     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `let` is an immutable binding; `var` is a mutable binding.                                                      | [`decl-let-var.slang`](decl-let-var.slang)                        |
+| C-10     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | A `let`-bound name cannot be reassigned (checker rejects with an l-value diagnostic).                           | [`decl-let-immutable-rejected.slang`](decl-let-immutable-rejected.slang)         |
+| C-11     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `func name(params) -> RetType { ... }` is the Slang-style function-decl form.                                   | [`decl-func-arrow.slang`](decl-func-arrow.slang)                     |
+| C-12     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `interface` declares a protocol-style requirement set that other types conform to via `:`.                      | [`decl-interface-conformance.slang`](decl-interface-conformance.slang)          |
+| C-13     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `extension <Type> { ... }` adds members to an existing type.                                                    | [`decl-extension-method.slang`](decl-extension-method.slang)               |
+| C-14     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `namespace name { ... }` introduces a named scope; members are reached with `::` qualification.                 | [`decl-namespace-scope.slang`](decl-namespace-scope.slang)                |
+| C-15     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `enum Name { Case = N, ... }` declares an enumeration with explicit case values (dispatched via direct lookahead, not the syntax table). | [`decl-enum-value.slang`](decl-enum-value.slang)                     |
+| C-16     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `__init` is the compiler-internal spelling of the constructor decl; it is invoked when the type name is used as a callable. | [`decl-init-constructor.slang`](decl-init-constructor.slang)               |
+| C-17     | [#decl-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#decl-keywords)                                        | `__subscript(args) -> T { get { ... } }` binds `v[args]` syntax to a user-defined accessor.                     | [`decl-subscript-index.slang`](decl-subscript-index.slang)                |
+| C-18     | [#simple-modifiers](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#simple-modifiers)                                  | `in`, `out`, `inout` are simple parameter-direction modifiers; an `out`/`inout` mutation is visible at the caller. | [`modifier-in-out-inout.slang`](modifier-in-out-inout.slang)               |
+| C-19     | [#simple-modifiers](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#simple-modifiers)                                  | `static const` at file scope is a compile-time-known read-only binding.                                         | [`modifier-static-const.slang`](modifier-static-const.slang)               |
+| C-20     | [#simple-modifiers](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#simple-modifiers)                                  | `public` and `private` are visibility modifiers; a `private` member is reachable from another member of the same type. | [`modifier-public-private.slang`](modifier-public-private.slang)             |
+| C-21     | [#simple-modifiers](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#simple-modifiers)                                  | `groupshared` is an HLSL-flavored storage modifier; it lowers to `groupshared` in HLSL and to `shared` in GLSL. | [`modifier-groupshared-multitarget.slang`](modifier-groupshared-multitarget.slang)    |
+| C-22     | [#expression-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#expression-keywords)                            | `this` is an expression keyword denoting the current object inside a member function.                           | [`expr-this-self-reference.slang`](expr-this-self-reference.slang)            |
+| C-23     | [#expression-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#expression-keywords)                            | `true` and `false` produce boolean-typed values that select different branches of a conditional.                | [`expr-true-false-bool.slang`](expr-true-false-bool.slang)                |
+| C-24     | [#expression-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#expression-keywords)                            | `none` is the empty value of `Optional<T>`; `hasValue` discriminates the empty case from the present case.      | [`expr-none-optional.slang`](expr-none-optional.slang)                  |
+| C-25     | [#expression-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#expression-keywords)                            | `sizeof(T)` is a compile-time-known size, in bytes, of `T`.                                                     | [`expr-sizeof-int.slang`](expr-sizeof-int.slang)                     |
+| C-26     | [#core-module-supplied-vocabulary](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#core-module-supplied-vocabulary)    | `int`, `uint`, `float`, `bool` are core-module type names distinguishable by overload resolution.               | [`builtin-numeric-types-overload.slang`](builtin-numeric-types-overload.slang)      |
+| C-27     | [#core-module-supplied-vocabulary](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#core-module-supplied-vocabulary)    | `vec3` is supplied by `glsl.meta.slang` and is available in GLSL emit.                                          | [`builtin-glsl-vec3.slang`](builtin-glsl-vec3.slang)                   |
+| C-28     | [#core-module-supplied-vocabulary](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#core-module-supplied-vocabulary)    | `StructuredBuffer<T>` is supplied by `hlsl.meta.slang` and survives into the emitted HLSL text.                 | [`builtin-hlsl-structured-buffer.slang`](builtin-hlsl-structured-buffer.slang)      |
+| C-29     | [#reserved-identifier-prefixes](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#reserved-identifier-prefixes)          | `SV_`-prefixed identifiers are HLSL system-value semantics surviving into HLSL emit.                            | [`reserved-sv-prefix-hlsl.slang`](reserved-sv-prefix-hlsl.slang)             |
+| C-30     | [#reserved-identifier-prefixes](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#reserved-identifier-prefixes)          | `gl_`-prefixed identifiers stand for GLSL-stage built-ins in the GLSL emit.                                     | [`reserved-gl-prefix-glsl.slang`](reserved-gl-prefix-glsl.slang)             |
 
 ## Tests in this bundle
 
 | File                                       | Intent     | Doc anchor                          |
 | ------------------------------------------ | ---------- | ----------------------------------- |
-| `statement-if-else.slang`                  | functional | `#statement-keywords`               |
-| `statement-for-loop.slang`                 | functional | `#statement-keywords`               |
-| `statement-while-do.slang`                 | functional | `#statement-keywords`               |
-| `statement-break-continue.slang`           | functional | `#statement-keywords`               |
-| `statement-return.slang`                   | functional | `#statement-keywords`               |
-| `statement-switch-case.slang`              | functional | `#statement-keywords`               |
-| `statement-discard-fragment.slang`         | functional | `#statement-keywords`               |
-| `decl-typealias.slang`                     | functional | `#decl-keywords`                    |
-| `decl-let-var.slang`                       | functional | `#decl-keywords`                    |
-| `decl-let-immutable-rejected.slang`        | negative   | `#decl-keywords`                    |
-| `decl-func-arrow.slang`                    | functional | `#decl-keywords`                    |
-| `decl-interface-conformance.slang`         | functional | `#decl-keywords`                    |
-| `decl-extension-method.slang`              | functional | `#decl-keywords`                    |
-| `decl-namespace-scope.slang`               | functional | `#decl-keywords`                    |
-| `decl-enum-value.slang`                    | functional | `#decl-keywords`                    |
-| `decl-init-constructor.slang`              | functional | `#decl-keywords`                    |
-| `decl-subscript-index.slang`               | functional | `#decl-keywords`                    |
-| `modifier-in-out-inout.slang`              | functional | `#simple-modifiers`                 |
-| `modifier-static-const.slang`              | functional | `#simple-modifiers`                 |
-| `modifier-public-private.slang`            | functional | `#simple-modifiers`                 |
-| `modifier-groupshared-multitarget.slang`   | functional | `#simple-modifiers`                 |
-| `expr-this-self-reference.slang`           | functional | `#expression-keywords`              |
-| `expr-true-false-bool.slang`               | functional | `#expression-keywords`              |
-| `expr-none-optional.slang`                 | functional | `#expression-keywords`              |
-| `expr-sizeof-int.slang`                    | functional | `#expression-keywords`              |
-| `builtin-numeric-types-overload.slang`     | functional | `#core-module-supplied-vocabulary`  |
-| `builtin-glsl-vec3.slang`                  | functional | `#core-module-supplied-vocabulary`  |
-| `builtin-hlsl-structured-buffer.slang`     | functional | `#core-module-supplied-vocabulary`  |
-| `reserved-sv-prefix-hlsl.slang`            | functional | `#reserved-identifier-prefixes`     |
-| `reserved-gl-prefix-glsl.slang`            | functional | `#reserved-identifier-prefixes`     |
-| `boundary-sizeof-double.slang`              | boundary   | `#expression-keywords`              |
-| `boundary-sizeof-bool-byte.slang`           | boundary   | `#expression-keywords`              |
-| `boundary-alignof-int.slang`                | boundary   | `#expression-keywords`              |
-| `boundary-countof-variadic-pack.slang`      | boundary   | `#expression-keywords`              |
-| `boundary-nullptr-pointer-literal.slang`    | boundary   | `#expression-keywords`              |
-| `boundary-optional-float-none.slang`        | boundary   | `#expression-keywords`              |
-| `boundary-int8-min.slang`                   | boundary   | `#core-module-supplied-vocabulary`  |
-| `boundary-uint8-max.slang`                  | boundary   | `#core-module-supplied-vocabulary`  |
-| `boundary-int64-max.slang`                  | boundary   | `#core-module-supplied-vocabulary`  |
-| `boundary-half-overload.slang`              | boundary   | `#core-module-supplied-vocabulary`  |
-| `boundary-float4-swizzle-reverse.slang`     | boundary   | `#core-module-supplied-vocabulary`  |
-| `boundary-float4x4-mul-vector.slang`        | boundary   | `#core-module-supplied-vocabulary`  |
-| `boundary-rwstructuredbuffer-index-zero-hlsl.slang` | boundary | `#core-module-supplied-vocabulary` |
-| `boundary-register-u0-binding-hlsl.slang`   | boundary   | `#core-module-supplied-vocabulary`  |
-| `boundary-enum-int-min-max.slang`           | boundary   | `#decl-keywords`                    |
-| `boundary-typedef-c-style.slang`            | boundary   | `#decl-keywords`                    |
-| `boundary-using-namespace.slang`            | boundary   | `#decl-keywords`                    |
-| `boundary-defer-statement-order.slang`      | boundary   | `#statement-keywords`               |
-| `negative-rwstructuredbuffer-missing-args.slang` | negative | `#core-module-supplied-vocabulary` |
-| `negative-int-as-identifier-in-expr.slang`  | negative   | `#core-module-supplied-vocabulary`  |
-| `negative-let-through-inout-argument.slang` | negative   | `#decl-keywords`                    |
-| `stress-deeply-nested-namespace-scope.slang` | stress    | `#decl-keywords`                    |
-| `stress-twelve-numeric-overloads.slang`     | stress     | `#core-module-supplied-vocabulary`  |
-| `stress-typealias-eight-deep-chain.slang`   | stress     | `#decl-keywords`                    |
+| [`statement-if-else.slang`](statement-if-else.slang)                  | functional | `#statement-keywords`               |
+| [`statement-for-loop.slang`](statement-for-loop.slang)                 | functional | `#statement-keywords`               |
+| [`statement-while-do.slang`](statement-while-do.slang)                 | functional | `#statement-keywords`               |
+| [`statement-break-continue.slang`](statement-break-continue.slang)           | functional | `#statement-keywords`               |
+| [`statement-return.slang`](statement-return.slang)                   | functional | `#statement-keywords`               |
+| [`statement-switch-case.slang`](statement-switch-case.slang)              | functional | `#statement-keywords`               |
+| [`statement-discard-fragment.slang`](statement-discard-fragment.slang)         | functional | `#statement-keywords`               |
+| [`decl-typealias.slang`](decl-typealias.slang)                     | functional | `#decl-keywords`                    |
+| [`decl-let-var.slang`](decl-let-var.slang)                       | functional | `#decl-keywords`                    |
+| [`decl-let-immutable-rejected.slang`](decl-let-immutable-rejected.slang)        | negative   | `#decl-keywords`                    |
+| [`decl-func-arrow.slang`](decl-func-arrow.slang)                    | functional | `#decl-keywords`                    |
+| [`decl-interface-conformance.slang`](decl-interface-conformance.slang)         | functional | `#decl-keywords`                    |
+| [`decl-extension-method.slang`](decl-extension-method.slang)              | functional | `#decl-keywords`                    |
+| [`decl-namespace-scope.slang`](decl-namespace-scope.slang)               | functional | `#decl-keywords`                    |
+| [`decl-enum-value.slang`](decl-enum-value.slang)                    | functional | `#decl-keywords`                    |
+| [`decl-init-constructor.slang`](decl-init-constructor.slang)              | functional | `#decl-keywords`                    |
+| [`decl-subscript-index.slang`](decl-subscript-index.slang)               | functional | `#decl-keywords`                    |
+| [`modifier-in-out-inout.slang`](modifier-in-out-inout.slang)              | functional | `#simple-modifiers`                 |
+| [`modifier-static-const.slang`](modifier-static-const.slang)              | functional | `#simple-modifiers`                 |
+| [`modifier-public-private.slang`](modifier-public-private.slang)            | functional | `#simple-modifiers`                 |
+| [`modifier-groupshared-multitarget.slang`](modifier-groupshared-multitarget.slang)   | functional | `#simple-modifiers`                 |
+| [`expr-this-self-reference.slang`](expr-this-self-reference.slang)           | functional | `#expression-keywords`              |
+| [`expr-true-false-bool.slang`](expr-true-false-bool.slang)               | functional | `#expression-keywords`              |
+| [`expr-none-optional.slang`](expr-none-optional.slang)                 | functional | `#expression-keywords`              |
+| [`expr-sizeof-int.slang`](expr-sizeof-int.slang)                    | functional | `#expression-keywords`              |
+| [`builtin-numeric-types-overload.slang`](builtin-numeric-types-overload.slang)     | functional | `#core-module-supplied-vocabulary`  |
+| [`builtin-glsl-vec3.slang`](builtin-glsl-vec3.slang)                  | functional | `#core-module-supplied-vocabulary`  |
+| [`builtin-hlsl-structured-buffer.slang`](builtin-hlsl-structured-buffer.slang)     | functional | `#core-module-supplied-vocabulary`  |
+| [`reserved-sv-prefix-hlsl.slang`](reserved-sv-prefix-hlsl.slang)            | functional | `#reserved-identifier-prefixes`     |
+| [`reserved-gl-prefix-glsl.slang`](reserved-gl-prefix-glsl.slang)            | functional | `#reserved-identifier-prefixes`     |
+| [`boundary-sizeof-double.slang`](boundary-sizeof-double.slang)              | boundary   | `#expression-keywords`              |
+| [`boundary-sizeof-bool-byte.slang`](boundary-sizeof-bool-byte.slang)           | boundary   | `#expression-keywords`              |
+| [`boundary-alignof-int.slang`](boundary-alignof-int.slang)                | boundary   | `#expression-keywords`              |
+| [`boundary-countof-variadic-pack.slang`](boundary-countof-variadic-pack.slang)      | boundary   | `#expression-keywords`              |
+| [`boundary-nullptr-pointer-literal.slang`](boundary-nullptr-pointer-literal.slang)    | boundary   | `#expression-keywords`              |
+| [`boundary-optional-float-none.slang`](boundary-optional-float-none.slang)        | boundary   | `#expression-keywords`              |
+| [`boundary-int8-min.slang`](boundary-int8-min.slang)                   | boundary   | `#core-module-supplied-vocabulary`  |
+| [`boundary-uint8-max.slang`](boundary-uint8-max.slang)                  | boundary   | `#core-module-supplied-vocabulary`  |
+| [`boundary-int64-max.slang`](boundary-int64-max.slang)                  | boundary   | `#core-module-supplied-vocabulary`  |
+| [`boundary-half-overload.slang`](boundary-half-overload.slang)              | boundary   | `#core-module-supplied-vocabulary`  |
+| [`boundary-float4-swizzle-reverse.slang`](boundary-float4-swizzle-reverse.slang)     | boundary   | `#core-module-supplied-vocabulary`  |
+| [`boundary-float4x4-mul-vector.slang`](boundary-float4x4-mul-vector.slang)        | boundary   | `#core-module-supplied-vocabulary`  |
+| [`boundary-rwstructuredbuffer-index-zero-hlsl.slang`](boundary-rwstructuredbuffer-index-zero-hlsl.slang) | boundary | `#core-module-supplied-vocabulary` |
+| [`boundary-register-u0-binding-hlsl.slang`](boundary-register-u0-binding-hlsl.slang)   | boundary   | `#core-module-supplied-vocabulary`  |
+| [`boundary-enum-int-min-max.slang`](boundary-enum-int-min-max.slang)           | boundary   | `#decl-keywords`                    |
+| [`boundary-typedef-c-style.slang`](boundary-typedef-c-style.slang)            | boundary   | `#decl-keywords`                    |
+| [`boundary-using-namespace.slang`](boundary-using-namespace.slang)            | boundary   | `#decl-keywords`                    |
+| [`boundary-defer-statement-order.slang`](boundary-defer-statement-order.slang)      | boundary   | `#statement-keywords`               |
+| [`negative-rwstructuredbuffer-missing-args.slang`](negative-rwstructuredbuffer-missing-args.slang) | negative | `#core-module-supplied-vocabulary` |
+| [`negative-int-as-identifier-in-expr.slang`](negative-int-as-identifier-in-expr.slang)  | negative   | `#core-module-supplied-vocabulary`  |
+| [`negative-let-through-inout-argument.slang`](negative-let-through-inout-argument.slang) | negative   | `#decl-keywords`                    |
+| [`stress-deeply-nested-namespace-scope.slang`](stress-deeply-nested-namespace-scope.slang) | stress    | `#decl-keywords`                    |
+| [`stress-twelve-numeric-overloads.slang`](stress-twelve-numeric-overloads.slang)     | stress     | `#core-module-supplied-vocabulary`  |
+| [`stress-typealias-eight-deep-chain.slang`](stress-typealias-eight-deep-chain.slang)   | stress     | `#decl-keywords`                    |
 
 ## Doc gaps observed
 

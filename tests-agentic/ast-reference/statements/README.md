@@ -49,89 +49,89 @@ are unobservable through any allowed `slang-test` directive.
 
 | Claim ID | Anchor | Claim (one line) | Tests |
 | --- | --- | --- | --- |
-| C-01 | [#blockstmt-and-seqstmt](../../../docs/llm-generated/ast-reference/statements.md#blockstmt-and-seqstmt) | A `BlockStmt` introduces a new lexical scope via its `ScopeDecl`; a local declared inside `{...}` does not affect a same-named outer variable. | `blockstmt-introduces-scope.slang` |
-| C-02 | [#blockstmt-and-seqstmt](../../../docs/llm-generated/ast-reference/statements.md#blockstmt-and-seqstmt) | A `SeqStmt` bundles several statements where a single `Stmt` slot is required; the canonical user surface is multiple declarators in one declaration in statement position. | `seqstmt-multi-declarator.slang` |
-| C-03 | [#ifstmt](../../../docs/llm-generated/ast-reference/statements.md#ifstmt) | An `IfStmt` holds predicate, positive, and negative branches; only the matching branch executes. | `ifstmt-else-branch.slang` |
-| C-04 | [#ifstmt](../../../docs/llm-generated/ast-reference/statements.md#ifstmt) | An `IfStmt` without an `else` leaves the `negativeStatement` slot null; a false predicate is a no-op. | `ifstmt-no-else-noop.slang` |
-| C-05 | [#loop-family](../../../docs/llm-generated/ast-reference/statements.md#loop-family) | A `ForStmt` is a `ScopeStmt`; the `initialStatement` declares a loop variable scoped to the body, leaving a same-named outer variable preserved. | `forstmt-variable-scoped.slang` |
-| C-06 | [#loop-family](../../../docs/llm-generated/ast-reference/statements.md#loop-family) | A `WhileStmt` tests its predicate before each iteration; a false initial condition skips the body. | `whilestmt-skips-zero-iterations.slang` |
-| C-07 | [#loop-family](../../../docs/llm-generated/ast-reference/statements.md#loop-family) | A `DoWhileStmt` tests its predicate after each iteration; the body always runs at least once. | `dowhilestmt-runs-once.slang` |
-| C-08 | [#switchstmt-casestmt-defaultstmt](../../../docs/llm-generated/ast-reference/statements.md#switchstmt-casestmt-defaultstmt) | A `SwitchStmt` dispatches to the matching `CaseStmt`; the body slices into per-case blocks, and `BreakStmt` returns control to the statement after the switch. | `switchstmt-case-dispatch.slang` |
-| C-09 | [#switchstmt-casestmt-defaultstmt](../../../docs/llm-generated/ast-reference/statements.md#switchstmt-casestmt-defaultstmt) | A `CaseStmt` is "just a marker"; consecutive empty case markers fall through to the next non-empty body. | `switchstmt-fall-through.slang` |
-| C-10 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | A `BreakStmt` exits the innermost enclosing `BreakableStmt`; the outer loop continues. | `breakstmt-exits-innermost-loop.slang` |
-| C-11 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | A `BreakStmt` outside any loop or switch is rejected because no enclosing `BreakableStmt` matches its target. | `breakstmt-outside-loop-rejected.slang` |
-| C-12 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | A `ContinueStmt` skips the remainder of the current iteration of the innermost loop. | `continuestmt-skips-rest-of-iteration.slang` |
-| C-13 | [#labelstmt-and-breakstmttargetlabel](../../../docs/llm-generated/ast-reference/statements.md#labelstmt-and-breakstmttargetlabel) | A `LabelStmt` attaches a label to an inner statement; a `BreakStmt` with that `targetLabel` breaks out of the labeled (non-innermost) loop. | `labelstmt-labeled-break.slang` |
-| C-14 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | A `ReturnStmt` yields a value and halts the function; statements after a taken return do not execute. | `returnstmt-halts-function.slang` |
-| C-15 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | A `ReturnStmt` in a non-void function requires an expression; `return;` is rejected. | `returnstmt-missing-expression-rejected.slang` |
-| C-16 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | A `DiscardStmt` is a fragment-only pixel-kill; using it from a compute entry point is rejected as a stage-unavailable feature. | `discardstmt-non-fragment-rejected.slang` |
-| C-17 | [#deferstmt](../../../docs/llm-generated/ast-reference/statements.md#deferstmt) | A `DeferStmt` enqueues its inner statement to run when the enclosing scope exits; the deferred side effect lands after the surrounding statements. | `deferstmt-scope-exit-order.slang` |
-| C-18 | [#deferstmt](../../../docs/llm-generated/ast-reference/statements.md#deferstmt) | A `DeferStmt`'s inner statement runs on every scope-exit path, including an early `return`. | `deferstmt-runs-on-early-return.slang` |
-| C-19 | [#throwstmt-and-catchstmt](../../../docs/llm-generated/ast-reference/statements.md#throwstmt-and-catchstmt) | A `ThrowStmt` in an errorable function transfers control to the caller's matching `CatchStmt`; the handler runs and the protected body is short-circuited. | `throw-catch-handler-runs.slang` |
-| C-20 | [#throwstmt-and-catchstmt](../../../docs/llm-generated/ast-reference/statements.md#throwstmt-and-catchstmt) | A `CatchStmt` with null `errorVar` is a catch-all; the handler runs for any thrown error and does not bind the error value. | `catchstmt-catch-all.slang` |
-| C-21 | [#throwstmt-and-catchstmt](../../../docs/llm-generated/ast-reference/statements.md#throwstmt-and-catchstmt) | A `ThrowStmt` is only valid inside a function declared to throw; an uncaught `throw` in a non-throwing function is rejected. | `throwstmt-without-throws-rejected.slang` |
-| C-22 | [#declstmt-and-expressionstmt](../../../docs/llm-generated/ast-reference/statements.md#declstmt-and-expressionstmt) | A `DeclStmt` lets a `DeclBase` appear in statement position; the local name is visible to later statements. | `declstmt-local-visible-later.slang` |
-| C-23 | [#declstmt-and-expressionstmt](../../../docs/llm-generated/ast-reference/statements.md#declstmt-and-expressionstmt) | An `ExpressionStmt` holds an `Expr` used for its side effects; the value is discarded but side effects (function call, `printf`) are observed. | `expressionstmt-side-effect.slang` |
-| C-24 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | An `EmptyStmt` is a bare `;` accepted in statement position; it produces no effect. | `emptystmt-bare-semicolon.slang` |
-| C-25 | [#requirecapabilitystmt](../../../docs/llm-generated/ast-reference/statements.md#requirecapabilitystmt) | A `RequireCapabilityStmt` (`__requireCapability(...)`) is a statement-level capability assertion scoped to the enclosing function. | `requirecapability-in-function.slang` |
-| C-26 | [#compiletimeforstmt](../../../docs/llm-generated/ast-reference/statements.md#compiletimeforstmt) | A `CompileTimeForStmt` (`$for(i in Range(N))`) is unrolled at compile time; the body executes once per iteration with the loop variable substituted as a compile-time constant. | `compiletimefor-unrolls.slang` |
-| C-27 | [#targetswitchstmt-stageswitchstmt-targetcasestmt](../../../docs/llm-generated/ast-reference/statements.md#targetswitchstmt-stageswitchstmt-targetcasestmt) | A `StageSwitchStmt` is statically resolved by entry-point stage at compile time; only the matching case body survives in emitted text. | `stageswitch-static-dispatch.slang` |
-| C-28 | [#targetswitchstmt-stageswitchstmt-targetcasestmt](../../../docs/llm-generated/ast-reference/statements.md#targetswitchstmt-stageswitchstmt-targetcasestmt) | A `TargetSwitchStmt` is statically resolved by capability at compile time; non-matching `TargetCaseStmt` bodies are eliminated. | `targetswitch-static-dispatch.slang` |
+| C-01 | [#blockstmt-and-seqstmt](../../../docs/llm-generated/ast-reference/statements.md#blockstmt-and-seqstmt) | A `BlockStmt` introduces a new lexical scope via its `ScopeDecl`; a local declared inside `{...}` does not affect a same-named outer variable. | [`blockstmt-introduces-scope.slang`](blockstmt-introduces-scope.slang) |
+| C-02 | [#blockstmt-and-seqstmt](../../../docs/llm-generated/ast-reference/statements.md#blockstmt-and-seqstmt) | A `SeqStmt` bundles several statements where a single `Stmt` slot is required; the canonical user surface is multiple declarators in one declaration in statement position. | [`seqstmt-multi-declarator.slang`](seqstmt-multi-declarator.slang) |
+| C-03 | [#ifstmt](../../../docs/llm-generated/ast-reference/statements.md#ifstmt) | An `IfStmt` holds predicate, positive, and negative branches; only the matching branch executes. | [`ifstmt-else-branch.slang`](ifstmt-else-branch.slang) |
+| C-04 | [#ifstmt](../../../docs/llm-generated/ast-reference/statements.md#ifstmt) | An `IfStmt` without an `else` leaves the `negativeStatement` slot null; a false predicate is a no-op. | [`ifstmt-no-else-noop.slang`](ifstmt-no-else-noop.slang) |
+| C-05 | [#loop-family](../../../docs/llm-generated/ast-reference/statements.md#loop-family) | A `ForStmt` is a `ScopeStmt`; the `initialStatement` declares a loop variable scoped to the body, leaving a same-named outer variable preserved. | [`forstmt-variable-scoped.slang`](forstmt-variable-scoped.slang) |
+| C-06 | [#loop-family](../../../docs/llm-generated/ast-reference/statements.md#loop-family) | A `WhileStmt` tests its predicate before each iteration; a false initial condition skips the body. | [`whilestmt-skips-zero-iterations.slang`](whilestmt-skips-zero-iterations.slang) |
+| C-07 | [#loop-family](../../../docs/llm-generated/ast-reference/statements.md#loop-family) | A `DoWhileStmt` tests its predicate after each iteration; the body always runs at least once. | [`dowhilestmt-runs-once.slang`](dowhilestmt-runs-once.slang) |
+| C-08 | [#switchstmt-casestmt-defaultstmt](../../../docs/llm-generated/ast-reference/statements.md#switchstmt-casestmt-defaultstmt) | A `SwitchStmt` dispatches to the matching `CaseStmt`; the body slices into per-case blocks, and `BreakStmt` returns control to the statement after the switch. | [`switchstmt-case-dispatch.slang`](switchstmt-case-dispatch.slang) |
+| C-09 | [#switchstmt-casestmt-defaultstmt](../../../docs/llm-generated/ast-reference/statements.md#switchstmt-casestmt-defaultstmt) | A `CaseStmt` is "just a marker"; consecutive empty case markers fall through to the next non-empty body. | [`switchstmt-fall-through.slang`](switchstmt-fall-through.slang) |
+| C-10 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | A `BreakStmt` exits the innermost enclosing `BreakableStmt`; the outer loop continues. | [`breakstmt-exits-innermost-loop.slang`](breakstmt-exits-innermost-loop.slang) |
+| C-11 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | A `BreakStmt` outside any loop or switch is rejected because no enclosing `BreakableStmt` matches its target. | [`breakstmt-outside-loop-rejected.slang`](breakstmt-outside-loop-rejected.slang) |
+| C-12 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | A `ContinueStmt` skips the remainder of the current iteration of the innermost loop. | [`continuestmt-skips-rest-of-iteration.slang`](continuestmt-skips-rest-of-iteration.slang) |
+| C-13 | [#labelstmt-and-breakstmttargetlabel](../../../docs/llm-generated/ast-reference/statements.md#labelstmt-and-breakstmttargetlabel) | A `LabelStmt` attaches a label to an inner statement; a `BreakStmt` with that `targetLabel` breaks out of the labeled (non-innermost) loop. | [`labelstmt-labeled-break.slang`](labelstmt-labeled-break.slang) |
+| C-14 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | A `ReturnStmt` yields a value and halts the function; statements after a taken return do not execute. | [`returnstmt-halts-function.slang`](returnstmt-halts-function.slang) |
+| C-15 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | A `ReturnStmt` in a non-void function requires an expression; `return;` is rejected. | [`returnstmt-missing-expression-rejected.slang`](returnstmt-missing-expression-rejected.slang) |
+| C-16 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | A `DiscardStmt` is a fragment-only pixel-kill; using it from a compute entry point is rejected as a stage-unavailable feature. | [`discardstmt-non-fragment-rejected.slang`](discardstmt-non-fragment-rejected.slang) |
+| C-17 | [#deferstmt](../../../docs/llm-generated/ast-reference/statements.md#deferstmt) | A `DeferStmt` enqueues its inner statement to run when the enclosing scope exits; the deferred side effect lands after the surrounding statements. | [`deferstmt-scope-exit-order.slang`](deferstmt-scope-exit-order.slang) |
+| C-18 | [#deferstmt](../../../docs/llm-generated/ast-reference/statements.md#deferstmt) | A `DeferStmt`'s inner statement runs on every scope-exit path, including an early `return`. | [`deferstmt-runs-on-early-return.slang`](deferstmt-runs-on-early-return.slang) |
+| C-19 | [#throwstmt-and-catchstmt](../../../docs/llm-generated/ast-reference/statements.md#throwstmt-and-catchstmt) | A `ThrowStmt` in an errorable function transfers control to the caller's matching `CatchStmt`; the handler runs and the protected body is short-circuited. | [`throw-catch-handler-runs.slang`](throw-catch-handler-runs.slang) |
+| C-20 | [#throwstmt-and-catchstmt](../../../docs/llm-generated/ast-reference/statements.md#throwstmt-and-catchstmt) | A `CatchStmt` with null `errorVar` is a catch-all; the handler runs for any thrown error and does not bind the error value. | [`catchstmt-catch-all.slang`](catchstmt-catch-all.slang) |
+| C-21 | [#throwstmt-and-catchstmt](../../../docs/llm-generated/ast-reference/statements.md#throwstmt-and-catchstmt) | A `ThrowStmt` is only valid inside a function declared to throw; an uncaught `throw` in a non-throwing function is rejected. | [`throwstmt-without-throws-rejected.slang`](throwstmt-without-throws-rejected.slang) |
+| C-22 | [#declstmt-and-expressionstmt](../../../docs/llm-generated/ast-reference/statements.md#declstmt-and-expressionstmt) | A `DeclStmt` lets a `DeclBase` appear in statement position; the local name is visible to later statements. | [`declstmt-local-visible-later.slang`](declstmt-local-visible-later.slang) |
+| C-23 | [#declstmt-and-expressionstmt](../../../docs/llm-generated/ast-reference/statements.md#declstmt-and-expressionstmt) | An `ExpressionStmt` holds an `Expr` used for its side effects; the value is discarded but side effects (function call, `printf`) are observed. | [`expressionstmt-side-effect.slang`](expressionstmt-side-effect.slang) |
+| C-24 | [#nodes](../../../docs/llm-generated/ast-reference/statements.md#nodes) | An `EmptyStmt` is a bare `;` accepted in statement position; it produces no effect. | [`emptystmt-bare-semicolon.slang`](emptystmt-bare-semicolon.slang) |
+| C-25 | [#requirecapabilitystmt](../../../docs/llm-generated/ast-reference/statements.md#requirecapabilitystmt) | A `RequireCapabilityStmt` (`__requireCapability(...)`) is a statement-level capability assertion scoped to the enclosing function. | [`requirecapability-in-function.slang`](requirecapability-in-function.slang) |
+| C-26 | [#compiletimeforstmt](../../../docs/llm-generated/ast-reference/statements.md#compiletimeforstmt) | A `CompileTimeForStmt` (`$for(i in Range(N))`) is unrolled at compile time; the body executes once per iteration with the loop variable substituted as a compile-time constant. | [`compiletimefor-unrolls.slang`](compiletimefor-unrolls.slang) |
+| C-27 | [#targetswitchstmt-stageswitchstmt-targetcasestmt](../../../docs/llm-generated/ast-reference/statements.md#targetswitchstmt-stageswitchstmt-targetcasestmt) | A `StageSwitchStmt` is statically resolved by entry-point stage at compile time; only the matching case body survives in emitted text. | [`stageswitch-static-dispatch.slang`](stageswitch-static-dispatch.slang) |
+| C-28 | [#targetswitchstmt-stageswitchstmt-targetcasestmt](../../../docs/llm-generated/ast-reference/statements.md#targetswitchstmt-stageswitchstmt-targetcasestmt) | A `TargetSwitchStmt` is statically resolved by capability at compile time; non-matching `TargetCaseStmt` bodies are eliminated. | [`targetswitch-static-dispatch.slang`](targetswitch-static-dispatch.slang) |
 
 ## Tests in this bundle
 
 | File | Intent | Doc anchor |
 | --- | --- | --- |
-| `blockstmt-introduces-scope.slang` | functional | `#blockstmt-and-seqstmt` |
-| `seqstmt-multi-declarator.slang` | functional | `#blockstmt-and-seqstmt` |
-| `ifstmt-else-branch.slang` | functional | `#ifstmt` |
-| `ifstmt-no-else-noop.slang` | functional | `#ifstmt` |
-| `forstmt-variable-scoped.slang` | functional | `#loop-family` |
-| `whilestmt-skips-zero-iterations.slang` | functional | `#loop-family` |
-| `dowhilestmt-runs-once.slang` | functional | `#loop-family` |
-| `switchstmt-case-dispatch.slang` | functional | `#switchstmt-casestmt-defaultstmt` |
-| `switchstmt-fall-through.slang` | functional | `#switchstmt-casestmt-defaultstmt` |
-| `breakstmt-exits-innermost-loop.slang` | functional | `#nodes` |
-| `breakstmt-outside-loop-rejected.slang` | negative | `#nodes` |
-| `continuestmt-skips-rest-of-iteration.slang` | functional | `#nodes` |
-| `labelstmt-labeled-break.slang` | functional | `#labelstmt-and-breakstmttargetlabel` |
-| `returnstmt-halts-function.slang` | functional | `#nodes` |
-| `returnstmt-missing-expression-rejected.slang` | negative | `#nodes` |
-| `discardstmt-non-fragment-rejected.slang` | negative | `#nodes` |
-| `deferstmt-scope-exit-order.slang` | functional | `#deferstmt` |
-| `deferstmt-runs-on-early-return.slang` | functional | `#deferstmt` |
-| `throw-catch-handler-runs.slang` | functional | `#throwstmt-and-catchstmt` |
-| `catchstmt-catch-all.slang` | functional | `#throwstmt-and-catchstmt` |
-| `throwstmt-without-throws-rejected.slang` | negative | `#throwstmt-and-catchstmt` |
-| `declstmt-local-visible-later.slang` | functional | `#declstmt-and-expressionstmt` |
-| `expressionstmt-side-effect.slang` | functional | `#declstmt-and-expressionstmt` |
-| `emptystmt-bare-semicolon.slang` | functional | `#nodes` |
-| `requirecapability-in-function.slang` | functional | `#requirecapabilitystmt` |
-| `compiletimefor-unrolls.slang` | functional | `#compiletimeforstmt` |
-| `stageswitch-static-dispatch.slang` | functional | `#targetswitchstmt-stageswitchstmt-targetcasestmt` |
-| `targetswitch-static-dispatch.slang` | functional | `#targetswitchstmt-stageswitchstmt-targetcasestmt` |
-| `blockstmt-empty.slang` | boundary | `#blockstmt-and-seqstmt` |
-| `blockstmt-single-statement.slang` | boundary | `#blockstmt-and-seqstmt` |
-| `blockstmt-deeply-nested-stress.slang` | stress | `#blockstmt-and-seqstmt` |
-| `ifstmt-elseif-chain-stress.slang` | stress | `#ifstmt` |
-| `ifstmt-predicate-evaluated-once.slang` | boundary | `#ifstmt` |
-| `forstmt-zero-iterations.slang` | boundary | `#loop-family` |
-| `forstmt-one-iteration.slang` | boundary | `#loop-family` |
-| `forstmt-many-iterations-stress.slang` | stress | `#loop-family` |
-| `forstmt-init-only-with-break.slang` | boundary | `#loop-family` |
-| `whilestmt-true-with-break.slang` | boundary | `#loop-family` |
-| `switchstmt-default-only.slang` | boundary | `#switchstmt-casestmt-defaultstmt` |
-| `switchstmt-no-default.slang` | boundary | `#switchstmt-casestmt-defaultstmt` |
-| `breakstmt-from-switch.slang` | boundary | `#switchstmt-casestmt-defaultstmt` |
-| `continuestmt-outside-loop-rejected.slang` | negative | `#nodes` |
-| `returnstmt-void-bare.slang` | boundary | `#nodes` |
-| `returnstmt-inside-loop.slang` | boundary | `#nodes` |
-| `deferstmt-multiple-lifo-order.slang` | boundary | `#deferstmt` |
-| `deferstmt-at-function-entry.slang` | boundary | `#deferstmt` |
-| `throwstmt-enum-value-preserved.slang` | boundary | `#throwstmt-and-catchstmt` |
-| `catchstmt-nested-try.slang` | boundary | `#throwstmt-and-catchstmt` |
-| `compiletimefor-zero-range.slang` | boundary | `#compiletimeforstmt` |
-| `compiletimefor-large-range-stress.slang` | stress | `#compiletimeforstmt` |
+| [`blockstmt-introduces-scope.slang`](blockstmt-introduces-scope.slang) | functional | `#blockstmt-and-seqstmt` |
+| [`seqstmt-multi-declarator.slang`](seqstmt-multi-declarator.slang) | functional | `#blockstmt-and-seqstmt` |
+| [`ifstmt-else-branch.slang`](ifstmt-else-branch.slang) | functional | `#ifstmt` |
+| [`ifstmt-no-else-noop.slang`](ifstmt-no-else-noop.slang) | functional | `#ifstmt` |
+| [`forstmt-variable-scoped.slang`](forstmt-variable-scoped.slang) | functional | `#loop-family` |
+| [`whilestmt-skips-zero-iterations.slang`](whilestmt-skips-zero-iterations.slang) | functional | `#loop-family` |
+| [`dowhilestmt-runs-once.slang`](dowhilestmt-runs-once.slang) | functional | `#loop-family` |
+| [`switchstmt-case-dispatch.slang`](switchstmt-case-dispatch.slang) | functional | `#switchstmt-casestmt-defaultstmt` |
+| [`switchstmt-fall-through.slang`](switchstmt-fall-through.slang) | functional | `#switchstmt-casestmt-defaultstmt` |
+| [`breakstmt-exits-innermost-loop.slang`](breakstmt-exits-innermost-loop.slang) | functional | `#nodes` |
+| [`breakstmt-outside-loop-rejected.slang`](breakstmt-outside-loop-rejected.slang) | negative | `#nodes` |
+| [`continuestmt-skips-rest-of-iteration.slang`](continuestmt-skips-rest-of-iteration.slang) | functional | `#nodes` |
+| [`labelstmt-labeled-break.slang`](labelstmt-labeled-break.slang) | functional | `#labelstmt-and-breakstmttargetlabel` |
+| [`returnstmt-halts-function.slang`](returnstmt-halts-function.slang) | functional | `#nodes` |
+| [`returnstmt-missing-expression-rejected.slang`](returnstmt-missing-expression-rejected.slang) | negative | `#nodes` |
+| [`discardstmt-non-fragment-rejected.slang`](discardstmt-non-fragment-rejected.slang) | negative | `#nodes` |
+| [`deferstmt-scope-exit-order.slang`](deferstmt-scope-exit-order.slang) | functional | `#deferstmt` |
+| [`deferstmt-runs-on-early-return.slang`](deferstmt-runs-on-early-return.slang) | functional | `#deferstmt` |
+| [`throw-catch-handler-runs.slang`](throw-catch-handler-runs.slang) | functional | `#throwstmt-and-catchstmt` |
+| [`catchstmt-catch-all.slang`](catchstmt-catch-all.slang) | functional | `#throwstmt-and-catchstmt` |
+| [`throwstmt-without-throws-rejected.slang`](throwstmt-without-throws-rejected.slang) | negative | `#throwstmt-and-catchstmt` |
+| [`declstmt-local-visible-later.slang`](declstmt-local-visible-later.slang) | functional | `#declstmt-and-expressionstmt` |
+| [`expressionstmt-side-effect.slang`](expressionstmt-side-effect.slang) | functional | `#declstmt-and-expressionstmt` |
+| [`emptystmt-bare-semicolon.slang`](emptystmt-bare-semicolon.slang) | functional | `#nodes` |
+| [`requirecapability-in-function.slang`](requirecapability-in-function.slang) | functional | `#requirecapabilitystmt` |
+| [`compiletimefor-unrolls.slang`](compiletimefor-unrolls.slang) | functional | `#compiletimeforstmt` |
+| [`stageswitch-static-dispatch.slang`](stageswitch-static-dispatch.slang) | functional | `#targetswitchstmt-stageswitchstmt-targetcasestmt` |
+| [`targetswitch-static-dispatch.slang`](targetswitch-static-dispatch.slang) | functional | `#targetswitchstmt-stageswitchstmt-targetcasestmt` |
+| [`blockstmt-empty.slang`](blockstmt-empty.slang) | boundary | `#blockstmt-and-seqstmt` |
+| [`blockstmt-single-statement.slang`](blockstmt-single-statement.slang) | boundary | `#blockstmt-and-seqstmt` |
+| [`blockstmt-deeply-nested-stress.slang`](blockstmt-deeply-nested-stress.slang) | stress | `#blockstmt-and-seqstmt` |
+| [`ifstmt-elseif-chain-stress.slang`](ifstmt-elseif-chain-stress.slang) | stress | `#ifstmt` |
+| [`ifstmt-predicate-evaluated-once.slang`](ifstmt-predicate-evaluated-once.slang) | boundary | `#ifstmt` |
+| [`forstmt-zero-iterations.slang`](forstmt-zero-iterations.slang) | boundary | `#loop-family` |
+| [`forstmt-one-iteration.slang`](forstmt-one-iteration.slang) | boundary | `#loop-family` |
+| [`forstmt-many-iterations-stress.slang`](forstmt-many-iterations-stress.slang) | stress | `#loop-family` |
+| [`forstmt-init-only-with-break.slang`](forstmt-init-only-with-break.slang) | boundary | `#loop-family` |
+| [`whilestmt-true-with-break.slang`](whilestmt-true-with-break.slang) | boundary | `#loop-family` |
+| [`switchstmt-default-only.slang`](switchstmt-default-only.slang) | boundary | `#switchstmt-casestmt-defaultstmt` |
+| [`switchstmt-no-default.slang`](switchstmt-no-default.slang) | boundary | `#switchstmt-casestmt-defaultstmt` |
+| [`breakstmt-from-switch.slang`](breakstmt-from-switch.slang) | boundary | `#switchstmt-casestmt-defaultstmt` |
+| [`continuestmt-outside-loop-rejected.slang`](continuestmt-outside-loop-rejected.slang) | negative | `#nodes` |
+| [`returnstmt-void-bare.slang`](returnstmt-void-bare.slang) | boundary | `#nodes` |
+| [`returnstmt-inside-loop.slang`](returnstmt-inside-loop.slang) | boundary | `#nodes` |
+| [`deferstmt-multiple-lifo-order.slang`](deferstmt-multiple-lifo-order.slang) | boundary | `#deferstmt` |
+| [`deferstmt-at-function-entry.slang`](deferstmt-at-function-entry.slang) | boundary | `#deferstmt` |
+| [`throwstmt-enum-value-preserved.slang`](throwstmt-enum-value-preserved.slang) | boundary | `#throwstmt-and-catchstmt` |
+| [`catchstmt-nested-try.slang`](catchstmt-nested-try.slang) | boundary | `#throwstmt-and-catchstmt` |
+| [`compiletimefor-zero-range.slang`](compiletimefor-zero-range.slang) | boundary | `#compiletimeforstmt` |
+| [`compiletimefor-large-range-stress.slang`](compiletimefor-large-range-stress.slang) | stress | `#compiletimeforstmt` |
 
 ## Doc gaps observed
 

@@ -26,100 +26,100 @@ with `-target wgsl -entry main -stage compute` against the
 
 | Claim ID | Anchor                                                         | Claim (one line)                                                                                | Tests                                                |
 | -------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| C-01     | #phase-d-wgsl-emit-and-downstream-tools                        | `[numthreads(X,Y,Z)]` becomes `@compute` + `@workgroup_size(X, Y, Z)`.                          | `numthreads-becomes-workgroup-size.slang`            |
-| C-02     | #phase-d-wgsl-emit-and-downstream-tools                        | `RWStructuredBuffer<T>` emits `var<storage, read_write>` with `@binding`/`@group`.              | `rw-structured-buffer-storage-binding.slang`         |
-| C-03     | #phase-d-wgsl-emit-and-downstream-tools                        | `StructuredBuffer<T>` is `var<storage, read>` (read-only access mode).                          | `structured-buffer-storage-read.slang`               |
-| C-04     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture2D<float4>` becomes a `var ... : texture_2d<f32>` global with a binding pair.           | `texture2d-binding.slang`                            |
-| C-05     | #specializeaddressspaceforwgsl                                 | `groupshared` becomes `var<workgroup> ... : array<T, N>`.                                       | `groupshared-becomes-workgroup-address-space.slang`  |
-| C-06     | #specializeaddressspaceforwgsl                                 | Module-scope `static` becomes `var<private>`; initializer moved into entry-point body.          | `static-module-global-becomes-private.slang`         |
-| C-07     | #legalizelogicalandor                                          | `legalizeLogicalAndOr` rewrites vector `&&` into a WGSL `select(...)` expression.               | `vector-logical-and-becomes-select.slang`            |
-| C-08     | #eliminatephis-with-default-options                            | `eliminatePhis` (default options) introduces a `var` assigned in each `if`/`else` branch.       | `eliminate-phis-default-options.slang`               |
-| C-09     | #legalizeirforwgsl                                             | `SV_DispatchThreadID` maps to `@builtin(global_invocation_id)`.                                 | `dispatch-thread-id-builtin.slang`                   |
-| C-10     | #legalizeirforwgsl                                             | `SV_GroupThreadID` maps to `@builtin(local_invocation_id)`.                                     | `group-thread-id-builtin.slang`                      |
-| C-11     | #phase-a-link-and-entry-point-prep                             | `lowerEnumType` lowers enumerator references to the underlying integer literal.                 | `enum-lowering-to-integer.slang`                     |
-| C-12     | #phase-c-wgsl-legalization-lowering-phi-elimination            | `legalizeArrayReturnType` rewrites `T[N] foo()` to take a `ptr<function, array<T, N>>` out param. | `array-return-rewritten-to-out-pointer.slang`        |
-| C-13     | #phase-c-wgsl-legalization-lowering-phi-elimination            | `lowerBitCast` emits WGSL `bitcast<T>(...)` for reinterpret casts (`asuint`).                   | `bitcast-spelling.slang`                             |
-| C-14     | #phase-c-wgsl-legalization-lowering-phi-elimination            | `lowerBufferElementTypeToStorageType` (WGSL policy) wraps matrix elements in a `_MatrixStorage_` struct. | `structured-buffer-of-matrix-wraps-storage.slang`    |
-| C-15     | #legalizebyteaddressbufferops-with-wgsl-options                | `ByteAddressBuffer.Load<uint>(off)` lowers to an `array<u32>[off/4]` indexing expression.       | `byte-address-buffer-load-divides-by-four.slang`     |
-| C-16     | #phase-d-wgsl-emit-and-downstream-tools                        | `ConstantBuffer<S>` emits as `var<uniform>` over a `std140`-shaped struct with `@align(...)`.   | `constant-buffer-uniform-std140.slang`               |
-| C-17     | #phase-b-specialization-and-type-legalization                  | `lowerCombinedTextureSamplers` splits `Sampler2D` into a `<name>_texture_*` + `<name>_sampler_*` pair. | `combined-texture-sampler-split.slang`              |
-| C-18     | #phase-d-wgsl-emit-and-downstream-tools                        | `Atomic<uint>` emits as `atomic<u32>` and `.add(v)` lowers to `atomicAdd(&(buf[i]), v)`.        | `atomic-add-buffer.slang`                            |
-| C-19     | #phase-d-wgsl-emit-and-downstream-tools                        | WGSL emit selects `LineDirectiveMode::None` — no `#line` directives in the output.              | `no-line-directives.slang`                           |
-| C-20     | #phase-d-wgsl-emit-and-downstream-tools                        | The entry-point name `main` is preserved — `fn main(...)` in the WGSL emit.                    | `entry-point-name-main-preserved.slang`              |
-| C-21     | #phase-d-wgsl-emit-and-downstream-tools                        | Multiple resources at module scope receive distinct sequential `@binding` indices.              | `multiple-resources-distinct-bindings.slang`         |
-| C-22     | #phase-d-wgsl-emit-and-downstream-tools                        | Slang integer constants emit as `i32(N)` / `u32(N)` (constructor-style spelling).               | `integer-literal-spelling.slang`                     |
-| C-23     | #phase-d-wgsl-emit-and-downstream-tools                        | Slang vector types spell out as `vec<rank><elem>` (no `uintN`/`floatN` shorthand).              | `uint3-becomes-vec3-u32.slang`                       |
-| C-24     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture1D<T>` emits as `texture_1d<f32>` with a `@binding`/`@group` annotation.                | `texture1d-emit.slang`                               |
-| C-25     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture3D<T>` emits as `texture_3d<f32>` with a `@binding`/`@group` annotation.                | `texture3d-emit.slang`                               |
-| C-26     | #phase-d-wgsl-emit-and-downstream-tools                        | `TextureCube<T>` emits as `texture_cube<f32>` and `SampleLevel` lowers to `textureSampleLevel`. | `texturecube-emit.slang`                             |
-| C-27     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture2DArray<T>` emits as `texture_2d_array<f32>` with WGSL splitting `.xy` / `i32(layer)` at the sample call. | `texture2darray-emit.slang`                  |
-| C-28     | #phase-d-wgsl-emit-and-downstream-tools                        | `RWTexture2D<T>` emits as `texture_storage_2d<...,read_write>`; subscript-store lowers to `textureStore`, subscript-load to `textureLoad`. | `rwtexture2d-storage-emit.slang`               |
-| C-29     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture2D.Load(int3(xy, lod))` lowers to `textureLoad(tex, xy, lod)` without a sampler.        | `texture2d-load-emit.slang`                          |
-| C-30     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture2D.Sample(samp, uv)` lowers to `textureSample(tex, samp, uv)` (no explicit LOD).        | `texture2d-sample-emit.slang`                        |
+| C-01     | #phase-d-wgsl-emit-and-downstream-tools                        | `[numthreads(X,Y,Z)]` becomes `@compute` + `@workgroup_size(X, Y, Z)`.                          | [`numthreads-becomes-workgroup-size.slang`](numthreads-becomes-workgroup-size.slang)            |
+| C-02     | #phase-d-wgsl-emit-and-downstream-tools                        | `RWStructuredBuffer<T>` emits `var<storage, read_write>` with `@binding`/`@group`.              | [`rw-structured-buffer-storage-binding.slang`](rw-structured-buffer-storage-binding.slang)         |
+| C-03     | #phase-d-wgsl-emit-and-downstream-tools                        | `StructuredBuffer<T>` is `var<storage, read>` (read-only access mode).                          | [`structured-buffer-storage-read.slang`](structured-buffer-storage-read.slang)               |
+| C-04     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture2D<float4>` becomes a `var ... : texture_2d<f32>` global with a binding pair.           | [`texture2d-binding.slang`](texture2d-binding.slang)                            |
+| C-05     | #specializeaddressspaceforwgsl                                 | `groupshared` becomes `var<workgroup> ... : array<T, N>`.                                       | [`groupshared-becomes-workgroup-address-space.slang`](groupshared-becomes-workgroup-address-space.slang)  |
+| C-06     | #specializeaddressspaceforwgsl                                 | Module-scope `static` becomes `var<private>`; initializer moved into entry-point body.          | [`static-module-global-becomes-private.slang`](static-module-global-becomes-private.slang)         |
+| C-07     | #legalizelogicalandor                                          | `legalizeLogicalAndOr` rewrites vector `&&` into a WGSL `select(...)` expression.               | [`vector-logical-and-becomes-select.slang`](vector-logical-and-becomes-select.slang)            |
+| C-08     | #eliminatephis-with-default-options                            | `eliminatePhis` (default options) introduces a `var` assigned in each `if`/`else` branch.       | [`eliminate-phis-default-options.slang`](eliminate-phis-default-options.slang)               |
+| C-09     | #legalizeirforwgsl                                             | `SV_DispatchThreadID` maps to `@builtin(global_invocation_id)`.                                 | [`dispatch-thread-id-builtin.slang`](dispatch-thread-id-builtin.slang)                   |
+| C-10     | #legalizeirforwgsl                                             | `SV_GroupThreadID` maps to `@builtin(local_invocation_id)`.                                     | [`group-thread-id-builtin.slang`](group-thread-id-builtin.slang)                      |
+| C-11     | #phase-a-link-and-entry-point-prep                             | `lowerEnumType` lowers enumerator references to the underlying integer literal.                 | [`enum-lowering-to-integer.slang`](enum-lowering-to-integer.slang)                     |
+| C-12     | #phase-c-wgsl-legalization-lowering-phi-elimination            | `legalizeArrayReturnType` rewrites `T[N] foo()` to take a `ptr<function, array<T, N>>` out param. | [`array-return-rewritten-to-out-pointer.slang`](array-return-rewritten-to-out-pointer.slang)        |
+| C-13     | #phase-c-wgsl-legalization-lowering-phi-elimination            | `lowerBitCast` emits WGSL `bitcast<T>(...)` for reinterpret casts (`asuint`).                   | [`bitcast-spelling.slang`](bitcast-spelling.slang)                             |
+| C-14     | #phase-c-wgsl-legalization-lowering-phi-elimination            | `lowerBufferElementTypeToStorageType` (WGSL policy) wraps matrix elements in a `_MatrixStorage_` struct. | [`structured-buffer-of-matrix-wraps-storage.slang`](structured-buffer-of-matrix-wraps-storage.slang)    |
+| C-15     | #legalizebyteaddressbufferops-with-wgsl-options                | `ByteAddressBuffer.Load<uint>(off)` lowers to an `array<u32>[off/4]` indexing expression.       | [`byte-address-buffer-load-divides-by-four.slang`](byte-address-buffer-load-divides-by-four.slang)     |
+| C-16     | #phase-d-wgsl-emit-and-downstream-tools                        | `ConstantBuffer<S>` emits as `var<uniform>` over a `std140`-shaped struct with `@align(...)`.   | [`constant-buffer-uniform-std140.slang`](constant-buffer-uniform-std140.slang)               |
+| C-17     | #phase-b-specialization-and-type-legalization                  | `lowerCombinedTextureSamplers` splits `Sampler2D` into a `<name>_texture_*` + `<name>_sampler_*` pair. | [`combined-texture-sampler-split.slang`](combined-texture-sampler-split.slang)              |
+| C-18     | #phase-d-wgsl-emit-and-downstream-tools                        | `Atomic<uint>` emits as `atomic<u32>` and `.add(v)` lowers to `atomicAdd(&(buf[i]), v)`.        | [`atomic-add-buffer.slang`](atomic-add-buffer.slang)                            |
+| C-19     | #phase-d-wgsl-emit-and-downstream-tools                        | WGSL emit selects `LineDirectiveMode::None` — no `#line` directives in the output.              | [`no-line-directives.slang`](no-line-directives.slang)                           |
+| C-20     | #phase-d-wgsl-emit-and-downstream-tools                        | The entry-point name `main` is preserved — `fn main(...)` in the WGSL emit.                    | [`entry-point-name-main-preserved.slang`](entry-point-name-main-preserved.slang)              |
+| C-21     | #phase-d-wgsl-emit-and-downstream-tools                        | Multiple resources at module scope receive distinct sequential `@binding` indices.              | [`multiple-resources-distinct-bindings.slang`](multiple-resources-distinct-bindings.slang)         |
+| C-22     | #phase-d-wgsl-emit-and-downstream-tools                        | Slang integer constants emit as `i32(N)` / `u32(N)` (constructor-style spelling).               | [`integer-literal-spelling.slang`](integer-literal-spelling.slang)                     |
+| C-23     | #phase-d-wgsl-emit-and-downstream-tools                        | Slang vector types spell out as `vec<rank><elem>` (no `uintN`/`floatN` shorthand).              | [`uint3-becomes-vec3-u32.slang`](uint3-becomes-vec3-u32.slang)                       |
+| C-24     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture1D<T>` emits as `texture_1d<f32>` with a `@binding`/`@group` annotation.                | [`texture1d-emit.slang`](texture1d-emit.slang)                               |
+| C-25     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture3D<T>` emits as `texture_3d<f32>` with a `@binding`/`@group` annotation.                | [`texture3d-emit.slang`](texture3d-emit.slang)                               |
+| C-26     | #phase-d-wgsl-emit-and-downstream-tools                        | `TextureCube<T>` emits as `texture_cube<f32>` and `SampleLevel` lowers to `textureSampleLevel`. | [`texturecube-emit.slang`](texturecube-emit.slang)                             |
+| C-27     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture2DArray<T>` emits as `texture_2d_array<f32>` with WGSL splitting `.xy` / `i32(layer)` at the sample call. | [`texture2darray-emit.slang`](texture2darray-emit.slang)                  |
+| C-28     | #phase-d-wgsl-emit-and-downstream-tools                        | `RWTexture2D<T>` emits as `texture_storage_2d<...,read_write>`; subscript-store lowers to `textureStore`, subscript-load to `textureLoad`. | [`rwtexture2d-storage-emit.slang`](rwtexture2d-storage-emit.slang)               |
+| C-29     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture2D.Load(int3(xy, lod))` lowers to `textureLoad(tex, xy, lod)` without a sampler.        | [`texture2d-load-emit.slang`](texture2d-load-emit.slang)                          |
+| C-30     | #phase-d-wgsl-emit-and-downstream-tools                        | `Texture2D.Sample(samp, uv)` lowers to `textureSample(tex, samp, uv)` (no explicit LOD).        | [`texture2d-sample-emit.slang`](texture2d-sample-emit.slang)                        |
 
 ## Tests in this bundle
 
 | File                                                  | Intent     | Doc anchor                                                       |
 | ----------------------------------------------------- | ---------- | ---------------------------------------------------------------- |
-| `array-return-rewritten-to-out-pointer.slang`         | functional | `#phase-c-wgsl-legalization-lowering-phi-elimination`            |
-| `atomic-add-buffer.slang`                             | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `bitcast-spelling.slang`                              | functional | `#phase-c-wgsl-legalization-lowering-phi-elimination`            |
-| `byte-address-buffer-load-divides-by-four.slang`      | functional | `#legalizebyteaddressbufferops-with-wgsl-options`                |
-| `combined-texture-sampler-split.slang`                | functional | `#phase-b-specialization-and-type-legalization`                  |
-| `constant-buffer-uniform-std140.slang`                | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `dispatch-thread-id-builtin.slang`                    | functional | `#legalizeirforwgsl`                                             |
-| `eliminate-phis-default-options.slang`                | functional | `#eliminatephis-with-default-options`                            |
-| `entry-point-name-main-preserved.slang`               | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `enum-lowering-to-integer.slang`                      | functional | `#phase-a-link-and-entry-point-prep`                             |
-| `group-thread-id-builtin.slang`                       | functional | `#legalizeirforwgsl`                                             |
-| `groupshared-becomes-workgroup-address-space.slang`   | functional | `#specializeaddressspaceforwgsl`                                 |
-| `integer-literal-spelling.slang`                      | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `multiple-resources-distinct-bindings.slang`          | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `no-line-directives.slang`                            | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `numthreads-becomes-workgroup-size.slang`             | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `rw-structured-buffer-storage-binding.slang`          | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `static-module-global-becomes-private.slang`          | functional | `#specializeaddressspaceforwgsl`                                 |
-| `structured-buffer-of-matrix-wraps-storage.slang`     | functional | `#phase-c-wgsl-legalization-lowering-phi-elimination`            |
-| `structured-buffer-storage-read.slang`                | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `texture2d-binding.slang`                             | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `uint3-becomes-vec3-u32.slang`                        | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `vector-logical-and-becomes-select.slang`             | functional | `#legalizelogicalandor`                                          |
-| `append-structured-buffer-rejected.slang`             | negative   | `#phase-b-specialization-and-type-legalization`                  |
-| `array-index-out-of-bounds-rejected.slang`            | negative   | `#phase-b-specialization-and-type-legalization`                  |
-| `atomic-int-add.slang`                                | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `atomic-uint-add-max-value.slang`                     | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `binding-15-group-3-high.slang`                       | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `binding-zero-group-zero.slang`                       | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `byte-address-buffer-load-offset-zero.slang`          | boundary   | `#legalizebyteaddressbufferops-with-wgsl-options`                |
-| `constant-buffer-matrix-std140-wrapper.slang`         | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `float-nan-via-helper.slang`                          | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `float-positive-and-negative-zero.slang`              | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `float-vector-with-infinity.slang`                    | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `groupshared-array-256-elements.slang`                | boundary   | `#specializeaddressspaceforwgsl`                                 |
-| `integer-literal-int-max.slang`                       | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `integer-literal-int-min.slang`                       | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `integer-literal-uint-max.slang`                      | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `integer-literal-uint-zero.slang`                     | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `interlocked-add-rejected.slang`                      | negative   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `large-array-1024-elements.slang`                     | stress     | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `matrix-storage-rectangular-3x4.slang`                | boundary   | `#phase-c-wgsl-legalization-lowering-phi-elimination`            |
-| `matrix-storage-square-2x2.slang`                     | boundary   | `#phase-c-wgsl-legalization-lowering-phi-elimination`            |
-| `multi-combined-texture-sampler-pairs.slang`          | boundary   | `#phase-b-specialization-and-type-legalization`                  |
-| `multi-resources-many-bindings-stress.slang`          | stress     | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `nested-branches-five-deep-phi.slang`                 | stress     | `#eliminatephis-with-default-options`                            |
-| `numthreads-256-1-1-webgpu-max.slang`                 | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `numthreads-3d-product-256.slang`                     | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `numthreads-one-one-one-minimum.slang`                | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `numthreads-zero-rejected.slang`                      | negative   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `storage-uniform-explicit-address-space.slang`        | boundary   | `#specializeaddressspaceforwgsl`                                 |
-| `vec3-padding-trailing-field.slang`                   | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `texture1d-emit.slang`                                | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `texture3d-emit.slang`                                | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `texturecube-emit.slang`                              | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `texture2darray-emit.slang`                           | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `rwtexture2d-storage-emit.slang`                      | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `texture2d-load-emit.slang`                           | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
-| `texture2d-sample-emit.slang`                         | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`array-return-rewritten-to-out-pointer.slang`](array-return-rewritten-to-out-pointer.slang)         | functional | `#phase-c-wgsl-legalization-lowering-phi-elimination`            |
+| [`atomic-add-buffer.slang`](atomic-add-buffer.slang)                             | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`bitcast-spelling.slang`](bitcast-spelling.slang)                              | functional | `#phase-c-wgsl-legalization-lowering-phi-elimination`            |
+| [`byte-address-buffer-load-divides-by-four.slang`](byte-address-buffer-load-divides-by-four.slang)      | functional | `#legalizebyteaddressbufferops-with-wgsl-options`                |
+| [`combined-texture-sampler-split.slang`](combined-texture-sampler-split.slang)                | functional | `#phase-b-specialization-and-type-legalization`                  |
+| [`constant-buffer-uniform-std140.slang`](constant-buffer-uniform-std140.slang)                | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`dispatch-thread-id-builtin.slang`](dispatch-thread-id-builtin.slang)                    | functional | `#legalizeirforwgsl`                                             |
+| [`eliminate-phis-default-options.slang`](eliminate-phis-default-options.slang)                | functional | `#eliminatephis-with-default-options`                            |
+| [`entry-point-name-main-preserved.slang`](entry-point-name-main-preserved.slang)               | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`enum-lowering-to-integer.slang`](enum-lowering-to-integer.slang)                      | functional | `#phase-a-link-and-entry-point-prep`                             |
+| [`group-thread-id-builtin.slang`](group-thread-id-builtin.slang)                       | functional | `#legalizeirforwgsl`                                             |
+| [`groupshared-becomes-workgroup-address-space.slang`](groupshared-becomes-workgroup-address-space.slang)   | functional | `#specializeaddressspaceforwgsl`                                 |
+| [`integer-literal-spelling.slang`](integer-literal-spelling.slang)                      | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`multiple-resources-distinct-bindings.slang`](multiple-resources-distinct-bindings.slang)          | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`no-line-directives.slang`](no-line-directives.slang)                            | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`numthreads-becomes-workgroup-size.slang`](numthreads-becomes-workgroup-size.slang)             | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`rw-structured-buffer-storage-binding.slang`](rw-structured-buffer-storage-binding.slang)          | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`static-module-global-becomes-private.slang`](static-module-global-becomes-private.slang)          | functional | `#specializeaddressspaceforwgsl`                                 |
+| [`structured-buffer-of-matrix-wraps-storage.slang`](structured-buffer-of-matrix-wraps-storage.slang)     | functional | `#phase-c-wgsl-legalization-lowering-phi-elimination`            |
+| [`structured-buffer-storage-read.slang`](structured-buffer-storage-read.slang)                | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`texture2d-binding.slang`](texture2d-binding.slang)                             | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`uint3-becomes-vec3-u32.slang`](uint3-becomes-vec3-u32.slang)                        | functional | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`vector-logical-and-becomes-select.slang`](vector-logical-and-becomes-select.slang)             | functional | `#legalizelogicalandor`                                          |
+| [`append-structured-buffer-rejected.slang`](append-structured-buffer-rejected.slang)             | negative   | `#phase-b-specialization-and-type-legalization`                  |
+| [`array-index-out-of-bounds-rejected.slang`](array-index-out-of-bounds-rejected.slang)            | negative   | `#phase-b-specialization-and-type-legalization`                  |
+| [`atomic-int-add.slang`](atomic-int-add.slang)                                | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`atomic-uint-add-max-value.slang`](atomic-uint-add-max-value.slang)                     | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`binding-15-group-3-high.slang`](binding-15-group-3-high.slang)                       | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`binding-zero-group-zero.slang`](binding-zero-group-zero.slang)                       | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`byte-address-buffer-load-offset-zero.slang`](byte-address-buffer-load-offset-zero.slang)          | boundary   | `#legalizebyteaddressbufferops-with-wgsl-options`                |
+| [`constant-buffer-matrix-std140-wrapper.slang`](constant-buffer-matrix-std140-wrapper.slang)         | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`float-nan-via-helper.slang`](float-nan-via-helper.slang)                          | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`float-positive-and-negative-zero.slang`](float-positive-and-negative-zero.slang)              | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`float-vector-with-infinity.slang`](float-vector-with-infinity.slang)                    | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`groupshared-array-256-elements.slang`](groupshared-array-256-elements.slang)                | boundary   | `#specializeaddressspaceforwgsl`                                 |
+| [`integer-literal-int-max.slang`](integer-literal-int-max.slang)                       | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`integer-literal-int-min.slang`](integer-literal-int-min.slang)                       | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`integer-literal-uint-max.slang`](integer-literal-uint-max.slang)                      | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`integer-literal-uint-zero.slang`](integer-literal-uint-zero.slang)                     | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`interlocked-add-rejected.slang`](interlocked-add-rejected.slang)                      | negative   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`large-array-1024-elements.slang`](large-array-1024-elements.slang)                     | stress     | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`matrix-storage-rectangular-3x4.slang`](matrix-storage-rectangular-3x4.slang)                | boundary   | `#phase-c-wgsl-legalization-lowering-phi-elimination`            |
+| [`matrix-storage-square-2x2.slang`](matrix-storage-square-2x2.slang)                     | boundary   | `#phase-c-wgsl-legalization-lowering-phi-elimination`            |
+| [`multi-combined-texture-sampler-pairs.slang`](multi-combined-texture-sampler-pairs.slang)          | boundary   | `#phase-b-specialization-and-type-legalization`                  |
+| [`multi-resources-many-bindings-stress.slang`](multi-resources-many-bindings-stress.slang)          | stress     | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`nested-branches-five-deep-phi.slang`](nested-branches-five-deep-phi.slang)                 | stress     | `#eliminatephis-with-default-options`                            |
+| [`numthreads-256-1-1-webgpu-max.slang`](numthreads-256-1-1-webgpu-max.slang)                 | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`numthreads-3d-product-256.slang`](numthreads-3d-product-256.slang)                     | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`numthreads-one-one-one-minimum.slang`](numthreads-one-one-one-minimum.slang)                | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`numthreads-zero-rejected.slang`](numthreads-zero-rejected.slang)                      | negative   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`storage-uniform-explicit-address-space.slang`](storage-uniform-explicit-address-space.slang)        | boundary   | `#specializeaddressspaceforwgsl`                                 |
+| [`vec3-padding-trailing-field.slang`](vec3-padding-trailing-field.slang)                   | boundary   | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`texture1d-emit.slang`](texture1d-emit.slang)                                | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`texture3d-emit.slang`](texture3d-emit.slang)                                | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`texturecube-emit.slang`](texturecube-emit.slang)                              | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`texture2darray-emit.slang`](texture2darray-emit.slang)                           | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`rwtexture2d-storage-emit.slang`](rwtexture2d-storage-emit.slang)                      | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`texture2d-load-emit.slang`](texture2d-load-emit.slang)                           | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
+| [`texture2d-sample-emit.slang`](texture2d-sample-emit.slang)                         | expansion  | `#phase-d-wgsl-emit-and-downstream-tools`                        |
 
 ## Doc gaps observed
 

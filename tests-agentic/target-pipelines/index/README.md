@@ -41,21 +41,21 @@ the dispatcher.
 
 | Claim ID | Anchor                      | Claim (one line)                                                                                                                                       | Tests                                     |
 | -------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
-| C-01     | `#target-pipelines`         | The subtree dispatches one Slang source through `linkAndOptimizeIR` to each of five text-emit backends (spirv, hlsl, metal, wgsl, cuda).               | `multi-target-dispatcher.slang`           |
-| C-02     | `#cross-target-comparison`  | The cross-target table assigns a distinct Phase D emitter per target; the same source produces distinctively different surface text on each.           | `same-source-distinct-emitters.slang`     |
-| C-03     | `#shared-shape`             | The shared four-phase shape (link → specialize → target-legalize → emit) runs end-to-end on every text-emit target without user pipeline intervention. | `four-phase-shape-end-to-end.slang`       |
-| C-04     | `#cross-target-comparison`  | `eliminatePhis` is gated per-target (reg-alloc only for SPIR-V; default options for HLSL, Metal, WGSL, CUDA); SSA-merging code still emits on each.    | `phi-elim-cross-target-success.slang`     |
-| C-05     | `#cross-target-comparison`  | The text-emit `CodeGenTarget` rows reach Phase D as source / asm without invoking the downstream binary tools (DXC, fxc, Apple `metal`, Tint, nvrtc).  | `text-emit-no-downstream-tools.slang`     |
+| C-01     | `#target-pipelines`         | The subtree dispatches one Slang source through `linkAndOptimizeIR` to each of five text-emit backends (spirv, hlsl, metal, wgsl, cuda).               | [`multi-target-dispatcher.slang`](multi-target-dispatcher.slang)           |
+| C-02     | `#cross-target-comparison`  | The cross-target table assigns a distinct Phase D emitter per target; the same source produces distinctively different surface text on each.           | [`same-source-distinct-emitters.slang`](same-source-distinct-emitters.slang)     |
+| C-03     | `#shared-shape`             | The shared four-phase shape (link → specialize → target-legalize → emit) runs end-to-end on every text-emit target without user pipeline intervention. | [`four-phase-shape-end-to-end.slang`](four-phase-shape-end-to-end.slang)       |
+| C-04     | `#cross-target-comparison`  | `eliminatePhis` is gated per-target (reg-alloc only for SPIR-V; default options for HLSL, Metal, WGSL, CUDA); SSA-merging code still emits on each.    | [`phi-elim-cross-target-success.slang`](phi-elim-cross-target-success.slang)     |
+| C-05     | `#cross-target-comparison`  | The text-emit `CodeGenTarget` rows reach Phase D as source / asm without invoking the downstream binary tools (DXC, fxc, Apple `metal`, Tint, nvrtc).  | [`text-emit-no-downstream-tools.slang`](text-emit-no-downstream-tools.slang)     |
 
 ## Tests in this bundle
 
 | File                                    | Intent     | Doc anchor                  |
 | --------------------------------------- | ---------- | --------------------------- |
-| `multi-target-dispatcher.slang`         | functional | `#target-pipelines`         |
-| `same-source-distinct-emitters.slang`   | functional | `#cross-target-comparison`  |
-| `four-phase-shape-end-to-end.slang`     | functional | `#shared-shape`             |
-| `phi-elim-cross-target-success.slang`   | functional | `#cross-target-comparison`  |
-| `text-emit-no-downstream-tools.slang`   | functional | `#cross-target-comparison`  |
+| [`multi-target-dispatcher.slang`](multi-target-dispatcher.slang)         | functional | `#target-pipelines`         |
+| [`same-source-distinct-emitters.slang`](same-source-distinct-emitters.slang)   | functional | `#cross-target-comparison`  |
+| [`four-phase-shape-end-to-end.slang`](four-phase-shape-end-to-end.slang)     | functional | `#shared-shape`             |
+| [`phi-elim-cross-target-success.slang`](phi-elim-cross-target-success.slang)   | functional | `#cross-target-comparison`  |
+| [`text-emit-no-downstream-tools.slang`](text-emit-no-downstream-tools.slang)   | functional | `#cross-target-comparison`  |
 
 ## Out of scope
 

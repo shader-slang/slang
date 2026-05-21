@@ -37,23 +37,23 @@ composition observable.
 
 | Claim ID | Anchor                            | Claim (one line)                                                                                                            | Tests                                            |
 | -------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| C-01     | #name-resolution                  | The subtree turns an identifier in source text into a resolved DeclRef whose value is observable.                           | `end-to-end-resolution-positive.slang`           |
-| C-02     | #flow-diagram                     | The four documented phases compose to pick a single visible candidate from a same-name set.                                 | `flow-phases-compose-positive.slang`             |
-| C-03     | #flow-diagram                     | The visibility filter precedes overload resolution, so an inaccessible-but-more-specific overload does not win.             | `visibility-filters-before-overload.slang`       |
-| C-04     | #where-this-fits-in-the-pipeline  | The resolved DeclRef flows into AST-to-IR lowering; breadcrumb chains turn into concrete field accesses in emitted code.    | `breadcrumb-flows-into-emitted-hlsl.slang`       |
-| C-05     | #flow-diagram                     | Phases interleave; shadowing is enforced during the scope walk, so an inner-scope same-name decl wins without an ambiguity. | `phases-interleave-shadowing-during-walk.slang`  |
-| C-06     | #name-resolution                  | The product of resolution is a DeclRef (not merely a Decl); a generic call's substitution is carried at the use site.       | `declref-product-of-resolution.slang`            |
+| C-01     | #name-resolution                  | The subtree turns an identifier in source text into a resolved DeclRef whose value is observable.                           | [`end-to-end-resolution-positive.slang`](end-to-end-resolution-positive.slang)           |
+| C-02     | #flow-diagram                     | The four documented phases compose to pick a single visible candidate from a same-name set.                                 | [`flow-phases-compose-positive.slang`](flow-phases-compose-positive.slang)             |
+| C-03     | #flow-diagram                     | The visibility filter precedes overload resolution, so an inaccessible-but-more-specific overload does not win.             | [`visibility-filters-before-overload.slang`](visibility-filters-before-overload.slang)       |
+| C-04     | #where-this-fits-in-the-pipeline  | The resolved DeclRef flows into AST-to-IR lowering; breadcrumb chains turn into concrete field accesses in emitted code.    | [`breadcrumb-flows-into-emitted-hlsl.slang`](breadcrumb-flows-into-emitted-hlsl.slang)       |
+| C-05     | #flow-diagram                     | Phases interleave; shadowing is enforced during the scope walk, so an inner-scope same-name decl wins without an ambiguity. | [`phases-interleave-shadowing-during-walk.slang`](phases-interleave-shadowing-during-walk.slang)  |
+| C-06     | #name-resolution                  | The product of resolution is a DeclRef (not merely a Decl); a generic call's substitution is carried at the use site.       | [`declref-product-of-resolution.slang`](declref-product-of-resolution.slang)            |
 
 ## Tests in this bundle
 
 | File                                            | Intent     | Doc anchor                          |
 | ----------------------------------------------- | ---------- | ----------------------------------- |
-| `end-to-end-resolution-positive.slang`          | functional | `#name-resolution`                  |
-| `flow-phases-compose-positive.slang`            | functional | `#flow-diagram`                     |
-| `visibility-filters-before-overload.slang`      | functional | `#flow-diagram`                     |
-| `breadcrumb-flows-into-emitted-hlsl.slang`      | functional | `#where-this-fits-in-the-pipeline`  |
-| `phases-interleave-shadowing-during-walk.slang` | functional | `#flow-diagram`                     |
-| `declref-product-of-resolution.slang`           | functional | `#name-resolution`                  |
+| [`end-to-end-resolution-positive.slang`](end-to-end-resolution-positive.slang)          | functional | `#name-resolution`                  |
+| [`flow-phases-compose-positive.slang`](flow-phases-compose-positive.slang)            | functional | `#flow-diagram`                     |
+| [`visibility-filters-before-overload.slang`](visibility-filters-before-overload.slang)      | functional | `#flow-diagram`                     |
+| [`breadcrumb-flows-into-emitted-hlsl.slang`](breadcrumb-flows-into-emitted-hlsl.slang)      | functional | `#where-this-fits-in-the-pipeline`  |
+| [`phases-interleave-shadowing-during-walk.slang`](phases-interleave-shadowing-during-walk.slang) | functional | `#flow-diagram`                     |
+| [`declref-product-of-resolution.slang`](declref-product-of-resolution.slang)           | functional | `#name-resolution`                  |
 
 ## Out of scope
 
