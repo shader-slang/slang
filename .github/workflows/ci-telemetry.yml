@@ -85,12 +85,14 @@ jobs:
     if: |
       (github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch')
       && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-    # Serialize ingests for the same (run_id, run_attempt) to avoid the rare
-    # workflow_run ↔ workflow_dispatch race on the same target, and to cap
-    # MERGE retry storms when many workflows complete simultaneously.
-    # Different targets stay parallel because the group key includes the run
-    # id + attempt; cancel-in-progress is false because the loader's
-    # idempotency model means a duplicate ingest is safe to let finish.
+    # Serialize ingests of the same (run_id, run_attempt). This avoids the
+    # rare workflow_run ↔ workflow_dispatch race on the same target and the
+    # gh-ui-double-click case. It does NOT cap global ingest fan-out — that's
+    # GitHub's per-repo job concurrency cap, not this knob — but the loader's
+    # MERGE conflict retry already handles concurrent ingests of different
+    # targets cleanly. cancel-in-progress is false because the loader's
+    # idempotency model means a duplicate ingest is safe to let finish, and
+    # mid-flight cancellation would skip the staging-table cleanup.
     concurrency:
       group: ci-telemetry-ingest-${{ github.event.workflow_run.id || inputs.run_id }}-${{ github.event.workflow_run.run_attempt || inputs.run_attempt }}
       cancel-in-progress: false
@@ -147,20 +149,24 @@ jobs:
             run_id="${DISPATCH_RUN_ID}"
             run_attempt="${DISPATCH_RUN_ATTEMPT}"
           fi
-          # Defensive validation: both must be positive integers (run IDs
-          # and attempt numbers are always >= 1 in GitHub Actions).
-          # ci_bq_ingest treats them as ints, but reject early so the failure
-          # surfaces here rather than mid-ingest.
+          # Defensive validation: both must be positive integers in their
+          # canonical form (no leading zeros). Run IDs and attempt numbers
+          # are always >= 1 in GitHub Actions. Canonical form matters here
+          # because the value flows into the concurrency group key
+          # `ci-telemetry-ingest-<run>-<attempt>`: an operator typing
+          # `026149...` would target the same numeric run as the matching
+          # workflow_run but fail to share the same concurrency group.
+          # Ingester idempotency would absorb the duplicate, but cleaner
+          # to reject at the boundary.
           #
-          # Two-stage check per field:
-          #   1. case-glob: must be non-empty and all digits. Cheap and
-          #      catches injection-shaped input before reaching `test`.
-          #   2. POSIX arithmetic test: must be > 0. Handles "0", "00",
-          #      "000" etc. which the case-glob alone would accept.
+          # Three-stage check per field:
+          #   1. case-glob: non-empty, all digits, no leading zero.
+          #   2. POSIX arithmetic test: must be > 0 (belt-and-suspenders,
+          #      and catches the literal "0" the glob does accept).
           for var in run_id run_attempt; do
             eval "val=\$$var"
             case "$val" in
-              ''|*[!0-9]*) echo "::error::invalid $var: $val"; exit 1 ;;
+              ''|*[!0-9]*|0?*) echo "::error::invalid $var: $val"; exit 1 ;;
             esac
             if [ "$val" -le 0 ]; then
               echo "::error::$var must be positive, got: $val"

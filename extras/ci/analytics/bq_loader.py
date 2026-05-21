@@ -201,7 +201,13 @@ def drop_staging_tables(suffix: str, *, tables: Iterable[str]) -> None:
         staging_id = f"{PROJECT}:slang_ci_staging.{table}__{suffix}"
         try:
             _bq_run(["rm", "-f", "-t", staging_id])
-        except subprocess.CalledProcessError as e:
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            # Swallow per-table failures so the loop continues — the goal is
+            # to attempt cleanup of every staging table even if one is stuck.
+            # CalledProcessError handles bq-side errors (auth, permissions);
+            # TimeoutExpired handles a hung bq subprocess after we added the
+            # _BQ_CMD_TIMEOUT_S guard. The staging dataset's 1-day default
+            # expiration sweeps anything we miss.
             sys.stderr.write(
                 f"warning: failed to drop staging table {staging_id}: {e}\n"
             )
@@ -241,6 +247,14 @@ def run_merge_with_retry(
     its flag list (a runaway suggestion-distance algorithm in absl
     blows the stack on a multi-statement MERGE).
     """
+    # Server-side job timeout in ms, matched to the client-side
+    # subprocess timeout so both sides agree. Killing the local `bq`
+    # process does not by itself cancel an already-submitted BigQuery job;
+    # --job_timeout_ms makes the BQ server give up on the query if it
+    # exceeds its own deadline. Cancellation is best-effort per Google's
+    # docs but it bounds the orphan-job blast radius.
+    job_timeout_ms = _BQ_CMD_TIMEOUT_S * 1000
+
     for attempt in range(1, max_attempts + 1):
         proc = subprocess.run(
             [
@@ -249,6 +263,7 @@ def run_merge_with_retry(
                 "--use_legacy_sql=false",
                 "--project_id",
                 PROJECT,
+                f"--job_timeout_ms={job_timeout_ms}",
                 "--format=none",
             ],
             input=sql,
