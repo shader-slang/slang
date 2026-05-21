@@ -415,23 +415,30 @@ private:
             return;
         }
 
-        Int64 cursor = 1;
+        // cursor is a byte offset into content (indent bytes were already stripped above)
+        Index cursor = 0;
         for (const auto& span : line.spans)
         {
-            Int64 start = span.column - indent;
-            if (start > cursor && cursor - 1 < content.getLength())
-                ss << content.subString(cursor - 1, start - cursor);
+            // span.column is a 1-based code-point column in the full line; subtract the
+            // (ASCII-only) indent to get a 0-based code-point offset into content, then
+            // convert to a byte offset so subString receives byte-based indices.
+            Index cpStart = (Index)std::max(Int64{0}, span.column - indent - 1);
+            Index cpEnd = (Index)std::max(Int64{0}, cpStart + std::max(Int64{0}, span.length));
+            Index byteStart = UTF8Util::codePointIndexToByteOffset(content, cpStart);
+            Index byteEnd = UTF8Util::codePointIndexToByteOffset(content, cpEnd);
+
+            if (byteStart > cursor && cursor < content.getLength())
+                ss << content.subString(cursor, byteStart - cursor);
 
             TerminalColor c = span.isPrimary ? TerminalColor::Red : TerminalColor::Cyan;
-            Int64 startIdx = std::max(Int64{0}, start - 1);
-            Int64 safeLen =
-                std::max(Int64{0}, std::min(span.length, content.getLength() - startIdx));
-            if (safeLen > 0)
-                ss << color(c, String(content.subString(startIdx, safeLen)));
-            cursor = start + span.length;
+            Index safeStart = std::min(byteStart, (Index)content.getLength());
+            Index safeEnd = std::min(byteEnd, (Index)content.getLength());
+            if (safeEnd > safeStart)
+                ss << color(c, String(content.subString(safeStart, safeEnd - safeStart)));
+            cursor = byteEnd;
         }
-        if (cursor - 1 >= 0 && cursor - 1 < content.getLength())
-            ss << content.tail(cursor - 1);
+        if (cursor < (Index)content.getLength())
+            ss << content.tail(cursor);
     }
 
     //
