@@ -566,11 +566,13 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 
 #if DIRECT_FROM_FOSSIL
     const auto numInsts = flat.instAllocInfo.getElementCount();
+    const auto operandIndicesCount = flat.operandIndices.getElementCount();
 #else
     const auto numInsts = flat.instAllocInfo.getCount();
-#endif
-
     const auto operandIndicesCount = flat.operandIndices.getCount();
+    SLANG_RELEASE_ASSERT(flat.childCounts.getCount() == numInsts);
+#endif
+    SLANG_RELEASE_ASSERT(sourceLocs.getCount() == numInsts);
 
     instsList.setCount(numInsts + 1);
     // nullptr instructions are represented as `-1`. We can save ourselves a
@@ -632,6 +634,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     };
     const auto go = [&](auto& go, IRInst* parent) -> IRInst*
     {
+        SLANG_RELEASE_ASSERT(instIndex < numInsts);
         const auto thisInstIndex = instIndex++;
         IRInst* inst = insts[thisInstIndex];
 
