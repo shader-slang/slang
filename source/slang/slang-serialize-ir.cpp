@@ -623,8 +623,8 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             SLANG_RELEASE_ASSERT(stringLengthIndex < stringLengthsCount);
             const Int64 strLen = flat.stringLengths[stringLengthIndex++];
             SLANG_RELEASE_ASSERT(strLen >= 0 && strLen <= (Int64)UINT32_MAX);
-            minSizeInBytes =
-                offsetof(IRConstant, value) + offsetof(IRConstant::StringValue, chars) + (size_t)strLen;
+            minSizeInBytes = offsetof(IRConstant, value) +
+                             offsetof(IRConstant::StringValue, chars) + (size_t)strLen;
             break;
         }
         insts[instIndex] = module->_allocateInst(op, a.operandCount, minSizeInBytes);
