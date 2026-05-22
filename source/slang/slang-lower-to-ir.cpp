@@ -4851,7 +4851,6 @@ struct ExprLoweringContext
                 if (auto sharedTypeBase =
                         as<SharedTypeExpr>(staticMemberFuncExpr->baseExpression))
                 {
-                    SLANG_ASSERT(sharedTypeBase->base.exp);
                     if (sharedTypeBase->base.exp)
                         outInfo->baseExpr = sharedTypeBase->base.exp;
                 }
@@ -5333,7 +5332,7 @@ struct ExprLoweringContext
                 // first parameter (`FwdDiffFuncType`/`BwdDiffFuncType`
                 // substitute it during type resolution). Skip the
                 // prepend below and iterate user args past the implicit
-                // slot. The narrow `isAdLookupOnCallable` gate avoids
+                // slot. The narrow `asLookupOnCallable` gate avoids
                 // mis-routing per-arg passing modes for unrelated
                 // shapes that happen to satisfy `paramCount ==
                 // argCount + 1`.

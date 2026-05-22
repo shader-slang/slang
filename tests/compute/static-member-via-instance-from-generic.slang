@@ -3,7 +3,7 @@
 // inside a generic body reaches the same `StaticMemberExpr`-with-
 // `SharedTypeExpr`-base lowering path the AD 2.0 receiver-threading
 // fix touches, but must NOT synthesize an implicit `this` argument.
-// The fix's gate keys on `isAdLookupOnCallable(declRefBase)` so this
+// The fix's gate keys on `asLookupOnCallable(declRefBase)` so this
 // shape stays untouched; if a future broadening of that predicate
 // over-fires here, the call would gain a spurious `this` arg and
 // downstream IR-funcType-arity checks would trip.
