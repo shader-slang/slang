@@ -567,10 +567,16 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 #if DIRECT_FROM_FOSSIL
     const auto numInsts = flat.instAllocInfo.getElementCount();
     const auto operandIndicesCount = flat.operandIndices.getElementCount();
+    const auto literalsCount = flat.literals.getElementCount();
+    const auto stringLengthsCount = flat.stringLengths.getElementCount();
+    const auto stringCharsCount = flat.stringChars.getElementCount();
     SLANG_RELEASE_ASSERT(flat.childCounts.getElementCount() == numInsts);
 #else
     const auto numInsts = flat.instAllocInfo.getCount();
     const auto operandIndicesCount = flat.operandIndices.getCount();
+    const auto literalsCount = flat.literals.getCount();
+    const auto stringLengthsCount = flat.stringLengths.getCount();
+    const auto stringCharsCount = flat.stringChars.getCount();
     SLANG_RELEASE_ASSERT(flat.childCounts.getCount() == numInsts);
 #endif
     SLANG_RELEASE_ASSERT(sourceLocs.getCount() == numInsts);
@@ -613,7 +619,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // About 5% of instructions in the core module are strings!
         case kIROp_StringLit:
         case kIROp_BlobLit:
-            SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
+            SLANG_RELEASE_ASSERT(stringLengthIndex < stringLengthsCount);
             minSizeInBytes = offsetof(IRConstant, value) +
                              offsetof(IRConstant::StringValue, chars) +
                              flat.stringLengths[stringLengthIndex++];
@@ -654,27 +660,28 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             break;
         case kIROp_BoolLit:
         case kIROp_IntLit:
-            SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
+            SLANG_RELEASE_ASSERT(litIndex < literalsCount);
             cast<IRConstant>(inst)->value.intVal =
                 bitCast<IRIntegerValue>(flat.literals[litIndex++]);
             break;
         case kIROp_FloatLit:
-            SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
+            SLANG_RELEASE_ASSERT(litIndex < literalsCount);
             cast<IRConstant>(inst)->value.floatVal = bitCast<double>(flat.literals[litIndex++]);
             break;
         case kIROp_PtrLit:
-            SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
+            SLANG_RELEASE_ASSERT(litIndex < literalsCount);
             // Keep the compiler happy on 32 bit builds
             cast<IRConstant>(inst)->value.ptrVal = (void*)(uintptr_t(flat.literals[litIndex++]));
             break;
         case kIROp_StringLit:
         case kIROp_BlobLit:
-            SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
+            SLANG_RELEASE_ASSERT(stringLengthIndex < stringLengthsCount);
             const auto c = cast<IRConstant>(inst);
             const auto len = flat.stringLengths[stringLengthIndex++];
+            SLANG_RELEASE_ASSERT(len >= 0);
             char* const dstChars = c->value.stringVal.chars;
             c->value.stringVal.numChars = uint32_t(len);
-            SLANG_RELEASE_ASSERT(stringDataIndex + len <= flat.stringChars.getCount());
+            SLANG_RELEASE_ASSERT(stringDataIndex + len <= stringCharsCount);
             memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
             stringDataIndex += len;
             break;
