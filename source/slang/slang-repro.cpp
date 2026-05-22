@@ -10,6 +10,7 @@
 #include "../core/slang-text-io.h"
 #include "../core/slang-type-text-util.h"
 #include "slang-options.h"
+#include "slang-repro-validator.h"
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
@@ -1280,13 +1281,21 @@ struct LoadContext
     auto remainingSize = reader.getRemainingSize();
     outBuffer.setCount(remainingSize);
 
+    if (remainingSize)
     {
-        auto result = reader.read(&outBuffer[0], remainingSize);
-        if (SLANG_FAILED(result))
+        auto readResult = reader.read(outBuffer.getBuffer(), remainingSize);
+        if (SLANG_FAILED(readResult))
         {
             sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
-            return result;
+            return readResult;
         }
+    }
+
+    if (!isReproStateValid(outBuffer))
+    {
+        outBuffer.clear();
+        sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
+        return SLANG_FAIL;
     }
 
     return SLANG_OK;
@@ -1294,6 +1303,11 @@ struct LoadContext
 
 /* static */ ReproUtil::RequestState* ReproUtil::getRequest(const List<uint8_t>& buffer)
 {
+    if (size_t(buffer.getCount()) < kStartOffset + sizeof(ReproUtil::RequestState))
+    {
+        return nullptr;
+    }
+
     return (ReproUtil::RequestState*)(buffer.getBuffer() + kStartOffset);
 }
 

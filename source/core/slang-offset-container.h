@@ -346,12 +346,14 @@ public:
     template<typename T>
     T* asRaw(const Offset32Ptr<T>& ptr)
     {
-        return (T*)_getRaw(ptr.m_offset);
+        return (T*)_getRaw(ptr.m_offset, sizeof(T));
     }
     template<typename T>
     T& asRaw(const Offset32Ref<T>& ref)
     {
-        return *(T*)_getRaw(ref.m_offset);
+        uint8_t* raw = _getRaw(ref.m_offset, sizeof(T));
+        SLANG_ASSERT(raw);
+        return *(T*)raw;
     }
 
     /// A more terse way to get a raw pointer/reference. Using the [] operator can be seen as
@@ -360,12 +362,14 @@ public:
     template<typename T>
     T* operator[](const Offset32Ptr<T>& ptr)
     {
-        return (T*)_getRaw(ptr.m_offset);
+        return (T*)_getRaw(ptr.m_offset, sizeof(T));
     }
     template<typename T>
     T& operator[](const Offset32Ref<T>& ref)
     {
-        return *(T*)_getRaw(ref.m_offset);
+        uint8_t* raw = _getRaw(ref.m_offset, sizeof(T));
+        SLANG_ASSERT(raw);
+        return *(T*)raw;
     }
 
     template<typename T>
@@ -403,9 +407,24 @@ public:
     void* getFirst() { return (m_dataSize < kStartOffset) ? nullptr : (m_data + kStartOffset); }
 
     /// Get a raw pointer from the offset
-    uint8_t* _getRaw(uint32_t offset)
+    uint8_t* _getRaw(uint32_t offset, size_t size)
     {
-        return (offset == kNull32Offset) ? nullptr : (m_data + offset);
+        if (offset == kNull32Offset)
+        {
+            return nullptr;
+        }
+
+        if (!m_data)
+        {
+            return nullptr;
+        }
+
+        if (offset > m_dataSize || size > m_dataSize - offset)
+        {
+            return nullptr;
+        }
+
+        return m_data + offset;
     }
 
     OffsetBase()

@@ -214,4 +214,26 @@ SLANG_UNIT_TEST(offsetContainer)
             }
         }
     }
+
+    {
+        uint8_t data[16] = {};
+
+        MemoryOffsetBase base;
+        base.set(data, sizeof(data));
+
+        Offset32Ptr<uint32_t> nullPtr;
+        SLANG_CHECK(base.asRaw(nullPtr) == nullptr);
+
+        Offset32Ptr<uint32_t> validPtr(kStartOffset);
+        SLANG_CHECK(base.asRaw(validPtr) == (uint32_t*)(data + kStartOffset));
+
+        Offset32Ptr<uint8_t> lastBytePtr(uint32_t(sizeof(data) - 1));
+        SLANG_CHECK(base.asRaw(lastBytePtr) == data + sizeof(data) - 1);
+
+        Offset32Ptr<uint32_t> partialPtr(uint32_t(sizeof(data) - sizeof(uint32_t) + 1));
+        SLANG_CHECK(base.asRaw(partialPtr) == nullptr);
+
+        Offset32Ptr<uint8_t> pastEndPtr(uint32_t(sizeof(data)));
+        SLANG_CHECK(base.asRaw(pastEndPtr) == nullptr);
+    }
 }
