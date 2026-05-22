@@ -17,6 +17,7 @@
 
 @ int x = 1;
 //CHECK: error
+//CHECK: E20003
 
 void main()
 {

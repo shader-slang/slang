@@ -20,6 +20,7 @@ import nonexistent_module_qwerty;
 /*CHECK:
        ^^^^^^^^^^^^^^^^^^^^^^^^^ cannot open file 'nonexistent_module_qwerty.slang'
 */
+// CHECK: E1
 
 RWStructuredBuffer<float> outBuf;
 

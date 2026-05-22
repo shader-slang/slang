@@ -26,3 +26,4 @@ int foo() { return 2; }
     ^^^ function 'foo' already has a body
     ^^^ redeclared here
 */
+// CHECK: E30201

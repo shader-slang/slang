@@ -23,4 +23,5 @@ void main()
     int z = p.zzz;
 //CHECK:      ^^^ member not found
 //CHECK:      ^^^ 'zzz' is not a member of 'Pt'.
+// CHECK: E30027
 }

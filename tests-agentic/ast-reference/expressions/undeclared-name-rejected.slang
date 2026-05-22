@@ -21,4 +21,5 @@ void main()
     int x = undeclaredName;
 //CHECK:    ^^^^^^^^^^^^^^ undefined identifier
 //CHECK:    ^^^^^^^^^^^^^^ undefined identifier 'undeclaredName'.
+// CHECK: E30015
 }

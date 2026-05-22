@@ -21,6 +21,7 @@ import diff;
 /*CHECK:
        ^^^^ cannot open file 'diff.slang'
 */
+// CHECK: E1
 
 RWStructuredBuffer<float> outBuf;
 

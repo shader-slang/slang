@@ -19,6 +19,7 @@ struct Bad { Bad next; };
 /*CHECK:
        ^^^ type 'Bad' contains cyclic reference to itself.
 */
+// CHECK: E41001
 
 [numthreads(1, 1, 1)]
 void main() {}

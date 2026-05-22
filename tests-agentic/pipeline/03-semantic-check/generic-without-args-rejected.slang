@@ -23,4 +23,5 @@ void main()
 /*CHECK:
     ^^^ generic type 'Box' used without argument
 */
+// CHECK: E30408
 }

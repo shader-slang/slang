@@ -20,6 +20,7 @@ int compute(int x)
 /*CHECK:
     ^^^^^^^ non-void function must return
 */
+// CHECK: E41009
 {
     if (x > 0)
         return x;

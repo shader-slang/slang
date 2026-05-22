@@ -23,4 +23,5 @@ int f()
     ^^^^^^ 'return' should have an expression
     ^^^^^^ 'return' should have an expression.
 */
+// CHECK: E30006
 }

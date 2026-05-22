@@ -18,5 +18,6 @@
 RWStructuredBuffer outBuf;
 // CHECK: error
 // CHECK: RWStructuredBuffer
+// CHECK: E30408
 
 void main() {}

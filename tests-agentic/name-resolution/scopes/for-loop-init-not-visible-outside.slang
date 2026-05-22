@@ -22,4 +22,5 @@ void main()
     int z = i;
 //CHECK:    ^ undefined identifier
 //CHECK:    ^ undefined identifier 'i'.
+// CHECK: E30015
 }

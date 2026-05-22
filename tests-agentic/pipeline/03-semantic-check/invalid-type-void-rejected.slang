@@ -22,4 +22,5 @@ void main()
     ^^^^ invalid type 'void'
     ^^^^ invalid type 'void'.
 */
+// CHECK: E30009
 }

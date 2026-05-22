@@ -24,4 +24,5 @@ void main()
     S s;
     int v = s.secret;
     //CHECK: error
+    //CHECK: E30600
 }

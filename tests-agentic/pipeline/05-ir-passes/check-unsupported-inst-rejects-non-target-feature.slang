@@ -25,6 +25,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 /*CHECK:
      ^^^^ profile implicitly upgraded
 */
+// CHECK: W41012
 {
     printf("debug message %d\n", buf[0]);
 }

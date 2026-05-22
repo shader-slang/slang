@@ -19,6 +19,7 @@
  ^^^^^^^^^^^^^^^^^^^^^^ specialization constant type error
  ^^^^^^^^^^^^^^^^^^^^^^ specialization constant must be a scalar or enum type.
 */
+// CHECK: E31218
 
 [shader("compute")][numthreads(1,1,1)]
 void main() {}

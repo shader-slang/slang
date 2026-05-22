@@ -18,5 +18,6 @@
 #pragma warning(maybe: 41024)
 //CHECK:        ^^^^^ 15613
 //CHECK:        ^^^^^ unknown #pragma warning specifier 'maybe'
+// CHECK: E15613
 
 void main() {}

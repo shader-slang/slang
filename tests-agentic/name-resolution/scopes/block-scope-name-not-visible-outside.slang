@@ -22,4 +22,5 @@ void main()
     int y = local_in_block;
 //CHECK:    ^^^^^^^^^^^^^^ undefined identifier
 //CHECK:    ^^^^^^^^^^^^^^ undefined identifier 'local_in_block'.
+// CHECK: E30015
 }

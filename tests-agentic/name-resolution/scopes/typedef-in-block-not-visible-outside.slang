@@ -26,4 +26,5 @@ void main()
     ^^^^^^^^^^ undefined identifier
     ^^^^^^^^^^ undefined identifier 'LocalAlias'.
 */
+// CHECK: E30015
 }

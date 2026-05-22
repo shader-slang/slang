@@ -26,4 +26,5 @@ void main()
 {
     Wrap w = Wrap(1, 2);
 //CHECK: error
+//CHECK: E39999
 }

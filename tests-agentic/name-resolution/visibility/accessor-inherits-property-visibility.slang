@@ -33,4 +33,5 @@ void test(S s)
              ^ declaration not accessible
              ^ 'operator[]' is not accessible from the current context.
 */
+// CHECK: E30600
 }

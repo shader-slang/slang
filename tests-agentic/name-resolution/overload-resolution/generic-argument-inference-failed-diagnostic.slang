@@ -26,4 +26,5 @@ void main()
 {
     int x = unbox(42);
 //CHECK:         ^ could not specialize generic for arguments of type (int)
+//CHECK: E39999
 }

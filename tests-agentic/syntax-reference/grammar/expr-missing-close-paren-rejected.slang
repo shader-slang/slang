@@ -18,5 +18,6 @@ void main()
 {
     int x = (1 + 2;
     //CHECK: error
+    //CHECK: E20001
     printf("x=%d\n", x);
 }

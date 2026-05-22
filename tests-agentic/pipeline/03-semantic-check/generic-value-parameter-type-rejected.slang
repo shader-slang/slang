@@ -16,5 +16,6 @@
 
 struct V<let x : float> { int y; }
 //CHECK:     ^ generic value parameter type 'float' is not supported; only integer and enum types are allowed
+// CHECK: E30624
 
 void main() {}

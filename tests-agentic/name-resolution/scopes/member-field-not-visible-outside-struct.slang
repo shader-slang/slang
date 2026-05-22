@@ -26,4 +26,5 @@ void main()
     int x = field;
 //CHECK:    ^^^^^ undefined identifier
 //CHECK:    ^^^^^ undefined identifier 'field'.
+// CHECK: E30015
 }

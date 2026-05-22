@@ -28,4 +28,5 @@ void main()
 {
     buf[0] = doStuff<>();
 //CHECK:              ^ could not specialize generic for arguments of type ()
+//CHECK: E39999
 }

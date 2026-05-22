@@ -18,5 +18,7 @@
 
 struct B : int {}
 //CHECK:   ^^^ cannot inherit from type 'int' in module 'core' because it is implicitly 'sealed'
+// CHECK: E30830
+// CHECK: E30831
 
 void main() {}

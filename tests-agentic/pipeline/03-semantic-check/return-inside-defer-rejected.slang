@@ -19,4 +19,5 @@ void main()
     defer { return; }
 //CHECK:    ^^^^^^ 'return' inside defer
 //CHECK:    ^^^^^^ 'return' must not appear inside a defer statement.
+// CHECK: E30110
 }

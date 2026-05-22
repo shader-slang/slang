@@ -25,6 +25,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 /*CHECK:
      ^^^^ entrypoint 'main' uses features that are not available in 'compute' stage for 'wgsl' compilation target.
 */
+// CHECK: E36107
 {
     InterlockedAdd(outBuf[tid.x], 1);
 }

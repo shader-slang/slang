@@ -24,4 +24,5 @@ void main()
 {
     buf[0] = a / 0;
 //CHECK:       ^ divide by zero
+// CHECK: E30002
 }

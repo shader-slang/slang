@@ -20,4 +20,5 @@ void main()
 {
     int x = noSuchNameZzz;
 //CHECK: error
+//CHECK: E30015
 }

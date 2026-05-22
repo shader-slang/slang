@@ -19,4 +19,5 @@ void main()
     for (int i = 0; i < 3; i++) { defer { continue; } }
 //CHECK:                                  ^^^^^^^^ 'continue' inside defer
 //CHECK:                                  ^^^^^^^^ 'continue' must not appear inside a defer statement.
+// CHECK: E30109
 }

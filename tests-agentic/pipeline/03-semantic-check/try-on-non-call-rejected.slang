@@ -17,3 +17,4 @@
 int main() throws int { int v = try 5; return v; }
 //CHECK:                        ^^^ expression in 'try' must be a call
 //CHECK:                        ^^^ expression in a 'try' clause must be a call to a function or operator overload.
+// CHECK: E30090

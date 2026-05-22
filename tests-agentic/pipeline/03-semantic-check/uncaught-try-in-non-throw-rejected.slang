@@ -18,3 +18,4 @@ int g() throws int { throw 1; return 0; }
 void main() { try g(); }
 //CHECK:      ^^^ uncaught 'try' in non-throwing function
 //CHECK:      ^^^ the current function or environment is not declared to throw any errors, but the 'try' clause is not caught
+// CHECK: E30093

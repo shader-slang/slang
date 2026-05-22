@@ -33,6 +33,7 @@ void main()
      ^^^^ unavailable features in entry point
      ^^^^ entrypoint 'main' uses features that are not available in 'compute' stage for 'hlsl' compilation target.
 */
+// CHECK: E36107
 {
     helper();
 }

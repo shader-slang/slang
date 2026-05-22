@@ -19,5 +19,6 @@ static static const int X = 5;
        ^^^^^^ duplicate modifier
        ^^^^^^ modifier 'static' is redundant or conflicting with existing modifier 'static'
 */
+// CHECK: E31202
 
 void main() { int y = X; }

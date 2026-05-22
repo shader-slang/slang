@@ -23,4 +23,5 @@ void main()
     Box<int> bi;
     Box<float> bf = bi;
 //CHECK:            ^^ expected an expression of type 'Box<float>', got 'Box<int>'
+//CHECK: E30019
 }

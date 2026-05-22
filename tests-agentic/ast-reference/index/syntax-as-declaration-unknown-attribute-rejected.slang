@@ -21,6 +21,7 @@
 
 [ThisAttributeIsNotDeclaredAnywhere]
 //CHECK: unknown attribute 'ThisAttributeIsNotDeclaredAnywhere'
+// CHECK: W31000
 void main()
 {
 }

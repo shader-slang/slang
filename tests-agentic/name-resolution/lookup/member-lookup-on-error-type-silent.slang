@@ -25,4 +25,5 @@ void main()
     int n = noSuchVar.field;
 //CHECK:    ^^^^^^^^^ undefined identifier
 //CHECK:    ^^^^^^^^^ undefined identifier 'noSuchVar'.
+// CHECK: E30015
 }

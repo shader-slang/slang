@@ -22,5 +22,6 @@ void take(float v) {}
 void main()
 {
     //CHECK: error
+// CHECK: E30019
     take("not-an-int-or-float");
 }

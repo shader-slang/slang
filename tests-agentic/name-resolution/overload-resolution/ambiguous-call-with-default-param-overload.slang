@@ -24,4 +24,5 @@ void main()
 {
     int tag = pick(5);
 //CHECK:          ^ ambiguous call to 'pick'
+//CHECK: E39999
 }

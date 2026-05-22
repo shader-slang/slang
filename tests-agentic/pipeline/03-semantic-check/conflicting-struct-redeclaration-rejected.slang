@@ -22,5 +22,6 @@ struct S { int y; }
        ^ conflicting declaration
        ^ declaration of 'S' conflicts with existing declaration
 */
+// CHECK: E30200
 
 void main() {}

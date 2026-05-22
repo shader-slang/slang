@@ -28,4 +28,5 @@ void main()
     s.bump();
 //CHECK:  ^ mutating method cannot be called on immutable value
 //CHECK:  ^ mutating method 'bump' cannot be called on an immutable value
+// CHECK: E30050
 }

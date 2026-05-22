@@ -18,5 +18,6 @@
 #pragma warning(pop)
 //CHECK:        ^^^ 15611
 //CHECK:        ^^^ detected #pragma warning(pop) with no corresponding #pragma warning(push)
+// CHECK: E15611
 
 void main() {}

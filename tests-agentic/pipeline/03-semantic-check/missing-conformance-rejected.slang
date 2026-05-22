@@ -21,5 +21,6 @@ interface IFoo { int bar(); }
 struct S : IFoo {}
 //CHECK:   ^^^^ missing interface member
 //CHECK:   ^^^^ type 'S' does not provide required interface member 'bar'
+// CHECK: E38100
 
 void main() {}

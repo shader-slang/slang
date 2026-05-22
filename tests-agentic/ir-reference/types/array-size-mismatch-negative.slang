@@ -25,5 +25,6 @@ void main()
     int b[4] = a;
 //CHECK:       ^ type mismatch in expression
 //CHECK:       ^ expected an expression of type 'int[4]', got 'int[3]'
+// CHECK: E30019
     buf[0] = b[0];
 }

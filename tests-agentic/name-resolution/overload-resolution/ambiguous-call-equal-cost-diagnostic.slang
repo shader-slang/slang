@@ -26,4 +26,5 @@ void main()
 {
     int v = act(7);
 //CHECK:       ^ ambiguous call to 'act'
+//CHECK: E39999
 }

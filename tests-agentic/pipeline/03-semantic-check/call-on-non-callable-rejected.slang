@@ -21,4 +21,5 @@ void main()
     int y = x(3);
 //CHECK:     ^ no call operation found for type
 //CHECK:     ^ no call operation found for type 'int'
+// CHECK: E30016
 }

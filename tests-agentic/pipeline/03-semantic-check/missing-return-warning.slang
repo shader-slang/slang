@@ -19,6 +19,7 @@ int foo()
 /*CHECK:
     ^^^ non-void function does not return in all cases
 */
+// CHECK: W41010
 {
     int x = 5;
 }

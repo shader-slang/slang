@@ -26,5 +26,6 @@ void main()
 {
     int x = 99999999999999999999;
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in any integer type
+// CHECK: E10012
     buf[0] = x;
 }

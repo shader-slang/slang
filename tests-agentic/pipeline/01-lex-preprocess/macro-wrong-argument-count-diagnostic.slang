@@ -21,5 +21,6 @@
 static const int q = BIN(1);
 //CHECK:                ^ wrong macro argument count
 //CHECK:                ^ wrong number of arguments to macro (expected 2, got 1)
+// CHECK: E15501
 
 void main() {}

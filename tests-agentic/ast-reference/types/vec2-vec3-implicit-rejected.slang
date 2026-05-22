@@ -21,4 +21,5 @@ void main()
     float2 v2 = float2(1.0, 2.0);
     float3 v3 = v2;
 //CHECK:        ^^ type mismatch in expression
+// CHECK: E30019
 }

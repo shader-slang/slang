@@ -20,5 +20,6 @@ void main()
     int y = x + 1;
 //CHECK:    ^ undefined identifier
 //CHECK:    ^ undefined identifier 'x'.
+// CHECK: E30015
     int x = 5;
 }

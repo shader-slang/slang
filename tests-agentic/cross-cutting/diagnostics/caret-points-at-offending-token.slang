@@ -20,4 +20,5 @@ void main()
     int a = b;
 //CHECK:    ^ undefined identifier
 //CHECK:    ^ undefined identifier 'b'.
+// CHECK: E30015
 }

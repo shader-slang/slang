@@ -17,3 +17,4 @@
 void main() { int x = 0; if (x = 5) { } }
 //CHECK:                       ^ assignment in predicate expression not allowed
 //CHECK:                       ^ use an assignment operation as predicate expression is not allowed, wrap the assignment with '()' to clarify the intent.
+// CHECK: E30057

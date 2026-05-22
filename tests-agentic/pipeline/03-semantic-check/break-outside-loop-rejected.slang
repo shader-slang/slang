@@ -22,4 +22,5 @@ void main()
     ^^^^^ 'break' must appear inside loop or switch constructs
     ^^^^^ 'break' must appear inside loop or switch constructs.
 */
+// CHECK: E30003
 }

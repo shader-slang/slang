@@ -19,4 +19,5 @@ void main()
     int a = mysteryIdent;
 //CHECK:    ^^^^^^^^^^^^ undefined identifier
 //CHECK:    ^^^^^^^^^^^^ undefined identifier 'mysteryIdent'.
+// CHECK: E30015
 }

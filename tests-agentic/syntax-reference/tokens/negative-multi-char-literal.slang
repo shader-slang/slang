@@ -19,4 +19,5 @@ void main()
 {
     int x = int('AB');
 //CHECK:          ^ illegal character literal
+// CHECK: E10001
 }

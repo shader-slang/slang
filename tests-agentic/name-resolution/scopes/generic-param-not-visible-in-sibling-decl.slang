@@ -24,4 +24,5 @@ void other()
     ^ undefined identifier
     ^ undefined identifier 'T'.
 */
+// CHECK: E30015
 }

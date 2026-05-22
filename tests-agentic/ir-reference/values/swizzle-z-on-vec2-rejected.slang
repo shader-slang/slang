@@ -25,4 +25,5 @@ void main()
     buf[0] = v.z;
 //CHECK:       ^ member not found
 //CHECK:       ^ 'z' is not a member of 'vector<float,2>'.
+// CHECK: E30027
 }

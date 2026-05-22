@@ -23,6 +23,7 @@ void main()
 /*CHECK:
      ^^^^ unavailable features in entry point
 */
+// CHECK: E36107
 {
     if (threshold < 0.0)
         discard;

@@ -24,4 +24,5 @@ void main()
     buf[0] = v.w;
 //CHECK:       ^ member not found
 //CHECK:       ^ 'w' is not a member of 'vector<float,3>'.
+// CHECK: E30027
 }

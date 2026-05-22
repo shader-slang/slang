@@ -18,6 +18,7 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -profile bogus_profile -entry main -stage compute
 //CHECK: unknown profile 'bogus_profile'
+// CHECK: E00014
 
 RWStructuredBuffer<int> outBuf;
 

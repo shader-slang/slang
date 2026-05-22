@@ -22,6 +22,7 @@ int fact(int n)
     if (n <= 1) return 1;
     return n * fact(n - 1);
 //CHECK: recursion detected in call to 'fact', but the current code generation target does not allow recursion.
+//CHECK: E55201
 }
 
 [shader("compute")]

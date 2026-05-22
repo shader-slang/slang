@@ -18,5 +18,6 @@
 #include "include-self-cycle-diagnostic.slang"
 //CHECK: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cyclic include
 //CHECK: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cyclic `#include` of file '"include-self-cycle-diagnostic.slang"'
+// CHECK: E15302
 
 void main() {}

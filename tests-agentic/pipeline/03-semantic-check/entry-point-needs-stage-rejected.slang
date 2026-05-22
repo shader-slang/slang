@@ -19,3 +19,4 @@ void myEntry() {}
 /*CHECK:
      ^^^^^^^ no stage specified for entry point
 */
+// CHECK: E38007

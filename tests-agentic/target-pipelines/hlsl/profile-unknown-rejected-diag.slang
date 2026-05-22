@@ -14,6 +14,7 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -profile cs_99_99
 //CHECK: unknown profile 'cs_99_99'
+// CHECK: E00014
 
 RWStructuredBuffer<int> outBuf;
 

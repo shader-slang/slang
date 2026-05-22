@@ -20,4 +20,5 @@ void main()
 {
     int x = undeclaredThing;
     //CHECK: undefined identifier
+// CHECK: E30015
 }

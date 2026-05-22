@@ -16,5 +16,6 @@
 
 [shader(123)] void m() {}
 //CHECK:^^^ expected a string literal
+// CHECK: E33071
 
 void main() {}

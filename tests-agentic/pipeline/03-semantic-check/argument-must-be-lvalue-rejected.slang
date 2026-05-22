@@ -20,3 +20,4 @@ void g(out int x) { x = 5; }
 void main() { g(5); }
 //CHECK:        ^ argument must be l-value
 //CHECK:        ^ argument passed to parameter '0' must be l-value.
+// CHECK: E30047

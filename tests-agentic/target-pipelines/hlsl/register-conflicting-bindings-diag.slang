@@ -19,6 +19,7 @@ RWStructuredBuffer<int> bufA : register(u0);
 RWStructuredBuffer<float> bufB : register(u0);
 //CHECK:                  ^^^^ explicit binding overlap
 //CHECK:                  ^^^^ explicit binding for parameter 'bufB' overlaps with parameter 'bufA'
+// CHECK: W39001
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

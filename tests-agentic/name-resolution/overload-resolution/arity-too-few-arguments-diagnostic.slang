@@ -21,4 +21,5 @@ void main()
 {
     int v = add(7);
 //CHECK:       ^ not enough arguments to call
+//CHECK: E39999
 }

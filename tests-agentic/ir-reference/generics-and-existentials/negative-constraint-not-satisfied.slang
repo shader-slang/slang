@@ -34,4 +34,6 @@ void main()
     a.x = inVal;
     buf[0] = helper<A>(a, inVal);
 //CHECK:     ^^^^^^ type argument doesn't conform to interface
+// CHECK: E38021
+// CHECK: E38029
 }

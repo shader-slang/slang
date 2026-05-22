@@ -19,4 +19,5 @@ void main()
     switch(x) { default: break; default: break; }
 //CHECK:                        ^^^^^^^ multiple default cases in switch
 //CHECK:                        ^^^^^^^ multiple 'default' cases not allowed within a 'switch' statement
+// CHECK: E30602
 }

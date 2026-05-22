@@ -22,4 +22,5 @@ void main()
     foo() = 7;
 //CHECK:  ^ left of '=' is not an l-value
 //CHECK:  ^ left of '=' is not an l-value.
+// CHECK: E30011
 }

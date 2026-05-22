@@ -28,6 +28,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 /*CHECK:
      ^^^^ entry point 'main' uses capabilities that are not part of the specified profile 'sm_6_0'. Missing capabilities are: 'sm_6_3'
 */
+// CHECK: E41013
 {
     RayQuery<RAY_FLAG_NONE> rq;
     RayDesc ray;

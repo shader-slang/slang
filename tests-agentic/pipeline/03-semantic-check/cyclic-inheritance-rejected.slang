@@ -19,5 +19,6 @@ struct A : A {}
 /*CHECK:
        ^ cyclic reference in inheritance graph 'A'
 */
+//CHECK: E39999
 
 void main() {}

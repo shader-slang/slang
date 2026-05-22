@@ -24,6 +24,7 @@ float plain(float x) { return x * x; }
 [Differentiable]
 float wrap(float x) { return plain(x); }
 //CHECK:                          ^ derivative cannot be propagated through non-differentiable call
+// CHECK: E41022
 
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)

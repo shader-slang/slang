@@ -18,6 +18,7 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -profile cs_6_5 -entry main -stage vertex
 //CHECK: conflicting stages have been specified for entry point 'main'
+// CHECK: E00031
 
 RWStructuredBuffer<int> outBuf;
 

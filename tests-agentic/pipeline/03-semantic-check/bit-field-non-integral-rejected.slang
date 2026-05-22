@@ -16,5 +16,6 @@
 struct S { float x : 4; };
 //CHECK:         ^ bit-field type must be integral
 //CHECK:         ^ bit-field type (float) must be an integral type
+// CHECK: E31301
 
 void main() { S s; }

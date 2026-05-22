@@ -27,5 +27,6 @@ void main(uint3 tid : SV_DispatchThreadID)
     // `neural` is a standard-module namespace not implicitly in scope.
     float v = neural.SomeName(tid.x);
 //CHECK:      ^^^^^^ undefined identifier 'neural'.
+// CHECK: E30015
     outBuf[tid.x] = v;
 }

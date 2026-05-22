@@ -20,3 +20,4 @@ int f(int8_t x) { return 2; }
 
 void main() { int y = f(1.5); }
 //CHECK:               ^ ambiguous call to 'f' with arguments of type (float)
+//CHECK: E39999

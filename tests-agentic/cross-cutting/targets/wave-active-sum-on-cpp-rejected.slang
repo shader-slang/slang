@@ -26,6 +26,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 /*CHECK:
      ^^^^ entrypoint 'main' uses features that are not available in 'compute' stage for 'cpp' compilation target.
 */
+//CHECK: E36107
 {
     outBuf[tid.x] = WaveActiveSum(int(tid.x));
 }

@@ -27,4 +27,5 @@ void main()
 {
     buf[0] = identity<UndefinedType>(a);
 //CHECK:              ^^^^^^^^^^^^^ undefined identifier 'UndefinedType'.
+// CHECK: E30015
 }

@@ -21,4 +21,5 @@ void main()
     int x = 1xyz;
 //CHECK:    ^^^^ invalid suffix on integer literal
 //CHECK:    ^^^^ invalid suffix 'xyz' on integer literal
+//CHECK: E39999
 }

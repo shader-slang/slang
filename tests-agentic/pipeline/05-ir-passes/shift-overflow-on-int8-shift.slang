@@ -22,4 +22,5 @@ void main(uint3 tid : SV_DispatchThreadID)
 {
     buf[0] = a << 8;
 //CHECK:       ^^ left shift overflow
+// CHECK: W41030
 }

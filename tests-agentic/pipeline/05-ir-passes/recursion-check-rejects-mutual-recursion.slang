@@ -22,6 +22,7 @@ int fb(int n);
 int fa(int n) { return n <= 0 ? 0 : fb(n - 1); }
 //CHECK:                              ^ recursion not allowed
 //CHECK:                              ^ recursion detected in call to 'fb', but the current code generation target does not allow recursion.
+// CHECK: E55201
 
 int fb(int n) { return n <= 0 ? 1 : fa(n - 1); }
 

@@ -20,4 +20,5 @@ void main()
 {
     uint64_t x = 99999999999999999999;
 //CHECK: integer literal is too large
+//CHECK: E10012
 }

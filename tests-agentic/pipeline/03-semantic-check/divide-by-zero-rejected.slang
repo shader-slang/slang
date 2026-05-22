@@ -17,5 +17,6 @@
 
 static const int X = 5 / 0;
 //CHECK:               ^ divide by zero
+// CHECK: E30002
 
 void main() { int y = X; }

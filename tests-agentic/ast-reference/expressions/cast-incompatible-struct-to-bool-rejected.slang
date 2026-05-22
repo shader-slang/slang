@@ -22,4 +22,5 @@ void main()
     bool x = (bool) s;
 //CHECK:            ^ type mismatch in expression
 //CHECK:            ^ expected an expression of type 'bool', got 'S'
+// CHECK: E30019
 }

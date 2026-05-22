@@ -22,6 +22,7 @@ int empty(int n)
 /*CHECK:
     ^^^^^ non-void function does not return in all cases
 */
+// CHECK: W41010
 {
 }
 

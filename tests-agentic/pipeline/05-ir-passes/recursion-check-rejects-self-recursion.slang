@@ -22,6 +22,7 @@ int fact(int n)
     return n <= 1 ? 1 : n * fact(n - 1);
 //CHECK:                        ^ recursion not allowed
 //CHECK:                        ^ recursion detected in call to 'fact', but the current code generation target does not allow recursion.
+// CHECK: E55201
 }
 
 [numthreads(1, 1, 1)]

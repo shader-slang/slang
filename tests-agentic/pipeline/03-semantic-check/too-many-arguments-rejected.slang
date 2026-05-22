@@ -20,3 +20,4 @@ void foo() {}
 void main() { foo(1, 2); }
 //CHECK:         ^ too many arguments to call
 //CHECK:         ^ too many arguments to call (got 2, expected 0)
+//CHECK: E39999

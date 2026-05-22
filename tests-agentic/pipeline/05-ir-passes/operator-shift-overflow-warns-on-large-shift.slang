@@ -25,5 +25,6 @@ void main(uint3 tid : SV_DispatchThreadID)
     int x = a;
     x = x << 40;
 //CHECK:  ^^ left shift overflow
+// CHECK: W41030
     buf[0] = x;
 }

@@ -19,6 +19,7 @@
  ^^^^^^^^^^ invalid attribute placement
  ^^^^^^^^^^ attribute 'numthreads' is not valid here
 */
+// CHECK: E31002
 struct S {}
 [shader("compute")][numthreads(1,1,1)]
 void main() {}

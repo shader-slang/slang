@@ -19,4 +19,5 @@ void main()
     int x = unknownName;
 //CHECK:    ^^^^^^^^^^^ undefined identifier
 //CHECK:    ^^^^^^^^^^^ undefined identifier 'unknownName'.
+// CHECK: E30015
 }

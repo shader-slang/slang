@@ -35,6 +35,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 /*CHECK:
      ^^^^ entrypoint 'main' uses features that are not available in 'compute' stage for 'glsl' compilation target.
 */
+//CHECK: E36107
 {
     outBuf[tid.x] = pickHlslOnly();
 }

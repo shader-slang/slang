@@ -25,4 +25,5 @@ void main()
     Custom c;
     receive(c);
 //CHECK:    ^ type mismatch in expression
+// CHECK: E30019
 }

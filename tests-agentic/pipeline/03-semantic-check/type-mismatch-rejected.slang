@@ -27,4 +27,5 @@ void main()
     takeA(b);
 //CHECK:  ^ type mismatch in expression
 //CHECK:  ^ expected an expression of type 'A', got 'B'
+// CHECK: E30019
 }

@@ -27,4 +27,5 @@ void main()
     int m = manhattan();
 //CHECK:    ^^^^^^^^^ undefined identifier
 //CHECK:    ^^^^^^^^^ undefined identifier 'manhattan'.
+// CHECK: E30015
 }

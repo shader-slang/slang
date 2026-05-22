@@ -19,3 +19,4 @@ struct P { int x; int y; };
 void main() { P p = {1, 2, 3, 4}; }
 //CHECK:            ^ too many initializers in initializer list
 //CHECK:            ^ too many initializers (expected 2, got 4)
+// CHECK: E30523

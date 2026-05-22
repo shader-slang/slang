@@ -24,4 +24,5 @@ void main()
 {
     buf[0] = bit_cast<uint64_t>(a);
 //CHECK:                       ^ bit_cast size mismatch
+// CHECK: E41202
 }

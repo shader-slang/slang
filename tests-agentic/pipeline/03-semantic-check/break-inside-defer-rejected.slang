@@ -20,4 +20,5 @@ void main()
     for (int i = 0; i < 10; i++) { defer { break; } }
 //CHECK:                                   ^^^^^ 'break' inside defer
 //CHECK:                                   ^^^^^ 'break' must not appear inside a defer statement.
+// CHECK: E30108
 }

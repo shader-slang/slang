@@ -21,6 +21,7 @@ int foo()
 /*CHECK:
     ^^^^^^ 'return' should have an expression
 */
+// CHECK: E30006
 }
 
 void main() { int z = foo(); }

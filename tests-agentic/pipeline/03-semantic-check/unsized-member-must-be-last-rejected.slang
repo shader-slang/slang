@@ -17,5 +17,6 @@
 struct S { int data[]; int x; }
 //CHECK:       ^^^^ unsized member must be last
 //CHECK:       ^^^^ member with unknown size at compile time can only appear as the last member in a composite type.
+// CHECK: E30070
 
 void main() {}

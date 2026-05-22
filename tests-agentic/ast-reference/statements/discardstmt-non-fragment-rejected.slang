@@ -25,4 +25,5 @@ void computeMain()
 {
     discard;
 //CHECK: ^^^^^^^
+//CHECK: E36107
 }

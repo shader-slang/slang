@@ -28,4 +28,5 @@ void g(B b)
       ^ type mismatch in expression
       ^ expected an expression of type 'A', got 'B'
 */
+// CHECK: E30019
 }

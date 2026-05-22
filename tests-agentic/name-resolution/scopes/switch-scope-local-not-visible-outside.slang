@@ -29,4 +29,5 @@ void main()
     int y = caseLocal;
 //CHECK:    ^^^^^^^^^ undefined identifier
 //CHECK:    ^^^^^^^^^ undefined identifier 'caseLocal'.
+// CHECK: E30015
 }

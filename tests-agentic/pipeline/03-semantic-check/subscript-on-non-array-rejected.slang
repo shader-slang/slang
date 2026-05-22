@@ -20,4 +20,5 @@ void main()
     int y = x[0];
 //CHECK:     ^ invalid subscript expression
 //CHECK:     ^ no subscript declarations found for type 'int'
+// CHECK: E30013
 }

@@ -21,6 +21,7 @@ struct IS {}
 public struct PS
 //CHECK:      ^^ references less visible type
 //CHECK:      ^^ '$init' references less visible type 'IS'.
+// CHECK: E30604
 {
     public IS member;
 }

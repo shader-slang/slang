@@ -24,4 +24,5 @@ void main()
     int x = helper();
 //CHECK:    ^^^^^^ undefined identifier
 //CHECK:    ^^^^^^ undefined identifier 'helper'.
+// CHECK: E30015
 }

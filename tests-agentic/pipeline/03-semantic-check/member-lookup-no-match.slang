@@ -24,4 +24,5 @@ void main()
     int y = f.nope;
 //CHECK:      ^^^^ member not found
 //CHECK:      ^^^^ 'nope' is not a member of 'Foo'.
+// CHECK: E30027
 }

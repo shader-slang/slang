@@ -27,4 +27,5 @@ void main()
     int n = a.missing;
 //CHECK:      ^^^^^^^ member not found
 //CHECK:      ^^^^^^^ 'missing' is not a member of 'A'.
+// CHECK: E30027
 }

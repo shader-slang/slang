@@ -23,6 +23,7 @@
  ^^^^^^^ disallowed capability
  ^^^^^^^ 'require' resolves into a disallowed `Invalid` Capability.
 */
+// CHECK: E36111
 void helper() {}
 
 RWStructuredBuffer<int> outBuf;

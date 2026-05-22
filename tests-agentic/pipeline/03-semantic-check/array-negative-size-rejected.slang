@@ -17,5 +17,6 @@
 int arr[-3];
 //CHECK: ^ array size must be non-negative
 //CHECK: ^ array size must be non-negative.
+// CHECK: E30025
 
 void main() {}

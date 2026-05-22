@@ -22,6 +22,7 @@ struct S
     {
         n = 42;
         //CHECK: error
+        //CHECK: E30011
     }
 }
 

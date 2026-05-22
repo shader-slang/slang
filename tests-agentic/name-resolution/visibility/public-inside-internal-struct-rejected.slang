@@ -20,4 +20,5 @@ struct Container
     public void leak() {}
 //CHECK:        ^^^^ visibility higher than parent
 //CHECK:        ^^^^ 'leak' cannot have a higher visibility than 'Container'.
+// CHECK: E30601
 }

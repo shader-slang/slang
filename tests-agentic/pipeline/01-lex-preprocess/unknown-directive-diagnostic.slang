@@ -20,5 +20,6 @@
  ^^^^^^^^^^^^^^^^^^^^ unknown directive
  ^^^^^^^^^^^^^^^^^^^^ unknown preprocessor directive 'not_a_real_directive'
 */
+// CHECK: E15101
 
 void main() {}

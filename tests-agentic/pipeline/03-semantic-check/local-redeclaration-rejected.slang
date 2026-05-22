@@ -21,4 +21,5 @@ void main()
     float x = 2;
 //CHECK:  ^ conflicting declaration
 //CHECK:  ^ declaration of 'x' conflicts with existing declaration
+// CHECK: E30200
 }

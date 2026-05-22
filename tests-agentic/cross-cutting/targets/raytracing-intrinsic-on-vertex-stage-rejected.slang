@@ -26,6 +26,7 @@ float4 main(uint vid : SV_VertexID) : SV_Position
 /*CHECK:
        ^^^^ entrypoint 'main' uses features that are not available in 'vertex' stage for 'hlsl' compilation target.
 */
+//CHECK: E36107
 {
     Payload p;
     p.v = 0;

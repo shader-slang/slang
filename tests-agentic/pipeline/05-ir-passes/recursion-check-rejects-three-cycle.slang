@@ -23,6 +23,7 @@ int C(int n);
 int A(int n) { return n <= 0 ? 0 : B(n - 1); }
 int B(int n) { return n <= 0 ? 0 : C(n - 1); }
 //CHECK:                            ^ recursion not allowed
+// CHECK: E55201
 int C(int n) { return n <= 0 ? 0 : A(n - 1); }
 
 [numthreads(1, 1, 1)]

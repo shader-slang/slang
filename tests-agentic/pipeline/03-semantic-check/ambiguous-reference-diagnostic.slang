@@ -28,4 +28,5 @@ void main()
 /*CHECK:
     ^ ambiguous reference to 'X'
 */
+//CHECK: E39999
 }

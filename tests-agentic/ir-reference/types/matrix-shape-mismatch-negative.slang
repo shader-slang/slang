@@ -25,5 +25,6 @@ void main()
     float3x3 m33 = m22;
 //CHECK:           ^^^ type mismatch in expression
 //CHECK:           ^^^ expected an expression of type 'matrix<float,3,3>', got 'matrix<float,2,2>'
+// CHECK: E30019
     buf[0] = m33[0][0];
 }

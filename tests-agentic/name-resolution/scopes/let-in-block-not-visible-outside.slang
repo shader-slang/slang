@@ -22,4 +22,5 @@ void main()
     int x = inner;
 //CHECK:    ^^^^^ undefined identifier
 //CHECK:    ^^^^^ undefined identifier 'inner'.
+// CHECK: E30015
 }

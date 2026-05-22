@@ -22,4 +22,5 @@ interface IThing
     ^^^^^^^ invalid private visibility
     ^^^^^^^ 'hidden' cannot have private visibility because it is not a member of a type.
 */
+// CHECK: E30603
 }

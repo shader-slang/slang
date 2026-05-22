@@ -27,3 +27,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 //CHECK: array index out of bounds
+// CHECK: E30029

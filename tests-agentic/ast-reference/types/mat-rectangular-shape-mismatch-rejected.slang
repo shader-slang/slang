@@ -21,4 +21,5 @@ void main()
     float2x3 a = float2x3(1, 2, 3, 4, 5, 6);
     float3x2 b = a;
 //CHECK:         ^ type mismatch in expression
+// CHECK: E30019
 }

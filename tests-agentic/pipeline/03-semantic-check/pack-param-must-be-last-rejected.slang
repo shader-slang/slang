@@ -17,5 +17,6 @@
 void f<each T, U>(U u) {}
 //CHECK:       ^ generic parameter after a variadic pack parameter is not allowed
 //CHECK:       ^ generic parameter 'U' cannot appear after a variadic pack parameter
+// CHECK: E30522
 
 void main() {}

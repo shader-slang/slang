@@ -22,4 +22,5 @@ void main()
     C c = C();
 //CHECK:   ^ class can only be initialized by `new`
 //CHECK:   ^ a class can only be initialized by a `new` clause
+// CHECK: E30066
 }

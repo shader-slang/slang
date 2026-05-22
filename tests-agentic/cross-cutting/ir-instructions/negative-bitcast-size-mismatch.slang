@@ -24,4 +24,5 @@ void main()
 {
     buf[0] = bit_cast<uint4>(0u);
 //CHECK:                    ^ type mismatch in expression
+// CHECK: E30019
 }

@@ -23,4 +23,5 @@ void main()
     int s = n;
 //CHECK:    ^ undefined identifier
 //CHECK:    ^ undefined identifier 'n'.
+// CHECK: E30015
 }

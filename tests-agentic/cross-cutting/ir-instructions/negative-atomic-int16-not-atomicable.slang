@@ -19,6 +19,8 @@
 
 uniform RWStructuredBuffer<Atomic<int16_t> > buf;
 //CHECK:                   ^^^^^^ type argument doesn't conform to interface
+// CHECK: E38021
+// CHECK: E38029
 
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)

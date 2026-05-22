@@ -28,4 +28,5 @@ void main()
 {
     int z = VAL;
 //CHECK:    ^^^ ambiguous reference to 'VAL'
+//CHECK: E39999
 }

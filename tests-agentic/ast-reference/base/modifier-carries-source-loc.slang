@@ -23,6 +23,7 @@
  ^^^^^^^^^^^ invalid attribute placement
  ^^^^^^^^^^^ attribute 'ForceInline' is not valid here
 */
+// CHECK: E31002
 struct S { int x; };
 
 void main() {}

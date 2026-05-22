@@ -26,3 +26,4 @@ int foo(){ return 2; }
     ^^^ error
     ^^^ redeclared here
 */
+//CHECK: E30201

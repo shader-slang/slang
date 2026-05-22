@@ -23,4 +23,5 @@ void main()
     ^^^^^^^^ 'continue' must appear inside loop constructs
     ^^^^^^^^ 'continue' must appear inside loop constructs.
 */
+// CHECK: E30004
 }

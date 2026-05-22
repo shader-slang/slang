@@ -23,4 +23,5 @@ void main()
     int y = s.bogus;
 //CHECK:      ^^^^^ member not found
 //CHECK:      ^^^^^ 'bogus' is not a member of 'S'.
+// CHECK: E30027
 }

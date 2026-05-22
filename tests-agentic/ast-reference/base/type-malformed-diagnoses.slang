@@ -22,5 +22,6 @@ void f(NotARealTypeName x) {}
        ^^^^^^^^^^^^^^^^ undefined identifier
        ^^^^^^^^^^^^^^^^ undefined identifier 'NotARealTypeName'.
 */
+// CHECK: E30015
 
 void main() {}

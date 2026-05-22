@@ -18,5 +18,6 @@
 #include "this-file-does-not-exist.slang.h"
 //CHECK: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ include file not found
 //CHECK: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ failed to find include file
+// CHECK: E15300
 
 void main() {}

@@ -25,4 +25,5 @@ void f()
     ^^^^^ uncaught 'throw' in non-throwing function
     ^^^^^ the current function or environment is not declared to throw any errors, but contains an uncaught 'throw' statement.
 */
+// CHECK: E30115
 }

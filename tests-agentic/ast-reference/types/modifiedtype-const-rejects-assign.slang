@@ -22,4 +22,5 @@ void main()
 /*CHECK:
       ^ left of '=' is not an l-value
 */
+// CHECK: E30011
 }

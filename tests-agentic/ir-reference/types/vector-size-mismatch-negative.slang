@@ -25,5 +25,6 @@ void main()
     int4 w = v;
 //CHECK:     ^ type mismatch in expression
 //CHECK:     ^ expected an expression of type 'vector<int,4>', got 'vector<int,3>'
+// CHECK: E30019
     buf[0] = w.x;
 }

@@ -21,4 +21,5 @@ void main()
 {
     int a[undeclaredN];
 //CHECK:  ^^^^^^^^^^^ undefined identifier 'undeclaredN'.
+// CHECK: E30015
 }

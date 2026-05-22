@@ -21,6 +21,7 @@
     ^^^^^^^^^^^ 15205
     ^^^^^^^^^^^ undefined identifier 'UNSET_MACRO' in preprocessor expression will evaluate to zero
 */
+// CHECK: E30015
 #endif
 
 void main() {}

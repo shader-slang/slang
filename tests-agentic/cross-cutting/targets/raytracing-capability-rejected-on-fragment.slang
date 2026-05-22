@@ -31,6 +31,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 /*CHECK:
      ^^^^ entrypoint 'main' uses features that are not available in 'compute' stage for 'hlsl' compilation target.
 */
+//CHECK: E36107
 {
     Payload p;
     p.v = 0;

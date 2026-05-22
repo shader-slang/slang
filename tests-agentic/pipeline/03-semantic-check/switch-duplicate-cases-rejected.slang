@@ -19,4 +19,5 @@ void main()
     switch(x) { case 1: break; case 1: break; }
 //CHECK:                       ^^^^ duplicate cases in switch
 //CHECK:                       ^^^^ duplicate cases not allowed within a 'switch' statement
+// CHECK: E30605
 }

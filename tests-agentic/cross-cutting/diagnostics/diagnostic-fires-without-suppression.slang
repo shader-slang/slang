@@ -20,5 +20,6 @@ int main()
     int x = (1, 2);
 //CHECK:      ^ 41024
 //CHECK:      ^ comma operator used in expression
+// CHECK: W41024
     return x;
 }

@@ -23,4 +23,5 @@ void main()
     int x = (int) s;
 //CHECK:          ^ type mismatch in expression
 //CHECK:          ^ expected an expression of type 'int', got 'S'
+// CHECK: E30019
 }

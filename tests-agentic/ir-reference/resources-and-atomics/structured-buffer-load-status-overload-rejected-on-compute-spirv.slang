@@ -25,6 +25,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 /*CHECK:
      ^^^^ unavailable features in entry point
 */
+// CHECK: E36107
 {
     int idx = (int)tid.x;
     uint status;

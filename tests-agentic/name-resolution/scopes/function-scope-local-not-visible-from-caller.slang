@@ -25,4 +25,5 @@ void main()
     int y = local_in_helper;
 //CHECK:    ^^^^^^^^^^^^^^^ undefined identifier
 //CHECK:    ^^^^^^^^^^^^^^^ undefined identifier 'local_in_helper'.
+// CHECK: E30015
 }

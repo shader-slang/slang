@@ -18,5 +18,7 @@
 #pragma totally_unknown
 //CHECK:^^^^^^^^^^^^^^^ unknown pragma ignored
 //CHECK:^^^^^^^^^^^^^^^ ignoring unknown directive '#pragma totally_unknown'
+// CHECK: W15601
+// CHECK: E15101
 
 void main() {}

@@ -26,4 +26,5 @@ void main()
     NotAShape n; n.v = 1;
     int x = polyArea(n);
 //CHECK: error
+//CHECK: E39999
 }

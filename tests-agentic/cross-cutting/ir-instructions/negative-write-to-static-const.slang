@@ -27,5 +27,6 @@ void main(uint3 tid : SV_DispatchThreadID)
 /*CHECK:
       ^ left of '=' is not an l-value
 */
+// CHECK: E30011
     buf[0] = k;
 }

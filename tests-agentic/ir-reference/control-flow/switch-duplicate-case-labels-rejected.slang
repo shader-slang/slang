@@ -32,6 +32,7 @@ void main()
 /*CHECK:
     ^^^^ duplicate cases in switch
 */
+// CHECK: E30605
         r = 20;
         break;
     default:

@@ -26,4 +26,5 @@ struct B
     int peek(A a) { return a.secret(); }
 //CHECK:                     ^^^^^^ declaration not accessible
 //CHECK:                     ^^^^^^ 'secret' is not accessible from the current context.
+// CHECK: E30600
 }

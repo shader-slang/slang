@@ -22,4 +22,5 @@ void main()
     R r = {1, 2, 3, 4, 5};
 //CHECK:  ^ too many initializers in initializer list
 //CHECK:  ^ too many initializers (expected 3, got 5)
+// CHECK: E30523
 }

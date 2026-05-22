@@ -24,4 +24,5 @@ void main()
     Pair<int> pi;
     Pair<float> pf = pi;
 //CHECK:             ^^ expected an expression of type 'Pair<float>', got 'Pair<int>'
+//CHECK: E30019
 }

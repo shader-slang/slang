@@ -22,3 +22,4 @@ void foo() { return @@; }
 
 void bar() { return @@; }
 //CHECK: syntax error
+//CHECK: E20002

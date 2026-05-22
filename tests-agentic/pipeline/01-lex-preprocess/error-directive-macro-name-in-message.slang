@@ -20,5 +20,6 @@
 
 #error message-contains WHAT_TOKEN
 //CHECK: WHAT_TOKEN
+//CHECK: E15900
 
 void main() {}

@@ -22,6 +22,7 @@ struct NotAShape : IShape
 {
     int side;
 //CHECK: error
+//CHECK: E38100
 }
 
 void main() {}

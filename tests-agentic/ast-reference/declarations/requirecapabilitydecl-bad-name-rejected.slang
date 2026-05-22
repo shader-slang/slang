@@ -20,3 +20,4 @@ __require_capability(ThisIsANonExistingCapability);
 
 void main() {}
 //CHECK: error
+//CHECK: E36105

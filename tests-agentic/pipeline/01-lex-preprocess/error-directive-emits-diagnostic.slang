@@ -22,6 +22,7 @@
  ^^^^^ preprocessor error
  ^^^^^ #error: This is the error message!
 */
+// CHECK: E15900
 #endif
 
 void main() {}

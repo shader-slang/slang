@@ -19,5 +19,7 @@
 #pragma unknown_pragma_with_args(arg1, arg2, 42)
 //CHECK:^^^^^^^^^^^^^^^^^^^^^^^^ unknown pragma ignored
 //CHECK:^^^^^^^^^^^^^^^^^^^^^^^^ ignoring unknown directive '#pragma unknown_pragma_with_args'
+// CHECK: W15601
+// CHECK: E15101
 
 void main() {}

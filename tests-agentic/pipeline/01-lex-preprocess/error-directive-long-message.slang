@@ -17,5 +17,6 @@
 
 #error this is a very long preprocessor error message designed to probe the upper boundary of the message text and contain a distinctive sentinel SENTINEL_END
 //CHECK: SENTINEL_END
+//CHECK: E15900
 
 void main() {}

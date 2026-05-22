@@ -20,4 +20,5 @@ void main()
     int a = longUndeclaredName;
 //CHECK:    ^^^^^^^^^^^^^^^^^^ undefined identifier
 //CHECK:    ^^^^^^^^^^^^^^^^^^ undefined identifier 'longUndeclaredName'.
+// CHECK: E30015
 }

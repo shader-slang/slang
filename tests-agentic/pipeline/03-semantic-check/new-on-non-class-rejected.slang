@@ -20,5 +20,6 @@ void main()
 {
     var s = new S();
 //CHECK:    ^^^ `new` can only be used to initialize a class
+// CHECK: E30065
 
 }

@@ -22,5 +22,6 @@ void main()
     int x = int + 1;
     // CHECK: error
     // CHECK: expected a type
+// CHECK: E30060
     printf("%d\n", x);
 }

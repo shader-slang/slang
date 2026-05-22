@@ -21,4 +21,5 @@ public struct PS
     public IS member;
 //CHECK:      ^^^^^^ references less visible type
 //CHECK:      ^^^^^^ 'member' references less visible type 'IS'.
+// CHECK: E30604
 }

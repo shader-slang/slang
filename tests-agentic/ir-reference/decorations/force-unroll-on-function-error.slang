@@ -20,6 +20,7 @@ uniform RWStructuredBuffer<int> buf;
 /*CHECK:
  ^^^^^^^^^^^ attribute 'ForceUnroll' is not valid here
 */
+// CHECK: E31002
 int helper(int x) { return x + 1; }
 
 [numthreads(1, 1, 1)]

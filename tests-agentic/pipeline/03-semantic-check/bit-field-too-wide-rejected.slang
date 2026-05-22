@@ -17,5 +17,6 @@
 struct S { int x : 64; };
 //CHECK:       ^ bit-field size exceeds type width
 //CHECK:       ^ bit-field size (64) exceeds the width of its type int (32)
+// CHECK: E31300
 
 void main() { S s; }

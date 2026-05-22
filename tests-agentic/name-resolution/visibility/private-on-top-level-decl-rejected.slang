@@ -19,4 +19,5 @@ private struct TopLevel
 ^^^^^^^ invalid private visibility
 ^^^^^^^ 'TopLevel' cannot have private visibility because it is not a member of a type.
 */
+// CHECK: E30603
 {}

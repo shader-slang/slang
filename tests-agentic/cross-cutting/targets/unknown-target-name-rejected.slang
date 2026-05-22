@@ -16,6 +16,7 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target zzfooz -entry main -stage compute
 //CHECK: unknown code generation target 'zzfooz'
+// CHECK: E00013
 
 RWStructuredBuffer<int> outBuf;
 

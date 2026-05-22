@@ -19,4 +19,5 @@ void main()
 {
     int x = 0xFFFFFFFFFFFFFFFFFFFF;
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in any integer type
+// CHECK: E10012
 }

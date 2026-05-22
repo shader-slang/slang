@@ -26,5 +26,6 @@ void main(uint3 tid : SV_DispatchThreadID)
 {
     int arr[n];
 //CHECK:    ^ expression does not evaluate to a compile-time constant
+//CHECK: E39999
     buf[0] = arr[0];
 }

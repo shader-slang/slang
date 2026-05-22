@@ -27,4 +27,5 @@ void main()
     int v = c.asInt();
 //CHECK:      ^^^^^ member not found
 //CHECK:      ^^^^^ 'asInt' is not a member of 'Color'.
+// CHECK: E30027
 }

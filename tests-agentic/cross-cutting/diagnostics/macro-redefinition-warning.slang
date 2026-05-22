@@ -26,5 +26,6 @@
         ^^^^^^^^ macro redefined
         ^^^^^^^^ redefinition of macro 'MY_MACRO'
 */
+// CHECK: W15400
 
 void main() {}

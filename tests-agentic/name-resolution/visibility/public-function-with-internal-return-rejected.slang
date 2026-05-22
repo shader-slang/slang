@@ -20,3 +20,4 @@ struct IS {}
 public IS makeIS() {}
 //CHECK:  ^^^^^^ references less visible type
 //CHECK:  ^^^^^^ 'makeIS' references less visible type 'IS'.
+// CHECK: E30604

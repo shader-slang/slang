@@ -21,6 +21,7 @@ int firstPos(int x)
 /*CHECK:
     ^^^^^^^^ non-void function does not return in all cases
 */
+// CHECK: W41010
 {
     if (x > 0) return x;
     // Falls off the end on the negative path.

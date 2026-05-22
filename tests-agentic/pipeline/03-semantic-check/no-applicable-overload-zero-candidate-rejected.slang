@@ -21,3 +21,4 @@ int f(int x, int y, int z) { return 3; }
 
 void main() { int y = f(); }
 //CHECK:               ^ no overload for 'f' applicable to arguments of type ()
+//CHECK: E39999

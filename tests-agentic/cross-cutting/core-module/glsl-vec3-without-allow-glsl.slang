@@ -24,5 +24,6 @@ void main(uint3 tid : SV_DispatchThreadID)
 {
     vec3 v = vec3(float(tid.x), 1.0, 2.0);
     //CHECK: undefined identifier 'vec3'.
+// CHECK: E30015
     outBuf[tid.x] = v.x;
 }

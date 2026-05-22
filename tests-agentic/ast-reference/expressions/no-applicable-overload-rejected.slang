@@ -28,4 +28,5 @@ void notMain()
         ^ type mismatch in expression
         ^ expected an expression of type 'int', got 'S'
 */
+// CHECK: E30019
 }

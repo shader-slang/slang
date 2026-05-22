@@ -21,6 +21,7 @@ uniform RWStructuredBuffer<int> buf;
  ^^^^^^^^^^ invalid 'numthreads' value
  ^^^^^^^^^^ expected a positive integer in 'numthreads' attribute, got '0'
 */
+// CHECK: E31102
 void main(uint3 tid : SV_DispatchThreadID)
 {
     buf[0] = int(tid.x);

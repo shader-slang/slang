@@ -24,4 +24,5 @@ void main()
 {
     inc(7);
     //CHECK: error
+    //CHECK: E30047
 }

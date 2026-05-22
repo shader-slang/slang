@@ -20,5 +20,6 @@
  ^^^^^^^ preprocessor warning
  ^^^^^^^ #warning:
 */
+// CHECK: W15901
 
 void main() {}

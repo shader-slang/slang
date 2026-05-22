@@ -23,4 +23,5 @@ void main(uint3 tid : SV_DispatchThreadID)
 {
     outBuf[tid.x] = undefined_symbol;
 //CHECK:            ^^^^^^^^^^^^^^^^ undefined identifier
+// CHECK: E30015
 }

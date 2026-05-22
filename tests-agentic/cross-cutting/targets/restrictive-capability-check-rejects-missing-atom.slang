@@ -36,6 +36,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 /*CHECK-ERR:
     ^^^^^^^^^^^^^^^^^^^ see call to '__requireCapability'
 */
+//CHECK-ERR: E41013
 }
 
 #elif WARN
@@ -51,6 +52,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 /*CHECK-WARN:
     ^^^^^^^^^^^^^^^^^^^ see call to '__requireCapability'
 */
+//CHECK-WARN: W41012
 }
 
 #endif

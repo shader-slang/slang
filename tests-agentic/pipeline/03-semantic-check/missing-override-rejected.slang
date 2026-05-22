@@ -17,5 +17,6 @@
 interface I { int m() { return 0; } }
 struct S : I { int m() { return 1; } }
 //CHECK:           ^ missing 'override' keyword for methods that overrides the default implementation in the interface
+// CHECK: E30853
 
 void main() {}

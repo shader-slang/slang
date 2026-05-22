@@ -21,4 +21,5 @@ void main()
 {
     int v = neg(1, 2, 3);
 //CHECK:       ^ too many arguments to call
+//CHECK: E39999
 }

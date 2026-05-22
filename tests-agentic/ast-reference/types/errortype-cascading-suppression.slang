@@ -21,6 +21,7 @@ void main()
 {
     int x = bogusName;
 //CHECK:    ^^^^^^^^^ undefined identifier 'bogusName'
+// CHECK: E30015
     int y = x + 1;
     int z = x * 2;
     int w = y + z;

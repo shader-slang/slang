@@ -21,4 +21,5 @@ void main()
     int y = x.foo;
 //CHECK:      ^^^ member not found
 //CHECK:      ^^^ 'foo' is not a member of 'int'.
+// CHECK: E30027
 }

@@ -27,4 +27,5 @@ void main(uint3 tid : SV_DispatchThreadID)
     arr[2] = 2;
     outBuf[tid.x] = arr[5];
 //CHECK:               ^ array index out of bounds
+// CHECK: E30029
 }

@@ -20,5 +20,6 @@
  ^^^^^ preprocessor error
  ^^^^^ #error:
 */
+// CHECK: E15900
 
 void main() {}

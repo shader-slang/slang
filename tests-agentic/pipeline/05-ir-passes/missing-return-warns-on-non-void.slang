@@ -21,6 +21,7 @@ int foo(int n)
 /*CHECK:
     ^^^ non-void function does not return in all cases
 */
+// CHECK: W41010
 {
     if (n > 0) return n;
 }

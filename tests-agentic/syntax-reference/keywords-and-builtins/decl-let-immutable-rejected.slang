@@ -21,4 +21,5 @@ void main()
     x = 8;
     // CHECK: error
     // CHECK: l-value
+    // CHECK: E30011
 }

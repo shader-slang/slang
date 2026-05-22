@@ -17,5 +17,6 @@
 static Texture2D g;
 //CHECK:         ^ global variable cannot have opaque type
 //CHECK:         ^ global variable cannot have opaque type.
+// CHECK: E30076
 
 void main() {}

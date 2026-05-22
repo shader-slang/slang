@@ -20,4 +20,5 @@ void main()
     const int x = 7;
     x = 42;
     //CHECK: error
+    //CHECK: E30011
 }

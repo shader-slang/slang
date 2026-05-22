@@ -22,3 +22,4 @@
 */
 void main() {}
 //CHECK: end of file encountered during preprocessor conditional
+// CHECK: E15000

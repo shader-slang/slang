@@ -22,5 +22,6 @@ float f(int x);
       ^ function return type mismatch
       ^ function 'f' declared to return 'float' was previously declared to return 'int'
 */
+// CHECK: E30202
 
 void main() {}

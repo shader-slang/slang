@@ -24,4 +24,5 @@ void main()
 {
     int x = convert;
 //CHECK:    ^^^^^^^ ambiguous reference to 'convert'
+//CHECK: E39999
 }

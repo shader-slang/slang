@@ -16,5 +16,6 @@
 
 void f<T : int>(T x) {}
 //CHECK:   ^^^ type 'int' cannot be used as a constraint
+// CHECK: E30401
 
 void main() {}

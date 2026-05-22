@@ -17,3 +17,4 @@
 
 struct S { int a; @ int b; };
 //CHECK: unexpected '@'
+//CHECK: E20003

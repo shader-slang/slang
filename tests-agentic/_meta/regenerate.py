@@ -874,6 +874,38 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
                 "no //TEST or //DIAGNOSTIC_TEST directive; slang-test would skip this file",
             )
         )
+    # Diagnostic tests (//DIAGNOSTIC_TEST) must pin the diagnostic
+    # code explicitly. Message-text-only checks would silently pass
+    # if the diagnostic gets renumbered, so the contract is: name
+    # the code in the CHECK output. Accept `E####`, `W####`, etc.
+    # in any CHECK line (single-line or block), or a bare numeric
+    # for catalog tests whose Slang code emits without an `E` prefix.
+    if "//DIAGNOSTIC_TEST" in text:
+        has_prefixed_code = bool(
+            re.search(r"CHECK[^:]*:\s*[^\n]*\b[EWNI]\d+\b", text)
+        )
+        has_block_code = False
+        for m in re.finditer(r"/\*\s*CHECK:\s*(.*?)\*/", text, re.DOTALL):
+            if re.search(r"\b[EWNI]\d+\b", m.group(1)):
+                has_block_code = True
+                break
+        # Catalog bundle tests use bare numeric for some codes.
+        is_catalog = "diagnostics-catalog" in spec.dir
+        has_bare_numeric = is_catalog and bool(
+            re.search(r"CHECK[^:]*:\s*\d{4,}\b", text)
+        )
+        if not (has_prefixed_code or has_block_code or has_bare_numeric):
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    "DIAGNOSTIC_TEST file does not pin an explicit"
+                    " diagnostic code (E####/W####) in any CHECK pattern;"
+                    " message-text-only checks would silently pass through"
+                    " a code renumbering",
+                )
+            )
+
     # Each //TEST or //DIAGNOSTIC_TEST directive that declares a
     # matcher (filecheck=NAME, filecheck-buffer=NAME, or diag=NAME)
     # must have at least one matching `// NAME:` / `//NAME:` /

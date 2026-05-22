@@ -16,5 +16,6 @@
 
 static const int X = X + 1;
 //CHECK:         ^ the initial-value expression for variable 'X' depends on the value of the variable itself
+//CHECK: E39999
 
 void main() { int y = X; }

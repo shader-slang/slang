@@ -21,4 +21,5 @@ void main()
     int v = doesNotExistAnywhere();
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^ undefined identifier
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^ undefined identifier 'doesNotExistAnywhere'.
+// CHECK: E30015
 }

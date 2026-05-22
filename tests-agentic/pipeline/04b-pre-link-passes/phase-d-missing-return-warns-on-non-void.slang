@@ -22,6 +22,7 @@ int helper(int x) { if (x > 0) return 1; }
 /*CHECK:
     ^^^^^^ non-void function does not return in all cases
 */
+// CHECK: W41010
 
 [numthreads(1, 1, 1)]
 void main()

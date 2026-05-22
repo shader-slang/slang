@@ -26,4 +26,5 @@ void main()
     S s;
     int v = s.secret();
 //CHECK:      ^^^^^^ declaration not accessible
+// CHECK: E30600
 }

@@ -21,4 +21,5 @@ void main()
     (x + 1) = 10;
 //CHECK:    ^ left of '=' is not an l-value
 //CHECK:    ^ left of '=' is not an l-value.
+// CHECK: E30011
 }

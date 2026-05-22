@@ -25,4 +25,5 @@ void main()
     int u = inIf;
 //CHECK:    ^^^^ undefined identifier
 //CHECK:    ^^^^ undefined identifier 'inIf'.
+// CHECK: E30015
 }

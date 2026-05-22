@@ -27,3 +27,4 @@ int bar(){ return 2; }
     ^^^ function 'bar' already has a body
     ^^^ redeclared here
 */
+// CHECK: E30201

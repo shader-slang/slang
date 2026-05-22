@@ -23,4 +23,5 @@ uniform RWStructuredBuffer<int> buf;
 /*CHECK:
 ^^^^^^^ no function found matching entry point name 'main'
 */
+// CHECK: E38000
 void other() { buf[0] = 1; }

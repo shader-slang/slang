@@ -19,5 +19,6 @@ interface I { int m(); }
 extension I { int m() { return 0; } }
 //CHECK:  ^ cannot extend interface type 'I'
 //CHECK:  ^ cannot extend interface type 'I'. consider using a generic extension: `extension<T:I> T {...}`
+// CHECK: E30852
 
 void main() {}

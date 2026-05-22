@@ -23,4 +23,5 @@ void main(uint3 tid : SV_DispatchThreadID)
     Optional<int> o;
     buf[0] = o.value;
 //CHECK:       ^^^^^ accessing .value on an Optional that is always none
+// CHECK: E41027
 }

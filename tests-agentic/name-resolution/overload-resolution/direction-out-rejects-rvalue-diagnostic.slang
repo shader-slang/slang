@@ -22,4 +22,5 @@ void main()
 {
     produce(7);
 //CHECK:    ^ argument must be l-value
+// CHECK: E30047
 }

@@ -24,4 +24,5 @@ void main()
        ^ not enough arguments to call
        ^ not enough arguments to call (got 1, expected 2)
 */
+//CHECK: E39999
 }

@@ -21,6 +21,7 @@ int helper(int x)
 /*CHECK:
     ^^^^^^ non-void function does not return in all cases
 */
+// CHECK: W41010
 {
     int y = x * 2;
 }

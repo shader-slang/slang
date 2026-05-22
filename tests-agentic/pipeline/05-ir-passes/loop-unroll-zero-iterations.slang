@@ -25,6 +25,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 /*CHECK:
     ^^^ the loop runs for 0 iterations and will be removed.
 */
+// CHECK: E30514
     {
         buf[i] = i;
     }

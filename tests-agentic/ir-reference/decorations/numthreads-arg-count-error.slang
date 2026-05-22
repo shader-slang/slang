@@ -20,6 +20,7 @@ uniform RWStructuredBuffer<int> buf;
 /*CHECK:
  ^^^^^^^^^^ wrong number of attribute arguments
 */
+// CHECK: E31001
 void main(uint3 tid : SV_DispatchThreadID)
 {
     buf[0] = int(tid.x);

@@ -24,5 +24,6 @@ void main()
     inc(v);
     // CHECK: error
     // CHECK: l-value
+    // CHECK: E30047
     printf("%d\n", v);
 }
