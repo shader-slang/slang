@@ -1076,7 +1076,7 @@ struct LoadContext
             {
                 // Create the source file
                 SourceFile* sourceFile =
-                    context.getSourceFile(base.asRaw(base.asRaw(srcSourceFiles[i])));
+                    context.getSourceFile(base.asRaw(base.asRaw(srcSourceFiles[j])));
 
                 // Create the artifact
                 auto sourceArtifact = ArtifactUtil::createArtifact(
@@ -1592,7 +1592,7 @@ static SlangResult _calcCommandLine(
 
             for (Index j = 0; j < srcSourceFiles.getCount(); ++j)
             {
-                SourceFileState* sourceFile = base.asRaw(base.asRaw(srcSourceFiles[i]));
+                SourceFileState* sourceFile = base.asRaw(base.asRaw(srcSourceFiles[j]));
                 OffsetString* path = base[sourceFile->foundPath];
 
                 if (path)

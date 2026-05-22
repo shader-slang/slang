@@ -214,4 +214,82 @@ SLANG_UNIT_TEST(reproStateValidator)
         containerToBuffer(container, buf);
         SLANG_CHECK(isReproStateValid(buf));
     }
+
+    // 14. Array with m_count that would overflow when multiplied by element size — fails.
+    // isArrayRangeInBounds: elementSize > size_t(-1) / count → return false.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto filesArray = container.newArray<Offset32Ptr<ReproUtil::FileState>>(1);
+        container[requestPtr]->files = filesArray;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+
+        // Overwrite m_count to near-UINT32_MAX; elementSize * count would overflow size_t.
+        uint32_t* countSlot =
+            reinterpret_cast<uint32_t*>(buf.getBuffer() + filesArray.m_data.m_offset + 4);
+        *countSlot = 0xFFFFFFFFu;
+
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
+    // 15. OffsetString with missing null terminator — fails.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto searchPathArray = container.newArray<Offset32Ptr<OffsetString>>(1);
+        auto strPtr = container.newString("hello");
+        container[requestPtr]->searchPaths = searchPathArray;
+        container[searchPathArray[0]] = strPtr;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+
+        // Overwrite the null terminator with a non-zero byte.
+        // "hello" is 5 chars; header is 1 byte (kSizeBase == 0 prefix for short strings,
+        // so the first byte is the length itself). Layout: [5]['h']['e']['l']['l']['o']['\0']
+        // The '\0' is at strPtr.m_offset + 1 + 5.
+        buf[strPtr.m_offset + 1 + 5] = 'X';
+
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
+    // 16. SourceFileState with a valid file pointer whose contents is null — fails.
+    // validateSourceFileState requires file->contents to be non-null.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto srcFilesArray = container.newArray<Offset32Ptr<ReproUtil::SourceFileState>>(1);
+        auto srcFilePtr = container.newObject<ReproUtil::SourceFileState>();
+        auto filePtr = container.newObject<ReproUtil::FileState>();
+        // filePtr->contents is left null (zero-init).
+
+        container[requestPtr]->sourceFiles = srcFilesArray;
+        container[srcFilesArray[0]] = srcFilePtr;
+        container[srcFilePtr]->file = filePtr;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
+    // 17. OffsetString with sizeByteCount == 5 (> 4) — fails.
+    // validateString: sizeByteCount < 1 || sizeByteCount > 4 → return false.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto searchPathArray = container.newArray<Offset32Ptr<OffsetString>>(1);
+        auto strPtr = container.newString("hello");
+        container[requestPtr]->searchPaths = searchPathArray;
+        container[searchPathArray[0]] = strPtr;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+
+        // Corrupt: set first byte to kSizeBase + 5, claiming 5 size extension bytes.
+        buf[strPtr.m_offset] = OffsetString::kSizeBase + 5;
+
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
 }
