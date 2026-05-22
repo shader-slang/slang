@@ -247,8 +247,9 @@ SLANG_UNIT_TEST(reproStateValidator)
         containerToBuffer(container, buf);
 
         // Overwrite the null terminator with a non-zero byte.
-        // "hello" is 5 chars; header is 1 byte (kSizeBase == 0 prefix for short strings,
-        // so the first byte is the length itself). Layout: [5]['h']['e']['l']['l']['o']['\0']
+        // "hello" is 5 chars; for short strings (length <= kSizeBase = 251)
+        // the first byte encodes the length directly, so the header is 1 byte.
+        // Layout: [5]['h']['e']['l']['l']['o']['\0']
         // The '\0' is at strPtr.m_offset + 1 + 5.
         buf[strPtr.m_offset + 1 + 5] = 'X';
 
@@ -538,6 +539,80 @@ SLANG_UNIT_TEST(reproStateValidator)
         // +1 makes the array start misaligned for any T with alignment > 1.
         *mDataSlot = originalOffset + 1;
         SLANG_CHECK(!isReproStateValid(buf));
+    }
+
+    // 19k. validateString with 4-byte multi-byte size encoding set to UINT32_MAX
+    // is rejected — either via the overflow guard (on 32-bit size_t) or via the
+    // subsequent buffer-bounds check (on 64-bit, where the claimed allocation
+    // exceeds m_dataSize). Pins the upper-bound rejection regardless of host
+    // word size.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto searchPathArray = container.newArray<Offset32Ptr<OffsetString>>(1);
+        auto strPtr = container.newString("hello");
+        container[requestPtr]->searchPaths = searchPathArray;
+        container[searchPathArray[0]] = strPtr;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+
+        // Set firstByte to kSizeBase + 4 (4 size bytes follow) and the 4 size
+        // bytes to 0xFF 0xFF 0xFF 0xFF, claiming a string of UINT32_MAX bytes.
+        // The string allocation we have is far smaller, so the bounds check
+        // (or overflow guard on 32-bit) must reject.
+        buf[strPtr.m_offset] = OffsetString::kSizeBase + 4;
+        // Ensure we have enough room to write the 4 size bytes.
+        SLANG_CHECK(buf.getCount() >= strPtr.m_offset + 5);
+        buf[strPtr.m_offset + 1] = 0xFF;
+        buf[strPtr.m_offset + 2] = 0xFF;
+        buf[strPtr.m_offset + 3] = 0xFF;
+        buf[strPtr.m_offset + 4] = 0xFF;
+
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
+    // 19l. TranslationUnitRequestState.moduleName corruption — fails.
+    // validateTranslationUnitArray calls validateString on moduleName; pin the
+    // call so a future refactor that drops the TU-level check would fail this.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto tuArray = container.newArray<ReproUtil::TranslationUnitRequestState>(1);
+        auto moduleNameStr = container.newString("my_module");
+
+        container[requestPtr]->translationUnits = tuArray;
+        container[tuArray[0]].moduleName = moduleNameStr;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(isReproStateValid(buf));
+
+        // Corrupt: set first byte to kSizeBase + 5 (invalid sizeByteCount).
+        buf[moduleNameStr.m_offset] = OffsetString::kSizeBase + 5;
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
+    // 19m. OutputState.outputPath = null is silently accepted by
+    // validateOutputStateArray (validateString returns true on null).
+    // Mirrors the pathInfoMap null-pathInfo contract pinned by 19c.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        // entryPointCount = 1 so that entryPointIndex = 0 is in range.
+        auto entryPoints = container.newArray<ReproUtil::EntryPointState>(1);
+        auto targetArray = container.newArray<ReproUtil::TargetRequestState>(1);
+        auto outputArray = container.newArray<ReproUtil::OutputState>(1);
+
+        container[requestPtr]->entryPoints = entryPoints;
+        container[requestPtr]->targetRequests = targetArray;
+        container[targetArray[0]].outputStates = outputArray;
+        container[outputArray[0]].entryPointIndex = 0;
+        // outputPath left null (zero-init) — must be accepted.
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(isReproStateValid(buf));
     }
 
     // 20. ReproUtil::getRequest size-guard boundary: N-1 / N / N+1, where
