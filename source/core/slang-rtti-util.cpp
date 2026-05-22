@@ -78,11 +78,7 @@ struct ListFuncs
             if (srcCount > dstList.getCount())
             {
                 void* newBuffer = _mallocArray(srcCount, elementType->m_size);
-                SLANG_RELEASE_ASSERT(newBuffer || srcCount == 0);
-                if (!newBuffer)
-                {
-                    return;
-                }
+                SLANG_RELEASE_ASSERT(newBuffer);
 
                 // Allocate new memory
                 const Index dstCapacity = dstList.getCapacity();
