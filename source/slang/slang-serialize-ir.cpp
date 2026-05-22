@@ -560,13 +560,20 @@ static T deserialize1(const IRReadSerializer& serializer, const Fossil::AnyValRe
 // host's control. The bounds-checking guards therefore double as a defense
 // against malformed or adversarial inputs.
 //
-// The guards use SLANG_RELEASE_ASSERT, which (in builds with
-// SLANG_HAS_EXCEPTIONS — the default) raises an InternalError; the outer
-// `Linkage::loadModuleFromBlob` catches `Exception` and converts it into a
-// nullptr return plus diagnostics, so a malformed blob normally fails the
-// module load rather than terminating the host. In non-exceptions builds the
-// asserts hit SLANG_BREAKPOINT. A follow-up refactor should thread Result out
-// of this function so failures need not transit the exception path.
+// The guards use SLANG_RELEASE_ASSERT, which in default builds (with
+// SLANG_HAS_EXCEPTIONS and no `SLANG_ASSERT` environment override) raises an
+// InternalError; the outer `Linkage::loadModuleFromBlob` catches `Exception`
+// and converts it into a nullptr return plus diagnostics, so a malformed
+// blob normally fails the module load rather than terminating the host.
+//
+// Two non-default modes change that contract:
+//   * In non-exceptions builds the asserts hit SLANG_BREAKPOINT.
+//   * Under `SLANG_ASSERT=system` (or `debugbreak` with no debugger attached)
+//     the asserts route through libc `assert()`, which aborts (and shows a
+//     modal dialog on Windows) — the outer `catch (Exception&)` is bypassed.
+//
+// A follow-up refactor should thread Result out of this function so failure
+// surfaces as SLANG_FAIL regardless of build configuration or env var.
 static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serializer, IRModule* module)
 {
     IRSerialReadContext& readContext = *serializer.getContext();
@@ -703,10 +710,14 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         return insts[index];
     };
     // Cap recursion depth to defend against deeply-nested malicious blobs that
-    // would otherwise stack-overflow the host (e.g. a chain where each inst has
-    // exactly one child of its own). The limit is far above what any realistic
-    // IR module exhibits.
-    constexpr Int64 kMaxRecursionDepth = 4096;
+    // would otherwise stack-overflow the host (e.g. a chain where each inst
+    // has exactly one child of its own). 512 is conservative against the
+    // smallest supported thread stacks: each `go` frame captures the
+    // surrounding lambda state plus locals (rough order of 300-400 bytes in
+    // unoptimized builds), so 512 frames ~= 200 KB — well below the typical
+    // 256 KB minimum on worker threads while remaining far above any
+    // realistic IR module's nesting depth (typical 4-6, occasionally tens).
+    constexpr Int64 kMaxRecursionDepth = 512;
     const auto go = [&](auto& go, IRInst* parent, Int64 depth) -> IRInst*
     {
         SLANG_RELEASE_ASSERT(depth < kMaxRecursionDepth);
