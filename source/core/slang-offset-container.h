@@ -502,6 +502,13 @@ public:
     ///   - the underlying realloc fails (OOM).
     /// Callers must treat the return value as nullable. The container itself is unchanged
     /// on every rejection path (m_dataSize, m_capacity, and m_data are preserved).
+    ///
+    /// TODO(security): callers in `source/slang/slang-repro.cpp` currently treat
+    /// newObject/newArray/newString as infallible and dereference the result without a
+    /// null check. After this PR, the new guards make the null return reachable on
+    /// hostile input (e.g. a crafted repro file with sizes > 4 GiB), turning the prior
+    /// memcpy-past-buffer UB into a deterministic null-deref. The container side is
+    /// now safe; the repro-side audit is tracked as a follow-up.
     void* allocate(size_t size, size_t alignment);
 
     /// As allocate(size, alignment) but zero-initializes the result. Returns nullptr on
