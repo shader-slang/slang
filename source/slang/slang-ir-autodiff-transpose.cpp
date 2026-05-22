@@ -1590,7 +1590,24 @@ struct DiffTransposePass
         auto primalType = tryGetPrimalTypeFromDiffInst(fwdLoad);
         auto loadType = fwdLoad->getDataType();
 
-        List<RevGradient> gradients(RevGradient(revPtr, revValue, nullptr));
+        // Issue #11160: when loadType is an IRDifferentialPairType, the
+        // `emitAggregateValue(builder, primalType, gradients)` call below
+        // dispatches a primal-typed dadd, so every gradient on the list needs
+        // to be a bare differential. Extract the differential field when the
+        // inbound or re-loaded value is itself a pair.
+        auto loadPairType = as<IRDifferentialPairType>(loadType);
+        auto narrowToDiffField = [&](IRInst* val) -> IRInst*
+        {
+            if (loadPairType && as<IRDifferentialPairTypeBase>(val->getDataType()))
+            {
+                return builder->emitDifferentialPairGetDifferential(
+                    (IRType*)diffTypeContext.getDiffTypeFromPairType(builder, loadPairType),
+                    val);
+            }
+            return val;
+        };
+
+        List<RevGradient> gradients(RevGradient(revPtr, narrowToDiffField(revValue), nullptr));
 
         if (usedPtrs.contains(revPtr))
         {
@@ -1598,7 +1615,7 @@ struct DiffTransposePass
             auto revCurrGrad = builder->emitLoad(revPtr);
 
             // Add the current value to the aggregation list.
-            gradients.add(RevGradient(revPtr, revCurrGrad, nullptr));
+            gradients.add(RevGradient(revPtr, narrowToDiffField(revCurrGrad), nullptr));
         }
         else
         {
@@ -1703,19 +1720,46 @@ struct DiffTransposePass
         IRInst* revValue)
     {
         TranspositionResult result;
+
+        // Issue #11160: in mixed fwd_diff/bwd_diff with `out`-differentiable
+        // params, an outer transpose may already have extracted the diff field,
+        // so revValue arrives as a bare differential rather than a DiffPair.
+        // Synthesizing GetPrimal/GetDifferential on a non-pair produces
+        // malformed IR. Mirrors the pair-narrowing convention in transposeStore
+        // (this file, ~L1660): when an outer transpose has narrowed a
+        // pair-typed gradient to its differential field, the primal-half was
+        // structurally zero by construction (the upstream pass narrowed
+        // precisely because nothing in the bwd flow contributed to .Primal).
+        // Routing revValue -> diff and zero -> primal is therefore exact, not
+        // an approximation.
+        IRInst* primalRevGrad = nullptr;
+        IRInst* diffRevGrad = nullptr;
+        if (as<IRDifferentialPairTypeBase>(revValue->getDataType()))
+        {
+            primalRevGrad = builder->emitDifferentialPairGetPrimal(
+                fwdMakePair->getPrimal()->getDataType(),
+                revValue);
+            diffRevGrad = builder->emitDifferentialPairGetDifferential(
+                fwdMakePair->getDifferentialValue()->getDataType(),
+                revValue);
+        }
+        else
+        {
+            primalRevGrad = diffTypeContext.emitDZeroOfDiffInstType(
+                builder,
+                fwdMakePair->getPrimal()->getDataType());
+            diffRevGrad = revValue;
+        }
+
         result.revPairs.add(RevGradient(
             RevGradient::Flavor::Simple,
             fwdMakePair->getPrimal(),
-            builder->emitDifferentialPairGetPrimal(
-                fwdMakePair->getPrimal()->getDataType(),
-                revValue),
+            primalRevGrad,
             fwdMakePair));
         result.revPairs.add(RevGradient(
             RevGradient::Flavor::Simple,
             fwdMakePair->getDifferentialValue(),
-            builder->emitDifferentialPairGetDifferential(
-                fwdMakePair->getDifferentialValue()->getDataType(),
-                revValue),
+            diffRevGrad,
             fwdMakePair));
 
         return result;
@@ -2656,25 +2700,55 @@ struct DiffTransposePass
             // materialize.
             if (auto fwdGetDiff = as<IRDifferentialPairGetDifferential>(gradient.fwdGradInst))
             {
-                simpleGradients.add(RevGradient(
-                    gradient.targetInst,
-                    builder->emitMakeDifferentialValuePair(
-                        fwdGetDiff->getBase()->getDataType(),
-                        diffTypeContext.emitDZeroOfDiffInstType(builder, fwdGetDiff->getDataType()),
-                        gradient.revGradInst),
-                    gradient.fwdGradInst));
+                // Issue #11160: when the fwd `getDiff`'s base is a bare
+                // differential rather than a real DiffPair (mixed fwd/bwd with
+                // `out`-diff params), wrapping the gradient in
+                // MakeDifferentialValuePair produces an IRMakeDifferentialPair
+                // whose result type isn't a pair, which crashes emit. Pass the
+                // gradient through directly in that case.
+                if (as<IRDifferentialPairTypeBase>(fwdGetDiff->getBase()->getDataType()))
+                {
+                    simpleGradients.add(RevGradient(
+                        gradient.targetInst,
+                        builder->emitMakeDifferentialValuePair(
+                            fwdGetDiff->getBase()->getDataType(),
+                            diffTypeContext.emitDZeroOfDiffInstType(
+                                builder,
+                                fwdGetDiff->getDataType()),
+                            gradient.revGradInst),
+                        gradient.fwdGradInst));
+                }
+                else
+                {
+                    simpleGradients.add(RevGradient(
+                        gradient.targetInst,
+                        gradient.revGradInst,
+                        gradient.fwdGradInst));
+                }
             }
             else if (auto fwdGetPrimal = as<IRDifferentialPairGetPrimal>(gradient.fwdGradInst))
             {
-                simpleGradients.add(RevGradient(
-                    gradient.targetInst,
-                    builder->emitMakeDifferentialValuePair(
-                        fwdGetPrimal->getBase()->getDataType(),
+                if (as<IRDifferentialPairTypeBase>(fwdGetPrimal->getBase()->getDataType()))
+                {
+                    simpleGradients.add(RevGradient(
+                        gradient.targetInst,
+                        builder->emitMakeDifferentialValuePair(
+                            fwdGetPrimal->getBase()->getDataType(),
+                            gradient.revGradInst,
+                            diffTypeContext.emitDZeroOfDiffInstType(
+                                builder,
+                                fwdGetPrimal->getDataType())),
+                        gradient.fwdGradInst));
+                }
+                else
+                {
+                    // Same robustness as above: drop the (zero-diff) wrapping
+                    // when the base isn't actually a pair.
+                    simpleGradients.add(RevGradient(
+                        gradient.targetInst,
                         gradient.revGradInst,
-                        diffTypeContext.emitDZeroOfDiffInstType(
-                            builder,
-                            fwdGetPrimal->getDataType())),
-                    gradient.fwdGradInst));
+                        gradient.fwdGradInst));
+                }
             }
         }
 
