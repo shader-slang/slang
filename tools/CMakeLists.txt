@@ -415,6 +415,10 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             SLANG_SHARED_LIBRARY_TOOL
             SLANG_NO_DEPRECATION
         USE_FEWER_WARNINGS
+        # slang-repro-validator.cpp is compiled directly into this module so that
+        # isReproStateValid() is accessible without requiring a DLL export from slang.
+        EXPLICIT_SOURCE
+            ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
         LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool

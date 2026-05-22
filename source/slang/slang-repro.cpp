@@ -1295,7 +1295,7 @@ struct LoadContext
     if (!isReproStateValid(outBuffer))
     {
         outBuffer.clear();
-        sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
+        sink->diagnose(Diagnostics::InvalidReproState{});
         return SLANG_FAIL;
     }
 
