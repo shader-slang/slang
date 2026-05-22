@@ -475,8 +475,7 @@ static SlangResult _testZipRejectsOversizedUncompressedEntry()
     SLANG_CHECK(pathType == SLANG_PATH_TYPE_FILE);
 
     ComPtr<ISlangBlob> blob;
-    SLANG_CHECK(
-        loadedFileSystem->loadFile("bomb.txt", blob.writeRef()) == SLANG_E_OUT_OF_MEMORY);
+    SLANG_CHECK(loadedFileSystem->loadFile("bomb.txt", blob.writeRef()) == SLANG_E_OUT_OF_MEMORY);
 
     return SLANG_OK;
 }

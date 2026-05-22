@@ -148,12 +148,17 @@ public:
     {
         if (size == std::numeric_limits<size_t>::max())
         {
+            deallocate();
             return nullptr;
         }
 
         uint8_t* data = (uint8_t*)allocate(size + 1);
         if (!data)
         {
+            // allocate() updates m_sizeInBytes/m_capacityInBytes even when
+            // ::malloc returns nullptr — reset to a fully deallocated state
+            // so callers don't see inconsistent sizes alongside a null buffer.
+            deallocate();
             return nullptr;
         }
 
