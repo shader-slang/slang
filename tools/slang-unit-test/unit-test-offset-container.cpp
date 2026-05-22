@@ -74,6 +74,30 @@ SLANG_UNIT_TEST(offsetContainer)
     _checkAllocateOverflowDoesNotWrap(8, 1, size_t(1) << 40);
 #endif
 
+    // Exhaust the 32-bit offset domain so allocate() returns nullptr, then verify that
+    // newObject / newArray / newString propagate the failure as their null sentinel.
+    {
+        OffsetContainer container;
+        container.m_dataSize = size_t(0xFFFFFFFFu) - 3;
+
+        auto obj = container.newObject<uint64_t>();
+        SLANG_CHECK(obj.isNull());
+
+        auto arr = container.newArray<uint64_t>(2);
+        SLANG_CHECK(arr.getCount() == 0);
+
+        auto str = container.newString(UnownedStringSlice("xyz"));
+        SLANG_CHECK(str.isNull());
+    }
+
+    // newArray must reject a count whose sizeof(T) * count would exceed the 32-bit offset
+    // domain, independent of the current m_dataSize.
+    {
+        OffsetContainer container;
+        auto arr = container.newArray<uint64_t>(size_t(0xFFFFFFFFu) / sizeof(uint64_t) + 1);
+        SLANG_CHECK(arr.getCount() == 0);
+    }
+
     {
         OffsetContainer container;
 
