@@ -599,6 +599,25 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         SLANG_RELEASE_ASSERT(totalChildren == numInsts - 1);
     }
 
+    // Validate cumulative operand consumption before any allocation. Each inst
+    // contributes 1 + operandCount operand-index slots (one for typeUse, plus
+    // one per operand), and a well-formed flat module sums to exactly
+    // operandIndicesCount. Without this upfront check, a single attacker
+    // crafted inst can advertise operandCount close to operandIndicesCount
+    // (potentially 100M entries from a multi-MB blob), causing _allocateInst
+    // to request GB-scale memory before any per-operand read can reject it.
+    {
+        Int64 expectedOperandIndices = 0;
+        for (Int64 i = 0; i < numInsts; ++i)
+        {
+            const Int64 contribution = 1 + (Int64)flat.instAllocInfo[i].operandCount;
+            SLANG_RELEASE_ASSERT(contribution >= 1);
+            SLANG_RELEASE_ASSERT(contribution <= operandIndicesCount - expectedOperandIndices);
+            expectedOperandIndices += contribution;
+        }
+        SLANG_RELEASE_ASSERT(expectedOperandIndices == operandIndicesCount);
+    }
+
     instsList.setCount(numInsts + 1);
     // nullptr instructions are represented as `-1`. We can save ourselves a
     // branch by just making that index valid.
