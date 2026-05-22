@@ -580,6 +580,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     SLANG_RELEASE_ASSERT(flat.childCounts.getCount() == numInsts);
 #endif
     SLANG_RELEASE_ASSERT(sourceLocs.getCount() == numInsts);
+    SLANG_RELEASE_ASSERT(numInsts >= 1);
 
     instsList.setCount(numInsts + 1);
     // nullptr instructions are represented as `-1`. We can save ourselves a
@@ -620,9 +621,11 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         case kIROp_StringLit:
         case kIROp_BlobLit:
             SLANG_RELEASE_ASSERT(stringLengthIndex < stringLengthsCount);
+            const Int64 strLen = flat.stringLengths[stringLengthIndex++];
+            SLANG_RELEASE_ASSERT(strLen >= 0 && strLen <= (Int64)UINT32_MAX);
             minSizeInBytes = offsetof(IRConstant, value) +
                              offsetof(IRConstant::StringValue, chars) +
-                             flat.stringLengths[stringLengthIndex++];
+                             (size_t)strLen;
             break;
         }
         insts[instIndex] = module->_allocateInst(op, a.operandCount, minSizeInBytes);
@@ -678,11 +681,12 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             SLANG_RELEASE_ASSERT(stringLengthIndex < stringLengthsCount);
             const auto c = cast<IRConstant>(inst);
             const auto len = flat.stringLengths[stringLengthIndex++];
-            SLANG_RELEASE_ASSERT(len >= 0);
+            SLANG_RELEASE_ASSERT(len >= 0 && len <= (Int64)UINT32_MAX);
             char* const dstChars = c->value.stringVal.chars;
             c->value.stringVal.numChars = uint32_t(len);
             SLANG_RELEASE_ASSERT(len <= (Int64)stringCharsCount - stringDataIndex);
-            memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
+            if (len > 0)
+                memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
             stringDataIndex += len;
             break;
         }
