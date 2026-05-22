@@ -438,24 +438,6 @@ bundles:
 
   # --- ast-reference/ ----------------------------------------------------
 
-  ast-reference/index:
-    prompt: prompts/ast-reference-index.md
-    source_doc: docs/llm-generated/ast-reference/index.md
-    watched_paths:
-      - source/slang/slang-ast-base.h
-    depends_on:
-      - ast-reference/base
-      - ast-reference/declarations
-      - ast-reference/expressions
-      - ast-reference/statements
-      - ast-reference/types
-      - ast-reference/modifiers
-      - ast-reference/values
-    coverage_targets: []
-    runner:
-      category: agentic-ast
-    size_cap_files: 10
-
   ast-reference/base:
     prompt: prompts/ast-reference-base.md
     source_doc: docs/llm-generated/ast-reference/base.md
@@ -563,22 +545,6 @@ bundles:
 
   # --- name-resolution/ --------------------------------------------------
 
-  name-resolution/index:
-    prompt: prompts/name-resolution-index.md
-    source_doc: docs/llm-generated/name-resolution/index.md
-    watched_paths:
-      - source/slang/slang-lookup.h
-      - source/slang/slang-ast-support-types.h
-    depends_on:
-      - name-resolution/scopes
-      - name-resolution/lookup
-      - name-resolution/visibility
-      - name-resolution/overload-resolution
-    coverage_targets: []
-    runner:
-      category: agentic-name-resolution
-    size_cap_files: 15
-
   name-resolution/scopes:
     prompt: prompts/name-resolution-scopes.md
     source_doc: docs/llm-generated/name-resolution/scopes.md
@@ -658,27 +624,6 @@ bundles:
     size_cap_files: 70
 
   # --- ir-reference/ -----------------------------------------------------
-
-  ir-reference/index:
-    prompt: prompts/ir-reference-index.md
-    source_doc: docs/llm-generated/ir-reference/index.md
-    watched_paths:
-      - source/slang/slang-ir-insts.lua
-    depends_on:
-      - ir-reference/types
-      - ir-reference/values
-      - ir-reference/control-flow
-      - ir-reference/structure
-      - ir-reference/generics-and-existentials
-      - ir-reference/resources-and-atomics
-      - ir-reference/differentiation
-      - ir-reference/decorations
-      - ir-reference/metadata
-      - ir-reference/misc
-    coverage_targets: []
-    runner:
-      category: agentic-ir
-    size_cap_files: 15
 
   ir-reference/types:
     prompt: prompts/ir-reference-types.md
@@ -877,22 +822,6 @@ bundles:
 
   # --- target-pipelines/ -------------------------------------------------
 
-  target-pipelines/index:
-    prompt: prompts/target-pipelines-index.md
-    source_doc: docs/llm-generated/target-pipelines/index.md
-    watched_paths:
-      - source/slang/slang-emit.cpp
-    depends_on:
-      - target-pipelines/spirv
-      - target-pipelines/hlsl
-      - target-pipelines/metal
-      - target-pipelines/wgsl
-      - target-pipelines/cuda
-    coverage_targets: []
-    runner:
-      category: agentic-target-pipelines
-    size_cap_files: 10
-
   target-pipelines/spirv:
     prompt: prompts/target-pipelines-spirv.md
     source_doc: docs/llm-generated/target-pipelines/spirv.md
@@ -1008,30 +937,3 @@ bundles:
 
   # --- top-level reference -----------------------------------------------
 
-  glossary:
-    prompt: prompts/glossary.md
-    source_doc: docs/llm-generated/glossary.md
-    watched_paths:
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ast-base.h
-      - source/slang/slang-ast-decl.h
-      - source/slang/slang-ast-expr.h
-      - source/slang/slang-ast-type.h
-      - source/slang/slang-ast-modifier.h
-      - source/slang/slang-syntax.h
-      - source/slang/slang-capability.h
-      - source/slang/slang-profile.h
-      - source/slang/slang-lookup.h
-      - source/compiler-core/slang-token.h
-    depends_on:
-      - architecture/overview
-      - pipeline/overview
-      - cross-cutting/ir-instructions
-      - syntax-reference/keywords-and-builtins
-      - name-resolution/index
-      - ir-reference/index
-    coverage_targets: []
-    runner:
-      category: agentic-glossary
-    size_cap_files: 40

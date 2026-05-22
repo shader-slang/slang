@@ -8,14 +8,14 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 ## Suite totals
 
-- **Bundles:** 52
-- **Total `.slang` tests:** 2735
+- **Bundles:** 47
+- **Total `.slang` tests:** 2699
 
 | Intent | Count |
 | --- | --- |
-| `functional` | 959 |
+| `functional` | 926 |
 | `boundary` | 632 |
-| `negative` | 593 |
+| `negative` | 590 |
 | `expansion` | 439 |
 | `stress` | 111 |
 | `regression` | 1 |
@@ -70,7 +70,6 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | [`ast-reference/base`](ast-reference/base/README.md) | 12 | [`docs/llm-generated/ast-reference/base.md`](../docs/llm-generated/ast-reference/base.md) |
 | [`ast-reference/declarations`](ast-reference/declarations/README.md) | 46 | [`docs/llm-generated/ast-reference/declarations.md`](../docs/llm-generated/ast-reference/declarations.md) |
 | [`ast-reference/expressions`](ast-reference/expressions/README.md) | 103 | [`docs/llm-generated/ast-reference/expressions.md`](../docs/llm-generated/ast-reference/expressions.md) |
-| [`ast-reference/index`](ast-reference/index/README.md) | 5 | [`docs/llm-generated/ast-reference/index.md`](../docs/llm-generated/ast-reference/index.md) |
 | [`ast-reference/modifiers`](ast-reference/modifiers/README.md) | 29 | [`docs/llm-generated/ast-reference/modifiers.md`](../docs/llm-generated/ast-reference/modifiers.md) |
 | [`ast-reference/statements`](ast-reference/statements/README.md) | 50 | [`docs/llm-generated/ast-reference/statements.md`](../docs/llm-generated/ast-reference/statements.md) |
 | [`ast-reference/types`](ast-reference/types/README.md) | 109 | [`docs/llm-generated/ast-reference/types.md`](../docs/llm-generated/ast-reference/types.md) |
@@ -80,7 +79,6 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`name-resolution/index`](name-resolution/index/README.md) | 6 | [`docs/llm-generated/name-resolution/index.md`](../docs/llm-generated/name-resolution/index.md) |
 | [`name-resolution/lookup`](name-resolution/lookup/README.md) | 24 | [`docs/llm-generated/name-resolution/lookup.md`](../docs/llm-generated/name-resolution/lookup.md) |
 | [`name-resolution/overload-resolution`](name-resolution/overload-resolution/README.md) | 24 | [`docs/llm-generated/name-resolution/overload-resolution.md`](../docs/llm-generated/name-resolution/overload-resolution.md) |
 | [`name-resolution/scopes`](name-resolution/scopes/README.md) | 25 | [`docs/llm-generated/name-resolution/scopes.md`](../docs/llm-generated/name-resolution/scopes.md) |
@@ -94,7 +92,6 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | [`ir-reference/decorations`](ir-reference/decorations/README.md) | 64 | [`docs/llm-generated/ir-reference/decorations.md`](../docs/llm-generated/ir-reference/decorations.md) |
 | [`ir-reference/differentiation`](ir-reference/differentiation/README.md) | 16 | [`docs/llm-generated/ir-reference/differentiation.md`](../docs/llm-generated/ir-reference/differentiation.md) |
 | [`ir-reference/generics-and-existentials`](ir-reference/generics-and-existentials/README.md) | 39 | [`docs/llm-generated/ir-reference/generics-and-existentials.md`](../docs/llm-generated/ir-reference/generics-and-existentials.md) |
-| [`ir-reference/index`](ir-reference/index/README.md) | 6 | [`docs/llm-generated/ir-reference/index.md`](../docs/llm-generated/ir-reference/index.md) |
 | [`ir-reference/metadata`](ir-reference/metadata/README.md) | 24 | [`docs/llm-generated/ir-reference/metadata.md`](../docs/llm-generated/ir-reference/metadata.md) |
 | [`ir-reference/misc`](ir-reference/misc/README.md) | 10 | [`docs/llm-generated/ir-reference/misc.md`](../docs/llm-generated/ir-reference/misc.md) |
 | [`ir-reference/resources-and-atomics`](ir-reference/resources-and-atomics/README.md) | 99 | [`docs/llm-generated/ir-reference/resources-and-atomics.md`](../docs/llm-generated/ir-reference/resources-and-atomics.md) |
@@ -108,16 +105,9 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | --- | ---: | --- |
 | [`target-pipelines/cuda`](target-pipelines/cuda/README.md) | 61 | [`docs/llm-generated/target-pipelines/cuda.md`](../docs/llm-generated/target-pipelines/cuda.md) |
 | [`target-pipelines/hlsl`](target-pipelines/hlsl/README.md) | 143 | [`docs/llm-generated/target-pipelines/hlsl.md`](../docs/llm-generated/target-pipelines/hlsl.md) |
-| [`target-pipelines/index`](target-pipelines/index/README.md) | 5 | [`docs/llm-generated/target-pipelines/index.md`](../docs/llm-generated/target-pipelines/index.md) |
 | [`target-pipelines/metal`](target-pipelines/metal/README.md) | 73 | [`docs/llm-generated/target-pipelines/metal.md`](../docs/llm-generated/target-pipelines/metal.md) |
 | [`target-pipelines/spirv`](target-pipelines/spirv/README.md) | 132 | [`docs/llm-generated/target-pipelines/spirv.md`](../docs/llm-generated/target-pipelines/spirv.md) |
 | [`target-pipelines/wgsl`](target-pipelines/wgsl/README.md) | 62 | [`docs/llm-generated/target-pipelines/wgsl.md`](../docs/llm-generated/target-pipelines/wgsl.md) |
-
-### Top-level
-
-| Bundle | Tests | Source doc |
-| --- | ---: | --- |
-| [`glossary`](glossary/README.md) | 14 | [`docs/llm-generated/glossary.md`](../docs/llm-generated/glossary.md) |
 
 ## Catalog snapshot
 
