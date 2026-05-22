@@ -637,7 +637,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     {
         SLANG_RELEASE_ASSERT(operandIndex < operandIndicesCount);
         const auto index = flat.operandIndices[operandIndex++];
-        SLANG_RELEASE_ASSERT(index >= -1 && index < numInsts);
+        SLANG_RELEASE_ASSERT(index >= -1 && index < (Int64)numInsts);
         return insts[index];
     };
     const auto go = [&](auto& go, IRInst* parent) -> IRInst*
@@ -681,7 +681,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             SLANG_RELEASE_ASSERT(len >= 0);
             char* const dstChars = c->value.stringVal.chars;
             c->value.stringVal.numChars = uint32_t(len);
-            SLANG_RELEASE_ASSERT(stringDataIndex + len <= stringCharsCount);
+            SLANG_RELEASE_ASSERT(len <= (Int64)stringCharsCount - stringDataIndex);
             memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
             stringDataIndex += len;
             break;
