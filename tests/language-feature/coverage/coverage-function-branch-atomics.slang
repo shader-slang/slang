@@ -6,6 +6,7 @@
 // default.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain -trace-function-coverage -trace-branch-coverage
+//TEST:SIMPLE(filecheck=ALL):-target cpp -stage compute -entry computeMain -trace-coverage -trace-function-coverage -trace-branch-coverage
 
 RWStructuredBuffer<uint> outputBuffer;
 
@@ -86,3 +87,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(14\)}}
 //CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(15\)}}
 //CHECK-NOT: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(16\)}}
+
+// The three coverage modes must be accepted together and share one
+// synthesized coverage buffer. The exact combined slot map is covered
+// by metadata/unit tests; this smoke test catches command-line pass
+// gating mistakes.
+//ALL: RWStructuredBuffer{{.*}}_slang_coverage
+//ALL-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(0\)}}
+//ALL-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(1\)}}
+//ALL-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(2\)}}

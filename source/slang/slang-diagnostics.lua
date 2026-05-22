@@ -4680,7 +4680,7 @@ err(
 warning(
     "coverage-target-not-supported",
     45102,
-    "`-trace-coverage` is not supported on this target; coverage instrumentation skipped"
+    "coverage tracing options (`-trace-coverage`, `-trace-function-coverage`, `-trace-branch-coverage`) are not supported on this target; coverage instrumentation skipped"
 )
 
 err(

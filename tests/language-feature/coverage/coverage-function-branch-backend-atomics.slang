@@ -1,7 +1,9 @@
 // Verifies that the new function/branch coverage marker ops lower to
 // native atomics on additional text backends. SPIR-V and CUDA have
 // dedicated tests because their binding paths are separate; this file
-// covers HLSL, GLSL, and Metal emission.
+// covers HLSL, GLSL, and Metal emission. WGSL is intentionally covered
+// by coverage-wgsl-skip.slang because it is an unsupported target for
+// coverage instrumentation today.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain -trace-function-coverage -trace-branch-coverage -profile cs_5_0
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry computeMain -trace-function-coverage -trace-branch-coverage -profile glsl_450

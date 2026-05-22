@@ -133,6 +133,14 @@ Branch coverage inserts counters at selected control-flow arm entry
 points. It answers "which branch outcome was selected?" It does not
 insert counters before every statement inside the selected arm.
 
+The current scope is source statement/control-flow coverage for:
+`if`/`else`, `for`/`while`/`do while` loop-condition outcomes, and
+`switch` case/default dispatch arms. Expression-level control flow,
+including short-circuit `&&` / `||` and ternary `?:`, is intentionally
+not instrumented by this mode yet. `return`, `break`, and `continue`
+are represented through the branch arm that reaches them rather than
+as separate branch entries.
+
 ### If / Else
 
 For an `if` with an `else`, Slang emits one counter for the true arm

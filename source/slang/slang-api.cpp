@@ -1264,13 +1264,12 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
             out << ", \"end_line\": " << (int64_t)entry.endLine;
         if (entry.endColumn != 0)
             out << ", \"end_column\": " << (int64_t)entry.endColumn;
-        if (entry.functionName)
+        if (entry.kind == slang::CoverageEntryKind::Function)
         {
+            if (!entry.functionName || !entry.functionMangledName)
+                return SLANG_FAIL;
             out << ", \"function\": ";
             _appendCoverageManifestJsonStringOrNull(out, entry.functionName);
-        }
-        if (entry.functionMangledName)
-        {
             out << ", \"function_mangled\": ";
             _appendCoverageManifestJsonStringOrNull(out, entry.functionMangledName);
         }

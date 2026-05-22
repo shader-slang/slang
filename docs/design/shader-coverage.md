@@ -126,6 +126,8 @@ counters are inserted, with examples, see
      loop-condition true/false arms (`for`, `while`, `do while`) and
      source `switch` case/default dispatch arms, including the
      implicit no-match default path when no `default` label exists.
+     Expression-level short-circuit and ternary branches are not
+     instrumented yet.
    - Marker ops are opaque void IR instructions. They do not reference
      a buffer at this point; the IR coverage pass rewrites them later.
    - The marker source position rides on the standard per-instruction
@@ -142,9 +144,9 @@ counters are inserted, with examples, see
      Metal, `DescriptorTableSlot` for Khronos / SPIR-V / GLSL. For
      CPU and CUDA targets it additionally reports `Uniform` size,
      which the global-uniform packaging pass uses to fold the buffer
-     into the standard `GlobalParams` struct. WGSL targets currently
-     skip instrumentation entirely (warning E45102) until the
-     synthesized type is wrapped in `Atomic<...>`.
+     into the standard `GlobalParams` struct. WGSL and LLVM-emitted
+     CPU targets currently skip instrumentation entirely (warning
+     E45102) until their coverage atomic lowering paths are supported.
    - **Picks a (set, binding)** — either honoring
      `-trace-coverage-binding <reg> <space>` if supplied, or
      auto-allocating a non-conflicting location for the chosen
@@ -192,10 +194,10 @@ counters are inserted, with examples, see
    - SPIR-V → `OpAtomicIAdd`
    - GLSL → `atomicAdd`
    - Metal → Metal atomic builtins
-   - WGSL → not reached today; coverage instrumentation is skipped
-     before rewrite for WGSL targets
+   - WGSL / LLVM-emitted CPU targets → not reached today; coverage
+     instrumentation is skipped before rewrite for these targets
    - CUDA → `atomicAdd`
-   - CPU → `_slang_atomic_add_u32` prelude helper (GCC/Clang
+   - CPU source → `_slang_atomic_add_u32` prelude helper (GCC/Clang
      `__atomic_fetch_add`, MSVC `_InterlockedExchangeAdd`)
 
 Coverage marker ops are side-effectful by default in DCE analysis, so

@@ -506,6 +506,11 @@ static bool shouldHonorReservedCoverageSpaces(TargetRequest* targetRequest)
     return isKhronosTarget(targetRequest);
 }
 
+static bool isCoverageInstrumentationTargetSupported(TargetRequest* targetRequest)
+{
+    return !isWGPUTarget(targetRequest) && !isCPUTargetViaLLVM(targetRequest);
+}
+
 static void addReservedCoverageSpaces(
     List<UsedBindingRange>& ranges,
     const int* reservedSpaces,
@@ -1211,13 +1216,11 @@ void instrumentCoverage(
     // WGSL requires the buffer's element type to be `atomic<u32>` for
     // atomic ops; the IR coverage pass synthesizes a plain
     // `RWStructuredBuffer<uint>` which lowers to `array<u32>` on WGSL
-    // and fails WGSL validation at the `atomicAdd` call. Until the
-    // synthesized type is wrapped in `Atomic<...>` for WGSL targets,
-    // skip instrumentation with a clear warning rather than emitting
-    // invalid WGSL. Other backends are unaffected. (For WebGPU
-    // workflows that need coverage today, `-target spirv` works via
-    // the SPIR-V → WebGPU path.)
-    if (isWGPUTarget(targetRequest))
+    // and fails WGSL validation at the `atomicAdd` call. LLVM-emitted
+    // CPU targets similarly do not have a verified lowering path for
+    // the synthesized resource + atomic sequence. Skip unsupported
+    // targets with a clear warning rather than emitting invalid IR.
+    if (!isCoverageInstrumentationTargetSupported(targetRequest))
     {
         if (sink)
             sink->diagnose(Diagnostics::CoverageTargetNotSupported{});

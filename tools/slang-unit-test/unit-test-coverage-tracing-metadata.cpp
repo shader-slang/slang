@@ -642,6 +642,43 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(seenBranchJson);
     }
 
+    // All three coverage modes must compose into one metadata object
+    // and one counter namespace. This catches mode-ordering bugs where
+    // line, function, and branch producers collide on counter slots.
+    {
+        auto allModesBundle = createMetadataBundle(SLANG_CPP_SOURCE, "sm_5_0", true, true, true);
+        auto* allModesCoverage = allModesBundle.coverage;
+        SLANG_CHECK(allModesCoverage->getCounterCount() > 0);
+        SLANG_CHECK(allModesCoverage->getEntryCount() > 0);
+
+        bool seenLine = false;
+        bool seenFunction = false;
+        bool seenBranch = false;
+        List<uint32_t> seenCounterSlots;
+        for (uint32_t i = 0; i < allModesCoverage->getEntryCount(); ++i)
+        {
+            slang::CoverageEntryInfo entry;
+            SLANG_CHECK(allModesCoverage->getEntryInfo(i, &entry) == SLANG_OK);
+            SLANG_CHECK(entry.counterIndex != slang::kInvalidCoverageCounterIndex);
+            SLANG_CHECK(entry.counterIndex < allModesCoverage->getCounterCount());
+            for (auto seenCounterSlot : seenCounterSlots)
+                SLANG_CHECK(seenCounterSlot != entry.counterIndex);
+            seenCounterSlots.add(entry.counterIndex);
+
+            if (entry.kind == slang::CoverageEntryKind::Line)
+                seenLine = true;
+            else if (entry.kind == slang::CoverageEntryKind::Function)
+                seenFunction = true;
+            else if (entry.kind == slang::CoverageEntryKind::Branch)
+                seenBranch = true;
+        }
+
+        SLANG_CHECK(seenLine);
+        SLANG_CHECK(seenFunction);
+        SLANG_CHECK(seenBranch);
+        SLANG_CHECK(seenCounterSlots.getCount() == allModesCoverage->getEntryCount());
+    }
+
     // Argument validation on the serializer.
     {
         ComPtr<ISlangBlob> dummy;
@@ -751,6 +788,105 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         JSONValue counter = findJsonField(container, entries[0], "counter");
         SLANG_CHECK(counter.isValid());
         SLANG_CHECK(counter.type == JSONValue::Type::Null);
+
+        struct MalformedFunctionMetadata : slang::ICoverageTracingMetadata
+        {
+            SLANG_NO_THROW SlangResult SLANG_MCALL
+            queryInterface(SlangUUID const&, void** outObject) SLANG_OVERRIDE
+            {
+                if (outObject)
+                    *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID&) SLANG_OVERRIDE
+            {
+                return nullptr;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW SlangResult SLANG_MCALL
+            getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE
+            {
+                if (!outInfo || index != 0)
+                    return SLANG_E_INVALID_ARG;
+                outInfo->file = "bad-function.slang";
+                outInfo->line = 1;
+                outInfo->counterIndex = 0;
+                outInfo->kind = slang::CoverageEntryKind::Function;
+                outInfo->counterMode = slang::CoverageCounterMode::Count;
+                outInfo->functionName = "helper";
+                outInfo->functionMangledName = nullptr;
+                return SLANG_OK;
+            }
+            SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
+                SLANG_OVERRIDE
+            {
+                if (!outInfo)
+                    return SLANG_E_INVALID_ARG;
+                *outInfo = {};
+                outInfo->structSize = sizeof(slang::CoverageBufferInfo);
+                outInfo->space = -1;
+                outInfo->binding = -1;
+                return SLANG_OK;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE { return 1; }
+        };
+
+        MalformedFunctionMetadata malformedFunctionMetadata;
+        SLANG_CHECK(
+            slang_writeCoverageManifestJson(&malformedFunctionMetadata, dummy.writeRef()) !=
+            SLANG_OK);
+
+        struct MalformedBranchMetadata : slang::ICoverageTracingMetadata
+        {
+            SLANG_NO_THROW SlangResult SLANG_MCALL
+            queryInterface(SlangUUID const&, void** outObject) SLANG_OVERRIDE
+            {
+                if (outObject)
+                    *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID&) SLANG_OVERRIDE
+            {
+                return nullptr;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW SlangResult SLANG_MCALL
+            getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE
+            {
+                if (!outInfo || index != 0)
+                    return SLANG_E_INVALID_ARG;
+                outInfo->file = "bad-branch.slang";
+                outInfo->line = 1;
+                outInfo->counterIndex = 0;
+                outInfo->kind = slang::CoverageEntryKind::Branch;
+                outInfo->counterMode = slang::CoverageCounterMode::Count;
+                outInfo->branchSiteID = 0;
+                outInfo->branchArmID = 1;
+                outInfo->branchArmKind = slang::CoverageBranchArmKind::TrueArm;
+                return SLANG_OK;
+            }
+            SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
+                SLANG_OVERRIDE
+            {
+                if (!outInfo)
+                    return SLANG_E_INVALID_ARG;
+                *outInfo = {};
+                outInfo->structSize = sizeof(slang::CoverageBufferInfo);
+                outInfo->space = -1;
+                outInfo->binding = -1;
+                return SLANG_OK;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE { return 1; }
+        };
+
+        MalformedBranchMetadata malformedBranchMetadata;
+        SLANG_CHECK(
+            slang_writeCoverageManifestJson(&malformedBranchMetadata, dummy.writeRef()) !=
+            SLANG_OK);
     }
 }
 
@@ -775,6 +911,7 @@ SLANG_UNIT_TEST(coverageTracingSpecializedEntryPointMetadata)
         {
             uint accum = genericHelper<int>(tid.x);
             accum += genericHelper<float2>(tid.x);
+            accum += genericHelper<float4>(tid.x);
             if ((tid.x & 1u) != 0u)
                 accum += uint(groupSize);
             else

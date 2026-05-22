@@ -324,6 +324,93 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             result.stderr,
         )
 
+    def test_emits_zero_hit_branch_arm_as_zero(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "entries": [
+                {
+                    "kind": "branch",
+                    "counter": 0,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 13,
+                    "branch_site": 1,
+                    "branch_arm": 1,
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "0\n")
+
+        self.assertIn("BRDA:13,1,1,0\n", result.stdout)
+        self.assertIn("BRH:0\n", result.stdout)
+
+    def test_rejects_out_of_range_v2_counter_index(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "entries": [
+                {
+                    "kind": "line",
+                    "counter": 1,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 12,
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "7\n", check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("error: counter index 1 out of range [0, 1)", result.stderr)
+
+    def test_accepts_empty_v2_entries(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 0,
+            "entries": [],
+        }
+
+        result = self.run_converter(manifest)
+
+        self.assertEqual(result.stdout, "TN:shader_coverage\n")
+        self.assertEqual(result.stderr, "")
+
+    def test_emits_multiple_branch_sites_on_same_line(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 2,
+            "entries": [
+                {
+                    "kind": "branch",
+                    "counter": 0,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 12,
+                    "branch_site": 1,
+                    "branch_arm": 1,
+                },
+                {
+                    "kind": "branch",
+                    "counter": 1,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 12,
+                    "branch_site": 2,
+                    "branch_arm": 1,
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "3 4\n")
+
+        self.assertIn("BRDA:12,1,1,3\n", result.stdout)
+        self.assertIn("BRDA:12,2,1,4\n", result.stdout)
+        self.assertIn("BRF:2\n", result.stdout)
+        self.assertIn("BRH:2\n", result.stdout)
+
     def test_rejects_unknown_manifest_version(self):
         manifest = {
             "version": 999,
