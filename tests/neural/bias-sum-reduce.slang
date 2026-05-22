@@ -26,8 +26,14 @@ static const int workgroupCount = WorkgroupSize / SubgroupSize;
 static const int InputSize = 8;
 static const int MaxOutputSize = 64;
 
-typealias ShMemSize = SharedMemorySize< DType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, workgroupCount>;
-typealias Layer1 = ShMemSize.OfLayer1<InputSize, MaxOutputSize>;
+typealias Layer1 = SharedMemorySize<
+    DType,
+    TargetEnum.CUDA,
+    ExecutionMode.Training,
+    SubgroupSize,
+    workgroupCount,
+    InputSize,
+    MaxOutputSize>;
 
 void test<int OutputSize>(uint tid, uint resIndex)
 {
