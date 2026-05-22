@@ -105,8 +105,12 @@ OffsetContainer::OffsetContainer()
     m_capacity = 0;
     m_data = nullptr;
 
-    // We need to allocate some of the first bytes 0 can be used for nullptr.
-    allocateAndZero(kStartOffset, 1);
+    // We need to allocate some of the first bytes so that offset 0 can be used for
+    // kNull32Offset. If this 8-byte allocation fails the container has no way to maintain
+    // that invariant — a subsequent newObject() would hand out offset 0 and collide with
+    // the null sentinel. Treat this as an unrecoverable startup failure.
+    void* start = allocateAndZero(kStartOffset, 1);
+    SLANG_RELEASE_ASSERT(start != nullptr);
 }
 
 OffsetContainer::~OffsetContainer()

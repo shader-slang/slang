@@ -442,6 +442,9 @@ changed.
 class OffsetContainer : public OffsetBase
 {
 public:
+    /// Construct a T inside the container.
+    /// Returns a null Offset32Ptr<T> if the underlying allocation fails (see allocate()
+    /// for the failure modes).
     template<typename T>
     Offset32Ptr<T> newObject()
     {
@@ -454,6 +457,10 @@ public:
         return Offset32Ptr<T>(getOffset(data));
     }
 
+    /// Construct an array of `size` default-initialized Ts inside the container.
+    /// Returns an empty Offset32Array<T> if `size == 0`, if `size` cannot be stored in the
+    /// 32-bit count, if `sizeof(T) * size` would overflow size_t, or if the underlying
+    /// allocation fails (see allocate() for the failure modes).
     template<typename T>
     Offset32Array<T> newArray(size_t size)
     {
@@ -482,13 +489,31 @@ public:
     /// Get the base - which is needed for turning offsets into things
     OffsetBase& asBase() { return *this; }
 
-    /// Allocate without alignment (effectively 1)
+    /// Allocate without alignment (effectively 1). Returns nullptr on the same failure
+    /// modes as allocate(size, alignment).
     void* allocate(size_t size);
+
+    /// Allocate `size` bytes with the given `alignment`. Returns nullptr if any of the
+    /// following hold:
+    ///   - `alignment` is zero or not a power of two;
+    ///   - `alignment - 1` exceeds the 32-bit offset domain (alignment > 2^32);
+    ///   - the request would grow the backing buffer past the 32-bit offset domain
+    ///     (m_dataSize + alignmentMask > 0xFFFFFFFFu, or size + offset > 0xFFFFFFFFu);
+    ///   - the underlying realloc fails (OOM).
+    /// Callers must treat the return value as nullable. The container itself is unchanged
+    /// on every rejection path (m_dataSize, m_capacity, and m_data are preserved).
     void* allocate(size_t size, size_t alignment);
+
+    /// As allocate(size, alignment) but zero-initializes the result. Returns nullptr on
+    /// the same failure modes as allocate().
     void* allocateAndZero(size_t size, size_t alignment);
 
     void fixAlignment(size_t alignment);
 
+    /// Encode and store `slice` (or the null-terminated `contents`) as an OffsetString.
+    /// Returns a null Offset32Ptr<OffsetString> if `slice.getLength()` would not fit in
+    /// the 32-bit offset domain after adding the encoded header and trailing null, or if
+    /// the underlying allocation fails (see allocate() for the failure modes).
     Offset32Ptr<OffsetString> newString(const UnownedStringSlice& slice);
     Offset32Ptr<OffsetString> newString(const char* contents);
 
