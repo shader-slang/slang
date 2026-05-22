@@ -420,6 +420,14 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools
     )
+    # Expose generated headers (capability defs, fiddle output) needed by unit
+    # tests that include internal slang headers such as slang-repro.h.
+    target_include_directories(
+        slang-unit-test
+        PRIVATE
+            $<TARGET_PROPERTY:slang-capability-defs,INTERFACE_INCLUDE_DIRECTORIES>
+            $<TARGET_PROPERTY:slang-fiddle-output,INTERFACE_INCLUDE_DIRECTORIES>
+    )
     slang_add_target(
         slang-reflection-test
         MODULE

@@ -53,8 +53,7 @@ SLANG_UNIT_TEST(reproStateValidator)
         OffsetContainer container;
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
         // Allocate a one-element files array; element starts null (zero-init).
-        auto filesArray =
-            container.newArray<Offset32Ptr<ReproUtil::FileState>>(1);
+        auto filesArray = container.newArray<Offset32Ptr<ReproUtil::FileState>>(1);
         container[requestPtr]->files = filesArray;
 
         List<uint8_t> buf;
@@ -72,8 +71,7 @@ SLANG_UNIT_TEST(reproStateValidator)
     {
         OffsetContainer container;
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
-        auto searchPathArray =
-            container.newArray<Offset32Ptr<OffsetString>>(1);
+        auto searchPathArray = container.newArray<Offset32Ptr<OffsetString>>(1);
         container[requestPtr]->searchPaths = searchPathArray;
         // searchPathArray[0] is null by zero-init; requireElements rejects nulls.
 
@@ -86,8 +84,7 @@ SLANG_UNIT_TEST(reproStateValidator)
     {
         OffsetContainer container;
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
-        auto searchPathArray =
-            container.newArray<Offset32Ptr<OffsetString>>(1);
+        auto searchPathArray = container.newArray<Offset32Ptr<OffsetString>>(1);
         auto strPtr = container.newString("hello");
         container[requestPtr]->searchPaths = searchPathArray;
         container[searchPathArray[0]] = strPtr;
@@ -107,8 +104,7 @@ SLANG_UNIT_TEST(reproStateValidator)
     {
         OffsetContainer container;
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
-        auto filesArray =
-            container.newArray<Offset32Ptr<ReproUtil::FileState>>(1);
+        auto filesArray = container.newArray<Offset32Ptr<ReproUtil::FileState>>(1);
         auto filePtr = container.newObject<ReproUtil::FileState>();
         auto contentsStr = container.newString("int main() {}");
 
@@ -126,8 +122,7 @@ SLANG_UNIT_TEST(reproStateValidator)
     {
         OffsetContainer container;
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
-        auto targetArray =
-            container.newArray<ReproUtil::TargetRequestState>(1);
+        auto targetArray = container.newArray<ReproUtil::TargetRequestState>(1);
         auto outputArray = container.newArray<ReproUtil::OutputState>(1);
 
         container[requestPtr]->targetRequests = targetArray;
@@ -144,8 +139,7 @@ SLANG_UNIT_TEST(reproStateValidator)
     {
         OffsetContainer container;
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
-        auto targetArray =
-            container.newArray<ReproUtil::TargetRequestState>(1);
+        auto targetArray = container.newArray<ReproUtil::TargetRequestState>(1);
         auto outputArray = container.newArray<ReproUtil::OutputState>(1);
 
         container[requestPtr]->targetRequests = targetArray;
@@ -157,12 +151,11 @@ SLANG_UNIT_TEST(reproStateValidator)
         SLANG_CHECK(!isReproStateValid(buf));
     }
 
-    // 10. EntryPointState with translationUnitIndex equal to translationUnitCount (0 == 0) — fails.
+    // 10. EntryPointState translationUnitIndex equal to translationUnitCount (0 == 0) — fails.
     {
         OffsetContainer container;
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
-        auto entryPointArray =
-            container.newArray<ReproUtil::EntryPointState>(1);
+        auto entryPointArray = container.newArray<ReproUtil::EntryPointState>(1);
 
         container[requestPtr]->entryPoints = entryPointArray;
         // translationUnitCount == 0; translationUnitIndex == 0 is out of range.
@@ -177,8 +170,7 @@ SLANG_UNIT_TEST(reproStateValidator)
     {
         OffsetContainer container;
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
-        auto entryPointArray =
-            container.newArray<ReproUtil::EntryPointState>(1);
+        auto entryPointArray = container.newArray<ReproUtil::EntryPointState>(1);
 
         container[requestPtr]->entryPoints = entryPointArray;
         container[entryPointArray[0]].translationUnitIndex = UINT32_MAX;
@@ -192,8 +184,7 @@ SLANG_UNIT_TEST(reproStateValidator)
     {
         OffsetContainer container;
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
-        auto srcFilesArray =
-            container.newArray<Offset32Ptr<ReproUtil::SourceFileState>>(1);
+        auto srcFilesArray = container.newArray<Offset32Ptr<ReproUtil::SourceFileState>>(1);
         auto srcFilePtr = container.newObject<ReproUtil::SourceFileState>();
 
         container[requestPtr]->sourceFiles = srcFilesArray;
@@ -209,8 +200,7 @@ SLANG_UNIT_TEST(reproStateValidator)
     {
         OffsetContainer container;
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
-        auto filesArray =
-            container.newArray<Offset32Ptr<ReproUtil::FileState>>(1);
+        auto filesArray = container.newArray<Offset32Ptr<ReproUtil::FileState>>(1);
         auto filePtr = container.newObject<ReproUtil::FileState>();
         auto contentsStr = container.newString("int main() {}");
         auto uniqueNameStr = container.newString("shader.slang");
