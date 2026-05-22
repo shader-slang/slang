@@ -398,6 +398,99 @@ SLANG_UNIT_TEST(reproStateValidator)
         SLANG_CHECK(isReproStateValid(buf));
     }
 
+    // 19d. validateStringPairArray positive case: RequestState.preprocessorDefinitions
+    // with one StringPair holding non-null first and second strings passes.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto defines = container.newArray<ReproUtil::StringPair>(1);
+        auto nameStr = container.newString("FOO");
+        auto valueStr = container.newString("1");
+
+        container[requestPtr]->preprocessorDefinitions = defines;
+        container[defines[0]].first = nameStr;
+        container[defines[0]].second = valueStr;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(isReproStateValid(buf));
+    }
+
+    // 19e. validateStringPairArray with null first — fails.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto defines = container.newArray<ReproUtil::StringPair>(1);
+        auto valueStr = container.newString("1");
+
+        container[requestPtr]->preprocessorDefinitions = defines;
+        // first left null (zero-init)
+        container[defines[0]].second = valueStr;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
+    // 19f. validateStringPairArray with null second — fails.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto defines = container.newArray<ReproUtil::StringPair>(1);
+        auto nameStr = container.newString("FOO");
+
+        container[requestPtr]->preprocessorDefinitions = defines;
+        container[defines[0]].first = nameStr;
+        // second left null (zero-init)
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
+    // 19g. validateOutputStateArray with valid entryPointIndex but corrupted
+    // outputPath string — fails. Exercises the
+    // `if (!validateString(outputState.outputPath))` branch.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        // entryPointCount = 1 so that entryPointIndex = 0 is in range.
+        auto entryPoints = container.newArray<ReproUtil::EntryPointState>(1);
+        auto targetArray = container.newArray<ReproUtil::TargetRequestState>(1);
+        auto outputArray = container.newArray<ReproUtil::OutputState>(1);
+        auto outputPathStr = container.newString("out.spv");
+
+        container[requestPtr]->entryPoints = entryPoints;
+        container[requestPtr]->targetRequests = targetArray;
+        container[targetArray[0]].outputStates = outputArray;
+        container[outputArray[0]].entryPointIndex = 0;
+        container[outputArray[0]].outputPath = outputPathStr;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        // First validate the buffer is otherwise well-formed.
+        SLANG_CHECK(isReproStateValid(buf));
+
+        // Corrupt: set first byte of outputPath to kSizeBase + 5 (invalid encoding).
+        buf[outputPathStr.m_offset] = OffsetString::kSizeBase + 5;
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
+    // 19h. validatePathInfoMap with null path — fails.
+    // Exercises the `if (!validateRequiredString(paths[i].path))` branch.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto pathAndPathInfoArray = container.newArray<ReproUtil::PathAndPathInfo>(1);
+
+        container[requestPtr]->pathInfoMap = pathAndPathInfoArray;
+        // path and pathInfo both left null (zero-init); validator requires path.
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
     // 20. ReproUtil::getRequest size-guard boundary: N-1 / N / N+1, where
     // N = kStartOffset + sizeof(RequestState). Locks in the unconditional
     // minimum-size check getRequest applies before casting the payload.

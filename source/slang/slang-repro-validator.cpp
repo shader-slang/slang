@@ -231,8 +231,8 @@ private:
 
     bool validateFileState(const FileState& file) const
     {
-        // extractFiles() dereferences uniqueName unconditionally when pathInfoMap
-        // references this file (slang-repro.cpp:1708), regardless of contents.
+        // extractFiles() dereferences uniqueName unconditionally inside its
+        // pathInfoMap iteration, regardless of whether contents is set.
         if (file.uniqueName.isNull())
         {
             return false;
