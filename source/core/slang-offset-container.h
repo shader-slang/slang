@@ -508,7 +508,12 @@ public:
     /// null check. After this PR, the new guards make the null return reachable on
     /// hostile input (e.g. a crafted repro file with sizes > 4 GiB), turning the prior
     /// memcpy-past-buffer UB into a deterministic null-deref. The container side is
-    /// now safe; the repro-side audit is tracked as a follow-up.
+    /// now safe; the repro-side audit is tracked as a follow-up. The null-on-overflow
+    /// contract is pinned by the regression block in
+    /// `tools/slang-unit-test/unit-test-offset-container.cpp` that bumps m_dataSize to
+    /// `0xFFFFFFFFu - 3` and asserts each of newObject / newArray / newString returns
+    /// its null sentinel — a future refactor that re-introduces UB at those call sites
+    /// has to break that test first.
     void* allocate(size_t size, size_t alignment);
 
     /// As allocate(size, alignment) but zero-initializes the result. Returns nullptr on
