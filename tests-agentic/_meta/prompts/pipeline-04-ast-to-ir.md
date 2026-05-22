@@ -104,7 +104,7 @@ The doc also says:
   with `ir-instructions`; cite that bundle's anchor for the catalog
   side).
 
-### Not testable through slangc (record under `## Out of scope`)
+### Not testable through slangc (record under `## Untested claims`)
 
 - Internal lowering visitor structure (e.g. which C++ visitor method
   handles which AST node). This is an implementation detail of
@@ -128,7 +128,7 @@ The doc also says:
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope (no-GPU runner)` as the home for the
+   `## Untested claims` as the home for the
    unobservable-via-slangc items listed above (the heading is a
    convention shared with `cross-cutting/ir-instructions`).
 2. 12 to 25 `.slang` test files. Aim for one observable AST→IR

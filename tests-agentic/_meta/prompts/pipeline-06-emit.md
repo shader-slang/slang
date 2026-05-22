@@ -101,7 +101,7 @@ The testable consequences are:
   header (the Metal "prelude" is the `metal_stdlib` system include,
   not a `prelude/` header).
 
-### Not testable through slangc (record under `## Out of scope`)
+### Not testable through slangc (record under `## Untested claims`)
 
 - **`IArtifact` object layout** (`#inputs-and-outputs`). The artefact
   wrapper is an internal C++ structure; the user-observable
@@ -118,7 +118,7 @@ The testable consequences are:
 - **Dependency-file output `.d`** (`#dependency-file-output`). The
   `-depfile` flag emits a side artefact; this bundle stays focused
   on the per-target text emission described in the rest of the doc.
-  Recorded under `## Out of scope`.
+  Recorded under `## Untested claims`.
 - **Torch glue** (`#backends` > Torch). Requires a host C++ compiler
   + PyTorch headers we cannot assume in the no-GPU runner.
 - **LLVM / native via `slang-llvm`** (`#backends` > LLVM). Requires

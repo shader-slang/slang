@@ -74,7 +74,7 @@ Concretely:
     keyword (`[shader("compute")]`-equivalent decoration / SPIR-V
     `OpEntryPoint`). Pin to one or two targets per test.
 
-### Not testable through slangc (record under `## Out of scope`)
+### Not testable through slangc (record under `## Untested claims`)
 
 - IR-internal **flag-bit layout** (`kIROpFlag_Hoistable`,
   `kIROpFlag_Global`, `kIROpFlag_Parent`, `kIROpFlag_UseOther`) —
@@ -103,7 +103,7 @@ implementation probe.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. The
-   `## Out of scope (no-GPU runner)` section here doubles as the
+   `## Untested claims` section here doubles as the
    place to list claims that aren't observable via slangc at all (IR
    flag bits, hoisting decisions, opcode-range layout, build-time
    FIDDLE wiring, module-versioning bumps).

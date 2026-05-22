@@ -137,7 +137,7 @@ the diagnostic produced. Group them by family for coverage:
 
 The doc carries many claims about the **internal AST shape** of these
 statements. These are unobservable through `slangc` text I/O. Record
-them under `## Out of scope` in `README.md`. Examples:
+them under `## Untested claims` in `README.md`. Examples:
 
 - That `IfStmt::negativeStatement` is a raw `Stmt*` (only the
   branch-selection behavior is observable).
@@ -293,7 +293,7 @@ backend). So:
       `slang-parser.cpp:NNNN`", stop and re-read the doc.
 - [ ] Synthesized / non-user-spellable nodes (`UnparsedStmt`,
       `IntrinsicAsmStmt`, `GpuForeachStmt`, `UniqueStmtIDNode`) are
-      recorded under `## Out of scope` in `README.md`, not as tests.
+      recorded under `## Untested claims` in `README.md`, not as tests.
 - [ ] `README.md` `## Doc gaps observed` is honest. If a claim
       wanted a test but had no good anchor (or the anchor was too
       coarse), record it.

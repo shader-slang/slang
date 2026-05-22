@@ -65,7 +65,7 @@ do not write tests that observe opcodes the doc lists as
 `global_hashed_string_literals`, `global_generic_param`) unless
 you can find a natural surface that produces them at the
 LOWER-TO-IR stage. Record any non-natural ones under
-`## Out of scope (no-GPU runner)` in `README.md`.
+`## Untested claims` in `README.md`.
 
 ## The translation rule: claims to observations
 
@@ -148,7 +148,7 @@ natural surface code via `-dump-ir`:
   `let %r : Int = call %helper(%a, %b)` in the caller body. This
   drills the call-and-callee structural link.
 
-### Out of scope (record under the bundle's out-of-scope heading)
+### Untested claims (record under the bundle's out-of-scope heading)
 
 - **`module` / `ModuleInst`** — observable only as the implicit
   preamble that wraps every dump. There is no anchor inside an
@@ -175,7 +175,7 @@ documented surface mapping.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope (no-GPU runner)` as the home for the
+   `## Untested claims` as the home for the
    unobservable-via-slangc items listed above.
 2. 15 to 25 `.slang` test files. Aim for one observable opcode (or
    one observable parent/child structural pair) per test. Group

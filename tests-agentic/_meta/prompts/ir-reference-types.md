@@ -117,7 +117,7 @@ rows with more prose:
   IR value across the module". This is hard to observe directly
   through `-dump-ir` (the dump shows the post-hoist result, not the
   decision). Record this as a doc-anchored but not testable claim;
-  put it in `## Out of scope` if helpful.
+  put it in `## Untested claims` if helpful.
 - `Func` shape → first operand is result, rest are params. Test by
   checking `Func(Int, Int, Float)` for a Slang function
   `int helper(int v, float f)`.
@@ -142,7 +142,7 @@ rows with more prose:
   not testable without a `[Differentiable]` function. Record as a
   doc gap if you want it covered.
 
-### Not testable through slangc (record under `## Out of scope`)
+### Not testable through slangc (record under `## Untested claims`)
 
 - **Hoistability flags** (`H` in the doc's tables) — the dump shows
   the post-hoist result, not the decision. Two textually identical
@@ -190,7 +190,7 @@ flag for opcode X", stop — that's an internal probe.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope (no-GPU runner)` as the home for the
+   `## Untested claims` as the home for the
    unobservable-via-slangc items listed above (the heading is a
    convention shared with `cross-cutting/ir-instructions`).
 2. 20 to 40 `.slang` test files. Aim for one observable opcode (or

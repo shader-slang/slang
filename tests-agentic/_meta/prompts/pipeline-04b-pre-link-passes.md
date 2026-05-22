@@ -144,7 +144,7 @@ Testable consequences:
   C3/C4 + the inner simplification cluster). Skip unless the doc
   names a concrete observable effect.
 
-### Not testable through slangc (record under `## Out of scope`)
+### Not testable through slangc (record under `## Untested claims`)
 
 - The **exact ordering** of A1…A10, B1…B6, C1…C7, D1…D15. The
   `### LOWER-TO-IR:` dump shows only the post-Phase-D state, not
@@ -165,7 +165,7 @@ Testable consequences:
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope (no-GPU runner)` as the home for unobservable
+   `## Untested claims` as the home for unobservable
    items.
 2. 12–18 `.slang` test files. Most are
    `//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir
@@ -265,6 +265,6 @@ These are in addition to the universal lessons in `_common.md`.
       makes but were not testable here (e.g. ordering of
       `### LOWER-TO-IR:` intermediate steps, `[__unsafeForceInlineEarly]`
       surface).
-- [ ] `## Out of scope (no-GPU runner)` records claims that are
+- [ ] `## Untested claims` records claims that are
       genuinely unobservable through any allowed directive
       (obfuscation, debug-info insertion, internal-only attributes).

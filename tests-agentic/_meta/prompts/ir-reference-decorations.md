@@ -116,7 +116,7 @@ natural Slang surface code are:
 - **Other**: `method` on a member function declared in a struct;
   `constructor(...)` on the synthesized `__init` of a struct.
 
-### Out of scope (record under the bundle's out-of-scope heading)
+### Untested claims (record under the bundle's out-of-scope heading)
 
 - All decorations marked `(synthesized)` in the `AST origin`
   column. Examples that should not be written as tests in this
@@ -165,7 +165,7 @@ stop — record it as out-of-scope and move on.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope (no-GPU runner)` as the home for the
+   `## Untested claims` as the home for the
    unobservable items.
 2. **20 to 35** `.slang` test files. Aim for **one decoration per
    test**; group two decorations into one test only when they

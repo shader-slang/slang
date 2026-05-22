@@ -62,7 +62,7 @@ For the bundle as a whole:
 7. **Front-matter valid.** Every required key in README.md and in every
    `//META` block.
 8. **Coverage table consistent.** Every `.slang` file in the bundle
-   appears in the `## Coverage` table's Tests column exactly once. The
+   appears in the `## Functional coverage` table's Tests column exactly once. The
    Claim cell of each row matches the corresponding test's
    `//META: purpose=...` line verbatim. The Anchor column matches
    `//META: doc_ref=...`. The Intent column matches

@@ -173,7 +173,7 @@ in the `## Nodes` table, one observable consequence of that kind**.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope` rather than `## Out of scope (no-GPU runner)`:
+   `## Untested claims` rather than `## Untested claims`:
    the "out of scope" reasons here are mostly "internal AST node
    identity" and "synthesized-not-user-spellable", which are not
    GPU-related. List the synthesized nodes from `## Nodes` that are
@@ -282,7 +282,7 @@ its checker-attached type are the same regardless of backend). So:
       you find yourself thinking "this would cover the branch at
       `slang-parser.cpp:NNNN`", stop and re-read the doc.
 - [ ] Synthesized / non-user-spellable nodes from `## Nodes` are
-      recorded under `## Out of scope` in `README.md`, not as tests.
+      recorded under `## Untested claims` in `README.md`, not as tests.
 - [ ] `README.md` `## Doc gaps observed` is honest. If a claim wanted
       a test but had no good anchor (or the anchor was too coarse),
       record it.

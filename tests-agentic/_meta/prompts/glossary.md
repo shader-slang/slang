@@ -13,7 +13,7 @@ vocabulary** defined in the glossary — but only those terms whose
 definitions imply a behavior observable through `slangc` on a CI runner
 without a GPU. Most glossary entries are conceptual (internal data
 structures, builder helpers, file formats, IR opcode families) and have
-no direct surface; those go into `## Out of scope` instead of becoming
+no direct surface; those go into `## Untested claims` instead of becoming
 tests.
 
 ## What is "testable" for this bundle?
@@ -52,7 +52,7 @@ Examples of **testable** glossary entries:
 - "target" / "target intrinsic" — `-target X` switches the emitted
   spelling of an intrinsic.
 
-Examples of **not testable** (go to `## Out of scope`):
+Examples of **not testable** (go to `## Untested claims`):
 
 - "ASTBuilder", "IRBuilder", "FIDDLE", "scope" struct internals,
   "Linkage" object, "decl-ref", "lookup breadcrumb", "lookup mask",
@@ -81,7 +81,7 @@ Examples of **not testable** (go to `## Out of scope`):
 
 The bar is **strict**: if you cannot write a test whose pass/fail is
 directly tied to the glossary entry's one-paragraph definition, drop
-the term after 3 attempts and record it under `## Out of scope`.
+the term after 3 attempts and record it under `## Untested claims`.
 
 ## Required structure
 
@@ -89,7 +89,7 @@ the term after 3 attempts and record it under `## Out of scope`.
    `## Doc gaps observed` section should be brief — the glossary is a
    lookup aid, not a contract surface; gaps mostly mean "term lacks an
    observable consequence" and should be listed under
-   `## Out of scope` instead.
+   `## Untested claims` instead.
 2. **10–18** `.slang` test files, one per testable glossary entry.
 3. Each test file is small (≤ ~30 lines), single-purpose, and named
    after the term it verifies (kebab-case). Examples:
@@ -140,7 +140,7 @@ Do not use any GPU-only directive.
       (e.g. `purpose=module: import brings another module's ...`).
 - [ ] No test exists for a conceptual / internal-only term. If you
       catch yourself writing one for `ASTBuilder` or `fossil format`,
-      drop it and move the term to `## Out of scope`.
+      drop it and move the term to `## Untested claims`.
 - [ ] No test depends on a GPU.
 - [ ] Bundle has between 10 and 18 `.slang` files.
 - [ ] No test was written by inspecting an uncovered source line. If

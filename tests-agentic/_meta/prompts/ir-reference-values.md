@@ -129,7 +129,7 @@ The catalog row → claim mapping:
   the "implicit cast when types differ" case as a doc gap if you
   cannot construct a portable surface for it.
 
-### Out of scope (record under the bundle's out-of-scope heading)
+### Untested claims (record under the bundle's out-of-scope heading)
 
 - **`constexpr*` opcodes** (`constexprAdd`/`constexprMul`/etc.) —
   produced by the IR's compile-time integer evaluator when an
@@ -189,7 +189,7 @@ probe.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope (no-GPU runner)` as the home for the
+   `## Untested claims` as the home for the
    unobservable-via-slangc items listed above (the heading is a
    convention shared with `cross-cutting/ir-instructions`,
    `ir-reference/types`, and `pipeline/04-ast-to-ir`).

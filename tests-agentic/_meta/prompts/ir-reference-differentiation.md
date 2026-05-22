@@ -56,7 +56,7 @@ Anchor each test at the IR opcode that the doc names; do not write
 tests for opcodes the doc lists as `(synthesized)` and that have no
 natural Slang surface — those are internal to the autodiff IR
 passes and never observable from a user program. Record them under
-`## Out of scope (no-GPU runner)` in `README.md`.
+`## Untested claims` in `README.md`.
 
 ## The translation rule: claims to observations
 
@@ -127,7 +127,7 @@ natural surface code via `-dump-ir`:
   between the construction opcode and the differential type
   family.
 
-### Out of scope (record under the bundle's out-of-scope heading)
+### Untested claims (record under the bundle's out-of-scope heading)
 
 Per the doc, the following opcodes are `(synthesized)` and produced
 only by the internal autodiff IR passes (`slang-ir-autodiff-fwd.cpp`,
@@ -174,7 +174,7 @@ internal probe, not a documented surface mapping.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope (no-GPU runner)` as the home for the
+   `## Untested claims` as the home for the
    unobservable-via-slangc items listed above.
 2. 10 to 18 `.slang` test files. Aim for one observable opcode (or
    one observable surface-to-opcode lowering) per test. Group

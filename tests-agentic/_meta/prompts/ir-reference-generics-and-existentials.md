@@ -57,7 +57,7 @@ Anchor each test at the opcode that the doc names; do not write
 tests that observe opcodes the doc lists as `(synthesized)` unless
 you can find a natural Slang surface that produces them at the
 LOWER-TO-IR stage. Record any non-natural ones under
-`## Out of scope (no-GPU runner)` in `README.md`.
+`## Untested claims` in `README.md`.
 
 ## The translation rule: claims to observations
 
@@ -149,7 +149,7 @@ natural surface code via `-dump-ir` at the first LOWER-TO-IR block:
 - **`global_generic_param`** — a module-scope `type_param T;`
   lowers to `let %T : Type = global_generic_param`.
 
-### Out of scope (record under the bundle's out-of-scope heading)
+### Untested claims (record under the bundle's out-of-scope heading)
 
 The doc explicitly lists most of these opcodes as `(synthesized)`
 by later IR passes — they do not appear at the LOWER-TO-IR stage
@@ -190,7 +190,7 @@ documented surface mapping.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope (no-GPU runner)` as the home for the
+   `## Untested claims` as the home for the
    synthesized-only opcodes listed above.
 2. 15 to 25 `.slang` test files. Aim for one observable opcode (or
    one observable operand-shape claim) per test. Group

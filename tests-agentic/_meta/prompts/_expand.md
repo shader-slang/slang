@@ -41,7 +41,7 @@ contract.
    - parameter-shape variations the doc mentions (scalar / vector /
      matrix / array; precision modes; capability gates).
 
-2. **Cross-check the README.md `## Coverage` table.** If a claim row's
+2. **Cross-check the README.md `## Functional coverage` table.** If a claim row's
    `Tests` cell is thinner than peer claims under the same anchor, that
    is a strong signal of where to expand. If the doc supports a claim
    the table does not yet describe, add a new row for it (one row per

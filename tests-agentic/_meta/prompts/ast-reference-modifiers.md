@@ -28,7 +28,7 @@ documented behavior is observable.
 This bundle aims for **15–25 tests**: a representative cross-section
 of modifier/attribute families, not exhaustive enumeration. Skip
 kinds whose only observable surface is internal AST shape (see
-`## Out of scope` below).
+`## Untested claims` below).
 
 ## The translation rule: claims to observations
 
@@ -116,7 +116,7 @@ these modifiers — which C++ class is the parent, which fields a
 class stores, whether `MemoryQualifierSetModifier` aggregates a
 bitmask of flags, whether `UncheckedAttribute` is the
 parser-time representation. These are unobservable through
-`slangc` text I/O. Record them under `## Out of scope` in
+`slangc` text I/O. Record them under `## Untested claims` in
 `README.md`. Examples:
 
 - That `InOutModifier` derives from `OutModifier` in C++ (only
@@ -196,7 +196,7 @@ behavioral claims that the doc does not make.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. List
-   internal-AST-shape claims under `## Out of scope`.
+   internal-AST-shape claims under `## Untested claims`.
 2. 15 to 25 `.slang` test files (size cap 60). The doc is large
    but most claims collapse into a few observable categories
    (direction, storage, visibility, interpolation, layout,
@@ -275,4 +275,4 @@ covered by `pipeline/06-emit/` and target-specific bundles).
 - [ ] `README.md` `## Doc gaps observed` is honest.
 - [ ] Internal-AST-shape claims (parent class in C++, private field
       names, FIDDLE tag, synthesized-only classes) are recorded
-      under `## Out of scope`, not as tests.
+      under `## Untested claims`, not as tests.

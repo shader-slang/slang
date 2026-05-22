@@ -24,7 +24,7 @@ documented behavior is observable.
 This bundle is **large** by manifest design (size cap 80). Aim for
 25–50 tests so the major declaration kinds get coverage. Skip kinds
 whose only observable surface is internal AST shape (see
-`## Out of scope` below).
+`## Untested claims` below).
 
 ## The translation rule: claims to observations
 
@@ -120,7 +120,7 @@ declarations — which C++ field stores the type expression, which
 class is the parent in the C++ hierarchy, which parser callback
 allocates the node, whether `inner` of `GenericDecl` holds the
 genericized decl. These are unobservable through `slangc` text I/O.
-Record them under `## Out of scope` in `README.md`. Examples:
+Record them under `## Untested claims` in `README.md`. Examples:
 
 - That `VarDecl::type` is a `TypeExp` (vs. a resolved `Type*`).
 - That `LetDecl` derives from `VarDecl` in C++ (only the immutability
@@ -210,7 +210,7 @@ claims that the doc does not make.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. List
-   internal-AST-shape claims under `## Out of scope` (using the same
+   internal-AST-shape claims under `## Untested claims` (using the same
    convention as `ast-reference/base/`).
 2. 25 to 50 `.slang` test files (size cap 80). The bundle is large by
    manifest design because the doc has many concrete decl kinds.
@@ -293,4 +293,4 @@ behavior.
 - [ ] Claims about internal AST shape (parent class in C++,
       private field names, FIDDLE tag, ASTBuilder allocation,
       synthesized-only classes) are recorded under
-      `## Out of scope` in `README.md`, not as tests.
+      `## Untested claims` in `README.md`, not as tests.

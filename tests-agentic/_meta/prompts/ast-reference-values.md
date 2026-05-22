@@ -76,7 +76,7 @@ Pick one representative claim per concrete user-spellable Val:
 - **`UNormModifierVal`** — `unorm` on a `Texture2D<...>` element
   type survives lowering and appears in HLSL emit.
 
-### Internal-only claims (record under `## Out of scope`)
+### Internal-only claims (record under `## Untested claims`)
 
 The doc carries many claims about the **internal shape** of these
 `Val`s. These are unobservable:
@@ -208,12 +208,12 @@ that the doc does not make.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope` for internal-shape claims and the
+   `## Untested claims` for internal-shape claims and the
    pack-only / autodiff-only / capability-only `Val` classes.
 2. **8–15** `.slang` test files (the doc is overwhelmingly internal;
    user-anchorable surface is smaller than for types / expressions /
    declarations). Drop after **3 attempts** per test and record the
-   blocking issue under `## Doc gaps observed` or `## Out of scope`.
+   blocking issue under `## Doc gaps observed` or `## Untested claims`.
 
 ## Test directives
 
@@ -272,7 +272,7 @@ and its checker-attached behavior do not differ across backends):
 - [ ] No test was written by inspecting an uncovered source line.
       If you find yourself thinking "this would cover the branch at
       `slang-ast-val.h:NNNN`", stop and re-read the doc.
-- [ ] `README.md` `## Out of scope` lists the internal-shape and
+- [ ] `README.md` `## Untested claims` lists the internal-shape and
       pack / autodiff / capability / existential `Val` classes that
       this bundle does not exercise, with one-line reasons.
 - [ ] `README.md` `## Doc gaps observed` is honest. If a doc claim

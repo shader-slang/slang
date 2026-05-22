@@ -126,7 +126,7 @@ test in a single `.slang` file. If a cross-module claim cannot be
 expressed in a single-file test using a free function at module
 scope versus a member function inside the struct, record it as a
 doc-gap-like note in `README.md` under
-`## Out of scope (single-file runner)`.
+`## Untested claims`.
 
 ## DIAGNOSTIC_TEST gotchas (from earlier bundles)
 

@@ -99,7 +99,7 @@ disguise.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. The
-   `## Out of scope (no-GPU runner)` section here doubles as the
+   `## Untested claims` section here doubles as the
    place to list claims that aren't observable via slangc at all (not
    GPU-related, but identical in spirit: out of reach of the runner).
 2. 6 to 15 `.slang` test files. Quality matters more than quantity;
@@ -162,5 +162,5 @@ parser/checker that runs before any backend), so:
 - [ ] Claims about internal AST shape (NodeBase discriminator,
       ASTBuilder pointer, `Val::m_operands` layout, support-type
       structure) are recorded under
-      `## Out of scope (no-GPU runner)` in `README.md`, not as
+      `## Untested claims` in `README.md`, not as
       tests.

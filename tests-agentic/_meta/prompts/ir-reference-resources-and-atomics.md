@@ -83,7 +83,7 @@ LOWER-TO-IR stage from a portable shader surface:
   initial LOWER-TO-IR dump they appear as `call %InterlockedAdd(...)`
   etc. Use `Atomic<T>` methods for the observation.
 
-### Out of scope (record under the bundle's out-of-scope heading)
+### Untested claims (record under the bundle's out-of-scope heading)
 
 - **`imageSubscript`, `imageLoad`, `imageStore`, `sample`,
   `sampleGrad`** — the natural surface (`tex.Sample(samp, uv)`,
@@ -159,7 +159,7 @@ that's an internal probe.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope (no-GPU runner)` as the home for the
+   `## Untested claims` as the home for the
    unobservable-via-slangc items listed above (the heading is a
    convention shared with other bundles).
 2. 15 to 25 `.slang` test files. Aim for one observable opcode (or

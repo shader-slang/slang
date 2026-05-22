@@ -250,7 +250,7 @@ Every `.slang` file must begin with:
 //META: doc_ref=docs/llm-generated/<path>.md#<anchor>
 //META: doc_section_digest=<sha256 of the cited section's text>
 //META: purpose=<one-line summary, in plain English>
-//META: intent=<functional | expansion | regression | negative>
+//META: intent=<functional | boundary | negative | stress | expansion | regression>
 //META: pipeline_stage=<lex | preprocess | parse | check | lower | ir-pass | layout | link | emit | runtime>
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 ```

@@ -134,7 +134,7 @@ layout-IR module has been merged in.
   the entry-point `func %main` body in the executable side is what
   carries the SSA work — the layout-side `func %main` is a stub. Not
   worth a dedicated test slot; documented under
-  `## Out of scope` if needed.)
+  `## Untested claims` if needed.)
 
 ### Conditional / target-specific gates
 
@@ -150,7 +150,7 @@ layout-IR module has been merged in.
   capability filter as a doc claim worth a single test only if a
   clean surface signal exists; otherwise record as out-of-scope.
 
-### Not testable through slangc (record under `## Out of scope`)
+### Not testable through slangc (record under `## Untested claims`)
 
 - The **lazy construction / cache reuse** of `m_irModuleForLayout`
   (a second `getOrCreateIRModuleForLayout` call returns the cached
@@ -179,7 +179,7 @@ layout-IR module has been merged in.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope (no-GPU runner)` as the home for unobservable
+   `## Untested claims` as the home for unobservable
    items.
 2. 8–14 `.slang` test files. All are
    `//TEST:SIMPLE(filecheck=CHECK):-target <T> -dump-ir
@@ -286,14 +286,14 @@ These are in addition to the universal lessons in `_common.md`.
       construction steps run; only post-construction observable
       shape.
 - [ ] No test exercises the obfuscation gate or the lazy-cache
-      mechanism — both are recorded under `## Out of scope`.
+      mechanism — both are recorded under `## Untested claims`.
 - [ ] No test asserts numeric `offset` / `size` operand values
       across targets (each target has different numeric encodings;
       structure-level assertions only).
 - [ ] `## Doc gaps observed` records layout-IR claims that the doc
       makes but were not testable here (capability filter, cache
       reuse, obfuscation pass).
-- [ ] `## Out of scope (no-GPU runner)` records claims that are
+- [ ] `## Untested claims` records claims that are
       genuinely unobservable through any allowed directive
       (`materialize` failure, lazy cache, multi-`TargetProgram`
       independence within one invocation).

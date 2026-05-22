@@ -19,7 +19,7 @@ the repository, not a behavior observable through `slang-test`.
 This is the sister doc to `architecture/overview.md`. The same
 translation rule applies: **directory layout and file-name claims
 are not slangc-observable**. The bundle is intentionally **small**
-(5–10 tests) and the `## Out of scope (no-GPU runner)` section is
+(5–10 tests) and the `## Untested claims` section is
 **large** — it itemises every subsystem the doc describes that is
 not reachable from `slangc`'s command line.
 
@@ -129,7 +129,7 @@ file naming it.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. The
-   `## Out of scope (no-GPU runner)` section here doubles as the
+   `## Untested claims` section here doubles as the
    place to list file-tree, prefix-convention, and Lua-table
    claims that are not observable via slangc at all. **Expect
    this section to be long** — most of the doc lives here.
@@ -195,7 +195,7 @@ emitted text, and **`-get-module-info`** round-trip. So:
 - [ ] No test depends on a GPU.
 - [ ] The dispatcher claim is exercised by **at least one test
       that runs against more than one text-emit target**.
-- [ ] `## Out of scope (no-GPU runner)` in `README.md` is long
+- [ ] `## Untested claims` in `README.md` is long
       and itemises file-tree claims, prefix conventions, Lua
       tables, IR-pass enumeration, and cross-cutting subsystem
       pointers.

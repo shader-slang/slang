@@ -149,7 +149,7 @@ HLSL-specific on HLSL.
   `#phase-d-hlsl-emit-and-downstream-tools`.)
 
 ### Not testable through `slangc -target hlsl` (record under
-`## Out of scope (no-GPU runner)`)
+`## Untested claims`)
 
 - **DXC / fxc invocation**, DXIL bytecode emission. Requires a
   Windows DXC build (or a Linux DXC) plus a real graphics
@@ -311,5 +311,5 @@ These are in addition to `_common.md` and `pipeline-06-emit.md`.
 - [ ] `## Doc gaps observed` records claims that lack a checkable
       marker in the doc, or behaviors observed in slangc emit
       that the doc does not currently describe.
-- [ ] `## Out of scope (no-GPU runner)` enumerates the
+- [ ] `## Untested claims` enumerates the
       DXC/fxc/DXIL/DXR/profile-gated items.

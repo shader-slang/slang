@@ -157,7 +157,7 @@ execution (Tint / Dawn).
   (Anchor: `#loops-in-the-pipeline`.)
 
 ### Not testable through `slangc -target wgsl` (record under
-`## Out of scope (no-GPU runner)`)
+`## Untested claims`)
 
 - **Tint invocation / WGSLSPIRV path.** `-target wgsl` stops at
   WGSL text. The downstream Tint binary is exercised only by
@@ -286,5 +286,5 @@ These are in addition to `_common.md`:
 - [ ] `## Doc gaps observed` records claims that lack a checkable
       marker in the doc, or behaviors observed in slangc emit
       that the doc does not currently describe.
-- [ ] `## Out of scope (no-GPU runner)` enumerates the Tint /
+- [ ] `## Untested claims` enumerates the Tint /
       WGSLSPIRV / append-consume-buffer / interlocked-add items.

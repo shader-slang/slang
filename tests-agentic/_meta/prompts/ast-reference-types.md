@@ -146,7 +146,7 @@ emitted text per target:
 Pre-backend type claims do not need multi-target directives. Test
 each claim once with `INTERPRET` or once with `DIAGNOSTIC_TEST`.
 
-### Not testable through slangc (record under `## Out of scope`)
+### Not testable through slangc (record under `## Untested claims`)
 
 The doc carries many claims about the **internal AST shape** of
 these types. These are unobservable:
@@ -178,7 +178,7 @@ these types. These are unobservable:
   `OverloadGroupType` (the overload set is observable, the class
   identity is not), `InitializerListType` (the brace-initializer is
   observable, the class identity is not). Record under
-  `## Out of scope`.
+  `## Untested claims`.
 - **`Fp8Type`** family (`FloatE4M3Type`, `FloatE5M2Type`,
   `BFloat16Type`) — surface support varies by target; not portable
   on the no-GPU runner. If the type is reachable from a portable
@@ -294,7 +294,7 @@ through a particular surface form (e.g. that `T*` produces a
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope` for the internal-shape claims and the
+   `## Untested claims` for the internal-shape claims and the
    GPU-only / synthesized-only classes named above.
 2. 18 to 35 `.slang` test files (size cap 60). The doc has ~150
    concrete classes but most are abstract intermediates,
@@ -368,7 +368,7 @@ regardless of backend):
 - [ ] No test was written by inspecting an uncovered source line.
       If you find yourself thinking "this would cover the branch at
       `slang-ast-type.h:NNNN`", stop and re-read the doc.
-- [ ] `README.md` `## Out of scope` lists the internal-shape and
+- [ ] `README.md` `## Untested claims` lists the internal-shape and
       synthesized-only / GPU-only / autodiff-only / pack-only type
       classes that this bundle does not exercise, with one-line
       reasons.

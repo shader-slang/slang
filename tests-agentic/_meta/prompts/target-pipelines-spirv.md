@@ -217,7 +217,7 @@ test file.
   `targetCompilerOptions.getDebugInfoLevel()`.)
 
 ### Not testable through `slangc -target spirv-asm` (record under
-`## Out of scope (no-GPU runner)`)
+`## Untested claims`)
 
 - **spirv-link**: requires more than one input SPIR-V module
   (an `IREmbeddedDownstreamIR` of `CodeGenTarget::SPIRV`).
@@ -407,6 +407,6 @@ These are in addition to `_common.md` and `pipeline-06-emit.md`.
 - [ ] `## Doc gaps observed` records claims that lack a
       checkable marker in the doc, or behaviors observed in
       slangc emit that the doc does not currently describe.
-- [ ] `## Out of scope (no-GPU runner)` enumerates the
+- [ ] `## Untested claims` enumerates the
       spirv-link / spirv-val / spirv-opt / DXR / mesh /
       capability-gated items.

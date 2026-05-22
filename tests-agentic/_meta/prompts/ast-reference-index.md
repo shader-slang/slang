@@ -21,7 +21,7 @@ solely responsible for.
 
 The bundle target is **3–8 tests**. If you cannot anchor a claim
 to text in the index doc itself, route it to a peer bundle via
-`## Out of scope` (e.g. `see ast-reference/declarations`) and **do
+`## Untested claims` (e.g. `see ast-reference/declarations`) and **do
 not** duplicate a peer claim here.
 
 ## What counts as a cross-cutting index claim
@@ -86,7 +86,7 @@ claims belong to peer bundles.
 ## What is NOT in scope for this bundle
 
 The index doc explicitly delegates these to peer pages. Route
-them to peer bundles in `## Out of scope`; do not write tests
+them to peer bundles in `## Untested claims`; do not write tests
 here:
 
 - Per-root abstract-class behaviors (`NodeBase`, `SyntaxNode`,
@@ -113,7 +113,7 @@ single-family behavior, stop and route it to the peer bundle.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`,
-   including a `## Out of scope` section listing the peer bundles
+   including a `## Untested claims` section listing the peer bundles
    for the topics not covered here.
 2. **3–8 `.slang` tests**, each anchored to an anchor in the
    index doc (`#ast-reference`, `#family-taxonomy`,
@@ -218,7 +218,7 @@ doc.
 - [ ] At least one AST-flows-end-to-end (emit) test exists.
 - [ ] At least one multi-family-composition test exists.
 - [ ] No test duplicates a sibling-bundle test verbatim.
-- [ ] `README.md` has `## Out of scope` listing the peer bundles
+- [ ] `README.md` has `## Untested claims` listing the peer bundles
       that own each delegated topic.
 - [ ] `README.md` has `## Sibling-bundle overlap` listing
       intentionally-avoided peer claims.

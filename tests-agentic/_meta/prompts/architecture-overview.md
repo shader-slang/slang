@@ -16,7 +16,7 @@ the `Module` / `IComponentType` abstraction. Most of the doc is
 **API-level** (`ISession`, `IGlobalSession`, `IModule`,
 `IComponentType`, `Linkage`, `EndToEndCompileRequest`) and is **not
 observable through `slang-test`**. The bundle therefore deliberately
-defers most of the doc to `## Out of scope (no-GPU runner)` and
+defers most of the doc to `## Untested claims` and
 keeps the test count small: **5–10 tests** is correct.
 
 ## The translation rule: API claims to slangc-observable behaviors
@@ -121,12 +121,12 @@ If you find yourself thinking "this would verify that the C++
 class `Module` is instantiated", stop — that is an API-shaped
 probe in disguise. Re-read the doc and find the slangc-observable
 consequence, or record the claim under
-`## Out of scope (no-GPU runner)`.
+`## Untested claims`.
 
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. The
-   `## Out of scope (no-GPU runner)` section here doubles as the
+   `## Untested claims` section here doubles as the
    place to list API-shaped and file-tree claims that aren't
    observable via slangc at all (not literally GPU-bound, but
    identical in spirit: out of reach of the runner). **Expect this
@@ -212,7 +212,7 @@ So:
       tests.
 - [ ] Tests use `-entry` / `-stage` explicitly where the claim is
       about those flags.
-- [ ] `## Out of scope (no-GPU runner)` in `README.md` is long.
+- [ ] `## Untested claims` in `README.md` is long.
       The doc is overwhelmingly about API / file-tree facts that
       are not observable through `slang-test`; the section should
       itemise the API claims, the directory-layout claims, the

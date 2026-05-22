@@ -226,7 +226,7 @@ contrasts are observable as IR-pass side effects in emitted text.
   predicates table.)
 
 ### Not testable through `slangc -target metal` (record under
-`## Out of scope (no-GPU runner)`)
+`## Untested claims`)
 
 - **Apple `metal` compiler invocation**, `.metallib` bytecode
   emission, `.metallib` disassembly. Requires Xcode toolchain;
@@ -424,5 +424,5 @@ These are in addition to `_common.md`.
       marker in the doc, or behaviors observed in slangc emit
       that the doc does not currently describe (e.g. the
       AppendStructuredBuffer Metal-compute rejection).
-- [ ] `## Out of scope (no-GPU runner)` enumerates the
+- [ ] `## Untested claims` enumerates the
       Apple-toolchain / `MetalLib*` / DXR / mesh / subpass items.

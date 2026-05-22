@@ -21,7 +21,7 @@ itself makes that no single peer page is responsible for.
 
 The bundle target is **3–8 tests**. If you cannot anchor a claim to
 text in the index doc itself, route it to a peer bundle via
-`## Out of scope` (e.g. `see target-pipelines/spirv`) and **do not**
+`## Untested claims` (e.g. `see target-pipelines/spirv`) and **do not**
 duplicate a peer claim here.
 
 ## What counts as a cross-cutting index claim
@@ -72,7 +72,7 @@ details belong to peer bundles.
 ## What is NOT in scope for this bundle
 
 The index doc explicitly delegates these to peer pages. Route them
-to peer bundles in `## Out of scope`; do not write tests here:
+to peer bundles in `## Untested claims`; do not write tests here:
 
 - SPIR-V direct-emit specifics, `legalizeIRForSPIRV` arms,
   `simplifyIRForSpirvLegalization` outer/inner loops,
@@ -103,7 +103,7 @@ single-target behavior, stop and route it to the peer bundle.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`, including
-   a `## Out of scope` section listing the peer bundles for the
+   a `## Untested claims` section listing the peer bundles for the
    topics not covered here, and a `## Sibling-bundle overlap`
    section recording intentionally-avoided peer claims.
 2. **3–8 `.slang` tests**, each anchored to an anchor in the
@@ -197,7 +197,7 @@ doc.
 - [ ] At least one emitter-divergence test exists (per-target
       `CHECK` patterns that diverge).
 - [ ] No test duplicates a sibling-bundle test verbatim.
-- [ ] `README.md` has `## Out of scope` listing the peer bundles
+- [ ] `README.md` has `## Untested claims` listing the peer bundles
       that own each delegated topic.
 - [ ] `README.md` has `## Sibling-bundle overlap` listing
       intentionally-avoided peer claims.

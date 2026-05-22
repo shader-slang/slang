@@ -99,7 +99,7 @@ natural surface code via `-dump-ir`:
   terminator); the block's real terminator (an
   `unconditionalBranch` to the post-`if` merge) follows.
 
-### Out of scope (record under the bundle's out-of-scope heading)
+### Untested claims (record under the bundle's out-of-scope heading)
 
 - **`conditionalBranch`** — the doc lists this as `(synthesized)`
   with no AST origin; in practice the front-end emits structured
@@ -139,7 +139,7 @@ that's an internal probe and the opcode itself isn't surfaced.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope (no-GPU runner)` as the home for the
+   `## Untested claims` as the home for the
    unobservable-via-slangc items listed above.
 2. 12 to 22 `.slang` test files. Aim for one observable opcode (or
    one observable per-AST-statement lowering) per test. Group two

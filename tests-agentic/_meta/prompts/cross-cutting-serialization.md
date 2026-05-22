@@ -114,7 +114,7 @@ The user-facing surface that survives is:
   a `.zip`, the archive contains `.map` files alongside the emitted
   text.
 
-### Not testable through slangc CLI (record under `## Out of scope`)
+### Not testable through slangc CLI (record under `## Untested claims`)
 
 - The **`serialize(serializer, value)` template pattern**
   (`#the-serialize-pattern`) — a C++ idiom; not observable from CLI.
@@ -142,7 +142,7 @@ The user-facing surface that survives is:
 1. `README.md` with the structure named in `_common.md`.
 2. **6 to 12** `.slang` test files. The bundle is intentionally
    small: many doc claims are internal and end up under
-   `## Out of scope`.
+   `## Untested claims`.
 3. Mix:
    - **`TEST:COMPILE` + `TEST:SIMPLE` pairs** that build a
      `.slang-module` then inspect it (`-dump-module`,
@@ -257,7 +257,7 @@ These add to the universal lessons in `_common.md`. Apply them ALL:
 - [ ] No test exercises `-dump-repro` / `-load-repro` (deprecated).
 - [ ] No test exercises `INTERPRET` (irrelevant to the serialization
       layer).
-- [ ] `## Out of scope (no-GPU runner)` enumerates the
+- [ ] `## Untested claims` enumerates the
       Fossil-memory-map property, raw RIFF chunk inspection,
       repro round-trip, and the C++ `serialize()` template.
 - [ ] Total file count is **6–12**; a bigger bundle would be

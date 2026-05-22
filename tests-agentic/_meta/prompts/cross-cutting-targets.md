@@ -92,7 +92,7 @@ the "feature X is rejected on target Y" claims.
   whose atom populates a different `target` keyhole is rejected
   when the active target does not match.
 
-### Not testable through slangc text emit (record under `## Out of scope`)
+### Not testable through slangc text emit (record under `## Untested claims`)
 
 - The **`.capdef` syntax** (`#definition-forms`) — the build-time
   generator runs once and the result is baked into the compiler; the
@@ -247,7 +247,7 @@ These add to the universal lessons in `_common.md`. Apply them ALL:
 - [ ] No test was written by inspecting an uncovered source line.
       If you find yourself thinking "this would cover the branch
       at `slang-capability.cpp:NNNN`", stop and re-read the doc.
-- [ ] `## Out of scope (no-GPU runner)` lists Torch / LLVM / VM /
+- [ ] `## Untested claims` lists Torch / LLVM / VM /
       DXBC / DXIL / metallib / Tint downstream paths, `.capdef`
       grammar, the `Adding a new target` checklist, and the
       per-target pass diagrams (those belong to

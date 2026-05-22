@@ -52,7 +52,7 @@ When you take a `fixed` action that edits a `.slang` file:
 - Keep the rest of the `//META` contract intact (every required key,
   `generated=true`, `warning` banner).
 - If you delete a test entirely, remove its filename from the
-  Tests cell in the `## Coverage` table. If that filename was the
+  Tests cell in the `## Functional coverage` table. If that filename was the
   only test on its claim row, drop the row.
 - If you add a new test in response to a finding (e.g. the reviewer
   said an enumerated claim has no test), the new test's `//META` block

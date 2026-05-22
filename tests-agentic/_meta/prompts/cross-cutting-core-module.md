@@ -92,7 +92,7 @@ the interpreter.
   (`#what-the-core-module-provides`): they are usable without an
   explicit `import`. Observe via a minimal use.
 
-### Not testable through slangc text emit (record under `## Out of scope`)
+### Not testable through slangc text emit (record under `## Untested claims`)
 
 - **Atomic-op intrinsics** (e.g. `InterlockedAdd` / `atomicAdd` /
   `OpAtomicIAdd`) — target-specific spellings; previous wave got
@@ -196,7 +196,7 @@ These add to the universal lessons in `_common.md`:
   spellings (HLSL `InterlockedAdd`, GLSL `atomicAdd`, SPIR-V
   `OpAtomicIAdd`) are not directly cited in the source doc and
   prior agents have wasted iterations on them. List them under
-  `## Out of scope` with one sentence and move on.
+  `## Untested claims` with one sentence and move on.
 - **Don't duplicate `syntax-reference/keywords-and-builtins`.** That
   bundle owns the modifier-vocabulary surface (`__intrinsic_op`,
   `__target_intrinsic`). This bundle is about module identity and
@@ -231,7 +231,7 @@ These add to the universal lessons in `_common.md`:
       unimported standard-module name).
 - [ ] No test depends on a GPU.
 - [ ] No test was written by inspecting an uncovered source line.
-- [ ] `## Out of scope` lists atomic intrinsics, the
+- [ ] `## Untested claims` lists atomic intrinsics, the
       `SLANG_EMBED_CORE_MODULE` build option, the embedded
       artefact's byte form, the standard-module-config template,
       and the adding-a-new-built-in workflow.

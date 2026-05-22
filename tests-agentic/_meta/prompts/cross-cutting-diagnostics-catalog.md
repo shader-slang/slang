@@ -137,7 +137,7 @@ its bucket's rows. Sections:
    ```
    | Bucket | Codes in bucket | Tests added | Codes dropped |
    ```
-4. `## Coverage` — one row per test (each diagnostic code is its own
+4. `## Functional coverage` — one row per test (each diagnostic code is its own
    claim), sorted by code. Columns per the universal Coverage rule in
    `_common.md`: `Claim | Intent | Anchor | Tests`. For this bundle
    the **Claim** cell is the test's `//META: purpose` line (typically

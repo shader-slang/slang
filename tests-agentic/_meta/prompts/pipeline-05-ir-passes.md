@@ -27,7 +27,7 @@ This bundle is the largest in the suite by design — `size_cap_files`
 is 100. Aim for 20–40 tests covering most categories. Quality matters
 more than line-coverage: a pass that is too deep to observe through
 slangc CLI must be dropped and recorded under
-`## Out of scope (no-GPU runner)`. Do **not** mine source files for
+`## Untested claims`. Do **not** mine source files for
 behavioral claims that the doc does not make.
 
 ## The translation rule: claims to observations
@@ -204,7 +204,7 @@ These are either gated on flags (`-trace-coverage-binding`) or
 internal scaffolding (SPIR-V opcode snippets). Skip unless a
 specific surface-observable claim is named.
 
-### Not testable through slangc (record under `## Out of scope`)
+### Not testable through slangc (record under `## Untested claims`)
 
 - The **exact order** in which passes run for a given target — the
   doc explicitly defers to `linkAndOptimizeIR` and the per-target
@@ -234,7 +234,7 @@ specific surface-observable claim is named.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`. Use
-   `## Out of scope (no-GPU runner)` as the home for unobservable
+   `## Untested claims` as the home for unobservable
    items.
 2. 20 to 40 `.slang` test files. Many tests are single-target
    `-dump-ir` observations; some are multi-target SIMPLE emit
@@ -399,7 +399,7 @@ These are in addition to the universal lessons in `_common.md`.
 - [ ] `## Doc gaps observed` records claims the doc makes that
       were not testable here, especially the differentiation
       family and the long tail of legalization passes.
-- [ ] `## Out of scope (no-GPU runner)` records claims that are
+- [ ] `## Untested claims` records claims that are
       genuinely unobservable through any allowed directive
       (utilities, hoisting decisions, pass-ordering, coverage
       instrumentation flags).

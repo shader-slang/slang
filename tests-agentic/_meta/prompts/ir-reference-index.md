@@ -22,7 +22,7 @@ peer page is responsible for.
 
 The bundle target is **3–8 tests**. If you cannot anchor a claim
 to text in the index doc itself, route it to a peer bundle via
-`## Out of scope` (e.g. `see ir-reference/structure`) and **do
+`## Untested claims` (e.g. `see ir-reference/structure`) and **do
 not** duplicate a peer claim here.
 
 ## What counts as a cross-cutting index claim
@@ -66,7 +66,7 @@ asserts it. The index doc's load-bearing claims are:
    `04-ast-to-ir.md` as the lowering-pipeline doc. These are
    pointer rows and **not** an in-scope claim source for this
    bundle; route observations to those subtrees via
-   `## Out of scope`.
+   `## Untested claims`.
 
 Pick **3–8** claims from items 1–5. Prefer claims that exercise
 the **composition** of two or more families in one IR dump,
@@ -75,7 +75,7 @@ since the per-family details belong to peer bundles.
 ## What is NOT in scope for this bundle
 
 The index doc explicitly delegates these to peer pages. Route
-them to peer bundles in `## Out of scope`; do not write tests
+them to peer bundles in `## Untested claims`; do not write tests
 here:
 
 - Per-opcode shape and operand catalog for type opcodes
@@ -114,7 +114,7 @@ peer bundle.
 ## Required structure
 
 1. `README.md` with the structure named in `_common.md`,
-   including a `## Out of scope` section listing the peer
+   including a `## Untested claims` section listing the peer
    bundles for the topics not covered here.
 2. **3–8 `.slang` tests**, each anchored to an anchor in the
    index doc (`#ir-reference`, `#family-taxonomy`,
@@ -210,7 +210,7 @@ about the doc.
 - [ ] At least one AST-to-IR mapping test exists.
 - [ ] At least one decoration-attachment test exists.
 - [ ] No test duplicates a sibling-bundle opcode-catalog row.
-- [ ] `README.md` has `## Out of scope` listing the peer
+- [ ] `README.md` has `## Untested claims` listing the peer
       bundles that own each delegated topic.
 - [ ] `README.md` has `## Sibling-bundle overlap` listing
       intentionally-avoided peer claims.
