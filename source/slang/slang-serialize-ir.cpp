@@ -717,6 +717,15 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     // unoptimized builds), so 512 frames ~= 200 KB — well below the typical
     // 256 KB minimum on worker threads while remaining far above any
     // realistic IR module's nesting depth (typical 4-6, occasionally tens).
+    //
+    // Note: this cap is reader-side only. The writer
+    // (`traverseInstsInSerializationOrder`) does not enforce a matching
+    // producer-side limit, so the round-trip is asymmetric: a sufficiently
+    // deeply-nested module that the writer happily serializes can be
+    // rejected on read. The mismatch is acceptable here because such modules
+    // do not occur in practice (we are far above realistic IR depth); a
+    // future tightening of the cap should add a matching producer-side
+    // assert so the asymmetry is diagnosed at write time too.
     constexpr Int64 kMaxRecursionDepth = 512;
     const auto go = [&](auto& go, IRInst* parent, Int64 depth) -> IRInst*
     {
