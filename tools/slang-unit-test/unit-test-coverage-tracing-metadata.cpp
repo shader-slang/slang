@@ -126,6 +126,12 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
                 accum += 20u;
                 break;
             }
+            switch (int(tid.x) & 3)
+            {
+            case 2:
+                accum += 30u;
+                break;
+            }
             outputBuffer[0] = accum;
         }
     )";
@@ -566,7 +572,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         bool seenBranchTrue = false;
         bool seenBranchFalse = false;
         bool seenBranchCase = false;
-        bool seenBranchDefault = false;
+        uint32_t branchDefaultCount = 0;
         bool seenLine = false;
         for (uint32_t i = 0; i < semanticCoverage->getEntryCount(); ++i)
         {
@@ -594,7 +600,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
                 if (entry.branchArmKind == slang::CoverageBranchArmKind::CaseArm)
                     seenBranchCase = true;
                 if (entry.branchArmKind == slang::CoverageBranchArmKind::DefaultArm)
-                    seenBranchDefault = true;
+                    branchDefaultCount++;
             }
             else if (entry.kind == slang::CoverageEntryKind::Line)
             {
@@ -605,7 +611,10 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(seenBranchTrue);
         SLANG_CHECK(seenBranchFalse);
         SLANG_CHECK(seenBranchCase);
-        SLANG_CHECK(seenBranchDefault);
+        // One switch has an explicit default and one omits default;
+        // the latter still emits a synthetic DefaultArm so the metadata
+        // can distinguish "no label selected" from "switch not reached".
+        SLANG_CHECK(branchDefaultCount >= 2);
         SLANG_CHECK(!seenLine);
 
         ComPtr<ISlangBlob> manifest;
@@ -815,8 +824,6 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
                 outInfo->counterIndex = 0;
                 outInfo->kind = slang::CoverageEntryKind::Function;
                 outInfo->counterMode = slang::CoverageCounterMode::Count;
-                outInfo->functionName = "helper";
-                outInfo->functionMangledName = nullptr;
                 return SLANG_OK;
             }
             SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
@@ -837,6 +844,71 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(
             slang_writeCoverageManifestJson(&malformedFunctionMetadata, dummy.writeRef()) !=
             SLANG_OK);
+
+        struct MangledOnlyFunctionMetadata : slang::ICoverageTracingMetadata
+        {
+            SLANG_NO_THROW SlangResult SLANG_MCALL
+            queryInterface(SlangUUID const&, void** outObject) SLANG_OVERRIDE
+            {
+                if (outObject)
+                    *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID&) SLANG_OVERRIDE
+            {
+                return nullptr;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE { return 1; }
+            SLANG_NO_THROW SlangResult SLANG_MCALL
+            getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE
+            {
+                if (!outInfo || index != 0)
+                    return SLANG_E_INVALID_ARG;
+                outInfo->file = "mangled-only-function.slang";
+                outInfo->line = 1;
+                outInfo->counterIndex = 0;
+                outInfo->kind = slang::CoverageEntryKind::Function;
+                outInfo->counterMode = slang::CoverageCounterMode::Count;
+                outInfo->functionMangledName = "_S6helperv";
+                return SLANG_OK;
+            }
+            SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
+                SLANG_OVERRIDE
+            {
+                if (!outInfo)
+                    return SLANG_E_INVALID_ARG;
+                *outInfo = {};
+                outInfo->structSize = sizeof(slang::CoverageBufferInfo);
+                outInfo->space = -1;
+                outInfo->binding = -1;
+                return SLANG_OK;
+            }
+            SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE { return 1; }
+        };
+
+        MangledOnlyFunctionMetadata mangledOnlyFunctionMetadata;
+        ComPtr<ISlangBlob> mangledOnlyManifest;
+        SLANG_CHECK(
+            slang_writeCoverageManifestJson(
+                &mangledOnlyFunctionMetadata,
+                mangledOnlyManifest.writeRef()) == SLANG_OK);
+        ParsedJson mangledOnlyParsed;
+        SLANG_CHECK(parseJsonBlob(mangledOnlyManifest, mangledOnlyParsed) == SLANG_OK);
+        auto mangledOnlyContainer = mangledOnlyParsed.container.Ptr();
+        JSONValue mangledOnlyEntriesValue =
+            findJsonField(mangledOnlyContainer, mangledOnlyParsed.root, "entries");
+        SLANG_CHECK(mangledOnlyEntriesValue.isValid());
+        auto mangledOnlyEntries = mangledOnlyContainer->getArray(mangledOnlyEntriesValue);
+        SLANG_CHECK(mangledOnlyEntries.getCount() == 1);
+        SLANG_CHECK(
+            !findJsonField(mangledOnlyContainer, mangledOnlyEntries[0], "function").isValid());
+        checkJsonStringField(
+            mangledOnlyContainer,
+            mangledOnlyEntries[0],
+            "function_mangled",
+            "_S6helperv");
 
         struct MalformedBranchMetadata : slang::ICoverageTracingMetadata
         {

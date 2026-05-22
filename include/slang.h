@@ -4557,7 +4557,8 @@ Lifetime and ownership:
 
 Future coverage modes:
   - this interface is intended to grow to cover richer reporting modes
-    such as source-region coverage and additional branch forms
+    such as source-region coverage, additional branch forms, binary
+    hit/not-hit counters, and warp/group-aggregated modes
   - callers should not assume that future revisions will always model
     one entry as one source line, one entry as one runtime counter, or
     one counter value as the final reported count for a source range
