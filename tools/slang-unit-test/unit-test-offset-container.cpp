@@ -23,10 +23,18 @@ static void _checkAllocateOverflowDoesNotWrap(size_t dataSize, size_t size, size
     OffsetContainer container;
     container.m_dataSize = dataSize;
 
+    // Snapshot capacity and data pointer so we can verify the rejection path leaves the
+    // backing buffer untouched. This guards against future regressions where a new guard
+    // is added after the realloc/capacity-bump block instead of before it.
+    const size_t capBefore = container.getCapacity();
+    const uint8_t* dataBefore = container.getData();
+
     void* data = container.allocate(size, alignment);
 
     SLANG_CHECK(data == nullptr);
     SLANG_CHECK(container.getDataCount() == dataSize);
+    SLANG_CHECK(container.getCapacity() == capBefore);
+    SLANG_CHECK(container.getData() == dataBefore);
 }
 
 namespace
@@ -96,6 +104,14 @@ SLANG_UNIT_TEST(offsetContainer)
         OffsetContainer container;
         auto arr = container.newArray<uint64_t>(size_t(0xFFFFFFFFu) / sizeof(uint64_t) + 1);
         SLANG_CHECK(arr.getCount() == 0);
+    }
+
+    // allocateAndZero must propagate allocate()'s nullptr instead of memset'ing through it.
+    {
+        OffsetContainer container;
+        container.m_dataSize = size_t(0xFFFFFFFFu) - 3;
+        void* zeroed = container.allocateAndZero(16, 1);
+        SLANG_CHECK(zeroed == nullptr);
     }
 
     {

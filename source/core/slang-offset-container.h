@@ -496,6 +496,10 @@ public:
     OffsetContainer();
     ~OffsetContainer();
 
+    /// Returns the current backing-buffer capacity. Exposed primarily so tests can
+    /// verify that the rejection paths in allocate() do not mutate the buffer.
+    size_t getCapacity() const { return m_capacity; }
+
 protected:
     size_t m_capacity;
 };
