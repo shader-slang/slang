@@ -122,17 +122,25 @@ SlangResult initVMModule(uint8_t* code, uint32_t codeSize, VMModuleView* moduleV
     SLANG_RETURN_ON_FAIL(
         calcArrayByteSize(moduleView->stringCount, sizeof(uint32_t), stringOffsetsSize));
     SLANG_RETURN_ON_FAIL(checkByteRangeAvailable(stream, codeSize, stringOffsetsSize));
-    moduleView->stringOffsets = reinterpret_cast<uint32_t*>(code + stream.getPosition());
-    SLANG_RETURN_ON_FAIL(stream.seek(SeekOrigin::Current, Int64(stringOffsetsSize)));
-
-    // constantBlobSize was read as the total section size. Subtract the bytes already consumed
-    // (stringCount field + stringOffsets array) so it reflects only the constants blob.
-    size_t consumedFromSection = sizeof(uint32_t) + stringOffsetsSize;
-    if (size_t(moduleView->constantBlobSize) < consumedFromSection)
+    // The stringOffsets array is accessed as uint32_t[]; require the underlying byte position
+    // to be 4-byte aligned so that the reinterpret_cast does not produce an unaligned pointer.
+    if (stream.getPosition() % sizeof(uint32_t) != 0)
     {
         return SLANG_FAIL;
     }
-    moduleView->constantBlobSize -= (uint32_t)consumedFromSection;
+    moduleView->stringOffsets = reinterpret_cast<uint32_t*>(code + stream.getPosition());
+    SLANG_RETURN_ON_FAIL(stream.seek(SeekOrigin::Current, Int64(stringOffsetsSize)));
+
+    // constantBlobSize was read as the total section size. Validate via subtraction so the
+    // bounds check is safe even if `stringOffsetsSize` is close to SIZE_MAX (avoids overflow
+    // in `sizeof(uint32_t) + stringOffsetsSize`). Then subtract the bytes already consumed
+    // (stringCount field + stringOffsets array) so it reflects only the constants blob.
+    size_t sectionSize = (size_t)moduleView->constantBlobSize;
+    if (sectionSize < sizeof(uint32_t) || stringOffsetsSize > sectionSize - sizeof(uint32_t))
+    {
+        return SLANG_FAIL;
+    }
+    moduleView->constantBlobSize = (uint32_t)(sectionSize - sizeof(uint32_t) - stringOffsetsSize);
     SLANG_RETURN_ON_FAIL(checkByteRangeAvailable(stream, codeSize, moduleView->constantBlobSize));
     moduleView->constants = code + stream.getPosition();
 
