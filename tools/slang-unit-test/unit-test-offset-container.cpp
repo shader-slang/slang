@@ -60,7 +60,9 @@ SLANG_UNIT_TEST(offsetContainer)
     _checkAllocateOverflowDoesNotWrap(size_t(0xFFFFFFFFu) - 3, 1, 8);
     _checkAllocateOverflowDoesNotWrap(size_t(0x80000000u), size_t(0x80000000u), 1);
 
-    // Non-power-of-two alignments must be rejected (the bitwise alignment math relies on it).
+    // Zero and non-power-of-two alignments must be rejected (the bitwise alignment math
+    // relies on a non-zero power of two).
+    _checkAllocateOverflowDoesNotWrap(0, 1, 0);
     _checkAllocateOverflowDoesNotWrap(0, 1, 3);
     _checkAllocateOverflowDoesNotWrap(0, 1, 5);
     _checkAllocateOverflowDoesNotWrap(0, 1, 6);
