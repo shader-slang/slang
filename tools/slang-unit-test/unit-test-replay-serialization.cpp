@@ -184,6 +184,37 @@ SLANG_UNIT_TEST(replayContextRejectsOversizedStringLength)
     SLANG_CHECK(caughtException);
 }
 
+SLANG_UNIT_TEST(replayContextRejectsTruncatedStringPayload)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    uint8_t typeId = uint8_t(TypeId::String);
+    uint32_t length = 16;
+    const char payload[4] = {'t', 'e', 's', 't'};
+    ctx().getStream().write(&typeId, sizeof(typeId));
+    ctx().getStream().write(&length, sizeof(length));
+    ctx().getStream().write(payload, sizeof(payload));
+
+    ctx().switchToPlayback();
+
+    bool caughtException = false;
+    try
+    {
+        const char* readStr = nullptr;
+        ctx().record(RecordFlag::None, readStr);
+    }
+    catch (const Slang::Exception&)
+    {
+        caughtException = true;
+    }
+
+    SLANG_CHECK(caughtException);
+}
+
 // =============================================================================
 // Slang Enums
 // =============================================================================
