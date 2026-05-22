@@ -1,6 +1,8 @@
 // unit-test-slang-vm.cpp
 
+#include "core/slang-blob.h"
 #include "core/slang-memory-file-system.h"
+#include "core/slang-riff.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
@@ -10,6 +12,39 @@
 #include <string.h>
 
 using namespace Slang;
+
+static void appendUInt32(List<uint8_t>& data, uint32_t value)
+{
+    data.addRange(reinterpret_cast<const uint8_t*>(&value), sizeof(value));
+}
+
+static ComPtr<slang::IBlob> createVMByteCodeWithStringCount(uint32_t stringCount)
+{
+    List<uint8_t> data;
+
+    appendUInt32(data, SLANG_FOUR_CC('S', 'V', 'M', 'C'));
+    appendUInt32(data, 100);
+
+    appendUInt32(data, SLANG_FOUR_CC('S', 'V', 'F', 'N'));
+    appendUInt32(data, sizeof(uint32_t));
+    appendUInt32(data, 0);
+
+    appendUInt32(data, SLANG_FOUR_CC('S', 'V', 'K', 'N'));
+    appendUInt32(data, 0);
+
+    appendUInt32(data, SLANG_FOUR_CC('S', 'V', 'C', 'S'));
+    appendUInt32(data, sizeof(uint32_t));
+    appendUInt32(data, stringCount);
+
+    return ListBlob::moveCreate(data);
+}
+
+SLANG_UNIT_TEST(slangVMRejectsOversizedStringOffsetArray)
+{
+    ComPtr<slang::IBlob> code = createVMByteCodeWithStringCount(0x40000001);
+    ComPtr<slang::IBlob> disasmBlob;
+    SLANG_CHECK(SLANG_FAILED(slang_disassembleByteCode(code, disasmBlob.writeRef())));
+}
 
 SLANG_UNIT_TEST(slangVM)
 {

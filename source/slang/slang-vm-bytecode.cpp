@@ -37,6 +37,37 @@ static SlangResult readUInt32(MemoryStreamBase& stream, uint32_t& value)
     return readValue(stream, value);
 }
 
+static SlangResult calcArrayByteSize(uint32_t count, size_t elementSize, size_t& outSize)
+{
+    if (elementSize != 0 && size_t(count) > (~size_t(0)) / elementSize)
+    {
+        return SLANG_FAIL;
+    }
+
+    outSize = size_t(count) * elementSize;
+    return SLANG_OK;
+}
+
+static SlangResult checkByteRangeAvailable(
+    MemoryStreamBase& stream,
+    uint32_t codeSize,
+    size_t byteCount)
+{
+    Int64 position = stream.getPosition();
+    if (position < 0 || UInt64(position) > UInt64(codeSize))
+    {
+        return SLANG_FAIL;
+    }
+
+    UInt64 remainingBytes = UInt64(codeSize) - UInt64(position);
+    if (UInt64(byteCount) > remainingBytes)
+    {
+        return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
 SlangResult initVMModule(uint8_t* code, uint32_t codeSize, VMModuleView* moduleView)
 {
     MemoryStreamBase stream(FileAccess::Read, code, codeSize);
@@ -87,8 +118,13 @@ SlangResult initVMModule(uint8_t* code, uint32_t codeSize, VMModuleView* moduleV
         return SLANG_FAIL; // Invalid section size
     }
     SLANG_RETURN_ON_FAIL(readUInt32(stream, moduleView->stringCount));
+    size_t stringOffsetsSize = 0;
+    SLANG_RETURN_ON_FAIL(
+        calcArrayByteSize(moduleView->stringCount, sizeof(uint32_t), stringOffsetsSize));
+    SLANG_RETURN_ON_FAIL(checkByteRangeAvailable(stream, codeSize, stringOffsetsSize));
     moduleView->stringOffsets = reinterpret_cast<uint32_t*>(code + stream.getPosition());
-    stream.seek(SeekOrigin::Current, moduleView->stringCount * sizeof(uint32_t));
+    SLANG_RETURN_ON_FAIL(stream.seek(SeekOrigin::Current, Int64(stringOffsetsSize)));
+    SLANG_RETURN_ON_FAIL(checkByteRangeAvailable(stream, codeSize, moduleView->constantBlobSize));
     moduleView->constants = code + stream.getPosition();
 
     for (uint32_t i = 0; i < moduleView->functionCount; i++)
