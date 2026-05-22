@@ -22,6 +22,27 @@ namespace SlangRecord
 using Slang::File;
 using Slang::Path;
 
+static bool isSHA1DigestChar(char c)
+{
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+static bool isValidSHA1DigestString(const char* str)
+{
+    static const size_t kSHA1DigestStringLength = 40;
+
+    if (!str)
+        return false;
+
+    size_t length = 0;
+    for (; str[length]; ++length)
+    {
+        if (!isSHA1DigestChar(str[length]))
+            return false;
+    }
+
+    return length == kSHA1DigestStringLength;
+}
 
 void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
 {
@@ -320,6 +341,12 @@ void ReplayContext::recordBlobByHash(RecordFlag flags, ISlangBlob*& blob)
         record(RecordFlag::None, hashCStr);
 
         if (!hashCStr || hashCStr[0] == '\0')
+        {
+            blob = nullptr;
+            return;
+        }
+
+        if (!isValidSHA1DigestString(hashCStr))
         {
             blob = nullptr;
             return;

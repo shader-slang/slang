@@ -18,6 +18,12 @@ static TypeId readTypeIdFromStream(ReplayStream& stream)
     return static_cast<TypeId>(byte);
 }
 
+static void writeTypeIdToStream(ReplayStream& stream, TypeId typeId)
+{
+    uint8_t byte = static_cast<uint8_t>(typeId);
+    stream.write(&byte, 1);
+}
+
 SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
 {
     REPLAY_TEST;
@@ -312,6 +318,49 @@ SLANG_UNIT_TEST(replayContextFindLatestFolder)
 
     // Clean up
     ctx().reset();
+    ctx().setReplayDirectory(".slang-replays");
+}
+
+SLANG_UNIT_TEST(replayContextRejectsInvalidBlobHash)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    const char* replayDirectory = ".slang-replays-security-test";
+    const char* sensitiveFileName = "sensitive-blob.bin";
+    const char* sensitiveContent = "content outside the replay blob store";
+    const char* invalidHash = "../../sensitive-blob.bin";
+
+    ctx().setReplayDirectory(replayDirectory);
+    ctx().setMode(Mode::Record);
+
+    const char* replayPath = ctx().getCurrentReplayPath();
+    SLANG_CHECK(replayPath != nullptr);
+
+    String filesDir = Path::combine(String(replayPath), "files");
+    SLANG_CHECK(Path::createDirectoryRecursive(filesDir));
+
+    String sensitivePath = Path::combine(String(replayDirectory), sensitiveFileName);
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        File::writeAllBytes(sensitivePath, sensitiveContent, strlen(sensitiveContent))));
+
+    writeTypeIdToStream(ctx().getStream(), TypeId::Blob);
+    const char* recordedHash = invalidHash;
+    ctx().record(RecordFlag::None, recordedHash);
+
+    ctx().switchToPlayback();
+
+    ISlangBlob* replayedBlobRaw = nullptr;
+    ctx().record(RecordFlag::Output, replayedBlobRaw);
+    ComPtr<ISlangBlob> replayedBlob;
+    replayedBlob.attach(replayedBlobRaw);
+
+    SLANG_CHECK(replayedBlob == nullptr);
+    SLANG_CHECK(ctx().getStream().atEnd());
+
+    ctx().reset();
+    File::remove(sensitivePath);
+    Path::removeNonEmpty(String(replayDirectory));
     ctx().setReplayDirectory(".slang-replays");
 }
 
