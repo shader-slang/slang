@@ -53,6 +53,18 @@ SLANG_UNIT_TEST(offsetContainer)
     _checkAllocateOverflowDoesNotWrap(SIZE_MAX - 7, 16, 1);
     _checkAllocateOverflowDoesNotWrap(SIZE_MAX - 3, 1, 8);
 
+    // Exceed the 32-bit offset limit (the container addresses memory via Offset32Ptr, so
+    // allocations beyond the 4GB boundary must be rejected even when size_t arithmetic does
+    // not overflow on a 64-bit host).
+    _checkAllocateOverflowDoesNotWrap(size_t(0xFFFFFFFFu) - 7, 16, 1);
+    _checkAllocateOverflowDoesNotWrap(size_t(0xFFFFFFFFu) - 3, 1, 8);
+    _checkAllocateOverflowDoesNotWrap(size_t(0x80000000u), size_t(0x80000000u), 1);
+
+    // Non-power-of-two alignments must be rejected (the bitwise alignment math relies on it).
+    _checkAllocateOverflowDoesNotWrap(0, 1, 3);
+    _checkAllocateOverflowDoesNotWrap(0, 1, 5);
+    _checkAllocateOverflowDoesNotWrap(0, 1, 6);
+
     {
         OffsetContainer container;
 

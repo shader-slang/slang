@@ -446,6 +446,10 @@ public:
     Offset32Ptr<T> newObject()
     {
         void* data = allocate(sizeof(T), alignof(T));
+        if (!data)
+        {
+            return Offset32Ptr<T>();
+        }
         new (data) T();
         return Offset32Ptr<T>(getOffset(data));
     }
@@ -457,7 +461,17 @@ public:
         {
             return Offset32Array<T>();
         }
+        // Reject counts that don't fit in the 32-bit count stored in Offset32Array, or whose
+        // byte size would overflow size_t when computing sizeof(T) * size.
+        if (size > size_t(0xFFFFFFFFu) || size > SIZE_MAX / sizeof(T))
+        {
+            return Offset32Array<T>();
+        }
         T* data = (T*)allocate(sizeof(T) * size, alignof(T));
+        if (!data)
+        {
+            return Offset32Array<T>();
+        }
         for (size_t i = 0; i < size; ++i)
         {
             new (data + i) T();

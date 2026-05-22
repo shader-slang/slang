@@ -129,19 +129,25 @@ void OffsetContainer::fixAlignment(size_t alignment)
 
 void* OffsetContainer::allocate(size_t size, size_t alignment)
 {
-    if (alignment == 0)
+    // Alignment must be a non-zero power of two for the bitwise alignment math below.
+    if (alignment == 0 || (alignment & (alignment - 1)) != 0)
     {
         return nullptr;
     }
 
+    // The container addresses memory via 32-bit offsets (Offset32Ptr), so reject any
+    // allocation that would grow the data beyond the 32-bit addressable range. Using the
+    // 32-bit limit (rather than SIZE_MAX) is tighter than required for size_t arithmetic,
+    // but prevents silent truncation when offsets are converted to uint32_t.
+    const size_t kMaxDataSize = size_t(0xFFFFFFFFu);
     const size_t alignmentMask = alignment - 1;
-    if (m_dataSize > SIZE_MAX - alignmentMask)
+    if (m_dataSize > kMaxDataSize - alignmentMask)
     {
         return nullptr;
     }
 
     size_t offset = (m_dataSize + alignmentMask) & ~alignmentMask;
-    if (size > SIZE_MAX - offset)
+    if (size > kMaxDataSize - offset)
     {
         return nullptr;
     }
@@ -195,11 +201,23 @@ Offset32Ptr<OffsetString> OffsetContainer::newString(const UnownedStringSlice& s
 {
     size_t stringSize = slice.getLength();
 
+    // OffsetString encodes the size in at most 4 bytes (kSizeBase + 4-byte little-endian),
+    // so the string itself must fit in 32 bits. Reject anything larger to avoid wrapping in
+    // the headSize + stringSize + 1 computation below.
+    if (stringSize > size_t(0xFFFFFFFFu))
+    {
+        return Offset32Ptr<OffsetString>();
+    }
+
     uint8_t head[OffsetString::kMaxSizeEncodeSize];
     size_t headSize = OffsetString::calcEncodedSize(stringSize, head);
 
     size_t allocSize = headSize + stringSize + 1;
     uint8_t* bytes = (uint8_t*)allocate(allocSize);
+    if (!bytes)
+    {
+        return Offset32Ptr<OffsetString>();
+    }
 
     ::memcpy(bytes, head, headSize);
     ::memcpy(bytes + headSize, slice.begin(), stringSize);
