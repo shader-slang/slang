@@ -49,8 +49,8 @@ Each bundle directory contains:
 Every `.slang` file begins with a `//META` block of `key=value` lines
 declaring `doc_ref` (the documentation anchor the test is derived
 from), `doc_section_digest` (used to detect doc drift), `intent`
-(functional / expansion / regression / negative), and the usual
-generation provenance. See
+(`functional` / `boundary` / `negative` / `stress` / `expansion` /
+`regression`), and the usual generation provenance. See
 [`_meta/prompts/_common.md`](_meta/prompts/_common.md) for the full
 contract.
 
@@ -83,23 +83,61 @@ expansion contract.
   doc says X but compiler does not-X (compiler bug **or** doc bug),
   or the test is wrong (regenerate).
 
-## Running
+## Running the suite
 
-Phase A (the current state) is scaffold only — there are no bundles
-yet. Drive the framework with:
+The full suite is run by `slang-test`:
 
 ```bash
-python3 tests-agentic/_meta/regenerate.py list           # 51 bundle keys
-python3 tests-agentic/_meta/regenerate.py list-stale     # all "missing"
-python3 tests-agentic/_meta/regenerate.py lint           # 0 errors
-python3 tests-agentic/_meta/regenerate.py show <bundle>
+./build/Release/bin/slang-test -use-test-server -server-count 4 -test-dir tests-agentic
 ```
 
-Bootstrap generation (Phase B1), slang-test wiring (Phase B2),
-cross-link (Phase C), review/remediate (Phase D), and the expansion
-loop (Phase E) land in subsequent PRs. See
-[`_meta/regenerate.md`](_meta/regenerate.md) for the operator
-workflow.
+This runs every `.slang` file in the tree. Backends that the runner
+doesn't have (GPU runtimes, `dxc.exe`, Apple toolchain, nvrtc, etc.)
+are ignored, not failed. CI nightly is expected to lift the ignored
+set by providing the missing toolchains.
+
+## Driving the framework
+
+```bash
+python3 tests-agentic/_meta/regenerate.py list           # bundle keys
+python3 tests-agentic/_meta/regenerate.py list-stale     # bundles whose source doc / watched paths drifted
+python3 tests-agentic/_meta/regenerate.py lint           # structural lint
+python3 tests-agentic/_meta/regenerate.py show <bundle>  # manifest entry + resolved files
+python3 tests-agentic/_meta/regenerate.py index --write  # regenerate INDEX.md
+python3 tests-agentic/_meta/regenerate.py doc-gaps       # aggregated doc-gap rows, grouped by source doc
+python3 tests-agentic/_meta/regenerate.py coverage-gaps <bundle> --from <report>.txt
+```
+
+See [`_meta/regenerate.md`](_meta/regenerate.md) for the full
+operator workflow.
+
+## Bundle README structure
+
+Every bundle's `README.md` carries YAML front-matter (`generated_at`,
+`source_commit`, `watched_paths_digest`, `source_doc_digest`) and
+four canonical sections, in this order:
+
+1. `## Intent` — a paragraph on which doc this bundle exercises and
+   the coverage strategy.
+2. `## Functional coverage` — `Claim | Intent | Anchor | Tests` table.
+   One row per documented claim that has a test; the Claim cell
+   matches the test's `//META: purpose=...` line verbatim.
+3. `## Untested claims` — `Claim | Reason | Anchor | Why untested`
+   table. Doc claims without a test yet. The `Reason` controlled
+   vocabulary classifies each into a test-harness alternative
+   (`needs-unit-test` / `needs-multi-file-test` / `needs-cli-test`),
+   a runner-capability alternative (`gpu-dxr`, `gpu-cuda`,
+   `gpu-metal-toolchain`, …), or a terminal category
+   (`link-stage-only`, `out-of-bundle`, `deprecated`, …).
+4. `## Doc gaps observed` — `Anchor | Kind | Gap | Suggested
+   addition` table. The feedback channel into doc regeneration. Rows
+   are aggregated by `regenerate.py doc-gaps` and consumed by the
+   doc-regen workflow.
+
+Empty sections are filled with `NA` rather than omitted. Bundle-
+specific sections (e.g., `## Sibling-bundle overlap`,
+`## Catalog coverage`, `## Codes dropped`) may appear after the four
+canonical headings.
 
 ## Reporting an issue
 

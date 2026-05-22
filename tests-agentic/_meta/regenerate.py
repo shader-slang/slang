@@ -1033,6 +1033,155 @@ def cmd_mark_fresh(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_index(args: argparse.Namespace) -> int:
+    """Emit tests-agentic/INDEX.md content to stdout (or --write to file)."""
+    from collections import Counter
+
+    manifest = load_manifest()
+    specs = sorted(manifest.bundles.values(), key=lambda s: s.dir)
+
+    # Per-bundle test counts
+    bundle_counts: dict[str, int] = {}
+    intent_counts: Counter[str] = Counter()
+    for spec in specs:
+        bdir = REPO_ROOT / spec.dir
+        if not bdir.exists():
+            bundle_counts[spec.key] = 0
+            continue
+        slangs = sorted(bdir.glob("*.slang"))
+        bundle_counts[spec.key] = len(slangs)
+        for tf in slangs:
+            meta = parse_test_meta(tf.read_text(encoding="utf-8"))
+            intent = meta.get("intent", "")
+            if intent:
+                intent_counts[intent] += 1
+
+    total_tests = sum(bundle_counts.values())
+    total_bundles = sum(1 for c in bundle_counts.values() if c >= 0 or True)
+    # Bundles that exist on disk (have at least 0 .slang files, including
+    # bundles that have zero tests — count them too).
+    existing_bundles = sum(
+        1 for spec in specs if (REPO_ROOT / spec.dir).exists()
+    )
+
+    # Section assignment by path prefix.
+    section_for = {
+        "architecture/": "Architecture",
+        "pipeline/": "Pipeline",
+        "syntax-reference/": "Syntax reference",
+        "cross-cutting/": "Cross-cutting",
+        "ast-reference/": "AST reference",
+        "name-resolution/": "Name resolution",
+        "ir-reference/": "IR reference",
+        "target-pipelines/": "Target pipelines",
+    }
+    section_order = [
+        "Architecture",
+        "Pipeline",
+        "Syntax reference",
+        "Cross-cutting",
+        "AST reference",
+        "Name resolution",
+        "IR reference",
+        "Target pipelines",
+        "Top-level",
+    ]
+
+    grouped: dict[str, list] = {s: [] for s in section_order}
+    for spec in specs:
+        section = "Top-level"
+        for prefix, sname in section_for.items():
+            if spec.key.startswith(prefix):
+                section = sname
+                break
+        grouped[section].append(spec)
+
+    out: list[str] = []
+    out.append("# tests-agentic — bundle index")
+    out.append("")
+    out.append(
+        "Navigational table of contents for every bundle in `tests-agentic/`. Each row links"
+    )
+    out.append(
+        "to that bundle's `README.md` and to the documentation file that anchors its tests."
+    )
+    out.append("")
+    out.append(
+        "See [`README.md`](README.md) for the framework intro and the trust model."
+    )
+    out.append(
+        "See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow."
+    )
+    out.append("")
+    out.append("## Suite totals")
+    out.append("")
+    out.append(f"- **Bundles:** {existing_bundles}")
+    out.append(f"- **Total `.slang` tests:** {total_tests}")
+    out.append("")
+    out.append("| Intent | Count |")
+    out.append("| --- | --- |")
+    for intent, n in intent_counts.most_common():
+        out.append(f"| `{intent}` | {n} |")
+    out.append("")
+    out.append("## Bundles by section")
+    out.append("")
+    for section in section_order:
+        if not grouped[section]:
+            continue
+        out.append(f"### {section}")
+        out.append("")
+        out.append("| Bundle | Tests | Source doc |")
+        out.append("| --- | ---: | --- |")
+        for spec in grouped[section]:
+            count = bundle_counts.get(spec.key, 0)
+            # Relative link from INDEX.md (at tests-agentic/INDEX.md) to source_doc
+            # tests-agentic/INDEX.md -> ../docs/llm-generated/<...>.md
+            doc_link = f"../{spec.source_doc}"
+            out.append(
+                f"| [`{spec.key}`]({spec.key}/README.md) | {count} |"
+                f" [`{spec.source_doc}`]({doc_link}) |"
+            )
+        out.append("")
+    out.append("## Catalog snapshot")
+    out.append("")
+    out.append(
+        "- [`_meta/diagnostics-catalog/catalog.txt`](_meta/diagnostics-catalog/catalog.txt)"
+        " — full diagnostic-code catalog consumed by the"
+        " `cross-cutting/diagnostics-catalog` bundle."
+    )
+    out.append("")
+    out.append("## Conventions")
+    out.append("")
+    out.append(
+        "- Every bundle's `README.md` carries YAML front-matter (`generated_at`,"
+        " `source_commit`, `watched_paths_digest`, `source_doc_digest`) and four"
+        " canonical sections: `## Intent`, `## Functional coverage`,"
+        " `## Untested claims`, `## Doc gaps observed`."
+    )
+    out.append(
+        "- Each `.slang` test file starts with a `//META` block declaring `doc_ref`,"
+        " `intent`, `pipeline_stage`, and provenance."
+    )
+    out.append(
+        "- Bundles are agent-generated. Hand-editing a `README.md` or a `.slang` file is"
+        " an anti-pattern — file a doc-improvement or prompt-improvement task and regenerate."
+    )
+    out.append(
+        "- Regenerate this file with `python3 tests-agentic/_meta/regenerate.py index"
+        " --write`."
+    )
+    out.append("")
+
+    text = "\n".join(out)
+    if args.write:
+        target = REPO_ROOT / "tests-agentic" / "INDEX.md"
+        target.write_text(text)
+        print(f"wrote: {target}")
+    else:
+        print(text)
+    return 0
+
+
 def cmd_lint(args: argparse.Namespace) -> int:
     manifest = load_manifest()
     specs = _bundles_arg(manifest, args.bundles)
@@ -1362,6 +1511,17 @@ def _build_parser() -> argparse.ArgumentParser:
     p_lint = sub.add_parser("lint", help="structural lint")
     p_lint.add_argument("bundles", nargs="*")
     p_lint.set_defaults(func=cmd_lint)
+
+    p_idx = sub.add_parser(
+        "index",
+        help="regenerate tests-agentic/INDEX.md (--write to overwrite)",
+    )
+    p_idx.add_argument(
+        "--write",
+        action="store_true",
+        help="overwrite tests-agentic/INDEX.md (otherwise print to stdout)",
+    )
+    p_idx.set_defaults(func=cmd_index)
 
     p_exp = sub.add_parser(
         "expansion-candidates",
