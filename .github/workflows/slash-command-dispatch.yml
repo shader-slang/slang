@@ -4,6 +4,7 @@ on:
     types: [created]
 jobs:
   slashCommandDispatch:
+    if: github.repository == 'shader-slang/slang'
     runs-on: ubuntu-latest
     steps:
       - name: Slash Command Dispatch
@@ -17,7 +18,7 @@ jobs:
             [
               {
                 "command": "format",
-                "permission": "none",
+                "permission": "write",
                 "issue_type": "pull-request"
               },
               {
