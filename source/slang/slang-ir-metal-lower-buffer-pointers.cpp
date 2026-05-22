@@ -194,42 +194,57 @@ struct MetalBufferPointerLoweringContext
             // Collect element-access instructions BEFORE mutating the type,
             // so we only capture accesses from pointer-element buffers (not
             // a user-declared RWStructuredBuffer<ulong> that may merge after).
-            List<IRInst*> elemPtrInsts;
-            List<IRInst*> elemLoadInsts;
+            List<IRInst*> elemAccessInsts;
             for (auto use = bufType->firstUse; use; use = use->nextUse)
             {
                 auto bufVar = use->getUser();
                 for (auto varUse = bufVar->firstUse; varUse; varUse = varUse->nextUse)
-                {
-                    auto varUser = varUse->getUser();
-                    if (varUser->getOp() == kIROp_RWStructuredBufferGetElementPtr)
-                        elemPtrInsts.add(varUser);
-                    else if (
-                        varUser->getOp() == kIROp_StructuredBufferLoad ||
-                        varUser->getOp() == kIROp_RWStructuredBufferLoad)
-                        elemLoadInsts.add(varUser);
-                }
+                    elemAccessInsts.add(varUse->getUser());
             }
 
             // Use replaceOperand to safely mutate the hoistable buffer type.
             builder.replaceOperand(bufType->getOperands() + 0, uintPtrType);
 
-            for (auto inst : elemPtrInsts)
+            for (auto inst : elemAccessInsts)
             {
-                auto ptrType = as<IRPtrTypeBase>(inst->getFullType());
-                if (ptrType)
-                    inst->setFullType(builder.getPtrType(uintPtrType, ptrType));
-
-                insertCastsForPointerUses(inst, origElemType, uintPtrType);
-            }
-
-            for (auto inst : elemLoadInsts)
-            {
-                inst->setFullType(uintPtrType);
-                builder.setInsertAfter(inst);
-                auto castInst = builder.emitCastIntToPtr(origElemType, inst);
-                inst->replaceUsesWith(castInst);
-                castInst->setOperand(0, inst);
+                switch (inst->getOp())
+                {
+                case kIROp_RWStructuredBufferGetElementPtr:
+                    {
+                        auto ptrType = as<IRPtrTypeBase>(inst->getFullType());
+                        if (ptrType)
+                            inst->setFullType(builder.getPtrType(uintPtrType, ptrType));
+                        insertCastsForPointerUses(inst, origElemType, uintPtrType);
+                        break;
+                    }
+                case kIROp_StructuredBufferLoad:
+                case kIROp_StructuredBufferLoadStatus:
+                case kIROp_RWStructuredBufferLoad:
+                case kIROp_RWStructuredBufferLoadStatus:
+                case kIROp_StructuredBufferConsume:
+                    {
+                        inst->setFullType(uintPtrType);
+                        builder.setInsertAfter(inst);
+                        auto castInst = builder.emitCastIntToPtr(origElemType, inst);
+                        inst->replaceUsesWith(castInst);
+                        castInst->setOperand(0, inst);
+                        break;
+                    }
+                case kIROp_RWStructuredBufferStore:
+                case kIROp_StructuredBufferAppend:
+                    {
+                        UInt valIdx = (inst->getOp() == kIROp_StructuredBufferAppend) ? 1 : 2;
+                        auto val = inst->getOperand(valIdx);
+                        builder.setInsertBefore(inst);
+                        IRInst* args[] = {val};
+                        auto castInst =
+                            builder.emitIntrinsicInst(uintPtrType, kIROp_CastPtrToInt, 1, args);
+                        inst->setOperand(valIdx, castInst);
+                        break;
+                    }
+                default:
+                    break;
+                }
             }
         }
     }
