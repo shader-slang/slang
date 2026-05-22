@@ -938,7 +938,7 @@ Result linkAndOptimizeIR(
 
     // Create the post-emit metadata object up-front so that IR passes
     // that need to record reportable data (e.g. `instrumentCoverage`'s
-    // slot → source mapping) can write into it directly. `collectMetadata`
+    // source-entry mapping) can write into it directly. `collectMetadata`
     // later fills in binding / exported-function fields.
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
@@ -982,14 +982,6 @@ Result linkAndOptimizeIR(
         SLANG_PASS(lowerGLSLShaderStorageBufferObjectsToStructuredBuffers, sink);
 
     SLANG_PASS(translateEntryPointInParamToBorrow, sink);
-
-    if (requiredLoweringPassSet.globalVaryingVar)
-        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
-
-    if (requiredLoweringPassSet.resolveVaryingInputRef)
-        SLANG_PASS(resolveVaryingInputRef);
-
-    SLANG_PASS(fixEntryPointCallsites);
 
     // Replace any global constants with their values.
     //
@@ -1036,7 +1028,7 @@ Result linkAndOptimizeIR(
     //
     // Counter ops carry source position on their built-in `sourceLoc`,
     // so this pass is independent of debug-info state. It writes its
-    // slot → source mapping into `metadata`, exposed to hosts via
+    // source-entry mapping into `metadata`, exposed to hosts via
     // ICoverageTracingMetadata.
     if (requiredLoweringPassSet.coverageTracing)
     {
@@ -1953,6 +1945,18 @@ Result linkAndOptimizeIR(
         SLANG_PASS(resolveTextureFormat);
         break;
     }
+
+    // Specialization can expose references to global varying builtins that were
+    // previously hidden behind generic/interface dispatch. Translate all global
+    // varying inputs/outputs now, after specialization, but before target
+    // entry-point legalization.
+    if (requiredLoweringPassSet.globalVaryingVar)
+        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
+
+    if (requiredLoweringPassSet.resolveVaryingInputRef)
+        SLANG_PASS(resolveVaryingInputRef);
+
+    SLANG_PASS(fixEntryPointCallsites);
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
