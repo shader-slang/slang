@@ -13,6 +13,8 @@ namespace Slang
 //
 // This pass rewrites pointer-typed struct fields to UIntPtr (which emits as
 // `ulong` on Metal) and inserts CastIntToPtr/CastPtrToInt at access sites.
+// It covers structs used in ConstantBuffer, ParameterBlock, and
+// RWStructuredBuffer element types.
 //
 // For storage buffers (RWStructuredBuffer<T*>), the buffer's element type
 // itself is a pointer, so the pass also rewrites the element type of the
@@ -40,16 +42,17 @@ namespace Slang
 // ## Instruction coverage
 //
 // Only load and store instructions on rewritten field addresses need casts.
-// Atomic instructions on pointer-typed fields are not supported on Metal.
 //
 // ## Relationship to the early ParameterBlock pass
 //
 // The early pass (MetalParameterBlockElementTypeLoweringPolicy in
-// slang-ir-lower-buffer-element-type.cpp) handles pointer lowering in
-// ParameterBlock (argument buffer) structs.  It must run early because
-// argument buffer layout is finalized before type legalization.  This late
-// pass handles ConstantBuffer and StorageBuffer, which don't have the same
-// early-layout constraint.
+// slang-ir-lower-buffer-element-type.cpp) converts resource-typed fields
+// (Texture2D, RWStructuredBuffer, etc.) in ParameterBlock structs into
+// DescriptorHandle wrappers.  It must run early to prevent the resource
+// legalization pass from hoisting resources out of argument buffer structs.
+// It does NOT handle pointer fields — those pass through unchanged and
+// are caught by this late pass via the IRParameterBlockType check in
+// collectStructsToLower.
 //
 // ## Why UIntPtrType instead of UInt64Type
 //
@@ -84,7 +87,7 @@ struct MetalBufferPointerLoweringContext
 
     IRType* getUIntPtrType() { return builder.getType(kIROp_UIntPtrType); }
 
-    // --- ConstantBuffer struct field lowering ---
+    // --- Buffer struct field lowering ---
 
     Dictionary<IRStructType*, List<FieldLoweringInfo>> collectStructsToLower()
     {
@@ -96,18 +99,19 @@ struct MetalBufferPointerLoweringContext
             if (!structType)
                 continue;
 
-            bool usedInConstantBuffer = false;
+            bool usedInBuffer = false;
             for (auto use = structType->firstUse; use; use = use->nextUse)
             {
                 auto user = use->getUser();
-                if (as<IRConstantBufferType>(user) || as<IRParameterBlockType>(user))
+                if (as<IRConstantBufferType>(user) || as<IRParameterBlockType>(user) ||
+                    as<IRHLSLStructuredBufferTypeBase>(user))
                 {
-                    usedInConstantBuffer = true;
+                    usedInBuffer = true;
                     break;
                 }
             }
 
-            if (!usedInConstantBuffer)
+            if (!usedInBuffer)
                 continue;
 
             List<FieldLoweringInfo> fieldsToLower;
@@ -186,6 +190,7 @@ struct MetalBufferPointerLoweringContext
                 continue;
 
             auto origElemType = elemType;
+            // Safe during iteration: setOperand does not move the inst in the global list.
             bufType->setOperand(0, uintPtrType);
 
             // Walk the use chain of the buffer type to find global variables
