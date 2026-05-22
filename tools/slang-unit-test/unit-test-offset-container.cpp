@@ -236,4 +236,29 @@ SLANG_UNIT_TEST(offsetContainer)
         Offset32Ptr<uint8_t> pastEndPtr(uint32_t(sizeof(data)));
         SLANG_CHECK(base.asRaw(pastEndPtr) == nullptr);
     }
+
+    // _getRaw early-return on null m_data: a default-constructed MemoryOffsetBase
+    // has m_data == nullptr; asRaw on any non-null offset must return nullptr
+    // without dereferencing.
+    {
+        MemoryOffsetBase emptyBase;
+        Offset32Ptr<uint32_t> ptr(kStartOffset);
+        SLANG_CHECK(emptyBase.asRaw(ptr) == nullptr);
+    }
+
+    // Offset32Array::operator[] positive coverage at 0 and count-1.
+    // The bounds check is a SLANG_RELEASE_ASSERT; this test would trip the
+    // assert if the check were ever inverted (e.g. `<=` instead of `<`).
+    {
+        OffsetContainer container;
+        auto& base = container.asBase();
+        auto arr = container.newArray<uint32_t>(3);
+
+        base[arr[0]] = 100u;
+        base[arr[1]] = 200u;
+        base[arr[2]] = 300u;
+
+        SLANG_CHECK(base[arr[0]] == 100u);
+        SLANG_CHECK(base[arr[2]] == 300u);
+    }
 }

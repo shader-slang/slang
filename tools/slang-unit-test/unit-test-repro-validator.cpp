@@ -358,4 +358,26 @@ SLANG_UNIT_TEST(reproStateValidator)
             SLANG_CHECK(isReproStateValid(buf));
         }
     }
+
+    // 20. ReproUtil::getRequest size-guard boundary: N-1 / N / N+1, where
+    // N = kStartOffset + sizeof(RequestState). Locks in the unconditional
+    // minimum-size check getRequest applies before casting the payload.
+    {
+        const size_t N = kStartOffset + sizeof(ReproUtil::RequestState);
+
+        List<uint8_t> tooSmall;
+        tooSmall.setCount(N - 1);
+        memset(tooSmall.getBuffer(), 0, tooSmall.getCount());
+        SLANG_CHECK(ReproUtil::getRequest(tooSmall) == nullptr);
+
+        List<uint8_t> exact;
+        exact.setCount(N);
+        memset(exact.getBuffer(), 0, exact.getCount());
+        SLANG_CHECK(ReproUtil::getRequest(exact) != nullptr);
+
+        List<uint8_t> oversize;
+        oversize.setCount(N + 1);
+        memset(oversize.getBuffer(), 0, oversize.getCount());
+        SLANG_CHECK(ReproUtil::getRequest(oversize) != nullptr);
+    }
 }
