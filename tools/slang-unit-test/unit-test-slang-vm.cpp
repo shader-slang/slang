@@ -3,6 +3,7 @@
 #include "core/slang-memory-file-system.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
+#include "slang/slang-vm-bytecode.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
@@ -10,6 +11,77 @@
 #include <string.h>
 
 using namespace Slang;
+
+struct MinimalVMByteCode
+{
+    List<uint8_t> data;
+    uint32_t functionOffsetOffset = 0;
+    uint32_t functionHeaderOffset = 0;
+    uint32_t stringOffsetOffset = 0;
+};
+
+template<typename T>
+static void appendValue(List<uint8_t>& data, const T& value)
+{
+    data.addRange(reinterpret_cast<const uint8_t*>(&value), sizeof(value));
+}
+
+static void patchUInt32(List<uint8_t>& data, uint32_t offset, uint32_t value)
+{
+    memcpy(data.getBuffer() + offset, &value, sizeof(value));
+}
+
+static MinimalVMByteCode makeMinimalVMByteCode()
+{
+    MinimalVMByteCode result;
+
+    appendValue(result.data, kSlangByteCodeFourCC);
+    appendValue(result.data, kSlangByteCodeVersion);
+
+    appendValue(result.data, kSlangByteCodeFunctionsFourCC);
+    uint32_t functionSectionSizeOffset = (uint32_t)result.data.getCount();
+    appendValue(result.data, uint32_t(0));
+
+    appendValue(result.data, uint32_t(1));
+    result.functionOffsetOffset = (uint32_t)result.data.getCount();
+    appendValue(result.data, uint32_t(0));
+
+    result.functionHeaderOffset = (uint32_t)result.data.getCount();
+    patchUInt32(result.data, result.functionOffsetOffset, result.functionHeaderOffset);
+
+    VMFuncHeader funcHeader = {};
+    funcHeader.name.sectionId = kSlangByteCodeSectionStrings;
+    funcHeader.name.offset = 0;
+    funcHeader.codeSize = sizeof(VMInstHeader);
+    appendValue(result.data, funcHeader);
+
+    VMInstHeader retInst = {};
+    retInst.opcode = VMOp::Ret;
+    appendValue(result.data, retInst);
+
+    uint32_t functionSectionSize =
+        (uint32_t)result.data.getCount() - functionSectionSizeOffset - sizeof(uint32_t);
+    patchUInt32(result.data, functionSectionSizeOffset, functionSectionSize);
+
+    appendValue(result.data, kSlangByteCodeKernelBlobFourCC);
+    appendValue(result.data, uint32_t(0));
+
+    const char functionName[] = "main";
+    appendValue(result.data, kSlangByteCodeConstantsFourCC);
+    appendValue(result.data, uint32_t(sizeof(functionName)));
+    appendValue(result.data, uint32_t(1));
+    result.stringOffsetOffset = (uint32_t)result.data.getCount();
+    appendValue(result.data, uint32_t(0));
+    result.data.addRange(reinterpret_cast<const uint8_t*>(functionName), sizeof(functionName));
+
+    return result;
+}
+
+static SlangResult initVMModuleForTest(List<uint8_t>& data)
+{
+    VMModuleView moduleView = {};
+    return initVMModule(data.getBuffer(), (uint32_t)data.getCount(), &moduleView);
+}
 
 SLANG_UNIT_TEST(slangVM)
 {
@@ -100,6 +172,29 @@ SLANG_UNIT_TEST(slangVM)
     int* returnVal = (int*)runner->getReturnValue(&returnValSize);
     SLANG_CHECK(returnValSize == sizeof(int));
     SLANG_CHECK(*returnVal == 100);
+}
+
+SLANG_UNIT_TEST(slangVMRejectMalformedByteCodeOffsets)
+{
+    auto validByteCode = makeMinimalVMByteCode();
+    SLANG_CHECK(initVMModuleForTest(validByteCode.data) == SLANG_OK);
+
+    auto invalidFunctionOffset = makeMinimalVMByteCode();
+    patchUInt32(
+        invalidFunctionOffset.data,
+        invalidFunctionOffset.functionOffsetOffset,
+        (uint32_t)invalidFunctionOffset.data.getCount() + sizeof(VMFuncHeader));
+    SLANG_CHECK(SLANG_FAILED(initVMModuleForTest(invalidFunctionOffset.data)));
+
+    auto invalidFunctionName = makeMinimalVMByteCode();
+    auto funcHeader = reinterpret_cast<VMFuncHeader*>(
+        invalidFunctionName.data.getBuffer() + invalidFunctionName.functionHeaderOffset);
+    funcHeader->name.offset = 1;
+    SLANG_CHECK(SLANG_FAILED(initVMModuleForTest(invalidFunctionName.data)));
+
+    auto invalidStringOffset = makeMinimalVMByteCode();
+    patchUInt32(invalidStringOffset.data, invalidStringOffset.stringOffsetOffset, UINT32_MAX);
+    SLANG_CHECK(SLANG_FAILED(initVMModuleForTest(invalidStringOffset.data)));
 }
 
 struct ExtCallState
