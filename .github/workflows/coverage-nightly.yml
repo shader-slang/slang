@@ -84,39 +84,24 @@ jobs:
 
       - name: Organize Coverage Data
         run: |
-          # Create organized structure
+          # Stage the per-OS summary JSON next to where the renderer step
+          # below expects it. The renderer reads its primary inputs (LCOV
+          # + auth-summary text) directly from the coverage-artifacts/
+          # layout downloaded above; here we only need to mirror the
+          # per-OS coverage-summary.json into coverage-reports/<os>/ for
+          # the landing-page generator.
           mkdir -p coverage-reports/{linux,macos,windows}
-
-          # Extract Linux coverage
-          if [ -d "coverage-artifacts/coverage-linux-x86_64" ]; then
-            cp coverage-artifacts/coverage-linux-x86_64/coverage-summary.json coverage-reports/linux/
-            cp -r coverage-artifacts/coverage-linux-x86_64/coverage-html coverage-reports/linux/
-            if [ -d "coverage-artifacts/coverage-linux-x86_64/coverage-html-slangc" ]; then
-              cp -r coverage-artifacts/coverage-linux-x86_64/coverage-html-slangc coverage-reports/linux/
+          for os_artifact in coverage-linux-x86_64 coverage-macos-aarch64 coverage-windows-x86_64; do
+            case "$os_artifact" in
+              coverage-linux-*)   os=linux   ;;
+              coverage-macos-*)   os=macos   ;;
+              coverage-windows-*) os=windows ;;
+            esac
+            src=coverage-artifacts/$os_artifact/coverage-summary.json
+            if [ -f "$src" ]; then
+              cp "$src" coverage-reports/$os/
             fi
-          fi
-
-          # Extract macOS coverage
-          if [ -d "coverage-artifacts/coverage-macos-aarch64" ]; then
-            cp coverage-artifacts/coverage-macos-aarch64/coverage-summary.json coverage-reports/macos/
-            cp -r coverage-artifacts/coverage-macos-aarch64/coverage-html coverage-reports/macos/
-            if [ -d "coverage-artifacts/coverage-macos-aarch64/coverage-html-slangc" ]; then
-              cp -r coverage-artifacts/coverage-macos-aarch64/coverage-html-slangc coverage-reports/macos/
-            fi
-          fi
-
-          # Extract Windows coverage. OpenCppCoverage does not produce a
-          # slangc-only HTML report on Windows (would require a second test
-          # pass with --excluded_sources baked in, doubling test-run time);
-          # the slangc LCOV is still captured and its totals flow through
-          # the JSON summary.
-          if [ -d "coverage-artifacts/coverage-windows-x86_64" ]; then
-            cp coverage-artifacts/coverage-windows-x86_64/coverage-summary.json coverage-reports/windows/
-            cp -r coverage-artifacts/coverage-windows-x86_64/coverage-html coverage-reports/windows/
-            if [ -f "coverage-artifacts/coverage-windows-x86_64/coverage-slangc.lcov" ]; then
-              cp coverage-artifacts/coverage-windows-x86_64/coverage-slangc.lcov coverage-reports/windows/
-            fi
-          fi
+          done
 
           echo "Organized coverage data:"
           ls -R coverage-reports/
@@ -285,6 +270,12 @@ jobs:
                       #          <branches> <missed_b> <b_cov>
                       p = line.split()
                       if len(p) < 13:
+                          print(
+                              f"merged-summary: malformed TOTAL line in {path} "
+                              f"({len(p)} fields, expected >=13). Merged row "
+                              f"will be omitted from the landing page.",
+                              file=sys.stderr,
+                          )
                           return None
                       def n(s):
                           try: return int(s)
@@ -309,6 +300,11 @@ jobs:
                           "branches_hit": b_tot - b_miss,
                           "branches_found": b_tot,
                       }
+              print(
+                  f"merged-summary: no TOTAL line in {path}. Merged row "
+                  f"will be omitted from the landing page.",
+                  file=sys.stderr,
+              )
               return None
 
           out = {
@@ -331,6 +327,23 @@ jobs:
 
           echo "Renderer outputs:"
           find coverage-reports -maxdepth 6 -name index.html -printf '  %p\n' | sort
+
+          # Fail loudly if no per-OS full HTML survived the render. The
+          # deploy step below copies $os/new-html/full/html/* into
+          # reports/latest/$os/; if those dirs are all empty we would
+          # otherwise silently commit blank per-OS landing pages.
+          rendered_any=false
+          for os in linux macos windows; do
+            if [ -f "coverage-reports/$os/new-html/full/html/index.html" ]; then
+              rendered_any=true
+              break
+            fi
+          done
+          if [ "$rendered_any" != "true" ]; then
+            echo "::error::No per-OS full HTML was produced by the renderer." >&2
+            echo "::error::Refusing to continue -- the deploy step would otherwise replace reports/latest/<os>/ with empty directories." >&2
+            exit 1
+          fi
 
       - name: Combine Platform Summaries
         run: |

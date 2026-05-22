@@ -200,7 +200,9 @@ if [[ -f "$COMBINED_SUMMARY" ]]; then
 
   # Headline badge uses the merged cross-OS number when available
   # (most comprehensive view), falling back to per-OS otherwise.
-  if [[ "$HAS_MERGED" == "true" ]]; then
+  # -n "$MERGED_LINE_COV" guards against the merged JSON existing but
+  # being incomplete (parse_total returned None).
+  if [[ "$HAS_MERGED" == "true" && -n "$MERGED_LINE_COV" ]]; then
     LINE_COV="$MERGED_LINE_COV"
     LINE_COLOR=$(get_badge_color "$LINE_COV")
   elif [[ "$HAS_LINUX" == "true" ]]; then
@@ -491,7 +493,10 @@ if [[ "$HAS_DATA" == "true" ]]; then
                 <tbody>
 EOF
 
-    if [[ "$HAS_MERGED" == "true" ]]; then
+    # Guard on -n "$MERGED_LINE_COV" too: HAS_MERGED only signals that
+    # coverage-summary.json exists, not that parse_total succeeded in
+    # writing coverage fields into it. Matches the slangc Merged row.
+    if [[ "$HAS_MERGED" == "true" && -n "$MERGED_LINE_COV" ]]; then
       merged_line_class=$(get_badge_color "$MERGED_LINE_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
       merged_function_class=$(get_badge_color "$MERGED_FUNCTION_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
       merged_branch_class=$(get_badge_color "$MERGED_BRANCH_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
