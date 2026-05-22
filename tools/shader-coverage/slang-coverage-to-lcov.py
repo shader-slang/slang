@@ -243,11 +243,10 @@ def main():
     for source in sorted(sources):
         out.write(f"SF:{source}\n")
         functions = functions_by_source[source]
-        for function_name, (line, _) in sorted(
-            functions.items(), key=lambda item: (item[1][0], item[0])
-        ):
+        function_sort_key = lambda item: (item[1][0], item[0])
+        for function_name, (line, _) in sorted(functions.items(), key=function_sort_key):
             out.write(f"FN:{line},{function_name}\n")
-        for function_name, (_, count) in sorted(functions.items()):
+        for function_name, (_, count) in sorted(functions.items(), key=function_sort_key):
             out.write(f"FNDA:{count},{function_name}\n")
         if functions:
             out.write(f"FNF:{len(functions)}\n")

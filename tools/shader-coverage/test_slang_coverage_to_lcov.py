@@ -231,6 +231,56 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         )
         self.assertEqual(result.stderr, "")
 
+    def test_emits_multiple_functions_with_stable_ordering(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 3,
+            "entries": [
+                {
+                    "kind": "function",
+                    "counter": 0,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 10,
+                    "function": "zeta",
+                },
+                {
+                    "kind": "function",
+                    "counter": 1,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 20,
+                    "function": "beta",
+                },
+                {
+                    "kind": "function",
+                    "counter": 2,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 20,
+                    "function": "alpha",
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "3 0 5\n")
+
+        self.assertEqual(
+            result.stdout,
+            "TN:shader_coverage\n"
+            "SF:shader.slang\n"
+            "FN:10,zeta\n"
+            "FN:20,alpha\n"
+            "FN:20,beta\n"
+            "FNDA:3,zeta\n"
+            "FNDA:5,alpha\n"
+            "FNDA:0,beta\n"
+            "FNF:3\n"
+            "FNH:2\n"
+            "end_of_record\n",
+        )
+        self.assertEqual(result.stderr, "")
+
     def test_skips_v2_function_entries_without_names(self):
         manifest = {
             "version": 2,
